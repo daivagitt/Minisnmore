@@ -37,6 +37,9 @@ artifacts/cr-*.md
 **/*-tokens.env
 artifacts/reports-site-tmp/
 
+# Local git bundle for offline push (not part of the repo)
+artifacts/*.bundle
+
 # CI: k6 metrics are merged into artifacts/postman/index.html (no standalone HTML tab)
 artifacts/load/index.html
 
