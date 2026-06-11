@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+    <!-- Canonical homepage blocks (prod skips faker CSV). -->
+    <changeSet id="20260528130000-1" author="minisandmore">
+        <sql dbms="postgresql">
+            INSERT INTO home_section (id, section_key, title, subtitle, enabled, sort_order, payload_json)
+            VALUES
+                (nextval('sequence_generator'), 'hero', 'Minis today, memories forever.', 'Heirloom-quality clothing for the first 24 months.', true, 10, '{}'),
+                (nextval('sequence_generator'), 'by_age', 'Shop by age', 'Sized to baby, not to a guess.', true, 20, '{"cards":[]}'),
+                (nextval('sequence_generator'), 'best_sellers', 'Best sellers', 'Loved by our families.', true, 30, '{"product_slugs":[]}'),
+                (nextval('sequence_generator'), 'trending', 'Trending now', 'What''s catching eyes this week.', true, 40, '{"product_slugs":[]}'),
+                (nextval('sequence_generator'), 'new_arrivals', 'New arrivals', 'Fresh in this season.', true, 50, '{"product_slugs":[]}'),
+                (nextval('sequence_generator'), 'featured', 'Featured', 'Editor''s picks.', true, 60, '{"product_slugs":[]}'),
+                (nextval('sequence_generator'), 'journal_strip', 'From the journal', 'Soft mornings, gentle reads.', true, 70, '{}'),
+                (nextval('sequence_generator'), 'gifts', 'Gifts', null, true, 80, '{}')
+            ON CONFLICT (section_key) DO NOTHING;
+        </sql>
+    </changeSet>
+</databaseChangeLog>

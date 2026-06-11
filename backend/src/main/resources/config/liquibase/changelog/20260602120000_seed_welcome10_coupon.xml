@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Storefront promotes WELCOME10 (10% off first order). Re-seed after DB truncate.
+    -->
+    <changeSet id="20260602120000-1" author="cursor">
+        <sql dbms="postgresql">
+            INSERT INTO coupon (
+                id, code, discount_type, discount_value, min_order, max_discount, expires_at, active
+            )
+            SELECT
+                nextval('sequence_generator'),
+                'WELCOME10',
+                'PERCENT',
+                10,
+                0,
+                NULL,
+                NULL,
+                true
+            WHERE NOT EXISTS (SELECT 1 FROM coupon WHERE UPPER(code) = 'WELCOME10');
+
+            UPDATE coupon
+            SET
+                discount_type = 'PERCENT',
+                discount_value = 10,
+                min_order = 0,
+                active = true
+            WHERE UPPER(code) = 'WELCOME10';
+        </sql>
+    </changeSet>
+</databaseChangeLog>

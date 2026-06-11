@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+    <changeSet id="20260528150000-1" author="minisandmore">
+        <sql dbms="postgresql">
+            UPDATE policy
+            SET body = 'Placeholder policy body. Edit in Admin → Policies.'
+            WHERE body IS NULL
+               OR body LIKE '../fake-data/%'
+               OR trim(body) = '';
+        </sql>
+    </changeSet>
+</databaseChangeLog>

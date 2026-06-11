@@ -1,0 +1,22 @@
+{
+  "generator-jhipster": {
+    "applicationType": "gateway",
+    "authenticationType": "jwt",
+    "baseName": "gateway",
+    "buildTool": "maven",
+    "creationTimestamp": 1780467326140,
+    "entities": [],
+    "jhipsterVersion": "9.0.0",
+    "jwtSecretKey": "NWNhYWRmODZlZDAzNzg4NGY2NTA0MzAyZTdjNjI2ZjYzYWI2YmQ3Yjk4ZDA5NGVkODNhYWY2ZmExOTJmZjA3YmJhNDdiYTYxMTdjZmM2ZWUyMmMwMzQyMTY1NDBjNTc5ODg4MjNkZjExODFmZjUwNDdlNjVhOTlhMWE5MjRjYTU=",
+    "languages": ["en"],
+    "messageBroker": "no",
+    "monorepository": true,
+    "nativeLanguage": "en",
+    "packageName": "com.miniandmore.gateway",
+    "reactive": true,
+    "serverPort": 8080,
+    "serviceDiscoveryType": "consul",
+    "skipClient": true,
+    "skipCommitHook": true
+  }
+}

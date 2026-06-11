@@ -1,0 +1,86 @@
+{
+  "id": "f6253a98-a22e-4651-9647-278e07a2e7a4",
+  "name": "Minis n More \u2014 API testing (UAT)",
+  "values": [
+    {
+      "key": "activationKey",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "baseUrl",
+      "value": "https://uat.minisnmore.com",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "email",
+      "value": "admin@uat.minisnmore.com",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "id",
+      "value": "1",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "key",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "login",
+      "value": "admin",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "newPassword",
+      "value": "admin",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "orderNumber",
+      "value": "{{id}}",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "password",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "resetKey",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "slug",
+      "value": "{{id}}",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "username",
+      "value": "{{email}}",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment",
+  "_postman_exported_using": "generate-module-wise-collection.py"
+}

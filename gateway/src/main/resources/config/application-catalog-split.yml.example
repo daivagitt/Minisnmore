@@ -1,0 +1,31 @@
+# Example gateway routes AFTER catalog is split into store + commerce + integration.
+# Copy predicates into application.yml (dev) and Consul central config (prod).
+# More specific routes must appear BEFORE the catch-all store route.
+
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: miniandmore-integration-api
+              uri: lb://miniandmore-integration
+              predicates:
+                - Path=/api/v1/admin/zoho/**,/api/v1/admin/zoho-settings
+              metadata:
+                response-timeout: 120000
+                connect-timeout: 5000
+            - id: miniandmore-commerce-api
+              uri: lb://miniandmore-commerce
+              predicates:
+                - Path=/api/v1/orders/**,/api/v1/account/**,/api/v1/payments,/api/v1/coupons/**,/api/v1/order-returns/**,/api/v1/admin/order-returns/**,/api/v1/admin/dashboard
+              metadata:
+                response-timeout: 120000
+                connect-timeout: 5000
+            - id: miniandmore-store-api
+              uri: lb://miniandmore-store
+              predicates:
+                - Path=/api/v1/**
+              metadata:
+                response-timeout: 120000
+                connect-timeout: 5000

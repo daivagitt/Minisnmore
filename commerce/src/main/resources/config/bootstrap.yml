@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: miniandmore-commerce
+  cloud:
+    consul:
+      config:
+        fail-fast: false
+      host: localhost
+      port: 8500
+  docker:
+    compose:
+      enabled: false

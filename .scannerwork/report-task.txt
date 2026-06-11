@@ -1,0 +1,6 @@
+projectKey=frontend
+serverUrl=http://127.0.0.1:9000/sonar
+serverVersion=25.5.0.107428
+dashboardUrl=http://127.0.0.1:9000/sonar/dashboard?id=frontend
+ceTaskId=5a0c5111-9366-4037-9827-c5d2b55ac0db
+ceTaskUrl=http://127.0.0.1:9000/sonar/api/ce/task?id=5a0c5111-9366-4037-9827-c5d2b55ac0db

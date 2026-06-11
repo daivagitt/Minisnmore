@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+    <changeSet id="20260528140000-1" author="minisandmore">
+        <sql dbms="postgresql">
+            UPDATE home_section
+            SET payload_json = '{}'
+            WHERE payload_json IS NULL
+               OR payload_json LIKE '../fake-data/%'
+               OR trim(payload_json) = '';
+        </sql>
+    </changeSet>
+</databaseChangeLog>

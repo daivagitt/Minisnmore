@@ -1,0 +1,34 @@
+# Isolated UAT microservices stack (store :9181, commerce :9182, integration :9183). Does not use the monolith on :8081.
+# OAuth: non-empty defaults let the JVM start when uat.env has APPLE_CLIENT_ID= (unused on UAT).
+# Real GOOGLE_* / FACEBOOK_* from /etc/mini-and-more/uat.env override these for social login.
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:uat-isolated-placeholder}
+            client-secret: ${GOOGLE_CLIENT_SECRET:uat-isolated-placeholder}
+          apple:
+            client-id: ${APPLE_CLIENT_ID:uat-isolated-placeholder}
+            client-secret: ${APPLE_CLIENT_SECRET:uat-isolated-placeholder}
+          facebook:
+            client-id: ${FACEBOOK_CLIENT_ID:uat-isolated-placeholder}
+            client-secret: ${FACEBOOK_CLIENT_SECRET:uat-isolated-placeholder}
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: miniandmore-integration-api
+              uri: http://127.0.0.1:9183
+              predicates:
+                - Path=/api/v1/admin/zoho/**,/api/v1/admin/zoho-settings
+            - id: miniandmore-commerce-api
+              uri: http://127.0.0.1:9182
+              predicates:
+                - Path=/api/v1/orders/**,/api/v1/account/**,/api/v1/payments,/api/v1/coupons/**,/api/v1/order-returns/**,/api/v1/admin/order-returns/**
+            - id: miniandmore-store-api
+              uri: http://127.0.0.1:9181
+              predicates:
+                - Path=/api/v1/**

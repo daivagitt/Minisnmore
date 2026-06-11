@@ -1,0 +1,6 @@
+projectKey=mnm-backend
+serverUrl=http://127.0.0.1:9000/sonar
+serverVersion=25.5.0.107428
+dashboardUrl=http://127.0.0.1:9000/sonar/dashboard?id=mnm-backend
+ceTaskId=dd87a41c-86ba-44d3-bdea-1d9f23651841
+ceTaskUrl=http://127.0.0.1:9000/sonar/api/ce/task?id=dd87a41c-86ba-44d3-bdea-1d9f23651841

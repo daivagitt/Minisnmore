@@ -1,0 +1,139 @@
+// Store / CMS microservice — generate into store/ (applicationType microservice).
+// Public + admin content; coupons master data. No orders, no Zoho.
+
+application {
+  config {
+    baseName miniandmoreStore
+    applicationType microservice
+    packageName com.miniandmore.store
+    databaseType sql
+    devDatabaseType postgresql
+    prodDatabaseType postgresql
+    build maven
+    serviceDiscoveryType consul
+    searchEngine false
+    messageBroker false
+    cacheProvider redis
+    enableHibernateCache false
+    clientFramework no
+    skipUserManagement true
+  }
+  entities Category, Product, BlogPost, Banner, HomeSection, PageVisibility, SiteSetting, Policy, Coupon
+}
+
+entity Category {
+  slug String required unique minlength(1) maxlength(160)
+  name String required minlength(1) maxlength(160)
+  description TextBlob
+  imageUrl String maxlength(600)
+  sortOrder Integer required min(0)
+  active Boolean required
+}
+
+entity Product {
+  slug String required unique minlength(1) maxlength(180)
+  name String required minlength(1) maxlength(200)
+  sku String unique maxlength(120)
+  fabricType String maxlength(120)
+  description TextBlob
+  story TextBlob
+  price BigDecimal required min(0)
+  compareAtPrice BigDecimal min(0)
+  currency String required minlength(3) maxlength(3)
+  ageMinMonths Integer min(0)
+  ageMaxMonths Integer min(0)
+  sizesJson TextBlob
+  colorsJson TextBlob
+  imagesJson TextBlob
+  badge String maxlength(80)
+  stock Integer required min(0)
+  sortOrder Integer required min(0)
+  featured Boolean required
+  trending Boolean required
+  newArrival Boolean required
+  bestSeller Boolean required
+  active Boolean required
+}
+
+entity BlogPost {
+  slug String required unique minlength(1) maxlength(180)
+  title String required minlength(1) maxlength(220)
+  excerpt TextBlob
+  content TextBlob
+  coverUrl String maxlength(600)
+  published Boolean required
+  publishedAt Instant
+}
+
+entity Banner {
+  title String required minlength(1) maxlength(180)
+  subtitle String maxlength(260)
+  imageUrl String maxlength(600)
+  linkUrl String maxlength(600)
+  ctaLabel String maxlength(80)
+  sortOrder Integer required min(0)
+  active Boolean required
+}
+
+entity HomeSection {
+  sectionKey String required unique minlength(1) maxlength(120)
+  title String maxlength(180)
+  subtitle String maxlength(260)
+  enabled Boolean required
+  sortOrder Integer required min(0)
+  payloadJson TextBlob
+}
+
+entity PageVisibility {
+  pageKey String required unique minlength(1) maxlength(120)
+  visible Boolean required
+}
+
+entity SiteSetting {
+  brandName String required minlength(1) maxlength(160)
+  careLabel String maxlength(180)
+  contactEmail String maxlength(180)
+  contactPhone String maxlength(40)
+  ecatalogueLabel String maxlength(120)
+  ecatalogueUrl String maxlength(600)
+  facebookUrl String maxlength(600)
+  footerCopyright String maxlength(260)
+  footerTagline String maxlength(260)
+  instagramUrl String maxlength(600)
+  legalEntityName String maxlength(180)
+  logoHorizontalUrl String maxlength(600)
+  logoUrl String maxlength(600)
+  twitterUrl String maxlength(600)
+  whatsappNumber String maxlength(60)
+  youtubeUrl String maxlength(600)
+}
+
+entity Policy {
+  slug String required unique minlength(1) maxlength(160)
+  title String required minlength(1) maxlength(220)
+  body TextBlob
+}
+
+enum DiscountType {
+  PERCENT,
+  FLAT
+}
+
+entity Coupon {
+  code String required unique minlength(1) maxlength(64)
+  discountType DiscountType required
+  discountValue BigDecimal required min(0)
+  minOrder BigDecimal required min(0)
+  maxDiscount BigDecimal min(0)
+  expiresAt Instant
+  active Boolean required
+}
+
+relationship ManyToOne {
+  Product{category(name)} to Category
+}
+
+paginate Category, Product, BlogPost, Banner, HomeSection, PageVisibility, SiteSetting, Policy, Coupon with pagination
+dto * with mapstruct
+service * with serviceClass
+filter *

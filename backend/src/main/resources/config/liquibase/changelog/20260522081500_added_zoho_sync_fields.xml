@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260522081500-1" author="cursor">
+        <addColumn tableName="product">
+            <column name="zoho_item_id" type="varchar(120)"/>
+            <column name="zoho_sync_status" type="varchar(20)"/>
+            <column name="zoho_last_synced_at" type="${datetimeType}"/>
+            <column name="zoho_sync_error" type="varchar(1000)"/>
+        </addColumn>
+        <addUniqueConstraint tableName="product" columnNames="zoho_item_id" constraintName="ux_product__zoho_item_id"/>
+        <createIndex tableName="product" indexName="idx_product__zoho_sync_status">
+            <column name="zoho_sync_status"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="20260522081500-2" author="cursor">
+        <addColumn tableName="customer_order">
+            <column name="zoho_sales_order_id" type="varchar(120)"/>
+            <column name="zoho_invoice_id" type="varchar(120)"/>
+            <column name="zoho_sync_status" type="varchar(20)"/>
+            <column name="zoho_last_synced_at" type="${datetimeType}"/>
+            <column name="zoho_sync_error" type="varchar(1000)"/>
+        </addColumn>
+        <addUniqueConstraint tableName="customer_order" columnNames="zoho_sales_order_id" constraintName="ux_customer_order__zoho_sales_order_id"/>
+        <createIndex tableName="customer_order" indexName="idx_customer_order__zoho_sync_status">
+            <column name="zoho_sync_status"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

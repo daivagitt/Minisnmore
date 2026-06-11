@@ -1,0 +1,55 @@
+{
+  "annotations": {
+    "changelogDate": "20260603061814"
+  },
+  "applications": ["*"],
+  "clientRootFolder": "miniandmore",
+  "databaseType": "sql",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "slug",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "unique", "minlength", "maxlength"],
+      "fieldValidateRulesMaxlength": "180",
+      "fieldValidateRulesMinlength": "1"
+    },
+    {
+      "fieldName": "title",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "minlength", "maxlength"],
+      "fieldValidateRulesMaxlength": "220",
+      "fieldValidateRulesMinlength": "1"
+    },
+    {
+      "fieldName": "excerpt",
+      "fieldType": "TextBlob"
+    },
+    {
+      "fieldName": "content",
+      "fieldType": "TextBlob"
+    },
+    {
+      "fieldName": "coverUrl",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "600"
+    },
+    {
+      "fieldName": "published",
+      "fieldType": "Boolean",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "publishedAt",
+      "fieldType": "Instant"
+    }
+  ],
+  "jpaMetamodelFiltering": true,
+  "microserviceName": "miniandmore",
+  "name": "BlogPost",
+  "pagination": "pagination",
+  "relationships": [],
+  "searchEngine": "no",
+  "service": "serviceClass"
+}

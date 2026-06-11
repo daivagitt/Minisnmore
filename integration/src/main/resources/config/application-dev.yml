@@ -1,0 +1,60 @@
+spring:
+  cloud:
+    consul:
+      host: localhost
+      port: 8500
+  datasource:
+    type: com.zaxxer.hikari.HikariDataSource
+    url: jdbc:postgresql://localhost:5432/miniandmore
+    username: miniandmore
+    password:
+    hikari:
+      poolName: HikariIntegration
+      auto-commit: false
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+        implicit-strategy: org.springframework.boot.hibernate.autoconfigure.SpringImplicitNamingStrategy
+  liquibase:
+    enabled: false
+
+logging:
+  level:
+    com.miniandmore.integration: DEBUG
+
+jhipster:
+  security:
+    authentication:
+      jwt:
+        base64-secret: ${JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET:NWNhYWRmODZlZDAzNzg4NGY2NTA0MzAyZTdjNjI2ZjYzYWI2YmQ3Yjk4ZDA5NGVkODNhYWY2ZmExOTJmZjA3YmJhNDdiYTYxMTdjZmM2ZWUyMmMwMzQyMTY1NDBjNTc5ODg4MjNkZjExODFmZjUwNDdlNjVhOTlhMWE5MjRjYTU=}
+
+application:
+  internal-api-key: ${INTERNAL_API_KEY:dev-local-internal-key}
+  zoho:
+    sync-product-images: ${ZOHO_SYNC_PRODUCT_IMAGES:true}
+    sync-product-stock: ${ZOHO_SYNC_PRODUCT_STOCK:true}
+    pull-products-auto-create-category: ${ZOHO_PULL_PRODUCTS_AUTO_CREATE_CATEGORY:false}
+    default-location-id: ${ZOHO_DEFAULT_LOCATION_ID:}
+    default-location-name: ${ZOHO_DEFAULT_LOCATION_NAME:Head Office}
+    inventory-account-id: ${ZOHO_INVENTORY_ACCOUNT_ID:}
+    order-retry:
+      fixed-delay-ms: ${ZOHO_ORDER_RETRY_FIXED_DELAY_MS:600000}
+    order-tracking:
+      enabled: ${ZOHO_ORDER_TRACKING_ENABLED:true}
+      fixed-delay-ms: ${ZOHO_ORDER_TRACKING_FIXED_DELAY_MS:900000}
+    oauth:
+      homepage-url: ${ZOHO_OAUTH_HOMEPAGE_URL:http://localhost:5173}
+      redirect-uris:
+        - ${ZOHO_OAUTH_REDIRECT_URI:http://localhost:5173}
+        - ${ZOHO_OAUTH_ADMIN_REDIRECT_URI:http://localhost:5173/admin/zoho}
+      javascript-domains:
+        - ${ZOHO_OAUTH_JAVASCRIPT_DOMAIN:http://localhost:5173}
+        - ${ZOHO_OAUTH_JAVASCRIPT_DOMAIN_ALT:http://127.0.0.1:5173}
+      scopes: ${ZOHO_OAUTH_SCOPES:ZohoBooks.fullaccess.all}
+      client-id: ${ZOHO_CLIENT_ID:}
+      client-secret: ${ZOHO_CLIENT_SECRET:}
+      org-id: ${ZOHO_ORG_ID:}
+      default-data-center: ${ZOHO_DATA_CENTER:in}

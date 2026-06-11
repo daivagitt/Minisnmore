@@ -1,0 +1,19 @@
+# This configuration is intended for development purpose, it's **your** responsibility to harden it for production
+name: miniandmore
+services:
+  postgresql:
+    extends:
+      file: ./postgresql.yml
+      service: postgresql
+  redis:
+    extends:
+      file: ./redis.yml
+      service: redis
+  consul:
+    extends:
+      file: ./consul.yml
+      service: consul
+  consul-config-loader:
+    extends:
+      file: ./consul.yml
+      service: consul-config-loader

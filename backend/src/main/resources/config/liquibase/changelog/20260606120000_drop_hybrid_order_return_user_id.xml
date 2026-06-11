@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Hybrid UAT DBs may have user_id on order_return from an older schema while the app uses user_login only.
+        Align order_return with OrderReturn JPA entity (customer_order_id + user_login).
+    -->
+    <changeSet id="20260606120000-drop-hybrid-order-return-user-id" author="miniandmore">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="order_return"/>
+                <columnExists tableName="order_return" columnName="user_id"/>
+                <columnExists tableName="order_return" columnName="user_login"/>
+            </and>
+        </preConditions>
+        <sql dbms="postgresql">
+            UPDATE order_return r
+            SET user_login = LOWER(u.login)
+            FROM jhi_user u
+            WHERE r.user_id = u.id
+              AND (r.user_login IS NULL OR TRIM(r.user_login) = '');
+        </sql>
+        <dropForeignKeyConstraint baseTableName="order_return" constraintName="fk_order_return__user_id"/>
+        <dropColumn tableName="order_return" columnName="user_id"/>
+    </changeSet>
+
+</databaseChangeLog>

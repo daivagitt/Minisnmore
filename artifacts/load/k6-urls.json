@@ -1,0 +1,176 @@
+{
+  "baseUrl": "https://uat.minisnmore.com",
+  "adminAuthenticated": true,
+  "customerAuthenticated": true,
+  "endpointCount": 24,
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/account",
+      "openapiPath": "/api/account",
+      "module": "account-resource",
+      "auth": "admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/authenticate",
+      "openapiPath": "/api/authenticate",
+      "module": "authenticate-controller",
+      "auth": "admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/account/profile",
+      "openapiPath": "/api/v1/account/profile",
+      "module": "account-order-resource",
+      "auth": "customer"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/banners",
+      "openapiPath": "/api/v1/admin/banners",
+      "module": "admin-store-resource",
+      "auth": "admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/blog-posts",
+      "openapiPath": "/api/v1/admin/blog-posts",
+      "module": "admin-store-resource",
+      "auth": "admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/categories",
+      "openapiPath": "/api/v1/admin/categories",
+      "module": "admin-store-resource",
+      "auth": "admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/coupons",
+      "openapiPath": "/api/v1/admin/coupons",
+      "module": "admin-store-resource",
+      "auth": "admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/dashboard",
+      "openapiPath": "/api/v1/admin/dashboard",
+      "module": "admin-store-resource",
+      "auth": "admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/home-sections",
+      "openapiPath": "/api/v1/admin/home-sections",
+      "module": "admin-store-resource",
+      "auth": "admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/page-visibility",
+      "openapiPath": "/api/v1/admin/page-visibility",
+      "module": "admin-store-resource",
+      "auth": "admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/policies",
+      "openapiPath": "/api/v1/admin/policies",
+      "module": "admin-store-resource",
+      "auth": "admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/products",
+      "openapiPath": "/api/v1/admin/products",
+      "module": "admin-store-resource",
+      "auth": "admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/site-settings",
+      "openapiPath": "/api/v1/admin/site-settings",
+      "module": "admin-store-resource",
+      "auth": "admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/zoho-settings",
+      "openapiPath": "/api/v1/admin/zoho-settings",
+      "module": "admin-store-resource",
+      "auth": "admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/banners",
+      "openapiPath": "/api/v1/banners",
+      "module": "storefront-resource",
+      "auth": "none"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/blog-posts",
+      "openapiPath": "/api/v1/blog-posts",
+      "module": "storefront-resource",
+      "auth": "none"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/categories",
+      "openapiPath": "/api/v1/categories",
+      "module": "storefront-resource",
+      "auth": "none"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/home-sections",
+      "openapiPath": "/api/v1/home-sections",
+      "module": "storefront-resource",
+      "auth": "none"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orders",
+      "openapiPath": "/api/v1/orders",
+      "module": "account-order-resource",
+      "auth": "customer"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/page-visibility",
+      "openapiPath": "/api/v1/page-visibility",
+      "module": "storefront-resource",
+      "auth": "none"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payments",
+      "openapiPath": "/api/v1/payments",
+      "module": "account-order-resource",
+      "auth": "admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/products",
+      "openapiPath": "/api/v1/products",
+      "module": "storefront-resource",
+      "auth": "none"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/products/gift-set-5-piece",
+      "openapiPath": "/api/v1/products/{slug}",
+      "module": "storefront-resource",
+      "auth": "none"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/site-settings",
+      "openapiPath": "/api/v1/site-settings",
+      "module": "storefront-resource",
+      "auth": "none"
+    }
+  ]
+}

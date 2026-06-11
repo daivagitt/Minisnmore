@@ -1,0 +1,1 @@
+packageSearchIndex = [{"l":"All Packages","u":"allpackages-index.html"},{"l":"com.miniandmore.store"},{"l":"com.miniandmore.store.client"},{"l":"com.miniandmore.store.config"},{"l":"com.miniandmore.store.security"},{"l":"com.miniandmore.store.web"}];updateSearchResults();

@@ -1,0 +1,75 @@
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "name": "Minis n More — Auth (Local)",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "username",
+      "value": "you@example.com",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "password",
+      "value": "admin",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "email",
+      "value": "you@example.com",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "login",
+      "value": "you",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "firstName",
+      "value": "Test",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "lastName",
+      "value": "User",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "activationKey",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "resetKey",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "newPassword",
+      "value": "NewPass12",
+      "type": "secret",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment",
+  "_postman_exported_at": "2026-05-25T00:00:00.000Z",
+  "_postman_exported_using": "blossom-blueprint-craft"
+}

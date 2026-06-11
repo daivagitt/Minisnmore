@@ -1,0 +1,44 @@
+spring:
+  servlet:
+    multipart:
+      max-file-size: 8MB
+      max-request-size: 9MB
+  application:
+    name: miniandmore-store
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          authority-prefix: ''
+          authorities-claim-name: auth
+  cloud:
+    consul:
+      discovery:
+        healthCheckPath: /management/health
+        instanceId: miniandmore-store:${spring.application.instance-id:${random.value}}
+        service-name: miniandmore-store
+      config:
+        watch:
+          enabled: false
+
+server:
+  port: 8081
+
+management:
+  endpoints:
+    web:
+      base-path: /management
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
+application:
+  catalog-base-url: ${CATALOG_BASE_URL:http://127.0.0.1:8084}
+
+jhipster:
+  security:
+    authentication:
+      jwt:
+        base64-secret: ${JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET}

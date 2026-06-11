@@ -1,0 +1,42 @@
+# Shared infrastructure for local JHipster microservices (Consul + Postgres + Redis).
+# Start once before running gateway (8080) and miniandmore (8081):
+#   docker compose -f docker/microservices.yml up -d
+name: minisandmore-ms
+services:
+  consul:
+    image: hashicorp/consul:1.22.5
+    ports:
+      - "127.0.0.1:8500:8500"
+    command: consul agent -dev -ui -client 0.0.0.0 -log-level=INFO
+
+  postgresql-catalog:
+    image: postgres:18.3
+    environment:
+      POSTGRES_USER: miniandmore
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U miniandmore"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgresql-gateway:
+    image: postgres:18.3
+    environment:
+      POSTGRES_USER: gateway
+      POSTGRES_DB: gateway
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gateway"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:8.6.1
+    ports:
+      - "127.0.0.1:6379:6379"

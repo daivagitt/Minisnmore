@@ -1,0 +1,146 @@
+{
+  "info": {
+    "name": "Minis n More — Auth",
+    "description": "Account activation, login, password reset. Import with postman-environment.local.json or postman-environment.uat.json.\n\nOrder: Register → Activate → Authenticate (sets authToken) → other calls.\nPassword reset: Reset init (plain email) → copy resetKey from email → Reset finish.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "1. Register",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"login\": \"{{login}}\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"firstName\": \"{{firstName}}\",\n  \"lastName\": \"{{lastName}}\",\n  \"langKey\": \"en\"\n}"
+        },
+        "url": "{{baseUrl}}/api/register"
+      }
+    },
+    {
+      "name": "2. Activate account",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/activate?key={{activationKey}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "activate"],
+          "query": [
+            {
+              "key": "key",
+              "value": "{{activationKey}}",
+              "description": "From activation email (param name must be 'key', not activationKey)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "3. Authenticate (login)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code >= 200 && pm.response.code < 300) {",
+              "  const json = pm.response.json();",
+              "  const token = json.id_token || json.idToken;",
+              "  if (token) {",
+              "    pm.environment.set('authToken', token);",
+              "    console.log('authToken saved');",
+              "  }",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\",\n  \"rememberMe\": true\n}"
+        },
+        "url": "{{baseUrl}}/api/authenticate"
+      }
+    },
+    {
+      "name": "4. Check authenticated (GET)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/authenticate"
+      }
+    },
+    {
+      "name": "5. Get account",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/account"
+      }
+    },
+    {
+      "name": "6. Reset password — init (send email)",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "text/plain" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{{email}}",
+          "options": { "raw": { "language": "text" } }
+        },
+        "description": "Body = plain text email only (not JSON). Use the same email as GET /api/account. User must be activated.",
+        "url": "{{baseUrl}}/api/account/reset-password/init"
+      }
+    },
+    {
+      "name": "7. Reset password — finish",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"key\": \"{{resetKey}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}"
+        },
+        "url": "{{baseUrl}}/api/account/reset-password/finish"
+      }
+    },
+    {
+      "name": "8. Change password (logged in)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"currentPassword\": \"{{password}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}"
+        },
+        "url": "{{baseUrl}}/api/account/change-password"
+      }
+    }
+  ]
+}

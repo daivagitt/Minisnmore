@@ -1,0 +1,30 @@
+{
+  "annotations": {
+    "changelogDate": "20260603061817"
+  },
+  "applications": ["*"],
+  "clientRootFolder": "miniandmore",
+  "databaseType": "sql",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "pageKey",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "unique", "minlength", "maxlength"],
+      "fieldValidateRulesMaxlength": "120",
+      "fieldValidateRulesMinlength": "1"
+    },
+    {
+      "fieldName": "visible",
+      "fieldType": "Boolean",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "jpaMetamodelFiltering": true,
+  "microserviceName": "miniandmore",
+  "name": "PageVisibility",
+  "pagination": "pagination",
+  "relationships": [],
+  "searchEngine": "no",
+  "service": "serviceClass"
+}

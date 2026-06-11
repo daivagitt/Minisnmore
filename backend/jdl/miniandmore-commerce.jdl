@@ -1,0 +1,109 @@
+// Commerce microservice — generate into commerce/ (applicationType microservice).
+// Orders, profile, returns. Calls store via Feign for stock and site settings.
+
+application {
+  config {
+    baseName miniandmoreCommerce
+    applicationType microservice
+    packageName com.miniandmore.commerce
+    databaseType sql
+    devDatabaseType postgresql
+    prodDatabaseType postgresql
+    build maven
+    serviceDiscoveryType consul
+    searchEngine false
+    messageBroker false
+    cacheProvider no
+    enableHibernateCache false
+    clientFramework no
+    skipUserManagement true
+    feignClient true
+  }
+  entities CustomerProfile, CustomerOrder, OrderItem, OrderReturn
+}
+
+entity CustomerProfile {
+  userLogin String required unique minlength(1) maxlength(50)
+  fullName String maxlength(120)
+  phone String maxlength(20)
+}
+
+enum OrderStatus {
+  PENDING,
+  CONFIRMED,
+  CANCELLED,
+  FULFILLED
+}
+
+enum PaymentStatus {
+  PENDING,
+  PAID,
+  FAILED,
+  REFUNDED
+}
+
+enum OrderReturnStatus {
+  REQUESTED,
+  APPROVED,
+  REJECTED,
+  RECEIVED,
+  REFUNDED,
+  CANCELLED
+}
+
+entity CustomerOrder {
+  userLogin String required minlength(1) maxlength(50)
+  orderNumber String required unique minlength(3) maxlength(40)
+  status OrderStatus required
+  paymentStatus PaymentStatus required
+  razorpayOrderId String maxlength(120)
+  razorpayPaymentId String maxlength(120)
+  razorpaySignature String maxlength(500)
+  subtotal BigDecimal required min(0)
+  discount BigDecimal required min(0)
+  shipping BigDecimal required min(0)
+  tax BigDecimal required min(0)
+  donation BigDecimal required min(0)
+  total BigDecimal required min(0)
+  couponCode String maxlength(64)
+  shippingAddressJson TextBlob required
+  notes String maxlength(500)
+  zohoSyncStatus String maxlength(40)
+  zohoSalesOrderId String maxlength(120)
+  zohoInvoiceId String maxlength(120)
+}
+
+entity OrderItem {
+  productId String required maxlength(120)
+  productSlug String maxlength(180)
+  productName String required minlength(1) maxlength(200)
+  productImage String maxlength(600)
+  itemSize String maxlength(40)
+  color String maxlength(40)
+  qty Integer required min(1)
+  price BigDecimal required min(0)
+}
+
+entity OrderReturn {
+  returnNumber String required unique minlength(3) maxlength(40)
+  userLogin String required minlength(1) maxlength(50)
+  orderNumber String required minlength(3) maxlength(40)
+  status OrderReturnStatus required
+  reason TextBlob required
+  rejectionReason TextBlob
+  refundAmount BigDecimal min(0)
+  adminNotes TextBlob
+  razorpayRefundId String maxlength(120)
+  zohoCreditNoteId String maxlength(120)
+  requestedAt Instant required
+  resolvedAt Instant
+}
+
+relationship OneToMany {
+  CustomerOrder{items} to OrderItem{order required}
+}
+
+paginate CustomerProfile, CustomerOrder, OrderItem, OrderReturn with pagination
+dto * with mapstruct
+service * with serviceClass
+filter *

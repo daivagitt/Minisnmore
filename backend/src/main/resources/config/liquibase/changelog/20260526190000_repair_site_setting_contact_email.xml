@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+    <!-- Postman/API tests sometimes wrote {{email}} into site_setting.contact_email. -->
+    <changeSet id="20260526190000-1" author="minisandmore">
+        <sql dbms="postgresql">
+            UPDATE site_setting
+            SET contact_email = 'care@minisnmore.com'
+            WHERE contact_email IS NULL
+               OR trim(contact_email) = ''
+               OR contact_email LIKE '%{{%}}%'
+               OR contact_email NOT LIKE '%@%';
+        </sql>
+    </changeSet>
+</databaseChangeLog>

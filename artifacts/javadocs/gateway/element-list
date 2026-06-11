@@ -1,0 +1,15 @@
+com.miniandmore.gateway
+com.miniandmore.gateway.aop.logging
+com.miniandmore.gateway.config
+com.miniandmore.gateway.domain
+com.miniandmore.gateway.management
+com.miniandmore.gateway.repository
+com.miniandmore.gateway.repository.rowmapper
+com.miniandmore.gateway.security
+com.miniandmore.gateway.security.jwt
+com.miniandmore.gateway.service
+com.miniandmore.gateway.service.dto
+com.miniandmore.gateway.service.mapper
+com.miniandmore.gateway.web.rest
+com.miniandmore.gateway.web.rest.errors
+com.miniandmore.gateway.web.rest.vm

@@ -1,0 +1,277 @@
+# ===================================================================
+# Spring Boot configuration.
+#
+# This configuration will be overridden by the Spring profile you use,
+# for example application-dev.yml if you use the "dev" profile.
+#
+# More information on profiles: https://www.jhipster.tech/profiles/
+# More information on configuration properties: https://www.jhipster.tech/common-application-properties/
+# ===================================================================
+
+# ===================================================================
+# Standard Spring Boot properties.
+# Full reference is available at:
+# https://docs.spring.io/spring-boot/appendix/application-properties/index.html
+# ===================================================================
+
+---
+# Conditionally disable springdoc on missing api-docs profile
+spring:
+  config:
+    activate:
+      on-profile: '!api-docs'
+springdoc:
+  api-docs:
+    enabled: false
+---
+management:
+  endpoints:
+    web:
+      base-path: /management
+      exposure:
+        include:
+          - configprops
+          - env
+          - health
+          - info
+          - jhimetrics
+          - jhiopenapigroups
+          - logfile
+          - loggers
+          - prometheus
+          - threaddump
+          - caches
+          - liquibase
+  endpoint:
+    health:
+      show-details: when_authorized
+      roles: 'ROLE_ADMIN'
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db
+    jhimetrics:
+      access: read-only
+  info:
+    git:
+      mode: full
+    env:
+      enabled: true
+  health:
+    mail:
+      enabled: false # When using the MailService, configure an SMTP server and set this to true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+        step: 60
+  observations:
+    key-values:
+      application: ${spring.application.name}
+  metrics:
+    enable:
+      http: true
+      jvm: true
+      logback: true
+      process: true
+      system: true
+    distribution:
+      percentiles-histogram:
+        all: true
+      percentiles:
+        all: 0, 0.5, 0.75, 0.95, 0.99, 1.0
+    data:
+      repository:
+        autotime:
+          enabled: true
+    tags:
+      application: ${spring.application.name}
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 8MB
+      max-request-size: 9MB
+  application:
+    name: miniandmore
+  cloud:
+    consul:
+      discovery:
+        healthCheckPath: /management/health
+        instanceId: miniandmore:${spring.application.instance-id:${random.value}}
+        service-name: miniandmore
+      config:
+        watch:
+          enabled: false
+  docker:
+    compose:
+      # Use `docker compose -f docker/microservices.yml up -d` for shared infra (recommended).
+      enabled: false
+      lifecycle-management: start-only
+      file: src/main/docker/services.yml
+  profiles:
+    # The commented value for `active` can be replaced with valid Spring profiles to load.
+    # Otherwise, it will be filled in by maven when building the JAR file
+    # Either way, it can be overridden by `--spring.profiles.active` value passed in the commandline or `-Dspring.profiles.active` set in `JAVA_OPTS`
+    active: '@spring.profiles.active@'
+    group:
+      dev:
+        - secret-samples
+        - api-docs
+        # Uncomment to activate TLS for the dev profile
+        #- tls
+  jmx:
+    enabled: false
+  data:
+    jpa:
+      repositories:
+        bootstrap-mode: deferred
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate.jdbc.time_zone: UTC
+      hibernate.timezone.default_storage: NORMALIZE
+      hibernate.type.preferred_instant_jdbc_type: TIMESTAMP
+      hibernate.id.new_generator_mappings: true
+      hibernate.connection.provider_disables_autocommit: true
+      hibernate.cache.use_second_level_cache: false
+      hibernate.cache.use_query_cache: false
+      hibernate.generate_statistics: false
+      # modify batch size as necessary
+      hibernate.jdbc.batch_size: 25
+      hibernate.order_inserts: true
+      hibernate.order_updates: true
+      hibernate.query.fail_on_pagination_over_collection_fetch: true
+      hibernate.query.in_clause_parameter_padding: true
+    hibernate:
+      ddl-auto: none
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+        implicit-strategy: org.springframework.boot.hibernate.SpringImplicitNamingStrategy
+  messages:
+    basename: i18n/messages
+  main:
+    allow-bean-definition-overriding: true
+  mvc:
+    problemdetails:
+      enabled: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          authority-prefix: ''
+          authorities-claim-name: auth
+  task:
+    execution:
+      thread-name-prefix: miniandmore-task-
+      pool:
+        core-size: 2
+        max-size: 50
+        queue-capacity: 10000
+    scheduling:
+      thread-name-prefix: miniandmore-scheduling-
+      pool:
+        size: 2
+  thymeleaf:
+    mode: HTML
+  output:
+    ansi:
+      console-available: true
+
+server:
+  servlet:
+    session:
+      cookie:
+        http-only: true
+
+springdoc:
+  show-actuator: true
+
+# Properties to be exposed on the /info management endpoint
+info:
+  # Comma separated list of profiles that will trigger the ribbon to show
+  display-ribbon-on-profiles: 'dev'
+
+# ===================================================================
+# JHipster specific properties
+#
+# Full reference is available at: https://www.jhipster.tech/common-application-properties/
+# ===================================================================
+
+jhipster:
+  mail:
+    from: miniandmore@localhost
+  api-docs:
+    default-include-pattern: /api/v1/**
+    management-include-pattern: /management/**
+    title: Miniandmore API
+    description: Miniandmore API documentation
+    version: 0.0.1
+    terms-of-service-url:
+    contact-name:
+    contact-url:
+    contact-email:
+    license: unlicensed
+    license-url:
+  security:
+
+
+# jhipster-needle-add-application-yaml-document
+---
+# ===================================================================
+# Application specific properties
+# Add your own application properties here, see the ApplicationProperties class
+# to have type-safe configuration, like in the JHipsterProperties above
+#
+# More documentation is available at:
+# https://www.jhipster.tech/common-application-properties/
+# ===================================================================
+
+application:
+  storage:
+    s3:
+      endpoint: ${S3_ENDPOINT:}
+      region: ${S3_REGION:us-east-1}
+      bucket: ${S3_BUCKET:}
+      access-key: ${S3_ACCESS_KEY:}
+      secret-key: ${S3_SECRET_KEY:}
+      public-base-url: ${S3_PUBLIC_BASE_URL:}
+      key-prefix: ${S3_KEY_PREFIX:${R2_KEY_PREFIX:}}
+      max-upload-bytes: ${S3_MAX_UPLOAD_BYTES:8192000}
+  internal-api-key: ${INTERNAL_API_KEY:}
+  zoho-integration:
+    base-url: ${ZOHO_INTEGRATION_BASE_URL:http://127.0.0.1:8083}
+  zoho:
+    sync-product-images: ${ZOHO_SYNC_PRODUCT_IMAGES:true}
+    sync-product-stock: ${ZOHO_SYNC_PRODUCT_STOCK:true}
+    pull-products-auto-create-category: ${ZOHO_PULL_PRODUCTS_AUTO_CREATE_CATEGORY:false}
+    default-location-id: ${ZOHO_DEFAULT_LOCATION_ID:}
+    default-location-name: ${ZOHO_DEFAULT_LOCATION_NAME:Head Office}
+    inventory-account-id: ${ZOHO_INVENTORY_ACCOUNT_ID:}
+    order-retry:
+      fixed-delay-ms: ${ZOHO_ORDER_RETRY_FIXED_DELAY_MS:600000}
+    order-tracking:
+      fixed-delay-ms: ${ZOHO_ORDER_TRACKING_FIXED_DELAY_MS:900000}
+    oauth:
+      homepage-url: ${ZOHO_OAUTH_HOMEPAGE_URL:http://localhost:5173}
+      redirect-uris:
+        - ${ZOHO_OAUTH_REDIRECT_URI:http://localhost:5173}
+        - ${ZOHO_OAUTH_ADMIN_REDIRECT_URI:http://localhost:5173/admin/zoho}
+      javascript-domains:
+        - ${ZOHO_OAUTH_JAVASCRIPT_DOMAIN:http://localhost:5173}
+        - ${ZOHO_OAUTH_JAVASCRIPT_DOMAIN_ALT:http://127.0.0.1:5173}
+      scopes: ${ZOHO_OAUTH_SCOPES:ZohoBooks.fullaccess.all}
+      client-id: ${ZOHO_CLIENT_ID:}
+      client-secret: ${ZOHO_CLIENT_SECRET:}
+      org-id: ${ZOHO_ORG_ID:}
+      default-data-center: ${ZOHO_DATA_CENTER:in}
+  inventory:
+    reservation-release:
+      fixed-delay-ms: ${INVENTORY_RESERVATION_RELEASE_FIXED_DELAY_MS:300000}
+
+razorpay:
+  key-id: ${RAZORPAY_KEY_ID:}
+  key-secret: ${RAZORPAY_KEY_SECRET:}

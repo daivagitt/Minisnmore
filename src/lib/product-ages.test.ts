@@ -1,0 +1,21 @@
+import { describe, expect, it } from "vitest";
+import { agesFromSizes, sizeToAgeBand } from "./product-ages";
+
+describe("product-ages", () => {
+  it("maps size labels case-insensitively", () => {
+    expect(sizeToAgeBand("0-3M")).toBe("0-3m");
+    expect(sizeToAgeBand("6-12m")).toBe("6-12m");
+  });
+
+  it("derives age bands from product sizes", () => {
+    expect(agesFromSizes(["0-3M", "3-6M", "6-12M"])).toEqual(["0-3m", "3-6m", "6-12m"]);
+  });
+
+  it("treats FreeSize as all age bands", () => {
+    expect(agesFromSizes(["FreeSize"])).toEqual(["0-3m", "3-6m", "6-12m", "12-18m", "18-24m"]);
+  });
+
+  it("falls back to month range when sizes are missing", () => {
+    expect(agesFromSizes([], { min: 6, max: 12 })).toEqual(["6-12m"]);
+  });
+});

@@ -1,0 +1,14 @@
+{
+  "concurrentUsers": 35,
+  "workers": 35,
+  "requests": {
+    "total": 875,
+    "failed": 0
+  },
+  "assertions": {
+    "total": 875,
+    "failed": 0
+  },
+  "avgResponseTimeMs": 864,
+  "maxResponseTimeMs": 26344
+}

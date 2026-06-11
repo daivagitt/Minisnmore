@@ -1,0 +1,11 @@
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+
+application:
+  catalog-base-url: ${APPLICATION_CATALOG_BASE_URL:http://127.0.0.1:8084}
+
+spring:
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:127.0.0.1}
+      port: ${CONSUL_PORT:8500}

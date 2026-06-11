@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: miniandmore-commerce
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          authority-prefix: ''
+          authorities-claim-name: auth
+  cloud:
+    consul:
+      discovery:
+        healthCheckPath: /management/health
+        instanceId: miniandmore-commerce:${spring.application.instance-id:${random.value}}
+        service-name: miniandmore-commerce
+      config:
+        watch:
+          enabled: false
+
+server:
+  port: 8082
+
+management:
+  endpoints:
+    web:
+      base-path: /management
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
+application:
+  catalog-base-url: ${CATALOG_BASE_URL:http://127.0.0.1:8084}
+
+jhipster:
+  security:
+    authentication:
+      jwt:
+        base64-secret: ${JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET}

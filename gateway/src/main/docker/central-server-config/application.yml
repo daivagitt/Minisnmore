@@ -1,0 +1,29 @@
+configserver:
+  name: Docker Consul Service
+  status: Connected to Consul Server running in Docker
+
+jhipster:
+  security:
+    authentication:
+      jwt:
+        # Override via env on VPS; must match gateway + catalog
+        base64-secret: NWNhYWRmODZlZDAzNzg4NGY2NTA0MzAyZTdjNjI2ZjYzYWI2YmQ3Yjk4ZDA5NGVkODNhYWY2ZmExOTJmZjA3YmJhNDdiYTYxMTdjZmM2ZWUyMmMwMzQyMTY1NDBjNTc5ODg4MjNkZjExODFmZjUwNDdlNjVhOTlhMWE5MjRjYTU=
+
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: miniandmore-integration-api
+              uri: lb://miniandmore-integration
+              predicates:
+                - Path=/api/v1/admin/zoho/**,/api/v1/admin/zoho-settings
+            - id: miniandmore-commerce-api
+              uri: lb://miniandmore-commerce
+              predicates:
+                - Path=/api/v1/orders/**,/api/v1/account/**,/api/v1/payments,/api/v1/coupons/**,/api/v1/order-returns/**,/api/v1/admin/order-returns/**
+            - id: miniandmore-store-api
+              uri: lb://miniandmore-store
+              predicates:
+                - Path=/api/v1/**

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+    <!-- Canonical storefront pages (prod profile skips faker CSV). Remove API-test junk keys. -->
+    <changeSet id="20260526140000-1" author="minisandmore">
+        <!-- UAT already ran an earlier revision of this file before it was added to master.xml -->
+        <validCheckSum>9:c08a983c0147d3434ff7f43ab6e72872</validCheckSum>
+        <sql dbms="postgresql">
+            DELETE FROM page_visibility
+            WHERE page_key LIKE 'page-%'
+               OR page_key LIKE 'sample-%'
+               OR page_key LIKE 'section-%';
+
+            INSERT INTO page_visibility (id, page_key, visible)
+            VALUES
+                (nextval('sequence_generator'), 'shop', true),
+                (nextval('sequence_generator'), 'gift', true),
+                (nextval('sequence_generator'), 'subscribe', true),
+                (nextval('sequence_generator'), 'track', true),
+                (nextval('sequence_generator'), 'blog', true),
+                (nextval('sequence_generator'), 'buyback', false)
+            ON CONFLICT (page_key) DO NOTHING;
+        </sql>
+    </changeSet>
+</databaseChangeLog>

@@ -1,0 +1,172 @@
+# Production profile — API gateway (public via Nginx → :8080).
+
+logging:
+  level:
+    ROOT: INFO
+    tech.jhipster: WARN
+    com.miniandmore.gateway: INFO
+    org.springframework.cloud.gateway: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+      roles: ROLE_ADMIN
+  prometheus:
+    metrics:
+      export:
+        enabled: ${PROMETHEUS_ENABLED:false}
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLE_PROBABILITY:0.1}
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://127.0.0.1:9411/api/v2/spans}
+
+spring:
+  devtools:
+    restart:
+      enabled: false
+    livereload:
+      enabled: false
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:30s}
+  cloud:
+    gateway:
+      trusted-proxies: ${GATEWAY_TRUSTED_PROXIES:127\\.0\\.0\\.1}
+      server:
+        webflux:
+          # Production VPS: static localhost routes (same layout as UAT). Replaces lb:// + Consul for edges.
+          routes:
+            - id: miniandmore-integration-api
+              uri: http://127.0.0.1:8083
+              predicates:
+                - Path=/api/v1/admin/zoho/**,/api/v1/admin/zoho-settings
+              metadata:
+                response-timeout: 120000
+                connect-timeout: 5000
+            - id: miniandmore-commerce-api
+              uri: http://127.0.0.1:8082
+              predicates:
+                - Path=/api/v1/orders/**,/api/v1/account/**,/api/v1/payments,/api/v1/coupons/**,/api/v1/order-returns/**,/api/v1/admin/order-returns/**
+              metadata:
+                response-timeout: 120000
+                connect-timeout: 5000
+            - id: miniandmore-store-api
+              uri: http://127.0.0.1:8081
+              predicates:
+                - Path=/api/v1/**
+              metadata:
+                response-timeout: 120000
+                connect-timeout: 5000
+          discovery:
+            locator:
+              enabled: false
+          httpclient:
+            connect-timeout: ${GATEWAY_CONNECT_TIMEOUT:5000}
+            response-timeout: ${GATEWAY_RESPONSE_TIMEOUT:120s}
+    consul:
+      discovery:
+        prefer-ip-address: true
+        tags:
+          - profile=prod
+          - version=@project.version@
+      host: ${CONSUL_HOST:127.0.0.1}
+      port: ${CONSUL_PORT:8500}
+  liquibase:
+    contexts: prod
+    url: ${SPRING_LIQUIBASE_URL:jdbc:postgresql://127.0.0.1:5432/gateway}
+    user: ${SPRING_LIQUIBASE_USERNAME:gateway}
+    password: ${SPRING_LIQUIBASE_PASSWORD}
+  mail:
+    host: ${SPRING_MAIL_HOST:}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    protocol: smtp
+    properties:
+      mail:
+        smtp:
+          auth: ${SPRING_MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${SPRING_MAIL_SMTP_STARTTLS_ENABLE:true}
+            required: ${SPRING_MAIL_SMTP_STARTTLS_REQUIRED:true}
+  r2dbc:
+    url: ${SPRING_R2DBC_URL:r2dbc:postgresql://127.0.0.1:5432/gateway}
+    username: ${SPRING_R2DBC_USERNAME:gateway}
+    password: ${SPRING_R2DBC_PASSWORD}
+  security:
+    oauth2:
+      client:
+        provider:
+          apple:
+            authorization-uri: https://appleid.apple.com/auth/authorize
+            token-uri: https://appleid.apple.com/auth/token
+            jwk-set-uri: https://appleid.apple.com/auth/keys
+            issuer-uri: https://appleid.apple.com
+            user-name-attribute: sub
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:}
+            client-secret: ${GOOGLE_CLIENT_SECRET:}
+            scope: openid,profile,email
+            redirect-uri: '{baseUrl}/login/oauth2/code/{registrationId}'
+          apple:
+            provider: apple
+            client-id: ${APPLE_CLIENT_ID:}
+            client-secret: ${APPLE_CLIENT_SECRET:}
+            scope: openid,name,email
+            client-authentication-method: client_secret_post
+            redirect-uri: '{baseUrl}/login/oauth2/code/{registrationId}'
+          facebook:
+            client-id: ${FACEBOOK_CLIENT_ID:}
+            client-secret: ${FACEBOOK_CLIENT_SECRET:}
+            scope: email,public_profile
+            redirect-uri: '{baseUrl}/login/oauth2/code/{registrationId}'
+  thymeleaf:
+    cache: true
+
+server:
+  port: ${SERVER_PORT:8080}
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  shutdown: graceful
+  forward-headers-strategy: native
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,application/javascript,application/json,image/svg+xml
+    min-response-size: 1024
+
+jhipster:
+  http:
+    cache:
+      timeToLiveInDays: 1461
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:https://minisnmore.com,https://www.minisnmore.com,https://uat.minisnmore.com}
+    allowed-methods: '*'
+    allowed-headers: '*'
+    exposed-headers: 'Authorization,Link,X-Total-Count,X-${jhipster.clientApp.name}-alert,X-${jhipster.clientApp.name}-error,X-${jhipster.clientApp.name}-params'
+    allow-credentials: true
+    max-age: 1800
+  security:
+    authentication:
+      jwt:
+        token-validity-in-seconds: ${JWT_TOKEN_VALIDITY_SECONDS:86400}
+        token-validity-in-seconds-for-remember-me: ${JWT_REMEMBER_ME_VALIDITY_SECONDS:2592000}
+  mail:
+    base-url: ${JHIPSTER_MAIL_BASE_URL:https://minisnmore.com}
+    from: ${JHIPSTER_MAIL_FROM:${SPRING_MAIL_USERNAME:}}
+  logging:
+    use-json-format: ${LOG_JSON:true}
+    logstash:
+      enabled: ${LOGSTASH_ENABLED:false}
+      host: ${LOGSTASH_HOST:127.0.0.1}
+      port: ${LOGSTASH_PORT:5000}
+      ring-buffer-size: 512
+
+application:
+  oauth2:
+    frontend-callback-url: ${FRONTEND_AUTH_CALLBACK_URL:https://minisnmore.com/auth/callback}

@@ -1,0 +1,38 @@
+// Zoho / integration microservice — generate into integration/ (applicationType microservice).
+// OAuth, sync APIs, schedulers. Feign to store + commerce for entity data.
+
+application {
+  config {
+    baseName miniandmoreIntegration
+    applicationType microservice
+    packageName com.miniandmore.integration
+    databaseType sql
+    devDatabaseType postgresql
+    prodDatabaseType postgresql
+    build maven
+    serviceDiscoveryType consul
+    searchEngine false
+    messageBroker false
+    cacheProvider no
+    enableHibernateCache false
+    clientFramework no
+    skipUserManagement true
+    feignClient true
+  }
+  entities ZohoSetting
+}
+
+entity ZohoSetting {
+  orgId String maxlength(120)
+  clientId String maxlength(220)
+  clientSecret String maxlength(500)
+  refreshToken String maxlength(800)
+  dataCenter String maxlength(40)
+  connected Boolean required
+  pullProductsAutoCreateCategory Boolean
+}
+
+paginate ZohoSetting with pagination
+dto ZohoSetting with mapstruct
+service ZohoSetting with serviceClass
+filter ZohoSetting

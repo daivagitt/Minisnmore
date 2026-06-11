@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+    <changeSet id="20260526200000-1" author="minisandmore">
+        <addColumn tableName="site_setting">
+            <column name="gst_rate" type="decimal(5,2)" defaultValueNumeric="5.00">
+                <constraints nullable="true"/>
+            </column>
+            <column name="prices_include_gst" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="true"/>
+            </column>
+            <column name="shipping_standard_inr" type="integer" defaultValueNumeric="99">
+                <constraints nullable="true"/>
+            </column>
+            <column name="shipping_express_inr" type="integer" defaultValueNumeric="150">
+                <constraints nullable="true"/>
+            </column>
+            <column name="free_shipping_min_inr" type="integer" defaultValueNumeric="2500">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+        <sql dbms="postgresql">
+            UPDATE site_setting
+            SET gst_rate = COALESCE(gst_rate, 5.00),
+                prices_include_gst = COALESCE(prices_include_gst, true),
+                shipping_standard_inr = COALESCE(shipping_standard_inr, 99),
+                shipping_express_inr = COALESCE(shipping_express_inr, 150),
+                free_shipping_min_inr = COALESCE(free_shipping_min_inr, 2500);
+        </sql>
+    </changeSet>
+</databaseChangeLog>

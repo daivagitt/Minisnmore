@@ -1,0 +1,3822 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Minisandmore API",
+    "description": "Minisandmore API documentation",
+    "termsOfService": "",
+    "contact": {
+      "name": "",
+      "url": "",
+      "email": ""
+    },
+    "license": {
+      "name": "unlicensed",
+      "url": ""
+    },
+    "version": "0.0.1"
+  },
+  "servers": [
+    {
+      "url": "https://uat.minisnmore.com",
+      "description": "Generated server url"
+    }
+  ],
+  "paths": {
+    "/api/v1/admin/zoho-settings": {
+      "get": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "zohoSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseZohoSettingDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "updateZohoSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ZohoSettingDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseZohoSettingDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/site-settings": {
+      "get": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "siteSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSiteSettingDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "updateSiteSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteSettingDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSiteSettingDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/products/{id}": {
+      "put": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "updateProduct",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProductDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "deleteProduct",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringBoolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/policies/{id}": {
+      "put": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "updatePolicy",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePolicyDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "deletePolicy",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringBoolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/page-visibility/{id}": {
+      "put": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "updatePageVisibility",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageVisibilityDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageVisibilityDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/home-sections/{id}": {
+      "put": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "updateHomeSection",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HomeSectionDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseHomeSectionDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/coupons/{id}": {
+      "put": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "updateCoupon",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CouponDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCouponDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "deleteCoupon",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringBoolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/categories/{id}": {
+      "put": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "updateCategory",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCategoryDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "deleteCategory",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringBoolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/blog-posts/{id}": {
+      "put": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "updateBlogPost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlogPostDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBlogPostDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "deleteBlogPost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringBoolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/banners/{id}": {
+      "put": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "updateBanner",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BannerDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBannerDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "deleteBanner",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringBoolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/account/profile": {
+      "get": {
+        "tags": [
+          "account-order-resource"
+        ],
+        "operationId": "profile",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringString"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "account-order-resource"
+        ],
+        "operationId": "updateProfile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringBoolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders": {
+      "get": {
+        "tags": [
+          "account-order-resource"
+        ],
+        "operationId": "orders",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "account-order-resource"
+        ],
+        "operationId": "createOrder",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/verify-payment": {
+      "post": {
+        "tags": [
+          "account-order-resource"
+        ],
+        "operationId": "verifyPayment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyPaymentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/coupons/validate": {
+      "post": {
+        "tags": [
+          "account-order-resource"
+        ],
+        "operationId": "validateCoupon",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CouponValidationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zoho/sync-products": {
+      "post": {
+        "tags": [
+          "zoho-sync-resource"
+        ],
+        "operationId": "syncProducts",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSyncSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zoho/sync-products/{id}": {
+      "post": {
+        "tags": [
+          "zoho-sync-resource"
+        ],
+        "operationId": "syncProduct",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zoho/sync-orders/{id}": {
+      "post": {
+        "tags": [
+          "zoho-sync-resource"
+        ],
+        "operationId": "syncOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zoho/retry-orders": {
+      "post": {
+        "tags": [
+          "zoho-sync-resource"
+        ],
+        "operationId": "retryOrders",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSyncSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zoho/pull-inventory": {
+      "post": {
+        "tags": [
+          "zoho-sync-resource"
+        ],
+        "operationId": "pullInventory",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSyncSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/uploads": {
+      "post": {
+        "tags": [
+          "storage-upload-resource"
+        ],
+        "operationId": "upload",
+        "parameters": [
+          {
+            "name": "folder",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "minLength": 0
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUploadResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/uploads/presign": {
+      "post": {
+        "tags": [
+          "storage-upload-resource"
+        ],
+        "operationId": "presign",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePresignedUpload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/products": {
+      "get": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "products",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListProductDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "createProduct",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProductDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/policies": {
+      "get": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "policies",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListPolicyDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "createPolicy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePolicyDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/coupons": {
+      "get": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "coupons",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListCouponDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "createCoupon",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CouponDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCouponDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/categories": {
+      "get": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "categories",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListCategoryDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "createCategory",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCategoryDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/blog-posts": {
+      "get": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "blogPosts",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListBlogPostDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "createBlogPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlogPostDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBlogPostDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/banners": {
+      "get": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "banners",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListBannerDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "createBanner",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BannerDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBannerDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/register": {
+      "post": {
+        "tags": [
+          "account-resource"
+        ],
+        "operationId": "registerAccount",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManagedUserVM"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        }
+      }
+    },
+    "/api/authenticate": {
+      "get": {
+        "tags": [
+          "authenticate-controller"
+        ],
+        "operationId": "isAuthenticated",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "authenticate-controller"
+        ],
+        "operationId": "authorize",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginVM"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/JWTToken"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/account": {
+      "get": {
+        "tags": [
+          "account-resource"
+        ],
+        "operationId": "getAccount",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "account-resource"
+        ],
+        "operationId": "saveAccount",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUserDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/account/reset-password/init": {
+      "post": {
+        "tags": [
+          "account-resource"
+        ],
+        "operationId": "requestPasswordReset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/account/reset-password/finish": {
+      "post": {
+        "tags": [
+          "account-resource"
+        ],
+        "operationId": "finishPasswordReset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyAndPasswordVM"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/account/change-password": {
+      "post": {
+        "tags": [
+          "account-resource"
+        ],
+        "operationId": "changePassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChangeDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/site-settings": {
+      "get": {
+        "tags": [
+          "storefront-resource"
+        ],
+        "operationId": "siteSettings_1",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSiteSettingDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/products": {
+      "get": {
+        "tags": [
+          "storefront-resource"
+        ],
+        "operationId": "products_1",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListProductDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/products/{slug}": {
+      "get": {
+        "tags": [
+          "storefront-resource"
+        ],
+        "operationId": "product",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProductDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/policies/{slug}": {
+      "get": {
+        "tags": [
+          "storefront-resource"
+        ],
+        "operationId": "policy",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePolicyDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/payments": {
+      "get": {
+        "tags": [
+          "account-order-resource"
+        ],
+        "operationId": "payments",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/page-visibility": {
+      "get": {
+        "tags": [
+          "storefront-resource"
+        ],
+        "operationId": "pageVisibility",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListPageVisibilityDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/{orderNumber}": {
+      "get": {
+        "tags": [
+          "account-order-resource"
+        ],
+        "operationId": "order",
+        "parameters": [
+          {
+            "name": "orderNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/home-sections": {
+      "get": {
+        "tags": [
+          "storefront-resource"
+        ],
+        "operationId": "homeSections",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListHomeSectionDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/categories": {
+      "get": {
+        "tags": [
+          "storefront-resource"
+        ],
+        "operationId": "categories_1",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListCategoryDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/blog-posts": {
+      "get": {
+        "tags": [
+          "storefront-resource"
+        ],
+        "operationId": "blogPosts_1",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListBlogPostDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/blog-posts/{slug}": {
+      "get": {
+        "tags": [
+          "storefront-resource"
+        ],
+        "operationId": "blogPost",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBlogPostDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/banners": {
+      "get": {
+        "tags": [
+          "storefront-resource"
+        ],
+        "operationId": "banners_1",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListBannerDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zoho/test": {
+      "get": {
+        "tags": [
+          "zoho-sync-resource"
+        ],
+        "operationId": "testConnection",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseConnectionStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/page-visibility": {
+      "get": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "pageVisibility_1",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListPageVisibilityDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/home-sections": {
+      "get": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "homeSections_1",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListHomeSectionDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/dashboard": {
+      "get": {
+        "tags": [
+          "admin-store-resource"
+        ],
+        "operationId": "dashboard",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/activate": {
+      "get": {
+        "tags": [
+          "account-resource"
+        ],
+        "operationId": "activateAccount",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zoho/integration-status": {
+      "get": {
+        "tags": [
+          "zoho-sync-resource"
+        ],
+        "operationId": "integrationStatus",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zoho/pull-products-auto-create-category": {
+      "put": {
+        "tags": [
+          "zoho-sync-resource"
+        ],
+        "operationId": "updatePullProductsAutoCreateCategory",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zoho/connect-url": {
+      "get": {
+        "tags": [
+          "zoho-sync-resource"
+        ],
+        "operationId": "connectUrl",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zoho/oauth/complete": {
+      "post": {
+        "tags": [
+          "zoho-sync-resource"
+        ],
+        "operationId": "completeOAuth",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ZohoOAuthCompleteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zoho/oauth-setup": {
+      "get": {
+        "tags": [
+          "zoho-sync-resource"
+        ],
+        "operationId": "oauthSetup",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zoho/pull-products": {
+      "post": {
+        "tags": [
+          "zoho-sync-resource"
+        ],
+        "operationId": "pullProducts",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zoho/sync-orders/by-number/{orderNumber}": {
+      "post": {
+        "tags": [
+          "zoho-sync-resource"
+        ],
+        "operationId": "syncOrderByNumber",
+        "parameters": [
+          {
+            "name": "orderNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zoho/pull-order-tracking/{id}": {
+      "post": {
+        "tags": [
+          "zoho-sync-resource"
+        ],
+        "operationId": "pullOrderTrackingById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zoho/pull-order-tracking": {
+      "post": {
+        "tags": [
+          "zoho-sync-resource"
+        ],
+        "operationId": "pullOrderTrackingBulk",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ZohoSettingDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "orgId": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "clientId": {
+            "type": "string",
+            "maxLength": 220,
+            "minLength": 0
+          },
+          "clientSecret": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          },
+          "refreshToken": {
+            "type": "string",
+            "maxLength": 800,
+            "minLength": 0
+          },
+          "dataCenter": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 0
+          },
+          "connected": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "connected"
+        ]
+      },
+      "ApiResponseZohoSettingDTO": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ZohoSettingDTO"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "SiteSettingDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "brandName": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1
+          },
+          "careLabel": {
+            "type": "string",
+            "maxLength": 180,
+            "minLength": 0
+          },
+          "contactEmail": {
+            "type": "string",
+            "maxLength": 180,
+            "minLength": 0
+          },
+          "contactPhone": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 0
+          },
+          "ecatalogueLabel": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "ecatalogueUrl": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 0
+          },
+          "facebookUrl": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 0
+          },
+          "footerCopyright": {
+            "type": "string",
+            "maxLength": 260,
+            "minLength": 0
+          },
+          "footerTagline": {
+            "type": "string",
+            "maxLength": 260,
+            "minLength": 0
+          },
+          "instagramUrl": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 0
+          },
+          "legalEntityName": {
+            "type": "string",
+            "maxLength": 180,
+            "minLength": 0
+          },
+          "logoHorizontalUrl": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 0
+          },
+          "logoUrl": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 0
+          },
+          "twitterUrl": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 0
+          },
+          "whatsappNumber": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 0
+          },
+          "youtubeUrl": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "brandName"
+        ]
+      },
+      "ApiResponseSiteSettingDTO": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SiteSettingDTO"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "CategoryDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "slug": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 0
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "active",
+          "name",
+          "slug",
+          "sortOrder"
+        ]
+      },
+      "ProductDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "slug": {
+            "type": "string",
+            "maxLength": 180,
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1
+          },
+          "sku": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "fabricType": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "description": {
+            "type": "string"
+          },
+          "story": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number",
+            "minimum": 0
+          },
+          "compareAtPrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 3,
+            "minLength": 3
+          },
+          "ageMinMonths": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "ageMaxMonths": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "sizesJson": {
+            "type": "string"
+          },
+          "colorsJson": {
+            "type": "string"
+          },
+          "imagesJson": {
+            "type": "string"
+          },
+          "badge": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
+          },
+          "stock": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "featured": {
+            "type": "boolean"
+          },
+          "trending": {
+            "type": "boolean"
+          },
+          "newArrival": {
+            "type": "boolean"
+          },
+          "bestSeller": {
+            "type": "boolean"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "zohoItemId": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "zohoSyncStatus": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "SYNCED",
+              "FAILED"
+            ]
+          },
+          "zohoLastSyncedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "zohoSyncError": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 0
+          },
+          "category": {
+            "$ref": "#/components/schemas/CategoryDTO"
+          }
+        },
+        "required": [
+          "active",
+          "bestSeller",
+          "currency",
+          "featured",
+          "name",
+          "newArrival",
+          "price",
+          "slug",
+          "sortOrder",
+          "stock",
+          "trending"
+        ]
+      },
+      "ApiResponseProductDTO": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProductDTO"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "PolicyDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "slug": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 220,
+            "minLength": 1
+          },
+          "body": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "title"
+        ]
+      },
+      "ApiResponsePolicyDTO": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PolicyDTO"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "PageVisibilityDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pageKey": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1
+          },
+          "visible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "pageKey",
+          "visible"
+        ]
+      },
+      "ApiResponsePageVisibilityDTO": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PageVisibilityDTO"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "HomeSectionDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sectionKey": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 180,
+            "minLength": 0
+          },
+          "subtitle": {
+            "type": "string",
+            "maxLength": 260,
+            "minLength": 0
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "payloadJson": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled",
+          "sectionKey",
+          "sortOrder"
+        ]
+      },
+      "ApiResponseHomeSectionDTO": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/HomeSectionDTO"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "CouponDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1
+          },
+          "discountType": {
+            "type": "string",
+            "enum": [
+              "PERCENT",
+              "FLAT"
+            ]
+          },
+          "discountValue": {
+            "type": "number",
+            "minimum": 0
+          },
+          "minOrder": {
+            "type": "number",
+            "minimum": 0
+          },
+          "maxDiscount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "active",
+          "code",
+          "discountType",
+          "discountValue",
+          "minOrder"
+        ]
+      },
+      "ApiResponseCouponDTO": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CouponDTO"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "ApiResponseCategoryDTO": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CategoryDTO"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "BlogPostDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "slug": {
+            "type": "string",
+            "maxLength": 180,
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 220,
+            "minLength": 1
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "coverUrl": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 0
+          },
+          "published": {
+            "type": "boolean"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "published",
+          "slug",
+          "title"
+        ]
+      },
+      "ApiResponseBlogPostDTO": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/BlogPostDTO"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "BannerDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 180,
+            "minLength": 1
+          },
+          "subtitle": {
+            "type": "string",
+            "maxLength": 260,
+            "minLength": 0
+          },
+          "imageUrl": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 0
+          },
+          "linkUrl": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 0
+          },
+          "ctaLabel": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "active",
+          "sortOrder",
+          "title"
+        ]
+      },
+      "ApiResponseBannerDTO": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/BannerDTO"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "ProfileUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "full_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "full_name",
+          "phone"
+        ]
+      },
+      "ApiResponseMapStringBoolean": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "boolean"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "CustomerOrderDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "orderNumber": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 3
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "CONFIRMED",
+              "CANCELLED",
+              "FULFILLED"
+            ]
+          },
+          "paymentStatus": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PAID",
+              "FAILED",
+              "REFUNDED"
+            ]
+          },
+          "razorpayOrderId": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "razorpayPaymentId": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "razorpaySignature": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          },
+          "subtotal": {
+            "type": "number",
+            "minimum": 0
+          },
+          "discount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "shipping": {
+            "type": "number",
+            "minimum": 0
+          },
+          "tax": {
+            "type": "number",
+            "minimum": 0
+          },
+          "donation": {
+            "type": "number",
+            "minimum": 0
+          },
+          "total": {
+            "type": "number",
+            "minimum": 0
+          },
+          "couponCode": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "shippingAddressJson": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          },
+          "inventoryReserved": {
+            "type": "boolean"
+          },
+          "inventoryReservedUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "inventoryReleasedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "zohoSalesOrderId": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "zohoInvoiceId": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "zohoSyncStatus": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "SYNCED",
+              "FAILED"
+            ]
+          },
+          "zohoLastSyncedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "zohoSyncError": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 0
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserDTO"
+          }
+        },
+        "required": [
+          "discount",
+          "donation",
+          "orderNumber",
+          "paymentStatus",
+          "shipping",
+          "status",
+          "subtotal",
+          "tax",
+          "total",
+          "user"
+        ]
+      },
+      "OrderItemDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "productId": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "productSlug": {
+            "type": "string",
+            "maxLength": 180,
+            "minLength": 0
+          },
+          "productName": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1
+          },
+          "productImage": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 0
+          },
+          "itemSize": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 0
+          },
+          "color": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 0
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "price": {
+            "type": "number",
+            "minimum": 0
+          },
+          "order": {
+            "$ref": "#/components/schemas/CustomerOrderDTO"
+          }
+        },
+        "required": [
+          "order",
+          "price",
+          "productId",
+          "productName",
+          "qty"
+        ]
+      },
+      "UserDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "login": {
+            "type": "string"
+          }
+        }
+      },
+      "CustomerProfileDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fullName": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 0
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserDTO"
+          }
+        },
+        "required": [
+          "user"
+        ]
+      },
+      "AdminUserDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "login": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "pattern": "^(?>[a-zA-Z0-9!$&*+=?^_`{|}~.-]+@[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)*)|(?>[_.@A-Za-z0-9-]+)$"
+          },
+          "firstName": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 0
+          },
+          "lastName": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 0
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254,
+            "minLength": 5
+          },
+          "imageUrl": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 0
+          },
+          "activated": {
+            "type": "boolean"
+          },
+          "langKey": {
+            "type": "string",
+            "maxLength": 10,
+            "minLength": 2
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastModifiedBy": {
+            "type": "string"
+          },
+          "lastModifiedDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "authorities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "login"
+        ]
+      },
+      "AddressRequest": {
+        "type": "object",
+        "properties": {
+          "full_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 160,
+            "minLength": 0
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 0
+          },
+          "line1": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 0
+          },
+          "line2": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 0
+          },
+          "city": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
+          },
+          "state": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
+          },
+          "pincode": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^\\d{6}$"
+          },
+          "baby_name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "city",
+          "email",
+          "full_name",
+          "line1",
+          "phone",
+          "pincode",
+          "state"
+        ]
+      },
+      "CreateOrderRequest": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderItemRequest"
+            },
+            "maxItems": 50,
+            "minItems": 0
+          },
+          "shipping_address": {
+            "$ref": "#/components/schemas/AddressRequest"
+          },
+          "shipping_mode": {
+            "type": "string",
+            "maxLength": 12,
+            "minLength": 0
+          },
+          "coupon_code": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "donation": {
+            "type": "number",
+            "minimum": 0
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "donation",
+          "items",
+          "shipping_address"
+        ]
+      },
+      "OrderItemRequest": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "product_slug": {
+            "type": "string",
+            "maxLength": 180,
+            "minLength": 0
+          },
+          "product_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 0
+          },
+          "product_image": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 0
+          },
+          "size": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 0
+          },
+          "color": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 0
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 50,
+            "minimum": 1
+          },
+          "price": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "price",
+          "product_id",
+          "product_name",
+          "qty"
+        ]
+      },
+      "ApiResponseMapStringObject": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "VerifyPaymentRequest": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "razorpay_order_id": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "razorpay_payment_id": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "razorpay_signature": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "orderId",
+          "razorpay_order_id",
+          "razorpay_payment_id",
+          "razorpay_signature"
+        ]
+      },
+      "CouponValidationRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "subtotal": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "code",
+          "subtotal"
+        ]
+      },
+      "ApiResponseSyncSummary": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SyncSummary"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "SyncSummary": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ApiResponseUploadResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UploadResult"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "UploadResult": {
+        "type": "object",
+        "properties": {
+          "publicUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "PresignRequest": {
+        "type": "object",
+        "properties": {
+          "folder": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 0
+          },
+          "filename": {
+            "type": "string",
+            "maxLength": 220,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "filename",
+          "folder"
+        ]
+      },
+      "ApiResponsePresignedUpload": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PresignedUpload"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "PresignedUpload": {
+        "type": "object",
+        "properties": {
+          "uploadUrl": {
+            "type": "string"
+          },
+          "publicUrl": {
+            "type": "string"
+          },
+          "objectKey": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "maxUploadBytes": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ManagedUserVM": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "login": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "pattern": "^(?>[a-zA-Z0-9!$&*+=?^_`{|}~.-]+@[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)*)|(?>[_.@A-Za-z0-9-]+)$"
+          },
+          "firstName": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 0
+          },
+          "lastName": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 0
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254,
+            "minLength": 5
+          },
+          "imageUrl": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 0
+          },
+          "activated": {
+            "type": "boolean"
+          },
+          "langKey": {
+            "type": "string",
+            "maxLength": 10,
+            "minLength": 2
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastModifiedBy": {
+            "type": "string"
+          },
+          "lastModifiedDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "authorities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 4
+          }
+        },
+        "required": [
+          "login"
+        ]
+      },
+      "Authority": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "LoginVM": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 254,
+            "minLength": 1
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 4
+          },
+          "rememberMe": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "password",
+          "username"
+        ]
+      },
+      "JWTToken": {
+        "type": "object",
+        "properties": {
+          "id_token": {
+            "type": "string"
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "createdBy": {
+            "type": "string"
+          },
+          "createdDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastModifiedBy": {
+            "type": "string"
+          },
+          "lastModifiedDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "login": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "pattern": "^(?>[a-zA-Z0-9!$&*+=?^_`{|}~.-]+@[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)*)|(?>[_.@A-Za-z0-9-]+)$"
+          },
+          "firstName": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 0
+          },
+          "lastName": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 0
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254,
+            "minLength": 5
+          },
+          "activated": {
+            "type": "boolean"
+          },
+          "langKey": {
+            "type": "string",
+            "maxLength": 10,
+            "minLength": 2
+          },
+          "imageUrl": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 0
+          },
+          "resetDate": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "activated",
+          "login"
+        ]
+      },
+      "KeyAndPasswordVM": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "newPassword": {
+            "type": "string"
+          }
+        }
+      },
+      "PasswordChangeDTO": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 4
+          },
+          "newPassword": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 4
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ]
+      },
+      "ApiResponseListProductDTO": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductDTO"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "ApiResponseListPageVisibilityDTO": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageVisibilityDTO"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "ApiResponseListHomeSectionDTO": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HomeSectionDTO"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "ApiResponseListCategoryDTO": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryDTO"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "ApiResponseListBlogPostDTO": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlogPostDTO"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "ApiResponseListBannerDTO": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BannerDTO"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "ApiResponseConnectionStatus": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ConnectionStatus"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "ConnectionStatus": {
+        "type": "object",
+        "properties": {
+          "connected": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "organizationName": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponseListPolicyDTO": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyDTO"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "ApiResponseListCouponDTO": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CouponDTO"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "ApiResponseMapStringString": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "ApiResponseObject": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object"
+          }
+        }
+      },
+      "ZohoOAuthCompleteRequest": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

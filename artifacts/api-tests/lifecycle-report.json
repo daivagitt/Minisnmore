@@ -1,0 +1,875 @@
+{
+  "summary": {
+    "strategy": "OpenAPI-driven: /api/v1/** + gateway auth; skip legacy /api/* catalog paths and user-interaction endpoints",
+    "openapiSource": "https://uat.minisnmore.com/v3/api-docs",
+    "baseUrl": "https://uat.minisnmore.com",
+    "skippedUserInteraction": 7,
+    "totalOpenApiOps": 68,
+    "requestsRun": 76,
+    "openapiOpsMarked": 107,
+    "adminLogin": 200,
+    "customerLogin": 200,
+    "pass2xx": 66,
+    "fail": 0,
+    "skipped": 10,
+    "passRatePct": 100.0,
+    "credentials": {
+      "admin": "admin@uat.minisnmore.com",
+      "customer": "saikedar092@gmail.com"
+    }
+  },
+  "byModule": {
+    "setup": {
+      "pass": 2,
+      "fail": 0,
+      "skip": 0
+    },
+    "products": {
+      "pass": 1,
+      "fail": 0,
+      "skip": 0
+    },
+    "storefront": {
+      "pass": 10,
+      "fail": 0,
+      "skip": 0
+    },
+    "admin-banners": {
+      "pass": 4,
+      "fail": 0,
+      "skip": 0
+    },
+    "admin-categories": {
+      "pass": 4,
+      "fail": 0,
+      "skip": 0
+    },
+    "admin-coupons": {
+      "pass": 4,
+      "fail": 0,
+      "skip": 0
+    },
+    "admin-policies": {
+      "pass": 4,
+      "fail": 0,
+      "skip": 0
+    },
+    "admin-blog-posts": {
+      "pass": 4,
+      "fail": 0,
+      "skip": 0
+    },
+    "admin-home-sections": {
+      "pass": 1,
+      "fail": 0,
+      "skip": 1
+    },
+    "admin-page-visibility": {
+      "pass": 2,
+      "fail": 0,
+      "skip": 0
+    },
+    "admin-users": {
+      "pass": 7,
+      "fail": 0,
+      "skip": 0
+    },
+    "authorities": {
+      "pass": 3,
+      "fail": 0,
+      "skip": 0
+    },
+    "admin": {
+      "pass": 10,
+      "fail": 0,
+      "skip": 0
+    },
+    "customer": {
+      "pass": 5,
+      "fail": 0,
+      "skip": 2
+    },
+    "account": {
+      "pass": 1,
+      "fail": 0,
+      "skip": 5
+    },
+    "authenticate": {
+      "pass": 1,
+      "fail": 0,
+      "skip": 0
+    },
+    "admin-store": {
+      "pass": 3,
+      "fail": 0,
+      "skip": 0
+    },
+    "storage-upload": {
+      "pass": 0,
+      "fail": 0,
+      "skip": 2
+    }
+  },
+  "results": [
+    {
+      "module": "setup",
+      "method": "POST",
+      "path": "/api/authenticate (admin)",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "admin",
+      "responseTimeMs": null
+    },
+    {
+      "module": "setup",
+      "method": "POST",
+      "path": "/api/authenticate (customer)",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "customer",
+      "responseTimeMs": null
+    },
+    {
+      "module": "products",
+      "method": "POST",
+      "path": "/api/v1/admin/products",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "seed product",
+      "responseTimeMs": 46
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/banners",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 22
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/blog-posts",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 21
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/categories",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 37
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/home-sections",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 18
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/page-visibility",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 29
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/products",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 265
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/site-settings",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 23
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/pincode/560001",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 33
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/products/face-napkin-wash-cloth",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 41
+    },
+    {
+      "module": "admin-banners",
+      "method": "POST",
+      "path": "/api/v1/admin/banners",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "create",
+      "responseTimeMs": 34
+    },
+    {
+      "module": "admin-banners",
+      "method": "GET",
+      "path": "/api/v1/admin/banners",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 21
+    },
+    {
+      "module": "admin-banners",
+      "method": "PUT",
+      "path": "/api/v1/admin/banners/30053",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 27
+    },
+    {
+      "module": "admin-banners",
+      "method": "DELETE",
+      "path": "/api/v1/admin/banners/30053",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 24
+    },
+    {
+      "module": "admin-categories",
+      "method": "POST",
+      "path": "/api/v1/admin/categories",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "create",
+      "responseTimeMs": 29
+    },
+    {
+      "module": "admin-categories",
+      "method": "GET",
+      "path": "/api/v1/admin/categories",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 40
+    },
+    {
+      "module": "admin-categories",
+      "method": "PUT",
+      "path": "/api/v1/admin/categories/30103",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 29
+    },
+    {
+      "module": "admin-categories",
+      "method": "DELETE",
+      "path": "/api/v1/admin/categories/30103",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 35
+    },
+    {
+      "module": "admin-coupons",
+      "method": "POST",
+      "path": "/api/v1/admin/coupons",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "create",
+      "responseTimeMs": 29
+    },
+    {
+      "module": "admin-coupons",
+      "method": "GET",
+      "path": "/api/v1/admin/coupons",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 24
+    },
+    {
+      "module": "admin-coupons",
+      "method": "PUT",
+      "path": "/api/v1/admin/coupons/30153",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 32
+    },
+    {
+      "module": "admin-coupons",
+      "method": "DELETE",
+      "path": "/api/v1/admin/coupons/30153",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 33
+    },
+    {
+      "module": "admin-policies",
+      "method": "POST",
+      "path": "/api/v1/admin/policies",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "create",
+      "responseTimeMs": 33
+    },
+    {
+      "module": "admin-policies",
+      "method": "GET",
+      "path": "/api/v1/admin/policies",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 33
+    },
+    {
+      "module": "admin-policies",
+      "method": "PUT",
+      "path": "/api/v1/admin/policies/30203",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 37
+    },
+    {
+      "module": "admin-policies",
+      "method": "DELETE",
+      "path": "/api/v1/admin/policies/30203",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 35
+    },
+    {
+      "module": "admin-blog-posts",
+      "method": "POST",
+      "path": "/api/v1/admin/blog-posts",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "create",
+      "responseTimeMs": 27
+    },
+    {
+      "module": "admin-blog-posts",
+      "method": "GET",
+      "path": "/api/v1/admin/blog-posts",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 23
+    },
+    {
+      "module": "admin-blog-posts",
+      "method": "PUT",
+      "path": "/api/v1/admin/blog-posts/30253",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 28
+    },
+    {
+      "module": "admin-blog-posts",
+      "method": "DELETE",
+      "path": "/api/v1/admin/blog-posts/30253",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 25
+    },
+    {
+      "module": "admin-home-sections",
+      "method": "GET",
+      "path": "/api/v1/admin/home-sections",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 24
+    },
+    {
+      "module": "admin-home-sections",
+      "method": "\u2014",
+      "path": "/api/v1/admin/home-sections/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skip: empty home section list",
+      "responseTimeMs": null
+    },
+    {
+      "module": "admin-page-visibility",
+      "method": "GET",
+      "path": "/api/v1/admin/page-visibility",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 24
+    },
+    {
+      "module": "admin-page-visibility",
+      "method": "PUT",
+      "path": "/api/v1/admin/page-visibility/26350",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 25
+    },
+    {
+      "module": "admin-users",
+      "method": "GET",
+      "path": "/api/admin/users",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 16
+    },
+    {
+      "module": "admin-users",
+      "method": "GET",
+      "path": "/api/admin/users/admin",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 12
+    },
+    {
+      "module": "admin-users",
+      "method": "POST",
+      "path": "/api/admin/users",
+      "status": "PASS",
+      "code": 201,
+      "2xx": true,
+      "note": "create user",
+      "responseTimeMs": 3632
+    },
+    {
+      "module": "admin-users",
+      "method": "GET",
+      "path": "/api/admin/users/apitest1780645839",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 13
+    },
+    {
+      "module": "admin-users",
+      "method": "GET",
+      "path": "/api/admin/users/apitest1780645839",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 12
+    },
+    {
+      "module": "admin-users",
+      "method": "PUT",
+      "path": "/api/admin/users/apitest1780645839",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 27
+    },
+    {
+      "module": "admin-users",
+      "method": "DELETE",
+      "path": "/api/admin/users/apitest1780645839",
+      "status": "PASS",
+      "code": 204,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 19
+    },
+    {
+      "module": "authorities",
+      "method": "POST",
+      "path": "/api/authorities",
+      "status": "PASS",
+      "code": 201,
+      "2xx": true,
+      "note": "create",
+      "responseTimeMs": 19
+    },
+    {
+      "module": "authorities",
+      "method": "GET",
+      "path": "/api/authorities/ROLE_APITEST_1780645839",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 13
+    },
+    {
+      "module": "authorities",
+      "method": "DELETE",
+      "path": "/api/authorities/ROLE_APITEST_1780645839",
+      "status": "PASS",
+      "code": 204,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 13
+    },
+    {
+      "module": "admin",
+      "method": "GET",
+      "path": "/api/v1/admin/dashboard",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 40
+    },
+    {
+      "module": "admin",
+      "method": "GET",
+      "path": "/api/account",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 11
+    },
+    {
+      "module": "admin",
+      "method": "GET",
+      "path": "/api/authenticate",
+      "status": "PASS",
+      "code": 204,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 9
+    },
+    {
+      "module": "admin",
+      "method": "GET",
+      "path": "/api/users",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 17
+    },
+    {
+      "module": "admin",
+      "method": "GET",
+      "path": "/api/admin/users",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 18
+    },
+    {
+      "module": "admin",
+      "method": "GET",
+      "path": "/api/admin/users/admin",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 15
+    },
+    {
+      "module": "admin",
+      "method": "GET",
+      "path": "/api/authorities",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 14
+    },
+    {
+      "module": "admin",
+      "method": "GET",
+      "path": "/api/authorities/ROLE_ADMIN",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 13
+    },
+    {
+      "module": "admin",
+      "method": "GET",
+      "path": "/api/v1/admin/site-settings",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 20
+    },
+    {
+      "module": "admin",
+      "method": "PUT",
+      "path": "/api/v1/admin/site-settings",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 26
+    },
+    {
+      "module": "customer",
+      "method": "GET",
+      "path": "/api/v1/account/profile",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 31
+    },
+    {
+      "module": "customer",
+      "method": "PUT",
+      "path": "/api/v1/account/profile",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 50
+    },
+    {
+      "module": "customer",
+      "method": "GET",
+      "path": "/api/v1/orders",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 44
+    },
+    {
+      "module": "customer",
+      "method": "GET",
+      "path": "/api/v1/payments",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 35
+    },
+    {
+      "module": "customer",
+      "method": "POST",
+      "path": "/api/v1/coupons/validate",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 37
+    },
+    {
+      "module": "customer",
+      "method": "POST",
+      "path": "/api/v1/orders",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: payment gateway (Razorpay / live credentials)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "customer",
+      "method": "POST",
+      "path": "/api/v1/orders/verify-payment",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: payment gateway (Razorpay / live credentials)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "account",
+      "method": "POST",
+      "path": "/api/account",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: user interaction (register/activate/reset/upload/account)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "account",
+      "method": "POST",
+      "path": "/api/account/change-password",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: user interaction (register/activate/reset/upload/account)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "account",
+      "method": "POST",
+      "path": "/api/account/reset-password/finish",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: user interaction (register/activate/reset/upload/account)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "account",
+      "method": "POST",
+      "path": "/api/account/reset-password/init",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: user interaction (register/activate/reset/upload/account)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "account",
+      "method": "GET",
+      "path": "/api/activate",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: user interaction (register/activate/reset/upload/account)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "authenticate",
+      "method": "POST",
+      "path": "/api/authenticate",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 85
+    },
+    {
+      "module": "account",
+      "method": "POST",
+      "path": "/api/register",
+      "status": "PASS",
+      "code": 201,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 3879
+    },
+    {
+      "module": "admin-store",
+      "method": "GET",
+      "path": "/api/v1/admin/products",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 208
+    },
+    {
+      "module": "storage-upload",
+      "method": "POST",
+      "path": "/api/v1/admin/uploads",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: user interaction (register/activate/reset/upload/account)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "storage-upload",
+      "method": "POST",
+      "path": "/api/v1/admin/uploads/presign",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: user interaction (register/activate/reset/upload/account)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "admin-store",
+      "method": "GET",
+      "path": "/api/v1/admin/zoho-settings",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 20
+    },
+    {
+      "module": "admin-store",
+      "method": "PUT",
+      "path": "/api/v1/admin/zoho-settings",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 21
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/products/api-test-seed-1780645839",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 19
+    }
+  ]
+}

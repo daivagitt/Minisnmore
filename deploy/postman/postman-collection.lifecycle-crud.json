@@ -1,0 +1,755 @@
+{
+  "info": {
+    "name": "Minis n More \u2014 CRUD lifecycle (POST then mutate)",
+    "description": "Per resource: POST mock \u2192 save entityId \u2192 GET/PUT/PATCH/DELETE. Run Authenticate first.",
+    "schema": "https://schema.getpostman.com/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "00 Setup",
+      "item": [
+        {
+          "name": "POST authenticate (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const t = pm.response.json().id_token;",
+                  "  if (t) pm.environment.set('authToken', t);",
+                  "}",
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin6\",\n  \"rememberMe\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/authenticate"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Banners",
+      "item": [
+        {
+          "name": "1 POST create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/banners",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\": \"Mock Banner {{$timestamp}}\", \"subtitle\": \"Sub\", \"imageUrl\": \"https://example.com/b.jpg\", \"linkUrl\": \"https://example.com\", \"ctaLabel\": \"Shop\", \"sortOrder\": 0, \"active\": true}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  try {",
+                  "    const j = pm.response.json();",
+                  "    const id = j.id != null ? j.id : (j.data && j.data.id);",
+                  "    if (id != null) pm.environment.set('entityId', String(id));",
+                  "  } catch (e) {}",
+                  "}",
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 GET by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/banners/{{entityId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 PUT update",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/banners/{{entityId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\": \"Mock Banner {{$timestamp}}\", \"subtitle\": \"Sub\", \"imageUrl\": \"https://example.com/b.jpg\", \"linkUrl\": \"https://example.com\", \"ctaLabel\": \"Shop\", \"sortOrder\": 0, \"active\": true, \"id\": \"{{entityId}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const b=JSON.parse(pm.request.body.raw);b.id=Number(pm.environment.get('entityId'));pm.request.body.raw=JSON.stringify(b);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4 PATCH partial",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/merge-patch+json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/banners/{{entityId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id\": \"{{entityId}}\", \"active\": false}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const b={id:Number(pm.environment.get('entityId')),active:false};pm.request.body.raw=JSON.stringify(b);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5 DELETE",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/banners/{{entityId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "1 POST create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/categories",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"slug\": \"mock-cat-{{$timestamp}}\", \"name\": \"Mock Cat\", \"description\": \"desc\", \"sortOrder\": 0, \"active\": true}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  try {",
+                  "    const j = pm.response.json();",
+                  "    const id = j.id != null ? j.id : (j.data && j.data.id);",
+                  "    if (id != null) pm.environment.set('entityId', String(id));",
+                  "  } catch (e) {}",
+                  "}",
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 GET by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/categories/{{entityId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 PUT update",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/categories/{{entityId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"slug\": \"mock-cat-{{$timestamp}}\", \"name\": \"Mock Cat\", \"description\": \"desc\", \"sortOrder\": 0, \"active\": true, \"id\": \"{{entityId}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const b=JSON.parse(pm.request.body.raw);b.id=Number(pm.environment.get('entityId'));pm.request.body.raw=JSON.stringify(b);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4 PATCH partial",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/merge-patch+json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/categories/{{entityId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id\": \"{{entityId}}\", \"active\": false}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const b={id:Number(pm.environment.get('entityId')),active:false};pm.request.body.raw=JSON.stringify(b);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5 DELETE",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/categories/{{entityId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Coupons",
+      "item": [
+        {
+          "name": "1 POST create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/coupons",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"code\": \"MOCK{{$timestamp}}\", \"discountType\": \"percent\", \"discountValue\": 10, \"minOrder\": 1, \"active\": true}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  try {",
+                  "    const j = pm.response.json();",
+                  "    const id = j.id != null ? j.id : (j.data && j.data.id);",
+                  "    if (id != null) pm.environment.set('entityId', String(id));",
+                  "  } catch (e) {}",
+                  "}",
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 GET by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/coupons/{{entityId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 PUT update",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/coupons/{{entityId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"code\": \"MOCK{{$timestamp}}\", \"discountType\": \"percent\", \"discountValue\": 10, \"minOrder\": 1, \"active\": true, \"id\": \"{{entityId}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const b=JSON.parse(pm.request.body.raw);b.id=Number(pm.environment.get('entityId'));pm.request.body.raw=JSON.stringify(b);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4 PATCH partial",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/merge-patch+json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/coupons/{{entityId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id\": \"{{entityId}}\", \"active\": false}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const b={id:Number(pm.environment.get('entityId')),active:false};pm.request.body.raw=JSON.stringify(b);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5 DELETE",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/coupons/{{entityId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Policies",
+      "item": [
+        {
+          "name": "1 POST create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/policies",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"slug\": \"mock-pol-{{$timestamp}}\", \"title\": \"Mock Policy\", \"body\": \"<p>body</p>\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  try {",
+                  "    const j = pm.response.json();",
+                  "    const id = j.id != null ? j.id : (j.data && j.data.id);",
+                  "    if (id != null) pm.environment.set('entityId', String(id));",
+                  "  } catch (e) {}",
+                  "}",
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 GET by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/policies/{{entityId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 PUT update",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/policies/{{entityId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"slug\": \"mock-pol-{{$timestamp}}\", \"title\": \"Mock Policy\", \"body\": \"<p>body</p>\", \"id\": \"{{entityId}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const b=JSON.parse(pm.request.body.raw);b.id=Number(pm.environment.get('entityId'));pm.request.body.raw=JSON.stringify(b);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4 PATCH partial",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/merge-patch+json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/policies/{{entityId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id\": \"{{entityId}}\", \"active\": false}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const b={id:Number(pm.environment.get('entityId')),active:false};pm.request.body.raw=JSON.stringify(b);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5 DELETE",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/policies/{{entityId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

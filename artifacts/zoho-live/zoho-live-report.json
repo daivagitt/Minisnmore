@@ -1,0 +1,112 @@
+{
+  "baseUrl": "http://127.0.0.1:9180",
+  "startedAt": "2026-06-05T12:16:45.059548+00:00",
+  "finishedAt": "2026-06-05T12:16:54.168377+00:00",
+  "productIdUsed": null,
+  "results": [
+    {
+      "method": "POST",
+      "path": "/api/authenticate (admin)",
+      "ok": true,
+      "code": 200,
+      "ms": 0,
+      "note": "admin login",
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/zoho-settings",
+      "ok": true,
+      "code": 200,
+      "ms": 93,
+      "note": "",
+      "body": "{\"success\": true, \"data\": {\"clientId\": \"1000.I0E54YSZMN3KFD5H8FASVAAXOSVYQS\", \"clientSecret\": \"[REDACTED]\", \"connected\": true, \"dataCenter\": \"in\", \"id\": 26351, \"orgId\": \"60073093410\", \"refreshToken\": \"[REDACTED]\"}, \"meta\": {\"timestamp\": \"2026-06-05T12:16:47.550372579Z\", \"requestId\": \"26ac2152-4934-4594-af8c-1635b8f92914\"}}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/zoho/integration-status",
+      "ok": true,
+      "code": 200,
+      "ms": 95,
+      "note": "",
+      "body": "{\"success\": true, \"data\": {\"serverConfigured\": true, \"connected\": true, \"dataCenter\": \"in\", \"organizationId\": \"60073093410\", \"pullProductsAutoCreateCategory\": false}, \"meta\": {\"timestamp\": \"2026-06-05T12:16:47.646454479Z\", \"requestId\": \"15cb5a68-1594-4701-93bf-b230c132f23b\"}}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/zoho/oauth-setup",
+      "ok": true,
+      "code": 200,
+      "ms": 91,
+      "note": "",
+      "body": "{\"success\": true, \"data\": {\"clientType\": \"server-based\", \"apiConsoleUrl\": \"https://api-console.zoho.in/\", \"homepageUrl\": \"https://uat.minisnmore.com\", \"redirectUris\": [\"https://uat.minisnmore.com\", \"https://uat.minisnmore.com/admin/zoho\"], \"javascriptDomains\": [\"https://uat.minisnmore.com\", \"https://uat.minisnmore.com\"], \"scopes\": \"ZohoBooks.fullaccess.all\", \"primaryRedirectUri\": \"https://uat.minisnmore.com/admin/zoho\", \"authorizationUrlTemplate\": \"https://accounts.zoho.in/oauth/v2/auth?scope=Zo"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/zoho/connect-url",
+      "ok": true,
+      "code": 200,
+      "ms": 94,
+      "note": "",
+      "body": "{\"success\": true, \"data\": {\"url\": \"https://accounts.zoho.in/oauth/v2/auth?scope=ZohoBooks.fullaccess.all&client_id=1000.I0E54YSZMN3KFD5H8FASVAAXOSVYQS&response_type=code&access_type=offline&prompt=consent&redirect_uri=https%3A%2F%2Fuat.minisnmore.com%2Fadmin%2Fzoho\"}, \"meta\": {\"timestamp\": \"2026-06-05T12:16:47.833967841Z\", \"requestId\": \"5bae3608-a4d5-475e-98ea-862375b826d8\"}}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/zoho/test",
+      "ok": false,
+      "code": 403,
+      "ms": 94,
+      "note": "HTTP error",
+      "body": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/zoho/pull-inventory",
+      "ok": true,
+      "code": 200,
+      "ms": 2899,
+      "note": "",
+      "body": "{\"success\": true, \"data\": {\"success\": 0, \"failed\": 25, \"failures\": [{\"productId\": 26521, \"productName\": \"Face Napkin / Wash Cloth\", \"message\": \"Zoho Books request failed: HTTP 429 The API call for this organization has exceeded the maximum call rate limit of 1,000 (code 45)\"}, {\"productId\": 26520, \"productName\": \"Socks\", \"message\": \"Zoho Books request failed: HTTP 429 The API call for this organization has exceeded the maximum call rate limit of 1,000 (code 45)\"}, {\"productId\": 26513, \"productNa"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/zoho/pull-products",
+      "ok": false,
+      "code": 403,
+      "ms": 101,
+      "note": "HTTP error",
+      "body": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/zoho/retry-orders",
+      "ok": true,
+      "code": 200,
+      "ms": 98,
+      "note": "",
+      "body": "{\"success\": true, \"data\": {\"success\": 0, \"failed\": 1, \"failures\": [{\"productId\": 29410, \"productName\": \"MNM-2606-3916F\", \"message\": \"Zoho Books request failed: HTTP 429 The API call for this organization has exceeded the maximum call rate limit of 1,000 (code 45)\"}], \"notices\": []}, \"meta\": {\"timestamp\": \"2026-06-05T12:16:51.024166895Z\", \"requestId\": \"a08d866e-01d9-4300-900a-27d8c0b8ccec\"}}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/zoho/sync-products",
+      "ok": true,
+      "code": 200,
+      "ms": 2664,
+      "note": "",
+      "body": "{\"success\": true, \"data\": {\"success\": 0, \"failed\": 25, \"failures\": [{\"productId\": 26521, \"productName\": \"Face Napkin / Wash Cloth\", \"message\": \"Zoho Books request failed: HTTP 429 The API call for this organization has exceeded the maximum call rate limit of 1,000 (code 45)\"}, {\"productId\": 26520, \"productName\": \"Socks\", \"message\": \"Zoho Books request failed: HTTP 429 The API call for this organization has exceeded the maximum call rate limit of 1,000 (code 45)\"}, {\"productId\": 26513, \"productNa"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/zoho/pull-order-tracking",
+      "ok": true,
+      "code": 200,
+      "ms": 471,
+      "note": "",
+      "body": "{\"success\": true, \"data\": {\"success\": 0, \"failed\": 6, \"failures\": [], \"notices\": []}, \"meta\": {\"timestamp\": \"2026-06-05T12:16:54.162568590Z\", \"requestId\": \"057cf93e-4af8-4ed0-889c-50c146d94cf7\"}}"
+    }
+  ],
+  "summary": {
+    "total": 11,
+    "pass2xx": 9,
+    "fail": 2
+  }
+}

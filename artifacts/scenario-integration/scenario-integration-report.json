@@ -1,0 +1,192 @@
+{
+  "baseUrl": "http://127.0.0.1:9180",
+  "startedAt": "2026-06-06T10:03:47.740973+00:00",
+  "finishedAt": "2026-06-06T10:03:48.258113+00:00",
+  "paymentDemo": false,
+  "refundDemo": false,
+  "credentials": {
+    "customer": "saikedar2003@gmail.com",
+    "admin": "admin@uat.minisnmore.com"
+  },
+  "orderContext": {
+    "orderId": 32202,
+    "orderNumber": "MNM-2606-E63A7",
+    "total": 2.0,
+    "demoMode": false,
+    "gatewayMode": "live"
+  },
+  "scenarios": [
+    {
+      "id": "auth",
+      "title": "Authentication",
+      "description": "Customer + admin JWT for scenario steps.",
+      "status": "pass",
+      "steps": [
+        {
+          "name": "customer-login",
+          "status": "pass",
+          "note": "HTTP 200",
+          "ms": 0,
+          "detail": {}
+        },
+        {
+          "name": "admin-login",
+          "status": "pass",
+          "note": "HTTP 200",
+          "ms": 0,
+          "detail": {}
+        }
+      ]
+    },
+    {
+      "id": "coupon-checkout",
+      "title": "Coupon checkout (WELCOM10 \u2192 \u20b92 total)",
+      "description": "Validate flat coupon on Baby Swaddle and create checkout order with correct totals.",
+      "status": "pass",
+      "steps": [
+        {
+          "name": "validate-coupon",
+          "status": "pass",
+          "note": "discount \u20b9348",
+          "ms": 35,
+          "detail": {
+            "discount": 348.0
+          }
+        },
+        {
+          "name": "create-order",
+          "status": "pass",
+          "note": "order MNM-2606-E63A7 total \u20b92 (demoMode=False)",
+          "ms": 225,
+          "detail": {
+            "orderId": 32202,
+            "orderNumber": "MNM-2606-E63A7",
+            "razorpayOrderId": "order_SyJ1XtNRPSUMVE",
+            "total": 2.0,
+            "demoMode": false,
+            "gatewayMode": "live"
+          }
+        }
+      ]
+    },
+    {
+      "id": "payment-verify",
+      "title": "Payment verify",
+      "description": "Demo bypass when RAZORPAY_PAYMENT_DEMO=true; otherwise skipped (live Razorpay required).",
+      "status": "skip",
+      "steps": [
+        {
+          "name": "verify-payment",
+          "status": "skip",
+          "note": "RAZORPAY_PAYMENT_DEMO=false \u2014 use Razorpay checkout for real payment",
+          "ms": 0,
+          "detail": {
+            "gatewayMode": "live"
+          }
+        }
+      ]
+    },
+    {
+      "id": "zoho-order-sync",
+      "title": "Zoho sales order + invoice sync",
+      "description": "Admin sync after payment; verifies Zoho IDs and SYNCED status.",
+      "status": "skip",
+      "steps": [
+        {
+          "name": "sync-order",
+          "status": "skip",
+          "note": "order not paid (live Razorpay required)",
+          "ms": 0,
+          "detail": {}
+        }
+      ]
+    },
+    {
+      "id": "zoho-coupon-pricing",
+      "title": "Zoho Books totals match store (\u20b92 paid)",
+      "description": "Live Zoho API check: entity discount + shipping \u2192 total \u20b92, not catalog line \u20b9349.",
+      "status": "skip",
+      "steps": [
+        {
+          "name": "zoho-so-total",
+          "status": "skip",
+          "note": "no Zoho sales order id",
+          "ms": 0,
+          "detail": {}
+        }
+      ]
+    },
+    {
+      "id": "shipment-tracking",
+      "title": "Shipment + tracking pull",
+      "description": "Set shipment on Zoho SO, pull tracking, verify shipped status on storefront API.",
+      "status": "skip",
+      "steps": [
+        {
+          "name": "shipment-flow",
+          "status": "skip",
+          "note": "requires paid order with Zoho SO",
+          "ms": 0,
+          "detail": {}
+        }
+      ]
+    },
+    {
+      "id": "return-refund",
+      "title": "Return request \u2192 approve \u2192 receive \u2192 refund",
+      "description": "Full return when order is paid + shipped; refund uses Razorpay demo only when RAZORPAY_REFUND_DEMO=true.",
+      "status": "skip",
+      "steps": [
+        {
+          "name": "return-flow",
+          "status": "skip",
+          "note": "order not paid",
+          "ms": 0,
+          "detail": {}
+        }
+      ]
+    },
+    {
+      "id": "reference-orders",
+      "title": "Previously verified UAT orders (read-only)",
+      "description": "Regression checks on orders from manual scenario runs \u2014 no mutations.",
+      "status": "pass",
+      "steps": [
+        {
+          "name": "shipped-order-track",
+          "status": "pass",
+          "note": "MNM-2606-A4A0B \u2192 delivered",
+          "ms": 37,
+          "detail": {
+            "order_number": "MNM-2606-A4A0B",
+            "status": "fulfilled",
+            "tracking_carrier": "Delhivery",
+            "tracking_number": "",
+            "tracking_status": "delivered",
+            "shipment_date": "2026-06-06"
+          }
+        },
+        {
+          "name": "returned-order-track",
+          "status": "pass",
+          "note": "MNM-2606-86EA3 shipment_date=2026-06-06",
+          "ms": 30,
+          "detail": {
+            "order_number": "MNM-2606-86EA3",
+            "status": "confirmed",
+            "tracking_carrier": "",
+            "tracking_number": "",
+            "tracking_status": "pending",
+            "shipment_date": "2026-06-06"
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total": 8,
+    "passed": 3,
+    "failed": 0,
+    "skipped": 5
+  }
+}

@@ -1,0 +1,57 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { CreditCard, Loader2 } from "lucide-react";
+import { useAccountData } from "@/lib/account";
+
+export const Route = createFileRoute("/account/payments")({
+  head: () => ({ meta: [{ title: "Payments · Mini's n More" }] }),
+  component: PaymentsPage,
+});
+
+function PaymentsPage() {
+  const { payments: items, loadingPayments, refreshPayments } = useAccountData();
+
+  useEffect(() => {
+    if (items === null && !loadingPayments) void refreshPayments();
+  }, [items, loadingPayments, refreshPayments]);
+
+  return (
+    <div className="glass-strong rounded-[2rem] p-6 md:p-8">
+      <h1 className="font-display text-3xl mb-1 flex items-center gap-2"><CreditCard className="h-6 w-6 text-primary" /> Payments</h1>
+      <p className="text-sm text-muted-foreground mb-6">A history of every transaction tied to your account.</p>
+
+      {loadingPayments && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+      {items && items.length === 0 && (
+        <div className="text-sm text-muted-foreground glass rounded-2xl p-6 text-center">No payments yet.</div>
+      )}
+
+      <div className="space-y-3">
+        {items?.map((p) => (
+          <Link key={p.id} to="/account/orders/$orderNumber" params={{ orderNumber: p.order_number }}
+            className="glass rounded-2xl p-4 flex items-center justify-between hover:bg-white/60 transition">
+            <div className="min-w-0">
+              <div className="font-medium">{p.order_number}</div>
+              <div className="text-xs text-muted-foreground break-all">
+                {p.razorpay_payment_id ? `Txn: ${p.razorpay_payment_id}` : "Awaiting payment"}
+              </div>
+              <div className="text-xs text-muted-foreground mt-0.5">{new Date(p.created_at).toLocaleString("en-IN")}</div>
+            </div>
+            <div className="text-right">
+              <div className="font-medium">₹{Number(p.total).toLocaleString("en-IN")}</div>
+              <StatusPill status={p.payment_status} />
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StatusPill({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    paid: "bg-primary/15 text-primary",
+    pending: "bg-amber-500/15 text-amber-700",
+    failed: "bg-destructive/15 text-destructive",
+  };
+  return <span className={`text-[10px] uppercase tracking-wider rounded-full px-2 py-0.5 ${map[status] ?? "bg-muted text-muted-foreground"}`}>{status}</span>;
+}

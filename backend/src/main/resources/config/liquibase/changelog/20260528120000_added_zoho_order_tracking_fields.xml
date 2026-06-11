@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260528120000-1" author="cursor">
+        <addColumn tableName="customer_order">
+            <column name="zoho_order_status" type="varchar(40)"/>
+            <column name="tracking_number" type="varchar(120)"/>
+            <column name="tracking_carrier" type="varchar(120)"/>
+            <column name="shipment_date" type="varchar(20)"/>
+            <column name="zoho_tracking_last_pulled_at" type="${datetimeType}"/>
+        </addColumn>
+        <createIndex tableName="customer_order" indexName="idx_customer_order__zoho_tracking_last_pulled_at">
+            <column name="zoho_tracking_last_pulled_at"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

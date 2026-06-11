@@ -1,0 +1,363 @@
+import { render, renderHook, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { AuthProvider, useAuth } from "./useAuth";
+
+const apiMock = vi.hoisted(() => ({
+  get: vi.fn(),
+  post: vi.fn(),
+}));
+
+vi.mock("@/lib/api", () => ({
+  api: apiMock,
+  backendOAuthUrl: (provider: string) => `https://api.test/oauth2/authorization/${provider}`,
+  getAuthToken: vi.fn(() => localStorage.getItem("mnm_backend_jwt")),
+  setAuthToken: vi.fn((token: string | null) => {
+    if (token) localStorage.setItem("mnm_backend_jwt", token);
+    else localStorage.removeItem("mnm_backend_jwt");
+  }),
+  ApiError: class ApiError extends Error {
+    status = 400;
+    body = null;
+    constructor(message: string) {
+      super(message);
+      this.name = "ApiError";
+    }
+  },
+}));
+
+function Harness() {
+  const auth = useAuth();
+  return (
+    <div>
+      <span data-testid="loading">{String(auth.loading)}</span>
+      <span data-testid="user">{auth.user?.email ?? "anonymous"}</span>
+      <span data-testid="admin">{String(auth.isAdmin)}</span>
+      <span data-testid="session">{auth.session?.access_token ?? "none"}</span>
+      <button onClick={() => auth.signIn("admin@example.com", "secret")}>sign in</button>
+      <button onClick={() => auth.signUp("new@example.com", "secret", "New Parent")}>sign up</button>
+      <button onClick={() => auth.signOut()}>sign out</button>
+      <button onClick={() => auth.signInWithOAuth("google", "/account")}>oauth</button>
+      <button onClick={() => auth.completeOAuthSignIn("oauth-token")}>complete oauth</button>
+      <button onClick={() => auth.refreshSession()}>refresh</button>
+    </div>
+  );
+}
+
+function renderAuth() {
+  return render(
+    <AuthProvider>
+      <Harness />
+    </AuthProvider>,
+  );
+}
+
+describe("useAuth", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    apiMock.get.mockResolvedValue({
+      id: 1,
+      login: "parent@example.com",
+      email: "parent@example.com",
+      authorities: ["ROLE_ADMIN"],
+    });
+    apiMock.post.mockImplementation(async (path: string) => {
+      if (path === "/api/authenticate") return { id_token: "token-1" };
+      return null;
+    });
+  });
+
+  it("refreshes the session from storage and clears it when missing", async () => {
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
+
+    localStorage.setItem("mnm_backend_jwt", "token-2");
+    apiMock.get.mockResolvedValueOnce({
+      id: 2,
+      login: "refreshed@example.com",
+      email: "refreshed@example.com",
+      authorities: [],
+    });
+    await userEvent.click(screen.getByRole("button", { name: "refresh" }));
+    await waitFor(() => expect(screen.getByTestId("user")).toHaveTextContent("refreshed@example.com"));
+
+    localStorage.removeItem("mnm_backend_jwt");
+    await userEvent.click(screen.getByRole("button", { name: "refresh" }));
+    await waitFor(() => expect(screen.getByTestId("user")).toHaveTextContent("anonymous"));
+  });
+
+  it("loads account from stored JWT and resolves admin state", async () => {
+    localStorage.setItem("mnm_backend_jwt", "token-1");
+    renderAuth();
+
+    await waitFor(() => expect(screen.getByTestId("admin")).toHaveTextContent("true"));
+    expect(screen.getByTestId("user")).toHaveTextContent("parent@example.com");
+    expect(screen.getByTestId("session")).toHaveTextContent("token-1");
+    expect(apiMock.get).toHaveBeenCalledWith("/api/account", { auth: true, unwrap: false });
+  });
+
+  it("exposes signIn/signUp/signOut/oauth wrappers", async () => {
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
+
+    await userEvent.click(screen.getByRole("button", { name: "sign in" }));
+    expect(apiMock.post).toHaveBeenCalledWith(
+      "/api/authenticate",
+      { username: "admin@example.com", password: "secret", rememberMe: true },
+      { unwrap: false },
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "sign up" }));
+    expect(apiMock.post).toHaveBeenCalledWith(
+      "/api/register",
+      expect.objectContaining({
+        login: "new@example.com",
+        email: "new@example.com",
+        password: "secret",
+      }),
+      { unwrap: false },
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "sign out" }));
+    expect(localStorage.getItem("mnm_backend_jwt")).toBeNull();
+
+    const prev = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...prev, href: "" },
+    });
+    await userEvent.click(screen.getByRole("button", { name: "oauth" }));
+    expect(window.sessionStorage.getItem("mnm_oauth_redirect")).toBe("/account");
+    expect(window.location.href).toBe("https://api.test/oauth2/authorization/google");
+    Object.defineProperty(window, "location", { configurable: true, value: prev });
+  });
+
+  it("throws when useAuth is called outside AuthProvider", () => {
+    expect(() => renderHook(() => useAuth())).toThrow("useAuth must be used inside AuthProvider");
+  });
+
+  it("clears invalid stored tokens during bootstrap", async () => {
+    localStorage.setItem("mnm_backend_jwt", "stale-token");
+    apiMock.get.mockRejectedValueOnce(new Error("unauthorized"));
+    renderAuth();
+
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
+    expect(screen.getByTestId("user")).toHaveTextContent("anonymous");
+    expect(localStorage.getItem("mnm_backend_jwt")).toBeNull();
+  });
+
+  it("reports sign-in failures from the API", async () => {
+    const { ApiError } = await import("@/lib/api");
+    apiMock.post.mockRejectedValueOnce(new ApiError("Bad credentials"));
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await expect(result.current.signIn("bad@example.com", "nope")).resolves.toEqual({
+      error: "Bad credentials",
+    });
+  });
+
+  it("reports sign-up failures and completes OAuth sign-in", async () => {
+    apiMock.post.mockImplementation(async (path: string) => {
+      if (path === "/api/register") throw new Error("Email taken");
+      return null;
+    });
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await expect(result.current.signUp("taken@example.com", "secret")).resolves.toEqual({
+      error: "Email taken",
+    });
+
+    apiMock.get.mockResolvedValueOnce({
+      id: 2,
+      login: "oauth@example.com",
+      email: "oauth@example.com",
+      authorities: [],
+    });
+    await expect(result.current.completeOAuthSignIn("oauth-token")).resolves.toEqual({ error: null });
+    await waitFor(() => expect(result.current.user?.email).toBe("oauth@example.com"));
+  });
+
+  it("handles sign-in responses without tokens or accounts", async () => {
+    apiMock.post.mockResolvedValueOnce({});
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await expect(result.current.signIn("ghost@example.com", "secret")).resolves.toEqual({
+      error: "Sign in failed. Please try again.",
+    });
+
+    apiMock.post.mockResolvedValueOnce({ id_token: "bad-token" });
+    apiMock.get.mockRejectedValueOnce(new Error("account missing"));
+    await expect(result.current.signIn("ghost@example.com", "secret")).resolves.toEqual({
+      error: "Sign in failed. Please try again.",
+    });
+  });
+
+  it("handles OAuth completion failures and sign-up without a full name", async () => {
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    apiMock.get.mockRejectedValueOnce(new Error("bad token"));
+    await expect(result.current.completeOAuthSignIn("bad-token")).resolves.toEqual({
+      error: "Sign in failed. Please try again.",
+    });
+
+    apiMock.post.mockResolvedValueOnce(null);
+    await expect(result.current.signUp("solo@example.com", "secret")).resolves.toEqual({ error: null });
+    expect(apiMock.post).toHaveBeenCalledWith(
+      "/api/register",
+      expect.objectContaining({ firstName: "", lastName: "" }),
+      { unwrap: false },
+    );
+  });
+
+  it("loads non-admin accounts and preserves existing authorization headers", async () => {
+    const fetchImpl = vi.fn(async () => new Response("{}"));
+    vi.stubGlobal("fetch", fetchImpl);
+    localStorage.setItem("mnm_backend_jwt", "token-1");
+    apiMock.get.mockResolvedValueOnce({
+      id: 3,
+      login: "shopper@example.com",
+      email: "shopper@example.com",
+      authorities: undefined,
+    });
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId("admin")).toHaveTextContent("false"));
+
+    await window.fetch("/_serverFn/validateCoupon", {
+      method: "POST",
+      headers: { authorization: "Bearer existing" },
+    });
+    const preserved = new Headers(fetchImpl.mock.calls.at(-1)?.[1]?.headers);
+    expect(preserved.get("authorization")).toBe("Bearer existing");
+    vi.unstubAllGlobals();
+  });
+
+  it("reads headers from Request objects for server function calls", async () => {
+    const fetchImpl = vi.fn(async () => new Response("{}"));
+    vi.stubGlobal("fetch", fetchImpl);
+    localStorage.setItem("mnm_backend_jwt", "token-1");
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
+
+    const request = new Request("http://localhost/_serverFn/from-request", {
+      method: "POST",
+      headers: { authorization: "Bearer preset" },
+    });
+    await window.fetch(request);
+    const headers = new Headers(fetchImpl.mock.calls.at(-1)?.[1]?.headers);
+    expect(headers.get("authorization")).toBe("Bearer preset");
+    vi.unstubAllGlobals();
+  });
+
+  it("supports URL-based server function fetch requests", async () => {
+    const fetchImpl = vi.fn(async () => new Response("{}"));
+    vi.stubGlobal("fetch", fetchImpl);
+    localStorage.setItem("mnm_backend_jwt", "token-1");
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
+
+    await window.fetch(new URL("http://localhost/_serverFn/from-url"));
+    const headers = new Headers(fetchImpl.mock.calls.at(-1)?.[1]?.headers);
+    expect(headers.get("authorization")).toBe("Bearer token-1");
+    vi.unstubAllGlobals();
+  });
+
+  it("injects authorization headers for server function fetch calls", async () => {
+    const fetchImpl = vi.fn(async () => new Response("{}"));
+    vi.stubGlobal("fetch", fetchImpl);
+    localStorage.setItem("mnm_backend_jwt", "token-1");
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
+
+    await window.fetch("/_serverFn/validateCoupon", { method: "POST" });
+
+    const [, init] = fetchImpl.mock.calls.at(-1) ?? [];
+    expect(new Headers(init?.headers).get("authorization")).toBe("Bearer token-1");
+    vi.unstubAllGlobals();
+  });
+
+  it("maps unknown auth errors and OAuth storage failures", async () => {
+    apiMock.post.mockRejectedValueOnce("network-down");
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await expect(result.current.signIn("x@example.com", "secret")).resolves.toEqual({
+      error: "Something went wrong. Please try again.",
+    });
+
+    const prevLocation = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: {
+        ...prevLocation,
+        set href(_value: string) {
+          throw new Error("redirect blocked");
+        },
+        get href() {
+          return "";
+        },
+      },
+    });
+    await expect(result.current.signInWithOAuth("facebook", "/account")).resolves.toEqual({
+      error: "redirect blocked",
+    });
+    Object.defineProperty(window, "location", { configurable: true, value: prevLocation });
+  });
+
+  it("adds auth headers to server function requests made with Request objects", async () => {
+    const fetchImpl = vi.fn(async () => new Response("{}"));
+    vi.stubGlobal("fetch", fetchImpl);
+    localStorage.setItem("mnm_backend_jwt", "token-1");
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
+
+    const request = new Request("http://localhost/_serverFn/validateCoupon", { method: "POST" });
+    await window.fetch(request);
+
+    const [, init] = fetchImpl.mock.calls.at(-1) ?? [];
+    expect(new Headers(init?.headers).get("authorization")).toBe("Bearer token-1");
+    vi.unstubAllGlobals();
+  });
+
+  it("reports complete OAuth sign-in failures when account loading fails", async () => {
+    apiMock.get.mockRejectedValueOnce(new Error("OAuth failed"));
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await expect(result.current.completeOAuthSignIn("oauth-token")).resolves.toEqual({
+      error: "Sign in failed. Please try again.",
+    });
+  });
+
+  it("logs interceptor failures in development", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchImpl = vi.fn(async () => new Response("{}"));
+    vi.stubGlobal("fetch", fetchImpl);
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
+
+    await window.fetch({
+      get url() {
+        throw new Error("bad input");
+      },
+    } as RequestInfo);
+
+    expect(consoleSpy).toHaveBeenCalledWith("useAuth fetch interceptor error", expect.any(Error));
+    consoleSpy.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it("leaves fetch untouched for non-server requests and when no token exists", async () => {
+    const fetchImpl = vi.fn(async () => new Response("{}"));
+    vi.stubGlobal("fetch", fetchImpl);
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
+
+    await window.fetch("/api/products");
+    const [, init] = fetchImpl.mock.calls.at(-1) ?? [];
+    expect(new Headers(init?.headers).get("authorization")).toBeNull();
+    vi.unstubAllGlobals();
+  });
+});

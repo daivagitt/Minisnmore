@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260602154500-1" author="codex">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="zoho_setting"/>
+                <not>
+                    <columnExists tableName="zoho_setting" columnName="pull_products_auto_create_category"/>
+                </not>
+            </and>
+        </preConditions>
+
+        <addColumn tableName="zoho_setting">
+            <column name="pull_products_auto_create_category" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>

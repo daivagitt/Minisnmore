@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Zoho live API tests</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:24px;max-width:1100px}
+table{width:100%;border-collapse:collapse} th,td{border-bottom:1px solid #e2e8f0;padding:8px;text-align:left}
+.code-ok{color:#15803d;font-weight:600} .code-fail{color:#b91c1c;font-weight:600}
+.meta{color:#64748b;margin-bottom:16px}
+</style></head><body>
+<h1>Zoho live API integration tests</h1>
+<p class="meta">Target: <strong>http://127.0.0.1:9180</strong> · 2026-06-05T12:16:54.168377+00:00 ·
+Passed <strong>9</strong> / 11 (2xx)</p>
+<table><thead><tr><th>Method</th><th>Path</th><th>Status</th><th>Time</th><th>Note</th></tr></thead>
+<tbody><tr><td><code>POST</code></td><td><code>/api/authenticate (admin)</code></td><td class="code-ok">200</td><td>0 ms</td><td>admin login</td></tr><tr><td><code>GET</code></td><td><code>/api/v1/admin/zoho-settings</code></td><td class="code-ok">200</td><td>93 ms</td><td></td></tr><tr><td><code>GET</code></td><td><code>/api/v1/admin/zoho/integration-status</code></td><td class="code-ok">200</td><td>95 ms</td><td></td></tr><tr><td><code>GET</code></td><td><code>/api/v1/admin/zoho/oauth-setup</code></td><td class="code-ok">200</td><td>91 ms</td><td></td></tr><tr><td><code>GET</code></td><td><code>/api/v1/admin/zoho/connect-url</code></td><td class="code-ok">200</td><td>94 ms</td><td></td></tr><tr><td><code>GET</code></td><td><code>/api/v1/admin/zoho/test</code></td><td class="code-fail">403</td><td>94 ms</td><td>HTTP error</td></tr><tr><td><code>POST</code></td><td><code>/api/v1/admin/zoho/pull-inventory</code></td><td class="code-ok">200</td><td>2899 ms</td><td></td></tr><tr><td><code>POST</code></td><td><code>/api/v1/admin/zoho/pull-products</code></td><td class="code-fail">403</td><td>101 ms</td><td>HTTP error</td></tr><tr><td><code>POST</code></td><td><code>/api/v1/admin/zoho/retry-orders</code></td><td class="code-ok">200</td><td>98 ms</td><td></td></tr><tr><td><code>POST</code></td><td><code>/api/v1/admin/zoho/sync-products</code></td><td class="code-ok">200</td><td>2664 ms</td><td></td></tr><tr><td><code>POST</code></td><td><code>/api/v1/admin/zoho/pull-order-tracking</code></td><td class="code-ok">200</td><td>471 ms</td><td></td></tr></tbody></table>
+<p class="meta">Read-only checks + live Zoho Books mutations (pull/sync/test). Non-2xx may mean missing OAuth or no SKUs in Zoho.</p>
+</body></html>

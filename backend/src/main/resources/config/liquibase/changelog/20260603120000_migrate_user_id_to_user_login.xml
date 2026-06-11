@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- For databases created from the old monolith schema (user_id FK). Fresh microservice installs already use user_login. -->
+    <changeSet id="20260603120000-customer-profile-user-login" author="miniandmore">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="customer_profile"/>
+                <columnExists tableName="customer_profile" columnName="user_id"/>
+                <not>
+                    <columnExists tableName="customer_profile" columnName="user_login"/>
+                </not>
+            </and>
+        </preConditions>
+        <addColumn tableName="customer_profile">
+            <column name="user_login" type="varchar(50)"/>
+        </addColumn>
+        <sql dbms="postgresql">
+            UPDATE customer_profile cp
+            SET user_login = LOWER(u.login)
+            FROM jhi_user u
+            WHERE cp.user_id = u.id AND cp.user_login IS NULL;
+        </sql>
+        <dropForeignKeyConstraint baseTableName="customer_profile" constraintName="fk_customer_profile__user_id"/>
+        <dropColumn tableName="customer_profile" columnName="user_id"/>
+        <addNotNullConstraint tableName="customer_profile" columnName="user_login" columnDataType="varchar(50)"/>
+        <addUniqueConstraint tableName="customer_profile" columnNames="user_login" constraintName="ux_customer_profile__user_login"/>
+    </changeSet>
+
+    <changeSet id="20260603120000-customer-order-user-login" author="miniandmore">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="customer_order"/>
+                <columnExists tableName="customer_order" columnName="user_id"/>
+                <not>
+                    <columnExists tableName="customer_order" columnName="user_login"/>
+                </not>
+            </and>
+        </preConditions>
+        <addColumn tableName="customer_order">
+            <column name="user_login" type="varchar(50)"/>
+        </addColumn>
+        <sql dbms="postgresql">
+            UPDATE customer_order co
+            SET user_login = LOWER(u.login)
+            FROM jhi_user u
+            WHERE co.user_id = u.id AND co.user_login IS NULL;
+        </sql>
+        <dropForeignKeyConstraint baseTableName="customer_order" constraintName="fk_customer_order__user_id"/>
+        <dropColumn tableName="customer_order" columnName="user_id"/>
+    </changeSet>
+</databaseChangeLog>

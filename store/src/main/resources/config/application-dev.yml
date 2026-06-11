@@ -1,0 +1,18 @@
+spring:
+  cloud:
+    consul:
+      host: localhost
+      port: 8500
+
+logging:
+  level:
+    com.miniandmore.store: DEBUG
+
+jhipster:
+  security:
+    authentication:
+      jwt:
+        base64-secret: ${JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET:NWNhYWRmODZlZDAzNzg4NGY2NTA0MzAyZTdjNjI2ZjYzYWI2YmQ3Yjk4ZDA5NGVkODNhYWY2ZmExOTJmZjA3YmJhNDdiYTYxMTdjZmM2ZWUyMmMwMzQyMTY1NDBjNTc5ODg4MjNkZjExODFmZjUwNDdlNjVhOTlhMWE5MjRjYTU=}
+
+application:
+  catalog-base-url: http://127.0.0.1:8084

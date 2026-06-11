@@ -1,0 +1,498 @@
+{
+  "collection": {
+    "item": [
+      {
+        "id": "39f7f4e3-41b5-41ef-9b87-ee87635e60a0",
+        "name": "POST register",
+        "request": {
+          "url": {
+            "path": [
+              "api",
+              "register"
+            ],
+            "host": [
+              "{{baseUrl}}"
+            ],
+            "query": [],
+            "variable": []
+          },
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "key": "Accept",
+              "value": "application/json"
+            }
+          ],
+          "method": "POST",
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"login\": \"{{registerLogin}}\",\n  \"email\": \"{{registerEmail}}\",\n  \"password\": \"{{registerPassword}}\",\n  \"firstName\": \"Perf\",\n  \"lastName\": \"Test\",\n  \"langKey\": \"en\"\n}"
+          }
+        },
+        "response": [],
+        "event": [
+          {
+            "listen": "prerequest",
+            "script": {
+              "id": "5879c73b-0b77-4cfc-baa4-cf60456b5512",
+              "type": "text/javascript",
+              "exec": [
+                "const seed = pm.environment.get('workerSeed') || pm.collectionVariables.get('workerSeed') || '0';",
+                "const ts = Date.now();",
+                "const login = `perf${ts}${seed}`;",
+                "pm.variables.set('registerLogin', login);",
+                "pm.variables.set('registerEmail', `${login}@uat.test`);"
+              ],
+              "_lastExecutionId": "809324f6-3f28-41d3-bd15-d6245eac3c4c"
+            }
+          },
+          {
+            "listen": "test",
+            "script": {
+              "id": "a3b27370-ce45-463e-ac76-ddef9cb4bd4d",
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 201 Created', () => pm.expect(pm.response.code).to.eql(201));"
+              ],
+              "_lastExecutionId": "ce5ab70d-0c1b-4525-b398-e9065d42e3a6"
+            }
+          }
+        ]
+      }
+    ],
+    "auth": {
+      "type": "noauth",
+      "noauth": []
+    },
+    "event": [],
+    "variable": [
+      {
+        "type": "any",
+        "value": "https://uat.minisnmore.com",
+        "key": "baseUrl"
+      },
+      {
+        "type": "any",
+        "value": "5000",
+        "key": "perfMaxMs"
+      },
+      {
+        "type": "any",
+        "value": "1",
+        "key": "workerSeed"
+      },
+      {
+        "type": "any",
+        "value": "Zero@1234",
+        "key": "registerPassword"
+      }
+    ],
+    "info": {
+      "_postman_id": "a80cfce9-7e63-45d0-b9b2-8d5a5655713f",
+      "name": "Minis n More API — Register performance",
+      "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+      "description": {
+        "content": "POST /api/register with unique credentials per worker. Run via Newman parallel workers.",
+        "type": "text/plain"
+      }
+    }
+  },
+  "environment": {
+    "_": {
+      "postman_variable_scope": "environment",
+      "postman_exported_using": "generate-module-wise-collection.py"
+    },
+    "id": "0d56603e-5577-4df0-88db-0ec9d6d30233",
+    "name": "Minis n More — API testing (UAT)",
+    "values": [
+      {
+        "type": "any",
+        "value": "",
+        "key": "activationKey"
+      },
+      {
+        "type": "any",
+        "value": "",
+        "key": "authToken"
+      },
+      {
+        "type": "any",
+        "value": "https://uat.minisnmore.com",
+        "key": "baseUrl"
+      },
+      {
+        "type": "any",
+        "value": "admin@uat.minisnmore.com",
+        "key": "email"
+      },
+      {
+        "type": "any",
+        "value": "1",
+        "key": "id"
+      },
+      {
+        "type": "any",
+        "value": "",
+        "key": "key"
+      },
+      {
+        "type": "any",
+        "value": "admin",
+        "key": "login"
+      },
+      {
+        "type": "any",
+        "value": "admin",
+        "key": "newPassword"
+      },
+      {
+        "type": "any",
+        "value": "{{id}}",
+        "key": "orderNumber"
+      },
+      {
+        "type": "any",
+        "value": "",
+        "key": "password"
+      },
+      {
+        "type": "any",
+        "value": "",
+        "key": "resetKey"
+      },
+      {
+        "type": "any",
+        "value": "{{id}}",
+        "key": "slug"
+      },
+      {
+        "type": "any",
+        "value": "{{email}}",
+        "key": "username"
+      },
+      {
+        "type": "any",
+        "value": "8000",
+        "key": "perfMaxMs"
+      },
+      {
+        "type": "any",
+        "value": "5",
+        "key": "workerSeed"
+      }
+    ]
+  },
+  "globals": {
+    "id": "256c6581-27a7-4324-b0a1-06d60e450e50",
+    "values": []
+  },
+  "run": {
+    "stats": {
+      "iterations": {
+        "total": 1,
+        "pending": 0,
+        "failed": 0
+      },
+      "items": {
+        "total": 1,
+        "pending": 0,
+        "failed": 0
+      },
+      "scripts": {
+        "total": 2,
+        "pending": 0,
+        "failed": 0
+      },
+      "prerequests": {
+        "total": 1,
+        "pending": 0,
+        "failed": 0
+      },
+      "requests": {
+        "total": 1,
+        "pending": 0,
+        "failed": 0
+      },
+      "tests": {
+        "total": 1,
+        "pending": 0,
+        "failed": 0
+      },
+      "assertions": {
+        "total": 1,
+        "pending": 0,
+        "failed": 0
+      },
+      "testScripts": {
+        "total": 1,
+        "pending": 0,
+        "failed": 0
+      },
+      "prerequestScripts": {
+        "total": 1,
+        "pending": 0,
+        "failed": 0
+      }
+    },
+    "timings": {
+      "responseAverage": 10535,
+      "responseMin": 10535,
+      "responseMax": 10535,
+      "responseSd": 0,
+      "dnsAverage": 0,
+      "dnsMin": 0,
+      "dnsMax": 0,
+      "dnsSd": 0,
+      "firstByteAverage": 0,
+      "firstByteMin": 0,
+      "firstByteMax": 0,
+      "firstByteSd": 0,
+      "started": 1780647884835,
+      "completed": 1780647895981
+    },
+    "executions": [
+      {
+        "cursor": {
+          "position": 0,
+          "iteration": 0,
+          "length": 1,
+          "cycles": 1,
+          "empty": false,
+          "eof": false,
+          "bof": true,
+          "cr": false,
+          "ref": "091d37c2-f48b-4b4f-ab55-1f22f866a88d",
+          "httpRequestId": "abe83f99-f2d0-450a-8381-d8769b06d6b0"
+        },
+        "item": {
+          "id": "39f7f4e3-41b5-41ef-9b87-ee87635e60a0",
+          "name": "POST register",
+          "request": {
+            "url": {
+              "path": [
+                "api",
+                "register"
+              ],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "method": "POST",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"login\": \"{{registerLogin}}\",\n  \"email\": \"{{registerEmail}}\",\n  \"password\": \"{{registerPassword}}\",\n  \"firstName\": \"Perf\",\n  \"lastName\": \"Test\",\n  \"langKey\": \"en\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "id": "5879c73b-0b77-4cfc-baa4-cf60456b5512",
+                "type": "text/javascript",
+                "exec": [
+                  "const seed = pm.environment.get('workerSeed') || pm.collectionVariables.get('workerSeed') || '0';",
+                  "const ts = Date.now();",
+                  "const login = `perf${ts}${seed}`;",
+                  "pm.variables.set('registerLogin', login);",
+                  "pm.variables.set('registerEmail', `${login}@uat.test`);"
+                ],
+                "_lastExecutionId": "809324f6-3f28-41d3-bd15-d6245eac3c4c"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "id": "a3b27370-ce45-463e-ac76-ddef9cb4bd4d",
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 Created', () => pm.expect(pm.response.code).to.eql(201));"
+                ],
+                "_lastExecutionId": "ce5ab70d-0c1b-4525-b398-e9065d42e3a6"
+              }
+            }
+          ]
+        },
+        "request": {
+          "url": {
+            "protocol": "https",
+            "path": [
+              "api",
+              "register"
+            ],
+            "host": [
+              "uat",
+              "minisnmore",
+              "com"
+            ],
+            "query": [],
+            "variable": []
+          },
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "key": "Accept",
+              "value": "application/json"
+            },
+            {
+              "key": "User-Agent",
+              "value": "PostmanRuntime/7.39.1",
+              "system": true
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache",
+              "system": true
+            },
+            {
+              "key": "Postman-Token",
+              "value": "a9702477-b18c-4e1b-bf89-ed50abc4ef3d",
+              "system": true
+            },
+            {
+              "key": "Host",
+              "value": "uat.minisnmore.com",
+              "system": true
+            },
+            {
+              "key": "Accept-Encoding",
+              "value": "gzip, deflate, br",
+              "system": true
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive",
+              "system": true
+            },
+            {
+              "key": "Content-Length",
+              "value": "168",
+              "system": true
+            }
+          ],
+          "method": "POST",
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"login\": \"perf17806478851295\",\n  \"email\": \"perf17806478851295@uat.test\",\n  \"password\": \"Zero@1234\",\n  \"firstName\": \"Perf\",\n  \"lastName\": \"Test\",\n  \"langKey\": \"en\"\n}"
+          },
+          "auth": {
+            "type": "noauth",
+            "noauth": []
+          }
+        },
+        "response": {
+          "id": "a49aa8e7-67e6-460c-9520-8f1e62556c88",
+          "status": "Created",
+          "code": 201,
+          "header": [
+            {
+              "key": "Server",
+              "value": "nginx/1.24.0 (Ubuntu)"
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 05 Jun 2026 08:24:55 GMT"
+            },
+            {
+              "key": "Content-Length",
+              "value": "0"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Vary",
+              "value": "Origin"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Method"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Headers"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, no-store, max-age=0, must-revalidate"
+            },
+            {
+              "key": "Pragma",
+              "value": "no-cache"
+            },
+            {
+              "key": "Expires",
+              "value": "0"
+            },
+            {
+              "key": "X-Content-Type-Options",
+              "value": "nosniff"
+            },
+            {
+              "key": "Strict-Transport-Security",
+              "value": "max-age=31536000 ; includeSubDomains"
+            },
+            {
+              "key": "X-Frame-Options",
+              "value": "DENY"
+            },
+            {
+              "key": "X-XSS-Protection",
+              "value": "0"
+            },
+            {
+              "key": "Permissions-Policy",
+              "value": "camera=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), sync-xhr=()"
+            },
+            {
+              "key": "Content-Security-Policy",
+              "value": "default-src 'self'; frame-src 'self' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://storage.googleapis.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:"
+            },
+            {
+              "key": "Referrer-Policy",
+              "value": "strict-origin-when-cross-origin"
+            }
+          ],
+          "stream": {
+            "type": "Buffer",
+            "data": []
+          },
+          "cookie": [],
+          "responseTime": 10535,
+          "responseSize": 0
+        },
+        "id": "39f7f4e3-41b5-41ef-9b87-ee87635e60a0",
+        "assertions": [
+          {
+            "assertion": "Status is 201 Created",
+            "skipped": false
+          }
+        ]
+      }
+    ],
+    "transfers": {
+      "responseTotal": 0
+    },
+    "failures": [],
+    "error": null
+  }
+}

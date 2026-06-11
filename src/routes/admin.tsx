@@ -1,0 +1,139 @@
+import { createFileRoute, Outlet, Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  LayoutDashboard, Image as ImgIcon, Tag, BookOpen, FileText, Package, Plug, LogOut, Loader2,
+  Folder, Home, EyeOff, Settings as SettingsIcon, ExternalLink, RotateCcw,
+} from "lucide-react";
+
+export const Route = createFileRoute("/admin")({
+  head: () => ({ meta: [{ title: "Admin · Mini's n More" }] }),
+  component: AdminLayout,
+});
+
+const nav = [
+  { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { to: "/admin/settings", label: "Site settings", icon: SettingsIcon },
+  { to: "/admin/banners", label: "Banners", icon: ImgIcon },
+  { to: "/admin/categories", label: "Categories", icon: Folder },
+  { to: "/admin/products", label: "Products", icon: Package },
+  { to: "/admin/home", label: "Home sections", icon: Home },
+  { to: "/admin/pages", label: "Page visibility", icon: EyeOff },
+  { to: "/admin/coupons", label: "Coupons", icon: Tag },
+  { to: "/admin/blog", label: "Blogs", icon: BookOpen },
+  { to: "/admin/policies", label: "Policies", icon: FileText },
+  { to: "/admin/zoho", label: "Zoho settings", icon: Plug },
+  { to: "/admin/returns", label: "Order returns", icon: RotateCcw },
+];
+
+function AdminLayout() {
+  const { user, isAdmin, loading, signOut } = useAuth();
+  const navigate = useNavigate();
+  const path = useRouterState({ select: (s) => s.location.pathname });
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user && path !== "/admin/login") navigate({ to: "/admin/login" });
+  }, [user, loading, path, navigate]);
+
+  // login route renders standalone
+  if (path === "/admin/login") return <Outlet />;
+
+  if (!loading && user && !isAdmin) {
+    return (
+      <div className="px-4 max-w-md mx-auto">
+        <div className="glass-strong rounded-[2rem] p-8 text-center">
+          <h1 className="font-display text-3xl">Not authorised</h1>
+          <p className="text-sm text-muted-foreground mt-2">Your account is signed in but doesn&rsquo;t have admin access.</p>
+          <button onClick={() => signOut()} className="mt-5 rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm">
+            Sign out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-3 md:px-6 min-h-screen py-4 md:py-6 lg:grid lg:grid-cols-[272px_1fr] lg:gap-6 lg:items-stretch">
+      {/* Sticky sidebar on desktop — darker glossy warm-brown theme */}
+      <aside
+        className="hidden lg:flex flex-col gap-1.5 rounded-[1.75rem] p-4 sticky top-4 self-start min-h-[calc(100vh-2rem)] shadow-[0_30px_80px_-28px_rgba(90,40,15,0.7),inset_0_1px_0_rgba(255,255,255,0.35)] ring-1 ring-white/20 backdrop-blur-xl text-white relative overflow-hidden"
+        style={{
+          backgroundImage:
+            "linear-gradient(155deg, #4a230f 0%, #7a3d1e 30%, #b06a36 55%, #8a4824 80%, #5a2c14 100%)",
+        }}
+      >
+        <div className="pointer-events-none absolute inset-0 rounded-[1.75rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.28),rgba(255,255,255,0.04)_38%,rgba(0,0,0,0.18)_100%)]" aria-hidden />
+        <div className="pointer-events-none absolute -top-1/3 -left-1/4 h-[60%] w-[140%] rotate-[-8deg] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(255,225,190,0.35),transparent_60%)] blur-2xl" aria-hidden />
+        <div className="pointer-events-none absolute inset-x-3 top-2 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent" aria-hidden />
+        <div className="relative px-2 pb-3 mb-1 border-b border-white/15">
+          <div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/90 font-semibold">Admin</div>
+          <div className="font-display text-lg leading-tight mt-0.5 text-white">Mini's n More</div>
+        </div>
+        {nav.map((n) => {
+          const active = n.exact ? path === n.to : path.startsWith(n.to);
+          return (
+            <Link key={n.to} to={n.to}
+              className={`group relative flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm whitespace-nowrap transition-all duration-200 ${
+                active
+                  ? "bg-gradient-to-r from-white/95 to-amber-50/90 text-[#6b3a1f] shadow-[0_10px_24px_-10px_rgba(0,0,0,0.45)] font-semibold ring-1 ring-white/60"
+                  : "text-amber-50/90 hover:bg-white/10 hover:text-white hover:translate-x-0.5"
+              }`}>
+              {active && <span className="absolute left-1 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#6b3a1f]/70" aria-hidden />}
+              <n.icon className={`h-4 w-4 ${active ? "" : "text-amber-100/80 group-hover:text-white"}`} /> <span>{n.label}</span>
+            </Link>
+          );
+        })}
+        <Link
+          to="/"
+          className="relative mt-2 flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm text-amber-50/90 hover:bg-white/10 hover:text-white transition"
+        >
+          <ExternalLink className="h-4 w-4 text-amber-100/80" /> View storefront
+        </Link>
+        <div className="relative mt-auto pt-3 border-t border-white/15">
+          <button onClick={() => signOut()}
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm text-amber-50/90 hover:bg-white/10 hover:text-white transition">
+            <LogOut className="h-4 w-4" /> Sign out
+          </button>
+        </div>
+      </aside>
+
+      {/* Mobile horizontal nav */}
+      <aside
+        className="lg:hidden rounded-[1.5rem] p-2 mb-4 flex gap-2 overflow-x-auto shadow-soft ring-1 ring-white/10 backdrop-blur-xl text-white"
+        style={{
+          backgroundImage:
+            "linear-gradient(160deg, #6b3a1f 0%, #8a4a26 38%, #b56b3a 72%, #7a3f22 100%)",
+        }}
+      >
+        {nav.map((n) => {
+          const active = n.exact ? path === n.to : path.startsWith(n.to);
+          return (
+            <Link key={n.to} to={n.to}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm whitespace-nowrap transition ${
+                active
+                  ? "bg-white text-[#6b3a1f] shadow-md font-semibold"
+                  : "text-amber-50/90 hover:bg-white/10 hover:text-white"
+              }`}>
+              <n.icon className="h-4 w-4" /> <span>{n.label}</span>
+            </Link>
+          );
+        })}
+        <button onClick={() => signOut()}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-amber-50/90 hover:bg-white/10 hover:text-white whitespace-nowrap transition">
+          <LogOut className="h-4 w-4" /> Sign out
+        </button>
+      </aside>
+
+      <section className="min-w-0 w-full pb-8">
+        {loading || !user ? (
+          <div className="grid place-items-center py-24">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        ) : (
+          <Outlet />
+        )}
+      </section>
+    </div>
+  );
+}

@@ -1,0 +1,10 @@
+com.miniandmore.integration
+com.miniandmore.integration.config
+com.miniandmore.integration.domain
+com.miniandmore.integration.domain.enumeration
+com.miniandmore.integration.repository
+com.miniandmore.integration.security
+com.miniandmore.integration.service
+com.miniandmore.integration.service.dto
+com.miniandmore.integration.service.mapper
+com.miniandmore.integration.web

@@ -1,0 +1,2055 @@
+{
+  "summary": {
+    "strategy": "OpenAPI-driven: payloads from spec/schemas, skip user-interaction endpoints",
+    "openapiSource": "http://127.0.0.1:9180/v3/api-docs",
+    "baseUrl": "https://uat.minisnmore.com",
+    "skippedUserInteraction": 8,
+    "totalOpenApiOps": 170,
+    "requestsRun": 175,
+    "openapiOpsMarked": 207,
+    "adminLogin": 200,
+    "customerLogin": 200,
+    "pass2xx": 56,
+    "fail": 95,
+    "skipped": 24,
+    "passRatePct": 37.1,
+    "credentials": {
+      "admin": "admin",
+      "customer": "irfanpatan9948@gmail.com"
+    }
+  },
+  "byModule": {
+    "setup": {
+      "pass": 2,
+      "fail": 0,
+      "skip": 0
+    },
+    "products": {
+      "pass": 1,
+      "fail": 1,
+      "skip": 1
+    },
+    "storefront": {
+      "pass": 10,
+      "fail": 0,
+      "skip": 0
+    },
+    "banners": {
+      "pass": 0,
+      "fail": 1,
+      "skip": 1
+    },
+    "blog-posts": {
+      "pass": 0,
+      "fail": 1,
+      "skip": 1
+    },
+    "categories": {
+      "pass": 0,
+      "fail": 1,
+      "skip": 1
+    },
+    "coupons": {
+      "pass": 0,
+      "fail": 1,
+      "skip": 1
+    },
+    "home-sections": {
+      "pass": 0,
+      "fail": 1,
+      "skip": 1
+    },
+    "page-visibilities": {
+      "pass": 0,
+      "fail": 1,
+      "skip": 1
+    },
+    "policies": {
+      "pass": 0,
+      "fail": 1,
+      "skip": 1
+    },
+    "site-settings": {
+      "pass": 0,
+      "fail": 1,
+      "skip": 1
+    },
+    "zoho-settings": {
+      "pass": 0,
+      "fail": 1,
+      "skip": 1
+    },
+    "admin-banners": {
+      "pass": 4,
+      "fail": 0,
+      "skip": 0
+    },
+    "admin-categories": {
+      "pass": 4,
+      "fail": 0,
+      "skip": 0
+    },
+    "admin-coupons": {
+      "pass": 4,
+      "fail": 0,
+      "skip": 0
+    },
+    "admin-policies": {
+      "pass": 4,
+      "fail": 0,
+      "skip": 0
+    },
+    "admin-blog-posts": {
+      "pass": 4,
+      "fail": 0,
+      "skip": 0
+    },
+    "admin-home-sections": {
+      "pass": 1,
+      "fail": 0,
+      "skip": 1
+    },
+    "admin-page-visibility": {
+      "pass": 2,
+      "fail": 0,
+      "skip": 0
+    },
+    "customer-profiles": {
+      "pass": 0,
+      "fail": 1,
+      "skip": 1
+    },
+    "customer-orders": {
+      "pass": 0,
+      "fail": 2,
+      "skip": 1
+    },
+    "order-items": {
+      "pass": 0,
+      "fail": 0,
+      "skip": 1
+    },
+    "admin-users": {
+      "pass": 0,
+      "fail": 1,
+      "skip": 0
+    },
+    "authorities": {
+      "pass": 3,
+      "fail": 0,
+      "skip": 0
+    },
+    "admin": {
+      "pass": 9,
+      "fail": 0,
+      "skip": 0
+    },
+    "customer": {
+      "pass": 5,
+      "fail": 0,
+      "skip": 2
+    },
+    "account": {
+      "pass": 0,
+      "fail": 0,
+      "skip": 6
+    },
+    "user": {
+      "pass": 1,
+      "fail": 3,
+      "skip": 0
+    },
+    "authenticate": {
+      "pass": 1,
+      "fail": 0,
+      "skip": 0
+    },
+    "banner": {
+      "pass": 0,
+      "fail": 2,
+      "skip": 0
+    },
+    "banner-resource": {
+      "pass": 0,
+      "fail": 4,
+      "skip": 0
+    },
+    "blog-post": {
+      "pass": 0,
+      "fail": 1,
+      "skip": 0
+    },
+    "blog-post-resource": {
+      "pass": 0,
+      "fail": 4,
+      "skip": 0
+    },
+    "category": {
+      "pass": 0,
+      "fail": 2,
+      "skip": 0
+    },
+    "category-resource": {
+      "pass": 0,
+      "fail": 4,
+      "skip": 0
+    },
+    "coupon": {
+      "pass": 0,
+      "fail": 2,
+      "skip": 0
+    },
+    "coupon-resource": {
+      "pass": 0,
+      "fail": 4,
+      "skip": 0
+    },
+    "customer-order": {
+      "pass": 0,
+      "fail": 2,
+      "skip": 0
+    },
+    "customer-order-resource": {
+      "pass": 0,
+      "fail": 4,
+      "skip": 0
+    },
+    "customer-profile": {
+      "pass": 0,
+      "fail": 2,
+      "skip": 0
+    },
+    "customer-profile-resource": {
+      "pass": 0,
+      "fail": 4,
+      "skip": 0
+    },
+    "home-section": {
+      "pass": 0,
+      "fail": 2,
+      "skip": 0
+    },
+    "home-section-resource": {
+      "pass": 0,
+      "fail": 4,
+      "skip": 0
+    },
+    "order-item": {
+      "pass": 0,
+      "fail": 3,
+      "skip": 0
+    },
+    "order-item-resource": {
+      "pass": 0,
+      "fail": 4,
+      "skip": 0
+    },
+    "page-visibility": {
+      "pass": 0,
+      "fail": 2,
+      "skip": 0
+    },
+    "page-visibility-resource": {
+      "pass": 0,
+      "fail": 4,
+      "skip": 0
+    },
+    "policy": {
+      "pass": 0,
+      "fail": 1,
+      "skip": 0
+    },
+    "policy-resource": {
+      "pass": 0,
+      "fail": 4,
+      "skip": 0
+    },
+    "product": {
+      "pass": 0,
+      "fail": 4,
+      "skip": 0
+    },
+    "site-setting": {
+      "pass": 0,
+      "fail": 2,
+      "skip": 0
+    },
+    "site-setting-resource": {
+      "pass": 0,
+      "fail": 4,
+      "skip": 0
+    },
+    "admin-store": {
+      "pass": 1,
+      "fail": 3,
+      "skip": 0
+    },
+    "storage-upload": {
+      "pass": 0,
+      "fail": 0,
+      "skip": 2
+    },
+    "zoho-setting": {
+      "pass": 0,
+      "fail": 2,
+      "skip": 0
+    },
+    "zoho-setting-resource": {
+      "pass": 0,
+      "fail": 4,
+      "skip": 0
+    }
+  },
+  "results": [
+    {
+      "module": "setup",
+      "method": "POST",
+      "path": "/api/authenticate (admin)",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "admin",
+      "responseTimeMs": null
+    },
+    {
+      "module": "setup",
+      "method": "POST",
+      "path": "/api/authenticate (customer)",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "customer",
+      "responseTimeMs": null
+    },
+    {
+      "module": "products",
+      "method": "POST",
+      "path": "/api/v1/admin/products",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "seed product",
+      "responseTimeMs": 186
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/banners",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 100
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/blog-posts",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 105
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/categories",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 99
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/home-sections",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 89
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/page-visibility",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 96
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/products",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 306
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/site-settings",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 27
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/pincode/560001",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 351
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/products/cap-socks-mitten-set",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 33
+    },
+    {
+      "module": "banners",
+      "method": "POST",
+      "path": "/api/banners",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/banners.\\\"\",\"instance\":\"/api/banners\",\"message\":\"erro",
+      "responseTimeMs": 18
+    },
+    {
+      "module": "banners",
+      "method": "\u2014",
+      "path": "/api/banners/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skip: no id from POST",
+      "responseTimeMs": null
+    },
+    {
+      "module": "blog-posts",
+      "method": "POST",
+      "path": "/api/blog-posts",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/blog-posts.\\\"\",\"instance\":\"/api/blog-posts\",\"message\"",
+      "responseTimeMs": 37
+    },
+    {
+      "module": "blog-posts",
+      "method": "\u2014",
+      "path": "/api/blog-posts/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skip: no id from POST",
+      "responseTimeMs": null
+    },
+    {
+      "module": "categories",
+      "method": "POST",
+      "path": "/api/categories",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/categories.\\\"\",\"instance\":\"/api/categories\",\"message\"",
+      "responseTimeMs": 17
+    },
+    {
+      "module": "categories",
+      "method": "\u2014",
+      "path": "/api/categories/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skip: no id from POST",
+      "responseTimeMs": null
+    },
+    {
+      "module": "coupons",
+      "method": "POST",
+      "path": "/api/coupons",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/coupons.\\\"\",\"instance\":\"/api/coupons\",\"message\":\"erro",
+      "responseTimeMs": 15
+    },
+    {
+      "module": "coupons",
+      "method": "\u2014",
+      "path": "/api/coupons/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skip: no id from POST",
+      "responseTimeMs": null
+    },
+    {
+      "module": "home-sections",
+      "method": "POST",
+      "path": "/api/home-sections",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/home-sections.\\\"\",\"instance\":\"/api/home-sections\",\"me",
+      "responseTimeMs": 13
+    },
+    {
+      "module": "home-sections",
+      "method": "\u2014",
+      "path": "/api/home-sections/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skip: no id from POST",
+      "responseTimeMs": null
+    },
+    {
+      "module": "page-visibilities",
+      "method": "POST",
+      "path": "/api/page-visibilities",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/page-visibilities.\\\"\",\"instance\":\"/api/page-visibilit",
+      "responseTimeMs": 55
+    },
+    {
+      "module": "page-visibilities",
+      "method": "\u2014",
+      "path": "/api/page-visibilities/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skip: no id from POST",
+      "responseTimeMs": null
+    },
+    {
+      "module": "policies",
+      "method": "POST",
+      "path": "/api/policies",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/policies.\\\"\",\"instance\":\"/api/policies\",\"message\":\"er",
+      "responseTimeMs": 14
+    },
+    {
+      "module": "policies",
+      "method": "\u2014",
+      "path": "/api/policies/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skip: no id from POST",
+      "responseTimeMs": null
+    },
+    {
+      "module": "products",
+      "method": "POST",
+      "path": "/api/products",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/products.\\\"\",\"instance\":\"/api/products\",\"message\":\"er",
+      "responseTimeMs": 16
+    },
+    {
+      "module": "products",
+      "method": "\u2014",
+      "path": "/api/products/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skip: no id from POST",
+      "responseTimeMs": null
+    },
+    {
+      "module": "site-settings",
+      "method": "POST",
+      "path": "/api/site-settings",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/site-settings.\\\"\",\"instance\":\"/api/site-settings\",\"me",
+      "responseTimeMs": 13
+    },
+    {
+      "module": "site-settings",
+      "method": "\u2014",
+      "path": "/api/site-settings/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skip: no id from POST",
+      "responseTimeMs": null
+    },
+    {
+      "module": "zoho-settings",
+      "method": "POST",
+      "path": "/api/zoho-settings",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/zoho-settings.\\\"\",\"instance\":\"/api/zoho-settings\",\"me",
+      "responseTimeMs": 57
+    },
+    {
+      "module": "zoho-settings",
+      "method": "\u2014",
+      "path": "/api/zoho-settings/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skip: no id from POST",
+      "responseTimeMs": null
+    },
+    {
+      "module": "admin-banners",
+      "method": "POST",
+      "path": "/api/v1/admin/banners",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "create",
+      "responseTimeMs": 38
+    },
+    {
+      "module": "admin-banners",
+      "method": "GET",
+      "path": "/api/v1/admin/banners",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 58
+    },
+    {
+      "module": "admin-banners",
+      "method": "PUT",
+      "path": "/api/v1/admin/banners/29652",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 36
+    },
+    {
+      "module": "admin-banners",
+      "method": "DELETE",
+      "path": "/api/v1/admin/banners/29652",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 36
+    },
+    {
+      "module": "admin-categories",
+      "method": "POST",
+      "path": "/api/v1/admin/categories",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "create",
+      "responseTimeMs": 40
+    },
+    {
+      "module": "admin-categories",
+      "method": "GET",
+      "path": "/api/v1/admin/categories",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 85
+    },
+    {
+      "module": "admin-categories",
+      "method": "PUT",
+      "path": "/api/v1/admin/categories/29702",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 32
+    },
+    {
+      "module": "admin-categories",
+      "method": "DELETE",
+      "path": "/api/v1/admin/categories/29702",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 31
+    },
+    {
+      "module": "admin-coupons",
+      "method": "POST",
+      "path": "/api/v1/admin/coupons",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "create",
+      "responseTimeMs": 56
+    },
+    {
+      "module": "admin-coupons",
+      "method": "GET",
+      "path": "/api/v1/admin/coupons",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 78
+    },
+    {
+      "module": "admin-coupons",
+      "method": "PUT",
+      "path": "/api/v1/admin/coupons/29752",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 98
+    },
+    {
+      "module": "admin-coupons",
+      "method": "DELETE",
+      "path": "/api/v1/admin/coupons/29752",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 35
+    },
+    {
+      "module": "admin-policies",
+      "method": "POST",
+      "path": "/api/v1/admin/policies",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "create",
+      "responseTimeMs": 87
+    },
+    {
+      "module": "admin-policies",
+      "method": "GET",
+      "path": "/api/v1/admin/policies",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 79
+    },
+    {
+      "module": "admin-policies",
+      "method": "PUT",
+      "path": "/api/v1/admin/policies/29802",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 42
+    },
+    {
+      "module": "admin-policies",
+      "method": "DELETE",
+      "path": "/api/v1/admin/policies/29802",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 95
+    },
+    {
+      "module": "admin-blog-posts",
+      "method": "POST",
+      "path": "/api/v1/admin/blog-posts",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "create",
+      "responseTimeMs": 93
+    },
+    {
+      "module": "admin-blog-posts",
+      "method": "GET",
+      "path": "/api/v1/admin/blog-posts",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 97
+    },
+    {
+      "module": "admin-blog-posts",
+      "method": "PUT",
+      "path": "/api/v1/admin/blog-posts/29852",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 106
+    },
+    {
+      "module": "admin-blog-posts",
+      "method": "DELETE",
+      "path": "/api/v1/admin/blog-posts/29852",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 80
+    },
+    {
+      "module": "admin-home-sections",
+      "method": "GET",
+      "path": "/api/v1/admin/home-sections",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 27
+    },
+    {
+      "module": "admin-home-sections",
+      "method": "\u2014",
+      "path": "/api/v1/admin/home-sections/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skip: no canonical home section row",
+      "responseTimeMs": null
+    },
+    {
+      "module": "admin-page-visibility",
+      "method": "GET",
+      "path": "/api/v1/admin/page-visibility",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 66
+    },
+    {
+      "module": "admin-page-visibility",
+      "method": "PUT",
+      "path": "/api/v1/admin/page-visibility/26350",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 33
+    },
+    {
+      "module": "customer-profiles",
+      "method": "GET",
+      "path": "/api/customer-profiles",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/customer-profiles.\\\"\",\"instance\":\"/api/customer-profi",
+      "responseTimeMs": 63
+    },
+    {
+      "module": "customer-profiles",
+      "method": "\u2014",
+      "path": "/api/customer-profiles/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skip: no row in DB",
+      "responseTimeMs": null
+    },
+    {
+      "module": "customer-orders",
+      "method": "GET",
+      "path": "/api/customer-orders",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/customer-orders.\\\"\",\"instance\":\"/api/customer-orders\"",
+      "responseTimeMs": 12
+    },
+    {
+      "module": "customer-orders",
+      "method": "\u2014",
+      "path": "/api/customer-orders/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skip: no row in DB",
+      "responseTimeMs": null
+    },
+    {
+      "module": "customer-orders",
+      "method": "GET",
+      "path": "/api/customer-orders",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/customer-orders.\\\"\",\"instance\":\"/api/customer-orders\"",
+      "responseTimeMs": 18
+    },
+    {
+      "module": "order-items",
+      "method": "\u2014",
+      "path": "/api/order-items/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skip: need order+product",
+      "responseTimeMs": null
+    },
+    {
+      "module": "admin-users",
+      "method": "POST",
+      "path": "/api/admin/users",
+      "status": "FAIL",
+      "code": 500,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Internal Server Error\",\"status\":500,\"detail\":\"Failure during data access\",\"instance\":\"/api/admin/users\",\"message\":\"error.http.",
+      "responseTimeMs": 148
+    },
+    {
+      "module": "authorities",
+      "method": "POST",
+      "path": "/api/authorities",
+      "status": "PASS",
+      "code": 201,
+      "2xx": true,
+      "note": "create",
+      "responseTimeMs": 21
+    },
+    {
+      "module": "authorities",
+      "method": "GET",
+      "path": "/api/authorities/ROLE_APITEST_1780638938",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 16
+    },
+    {
+      "module": "authorities",
+      "method": "DELETE",
+      "path": "/api/authorities/ROLE_APITEST_1780638938",
+      "status": "PASS",
+      "code": 204,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 17
+    },
+    {
+      "module": "admin",
+      "method": "GET",
+      "path": "/api/v1/admin/dashboard",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 77
+    },
+    {
+      "module": "admin",
+      "method": "GET",
+      "path": "/api/account",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 17
+    },
+    {
+      "module": "admin",
+      "method": "GET",
+      "path": "/api/authenticate",
+      "status": "PASS",
+      "code": 204,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 10
+    },
+    {
+      "module": "admin",
+      "method": "GET",
+      "path": "/api/users",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 53
+    },
+    {
+      "module": "admin",
+      "method": "GET",
+      "path": "/api/admin/users",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 31
+    },
+    {
+      "module": "admin",
+      "method": "GET",
+      "path": "/api/admin/users/admin",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 19
+    },
+    {
+      "module": "admin",
+      "method": "GET",
+      "path": "/api/authorities",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 46
+    },
+    {
+      "module": "admin",
+      "method": "GET",
+      "path": "/api/authorities/ROLE_ADMIN",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 19
+    },
+    {
+      "module": "admin",
+      "method": "GET",
+      "path": "/api/v1/admin/site-settings",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 71
+    },
+    {
+      "module": "customer",
+      "method": "GET",
+      "path": "/api/v1/account/profile",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 99
+    },
+    {
+      "module": "customer",
+      "method": "PUT",
+      "path": "/api/v1/account/profile",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 43
+    },
+    {
+      "module": "customer",
+      "method": "GET",
+      "path": "/api/v1/orders",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 96
+    },
+    {
+      "module": "customer",
+      "method": "GET",
+      "path": "/api/v1/payments",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 91
+    },
+    {
+      "module": "customer",
+      "method": "POST",
+      "path": "/api/v1/coupons/validate",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 102
+    },
+    {
+      "module": "customer",
+      "method": "POST",
+      "path": "/api/v1/orders",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: payment gateway (Razorpay / live credentials)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "customer",
+      "method": "POST",
+      "path": "/api/v1/orders/verify-payment",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: payment gateway (Razorpay / live credentials)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "account",
+      "method": "POST",
+      "path": "/api/account",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: user interaction (register/activate/reset/upload/account)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "account",
+      "method": "POST",
+      "path": "/api/account/change-password",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: user interaction (register/activate/reset/upload/account)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "account",
+      "method": "POST",
+      "path": "/api/account/reset-password/finish",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: user interaction (register/activate/reset/upload/account)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "account",
+      "method": "POST",
+      "path": "/api/account/reset-password/init",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: user interaction (register/activate/reset/upload/account)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "account",
+      "method": "GET",
+      "path": "/api/activate",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: user interaction (register/activate/reset/upload/account)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "user",
+      "method": "PUT",
+      "path": "/api/admin/users",
+      "status": "FAIL",
+      "code": 400,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Bad Request\",\"status\":400,\"detail\":\"400 BAD_REQUEST \\\"Validation failure\\\"\",\"instance\":\"/api/admin/users\",\"message\":\"error.htt",
+      "responseTimeMs": 21
+    },
+    {
+      "module": "user",
+      "method": "DELETE",
+      "path": "/api/admin/users/admin",
+      "status": "FAIL",
+      "code": 500,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Internal Server Error\",\"status\":500,\"detail\":\"Failure during data access\",\"instance\":\"/api/admin/users/admin\",\"message\":\"error",
+      "responseTimeMs": 68
+    },
+    {
+      "module": "user",
+      "method": "GET",
+      "path": "/api/admin/users/admin",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 37
+    },
+    {
+      "module": "user",
+      "method": "PUT",
+      "path": "/api/admin/users/admin",
+      "status": "FAIL",
+      "code": 400,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Bad Request\",\"status\":400,\"detail\":\"400 BAD_REQUEST \\\"Validation failure\\\"\",\"instance\":\"/api/admin/users/admin\",\"message\":\"err",
+      "responseTimeMs": 85
+    },
+    {
+      "module": "authenticate",
+      "method": "POST",
+      "path": "/api/authenticate",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 115
+    },
+    {
+      "module": "banner",
+      "method": "GET",
+      "path": "/api/banners",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/banners.\\\"\",\"instance\":\"/api/banners\",\"message\":\"erro",
+      "responseTimeMs": 15
+    },
+    {
+      "module": "banner",
+      "method": "GET",
+      "path": "/api/banners/count",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/banners/count.\\\"\",\"instance\":\"/api/banners/count\",\"me",
+      "responseTimeMs": 14
+    },
+    {
+      "module": "banner-resource",
+      "method": "DELETE",
+      "path": "/api/banners/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "banner-resource",
+      "method": "GET",
+      "path": "/api/banners/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "banner-resource",
+      "method": "PATCH",
+      "path": "/api/banners/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "banner-resource",
+      "method": "PUT",
+      "path": "/api/banners/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "blog-post",
+      "method": "GET",
+      "path": "/api/blog-posts",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/blog-posts.\\\"\",\"instance\":\"/api/blog-posts\",\"message\"",
+      "responseTimeMs": 11
+    },
+    {
+      "module": "blog-post-resource",
+      "method": "DELETE",
+      "path": "/api/blog-posts/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "blog-post-resource",
+      "method": "GET",
+      "path": "/api/blog-posts/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "blog-post-resource",
+      "method": "PATCH",
+      "path": "/api/blog-posts/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "blog-post-resource",
+      "method": "PUT",
+      "path": "/api/blog-posts/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "category",
+      "method": "GET",
+      "path": "/api/categories",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/categories.\\\"\",\"instance\":\"/api/categories\",\"message\"",
+      "responseTimeMs": 68
+    },
+    {
+      "module": "category",
+      "method": "GET",
+      "path": "/api/categories/count",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/categories/count.\\\"\",\"instance\":\"/api/categories/coun",
+      "responseTimeMs": 17
+    },
+    {
+      "module": "category-resource",
+      "method": "DELETE",
+      "path": "/api/categories/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "category-resource",
+      "method": "GET",
+      "path": "/api/categories/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "category-resource",
+      "method": "PATCH",
+      "path": "/api/categories/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "category-resource",
+      "method": "PUT",
+      "path": "/api/categories/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "coupon",
+      "method": "GET",
+      "path": "/api/coupons",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/coupons.\\\"\",\"instance\":\"/api/coupons\",\"message\":\"erro",
+      "responseTimeMs": 18
+    },
+    {
+      "module": "coupon",
+      "method": "GET",
+      "path": "/api/coupons/count",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/coupons/count.\\\"\",\"instance\":\"/api/coupons/count\",\"me",
+      "responseTimeMs": 21
+    },
+    {
+      "module": "coupon-resource",
+      "method": "DELETE",
+      "path": "/api/coupons/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "coupon-resource",
+      "method": "GET",
+      "path": "/api/coupons/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "coupon-resource",
+      "method": "PATCH",
+      "path": "/api/coupons/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "coupon-resource",
+      "method": "PUT",
+      "path": "/api/coupons/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "customer-order",
+      "method": "POST",
+      "path": "/api/customer-orders",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/customer-orders.\\\"\",\"instance\":\"/api/customer-orders\"",
+      "responseTimeMs": 15
+    },
+    {
+      "module": "customer-order",
+      "method": "GET",
+      "path": "/api/customer-orders/count",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/customer-orders/count.\\\"\",\"instance\":\"/api/customer-o",
+      "responseTimeMs": 62
+    },
+    {
+      "module": "customer-order-resource",
+      "method": "DELETE",
+      "path": "/api/customer-orders/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "customer-order-resource",
+      "method": "GET",
+      "path": "/api/customer-orders/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "customer-order-resource",
+      "method": "PATCH",
+      "path": "/api/customer-orders/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "customer-order-resource",
+      "method": "PUT",
+      "path": "/api/customer-orders/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "customer-profile",
+      "method": "POST",
+      "path": "/api/customer-profiles",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/customer-profiles.\\\"\",\"instance\":\"/api/customer-profi",
+      "responseTimeMs": 56
+    },
+    {
+      "module": "customer-profile",
+      "method": "GET",
+      "path": "/api/customer-profiles/count",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/customer-profiles/count.\\\"\",\"instance\":\"/api/customer",
+      "responseTimeMs": 13
+    },
+    {
+      "module": "customer-profile-resource",
+      "method": "DELETE",
+      "path": "/api/customer-profiles/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "customer-profile-resource",
+      "method": "GET",
+      "path": "/api/customer-profiles/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "customer-profile-resource",
+      "method": "PATCH",
+      "path": "/api/customer-profiles/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "customer-profile-resource",
+      "method": "PUT",
+      "path": "/api/customer-profiles/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "home-section",
+      "method": "GET",
+      "path": "/api/home-sections",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/home-sections.\\\"\",\"instance\":\"/api/home-sections\",\"me",
+      "responseTimeMs": 14
+    },
+    {
+      "module": "home-section",
+      "method": "GET",
+      "path": "/api/home-sections/count",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/home-sections/count.\\\"\",\"instance\":\"/api/home-section",
+      "responseTimeMs": 15
+    },
+    {
+      "module": "home-section-resource",
+      "method": "DELETE",
+      "path": "/api/home-sections/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "home-section-resource",
+      "method": "GET",
+      "path": "/api/home-sections/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "home-section-resource",
+      "method": "PATCH",
+      "path": "/api/home-sections/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "home-section-resource",
+      "method": "PUT",
+      "path": "/api/home-sections/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "order-item",
+      "method": "GET",
+      "path": "/api/order-items",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/order-items.\\\"\",\"instance\":\"/api/order-items\",\"messag",
+      "responseTimeMs": 15
+    },
+    {
+      "module": "order-item",
+      "method": "POST",
+      "path": "/api/order-items",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/order-items.\\\"\",\"instance\":\"/api/order-items\",\"messag",
+      "responseTimeMs": 17
+    },
+    {
+      "module": "order-item",
+      "method": "GET",
+      "path": "/api/order-items/count",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/order-items/count.\\\"\",\"instance\":\"/api/order-items/co",
+      "responseTimeMs": 61
+    },
+    {
+      "module": "order-item-resource",
+      "method": "DELETE",
+      "path": "/api/order-items/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "order-item-resource",
+      "method": "GET",
+      "path": "/api/order-items/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "order-item-resource",
+      "method": "PATCH",
+      "path": "/api/order-items/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "order-item-resource",
+      "method": "PUT",
+      "path": "/api/order-items/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "page-visibility",
+      "method": "GET",
+      "path": "/api/page-visibilities",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/page-visibilities.\\\"\",\"instance\":\"/api/page-visibilit",
+      "responseTimeMs": 63
+    },
+    {
+      "module": "page-visibility",
+      "method": "GET",
+      "path": "/api/page-visibilities/count",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/page-visibilities/count.\\\"\",\"instance\":\"/api/page-vis",
+      "responseTimeMs": 95
+    },
+    {
+      "module": "page-visibility-resource",
+      "method": "DELETE",
+      "path": "/api/page-visibilities/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "page-visibility-resource",
+      "method": "GET",
+      "path": "/api/page-visibilities/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "page-visibility-resource",
+      "method": "PATCH",
+      "path": "/api/page-visibilities/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "page-visibility-resource",
+      "method": "PUT",
+      "path": "/api/page-visibilities/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "policy",
+      "method": "GET",
+      "path": "/api/policies",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/policies.\\\"\",\"instance\":\"/api/policies\",\"message\":\"er",
+      "responseTimeMs": 15
+    },
+    {
+      "module": "policy-resource",
+      "method": "DELETE",
+      "path": "/api/policies/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "policy-resource",
+      "method": "GET",
+      "path": "/api/policies/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "policy-resource",
+      "method": "PATCH",
+      "path": "/api/policies/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "policy-resource",
+      "method": "PUT",
+      "path": "/api/policies/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "product",
+      "method": "GET",
+      "path": "/api/products",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/products.\\\"\",\"instance\":\"/api/products\",\"message\":\"er",
+      "responseTimeMs": 49
+    },
+    {
+      "module": "product",
+      "method": "DELETE",
+      "path": "/api/products/29602",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/products/29602.\\\"\",\"instance\":\"/api/products/29602\",\"",
+      "responseTimeMs": 14
+    },
+    {
+      "module": "product",
+      "method": "PATCH",
+      "path": "/api/products/29602",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/products/29602.\\\"\",\"instance\":\"/api/products/29602\",\"",
+      "responseTimeMs": 12
+    },
+    {
+      "module": "product",
+      "method": "PUT",
+      "path": "/api/products/29602",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/products/29602.\\\"\",\"instance\":\"/api/products/29602\",\"",
+      "responseTimeMs": 10
+    },
+    {
+      "module": "account",
+      "method": "POST",
+      "path": "/api/register",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: user interaction (register/activate/reset/upload/account)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "site-setting",
+      "method": "GET",
+      "path": "/api/site-settings",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/site-settings.\\\"\",\"instance\":\"/api/site-settings\",\"me",
+      "responseTimeMs": 53
+    },
+    {
+      "module": "site-setting",
+      "method": "GET",
+      "path": "/api/site-settings/count",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/site-settings/count.\\\"\",\"instance\":\"/api/site-setting",
+      "responseTimeMs": 16
+    },
+    {
+      "module": "site-setting-resource",
+      "method": "DELETE",
+      "path": "/api/site-settings/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "site-setting-resource",
+      "method": "GET",
+      "path": "/api/site-settings/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "site-setting-resource",
+      "method": "PATCH",
+      "path": "/api/site-settings/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "site-setting-resource",
+      "method": "PUT",
+      "path": "/api/site-settings/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "admin-store",
+      "method": "GET",
+      "path": "/api/v1/admin/products",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 495
+    },
+    {
+      "module": "admin-store",
+      "method": "PUT",
+      "path": "/api/v1/admin/site-settings",
+      "status": "FAIL",
+      "code": 503,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Service Unavailable\",\"status\":503,\"detail\":\"A backend service is temporarily unavailable. If you just restarted the server, wa",
+      "responseTimeMs": 105
+    },
+    {
+      "module": "storage-upload",
+      "method": "POST",
+      "path": "/api/v1/admin/uploads",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: user interaction (register/activate/reset/upload/account)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "storage-upload",
+      "method": "POST",
+      "path": "/api/v1/admin/uploads/presign",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: user interaction (register/activate/reset/upload/account)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "admin-store",
+      "method": "GET",
+      "path": "/api/v1/admin/zoho-settings",
+      "status": "FAIL",
+      "code": 503,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Service Unavailable\",\"status\":503,\"detail\":\"A backend service is temporarily unavailable. If you just restarted the server, wa",
+      "responseTimeMs": 82
+    },
+    {
+      "module": "admin-store",
+      "method": "PUT",
+      "path": "/api/v1/admin/zoho-settings",
+      "status": "FAIL",
+      "code": 503,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Service Unavailable\",\"status\":503,\"detail\":\"A backend service is temporarily unavailable. If you just restarted the server, wa",
+      "responseTimeMs": 16
+    },
+    {
+      "module": "storefront",
+      "method": "GET",
+      "path": "/api/v1/products/api-test-seed-1780638938",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 90
+    },
+    {
+      "module": "zoho-setting",
+      "method": "GET",
+      "path": "/api/zoho-settings",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/zoho-settings.\\\"\",\"instance\":\"/api/zoho-settings\",\"me",
+      "responseTimeMs": 15
+    },
+    {
+      "module": "zoho-setting",
+      "method": "GET",
+      "path": "/api/zoho-settings/count",
+      "status": "FAIL",
+      "code": 404,
+      "2xx": false,
+      "note": "{\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"404 NOT_FOUND \\\"No static resource api/zoho-settings/count.\\\"\",\"instance\":\"/api/zoho-setting",
+      "responseTimeMs": 78
+    },
+    {
+      "module": "zoho-setting-resource",
+      "method": "DELETE",
+      "path": "/api/zoho-settings/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "zoho-setting-resource",
+      "method": "GET",
+      "path": "/api/zoho-settings/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "zoho-setting-resource",
+      "method": "PATCH",
+      "path": "/api/zoho-settings/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "zoho-setting-resource",
+      "method": "PUT",
+      "path": "/api/zoho-settings/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "no path param",
+      "responseTimeMs": null
+    }
+  ]
+}
