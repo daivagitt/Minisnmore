@@ -49,25 +49,34 @@ export function parsePostalPincodeResponse(data: unknown): PincodeLookup | null 
   return { city, state, eta: deliveryEtaForDistrict(city) };
 }
 
+const PINCODE_UNAVAILABLE =
+  "Delivery isn't available for this pincode yet. Try another pincode or contact us on WhatsApp.";
+
 /** Lookup pincode via our API (avoids expired third-party TLS certs in the browser). */
 export async function lookupPincode(
   value: string,
-  fetcher: (path: string) => Promise<PincodeLookup> = defaultPincodeFetcher,
+  fetcher: (path: string) => Promise<PincodeLookup | null> = defaultPincodeFetcher,
 ): Promise<{ ok: true; lookup: PincodeLookup } | { ok: false; error: string }> {
   const validated = validatePincode(value);
   if (!validated.ok) return validated;
   try {
     const lookup = await fetcher(`/api/v1/pincode/${validated.pin}`);
     if (!lookup?.city?.trim() || !lookup?.state?.trim()) {
-      return { ok: false, error: "We don't deliver here yet" };
+      return { ok: false, error: PINCODE_UNAVAILABLE };
     }
     return { ok: true, lookup };
-  } catch {
-    return { ok: false, error: "Couldn't check just now" };
+  } catch (error) {
+    const { ApiError } = await import("@/lib/api");
+    if (error instanceof ApiError) {
+      if (error.status === 404 || error.status === 400) {
+        return { ok: false, error: PINCODE_UNAVAILABLE };
+      }
+    }
+    return { ok: false, error: "Couldn't check delivery just now. Please try again." };
   }
 }
 
-async function defaultPincodeFetcher(path: string): Promise<PincodeLookup> {
+async function defaultPincodeFetcher(path: string): Promise<PincodeLookup | null> {
   const { api } = await import("@/lib/api");
-  return api.get<PincodeLookup>(path);
+  return api.get<PincodeLookup | null>(path);
 }

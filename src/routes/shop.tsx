@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router"
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ProductCard } from "@/components/ProductCard";
-import { ages, type AgeRange, type Fabric } from "@/data/products";
+import { type Fabric } from "@/data/products";
 import { useCategories } from "@/hooks/useCategories";
 import { useProducts } from "@/hooks/useProducts";
 import {
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/shop")({
   head: () => ({
     meta: [
       { title: "Shop · Mini's n More" },
-      { name: "description", content: "Browse heirloom baby clothing — filter by age and fabric." },
+      { name: "description", content: "Browse heirloom baby clothing — filter by category and fabric." },
     ],
   }),
   component: Shop,
@@ -41,10 +41,6 @@ function Shop() {
       search: buildShopSearch({ ...filters, ...patch }),
       replace: true,
     });
-  };
-
-  const toggleAge = (a: AgeRange) => {
-    patchSearch({ age: filters.age === a ? undefined : a });
   };
 
   const toggleFabric = (f: Fabric) => {
@@ -110,18 +106,7 @@ function Shop() {
               ))}
             </>
           )}
-          <span className="text-xs uppercase tracking-wider text-muted-foreground ml-1 mr-1">Age</span>
-          {ages.map((a) => (
-            <button
-              key={a}
-              type="button"
-              onClick={() => toggleAge(a)}
-              className={`rounded-full px-3.5 py-1.5 text-xs transition ${filters.age === a ? "bg-primary text-primary-foreground" : "glass hover:bg-white/60"}`}
-            >
-              {a}
-            </button>
-          ))}
-          <span className="text-xs uppercase tracking-wider text-muted-foreground ml-3 mr-1">Fabric</span>
+          <span className="text-xs uppercase tracking-wider text-muted-foreground ml-1 mr-1">Fabric</span>
           {SHOP_FILTER_FABRICS.map((f) => (
             <button
               key={f}
@@ -160,7 +145,7 @@ function Shop() {
       </div>
       {filtered.length === 0 && (
         <div className="glass-strong rounded-3xl p-16 text-center text-muted-foreground">
-          Nothing matches just yet. Try a different age or fabric.
+          Nothing matches just yet. Try a different category or fabric.
           {activeFilters && (
             <div className="mt-4">
               <button type="button" onClick={clearFilters} className="text-primary story-link text-sm">

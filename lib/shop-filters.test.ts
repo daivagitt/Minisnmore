@@ -85,8 +85,29 @@ describe("shop product filters", () => {
     expect(productMatchesCategory(p, "gift-sets")).toBe(true);
   });
 
+  it("matches category slugs when hyphens differ (t-shirt vs tshirt)", () => {
+    const p = makeProduct({
+      id: "6",
+      slug: "tee",
+      categorySlug: "t-shirt",
+      categoryName: "T-Shirt",
+      category: "Newborn",
+    });
+    expect(productMatchesCategory(p, "tshirt")).toBe(true);
+    expect(productMatchesCategory(p, "t-shirt")).toBe(true);
+  });
+
   it("filters by age and fabric together", () => {
     expect(filterProducts(products, { age: "3-6m", fabric: "Muslin", sort: "new" }).map((p) => p.slug)).toEqual(["c"]);
+  });
+
+  it("excludes products that do not offer the selected size band", () => {
+    const sized = [
+      makeProduct({ id: "7", slug: "socks", categorySlug: "accessories", ages: ["0-3m", "3-6m", "6-12m"] }),
+      makeProduct({ id: "8", slug: "vest", categorySlug: "vest", ages: ["12-18m", "18-24m"] }),
+    ];
+    expect(filterProducts(sized, { age: "0-3m", sort: "new" }).map((p) => p.slug)).toEqual(["socks"]);
+    expect(filterProducts(sized, { age: "18-24m", sort: "new" }).map((p) => p.slug)).toEqual(["vest"]);
   });
 
   it("sorts by price low to high", () => {

@@ -109,7 +109,7 @@ function mapProduct(row: DbProductRow): Product {
     id: row.id,
     slug: row.slug,
     name: row.name,
-    tagline: row.description?.slice(0, 80) ?? row.story?.slice(0, 80) ?? "",
+    tagline: (row.description ?? row.story ?? "").trim(),
     price: Number(row.price) || 0,
     compareAt: row.compare_at_price ? Number(row.compare_at_price) : undefined,
     image: img,

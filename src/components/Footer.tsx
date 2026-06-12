@@ -1,9 +1,11 @@
 import { Link } from "@tanstack/react-router";
+import { Fragment, useMemo, type ReactNode } from "react";
 import {
   Facebook,
   Heart,
   Instagram,
   Leaf,
+  Linkedin,
   Mail,
   MessageCircle,
   Phone,
@@ -15,27 +17,144 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { toDirectDownloadUrl } from "@/lib/utils";
 import footerLogo from "@/assets/logo-footer.png";
 
-function XLogo({ className }: { className?: string }) {
+const defaultFooterTagline =
+  "Minis today, memories forever. Premium organic clothing for the first 24 months — softly made in India, gently loved everywhere.";
+
+const COLLECTION_LINKS = [
+  { to: "/best-sellers" as const, label: "Best sellers" },
+  { to: "/new-arrivals" as const, label: "New arrivals" },
+  { to: "/trending" as const, label: "Trending" },
+];
+
+type FooterShopLink =
+  | { key: string; label: string; to: "/shop"; category: string }
+  | { key: string; label: string; to: "/gift" | "/blog" };
+
+function formatShopLabel(label: string) {
+  const text = label.trim();
+  if (!text) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+const FOOTER_LINK_ROW = "h-5 flex items-center text-sm leading-none";
+const FOOTER_LINK_STACK = "flex flex-col gap-2";
+const FOOTER_GRID =
+  "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-y-10 gap-x-6 lg:gap-x-8 items-start";
+
+function splitShopColumns(links: FooterShopLink[]) {
+  const mid = Math.ceil(links.length / 2);
+  return [links.slice(0, mid), links.slice(mid)] as const;
+}
+
+function FooterNavList({ children }: { children: ReactNode }) {
+  return <ul className={FOOTER_LINK_STACK}>{children}</ul>;
+}
+
+function FooterNavItem({ children }: { children: ReactNode }) {
+  return <li className={FOOTER_LINK_ROW}>{children}</li>;
+}
+
+function FooterColumn({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={`min-w-0 ${className}`.trim()}>{children}</div>;
+}
+
+function FooterHeading({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <svg
-      viewBox="0 0 1200 1227"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-      className={className}
-      fill="currentColor"
+    <div
+      className={`font-display text-base text-foreground mb-2 inline-block border-b-2 border-primary/40 pb-0.5 ${className}`.trim()}
     >
-      <path d="M714.163 519.284 1160.89 0h-105.86L667.137 450.887 357.328 0H0l468.492 681.821L0 1226.37h105.866l409.625-476.152 327.181 476.152H1200L714.137 519.284h.026ZM569.165 687.828l-47.468-67.894L144.011 79.694h162.604l304.797 435.991 47.468 67.894 396.2 566.721H892.476L569.165 687.854v-.026Z" />
-    </svg>
+      {children}
+    </div>
   );
 }
 
-const defaultFooterTagline =
-  "Minis today, memories forever. Premium organic clothing for the first 24 months — softly made in India, gently loved everywhere.";
+function FooterSubheading({ children }: { children: ReactNode }) {
+  return (
+    <div className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground mb-1.5">{children}</div>
+  );
+}
+
+function ShopFooterLink({ item }: { item: FooterShopLink }) {
+  if (item.to === "/shop") {
+    return (
+      <Link
+        to="/shop"
+        search={{ category: item.category }}
+        className="story-link text-muted-foreground hover:text-foreground"
+      >
+        {formatShopLabel(item.label)}
+      </Link>
+    );
+  }
+  return (
+    <Link to={item.to} className="story-link text-muted-foreground hover:text-foreground">
+      {item.label}
+    </Link>
+  );
+}
+
+function socialHref(url: string | null | undefined) {
+  const trimmed = url?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function SocialIconLink({
+  href,
+  label,
+  children,
+}: {
+  href: string | null;
+  label: string;
+  children: ReactNode;
+}) {
+  const className =
+    "h-9 w-9 grid place-items-center rounded-full bg-primary text-primary-foreground shadow-sm hover:scale-110 hover:shadow-md transition";
+  if (href) {
+    return (
+      <a href={href} target="_blank" rel="noreferrer" aria-label={label} className={className}>
+        {children}
+      </a>
+    );
+  }
+  return (
+    <span aria-label={label} className={`${className} opacity-90`} title={`${label} link coming soon`}>
+      {children}
+    </span>
+  );
+}
 
 export function Footer() {
   const { isVisible } = usePageVisibility();
   const categories = useCategories();
   const settings = useSiteSettings();
+  const shopLinks = useMemo(() => {
+    const links: FooterShopLink[] = [];
+    if (isVisible("shop")) {
+      for (const category of categories) {
+        links.push({
+          key: category.id,
+          label: category.name,
+          to: "/shop",
+          category: category.slug,
+        });
+      }
+    }
+    if (isVisible("gift")) {
+      links.push({ key: "gift", label: "Gifting", to: "/gift" });
+    }
+    if (isVisible("blog")) {
+      links.push({ key: "blog", label: "Blogs", to: "/blog" });
+    }
+    return links;
+  }, [categories, isVisible]);
+  const [shopColLeft, shopColRight] = splitShopColumns(shopLinks);
+  const shopRowCount = Math.max(shopColLeft.length, shopColRight.length);
   const logo = settings.logo_url || footerLogo;
   const tagline = settings.footer_tagline || defaultFooterTagline;
   const waHref = settings.whatsapp_number
@@ -44,7 +163,7 @@ export function Footer() {
 
   return (
     <footer className="relative mt-10">
-      <div className="relative mx-4 md:mx-6 mb-3 glass-strong rounded-[2rem] p-4 md:p-5 overflow-hidden">
+      <div className="relative mx-4 md:mx-6 mb-3 glass-strong rounded-[2rem] px-5 py-4 sm:px-6 sm:py-5 md:px-8 overflow-hidden">
         <Leaf
           className="pointer-events-none absolute -top-6 -right-6 h-40 w-40 text-primary/5 rotate-12"
           aria-hidden
@@ -58,20 +177,21 @@ export function Footer() {
           aria-hidden
         />
 
-        <div className="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-5 items-start">
-          <div className="sm:col-span-2 lg:col-span-1">
-            <div className="mb-2">
+        <div className={`relative ${FOOTER_GRID}`}>
+          <FooterColumn className="sm:col-span-2 lg:col-span-1">
+            <div className="mx-auto w-full max-w-[13rem] sm:max-w-[14rem] text-left lg:mx-0">
               <img
                 src={logo}
                 alt={settings.brand_name}
-                className="h-20 sm:h-24 md:h-28 w-auto max-w-full object-contain object-left bg-transparent shrink-0"
+                className="mb-2 block h-20 sm:h-24 md:h-28 w-full object-contain object-left object-[left_top]"
                 style={{ background: "transparent" }}
                 loading="lazy"
                 decoding="async"
               />
-            </div>
-            <div className="pl-3 sm:pl-4 md:pl-5">
-            <p className="text-sm text-muted-foreground leading-snug max-w-sm">{tagline}</p>
+              <div className="pl-[calc(15%-0.5rem)]">
+            {tagline.trim() ? (
+              <p className="text-sm text-muted-foreground leading-snug">{tagline}</p>
+            ) : null}
             <div className="mt-2 text-xs text-muted-foreground space-y-0.5">
               {settings.legal_entity_name ? (
                 <div className="text-foreground/80 font-medium">{settings.legal_entity_name}</div>
@@ -106,79 +226,96 @@ export function Footer() {
                 <div className="text-muted-foreground">10% off first order</div>
               </div>
             </div>
+              </div>
             </div>
-          </div>
+          </FooterColumn>
 
-          <div>
-            <div className="font-display text-base text-foreground mb-1.5 inline-block border-b-2 border-primary/40 pb-0.5">
-              Shop
+          <FooterColumn>
+            <FooterHeading>Shop</FooterHeading>
+            <div
+              className="grid w-fit max-w-full grid-cols-[auto_auto] gap-x-2 sm:gap-x-3 gap-y-2"
+              aria-label="Shop categories"
+            >
+              {Array.from({ length: shopRowCount }, (_, row) => (
+                <Fragment key={`shop-row-${row}`}>
+                  <div className={FOOTER_LINK_ROW}>
+                    {shopColLeft[row] ? <ShopFooterLink item={shopColLeft[row]} /> : null}
+                  </div>
+                  <div className={FOOTER_LINK_ROW}>
+                    {shopColRight[row] ? <ShopFooterLink item={shopColRight[row]} /> : null}
+                  </div>
+                </Fragment>
+              ))}
             </div>
-            <ul className="space-y-1 text-sm">
-              {isVisible("shop")
-                ? categories.map((category) => (
-                    <li key={category.id}>
-                      <Link
-                        to="/shop"
-                        search={{ category: category.slug }}
-                        className="story-link text-muted-foreground hover:text-foreground"
-                      >
-                        {category.name}
-                      </Link>
-                    </li>
-                  ))
-                : null}
-              {isVisible("gift") ? (
-                <li>
-                  <Link to="/gift" className="story-link text-muted-foreground hover:text-foreground">
-                    Gifting
-                  </Link>
-                </li>
-              ) : null}
-              {isVisible("blog") ? (
-                <li>
-                  <Link to="/blog" className="story-link text-muted-foreground hover:text-foreground">
-                    Blogs
-                  </Link>
-                </li>
-              ) : null}
-            </ul>
-          </div>
+          </FooterColumn>
 
-          <div>
-            <div className="font-display text-base text-foreground mb-1.5 inline-block border-b-2 border-primary/40 pb-0.5">
-              Care
+          <FooterColumn>
+            <FooterHeading>Collections</FooterHeading>
+            <FooterNavList>
+              {COLLECTION_LINKS.map((item) => (
+                <FooterNavItem key={item.to}>
+                  <Link to={item.to} className="story-link text-muted-foreground hover:text-foreground">
+                    {item.label}
+                  </Link>
+                </FooterNavItem>
+              ))}
+            </FooterNavList>
+            <div className="mt-4">
+              <FooterSubheading>Follow us</FooterSubheading>
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <SocialIconLink href={socialHref(settings.instagram_url)} label="Instagram">
+                    <Instagram className="h-4 w-4" />
+                  </SocialIconLink>
+                  <SocialIconLink href={socialHref(settings.facebook_url)} label="Facebook">
+                    <Facebook className="h-4 w-4" />
+                  </SocialIconLink>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <SocialIconLink href={socialHref(settings.linkedin_url)} label="LinkedIn">
+                    <Linkedin className="h-4 w-4" />
+                  </SocialIconLink>
+                  <SocialIconLink href={socialHref(settings.youtube_url)} label="YouTube">
+                    <Youtube className="h-4 w-4" />
+                  </SocialIconLink>
+                </div>
+              </div>
             </div>
-            <ul className="space-y-1 text-sm">
+          </FooterColumn>
+
+          <FooterColumn>
+            <FooterHeading>Care</FooterHeading>
+            <FooterNavList>
               {isVisible("track") ? (
-                <li>
+                <FooterNavItem>
                   <Link to="/track" className="story-link text-muted-foreground hover:text-foreground">
                     Order tracking
                   </Link>
-                </li>
+                </FooterNavItem>
               ) : null}
               {isVisible("subscribe") ? (
-                <li>
+                <FooterNavItem>
                   <Link to="/subscribe" className="story-link text-muted-foreground hover:text-foreground">
                     Subscriptions
                   </Link>
-                </li>
+                </FooterNavItem>
               ) : null}
-              <li>
+              <FooterNavItem>
                 <Link to="/account" className="story-link text-muted-foreground hover:text-foreground">
                   My account
                 </Link>
-              </li>
-              <li>
+              </FooterNavItem>
+              <FooterNavItem>
                 <Link to="/shipping" className="story-link text-muted-foreground hover:text-foreground">
                   Shipping &amp; returns
                 </Link>
-              </li>
-              <li>
+              </FooterNavItem>
+              <FooterNavItem>
                 <Link to="/about" className="story-link text-muted-foreground hover:text-foreground">
                   About us
                 </Link>
-              </li>
-              <li>
+              </FooterNavItem>
+              <FooterNavItem>
                 <a
                   href={toDirectDownloadUrl(settings.ecatalogue_url) || "/e-catalogue.pdf"}
                   download
@@ -186,57 +323,11 @@ export function Footer() {
                 >
                   Download e-catalogue
                 </a>
-              </li>
-            </ul>
-            <div className="mt-3">
-              <div className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground mb-1.5">
-                Follow us
-              </div>
+              </FooterNavItem>
+            </FooterNavList>
+            <div className="mt-4">
+              <FooterSubheading>Contact us</FooterSubheading>
               <div className="flex flex-wrap gap-2">
-                {settings.instagram_url ? (
-                  <a
-                    href={settings.instagram_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label="Instagram"
-                    className="h-9 w-9 grid place-items-center rounded-full bg-primary text-primary-foreground shadow-sm hover:scale-110 hover:shadow-md transition"
-                  >
-                    <Instagram className="h-4 w-4" />
-                  </a>
-                ) : null}
-                {settings.facebook_url ? (
-                  <a
-                    href={settings.facebook_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label="Facebook"
-                    className="h-9 w-9 grid place-items-center rounded-full bg-primary text-primary-foreground shadow-sm hover:scale-110 hover:shadow-md transition"
-                  >
-                    <Facebook className="h-4 w-4" />
-                  </a>
-                ) : null}
-                {settings.youtube_url ? (
-                  <a
-                    href={settings.youtube_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label="YouTube"
-                    className="h-9 w-9 grid place-items-center rounded-full bg-primary text-primary-foreground shadow-sm hover:scale-110 hover:shadow-md transition"
-                  >
-                    <Youtube className="h-4 w-4" />
-                  </a>
-                ) : null}
-                {settings.twitter_url ? (
-                  <a
-                    href={settings.twitter_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label="X (Twitter)"
-                    className="h-9 w-9 grid place-items-center rounded-full bg-primary text-primary-foreground shadow-sm hover:scale-110 hover:shadow-md transition"
-                  >
-                    <XLogo className="h-3.5 w-3.5" />
-                  </a>
-                ) : null}
                 {settings.contact_email ? (
                   <a
                     href={`mailto:${settings.contact_email}`}
@@ -268,18 +359,19 @@ export function Footer() {
                 ) : null}
               </div>
             </div>
-          </div>
+          </FooterColumn>
 
-          <div>
-            <div className="font-display text-base text-foreground mb-1.5 inline-block border-b-2 border-primary/40 pb-0.5">
-              Letters from us
-            </div>
+          <FooterColumn className="sm:col-span-2 lg:col-span-1">
+            <FooterHeading>Letters from us</FooterHeading>
             <p className="text-sm text-muted-foreground mb-2">
               Soft mornings, slow Sundays — delivered monthly.
             </p>
-            <form className="glass rounded-full p-1.5 flex items-center" onSubmit={(e) => e.preventDefault()}>
+            <form
+              className="glass rounded-full p-1.5 flex items-center w-full"
+              onSubmit={(e) => e.preventDefault()}
+            >
               <input
-                className="bg-transparent flex-1 px-3 py-2 text-sm outline-none placeholder:text-muted-foreground"
+                className="bg-transparent flex-1 min-w-0 px-3 py-2 text-sm outline-none placeholder:text-muted-foreground"
                 placeholder="you@email.com"
                 type="email"
                 autoComplete="email"
@@ -297,7 +389,7 @@ export function Footer() {
               <li>· Subscriber-only offers</li>
               <li>· Care tips from our team</li>
             </ul>
-          </div>
+          </FooterColumn>
         </div>
 
         <div className="relative mt-3 pt-2.5 border-t border-border/60 flex flex-col sm:flex-row sm:justify-between items-center gap-2 text-xs text-muted-foreground">

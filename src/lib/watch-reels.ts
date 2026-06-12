@@ -34,17 +34,12 @@ export function matchReelsToProducts(
   });
 }
 
-/** CMS/static reels paired with live catalog; falls back by index when slugs differ. */
+/** CMS/theme reels paired with live catalog by product slug (no index fallback). */
 export function resolveWatchShopReels(
   reels: WatchReel[],
   products: Product[],
   max = 5,
 ): { video: string; slug: string; product: Product }[] {
   if (reels.length === 0 || products.length === 0) return [];
-  const matched = matchReelsToProducts(reels, products);
-  if (matched.length > 0) return matched.slice(0, max);
-  return reels.slice(0, max).map((r, i) => ({
-    ...r,
-    product: products[i % products.length]!,
-  }));
+  return matchReelsToProducts(reels, products).slice(0, max);
 }

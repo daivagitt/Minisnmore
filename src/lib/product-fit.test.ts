@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   ageMonthsFromBirthDate,
+  checkSizeFit,
   clampQuantity,
+  pickLargerSize,
   recommendSizeByAgeMonths,
+  recommendSizeByChest,
   recommendSizeByHeight,
   resolveRecommendedSize,
   validateBirthDate,
@@ -61,6 +64,16 @@ describe("product fit validators", () => {
     expect(recommendSizeByAgeMonths(20, sizes)).toBe("18-24m");
     expect(recommendSizeByAgeMonths(20, ["18-24m"])).toBe("18-24m");
     expect(recommendSizeByAgeMonths(20, [])).toBe("18-24m");
+  });
+
+  it("recommends sizes from chest and picks the roomier band", () => {
+    expect(recommendSizeByChest(42, sizes)).toBe("0-3m");
+    expect(recommendSizeByChest(46, sizes)).toBe("6-12m");
+    expect(pickLargerSize("3-6m", "6-12m", sizes)).toBe("6-12m");
+    expect(checkSizeFit({ heightCm: "68", chestCm: "", sizes })).toEqual({ ok: true, size: "6-12m" });
+    expect(checkSizeFit({ heightCm: "60", chestCm: "49", sizes })).toEqual({ ok: true, size: "12-18m" });
+    expect(checkSizeFit({ heightCm: "", chestCm: "45", sizes }).ok).toBe(false);
+    expect(checkSizeFit({ heightCm: "68", chestCm: "bad", sizes }).ok).toBe(false);
   });
 
   it("resolves recommended size from height or birth date", () => {

@@ -106,6 +106,48 @@ export function recommendSizeByHeight(height: number, sizes: string[]): string {
   return matchProductSize(label, sizes) ?? sizes[sizes.length - 1] ?? label;
 }
 
+export function recommendSizeByChest(chest: number, sizes: string[]): string {
+  let label: string;
+  if (chest < 43) label = "0-3m";
+  else if (chest < 45) label = "3-6m";
+  else if (chest < 48) label = "6-12m";
+  else if (chest < 51) label = "12-18m";
+  else label = "18-24m";
+  return matchProductSize(label, sizes) ?? sizes[sizes.length - 1] ?? label;
+}
+
+function sizeBandIndex(label: string, sizes: string[]): number {
+  const norm = normalizeSizeLabel(label);
+  const idx = sizes.findIndex((s) => normalizeSizeLabel(s) === norm);
+  return idx >= 0 ? idx : sizes.length - 1;
+}
+
+/** Prefer the roomier band when height and chest suggest different sizes. */
+export function pickLargerSize(a: string, b: string, sizes: string[]): string {
+  return sizeBandIndex(a, sizes) >= sizeBandIndex(b, sizes) ? a : b;
+}
+
+export type SizeFitResult =
+  | { ok: true; size: string }
+  | { ok: false; error: string };
+
+export function checkSizeFit(input: {
+  heightCm: string;
+  chestCm?: string;
+  sizes: string[];
+}): SizeFitResult {
+  const height = validateHeightCm(input.heightCm);
+  if (!height.ok) return { ok: false, error: height.error };
+  const chest = validateChestCm(input.chestCm ?? "");
+  if (!chest.ok) return { ok: false, error: chest.error };
+
+  let size = recommendSizeByHeight(height.value, input.sizes);
+  if (chest.value !== null) {
+    size = pickLargerSize(size, recommendSizeByChest(chest.value, input.sizes), input.sizes);
+  }
+  return { ok: true, size };
+}
+
 export function recommendSizeByAgeMonths(months: number, sizes: string[]): string {
   let label: string;
   if (months < 3) label = "0-3m";

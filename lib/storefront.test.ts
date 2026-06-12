@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 async function loadStorefront(mocks: {
   products?: any[];
+  categories?: any[];
   blogPosts?: any[];
   policy?: any | null;
 }) {
   vi.resetModules();
   const listProducts = vi.fn(async () => mocks.products ?? []);
+  const listCategories = vi.fn(async () => mocks.categories ?? []);
   const listBlogPosts = vi.fn(async () => mocks.blogPosts ?? []);
   const getPolicy = vi.fn(async (slug: string) => {
     const row = mocks.policy;
@@ -15,6 +17,7 @@ async function loadStorefront(mocks: {
   });
   vi.doMock("@/lib/backend-data", () => ({
     listProducts,
+    listCategories,
     listBlogPosts,
     getPolicy,
   }));
@@ -69,34 +72,47 @@ describe("storefront cache", () => {
   });
 
   it("resolves category slug from categories when product DTO omits slug", async () => {
-    const listProducts = [
-      {
-        id: "p4",
-        slug: "dress",
-        name: "Dress",
-        description: "",
-        story: null,
-        price: 100,
-        compare_at_price: null,
-        images: [],
-        sizes: [],
-        colors: [],
-        age_min_months: null,
-        age_max_months: null,
-        badge: null,
-        featured: false,
-        best_seller: false,
-        new_arrival: false,
-        trending: false,
-        category_slug: "dresses",
-        category_name: "Dresses",
-        active: true,
-      },
-    ];
-    const storefront = await loadStorefront({ products: listProducts });
+    const storefront = await loadStorefront({
+      categories: [
+        {
+          id: "cat-tshirt",
+          slug: "tshirt",
+          name: "T-Shirt",
+          description: null,
+          image_url: null,
+          sort_order: 1,
+          active: true,
+        },
+      ],
+      products: [
+        {
+          id: "p4",
+          slug: "tee",
+          name: "Baby Tee",
+          description: "",
+          story: null,
+          price: 100,
+          compare_at_price: null,
+          images: [],
+          sizes: [],
+          colors: [],
+          age_min_months: null,
+          age_max_months: null,
+          badge: null,
+          featured: false,
+          best_seller: false,
+          new_arrival: false,
+          trending: false,
+          category_id: "cat-tshirt",
+          category_slug: "t-shirt",
+          category_name: "T-Shirt",
+          active: true,
+        },
+      ],
+    });
     const products = await storefront.loadProducts();
-    expect(products[0].categorySlug).toBe("dresses");
-    expect(products[0].categoryName).toBe("Dresses");
+    expect(products[0].categorySlug).toBe("tshirt");
+    expect(products[0].categoryName).toBe("T-Shirt");
   });
 
   it("maps category slug for shop-by-category filtering", async () => {

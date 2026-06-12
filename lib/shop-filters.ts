@@ -33,6 +33,11 @@ export function slugify(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
+/** Collapse hyphens so e.g. `t-shirt` and `tshirt` match the same category filter. */
+export function normalizeCategorySlug(value: string): string {
+  return slugify(value).replace(/-/g, "");
+}
+
 export function productCategorySlug(product: Product): string {
   if (product.categorySlug?.trim()) return slugify(product.categorySlug);
   if (product.categoryName?.trim()) return slugify(product.categoryName);
@@ -41,7 +46,11 @@ export function productCategorySlug(product: Product): string {
 
 export function productMatchesCategory(product: Product, category?: string): boolean {
   if (!category?.trim()) return true;
-  return productCategorySlug(product) === slugify(category);
+  const target = normalizeCategorySlug(category);
+  const candidates = [product.categorySlug, product.categoryName, product.category].filter(
+    (value): value is string => !!value?.trim(),
+  );
+  return candidates.some((value) => normalizeCategorySlug(value) === target);
 }
 
 export function productMatchesAge(product: Product, age?: AgeRange): boolean {

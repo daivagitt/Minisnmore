@@ -1,5 +1,6 @@
-import { listProducts, listBlogPosts, getPolicy } from "@/lib/backend-data";
-import { products as seedProducts, type Product, type AgeRange, type Fabric } from "@/data/products";
+import { listProducts, listBlogPosts, getPolicy, listCategories } from "@/lib/backend-data";
+import { agesFromSizes } from "@/lib/product-ages";
+import { products as seedProducts, type Product, type Fabric } from "@/data/products";
 import { posts as seedPosts, type BlogPost } from "@/data/blog";
 
 /**
@@ -26,26 +27,13 @@ function hexFor(name: string): string {
   return COLOR_PALETTE[key] ?? "#d9bfa6";
 }
 
-function bandsFromMonths(min: number | null | undefined, max: number | null | undefined): AgeRange[] {
-  const lo = typeof min === "number" ? min : 0;
-  const hi = typeof max === "number" ? max : 24;
-  const all: { range: AgeRange; lo: number; hi: number }[] = [
-    { range: "0-3m", lo: 0, hi: 3 },
-    { range: "3-6m", lo: 3, hi: 6 },
-    { range: "6-12m", lo: 6, hi: 12 },
-    { range: "12-18m", lo: 12, hi: 18 },
-    { range: "18-24m", lo: 18, hi: 24 },
-  ];
-  const hits = all.filter((b) => b.lo < hi && b.hi > lo).map((b) => b.range);
-  return hits.length ? hits : ["3-6m"];
-}
-
 function fabricFromText(...inputs: (string | null | undefined)[]): Fabric {
   const hay = inputs.filter(Boolean).join(" ").toLowerCase();
   if (hay.includes("muslin") || hay.includes("gauze")) return "Muslin";
   if (hay.includes("linen")) return "Linen";
   if (hay.includes("knit") || hay.includes("wool")) return "Knit";
   if (hay.includes("bamboo")) return "Bamboo";
+  if (hay.includes("organic") || hay.includes("cotton")) return "Organic Cotton";
   return "Organic Cotton";
 }
 
@@ -88,24 +76,48 @@ type DbProductRow = {
   sku?: string | null;
 };
 
+type CategoryLookup = Map<string, { slug: string; name: string }>;
+
+function buildCategoryLookup(rows: Awaited<ReturnType<typeof listCategories>>): CategoryLookup {
+  const map: CategoryLookup = new Map();
+  for (const row of rows) {
+    const id = row.id ?? row.slug;
+    if (!id) continue;
+    map.set(String(id), { slug: row.slug.trim().toLowerCase(), name: row.name.trim() });
+  }
+  return map;
+}
+
+function resolveCategoryFields(
+  row: DbProductRow,
+  lookup: CategoryLookup,
+): Pick<DbProductRow, "category_slug" | "category_name"> {
+  const fromLookup = row.category_id ? lookup.get(String(row.category_id)) : undefined;
+  return {
+    category_slug: fromLookup?.slug || row.category_slug?.trim().toLowerCase() || null,
+    category_name: fromLookup?.name || row.category_name?.trim() || null,
+  };
+}
+
 function mapProduct(row: DbProductRow): Product {
   const images = Array.isArray(row.images) ? (row.images as string[]).filter((x) => typeof x === "string" && x.length > 0) : [];
   const fallbackImg = seedProducts[0]?.image ?? "";
   const img = images[0] ?? fallbackImg;
+  const sizes = normalizeSizes(row.sizes);
   const badge = (row.badge ?? "").toLowerCase();
   return {
     id: row.id,
     slug: row.slug,
     name: row.name,
-    tagline: row.description?.slice(0, 80) ?? row.story?.slice(0, 80) ?? "",
+    tagline: (row.description ?? row.story ?? "").trim(),
     price: Number(row.price) || 0,
     compareAt: row.compare_at_price ? Number(row.compare_at_price) : undefined,
     image: img,
     gallery: images.length ? images : [img],
-    ages: bandsFromMonths(row.age_min_months, row.age_max_months),
+    ages: agesFromSizes(sizes, { min: row.age_min_months, max: row.age_max_months }),
     fabric: fabricFromText(row.fabric_type, row.description, row.story, row.name, row.badge),
     colors: normalizeColors(row.colors),
-    sizes: normalizeSizes(row.sizes),
+    sizes,
     rating: 4.8,
     reviewCount: 0,
     category: categoryFromAge(row.age_min_months),
@@ -131,11 +143,13 @@ export async function loadProducts(): Promise<Product[]> {
   if (productsInflight) return productsInflight;
   productsInflight = (async () => {
     try {
-      const rows = await listProducts();
+      const [rows, categoryRows] = await Promise.all([listProducts(), listCategories()]);
+      const categoryLookup = buildCategoryLookup(categoryRows);
       const mapped = rows
         .filter((row) => row.active !== false)
-        .map((row) =>
-          mapProduct({
+        .map((row) => {
+          const { category_slug, category_name } = resolveCategoryFields(row, categoryLookup);
+          return mapProduct({
             id: String(row.id ?? row.slug),
             slug: row.slug,
             name: row.name,
@@ -154,12 +168,12 @@ export async function loadProducts(): Promise<Product[]> {
             new_arrival: row.new_arrival,
             trending: row.trending,
             category_id: row.category_id,
-            category_slug: row.category_slug,
-            category_name: row.category_name,
+            category_slug,
+            category_name,
             fabric_type: row.fabric_type,
             sku: row.sku,
-          }),
-        );
+          });
+        });
       const list = mapped.length > 0 ? mapped : seedProducts;
       productsCache = list;
       productSubs.forEach((fn) => fn(list));

@@ -70,13 +70,16 @@ describe("pincode helpers", () => {
     const incomplete = vi.fn().mockResolvedValue({ city: " ", state: "Karnataka", eta: "2–3 days" });
     await expect(lookupPincode("560001", incomplete)).resolves.toEqual({
       ok: false,
-      error: "We don't deliver here yet",
+      error: "Delivery isn't available for this pincode yet. Try another pincode or contact us on WhatsApp.",
     });
+
+    const missing = vi.fn().mockResolvedValue(null);
+    await expect(lookupPincode("522235", missing)).resolves.toMatchObject({ ok: false });
 
     const failing = vi.fn().mockRejectedValue(new Error("offline"));
     await expect(lookupPincode("560001", failing)).resolves.toEqual({
       ok: false,
-      error: "Couldn't check just now",
+      error: "Couldn't check delivery just now. Please try again.",
     });
   });
 });

@@ -11,11 +11,13 @@ import {
 import { products, reviews } from "@/data/products";
 import { useProducts, useProductsLoaded } from "@/hooks/useProducts";
 import { ProductGridSkeleton } from "@/components/ProductGridSkeleton";
+import { WatchShopSkeleton } from "@/components/WatchShopSkeleton";
 import { useBlogPosts } from "@/hooks/useBlogPosts";
 import { ProductCard } from "@/components/ProductCard";
 import { SectionDivider } from "@/components/SectionDivider";
 import { FloatingDecor } from "@/components/FloatingDecor";
-import { listBanners, listBlogPosts } from "@/lib/backend-data";
+import { listBlogPosts } from "@/lib/backend-data";
+import { useBanners } from "@/hooks/useBanners";
 import { useHomeSections } from "@/hooks/useHomeSections";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { resolveHomeByAgeCards } from "@/lib/home-by-age";
@@ -52,6 +54,12 @@ export const Route = createFileRoute("/")({
       { property: "og:description", content: "Hand-finished organic baby clothing with thoughtful gifting and heirloom quality." },
       { property: "og:image", content: heroBaby },
     ],
+    links: [
+      { rel: "preload", as: "image", href: heroBaby, fetchPriority: "high" },
+      { rel: "preload", as: "image", href: heroInfant },
+      { rel: "preload", as: "image", href: lifestyle },
+      { rel: "preload", as: "image", href: heroFounders },
+    ],
   }),
   component: Home,
 });
@@ -71,7 +79,6 @@ const offers = [
   { icon: Wind, t: "Comfort First Design — soft, breathable fabrics" },
 ];
 
-type Banner = { id: string; title: string; subtitle: string | null; image_url: string | null; link_url: string | null; cta_label: string | null };
 type BlogPost = { slug: string; title: string; excerpt: string | null; cover_url: string | null; published_at: string | null };
 type HeroSlide = {
   id: string;
@@ -137,7 +144,7 @@ function Home() {
   const heroY = useTransform(heroProgress, [0, 1], ["0%", "12%"]);
   const heroScale = useTransform(heroProgress, [0, 1], [1, 1.06]);
 
-  const [banners, setBanners] = useState<Banner[]>([]);
+  const { banners } = useBanners();
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const seedPosts = useBlogPosts();
   const { isEnabled, titleFor, subtitleFor, byKey } = useHomeSections();
@@ -154,27 +161,6 @@ function Home() {
   }, [byKey]);
 
   useEffect(() => {
-    listBanners()
-      .then((rows) => {
-        const active = rows
-          .filter((b) => b.active)
-          .slice(0, 6)
-          .map((b) => ({
-            id: b.id,
-            title: b.title,
-            subtitle: b.subtitle,
-            image_url: b.image_url,
-            link_url: b.link_url,
-            cta_label: b.cta_label,
-          }));
-        setBanners(active);
-      })
-      .catch((err) => {
-        if (import.meta.env.DEV) {
-          console.error("Failed to load banners", err);
-        }
-        setBanners([]);
-      });
     listBlogPosts()
       .then((rows) => {
         const published = rows
@@ -209,12 +195,10 @@ function Home() {
         image: b.image_url as string,
         align: "left",
       }));
-    const combined = [...fromCms, ...defaultHeroSlides];
-    // Dedupe by id, keep first 5
-    const seen = new Set<string>();
-    return combined
-      .filter((s) => (seen.has(s.id) ? false : (seen.add(s.id), true)))
-      .slice(0, HOME_SECTION_PRODUCT_LIMIT);
+    if (fromCms.length > 0) {
+      return fromCms.slice(0, HOME_SECTION_PRODUCT_LIMIT);
+    }
+    return defaultHeroSlides;
   }, [banners]);
 
   const newArrivals = useMemo(
@@ -715,13 +699,34 @@ function FabricStorySection({
 
 function WatchAndShop() {
   const live = useProducts();
-  const { byKey } = useHomeSections();
-  const payload = byKey.get("watch_shop")?.payload;
-  const fromCms = parseWatchReels(
-    payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {},
-  );
-  const reelSource = fromCms.length > 0 ? fromCms : watchReels;
-  const reels = resolveWatchShopReels(reelSource, live);
+  const productsLoaded = useProductsLoaded();
+  const { byKey, loaded: homeLoaded } = useHomeSections();
+  const reels = useMemo(() => {
+    if (!productsLoaded || !homeLoaded) return [];
+    const payload = byKey.get("watch_shop")?.payload;
+    const fromCms = parseWatchReels(
+      payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {},
+    );
+    const reelSource = fromCms.length > 0 ? fromCms : watchReels;
+    return resolveWatchShopReels(reelSource, live);
+  }, [live, byKey, productsLoaded, homeLoaded]);
+
+  if (!productsLoaded || !homeLoaded) {
+    return (
+      <section id="watch-shop" className="px-4 md:px-6 scroll-mt-28">
+        <div className="flex items-end justify-between mb-5">
+          <div>
+            <div className="text-xs uppercase tracking-[0.28em] text-muted-foreground inline-flex items-center gap-2">
+              <Play className="h-3.5 w-3.5 text-primary" /> Tap a moment to shop the look
+            </div>
+            <h2 className="font-display text-2xl md:text-3xl mt-2">Watch & Shop</h2>
+          </div>
+        </div>
+        <WatchShopSkeleton />
+      </section>
+    );
+  }
+
   if (reels.length === 0) return null;
 
   return (
@@ -757,7 +762,7 @@ function WatchAndShop() {
                 muted
                 loop
                 playsInline
-                preload="metadata"
+                preload={i <= 1 ? "auto" : "metadata"}
                 poster={r.product.image}
                 className="absolute inset-0 h-full w-full object-cover transition-transform duration-1200 group-hover:scale-[1.06]"
               />
@@ -824,27 +829,23 @@ function HeroCarousel({
       className="relative rounded-[2rem] md:rounded-[2.5rem] overflow-hidden flex items-end
                  h-[min(92vh,720px)] sm:h-[min(88vh,760px)] md:h-[min(86vh,820px)]"
     >
-      {/* Background image with crossfade + parallax */}
-      <AnimatePresence mode="sync">
-        <motion.div
-          key={slide.id}
-          initial={{ opacity: 0, scale: 1.05 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 1.1, ease: [0.2, 0.8, 0.2, 1] }}
-          className="absolute inset-0"
-        >
-          <motion.div style={{ y: heroY, scale: heroScale }} className="absolute inset-0">
-            <img
-              src={slide.image}
-              alt={slide.title}
-              fetchPriority={index === 0 ? "high" : "low"}
-              decoding="async"
-              className="absolute inset-0 h-full w-full object-cover object-center md:object-right"
-            />
-          </motion.div>
-        </motion.div>
-      </AnimatePresence>
+      {/* All slides mounted up front so images load in parallel */}
+      <motion.div style={{ y: heroY, scale: heroScale }} className="absolute inset-0">
+        {slides.map((s, i) => (
+          <img
+            key={s.id}
+            src={s.image}
+            alt={i === index ? s.title : ""}
+            aria-hidden={i !== index}
+            fetchPriority={i === 0 ? "high" : i === 1 ? "low" : "auto"}
+            loading={i <= 1 ? "eager" : "lazy"}
+            decoding="async"
+            className={`absolute inset-0 h-full w-full object-cover object-center md:object-right transition-opacity duration-500 ease-out ${
+              i === index ? "opacity-100" : "opacity-0"
+            }`}
+          />
+        ))}
+      </motion.div>
 
       <FloatingDecor count={8} variant="petals" />
       <div className="absolute inset-0 bg-linear-to-r from-background/90 via-background/45 to-transparent md:from-background/80 md:via-background/20 md:to-transparent" />
@@ -880,10 +881,10 @@ function HeroCarousel({
         <AnimatePresence mode="wait">
           <motion.div
             key={slide.id}
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.7, ease: [0.2, 0.8, 0.2, 1] }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.35, ease: [0.2, 0.8, 0.2, 1] }}
             className="glass-strong rounded-[1.5rem] md:rounded-[2rem] p-5 sm:p-7 md:p-9 lg:p-10"
           >
             <div className="text-[11px] sm:text-xs uppercase tracking-[0.28em] text-primary">

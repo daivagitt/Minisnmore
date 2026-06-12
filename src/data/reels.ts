@@ -6,12 +6,13 @@ import reelInfantGirl from "@/assets/videos/reel-infant-girl.mp4";
 
 export type WatchReel = { video: string; slug: string };
 
+/** Theme reels — slugs must match live catalog products (Admin → Products). */
 export const watchReels: WatchReel[] = [
-  { video: reelRomper, slug: "terracotta-petal-romper" },
-  { video: reelDress, slug: "rose-blossom-dress" },
-  { video: reelCardigan, slug: "pearl-knit-cardigan" },
-  { video: reelDayset, slug: "buttercup-day-set" },
-  { video: reelInfantGirl, slug: "meadow-sleepsuit" },
+  { video: reelRomper, slug: "baby-front-open-frock" },
+  { video: reelDress, slug: "book-style-jabla-short-set" },
+  { video: reelCardigan, slug: "side-button-tshirt-short-set" },
+  { video: reelDayset, slug: "baby-swaddle" },
+  { video: reelInfantGirl, slug: "socks" },
 ];
 
 export function getReelForSlug(slug: string | undefined): WatchReel | undefined {

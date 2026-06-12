@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import type { Product } from "@/data/products";
 import { useProduct, useProducts } from "@/hooks/useProducts";
@@ -7,7 +7,7 @@ import { useShop } from "@/store/shop";
 import { Heart, Truck, Leaf, ChevronRight, MessageCircle, Ruler, Plus, Minus, Share2, X, BadgeCheck, Banknote, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { ProductCard } from "@/components/ProductCard";
-import { clampQuantity, matchProductSize, resolveRecommendedSize } from "@/lib/product-fit";
+import { checkSizeFit, clampQuantity } from "@/lib/product-fit";
 import { lookupPincode, normalizePincode } from "@/lib/pincode";
 
 export const Route = createFileRoute("/product/$slug")({
@@ -34,6 +34,7 @@ function ProductPage() {
   const [color, setColor] = useState<string | null>(() => product?.colors?.[0]?.name ?? null);
   const [active, setActive] = useState(0);
   const [heightCm, setHeightCm] = useState<string>("");
+  const [chestCm, setChestCm] = useState<string>("");
   const [sizeChart, setSizeChart] = useState(false);
   const [qty, setQty] = useState(1);
   const [pin, setPin] = useState("");
@@ -47,6 +48,12 @@ function ProductPage() {
     setSize((prev) => (prev && product.sizes.includes(prev) ? prev : product.sizes[0] ?? null));
     setColor((prev) => (prev && product.colors.some((c) => c.name === prev) ? prev : product.colors[0]?.name ?? null));
   }, [product]);
+
+  const sizeFit = useMemo(() => {
+    if (!product || !heightCm.trim()) return null;
+    const result = checkSizeFit({ heightCm, chestCm, sizes: product.sizes });
+    return result.ok ? { size: result.size } : { error: result.error };
+  }, [heightCm, chestCm, product]);
 
   if (!product) {
     return (
@@ -67,9 +74,6 @@ function ProductPage() {
     ...product.gallery.map((g) => ({ type: "image" as const, src: g })),
   ];
   const activeMedia = media[Math.min(active, media.length - 1)] ?? media[0];
-
-  const recommended = resolveRecommendedSize({ heightCm, sizes: product.sizes });
-  const recommendedSize = recommended ? matchProductSize(recommended, product.sizes) ?? recommended : null;
 
   const checkPin = async () => {
     setPinLoading(true);
@@ -129,7 +133,6 @@ function ProductPage() {
           <div className="space-y-1.5">
             <div className="text-[10px] uppercase tracking-[0.24em] text-primary">{product.fabric} · {product.category}</div>
             <h1 className="font-display text-xl md:text-2xl lg:text-[1.65rem] leading-tight text-balance">{product.name}</h1>
-            {product.tagline ? <p className="text-muted-foreground text-sm leading-snug">{product.tagline}</p> : null}
             <div className="flex flex-wrap items-baseline gap-2 pt-0.5">
               <span className="font-display text-2xl">&#8377;{product.price.toLocaleString("en-IN")}</span>
               {product.compareAt && <span className="line-through text-muted-foreground text-sm">&#8377;{product.compareAt.toLocaleString("en-IN")}</span>}
@@ -168,37 +171,52 @@ function ProductPage() {
             </div>
           </div>
 
-          <details className="glass rounded-xl p-3 group">
-            <summary className="flex items-center gap-2 cursor-pointer text-xs font-medium list-none">
-              <Ruler className="h-3.5 w-3.5 text-primary shrink-0" /> Size calculator
-            </summary>
-            <div className="mt-3">
-              <label className="text-xs text-muted-foreground space-y-1 block">
-                <span>Height (cm)</span>
-                <div className="relative max-w-xs">
-                  <input
-                    type="number" inputMode="decimal" min={30} max={120}
-                    value={heightCm}
-                    onChange={(e) => setHeightCm(e.target.value)}
-                    placeholder="e.g. 75"
-                    className="w-full h-10 glass rounded-full px-4 pr-12 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground">cm</span>
-                </div>
-              </label>
-              {recommendedSize ? (
-                <div className="mt-2 flex items-center justify-between gap-2 text-xs">
-                  <span className="text-muted-foreground">
-                    Best fit: <span className="text-primary font-medium">{recommendedSize}</span>
-                  </span>
-                  <button type="button" onClick={() => setSize(recommendedSize)}
-                    className="text-primary underline-offset-2 hover:underline shrink-0">Use size</button>
-                </div>
-              ) : (
-                <p className="text-[11px] text-muted-foreground mt-2">Enter height (30–120 cm) for a size suggestion.</p>
-              )}
+          <div className="glass rounded-xl p-3 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-medium">
+              <Ruler className="h-3.5 w-3.5 text-primary shrink-0" />
+              Size calculator
             </div>
-          </details>
+            {sizeFit && "size" in sizeFit ? (
+              <div className="flex items-center justify-between gap-2 text-xs min-w-0">
+                <span className="text-muted-foreground truncate">
+                  Best fit: <span className="text-primary font-medium">{sizeFit.size}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSize(sizeFit.size)}
+                  className="text-primary underline-offset-2 hover:underline shrink-0"
+                >
+                  Use size
+                </button>
+              </div>
+            ) : sizeFit && "error" in sizeFit ? (
+              <p className="text-destructive text-xs leading-snug line-clamp-2">{sizeFit.error}</p>
+            ) : null}
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="number"
+                inputMode="decimal"
+                min={30}
+                max={120}
+                value={heightCm}
+                onChange={(e) => setHeightCm(e.target.value)}
+                placeholder="Height (cm)"
+                aria-label="Height in centimetres"
+                className="h-10 glass rounded-full px-4 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40 min-w-0"
+              />
+              <input
+                type="number"
+                inputMode="decimal"
+                min={20}
+                max={70}
+                value={chestCm}
+                onChange={(e) => setChestCm(e.target.value)}
+                placeholder="Chest (cm) · optional"
+                aria-label="Chest in centimetres (optional)"
+                className="h-10 glass rounded-full px-4 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40 min-w-0"
+              />
+            </div>
+          </div>
 
           <div className="grid grid-cols-[auto_1fr] gap-3 items-end">
             <div>
@@ -300,6 +318,11 @@ function ProductPage() {
             <Plus className="h-4 w-4 text-muted-foreground group-open:hidden" />
             <X className="h-4 w-4 text-muted-foreground hidden group-open:block" />
           </summary>
+          {product.description ? (
+            <p className="mt-3 text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
+              {product.description}
+            </p>
+          ) : null}
           <div className="mt-3 flex flex-wrap gap-2">
             {["100% Organic Cotton", "Pre-Washed", "Breathable"].map((tag) => (
               <span key={tag} className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-3 py-1.5 text-xs font-medium">

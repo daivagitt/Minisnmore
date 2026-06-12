@@ -47,6 +47,9 @@ async function load(): Promise<HomeSection[]> {
   return inflight;
 }
 
+/** Warm home-section config before the homepage mounts. */
+void load();
+
 export function invalidateHomeSections() {
   cache = null;
   void load();
@@ -85,5 +88,5 @@ export function useHomeSections() {
   const isEnabled = (key: string) => (loaded ? (byKey.get(key)?.enabled ?? true) : true);
   const titleFor = (key: string, fallback: string) => byKey.get(key)?.title?.trim() || fallback;
   const subtitleFor = (key: string, fallback?: string) => byKey.get(key)?.subtitle?.trim() || fallback || "";
-  return { list, byKey, isEnabled, titleFor, subtitleFor };
+  return { list, byKey, loaded, isEnabled, titleFor, subtitleFor };
 }
