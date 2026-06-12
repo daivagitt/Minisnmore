@@ -9,7 +9,8 @@ import {
   Smile, Feather, Wind, Droplets, RefreshCw,
 } from "lucide-react";
 import { products, reviews } from "@/data/products";
-import { useProducts } from "@/hooks/useProducts";
+import { useProducts, useProductsLoaded } from "@/hooks/useProducts";
+import { ProductGridSkeleton } from "@/components/ProductGridSkeleton";
 import { useBlogPosts } from "@/hooks/useBlogPosts";
 import { ProductCard } from "@/components/ProductCard";
 import { SectionDivider } from "@/components/SectionDivider";
@@ -142,6 +143,7 @@ function Home() {
   const { isEnabled, titleFor, subtitleFor, byKey } = useHomeSections();
   const settings = useSiteSettings();
   const liveProducts = useProducts();
+  const productsLoaded = useProductsLoaded();
 
   const byAgeCats = useMemo(() => {
     const payload = byKey.get("by_age")?.payload;
@@ -323,13 +325,17 @@ function Home() {
           </div>
           <Link to="/shop" className="story-link text-sm hidden md:inline">See all new</Link>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
-          {(newArrivals.length ? newArrivals : liveProducts.slice(0, HOME_SECTION_PRODUCT_LIMIT))
-            .slice(0, HOME_SECTION_PRODUCT_LIMIT)
-            .map((p, i) => (
-            <ProductCard key={p.id} product={p} index={i} />
-          ))}
-        </div>
+        {productsLoaded ? (
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
+            {(newArrivals.length ? newArrivals : liveProducts.slice(0, HOME_SECTION_PRODUCT_LIMIT))
+              .slice(0, HOME_SECTION_PRODUCT_LIMIT)
+              .map((p, i) => (
+              <ProductCard key={p.id} product={p} index={i} />
+            ))}
+          </div>
+        ) : (
+          <ProductGridSkeleton />
+        )}
       </section>
       )}
 
@@ -345,13 +351,17 @@ function Home() {
           </div>
           <Link to="/trending" className="story-link text-sm hidden md:inline">Shop trending</Link>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
-          {trending
-            .slice(0, HOME_SECTION_PRODUCT_LIMIT)
-            .map((p, i) => (
-              <ProductCard key={p.id} product={p} index={i} />
-            ))}
-        </div>
+        {productsLoaded ? (
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
+            {trending
+              .slice(0, HOME_SECTION_PRODUCT_LIMIT)
+              .map((p, i) => (
+                <ProductCard key={p.id} product={p} index={i} />
+              ))}
+          </div>
+        ) : (
+          <ProductGridSkeleton />
+        )}
       </section>
       )}
 
@@ -558,6 +568,7 @@ const featuredTabs = [
 
 function FeaturedTabs() {
   const liveProducts = useProducts();
+  const productsLoaded = useProductsLoaded();
   const { byKey } = useHomeSections();
   const [tab, setTab] = useState<typeof featuredTabs[number]["key"]>("best");
   const list = useMemo(() => {
@@ -619,11 +630,15 @@ function FeaturedTabs() {
           );
         })}
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
-        {list.slice(0, HOME_SECTION_PRODUCT_LIMIT).map((p, i) => (
-          <ProductCard key={p.id} product={p} index={i} />
-        ))}
-      </div>
+      {productsLoaded ? (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
+          {list.slice(0, HOME_SECTION_PRODUCT_LIMIT).map((p, i) => (
+            <ProductCard key={p.id} product={p} index={i} />
+          ))}
+        </div>
+      ) : (
+        <ProductGridSkeleton />
+      )}
     </div>
   );
 }
