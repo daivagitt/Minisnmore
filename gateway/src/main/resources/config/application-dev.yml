@@ -57,7 +57,7 @@ spring:
     gateway:
       server:
         webflux:
-          # Dev: direct URIs (no Consul). Store :8081, commerce :8082, integration :8083; core catalog :8084 internal only.
+          # Dev: direct URIs (no Consul). Store :8081, commerce :8082; core catalog :8084 internal only.
           routes:
             - id: miniandmore-ledgerly-api
               uri: http://127.0.0.1:8081

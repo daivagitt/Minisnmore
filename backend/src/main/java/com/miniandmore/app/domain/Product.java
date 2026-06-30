@@ -1,6 +1,6 @@
 package com.miniandmore.app.domain;
 
-import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
+import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serial;
@@ -116,18 +116,18 @@ public class Product implements Serializable {
 
     @Size(max = 120)
     @Column(name = "ledgerly_item_id", length = 120, unique = true)
-    private String zohoItemId;
+    private String ledgerlyItemId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "ledgerly_sync_status")
-    private ZohoSyncStatus zohoSyncStatus;
+    private LedgerlySyncStatus ledgerlySyncStatus;
 
     @Column(name = "ledgerly_last_synced_at")
-    private Instant zohoLastSyncedAt;
+    private Instant ledgerlyLastSyncedAt;
 
     @Size(max = 1000)
     @Column(name = "ledgerly_sync_error", length = 1000)
-    private String zohoSyncError;
+    private String ledgerlySyncError;
 
     @ManyToOne(fetch = FetchType.LAZY)
     private Category category;
@@ -433,56 +433,56 @@ public class Product implements Serializable {
         this.active = active;
     }
 
-    public String getZohoItemId() {
-        return this.zohoItemId;
+    public String getLedgerlyItemId() {
+        return this.ledgerlyItemId;
     }
 
-    public Product zohoItemId(String zohoItemId) {
-        this.setZohoItemId(zohoItemId);
+    public Product ledgerlyItemId(String ledgerlyItemId) {
+        this.setLedgerlyItemId(ledgerlyItemId);
         return this;
     }
 
-    public void setZohoItemId(String zohoItemId) {
-        this.zohoItemId = zohoItemId;
+    public void setLedgerlyItemId(String ledgerlyItemId) {
+        this.ledgerlyItemId = ledgerlyItemId;
     }
 
-    public ZohoSyncStatus getZohoSyncStatus() {
-        return this.zohoSyncStatus;
+    public LedgerlySyncStatus getLedgerlySyncStatus() {
+        return this.ledgerlySyncStatus;
     }
 
-    public Product zohoSyncStatus(ZohoSyncStatus zohoSyncStatus) {
-        this.setZohoSyncStatus(zohoSyncStatus);
+    public Product ledgerlySyncStatus(LedgerlySyncStatus ledgerlySyncStatus) {
+        this.setLedgerlySyncStatus(ledgerlySyncStatus);
         return this;
     }
 
-    public void setZohoSyncStatus(ZohoSyncStatus zohoSyncStatus) {
-        this.zohoSyncStatus = zohoSyncStatus;
+    public void setLedgerlySyncStatus(LedgerlySyncStatus ledgerlySyncStatus) {
+        this.ledgerlySyncStatus = ledgerlySyncStatus;
     }
 
-    public Instant getZohoLastSyncedAt() {
-        return this.zohoLastSyncedAt;
+    public Instant getLedgerlyLastSyncedAt() {
+        return this.ledgerlyLastSyncedAt;
     }
 
-    public Product zohoLastSyncedAt(Instant zohoLastSyncedAt) {
-        this.setZohoLastSyncedAt(zohoLastSyncedAt);
+    public Product ledgerlyLastSyncedAt(Instant ledgerlyLastSyncedAt) {
+        this.setLedgerlyLastSyncedAt(ledgerlyLastSyncedAt);
         return this;
     }
 
-    public void setZohoLastSyncedAt(Instant zohoLastSyncedAt) {
-        this.zohoLastSyncedAt = zohoLastSyncedAt;
+    public void setLedgerlyLastSyncedAt(Instant ledgerlyLastSyncedAt) {
+        this.ledgerlyLastSyncedAt = ledgerlyLastSyncedAt;
     }
 
-    public String getZohoSyncError() {
-        return this.zohoSyncError;
+    public String getLedgerlySyncError() {
+        return this.ledgerlySyncError;
     }
 
-    public Product zohoSyncError(String zohoSyncError) {
-        this.setZohoSyncError(zohoSyncError);
+    public Product ledgerlySyncError(String ledgerlySyncError) {
+        this.setLedgerlySyncError(ledgerlySyncError);
         return this;
     }
 
-    public void setZohoSyncError(String zohoSyncError) {
-        this.zohoSyncError = zohoSyncError;
+    public void setLedgerlySyncError(String ledgerlySyncError) {
+        this.ledgerlySyncError = ledgerlySyncError;
     }
 
     public Category getCategory() {

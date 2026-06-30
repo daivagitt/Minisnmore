@@ -84,7 +84,7 @@ public class InternalAdminOrderReturnResource {
         data.put("rejection_reason", orderReturn.getRejectionReason());
         data.put("refund_amount", orderReturn.getRefundAmount());
         data.put("razorpay_refund_id", orderReturn.getRazorpayRefundId());
-        data.put("zoho_credit_note_id", orderReturn.getZohoCreditNoteId());
+        data.put("ledgerly_credit_note_id", orderReturn.getLedgerlyCreditNoteId());
         data.put("requested_at", orderReturn.getRequestedAt());
         data.put("resolved_at", orderReturn.getResolvedAt());
         if (orderReturn.getOrder() != null) {

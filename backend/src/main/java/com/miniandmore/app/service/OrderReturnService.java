@@ -173,11 +173,11 @@ public class OrderReturnService {
                 order.setPaymentStatus(PaymentStatus.REFUNDED);
                 customerOrderRepository.save(order);
             }
-            if (StringUtils.isBlank(orderReturn.getZohoCreditNoteId())) {
+            if (StringUtils.isBlank(orderReturn.getLedgerlyCreditNoteId())) {
                 try {
                     ledgerlyIntegrationClient
                         .createCreditNote(order.getOrderNumber(), orderReturn.getReturnNumber())
-                        .ifPresent(orderReturn::setZohoCreditNoteId);
+                        .ifPresent(orderReturn::setLedgerlyCreditNoteId);
                 } catch (RuntimeException e) {
                     LOG.warn("Ledgerly credit note failed for return {}: {}", orderReturn.getReturnNumber(), e.getMessage());
                     orderReturn.setAdminNotes(
@@ -252,16 +252,16 @@ public class OrderReturnService {
             return shipment.atStartOfDay(INDIA).toInstant();
         }
         if (order.getStatus() == OrderStatus.FULFILLED) {
-            if (order.getZohoTrackingLastPulledAt() != null) {
-                return order.getZohoTrackingLastPulledAt();
+            if (order.getLedgerlyTrackingLastPulledAt() != null) {
+                return order.getLedgerlyTrackingLastPulledAt();
             }
-            if (order.getZohoLastSyncedAt() != null) {
-                return order.getZohoLastSyncedAt();
+            if (order.getLedgerlyLastSyncedAt() != null) {
+                return order.getLedgerlyLastSyncedAt();
             }
         }
         String trackingStatus = OrderTrackingStatusResolver.resolve(order);
-        if ("delivered".equalsIgnoreCase(trackingStatus) && order.getZohoTrackingLastPulledAt() != null) {
-            return order.getZohoTrackingLastPulledAt();
+        if ("delivered".equalsIgnoreCase(trackingStatus) && order.getLedgerlyTrackingLastPulledAt() != null) {
+            return order.getLedgerlyTrackingLastPulledAt();
         }
         if (StringUtils.isNotBlank(order.getTrackingNumber())) {
             LocalDate trackedShipment = parseShipmentDate(order.getShipmentDate());
@@ -269,8 +269,8 @@ public class OrderReturnService {
                 return trackedShipment.atStartOfDay(INDIA).toInstant();
             }
         }
-        if (StringUtils.isNotBlank(order.getTrackingNumber()) && order.getZohoTrackingLastPulledAt() != null) {
-            return order.getZohoTrackingLastPulledAt();
+        if (StringUtils.isNotBlank(order.getTrackingNumber()) && order.getLedgerlyTrackingLastPulledAt() != null) {
+            return order.getLedgerlyTrackingLastPulledAt();
         }
         return null;
     }

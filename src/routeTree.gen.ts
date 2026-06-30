@@ -35,7 +35,6 @@ import { Route as AccountIndexRouteImport } from './routes/account.index'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
 import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
-import { Route as AdminZohoRouteImport } from './routes/admin.zoho'
 import { Route as AdminSubscribeRouteImport } from './routes/admin.subscribe'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminReturnsRouteImport } from './routes/admin.returns'
@@ -58,6 +57,7 @@ import { Route as AccountNotificationsRouteImport } from './routes/account.notif
 import { Route as AccountCartRouteImport } from './routes/account.cart'
 import { Route as AccountAddressesRouteImport } from './routes/account.addresses'
 import { Route as AccountActivateRouteImport } from './routes/account.activate'
+import { Route as AdminIntegrationsLedgerlyRouteImport } from './routes/admin.integrations.ledgerly'
 import { Route as AccountOrdersOrderNumberRouteImport } from './routes/account.orders.$orderNumber'
 
 const WishlistRoute = WishlistRouteImport.update({
@@ -190,11 +190,6 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
   path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminZohoRoute = AdminZohoRouteImport.update({
-  id: '/zoho',
-  path: '/zoho',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminSubscribeRoute = AdminSubscribeRouteImport.update({
   id: '/subscribe',
   path: '/subscribe',
@@ -305,6 +300,12 @@ const AccountActivateRoute = AccountActivateRouteImport.update({
   path: '/activate',
   getParentRoute: () => AccountRoute,
 } as any)
+const AdminIntegrationsLedgerlyRoute =
+  AdminIntegrationsLedgerlyRouteImport.update({
+    id: '/integrations/ledgerly',
+    path: '/integrations/ledgerly',
+    getParentRoute: () => AdminRoute,
+  } as any)
 const AccountOrdersOrderNumberRoute =
   AccountOrdersOrderNumberRouteImport.update({
     id: '/$orderNumber',
@@ -355,7 +356,6 @@ export interface FileRoutesByFullPath {
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/subscribe': typeof AdminSubscribeRoute
-  '/admin/zoho': typeof AdminZohoRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/product/$slug': typeof ProductSlugRoute
@@ -363,6 +363,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/blog/': typeof BlogIndexRoute
   '/account/orders/$orderNumber': typeof AccountOrdersOrderNumberRoute
+  '/admin/integrations/ledgerly': typeof AdminIntegrationsLedgerlyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -404,7 +405,6 @@ export interface FileRoutesByTo {
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/subscribe': typeof AdminSubscribeRoute
-  '/admin/zoho': typeof AdminZohoRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/product/$slug': typeof ProductSlugRoute
@@ -412,6 +412,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/blog': typeof BlogIndexRoute
   '/account/orders/$orderNumber': typeof AccountOrdersOrderNumberRoute
+  '/admin/integrations/ledgerly': typeof AdminIntegrationsLedgerlyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -457,7 +458,6 @@ export interface FileRoutesById {
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/subscribe': typeof AdminSubscribeRoute
-  '/admin/zoho': typeof AdminZohoRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/product/$slug': typeof ProductSlugRoute
@@ -465,6 +465,7 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/blog/': typeof BlogIndexRoute
   '/account/orders/$orderNumber': typeof AccountOrdersOrderNumberRoute
+  '/admin/integrations/ledgerly': typeof AdminIntegrationsLedgerlyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -511,7 +512,6 @@ export interface FileRouteTypes {
     | '/admin/returns'
     | '/admin/settings'
     | '/admin/subscribe'
-    | '/admin/zoho'
     | '/auth/callback'
     | '/blog/$slug'
     | '/product/$slug'
@@ -519,6 +519,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/blog/'
     | '/account/orders/$orderNumber'
+    | '/admin/integrations/ledgerly'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -560,7 +561,6 @@ export interface FileRouteTypes {
     | '/admin/returns'
     | '/admin/settings'
     | '/admin/subscribe'
-    | '/admin/zoho'
     | '/auth/callback'
     | '/blog/$slug'
     | '/product/$slug'
@@ -568,6 +568,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/blog'
     | '/account/orders/$orderNumber'
+    | '/admin/integrations/ledgerly'
   id:
     | '__root__'
     | '/'
@@ -612,7 +613,6 @@ export interface FileRouteTypes {
     | '/admin/returns'
     | '/admin/settings'
     | '/admin/subscribe'
-    | '/admin/zoho'
     | '/auth/callback'
     | '/blog/$slug'
     | '/product/$slug'
@@ -620,6 +620,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/blog/'
     | '/account/orders/$orderNumber'
+    | '/admin/integrations/ledgerly'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -831,13 +832,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/zoho': {
-      id: '/admin/zoho'
-      path: '/zoho'
-      fullPath: '/admin/zoho'
-      preLoaderRoute: typeof AdminZohoRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/subscribe': {
       id: '/admin/subscribe'
       path: '/subscribe'
@@ -992,6 +986,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountActivateRouteImport
       parentRoute: typeof AccountRoute
     }
+    '/admin/integrations/ledgerly': {
+      id: '/admin/integrations/ledgerly'
+      path: '/integrations/ledgerly'
+      fullPath: '/admin/integrations/ledgerly'
+      preLoaderRoute: typeof AdminIntegrationsLedgerlyRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/account/orders/$orderNumber': {
       id: '/account/orders/$orderNumber'
       path: '/$orderNumber'
@@ -1058,8 +1059,8 @@ interface AdminRouteChildren {
   AdminReturnsRoute: typeof AdminReturnsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSubscribeRoute: typeof AdminSubscribeRoute
-  AdminZohoRoute: typeof AdminZohoRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  AdminIntegrationsLedgerlyRoute: typeof AdminIntegrationsLedgerlyRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -1075,8 +1076,8 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminReturnsRoute: AdminReturnsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminSubscribeRoute: AdminSubscribeRoute,
-  AdminZohoRoute: AdminZohoRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminIntegrationsLedgerlyRoute: AdminIntegrationsLedgerlyRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)

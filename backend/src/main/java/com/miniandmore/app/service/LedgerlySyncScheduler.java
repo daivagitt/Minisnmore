@@ -1,6 +1,6 @@
 package com.miniandmore.app.service;
 
-import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
+import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import java.util.List;
 import org.slf4j.Logger;
@@ -26,7 +26,7 @@ public class LedgerlySyncScheduler {
         List<Long> orderIds = customerOrderRepository
             .findAll()
             .stream()
-            .filter(o -> o.getZohoSyncStatus() == ZohoSyncStatus.FAILED || o.getZohoSyncStatus() == ZohoSyncStatus.PENDING)
+            .filter(o -> o.getLedgerlySyncStatus() == LedgerlySyncStatus.FAILED || o.getLedgerlySyncStatus() == LedgerlySyncStatus.PENDING)
             .map(o -> o.getId())
             .toList();
         for (Long id : orderIds) {

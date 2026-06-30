@@ -18,22 +18,8 @@ class ApplicationPropertiesTest {
         properties.getStorage().getS3().setBucket("bucket");
         assertThat(properties.getStorage().getS3().getBucket()).isEqualTo("bucket");
 
-        assertThat(properties.getZoho()).isNotNull();
         assertThat(properties.getInventory()).isNotNull();
-    }
-
-    @Test
-    void zohoOAuthProperties_roundTrip() {
-        ApplicationProperties properties = new ApplicationProperties();
-        var oauth = properties.getZoho().getOauth();
-        oauth.setClientId("client");
-        oauth.setClientSecret("secret");
-        oauth.setHomepageUrl("https://example.com");
-        oauth.setScopes("ZohoBooks.fullaccess.all");
-
-        assertThat(properties.getZoho().getOauth().getClientId()).isEqualTo("client");
-        assertThat(properties.getZoho().getOauth().getClientSecret()).isEqualTo("secret");
-        assertThat(properties.getZoho().getOauth().getHomepageUrl()).isEqualTo("https://example.com");
-        assertThat(properties.getZoho().getOauth().getScopes()).isEqualTo("ZohoBooks.fullaccess.all");
+        properties.getInventory().getReservationRelease().setFixedDelayMs(120_000L);
+        assertThat(properties.getInventory().getReservationRelease().getFixedDelayMs()).isEqualTo(120_000L);
     }
 }

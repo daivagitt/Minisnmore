@@ -76,8 +76,7 @@ public class LedgerlyIntegrationClient {
     }
 
     public Map<String, Object> syncOrderPayload(Map<String, Object> payload, String idempotencyKey) {
-        RestClient.RequestBodySpec spec = authorized(client().post().uri("/v1/integrations/commerce/orders/sync"))
-            .contentType(MediaType.APPLICATION_JSON);
+        RestClient.RequestBodySpec spec = authorizedPost("/v1/integrations/commerce/orders/sync").contentType(MediaType.APPLICATION_JSON);
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             spec = spec.header("Idempotency-Key", idempotencyKey);
         }
@@ -88,21 +87,28 @@ public class LedgerlyIntegrationClient {
 
     @SuppressWarnings("unchecked")
     private <T> T post(String path, Object body) {
-        return authorized(client().post().uri(path).contentType(MediaType.APPLICATION_JSON))
+        return (T) authorizedPost(path)
+            .contentType(MediaType.APPLICATION_JSON)
             .body(body)
             .retrieve()
-            .body((Class<T>) Map.class);
+            .body(Map.class);
     }
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> get(String path) {
-        return authorized(client().get().uri(path)).retrieve().body(Map.class);
-    }
-
-    private RestClient.RequestHeadersSpec<?> authorized(RestClient.RequestHeadersUriSpec<?> spec) {
+        RestClient.RequestHeadersSpec<?> spec = client().get().uri(path);
         String token = credentials.token();
         if (token != null && !token.isBlank()) {
-            return spec.header("Authorization", "Bearer " + token);
+            spec = spec.header("Authorization", "Bearer " + token);
+        }
+        return spec.retrieve().body(Map.class);
+    }
+
+    private RestClient.RequestBodySpec authorizedPost(String path) {
+        RestClient.RequestBodySpec spec = client().post().uri(path);
+        String token = credentials.token();
+        if (token != null && !token.isBlank()) {
+            spec = spec.header("Authorization", "Bearer " + token);
         }
         return spec;
     }

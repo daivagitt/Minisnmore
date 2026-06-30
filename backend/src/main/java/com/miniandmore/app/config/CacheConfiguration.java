@@ -77,7 +77,6 @@ public class CacheConfiguration {
             createCache(cm, com.miniandmore.app.domain.CustomerOrder.class.getName(), jcacheConfiguration);
             createCache(cm, com.miniandmore.app.domain.CustomerOrder.class.getName() + ".itemses", jcacheConfiguration);
             createCache(cm, com.miniandmore.app.domain.OrderItem.class.getName(), jcacheConfiguration);
-            createCache(cm, com.miniandmore.app.domain.ZohoSetting.class.getName(), jcacheConfiguration);
             // jhipster-needle-redis-add-entry
         };
     }

@@ -39,6 +39,10 @@ public class LedgerlySetting implements Serializable {
     @Column(name = "pull_products_auto_create_category", nullable = false)
     private Boolean pullProductsAutoCreateCategory = false;
 
+    @Size(max = 200)
+    @Column(name = "webhook_secret", length = 200)
+    private String webhookSecret;
+
     public Long getId() {
         return id;
     }
@@ -85,5 +89,13 @@ public class LedgerlySetting implements Serializable {
 
     public void setPullProductsAutoCreateCategory(Boolean pullProductsAutoCreateCategory) {
         this.pullProductsAutoCreateCategory = pullProductsAutoCreateCategory;
+    }
+
+    public String getWebhookSecret() {
+        return webhookSecret;
+    }
+
+    public void setWebhookSecret(String webhookSecret) {
+        this.webhookSecret = webhookSecret;
     }
 }

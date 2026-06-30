@@ -3,6 +3,7 @@ package com.miniandmore.app.web.rest.admin;
 import com.miniandmore.app.domain.LedgerlySetting;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.LedgerlySettingRepository;
+import com.miniandmore.app.repository.ProductRepository;
 import com.miniandmore.app.service.LedgerlySyncService;
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
 import java.util.LinkedHashMap;
@@ -19,17 +20,20 @@ public class LedgerlyAdminResource {
     private final LedgerlySyncService syncService;
     private final LedgerlyIntegrationClient ledgerlyClient;
     private final CustomerOrderRepository customerOrderRepository;
+    private final ProductRepository productRepository;
 
     public LedgerlyAdminResource(
         LedgerlySettingRepository settingRepository,
         LedgerlySyncService syncService,
         LedgerlyIntegrationClient ledgerlyClient,
-        CustomerOrderRepository customerOrderRepository
+        CustomerOrderRepository customerOrderRepository,
+        ProductRepository productRepository
     ) {
         this.settingRepository = settingRepository;
         this.syncService = syncService;
         this.ledgerlyClient = ledgerlyClient;
         this.customerOrderRepository = customerOrderRepository;
+        this.productRepository = productRepository;
     }
 
     @GetMapping("/integration-status")
@@ -58,6 +62,7 @@ public class LedgerlyAdminResource {
                 dto.put("connected", s.getConnected());
                 dto.put("pullProductsAutoCreateCategory", s.getPullProductsAutoCreateCategory());
                 dto.put("hasToken", s.getApiToken() != null && !s.getApiToken().isBlank());
+                dto.put("hasWebhookSecret", s.getWebhookSecret() != null && !s.getWebhookSecret().isBlank());
                 return ResponseEntity.ok(dto);
             })
             .orElse(ResponseEntity.ok(Map.of()));
@@ -88,6 +93,10 @@ public class LedgerlyAdminResource {
         if (body.get("pullProductsAutoCreateCategory") != null) {
             setting.setPullProductsAutoCreateCategory(Boolean.parseBoolean(body.get("pullProductsAutoCreateCategory").toString()));
         }
+        Object webhookSecretVal = body.get("webhookSecret") != null ? body.get("webhookSecret") : body.get("webhook_secret");
+        if (webhookSecretVal != null && !webhookSecretVal.toString().isBlank()) {
+            setting.setWebhookSecret(webhookSecretVal.toString());
+        }
         settingRepository.save(setting);
         return Map.of("ok", true);
     }
@@ -108,7 +117,17 @@ public class LedgerlyAdminResource {
     @PostMapping("/sync-products/{id}")
     public Map<String, Object> syncProduct(@PathVariable Long id) {
         syncService.syncProduct(id);
-        return Map.of("ok", true, "productId", id);
+        return productRepository
+            .findById(id)
+            .map(product -> {
+                Map<String, Object> result = new LinkedHashMap<>();
+                result.put("ledgerlyItemId", product.getLedgerlyItemId());
+                result.put("ledgerlySyncStatus", product.getLedgerlySyncStatus());
+                result.put("ledgerlyLastSyncedAt", product.getLedgerlyLastSyncedAt());
+                result.put("ledgerlySyncError", product.getLedgerlySyncError());
+                return result;
+            })
+            .orElse(Map.of("ok", false, "productId", id, "error", "not found"));
     }
 
     @PostMapping("/pull-products")

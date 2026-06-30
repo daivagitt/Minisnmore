@@ -12,7 +12,6 @@ docker compose -f docker/microservices.yml up -d
 | Catalog core (`backend/`) | 8084 (internal APIs only) |
 | Store (`store/`) | 8081 |
 | Commerce (`commerce/`) | 8082 |
-| Integration (`integration/`) | 8083 |
 | Consul | 8500 |
 | Postgres (catalog) | 5432 |
 | Postgres (gateway) | 5433 |
@@ -100,7 +99,7 @@ cd gateway && ./mvnw compile -DskipTests
 |------|----------------|
 | Module smoke (`verify-frontend-api-contract.sh`) | Install Postgres (5432 + 5433), Redis, Consul locally, or use Docker |
 | `mvn verify` on catalog (JHipster `*IT*`) | Docker (Testcontainers) or skip: `./mvnw test` only |
-| Zoho / checkout E2E | Running API + env vars — see [zoho-integration-test-scenarios.md](./zoho-integration-test-scenarios.md) |
+| Ledgerly / checkout E2E | Running API + `LEDGERLY_*` env vars — see [ledgerly-integration-test-scenarios.md](./ledgerly-integration-test-scenarios.md) |
 
 ### Native Postgres (optional, to run apps without Docker)
 
@@ -111,7 +110,7 @@ Create DBs matching `application-dev.yml`:
 - Redis: `localhost:6379`
 - Consul: `localhost:8500` (optional in dev — gateway routes `/api/v1` directly to `:8081`)
 
-Disable schedulers in dev if Zoho/Razorpay keys are unset.
+Disable schedulers in dev if `LEDGERLY_API_TOKEN` / Razorpay keys are unset.
 
 ## References
 

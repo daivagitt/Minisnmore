@@ -56,7 +56,7 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     Optional<Product> findOneBySku(String sku);
 
-    Optional<Product> findOneByZohoItemId(String zohoItemId);
+    Optional<Product> findOneByLedgerlyItemId(String ledgerlyItemId);
 
     @Query("select coalesce(max(product.sortOrder), 0) from Product product")
     Integer findMaxSortOrder();
@@ -66,12 +66,12 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     List<Product> findAllByActiveTrue();
 
-    List<Product> findAllByZohoItemIdIsNotNull();
+    List<Product> findAllByLedgerlyItemIdIsNotNull();
 
     @Query(
-        "select product from Product product where product.active = true and (product.zohoItemId is not null or product.sku is not null)"
+        "select product from Product product where product.active = true and (product.ledgerlyItemId is not null or product.sku is not null)"
     )
-    List<Product> findAllActiveEligibleForZohoInventoryPull();
+    List<Product> findAllActiveEligibleForLedgerlyInventoryPull();
 
     long countByCategory_Id(Long categoryId);
 }

@@ -54,7 +54,7 @@ public class OrderReturn implements Serializable {
 
     @Size(max = 120)
     @Column(name = "ledgerly_credit_note_id", length = 120)
-    private String zohoCreditNoteId;
+    private String ledgerlyCreditNoteId;
 
     @NotNull
     @Column(name = "requested_at", nullable = false)
@@ -138,12 +138,12 @@ public class OrderReturn implements Serializable {
         this.razorpayRefundId = razorpayRefundId;
     }
 
-    public String getZohoCreditNoteId() {
-        return zohoCreditNoteId;
+    public String getLedgerlyCreditNoteId() {
+        return ledgerlyCreditNoteId;
     }
 
-    public void setZohoCreditNoteId(String zohoCreditNoteId) {
-        this.zohoCreditNoteId = zohoCreditNoteId;
+    public void setLedgerlyCreditNoteId(String ledgerlyCreditNoteId) {
+        this.ledgerlyCreditNoteId = ledgerlyCreditNoteId;
     }
 
     public Instant getRequestedAt() {

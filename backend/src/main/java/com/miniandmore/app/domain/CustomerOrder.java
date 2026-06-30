@@ -3,7 +3,7 @@ package com.miniandmore.app.domain;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
-import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
+import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serial;
@@ -114,26 +114,26 @@ public class CustomerOrder implements Serializable {
 
     @Size(max = 120)
     @Column(name = "ledgerly_sales_order_id", length = 120, unique = true)
-    private String zohoSalesOrderId;
+    private String ledgerlySalesOrderId;
 
     @Size(max = 120)
     @Column(name = "ledgerly_invoice_id", length = 120)
-    private String zohoInvoiceId;
+    private String ledgerlyInvoiceId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "ledgerly_sync_status")
-    private ZohoSyncStatus zohoSyncStatus;
+    private LedgerlySyncStatus ledgerlySyncStatus;
 
     @Column(name = "ledgerly_last_synced_at")
-    private Instant zohoLastSyncedAt;
+    private Instant ledgerlyLastSyncedAt;
 
     @Size(max = 1000)
     @Column(name = "ledgerly_sync_error", length = 1000)
-    private String zohoSyncError;
+    private String ledgerlySyncError;
 
     @Size(max = 40)
     @Column(name = "ledgerly_order_status", length = 40)
-    private String zohoOrderStatus;
+    private String ledgerlyOrderStatus;
 
     @Size(max = 120)
     @Column(name = "tracking_number", length = 120)
@@ -148,7 +148,7 @@ public class CustomerOrder implements Serializable {
     private String shipmentDate;
 
     @Column(name = "ledgerly_tracking_last_pulled_at")
-    private Instant zohoTrackingLastPulledAt;
+    private Instant ledgerlyTrackingLastPulledAt;
 
     @OneToMany(fetch = FetchType.LAZY, mappedBy = "order")
     @JsonIgnoreProperties(value = { "order" }, allowSetters = true)
@@ -403,82 +403,82 @@ public class CustomerOrder implements Serializable {
         this.inventoryReleasedAt = inventoryReleasedAt;
     }
 
-    public String getZohoSalesOrderId() {
-        return this.zohoSalesOrderId;
+    public String getLedgerlySalesOrderId() {
+        return this.ledgerlySalesOrderId;
     }
 
-    public CustomerOrder zohoSalesOrderId(String zohoSalesOrderId) {
-        this.setZohoSalesOrderId(zohoSalesOrderId);
+    public CustomerOrder ledgerlySalesOrderId(String ledgerlySalesOrderId) {
+        this.setLedgerlySalesOrderId(ledgerlySalesOrderId);
         return this;
     }
 
-    public void setZohoSalesOrderId(String zohoSalesOrderId) {
-        this.zohoSalesOrderId = zohoSalesOrderId;
+    public void setLedgerlySalesOrderId(String ledgerlySalesOrderId) {
+        this.ledgerlySalesOrderId = ledgerlySalesOrderId;
     }
 
-    public String getZohoInvoiceId() {
-        return this.zohoInvoiceId;
+    public String getLedgerlyInvoiceId() {
+        return this.ledgerlyInvoiceId;
     }
 
-    public CustomerOrder zohoInvoiceId(String zohoInvoiceId) {
-        this.setZohoInvoiceId(zohoInvoiceId);
+    public CustomerOrder ledgerlyInvoiceId(String ledgerlyInvoiceId) {
+        this.setLedgerlyInvoiceId(ledgerlyInvoiceId);
         return this;
     }
 
-    public void setZohoInvoiceId(String zohoInvoiceId) {
-        this.zohoInvoiceId = zohoInvoiceId;
+    public void setLedgerlyInvoiceId(String ledgerlyInvoiceId) {
+        this.ledgerlyInvoiceId = ledgerlyInvoiceId;
     }
 
-    public ZohoSyncStatus getZohoSyncStatus() {
-        return this.zohoSyncStatus;
+    public LedgerlySyncStatus getLedgerlySyncStatus() {
+        return this.ledgerlySyncStatus;
     }
 
-    public CustomerOrder zohoSyncStatus(ZohoSyncStatus zohoSyncStatus) {
-        this.setZohoSyncStatus(zohoSyncStatus);
+    public CustomerOrder ledgerlySyncStatus(LedgerlySyncStatus ledgerlySyncStatus) {
+        this.setLedgerlySyncStatus(ledgerlySyncStatus);
         return this;
     }
 
-    public void setZohoSyncStatus(ZohoSyncStatus zohoSyncStatus) {
-        this.zohoSyncStatus = zohoSyncStatus;
+    public void setLedgerlySyncStatus(LedgerlySyncStatus ledgerlySyncStatus) {
+        this.ledgerlySyncStatus = ledgerlySyncStatus;
     }
 
-    public Instant getZohoLastSyncedAt() {
-        return this.zohoLastSyncedAt;
+    public Instant getLedgerlyLastSyncedAt() {
+        return this.ledgerlyLastSyncedAt;
     }
 
-    public CustomerOrder zohoLastSyncedAt(Instant zohoLastSyncedAt) {
-        this.setZohoLastSyncedAt(zohoLastSyncedAt);
+    public CustomerOrder ledgerlyLastSyncedAt(Instant ledgerlyLastSyncedAt) {
+        this.setLedgerlyLastSyncedAt(ledgerlyLastSyncedAt);
         return this;
     }
 
-    public void setZohoLastSyncedAt(Instant zohoLastSyncedAt) {
-        this.zohoLastSyncedAt = zohoLastSyncedAt;
+    public void setLedgerlyLastSyncedAt(Instant ledgerlyLastSyncedAt) {
+        this.ledgerlyLastSyncedAt = ledgerlyLastSyncedAt;
     }
 
-    public String getZohoSyncError() {
-        return this.zohoSyncError;
+    public String getLedgerlySyncError() {
+        return this.ledgerlySyncError;
     }
 
-    public CustomerOrder zohoSyncError(String zohoSyncError) {
-        this.setZohoSyncError(zohoSyncError);
+    public CustomerOrder ledgerlySyncError(String ledgerlySyncError) {
+        this.setLedgerlySyncError(ledgerlySyncError);
         return this;
     }
 
-    public void setZohoSyncError(String zohoSyncError) {
-        this.zohoSyncError = zohoSyncError;
+    public void setLedgerlySyncError(String ledgerlySyncError) {
+        this.ledgerlySyncError = ledgerlySyncError;
     }
 
-    public String getZohoOrderStatus() {
-        return this.zohoOrderStatus;
+    public String getLedgerlyOrderStatus() {
+        return this.ledgerlyOrderStatus;
     }
 
-    public CustomerOrder zohoOrderStatus(String zohoOrderStatus) {
-        this.setZohoOrderStatus(zohoOrderStatus);
+    public CustomerOrder ledgerlyOrderStatus(String ledgerlyOrderStatus) {
+        this.setLedgerlyOrderStatus(ledgerlyOrderStatus);
         return this;
     }
 
-    public void setZohoOrderStatus(String zohoOrderStatus) {
-        this.zohoOrderStatus = zohoOrderStatus;
+    public void setLedgerlyOrderStatus(String ledgerlyOrderStatus) {
+        this.ledgerlyOrderStatus = ledgerlyOrderStatus;
     }
 
     public String getTrackingNumber() {
@@ -520,17 +520,17 @@ public class CustomerOrder implements Serializable {
         this.shipmentDate = shipmentDate;
     }
 
-    public Instant getZohoTrackingLastPulledAt() {
-        return this.zohoTrackingLastPulledAt;
+    public Instant getLedgerlyTrackingLastPulledAt() {
+        return this.ledgerlyTrackingLastPulledAt;
     }
 
-    public CustomerOrder zohoTrackingLastPulledAt(Instant zohoTrackingLastPulledAt) {
-        this.setZohoTrackingLastPulledAt(zohoTrackingLastPulledAt);
+    public CustomerOrder ledgerlyTrackingLastPulledAt(Instant ledgerlyTrackingLastPulledAt) {
+        this.setLedgerlyTrackingLastPulledAt(ledgerlyTrackingLastPulledAt);
         return this;
     }
 
-    public void setZohoTrackingLastPulledAt(Instant zohoTrackingLastPulledAt) {
-        this.zohoTrackingLastPulledAt = zohoTrackingLastPulledAt;
+    public void setLedgerlyTrackingLastPulledAt(Instant ledgerlyTrackingLastPulledAt) {
+        this.ledgerlyTrackingLastPulledAt = ledgerlyTrackingLastPulledAt;
     }
 
     public Set<OrderItem> getItemses() {

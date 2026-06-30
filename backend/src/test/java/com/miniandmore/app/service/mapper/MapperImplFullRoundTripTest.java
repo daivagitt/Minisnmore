@@ -6,7 +6,7 @@ import com.miniandmore.app.domain.*;
 import com.miniandmore.app.domain.enumeration.DiscountType;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
-import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
+import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import com.miniandmore.app.service.dto.*;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -54,13 +54,13 @@ class MapperImplFullRoundTripTest {
             .trackingNumber("T")
             .trackingCarrier("DHL")
             .shipmentDate("2026-01-01")
-            .zohoOrderStatus("shipped")
-            .zohoSalesOrderId("SO")
-            .zohoInvoiceId("INV")
-            .zohoSyncStatus(ZohoSyncStatus.SYNCED)
-            .zohoSyncError("err")
-            .zohoLastSyncedAt(Instant.parse("2026-01-01T00:00:00Z"))
-            .zohoTrackingLastPulledAt(Instant.parse("2026-01-02T00:00:00Z"))
+            .ledgerlyOrderStatus("shipped")
+            .ledgerlySalesOrderId("SO")
+            .ledgerlyInvoiceId("INV")
+            .ledgerlySyncStatus(LedgerlySyncStatus.SYNCED)
+            .ledgerlySyncError("err")
+            .ledgerlyLastSyncedAt(Instant.parse("2026-01-01T00:00:00Z"))
+            .ledgerlyTrackingLastPulledAt(Instant.parse("2026-01-02T00:00:00Z"))
             .inventoryReserved(true)
             .inventoryReservedUntil(Instant.parse("2026-01-03T00:00:00Z"))
             .inventoryReleasedAt(Instant.parse("2026-01-04T00:00:00Z"))
@@ -208,10 +208,10 @@ class MapperImplFullRoundTripTest {
             .newArrival(true)
             .bestSeller(true)
             .active(true)
-            .zohoItemId("Z")
-            .zohoSyncStatus(ZohoSyncStatus.PENDING)
-            .zohoLastSyncedAt(Instant.now())
-            .zohoSyncError("e")
+            .ledgerlyItemId("Z")
+            .ledgerlySyncStatus(LedgerlySyncStatus.PENDING)
+            .ledgerlyLastSyncedAt(Instant.now())
+            .ledgerlySyncError("e")
             .category(category);
     }
 }

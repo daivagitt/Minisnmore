@@ -8,7 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.miniandmore.app.client.ZohoBooksIntegrationClient;
+import com.miniandmore.app.client.LedgerlyIntegrationClient;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.OrderReturn;
@@ -55,7 +55,7 @@ class OrderReturnServiceTest {
     private RazorpayRefundService razorpayRefundService;
 
     @Mock
-    private ZohoBooksIntegrationClient zohoBooksIntegrationClient;
+    private LedgerlyIntegrationClient ledgerlyIntegrationClient;
 
     @InjectMocks
     private OrderReturnService orderReturnService;
@@ -255,12 +255,44 @@ class OrderReturnServiceTest {
     }
 
     @Test
-    void processRefund_zohoFailure_stillRefunds() {
+    void processRefund_ledgerlySuccess_setsCreditNoteId() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo_ORD-9001");
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
+        when(ledgerlyIntegrationClient.createCreditNote(ORDER_NUMBER, "RET-1")).thenReturn(Optional.of("cn-9001"));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderReturn result = orderReturnService.processRefund("RET-1", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REFUNDED);
+        assertThat(result.getLedgerlyCreditNoteId()).isEqualTo("cn-9001");
+        verify(ledgerlyIntegrationClient).createCreditNote(ORDER_NUMBER, "RET-1");
+    }
+
+    @Test
+    void processRefund_existingCreditNoteId_skipsLedgerlyCall() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+        orderReturn.setLedgerlyCreditNoteId("cn-existing");
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo");
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        orderReturnService.processRefund("RET-1", null);
+
+        verify(ledgerlyIntegrationClient, never()).createCreditNote(any(), any());
+    }
+
+    @Test
+    void processRefund_ledgerlyFailure_stillRefunds() {
         OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(java.util.Optional.of(orderReturn));
         when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo_ORD-9001");
         when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
-        when(zohoBooksIntegrationClient.createCreditNote(any(), any())).thenThrow(new RuntimeException("zoho down"));
+        when(ledgerlyIntegrationClient.createCreditNote(any(), any())).thenThrow(new RuntimeException("ledgerly down"));
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -342,11 +374,11 @@ class OrderReturnServiceTest {
     }
 
     @Test
-    void resolveDeliveryAnchor_withoutShipmentDate_usesZohoTrackingPull() {
+    void resolveDeliveryAnchor_withoutShipmentDate_usesLedgerlyTrackingPull() {
         CustomerOrder order = eligibleOrder()
             .shipmentDate(null)
             .status(OrderStatus.FULFILLED)
-            .zohoTrackingLastPulledAt(Instant.parse("2026-01-05T00:00:00Z"));
+            .ledgerlyTrackingLastPulledAt(Instant.parse("2026-01-05T00:00:00Z"));
 
         Instant anchor = orderReturnService.resolveDeliveryAnchor(order);
 

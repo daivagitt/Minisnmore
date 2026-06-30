@@ -10,13 +10,13 @@ public final class OrderTrackingStatusResolver {
     private OrderTrackingStatusResolver() {}
 
     public static String resolve(CustomerOrder order) {
-        if (order.getStatus() == OrderStatus.CANCELLED || "void".equalsIgnoreCase(StringUtils.defaultString(order.getZohoOrderStatus()))) {
+        if (order.getStatus() == OrderStatus.CANCELLED || "void".equalsIgnoreCase(StringUtils.defaultString(order.getLedgerlyOrderStatus()))) {
             return "cancelled";
         }
         if (order.getPaymentStatus() != PaymentStatus.PAID) {
             return "pending";
         }
-        if (order.getStatus() == OrderStatus.FULFILLED || "closed".equalsIgnoreCase(StringUtils.defaultString(order.getZohoOrderStatus()))) {
+        if (order.getStatus() == OrderStatus.FULFILLED || "closed".equalsIgnoreCase(StringUtils.defaultString(order.getLedgerlyOrderStatus()))) {
             return "delivered";
         }
         if (StringUtils.isNotBlank(order.getTrackingNumber()) || StringUtils.isNotBlank(order.getShipmentDate())) {

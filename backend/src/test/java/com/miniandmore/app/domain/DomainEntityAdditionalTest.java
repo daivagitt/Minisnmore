@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
-import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
+import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import java.math.BigDecimal;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
@@ -26,10 +26,10 @@ class DomainEntityAdditionalTest {
             .newArrival(true)
             .bestSeller(true)
             .active(true)
-            .zohoItemId("z1")
-            .zohoSyncStatus(ZohoSyncStatus.PENDING)
-            .zohoLastSyncedAt(Instant.now())
-            .zohoSyncError("err");
+            .ledgerlyItemId("z1")
+            .ledgerlySyncStatus(LedgerlySyncStatus.PENDING)
+            .ledgerlyLastSyncedAt(Instant.now())
+            .ledgerlySyncError("err");
 
         assertThat(product.getDescription()).isEqualTo("desc");
         assertThat(product.getFeatured()).isTrue();
@@ -37,7 +37,7 @@ class DomainEntityAdditionalTest {
     }
 
     @Test
-    void customerOrder_trackingAndZohoFields() {
+    void customerOrder_trackingAndLedgerlyFields() {
         CustomerOrder order = new CustomerOrder()
             .status(OrderStatus.FULFILLED)
             .paymentStatus(PaymentStatus.PAID)
@@ -47,17 +47,17 @@ class DomainEntityAdditionalTest {
             .tax(BigDecimal.ONE)
             .donation(BigDecimal.ZERO)
             .total(BigDecimal.valueOf(13))
-            .zohoOrderStatus("shipped")
+            .ledgerlyOrderStatus("shipped")
             .trackingCarrier("Delhivery")
             .trackingNumber("TN1")
             .shipmentDate("2026-01-01")
-            .zohoTrackingLastPulledAt(Instant.now())
+            .ledgerlyTrackingLastPulledAt(Instant.now())
             .inventoryReserved(true)
             .inventoryReservedUntil(Instant.now())
             .inventoryReleasedAt(Instant.now());
 
         assertThat(order.getTrackingCarrier()).isEqualTo("Delhivery");
-        assertThat(order.getZohoOrderStatus()).isEqualTo("shipped");
+        assertThat(order.getLedgerlyOrderStatus()).isEqualTo("shipped");
         assertThat(order.toString()).contains("orderNumber");
     }
 

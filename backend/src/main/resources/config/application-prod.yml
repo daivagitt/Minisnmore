@@ -103,11 +103,10 @@ application:
       secret-key: ${S3_SECRET_KEY:}
       public-base-url: ${S3_PUBLIC_BASE_URL:}
       key-prefix: ${S3_KEY_PREFIX:}
-  zoho:
-    oauth:
-      client-id: ${ZOHO_CLIENT_ID:}
-      client-secret: ${ZOHO_CLIENT_SECRET:}
-      org-id: ${ZOHO_ORG_ID:}
+  ledgerly:
+    api-base-url: ${LEDGERLY_API_BASE_URL:}
+    api-token: ${LEDGERLY_API_TOKEN:}
+    org-id: ${LEDGERLY_ORG_ID:}
 
 razorpay:
   key-id: ${RAZORPAY_KEY_ID:}

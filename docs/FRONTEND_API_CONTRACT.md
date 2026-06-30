@@ -61,7 +61,7 @@ Subscribe CMS fields: `subscribeHeroTitle`, … or snake_case on `/subscribe-pag
 | Frontend | Path prefix |
 |----------|-------------|
 | `backend-data.ts` CRUD | `/api/v1/admin/{categories,products,...}` |
-| Zoho | `/api/v1/admin/zoho/*`, `/api/v1/admin/zoho-settings` |
+| Ledgerly | `/api/v1/admin/ledgerly/*` (settings at `/api/v1/admin/ledgerly/settings`) |
 | Uploads | `/api/v1/admin/uploads`, `/presign` |
 | Dashboard | GET `/api/v1/admin/dashboard` |
 | Returns | `/api/v1/admin/order-returns/*` |

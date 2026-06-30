@@ -13,7 +13,10 @@ import {
   pullLedgerlyProducts,
   retryLedgerlyOrders,
   pullLedgerlyOrderTracking,
+  formatLedgerlySyncSummary,
+  formatLedgerlySyncFailures,
   type LedgerlyIntegrationStatus,
+  type LedgerlySyncSummary,
 } from "@/lib/backend-data";
 import { showApiError } from "@/lib/ui-errors";
 
@@ -28,13 +31,14 @@ function LedgerlyPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [lastResult, setLastResult] = useState<{ label: string; summary: LedgerlySyncSummary } | null>(null);
 
   const reload = useCallback(async () => {
     const [status, settings] = await Promise.all([getLedgerlyIntegrationStatus(), getLedgerlySettings()]);
     setIntegration(status);
     if (settings) {
-      setApiBaseUrl(settings.api_base_url ?? "");
-      setOrgId(settings.org_id ?? "");
+      setApiBaseUrl(settings.apiBaseUrl ?? settings.api_base_url ?? "");
+      setOrgId(settings.orgId ?? settings.org_id ?? "");
     }
     return status;
   }, []);
@@ -45,11 +49,22 @@ function LedgerlyPage() {
       .finally(() => setLoading(false));
   }, [reload]);
 
-  const run = async (key: string, fn: () => Promise<unknown>, label: string) => {
+  const run = async (key: string, label: string, fn: () => Promise<LedgerlySyncSummary>) => {
     setSyncing(key);
     try {
-      await fn();
-      toast.success(label);
+      const summary = await fn();
+      setLastResult({ label, summary });
+      const failed = summary.failureCount ?? 0;
+      const success = summary.successCount ?? 0;
+      if (failed > 0) {
+        toast.warning(formatLedgerlySyncSummary(summary, label));
+      } else if ((summary.notices ?? []).length > 0) {
+        toast.info(formatLedgerlySyncSummary(summary, label));
+      } else if (success > 0) {
+        toast.success(formatLedgerlySyncSummary(summary, label));
+      } else {
+        toast.info(`${label}: nothing to process`);
+      }
       await reload();
     } catch (e) {
       showApiError(e);
@@ -162,13 +177,26 @@ function LedgerlyPage() {
             type="button"
             className="flex items-center gap-2 rounded-xl border border-white/50 bg-white/60 px-4 py-3 text-left text-sm hover:bg-white/80"
             disabled={syncing !== null}
-            onClick={() => run(action.key, action.fn, action.label + " started")}
+            onClick={() => run(action.key, action.label, action.fn)}
           >
             {syncing === action.key ? <Loader2 className="h-4 w-4 animate-spin" /> : <action.icon className="h-4 w-4" />}
             {action.label}
           </button>
         ))}
       </div>
+
+      {lastResult && (
+        <div className="mt-6 rounded-xl border border-white/40 bg-white/50 p-4 text-sm text-muted-foreground">
+          <p>{formatLedgerlySyncSummary(lastResult.summary, lastResult.label)}</p>
+          {formatLedgerlySyncFailures(lastResult.summary).length > 0 && (
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {formatLedgerlySyncFailures(lastResult.summary).map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </AdminPage>
   );
 }

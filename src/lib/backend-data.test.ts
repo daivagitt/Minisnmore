@@ -13,23 +13,20 @@ import {
   fromPolicyDto,
   fromProductDto,
   getProductValidationErrors,
-  completeZohoOAuth,
-  formatZohoSyncFailures,
-  formatZohoSyncSummary,
+  formatLedgerlySyncFailures,
+  formatLedgerlySyncSummary,
   getAdminSiteSettings,
   getSiteSettings,
-  getZohoConnectUrl,
-  getZohoIntegrationStatus,
-  getZohoOAuthSetup,
-  getZohoSettings,
-  pullZohoInventory,
-  pullZohoProducts,
-  retryZohoOrders,
-  setZohoPullProductsAutoCreateCategory,
-  syncAllZohoProducts,
-  syncZohoOrderByNumber,
-  syncZohoProduct,
-  testZohoConnection,
+  getLedgerlyIntegrationStatus,
+  getLedgerlySettings,
+  pullLedgerlyInventory,
+  pullLedgerlyProducts,
+  retryLedgerlyOrders,
+  setLedgerlyPullProductsAutoCreateCategory,
+  syncAllLedgerlyProducts,
+  syncLedgerlyOrderByNumber,
+  syncLedgerlyProduct,
+  testLedgerlyConnection,
   listBanners,
   listCategories,
   listProducts,
@@ -40,7 +37,7 @@ import {
   saveCoupon,
   saveProduct,
   saveSiteSettings,
-  saveZohoSettings,
+  saveLedgerlySettings,
   uploadAdminImage,
 } from "./backend-data";
 
@@ -366,103 +363,86 @@ describe("backend data API calls", () => {
     );
   });
 
-  it("calls Zoho sync admin endpoints", async () => {
-    mockedApi.post.mockResolvedValueOnce({ success: 3, failed: 0 });
-    await expect(syncAllZohoProducts()).resolves.toEqual({ success: 3, failed: 0 });
-    expect(mockedApi.post).toHaveBeenCalledWith("/api/v1/admin/zoho/sync-products", undefined, {
+  it("calls Ledgerly sync admin endpoints", async () => {
+    mockedApi.post.mockResolvedValueOnce({ successCount: 3, failureCount: 0 });
+    await expect(syncAllLedgerlyProducts()).resolves.toEqual({ successCount: 3, failureCount: 0 });
+    expect(mockedApi.post).toHaveBeenCalledWith("/api/v1/admin/ledgerly/sync-products", undefined, {
       auth: true,
     });
 
-    mockedApi.post.mockResolvedValueOnce({ success: 2, failed: 1 });
-    await expect(pullZohoInventory()).resolves.toEqual({ success: 2, failed: 1 });
-    expect(mockedApi.post).toHaveBeenCalledWith("/api/v1/admin/zoho/pull-inventory", undefined, {
+    mockedApi.post.mockResolvedValueOnce({ successCount: 2, failureCount: 1 });
+    await expect(pullLedgerlyInventory()).resolves.toEqual({ successCount: 2, failureCount: 1 });
+    expect(mockedApi.post).toHaveBeenCalledWith("/api/v1/admin/ledgerly/pull-inventory", undefined, {
       auth: true,
     });
 
-    mockedApi.post.mockResolvedValueOnce({ success: 4, failed: 0 });
-    await expect(pullZohoProducts()).resolves.toEqual({ success: 4, failed: 0 });
-    expect(mockedApi.post).toHaveBeenCalledWith("/api/v1/admin/zoho/pull-products", undefined, {
+    mockedApi.post.mockResolvedValueOnce({ successCount: 4, failureCount: 0 });
+    await expect(pullLedgerlyProducts()).resolves.toEqual({ successCount: 4, failureCount: 0 });
+    expect(mockedApi.post).toHaveBeenCalledWith("/api/v1/admin/ledgerly/pull-products", undefined, {
       auth: true,
     });
 
-    mockedApi.post.mockResolvedValueOnce({ success: 1, failed: 0 });
-    await expect(retryZohoOrders()).resolves.toEqual({ success: 1, failed: 0 });
+    mockedApi.post.mockResolvedValueOnce({ successCount: 1, failureCount: 0 });
+    await expect(retryLedgerlyOrders()).resolves.toEqual({ successCount: 1, failureCount: 0 });
 
-    expect(formatZohoSyncSummary({ success: 2, failed: 1 }, "Inventory")).toBe(
+    expect(formatLedgerlySyncSummary({ successCount: 2, failureCount: 1 }, "Inventory")).toBe(
       "Inventory: 2 succeeded, 1 failed",
     );
-    expect(formatZohoSyncSummary({ success: 5, failed: 0 }, "Products")).toBe("Products: 5 succeeded");
+    expect(formatLedgerlySyncSummary({ successCount: 5, failureCount: 0 }, "Products")).toBe(
+      "Products: 5 succeeded",
+    );
     expect(
-      formatZohoSyncFailures({
-        success: 0,
-        failed: 1,
-        failures: [{ productId: 1, productName: "Dress", message: "No stock" }],
+      formatLedgerlySyncFailures({
+        successCount: 0,
+        failureCount: 1,
+        failures: [{ productName: "Dress", message: "No stock" }],
       }),
     ).toEqual(["Dress: No stock"]);
   });
 
-  it("calls Zoho OAuth and status admin endpoints", async () => {
+  it("calls Ledgerly status and settings admin endpoints", async () => {
     mockedApi.get.mockResolvedValueOnce({
       serverConfigured: true,
       connected: false,
-      dataCenter: "in",
-      organizationId: "org-1",
       pullProductsAutoCreateCategory: true,
     });
-    await expect(getZohoIntegrationStatus()).resolves.toMatchObject({
+    await expect(getLedgerlyIntegrationStatus()).resolves.toMatchObject({
       serverConfigured: true,
       connected: false,
-      dataCenter: "in",
     });
-    expect(mockedApi.get).toHaveBeenCalledWith("/api/v1/admin/zoho/integration-status", { auth: true });
+    expect(mockedApi.get).toHaveBeenCalledWith("/api/v1/admin/ledgerly/integration-status", { auth: true });
 
-    mockedApi.get.mockResolvedValueOnce({
-      clientType: "server-based",
-      dataCenter: "in",
-      scopes: "ZohoBooks.fullaccess.all",
-      primaryRedirectUri: "https://uat.minisnmore.com/admin/zoho",
-      authorizationUrlTemplate: "https://accounts.zoho.in/oauth/v2/auth?scope=...",
-    });
-    await expect(getZohoOAuthSetup()).resolves.toMatchObject({ clientType: "server-based" });
-    expect(mockedApi.get).toHaveBeenCalledWith("/api/v1/admin/zoho/oauth-setup", { auth: true });
-
-    mockedApi.get.mockResolvedValueOnce({ url: "https://accounts.zoho.in/oauth/v2/auth?..." });
-    await expect(getZohoConnectUrl()).resolves.toEqual({ url: "https://accounts.zoho.in/oauth/v2/auth?..." });
-
-    mockedApi.post.mockResolvedValueOnce({ connected: true, serverConfigured: true });
-    await expect(completeZohoOAuth("auth-code-xyz")).resolves.toMatchObject({ connected: true });
-    expect(mockedApi.post).toHaveBeenCalledWith(
-      "/api/v1/admin/zoho/oauth/complete",
-      { code: "auth-code-xyz" },
-      { auth: true },
-    );
-
-    mockedApi.get.mockResolvedValueOnce({ connected: true, message: "OK", organizationName: "Mini" });
-    await expect(testZohoConnection()).resolves.toMatchObject({ connected: true, message: "OK" });
+    mockedApi.get.mockResolvedValueOnce({ connected: true, message: "OK" });
+    await expect(testLedgerlyConnection()).resolves.toMatchObject({ connected: true, message: "OK" });
 
     mockedApi.put.mockResolvedValueOnce({ pullProductsAutoCreateCategory: false });
-    await expect(setZohoPullProductsAutoCreateCategory(false)).resolves.toMatchObject({
+    await expect(setLedgerlyPullProductsAutoCreateCategory(false)).resolves.toMatchObject({
       pullProductsAutoCreateCategory: false,
     });
     expect(mockedApi.put).toHaveBeenCalledWith(
-      "/api/v1/admin/zoho/pull-products-auto-create-category",
+      "/api/v1/admin/ledgerly/pull-products-auto-create-category",
       { enabled: false },
       { auth: true },
     );
 
-    mockedApi.post.mockResolvedValueOnce({ id: 9, zohoItemId: "z-9", zohoSyncStatus: "SYNCED" });
-    await expect(syncZohoProduct(9)).resolves.toMatchObject({ id: 9, zohoItemId: "z-9" });
-
-    mockedApi.post.mockResolvedValueOnce({ id: 1, orderNumber: "ORD-1", zohoSyncStatus: "SYNCED" });
-    await expect(syncZohoOrderByNumber("ORD-1")).resolves.toMatchObject({ orderNumber: "ORD-1" });
+    mockedApi.post.mockResolvedValueOnce({ ledgerlyItemId: "ll-9", ledgerlySyncStatus: "SYNCED" });
+    await expect(syncLedgerlyProduct(9)).resolves.toMatchObject({ ledgerlyItemId: "ll-9" });
     expect(mockedApi.post).toHaveBeenCalledWith(
-      "/api/v1/admin/zoho/sync-orders/by-number/ORD-1",
+      "/api/v1/admin/ledgerly/sync-products/9",
+      undefined,
+      { auth: true },
+    );
+
+    mockedApi.post.mockResolvedValueOnce({ ok: true, orderNumber: "ORD-1" });
+    await expect(syncLedgerlyOrderByNumber("ORD-1")).resolves.toMatchObject({ orderNumber: "ORD-1" });
+    expect(mockedApi.post).toHaveBeenCalledWith(
+      "/api/v1/admin/ledgerly/sync-orders/by-number/ORD-1",
       undefined,
       { auth: true },
     );
   });
 
-  it("maps settings and Zoho payloads between camelCase and snake_case", async () => {
+  it("maps settings and Ledgerly payloads between camelCase and snake_case", async () => {
     mockedApi.get.mockResolvedValueOnce({ brandName: "Mini", contactEmail: "care@example.com" });
     await expect(getSiteSettings()).resolves.toMatchObject({
       brand_name: "Mini",
@@ -511,25 +491,28 @@ describe("backend data API calls", () => {
       { auth: true },
     );
 
-    mockedApi.get.mockResolvedValueOnce({ orgId: "123", dataCenter: "in", connected: 1 });
-    await expect(getZohoSettings()).resolves.toMatchObject({
-      org_id: "123",
-      data_center: "in",
+    mockedApi.get.mockResolvedValueOnce({ apiBaseUrl: "https://ledgerly.example/api", orgId: "org-1", connected: true });
+    await expect(getLedgerlySettings()).resolves.toMatchObject({
+      apiBaseUrl: "https://ledgerly.example/api",
+      orgId: "org-1",
       connected: true,
     });
 
     mockedApi.put.mockResolvedValueOnce({ ok: true });
-    await saveZohoSettings({
-      org_id: "123",
-      client_id: "client",
-      client_secret: "secret",
-      refresh_token: "refresh",
-      data_center: "in",
-      connected: false,
+    await saveLedgerlySettings({
+      api_base_url: "https://ledgerly.example/api",
+      api_token: "lt_live_token",
+      org_id: "org-1",
+      connected: true,
     });
     expect(mockedApi.put).toHaveBeenLastCalledWith(
-      "/api/v1/admin/zoho-settings",
-      expect.objectContaining({ orgId: "123", connected: false }),
+      "/api/v1/admin/ledgerly/settings",
+      expect.objectContaining({
+        api_base_url: "https://ledgerly.example/api",
+        api_token: "lt_live_token",
+        org_id: "org-1",
+        connected: true,
+      }),
       { auth: true },
     );
   });

@@ -7,10 +7,11 @@ This repository follows a **gateway + catalog** split. Treat these as hard bound
 | Service | Folder | Port (dev) | Owns |
 |---------|--------|------------|------|
 | **Gateway** | `gateway/` | 8080 | Users, JWT **issuance**, `/api/authenticate`, `/api/register`, `/api/account/*`, Spring Cloud Gateway |
-| **Catalog core** | `backend/` (`miniandmore`) | 8084 | DB, domain logic, **`/internal/v1/**` only** (not public) |
-| **Store** | `store/` (`miniandmore-store`) | 8081 | Public storefront + admin CMS + uploads; proxies to core |
+| **Catalog core** | `backend/` (`miniandmore`) | 8084 | DB, domain logic, Ledgerly sync/schedulers, **`/internal/v1/**` only** (not public) |
+| **Store** | `store/` (`miniandmore-store`) | 8081 | Public storefront + admin CMS + uploads; proxies to core (including Ledgerly admin API) |
 | **Commerce** | `commerce/` (`miniandmore-commerce`) | 8082 | Orders, profile, coupons, returns; proxies to core |
-| **Integration** | `integration/` (`miniandmore-integration`) | 8083 | Zoho admin API; proxies to core |
+
+Ledgerly accounting integration runs **inside catalog core** — there is no separate integration microservice on `:8083`.
 
 ## Catalog (`miniandmore`) must NOT
 
@@ -30,11 +31,21 @@ This repository follows a **gateway + catalog** split. Treat these as hard bound
 
 ```text
 Browser → Vite (:5173) → Gateway (:8080)
-  ├── /api/authenticate, /api/register, /api/account/*  → gateway app
-  ├── /api/v1/admin/zoho/**                           → integration (:8083)
-  ├── /api/v1/orders/**, account, coupons, returns    → commerce (:8082)
-  └── /api/v1/** (shop + admin CMS)                   → store (:8081) → core (:8084)
+  ├── /api/authenticate, /api/register, /api/account/*     → gateway app
+  ├── /api/v1/admin/ledgerly/**                            → store (:8081) → core (:8084)
+  ├── /api/v1/orders/**, account, coupons, returns         → commerce (:8082)
+  └── /api/v1/** (shop + admin CMS)                        → store (:8081) → core (:8084)
 ```
+
+## Ledgerly env vars (catalog core)
+
+| Variable | Purpose |
+|----------|---------|
+| `LEDGERLY_API_BASE_URL` | Ledgerly API base URL |
+| `LEDGERLY_API_TOKEN` | Developer token (`lt_live_…`) |
+| `LEDGERLY_ORG_ID` | Organisation ID |
+| `LEDGERLY_ORDER_RETRY_MS` | Failed-order retry scheduler (optional) |
+| `LEDGERLY_ORDER_TRACKING_MS` | Tracking pull scheduler (optional) |
 
 ## Regenerating JHipster entities
 
@@ -46,7 +57,7 @@ Use `docker/microservices.yml` (Consul, Postgres ×2, Redis). Do not enable per-
 
 ## Splitting the catalog further
 
-The catalog is **one** microservice today (`miniandmore`). To split it into store + commerce + integration, see [catalog-microservice-split.md](./catalog-microservice-split.md) and `backend/jdl/*.jdl`.
+The catalog is split into **store + commerce + core**. See [catalog-microservice-split.md](./catalog-microservice-split.md) and `backend/jdl/*.jdl`.
 
 ## Production
 

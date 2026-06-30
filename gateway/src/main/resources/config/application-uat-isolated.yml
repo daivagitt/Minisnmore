@@ -1,4 +1,4 @@
-# Isolated UAT microservices stack (store :9181, commerce :9182, integration :9183). Does not use the monolith on :8081.
+# Isolated UAT microservices stack (store :9181, commerce :9182). Does not use the monolith on :8081.
 # OAuth: non-empty defaults let the JVM start when uat.env has APPLE_CLIENT_ID= (unused on UAT).
 # Real GOOGLE_* / FACEBOOK_* from /etc/mini-and-more/uat.env override these for social login.
 spring:
@@ -21,7 +21,7 @@ spring:
         webflux:
           routes:
             - id: miniandmore-ledgerly-api
-              uri: http://127.0.0.1:9183
+              uri: http://127.0.0.1:9181
               predicates:
                 - Path=/api/v1/admin/ledgerly/**
             - id: miniandmore-commerce-api

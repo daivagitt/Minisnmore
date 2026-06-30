@@ -21,9 +21,6 @@ echo "==> Store unit tests"
 echo "==> Commerce unit tests"
 (cd commerce && ./mvnw -q test)
 
-echo "==> Integration (Zoho) unit tests"
-(cd integration && ./mvnw -q test)
-
 echo ""
 echo "All unit tests passed (95% coverage gate per module)."
 echo ""

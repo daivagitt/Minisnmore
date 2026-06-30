@@ -140,7 +140,7 @@ public class LoggingAspect {
             typeName.equals("customerordercriteria") ||
             typeName.equals("customerprofiledto") ||
             typeName.equals("customerorderdto") ||
-            typeName.equals("zohosetting")
+            typeName.equals("ledgerlysetting")
         ) {
             return "[REDACTED]";
         }

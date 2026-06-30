@@ -56,7 +56,7 @@ function AdminReturnsPage() {
     <AdminPage
       eyebrow="Fulfilment"
       title="Order returns"
-      description="Review customer return requests, confirm receipt, and issue Razorpay refunds (Zoho credit note when invoice exists)."
+      description="Review customer return requests, confirm receipt, and issue Razorpay refunds (Ledgerly credit note when invoice exists)."
     >
       <div className="flex flex-wrap gap-2 mb-4">
         {STATUS_FILTERS.map((s) => (
@@ -102,8 +102,8 @@ function AdminReturnsPage() {
               {r.razorpay_refund_id ? (
                 <p className="text-xs text-muted-foreground">Razorpay refund: {r.razorpay_refund_id}</p>
               ) : null}
-              {r.zoho_credit_note_id ? (
-                <p className="text-xs text-muted-foreground">Zoho credit note: {r.zoho_credit_note_id}</p>
+              {r.ledgerly_credit_note_id ? (
+                <p className="text-xs text-muted-foreground">Ledgerly credit note: {r.ledgerly_credit_note_id}</p>
               ) : null}
               <div className="flex flex-wrap gap-2">
                 {r.status === "requested" ? (

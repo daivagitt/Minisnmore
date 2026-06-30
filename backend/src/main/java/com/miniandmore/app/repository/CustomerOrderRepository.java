@@ -3,7 +3,7 @@ package com.miniandmore.app.repository;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
-import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
+import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -35,23 +35,23 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     @Query(
         value = "select customerOrder from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
-        "(customerOrder.zohoSyncStatus in :statuses or customerOrder.zohoSyncStatus is null) order by customerOrder.id asc",
+        "(customerOrder.ledgerlySyncStatus in :statuses or customerOrder.ledgerlySyncStatus is null) order by customerOrder.id asc",
         countQuery = "select count(customerOrder) from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
-        "(customerOrder.zohoSyncStatus in :statuses or customerOrder.zohoSyncStatus is null)"
+        "(customerOrder.ledgerlySyncStatus in :statuses or customerOrder.ledgerlySyncStatus is null)"
     )
-    Page<CustomerOrder> findPaidOrdersForZohoRetry(
+    Page<CustomerOrder> findPaidOrdersForLedgerlyRetry(
         @Param("paymentStatus") PaymentStatus paymentStatus,
-        @Param("statuses") List<ZohoSyncStatus> statuses,
+        @Param("statuses") List<LedgerlySyncStatus> statuses,
         Pageable pageable
     );
 
     @Query(
         value = "select customerOrder from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
-        "customerOrder.zohoSalesOrderId is null order by customerOrder.id asc",
+        "customerOrder.ledgerlySalesOrderId is null order by customerOrder.id asc",
         countQuery = "select count(customerOrder) from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
-        "customerOrder.zohoSalesOrderId is null"
+        "customerOrder.ledgerlySalesOrderId is null"
     )
-    Page<CustomerOrder> findPaidOrdersMissingZohoSalesOrder(@Param("paymentStatus") PaymentStatus paymentStatus, Pageable pageable);
+    Page<CustomerOrder> findPaidOrdersMissingLedgerlySalesOrder(@Param("paymentStatus") PaymentStatus paymentStatus, Pageable pageable);
 
     Optional<CustomerOrder> findOneByOrderNumber(String orderNumber);
 
@@ -70,11 +70,11 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     @Query(
         value = "select customerOrder from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
-        "customerOrder.zohoSalesOrderId is not null and customerOrder.status in :statuses order by customerOrder.id asc",
+        "customerOrder.ledgerlySalesOrderId is not null and customerOrder.status in :statuses order by customerOrder.id asc",
         countQuery = "select count(customerOrder) from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
-        "customerOrder.zohoSalesOrderId is not null and customerOrder.status in :statuses"
+        "customerOrder.ledgerlySalesOrderId is not null and customerOrder.status in :statuses"
     )
-    Page<CustomerOrder> findOrdersForZohoTrackingPull(
+    Page<CustomerOrder> findOrdersForLedgerlyTrackingPull(
         @Param("paymentStatus") PaymentStatus paymentStatus,
         @Param("statuses") List<OrderStatus> statuses,
         Pageable pageable

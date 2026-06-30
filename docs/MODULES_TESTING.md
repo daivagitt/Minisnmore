@@ -15,7 +15,6 @@ All store modules are implemented on the **catalog** (`backend/`, `miniandmore`)
 | Catalog (`backend/`) | `cd backend && ./mvnw test` | JaCoCo LINE ≥ 95% |
 | Store | `cd store && ./mvnw test` | JaCoCo LINE ≥ 95% |
 | Commerce | `cd commerce && ./mvnw test` | JaCoCo LINE ≥ 95% |
-| Integration (Zoho) | `cd integration && ./mvnw test` | JaCoCo LINE ≥ 95% |
 
 ```bash
 docker compose -f docker/microservices.yml up -d   # optional if you have native Postgres/Redis/Consul
@@ -33,7 +32,7 @@ Obtain JWT: `POST http://localhost:8080/api/authenticate` with admin credentials
 | # | Module | Status | How to verify |
 |---|--------|--------|----------------|
 | 1 | Consul + Postgres + Redis | Ready | `http://localhost:8500`, compose healthy |
-| 2 | Gateway routes `/api/v1/**` → catalog / integration | Ready | Store: `curl -s http://localhost:8080/api/v1/categories`; Zoho admin → `:8083` via gateway |
+| 2 | Gateway routes `/api/v1/**` → store / commerce | Ready | Store: `curl -s http://localhost:8080/api/v1/categories`; Ledgerly: `curl -s -H "Authorization: Bearer $JWT" http://localhost:8080/api/v1/admin/ledgerly/integration-status` |
 | 3 | JWT shared secret | Ready | Login on :8080, call protected catalog route with Bearer token |
 
 ---
@@ -76,7 +75,7 @@ Obtain JWT: `POST http://localhost:8080/api/authenticate` with admin credentials
 | 21 | Orders | `POST/GET /api/v1/account/orders`, verify-payment, payments |
 | 22 | Order tracking | `GET /api/v1/orders/track/{token}` (public) |
 | 23 | Order returns | `POST/GET /api/v1/order-returns` |
-| 24 | Schedulers | Inventory release, Zoho retry/tracking (logs on catalog) |
+| 24 | Schedulers | Inventory release, Ledgerly retry/tracking (logs on catalog core) |
 
 ---
 
@@ -86,8 +85,8 @@ Obtain JWT: `POST http://localhost:8080/api/authenticate` with admin credentials
 |---|--------|----------|
 | 24 | Dashboard | `GET /api/v1/admin/dashboard` |
 | 25 | CRUD | categories, products, blog-posts, banners, home-sections, page-visibility, site-settings, policies, coupons |
-| 26 | Zoho settings | `GET/PUT /api/v1/admin/zoho-settings` |
-| 27 | Zoho sync | `/api/v1/admin/zoho/*` (oauth, sync, pull, retry, tracking) |
+| 26 | Ledgerly settings | `GET/PUT /api/v1/admin/ledgerly/settings` |
+| 27 | Ledgerly sync | `/api/v1/admin/ledgerly/*` (test, sync, pull, retry, tracking) |
 | 28 | Uploads | `/api/v1/admin/uploads/*` (S3/R2 presign + multipart) |
 | 29 | Admin returns | `/api/v1/admin/order-returns` |
 
@@ -101,7 +100,7 @@ Obtain JWT: `POST http://localhost:8080/api/authenticate` with admin credentials
 | 31 | Store pages | Home, shop, product, blog, policies |
 | 32 | Cart / checkout | Razorpay + order APIs |
 | 33 | Admin | All `/admin/*` routes |
-| 34 | Zoho admin | OAuth + sync UI |
+| 34 | Ledgerly admin | Settings + sync UI at `/admin/integrations/ledgerly` |
 
 ---
 
@@ -112,7 +111,7 @@ Obtain JWT: `POST http://localhost:8080/api/authenticate` with admin credentials
 | 35 | Build JARs | `backend` + `gateway` `./mvnw -Pprod -DskipTests package` |
 | 36 | PM2 on VPS | `deploy/scripts/uat-microservices-pm2.sh` |
 | 37 | Nginx | `deploy/nginx/uat.minisnmore.com.locations.conf` → :8080 |
-| 38 | Jenkins UAT1 | `BUILD_*` for core + gateway + store + commerce + integration; `DEPLOY_UAT` → `/var/www/uat1/mini_and_more` |
+| 38 | Jenkins UAT1 | `BUILD_*` for core + gateway + store + commerce; `DEPLOY_UAT` → `/var/www/uat1/mini_and_more` |
 
 ---
 
@@ -125,9 +124,9 @@ Obtain JWT: `POST http://localhost:8080/api/authenticate` with admin credentials
 | P3 | Nginx prod locations + security headers | `deploy/nginx/prod.minisnmore.com.locations.conf` |
 | P4 | JWT + CORS + secrets not in Git | [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md) |
 
-## Detailed Zoho scenarios
+## Detailed Ledgerly scenarios
 
-See [zoho-integration-test-scenarios.md](./zoho-integration-test-scenarios.md).
+See [ledgerly-integration-test-scenarios.md](./ledgerly-integration-test-scenarios.md).
 
 ## Architecture rules
 

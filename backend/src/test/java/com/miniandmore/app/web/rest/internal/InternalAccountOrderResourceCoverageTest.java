@@ -12,10 +12,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.miniandmore.app.client.LedgerlyIntegrationClient;
 import com.miniandmore.app.domain.*;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.repository.*;
+import com.miniandmore.app.service.LedgerlySyncService;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -42,7 +44,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(InternalAccountOrderResource.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(InternalAccountOrderResourceCoverageTest.DataAccessConfig.class)
+@Import({ InternalAccountOrderResourceCoverageTest.DataAccessConfig.class, com.miniandmore.app.web.rest.errors.ResponseStatusExceptionHandler.class })
 class InternalAccountOrderResourceCoverageTest {
 
     private static final String LIVE_SECRET = "live_secret_key";
@@ -72,7 +74,10 @@ class InternalAccountOrderResourceCoverageTest {
     private SiteSettingRepository siteSettingRepository;
 
     @MockitoBean
-    private com.miniandmore.app.client.ZohoBooksIntegrationClient zohoBooksIntegrationClient;
+    private LedgerlyIntegrationClient ledgerlyIntegrationClient;
+
+    @MockitoBean
+    private LedgerlySyncService ledgerlySyncService;
 
     @BeforeEach
     void setUp() {
@@ -142,11 +147,11 @@ class InternalAccountOrderResourceCoverageTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.ok").value(true));
 
-        verify(zohoBooksIntegrationClient).syncOrder(51L);
+        verify(ledgerlySyncService).syncOrder(51L);
     }
 
     @Test
-    void verifyPayment_alreadyPaidWithoutZoho_triggersSync() throws Exception {
+    void verifyPayment_alreadyPaidWithoutLedgerly_triggersSync() throws Exception {
         CustomerOrder order = new CustomerOrder()
             .id(52L)
             .userLogin("customer1")
@@ -171,30 +176,30 @@ class InternalAccountOrderResourceCoverageTest {
             )
             .andExpect(status().isOk());
 
-        verify(zohoBooksIntegrationClient).syncOrder(52L);
+        verify(ledgerlySyncService).syncOrder(52L);
     }
 
     @Test
-    void trackOrder_zohoRefreshFailure_returnsOrderAnyway() throws Exception {
+    void trackOrder_ledgerlyRefreshFailure_returnsOrderAnyway() throws Exception {
         CustomerOrder order = new CustomerOrder()
             .id(6L)
-            .orderNumber("MNM-ZOHO")
+            .orderNumber("MNM-LDR")
             .status(OrderStatus.CONFIRMED)
-            .zohoSalesOrderId("SO-1")
-            .zohoTrackingLastPulledAt(Instant.now().minusSeconds(7200));
-        when(customerOrderRepository.findOneByOrderNumber("MNM-ZOHO")).thenReturn(Optional.of(order));
-        doThrow(new RuntimeException("zoho down")).when(zohoBooksIntegrationClient).pullOrderTracking(6L);
+            .ledgerlySalesOrderId("SO-1")
+            .ledgerlyTrackingLastPulledAt(Instant.now().minusSeconds(7200));
+        when(customerOrderRepository.findOneByOrderNumber("MNM-LDR")).thenReturn(Optional.of(order));
+        doThrow(new RuntimeException("ledgerly down")).when(ledgerlySyncService).pullOrderTracking(6L);
 
-        mockMvc.perform(get("/internal/v1/orders/track/MNM-ZOHO")).andExpect(status().isOk());
+        mockMvc.perform(get("/internal/v1/orders/track/MNM-LDR")).andExpect(status().isOk());
     }
 
     @Test
-    void trackOrder_fulfilledOrder_skipsZohoRefresh() throws Exception {
+    void trackOrder_fulfilledOrder_skipsLedgerlyRefresh() throws Exception {
         CustomerOrder order = new CustomerOrder()
             .id(7L)
             .orderNumber("MNM-DONE")
             .status(OrderStatus.FULFILLED)
-            .zohoSalesOrderId("SO-2")
+            .ledgerlySalesOrderId("SO-2")
             .trackingNumber("TRK");
         when(customerOrderRepository.findOneByOrderNumber("MNM-DONE")).thenReturn(Optional.of(order));
 
@@ -248,12 +253,12 @@ class InternalAccountOrderResourceCoverageTest {
     }
 
     @Test
-    void trackOrder_cancelledOrder_skipsZohoRefresh() throws Exception {
+    void trackOrder_cancelledOrder_skipsLedgerlyRefresh() throws Exception {
         CustomerOrder order = new CustomerOrder()
             .id(8L)
             .orderNumber("MNM-CAN")
             .status(OrderStatus.CANCELLED)
-            .zohoSalesOrderId("SO-9");
+            .ledgerlySalesOrderId("SO-9");
         when(customerOrderRepository.findOneByOrderNumber("MNM-CAN")).thenReturn(Optional.of(order));
 
         mockMvc.perform(get("/internal/v1/orders/track/MNM-CAN")).andExpect(status().isOk());
@@ -336,7 +341,7 @@ class InternalAccountOrderResourceCoverageTest {
             OrderItemRepository orderItemRepository,
             ProductRepository productRepository,
             SiteSettingRepository siteSettingRepository,
-            com.miniandmore.app.client.ZohoBooksIntegrationClient zohoBooksIntegrationClient
+            LedgerlyIntegrationClient ledgerlyIntegrationClient
         ) {
             return new AccountOrderDataAccess(
                 couponRepository,
@@ -345,7 +350,7 @@ class InternalAccountOrderResourceCoverageTest {
                 orderItemRepository,
                 productRepository,
                 siteSettingRepository,
-                zohoBooksIntegrationClient
+                ledgerlyIntegrationClient
             );
         }
     }

@@ -7,7 +7,7 @@ import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.Product;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
-import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
+import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import java.math.BigDecimal;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
@@ -42,10 +42,10 @@ class EntityFullFieldsMapperTest {
             .newArrival(true)
             .bestSeller(false)
             .active(true)
-            .zohoItemId("zoho-1")
-            .zohoSyncStatus(ZohoSyncStatus.SYNCED)
-            .zohoLastSyncedAt(Instant.parse("2026-01-01T00:00:00Z"))
-            .zohoSyncError(null)
+            .ledgerlyItemId("ledgerly-1")
+            .ledgerlySyncStatus(LedgerlySyncStatus.SYNCED)
+            .ledgerlyLastSyncedAt(Instant.parse("2026-01-01T00:00:00Z"))
+            .ledgerlySyncError(null)
             .category(category);
 
         var dto = mapper.toDto(product);
@@ -78,12 +78,12 @@ class EntityFullFieldsMapperTest {
             .notes("Gift wrap")
             .trackingNumber("TRACK1")
             .shipmentDate("2026-01-15")
-            .zohoSalesOrderId("SO-1")
-            .zohoInvoiceId("INV-1")
-            .zohoSyncStatus(ZohoSyncStatus.SYNCED)
-            .zohoSyncError(null)
-            .zohoLastSyncedAt(Instant.parse("2026-01-02T00:00:00Z"))
-            .zohoTrackingLastPulledAt(Instant.parse("2026-01-03T00:00:00Z"))
+            .ledgerlySalesOrderId("SO-1")
+            .ledgerlyInvoiceId("INV-1")
+            .ledgerlySyncStatus(LedgerlySyncStatus.SYNCED)
+            .ledgerlySyncError(null)
+            .ledgerlyLastSyncedAt(Instant.parse("2026-01-02T00:00:00Z"))
+            .ledgerlyTrackingLastPulledAt(Instant.parse("2026-01-03T00:00:00Z"))
             .inventoryReserved(true)
             .inventoryReservedUntil(Instant.parse("2026-01-01T01:00:00Z"))
             .inventoryReleasedAt(null)

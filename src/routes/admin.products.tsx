@@ -39,7 +39,7 @@ import {
   saveCategory,
   saveProduct,
   slugifyProductSlug,
-  syncZohoProduct,
+  syncLedgerlyProduct,
   uploadAdminImage,
   type ProductRow,
 } from "@/lib/backend-data";
@@ -96,7 +96,7 @@ function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
   const [editing, setEditing] = useState<number | null>(null);
-  const [zohoSyncing, setZohoSyncing] = useState<Set<number>>(() => new Set());
+  const [ledgerlySyncing, setLedgerlySyncing] = useState<Set<number>>(() => new Set());
 
   const load = async () => {
     setLoading(true);
@@ -131,36 +131,36 @@ function ProductsPage() {
   const update = (i: number, patch: Partial<Product>) =>
     setRows((r) => r.map((x, j) => (j === i ? { ...x, ...patch } : x)));
 
-  const syncToZoho = async (i: number, p: Product) => {
+  const syncToLedgerly = async (i: number, p: Product) => {
     if (!p.id) {
-      toast.error("Save the product first, then sync to Zoho.");
+      toast.error("Save the product first, then sync to Ledgerly.");
       return;
     }
     if (!p.sku?.trim()) {
-      toast.error("SKU is required before syncing to Zoho.");
+      toast.error("SKU is required before syncing to Ledgerly.");
       return;
     }
     if (!p.category_id) {
-      toast.error("Category is required before syncing to Zoho.");
+      toast.error("Category is required before syncing to Ledgerly.");
       return;
     }
-    setZohoSyncing((prev) => new Set(prev).add(i));
+    setLedgerlySyncing((prev) => new Set(prev).add(i));
     try {
-      const result = await syncZohoProduct(Number(p.id));
+      const result = await syncLedgerlyProduct(Number(p.id));
       update(i, {
-        zoho_sync_status: result.zohoSyncStatus ?? null,
-        zoho_item_id: result.zohoItemId ?? null,
-        zoho_sync_error: null,
+        ledgerly_sync_status: result.ledgerlySyncStatus ?? null,
+        ledgerly_item_id: result.ledgerlyItemId ?? null,
+        ledgerly_sync_error: result.ledgerlySyncError ?? null,
       });
-      toast.success("Product synced to Zoho Books");
+      toast.success("Product synced to Ledgerly");
     } catch (error) {
       update(i, {
-        zoho_sync_status: "FAILED",
-        zoho_sync_error: getUserErrorMessage(error, "Zoho sync failed"),
+        ledgerly_sync_status: "FAILED",
+        ledgerly_sync_error: getUserErrorMessage(error, "Ledgerly sync failed"),
       });
-      showApiError(error, "Zoho sync failed");
+      showApiError(error, "Ledgerly sync failed");
     } finally {
-      setZohoSyncing((prev) => {
+      setLedgerlySyncing((prev) => {
         const next = new Set(prev);
         next.delete(i);
         return next;
@@ -715,16 +715,16 @@ function ProductsPage() {
                       </label>
                     </div>
 
-                    {(p.zoho_sync_status || p.zoho_sync_error) && (
+                    {(p.ledgerly_sync_status || p.ledgerly_sync_error) && (
                       <div className="text-xs rounded-xl bg-white/40 px-3 py-2 space-y-1">
-                        {p.zoho_sync_status && (
+                        {p.ledgerly_sync_status && (
                           <p>
-                            Zoho: <span className="font-medium">{p.zoho_sync_status}</span>
-                            {p.zoho_item_id ? ` · item ${p.zoho_item_id}` : ""}
+                            Ledgerly: <span className="font-medium">{p.ledgerly_sync_status}</span>
+                            {p.ledgerly_item_id ? ` · item ${p.ledgerly_item_id}` : ""}
                           </p>
                         )}
-                        {p.zoho_sync_error && (
-                          <p className="text-destructive">{p.zoho_sync_error}</p>
+                        {p.ledgerly_sync_error && (
+                          <p className="text-destructive">{p.ledgerly_sync_error}</p>
                         )}
                       </div>
                     )}
@@ -739,17 +739,17 @@ function ProductsPage() {
                       {p.id && (
                         <button
                           type="button"
-                          disabled={zohoSyncing.has(i)}
-                          onClick={() => void syncToZoho(i, p)}
+                          disabled={ledgerlySyncing.has(i)}
+                          onClick={() => void syncToLedgerly(i, p)}
                           className="rounded-full glass px-4 py-2 text-sm flex items-center gap-2 disabled:opacity-50"
-                          title="Push this product to Zoho Books (requires SKU and category)"
+                          title="Push this product to Ledgerly (requires SKU and category)"
                         >
-                          {zohoSyncing.has(i) ? (
+                          {ledgerlySyncing.has(i) ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
                             <CloudUpload className="h-4 w-4" />
                           )}
-                          {zohoSyncing.has(i) ? "Syncing…" : "Sync to Zoho"}
+                          {ledgerlySyncing.has(i) ? "Syncing…" : "Sync to Ledgerly"}
                         </button>
                       )}
                       <button
