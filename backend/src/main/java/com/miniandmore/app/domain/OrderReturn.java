@@ -53,7 +53,7 @@ public class OrderReturn implements Serializable {
     private String razorpayRefundId;
 
     @Size(max = 120)
-    @Column(name = "zoho_credit_note_id", length = 120)
+    @Column(name = "ledgerly_credit_note_id", length = 120)
     private String zohoCreditNoteId;
 
     @NotNull

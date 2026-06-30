@@ -113,26 +113,26 @@ public class CustomerOrder implements Serializable {
     private Instant inventoryReleasedAt;
 
     @Size(max = 120)
-    @Column(name = "zoho_sales_order_id", length = 120, unique = true)
+    @Column(name = "ledgerly_sales_order_id", length = 120, unique = true)
     private String zohoSalesOrderId;
 
     @Size(max = 120)
-    @Column(name = "zoho_invoice_id", length = 120)
+    @Column(name = "ledgerly_invoice_id", length = 120)
     private String zohoInvoiceId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "zoho_sync_status")
+    @Column(name = "ledgerly_sync_status")
     private ZohoSyncStatus zohoSyncStatus;
 
-    @Column(name = "zoho_last_synced_at")
+    @Column(name = "ledgerly_last_synced_at")
     private Instant zohoLastSyncedAt;
 
     @Size(max = 1000)
-    @Column(name = "zoho_sync_error", length = 1000)
+    @Column(name = "ledgerly_sync_error", length = 1000)
     private String zohoSyncError;
 
     @Size(max = 40)
-    @Column(name = "zoho_order_status", length = 40)
+    @Column(name = "ledgerly_order_status", length = 40)
     private String zohoOrderStatus;
 
     @Size(max = 120)
@@ -147,7 +147,7 @@ public class CustomerOrder implements Serializable {
     @Column(name = "shipment_date", length = 20)
     private String shipmentDate;
 
-    @Column(name = "zoho_tracking_last_pulled_at")
+    @Column(name = "ledgerly_tracking_last_pulled_at")
     private Instant zohoTrackingLastPulledAt;
 
     @OneToMany(fetch = FetchType.LAZY, mappedBy = "order")

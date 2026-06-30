@@ -115,18 +115,18 @@ public class Product implements Serializable {
     private Boolean active;
 
     @Size(max = 120)
-    @Column(name = "zoho_item_id", length = 120, unique = true)
+    @Column(name = "ledgerly_item_id", length = 120, unique = true)
     private String zohoItemId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "zoho_sync_status")
+    @Column(name = "ledgerly_sync_status")
     private ZohoSyncStatus zohoSyncStatus;
 
-    @Column(name = "zoho_last_synced_at")
+    @Column(name = "ledgerly_last_synced_at")
     private Instant zohoLastSyncedAt;
 
     @Size(max = 1000)
-    @Column(name = "zoho_sync_error", length = 1000)
+    @Column(name = "ledgerly_sync_error", length = 1000)
     private String zohoSyncError;
 
     @ManyToOne(fetch = FetchType.LAZY)

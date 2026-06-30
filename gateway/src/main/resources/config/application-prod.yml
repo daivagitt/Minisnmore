@@ -42,10 +42,10 @@ spring:
         webflux:
           # Production VPS: static localhost routes (same layout as UAT). Replaces lb:// + Consul for edges.
           routes:
-            - id: miniandmore-integration-api
-              uri: http://127.0.0.1:8083
+            - id: miniandmore-ledgerly-api
+              uri: http://127.0.0.1:8081
               predicates:
-                - Path=/api/v1/admin/zoho/**,/api/v1/admin/zoho-settings
+                - Path=/api/v1/admin/ledgerly/**
               metadata:
                 response-timeout: 120000
                 connect-timeout: 5000

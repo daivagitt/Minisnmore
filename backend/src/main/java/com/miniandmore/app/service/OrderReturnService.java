@@ -1,6 +1,6 @@
 package com.miniandmore.app.service;
 
-import com.miniandmore.app.client.ZohoBooksIntegrationClient;
+import com.miniandmore.app.client.LedgerlyIntegrationClient;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.OrderReturn;
@@ -54,7 +54,7 @@ public class OrderReturnService {
     private final OrderItemRepository orderItemRepository;
     private final ProductRepository productRepository;
     private final RazorpayRefundService razorpayRefundService;
-    private final ZohoBooksIntegrationClient zohoBooksIntegrationClient;
+    private final LedgerlyIntegrationClient ledgerlyIntegrationClient;
 
     public OrderReturnService(
         OrderReturnRepository orderReturnRepository,
@@ -62,14 +62,14 @@ public class OrderReturnService {
         OrderItemRepository orderItemRepository,
         ProductRepository productRepository,
         RazorpayRefundService razorpayRefundService,
-        ZohoBooksIntegrationClient zohoBooksIntegrationClient
+        LedgerlyIntegrationClient ledgerlyIntegrationClient
     ) {
         this.orderReturnRepository = orderReturnRepository;
         this.customerOrderRepository = customerOrderRepository;
         this.orderItemRepository = orderItemRepository;
         this.productRepository = productRepository;
         this.razorpayRefundService = razorpayRefundService;
-        this.zohoBooksIntegrationClient = zohoBooksIntegrationClient;
+        this.ledgerlyIntegrationClient = ledgerlyIntegrationClient;
     }
 
     public List<OrderReturn> listForUser(String login) {
@@ -175,13 +175,13 @@ public class OrderReturnService {
             }
             if (StringUtils.isBlank(orderReturn.getZohoCreditNoteId())) {
                 try {
-                    zohoBooksIntegrationClient
-                        .createCreditNote(order.getId(), orderReturn.getReturnNumber())
+                    ledgerlyIntegrationClient
+                        .createCreditNote(order.getOrderNumber(), orderReturn.getReturnNumber())
                         .ifPresent(orderReturn::setZohoCreditNoteId);
                 } catch (RuntimeException e) {
-                    LOG.warn("Zoho credit note failed for return {}: {}", orderReturn.getReturnNumber(), e.getMessage());
+                    LOG.warn("Ledgerly credit note failed for return {}: {}", orderReturn.getReturnNumber(), e.getMessage());
                     orderReturn.setAdminNotes(
-                        mergeNotes(orderReturn.getAdminNotes(), "Zoho credit note failed: " + StringUtils.left(e.getMessage(), 200))
+                        mergeNotes(orderReturn.getAdminNotes(), "Ledgerly credit note failed: " + StringUtils.left(e.getMessage(), 200))
                     );
                 }
             }

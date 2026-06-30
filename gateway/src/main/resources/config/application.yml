@@ -116,10 +116,10 @@ spring:
       server:
         webflux:
           routes:
-            - id: miniandmore-integration-api
-              uri: lb://miniandmore-integration
+            - id: miniandmore-ledgerly-api
+              uri: lb://miniandmore-store
               predicates:
-                - Path=/api/v1/admin/zoho/**,/api/v1/admin/zoho-settings
+                - Path=/api/v1/admin/ledgerly/**
               metadata:
                 response-timeout: 120000
                 connect-timeout: 5000

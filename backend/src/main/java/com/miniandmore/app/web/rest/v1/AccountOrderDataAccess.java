@@ -1,7 +1,7 @@
 package com.miniandmore.app.web.rest.v1;
 
 import com.miniandmore.app.repository.*;
-import com.miniandmore.app.client.ZohoBooksIntegrationClient;
+import com.miniandmore.app.client.LedgerlyIntegrationClient;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -12,5 +12,5 @@ public record AccountOrderDataAccess(
     OrderItemRepository orderItemRepository,
     ProductRepository productRepository,
     SiteSettingRepository siteSettingRepository,
-    ZohoBooksIntegrationClient zohoBooksIntegrationClient
+    LedgerlyIntegrationClient ledgerlyIntegrationClient
 ) {}

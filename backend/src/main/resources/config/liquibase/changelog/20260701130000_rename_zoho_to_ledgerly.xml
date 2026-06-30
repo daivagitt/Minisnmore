@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260701130000-1" author="miniandmore">
+        <createTable tableName="ledgerly_setting">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="api_base_url" type="varchar(500)"/>
+            <column name="api_token" type="varchar(500)"/>
+            <column name="org_id" type="varchar(120)"/>
+            <column name="connected" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="pull_products_auto_create_category" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="20260701130000-2" author="miniandmore">
+        <renameColumn tableName="product" oldColumnName="zoho_item_id" newColumnName="ledgerly_item_id" columnDataType="varchar(120)"/>
+        <renameColumn tableName="product" oldColumnName="zoho_sync_status" newColumnName="ledgerly_sync_status" columnDataType="varchar(255)"/>
+        <renameColumn tableName="product" oldColumnName="zoho_last_synced_at" newColumnName="ledgerly_last_synced_at" columnDataType="timestamp"/>
+        <renameColumn tableName="product" oldColumnName="zoho_sync_error" newColumnName="ledgerly_sync_error" columnDataType="varchar(1000)"/>
+        <renameColumn tableName="customer_order" oldColumnName="zoho_sales_order_id" newColumnName="ledgerly_sales_order_id" columnDataType="varchar(120)"/>
+        <renameColumn tableName="customer_order" oldColumnName="zoho_invoice_id" newColumnName="ledgerly_invoice_id" columnDataType="varchar(120)"/>
+        <renameColumn tableName="customer_order" oldColumnName="zoho_sync_status" newColumnName="ledgerly_sync_status" columnDataType="varchar(255)"/>
+        <renameColumn tableName="customer_order" oldColumnName="zoho_last_synced_at" newColumnName="ledgerly_last_synced_at" columnDataType="timestamp"/>
+        <renameColumn tableName="customer_order" oldColumnName="zoho_sync_error" newColumnName="ledgerly_sync_error" columnDataType="varchar(1000)"/>
+        <renameColumn tableName="customer_order" oldColumnName="zoho_order_status" newColumnName="ledgerly_order_status" columnDataType="varchar(40)"/>
+        <renameColumn tableName="customer_order" oldColumnName="zoho_tracking_last_pulled_at" newColumnName="ledgerly_tracking_last_pulled_at" columnDataType="timestamp"/>
+        <renameColumn tableName="order_return" oldColumnName="zoho_credit_note_id" newColumnName="ledgerly_credit_note_id" columnDataType="varchar(120)"/>
+        <renameColumn tableName="category" oldColumnName="zoho_category_id" newColumnName="ledgerly_category_id" columnDataType="varchar(120)"/>
+    </changeSet>
+
+    <changeSet id="20260701130000-3" author="miniandmore">
+        <dropTable tableName="zoho_setting" cascadeConstraints="true"/>
+    </changeSet>
+
+</databaseChangeLog>

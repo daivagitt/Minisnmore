@@ -49,7 +49,7 @@ public class Category implements Serializable {
     private Boolean active;
 
     @Size(max = 120)
-    @Column(name = "zoho_category_id", length = 120, unique = true)
+    @Column(name = "ledgerly_category_id", length = 120, unique = true)
     private String zohoCategoryId;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here

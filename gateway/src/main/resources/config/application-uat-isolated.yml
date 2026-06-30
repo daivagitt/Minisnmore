@@ -20,10 +20,10 @@ spring:
       server:
         webflux:
           routes:
-            - id: miniandmore-integration-api
+            - id: miniandmore-ledgerly-api
               uri: http://127.0.0.1:9183
               predicates:
-                - Path=/api/v1/admin/zoho/**,/api/v1/admin/zoho-settings
+                - Path=/api/v1/admin/ledgerly/**
             - id: miniandmore-commerce-api
               uri: http://127.0.0.1:9182
               predicates:

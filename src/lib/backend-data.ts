@@ -1389,3 +1389,51 @@ export async function bulkSave<T extends { id?: string }>(
 
   return { inserted, errors };
 }
+
+// --- Ledgerly integration (replaces Zoho) ---
+
+export type LedgerlySettingsRow = {
+  api_base_url?: string | null;
+  api_token?: string | null;
+  org_id?: string | null;
+  connected?: boolean;
+};
+
+export type LedgerlyIntegrationStatus = {
+  connected?: boolean;
+  serverConfigured?: boolean;
+  pullProductsAutoCreateCategory?: boolean;
+};
+
+export type LedgerlySyncSummary = {
+  successCount?: number;
+  failureCount?: number;
+  failures?: Array<{ message?: string; id?: number; orderNumber?: string }>;
+};
+
+export const getLedgerlyIntegrationStatus = () =>
+  api.get<LedgerlyIntegrationStatus>("/api/v1/admin/ledgerly/integration-status", { auth: true });
+
+export const getLedgerlySettings = () =>
+  api.get<LedgerlySettingsRow | null>("/api/v1/admin/ledgerly/settings", { auth: true });
+
+export const saveLedgerlySettings = (row: LedgerlySettingsRow) =>
+  api.put("/api/v1/admin/ledgerly/settings", row, { auth: true });
+
+export const testLedgerlyConnection = () =>
+  api.get<Record<string, unknown>>("/api/v1/admin/ledgerly/test", { auth: true });
+
+export const syncAllLedgerlyProducts = () =>
+  api.post<LedgerlySyncSummary>("/api/v1/admin/ledgerly/sync-products", undefined, { auth: true });
+
+export const pullLedgerlyInventory = () =>
+  api.post<LedgerlySyncSummary>("/api/v1/admin/ledgerly/pull-inventory", undefined, { auth: true });
+
+export const pullLedgerlyProducts = () =>
+  api.post<LedgerlySyncSummary>("/api/v1/admin/ledgerly/pull-products", undefined, { auth: true });
+
+export const retryLedgerlyOrders = () =>
+  api.post<LedgerlySyncSummary>("/api/v1/admin/ledgerly/retry-orders", undefined, { auth: true });
+
+export const pullLedgerlyOrderTracking = () =>
+  api.post<LedgerlySyncSummary>("/api/v1/admin/ledgerly/pull-order-tracking", undefined, { auth: true });
