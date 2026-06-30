@@ -56,8 +56,9 @@ Full shared runbook (includes Ledgerly platform fixes): see also `spec-driven-ha
 ## R2 / images
 
 - Store `S3_*` → product images in Admin (Mini's n More R2).
-- Ledgerly commerce sync does **not** transfer images today (SKU, price, stock, description only).
-- Ledgerly does **not** need store R2 credentials.
+- With `LEDGERLY_SYNC_PRODUCT_IMAGES=true`, pull/webhook downloads Ledgerly `imageUrl` and imports to R2 (same pattern as legacy `ZOHO_SYNC_PRODUCT_IMAGES`).
+- Push to Ledgerly sends the first store `images_json` URL as `imageUrl` (no binary upload to Ledgerly).
+- Ledgerly does **not** need store R2 credentials; R2 is used only on the store side when importing pulled images.
 
 ## Security
 

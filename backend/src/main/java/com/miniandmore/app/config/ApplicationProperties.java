@@ -17,6 +17,8 @@ public class ApplicationProperties {
 
     private final Inventory inventory = new Inventory();
 
+    private final Ledgerly ledgerly = new Ledgerly();
+
     private String internalApiKey = "";
 
     // jhipster-needle-application-properties-property
@@ -31,6 +33,10 @@ public class ApplicationProperties {
 
     public Inventory getInventory() {
         return inventory;
+    }
+
+    public Ledgerly getLedgerly() {
+        return ledgerly;
     }
 
     public String getInternalApiKey() {
@@ -171,4 +177,17 @@ public class ApplicationProperties {
     }
 
     // jhipster-needle-application-properties-property-class
+
+    public static class Ledgerly {
+
+        private boolean syncProductImages = false;
+
+        public boolean isSyncProductImages() {
+            return syncProductImages;
+        }
+
+        public void setSyncProductImages(boolean syncProductImages) {
+            this.syncProductImages = syncProductImages;
+        }
+    }
 }

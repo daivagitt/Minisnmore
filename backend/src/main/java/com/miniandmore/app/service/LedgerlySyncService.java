@@ -34,19 +34,22 @@ public class LedgerlySyncService {
     private final CustomerOrderRepository customerOrderRepository;
     private final LedgerlySettingRepository ledgerlySettingRepository;
     private final CategoryRepository categoryRepository;
+    private final LedgerlyItemImageSync itemImageSync;
 
     public LedgerlySyncService(
         LedgerlyIntegrationClient ledgerlyClient,
         ProductRepository productRepository,
         CustomerOrderRepository customerOrderRepository,
         LedgerlySettingRepository ledgerlySettingRepository,
-        CategoryRepository categoryRepository
+        CategoryRepository categoryRepository,
+        LedgerlyItemImageSync itemImageSync
     ) {
         this.ledgerlyClient = ledgerlyClient;
         this.productRepository = productRepository;
         this.customerOrderRepository = customerOrderRepository;
         this.ledgerlySettingRepository = ledgerlySettingRepository;
         this.categoryRepository = categoryRepository;
+        this.itemImageSync = itemImageSync;
     }
 
     @Async
@@ -260,6 +263,11 @@ public class LedgerlySyncService {
             });
         }
 
+        String imageUrl = stringValue(item.get("imageUrl"));
+        if (imageUrl != null && !imageUrl.isBlank()) {
+            itemImageSync.importItemImage(product, imageUrl);
+        }
+
         productRepository.save(product);
         builder.success();
     }
@@ -359,6 +367,10 @@ public class LedgerlySyncService {
         payload.put("taxPct", BigDecimal.valueOf(5));
         if (product.getDescription() != null) {
             payload.put("description", product.getDescription());
+        }
+        String firstImage = itemImageSync.firstImageUrl(product.getImagesJson());
+        if (firstImage != null) {
+            payload.put("imageUrl", firstImage);
         }
         return payload;
     }

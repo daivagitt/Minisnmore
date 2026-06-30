@@ -35,19 +35,22 @@ public class LedgerlyWebhookHandlerService {
     private final ProductRepository productRepository;
     private final CustomerOrderRepository customerOrderRepository;
     private final ObjectMapper objectMapper;
+    private final LedgerlyItemImageSync itemImageSync;
 
     public LedgerlyWebhookHandlerService(
         LedgerlyCredentialsProvider credentialsProvider,
         LedgerlyWebhookEventRepository webhookEventRepository,
         ProductRepository productRepository,
         CustomerOrderRepository customerOrderRepository,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        LedgerlyItemImageSync itemImageSync
     ) {
         this.credentialsProvider = credentialsProvider;
         this.webhookEventRepository = webhookEventRepository;
         this.productRepository = productRepository;
         this.customerOrderRepository = customerOrderRepository;
         this.objectMapper = objectMapper;
+        this.itemImageSync = itemImageSync;
     }
 
     public Map<String, Object> handle(String rawBody, String signature, String eventHeader) {
@@ -104,6 +107,10 @@ public class LedgerlyWebhookHandlerService {
         String ledgerlyItemId = stringValue(data.get("ledgerlyItemId"));
         if (ledgerlyItemId != null && !ledgerlyItemId.isBlank()) {
             product.setLedgerlyItemId(ledgerlyItemId);
+        }
+        String imageUrl = stringValue(data.get("imageUrl"));
+        if (imageUrl != null && !imageUrl.isBlank()) {
+            itemImageSync.importItemImage(product, imageUrl);
         }
         product.setLedgerlySyncStatus(LedgerlySyncStatus.SYNCED);
         product.setLedgerlyLastSyncedAt(Instant.now());

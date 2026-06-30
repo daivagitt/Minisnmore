@@ -247,6 +247,7 @@ application:
     api-token: ${LEDGERLY_API_TOKEN:}
     org-id: ${LEDGERLY_ORG_ID:}
     webhook-secret: ${LEDGERLY_WEBHOOK_SECRET:}
+    sync-product-images: ${LEDGERLY_SYNC_PRODUCT_IMAGES:false}
     schedulers:
       retry-orders-ms: ${LEDGERLY_ORDER_RETRY_MS:300000}
       pull-tracking-ms: ${LEDGERLY_ORDER_TRACKING_MS:3600000}

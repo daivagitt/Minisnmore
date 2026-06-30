@@ -34,6 +34,9 @@ class LedgerlySyncServiceTest {
     @Mock
     private CustomerOrderRepository customerOrderRepository;
 
+    @Mock
+    private LedgerlyItemImageSync itemImageSync;
+
     @InjectMocks
     private LedgerlySyncService service;
 
