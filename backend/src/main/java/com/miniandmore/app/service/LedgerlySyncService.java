@@ -162,12 +162,12 @@ public class LedgerlySyncService {
                 continue;
             }
             try {
-                Product p = product.get();
+                Product p = product.orElseThrow();
                 p.setStock(toInteger(level.get("stock")));
                 productRepository.save(p);
                 builder.success();
             } catch (Exception e) {
-                builder.failure(product.get().getSku(), e.getMessage());
+                builder.failure(product.orElseThrow().getSku(), e.getMessage());
             }
         }
         return builder.build().toMap();

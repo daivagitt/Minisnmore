@@ -15,7 +15,7 @@ class DataIntegrityViolationMapperAdditionalTest {
         );
 
         assertThat(issue).isPresent();
-        assertThat(issue.get().title()).isEqualTo("Linked records exist");
+        assertThat(issue.orElseThrow().title()).isEqualTo("Linked records exist");
     }
 
     @Test
@@ -25,7 +25,7 @@ class DataIntegrityViolationMapperAdditionalTest {
         );
 
         assertThat(issue).isPresent();
-        assertThat(issue.get().detail()).contains("Title (max 180 characters)");
+        assertThat(issue.orElseThrow().detail()).contains("Title (max 180 characters)");
     }
 
     @Test
@@ -33,7 +33,7 @@ class DataIntegrityViolationMapperAdditionalTest {
         var issue = DataIntegrityViolationMapper.resolve(new RuntimeException("duplicate key value violates unique constraint \"unknown_idx\""));
 
         assertThat(issue).isPresent();
-        assertThat(issue.get().title()).isEqualTo("Duplicate value");
+        assertThat(issue.orElseThrow().title()).isEqualTo("Duplicate value");
     }
 
     @Test
@@ -48,7 +48,7 @@ class DataIntegrityViolationMapperAdditionalTest {
         );
 
         assertThat(issue).isPresent();
-        assertThat(issue.get().detail()).contains("URL slug");
+        assertThat(issue.orElseThrow().detail()).contains("URL slug");
     }
 
     @Test

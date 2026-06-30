@@ -46,9 +46,9 @@ class PincodeLookupServiceTest {
         Optional<PincodeLookupDTO> result = pincodeLookupService.parseZippopotamResponse(body, "560001");
 
         assertThat(result).isPresent();
-        assertThat(result.get().city()).isEqualTo("Bangalore");
-        assertThat(result.get().state()).isEqualTo("Karnataka");
-        assertThat(result.get().eta()).isEqualTo("2–3 days");
+        assertThat(result.orElseThrow().city()).isEqualTo("Bangalore");
+        assertThat(result.orElseThrow().state()).isEqualTo("Karnataka");
+        assertThat(result.orElseThrow().eta()).isEqualTo("2–3 days");
     }
 
     @Test
@@ -71,9 +71,9 @@ class PincodeLookupServiceTest {
         Optional<PincodeLookupDTO> result = pincodeLookupService.parseIndiaPostResponse(body, "302001");
 
         assertThat(result).isPresent();
-        assertThat(result.get().city()).isEqualTo("Jaipur");
-        assertThat(result.get().state()).isEqualTo("Rajasthan");
-        assertThat(result.get().eta()).isEqualTo("4–6 days");
+        assertThat(result.orElseThrow().city()).isEqualTo("Jaipur");
+        assertThat(result.orElseThrow().state()).isEqualTo("Rajasthan");
+        assertThat(result.orElseThrow().eta()).isEqualTo("4–6 days");
     }
 
     @Test

@@ -40,7 +40,7 @@ class DataIntegrityViolationMapperExhaustiveTest {
     void resolve_knownForeignKey(String constraint, String detailFragment) {
         var issue = DataIntegrityViolationMapper.resolve(new DataIntegrityViolationException("violates " + constraint));
         assertThat(issue).isPresent();
-        assertThat(issue.get().detail()).containsIgnoringCase(detailFragment);
+        assertThat(issue.orElseThrow().detail()).containsIgnoringCase(detailFragment);
     }
 
     @ParameterizedTest
@@ -48,6 +48,6 @@ class DataIntegrityViolationMapperExhaustiveTest {
     void resolve_knownUniqueKey(String constraint, String detailFragment) {
         var issue = DataIntegrityViolationMapper.resolve(new DataIntegrityViolationException("duplicate key " + constraint));
         assertThat(issue).isPresent();
-        assertThat(issue.get().detail()).containsIgnoringCase(detailFragment);
+        assertThat(issue.orElseThrow().detail()).containsIgnoringCase(detailFragment);
     }
 }

@@ -20,10 +20,10 @@ class DataIntegrityViolationMapperTest {
         var issue = DataIntegrityViolationMapper.resolve(ex);
 
         assertThat(issue).isPresent();
-        assertThat(issue.get().title()).isEqualTo("Linked records exist");
-        assertThat(issue.get().detail()).contains("category");
-        assertThat(issue.get().status()).isEqualTo(HttpStatus.CONFLICT);
-        assertThat(issue.get().messageKey()).isEqualTo(ErrorConstants.ERR_REFERENTIAL_INTEGRITY);
+        assertThat(issue.orElseThrow().title()).isEqualTo("Linked records exist");
+        assertThat(issue.orElseThrow().detail()).contains("category");
+        assertThat(issue.orElseThrow().status()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(issue.orElseThrow().messageKey()).isEqualTo(ErrorConstants.ERR_REFERENTIAL_INTEGRITY);
     }
 
     @Test
@@ -33,9 +33,9 @@ class DataIntegrityViolationMapperTest {
         var issue = DataIntegrityViolationMapper.resolve(ex);
 
         assertThat(issue).isPresent();
-        assertThat(issue.get().title()).isEqualTo("Duplicate value");
-        assertThat(issue.get().detail()).contains("slug");
-        assertThat(issue.get().messageKey()).isEqualTo(ErrorConstants.ERR_DUPLICATE_KEY);
+        assertThat(issue.orElseThrow().title()).isEqualTo("Duplicate value");
+        assertThat(issue.orElseThrow().detail()).contains("slug");
+        assertThat(issue.orElseThrow().messageKey()).isEqualTo(ErrorConstants.ERR_DUPLICATE_KEY);
     }
 
     @Test
@@ -45,8 +45,8 @@ class DataIntegrityViolationMapperTest {
         var issue = DataIntegrityViolationMapper.resolve(ex);
 
         assertThat(issue).isPresent();
-        assertThat(issue.get().title()).isEqualTo("Invalid data");
-        assertThat(issue.get().messageKey()).isEqualTo(ErrorConstants.ERR_VALIDATION);
+        assertThat(issue.orElseThrow().title()).isEqualTo("Invalid data");
+        assertThat(issue.orElseThrow().messageKey()).isEqualTo(ErrorConstants.ERR_VALIDATION);
     }
 
     @Test
@@ -56,7 +56,7 @@ class DataIntegrityViolationMapperTest {
         var issue = DataIntegrityViolationMapper.resolve(ex);
 
         assertThat(issue).isPresent();
-        assertThat(issue.get().detail()).contains("Title");
+        assertThat(issue.orElseThrow().detail()).contains("Title");
     }
 
     @Test
@@ -66,7 +66,7 @@ class DataIntegrityViolationMapperTest {
         var issue = DataIntegrityViolationMapper.resolve(ex);
 
         assertThat(issue).isPresent();
-        assertThat(issue.get().detail()).contains("too long");
+        assertThat(issue.orElseThrow().detail()).contains("too long");
     }
 
     @Test
@@ -81,7 +81,7 @@ class DataIntegrityViolationMapperTest {
         var issue = DataIntegrityViolationMapper.resolve(ex);
 
         assertThat(issue).isPresent();
-        assertThat(issue.get().detail()).contains("line items");
+        assertThat(issue.orElseThrow().detail()).contains("line items");
     }
 
     @Test
@@ -91,7 +91,7 @@ class DataIntegrityViolationMapperTest {
         var issue = DataIntegrityViolationMapper.resolve(ex);
 
         assertThat(issue).isPresent();
-        assertThat(issue.get().detail()).contains("coupon code");
+        assertThat(issue.orElseThrow().detail()).contains("coupon code");
     }
 
     @Test
@@ -101,7 +101,7 @@ class DataIntegrityViolationMapperTest {
         var issue = DataIntegrityViolationMapper.resolve(ex);
 
         assertThat(issue).isPresent();
-        assertThat(issue.get().title()).isEqualTo("Linked records exist");
+        assertThat(issue.orElseThrow().title()).isEqualTo("Linked records exist");
     }
 
     @Test

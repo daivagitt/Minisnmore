@@ -83,7 +83,7 @@ public class InternalAccountOrderResource {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("ok", true);
         data.put("code", request.code().trim().toUpperCase(Locale.ROOT));
-        data.put(FIELD_DISCOUNT, discount.get().get(FIELD_DISCOUNT));
+        data.put(FIELD_DISCOUNT, discount.orElseThrow().get(FIELD_DISCOUNT));
         return ApiResponse.ok(data);
     }
 
@@ -318,7 +318,7 @@ public class InternalAccountOrderResource {
         if (couponOpt.isEmpty()) {
             return Optional.empty();
         }
-        Coupon coupon = couponOpt.get();
+        Coupon coupon = couponOpt.orElseThrow();
         if (!Boolean.TRUE.equals(coupon.getActive())) {
             return Optional.empty();
         }
