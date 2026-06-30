@@ -60,6 +60,16 @@ Full shared runbook (includes Ledgerly platform fixes): see also `spec-driven-ha
 - Push to Ledgerly sends the first store `images_json` URL as `imageUrl` (no binary upload to Ledgerly).
 - Ledgerly does **not** need store R2 credentials; R2 is used only on the store side when importing pulled images.
 
+## Product field sync (parity)
+
+| Direction | Fields |
+|-----------|--------|
+| Push (store → Ledgerly) | sku, name, price/rate, stock, cost (from compare-at), unit (`ea`), taxPct (18 default), encoded description, imageUrl |
+| Pull (Ledgerly → store) | price, stock, cost, unit, hsn, taxPct, description (decoded), imageUrl → R2 when enabled |
+| Webhook `item.updated` | Same as pull row |
+
+Structured `description` lines carry category, fabric, sizes, colors, age, story, badge, compare-at. Slug and merchandising flags remain store-only.
+
 ## Security
 
 - Never commit `uat.env` or tokens to git.

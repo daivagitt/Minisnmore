@@ -9,20 +9,26 @@ import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.Product;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
+import com.miniandmore.app.repository.CategoryRepository;
 import com.miniandmore.app.repository.CustomerOrderRepository;
+import com.miniandmore.app.repository.LedgerlySettingRepository;
 import com.miniandmore.app.repository.ProductRepository;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.quality.Strictness;
+import org.mockito.junit.jupiter.MockitoSettings;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class LedgerlySyncServiceTest {
 
     @Mock
@@ -35,10 +41,36 @@ class LedgerlySyncServiceTest {
     private CustomerOrderRepository customerOrderRepository;
 
     @Mock
-    private LedgerlyItemImageSync itemImageSync;
+    private LedgerlySettingRepository ledgerlySettingRepository;
+
+    @Mock
+    private CategoryRepository categoryRepository;
+
+    @Mock
+    private LedgerlyProductMergeService productMergeService;
 
     @InjectMocks
     private LedgerlySyncService service;
+
+    @BeforeEach
+    void stubMergeService() {
+        when(productMergeService.buildPushPayload(any(), any()))
+            .thenAnswer(inv -> {
+                Product p = inv.getArgument(0);
+                return Map.of("sku", p.getSku(), "price", p.getPrice(), "taxPct", BigDecimal.valueOf(18), "unit", "ea", "cost", BigDecimal.ONE);
+            });
+        doAnswer(inv -> {
+            Product p = inv.getArgument(0);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> item = inv.getArgument(1);
+            if (item.get("price") != null) {
+                p.setPrice(new BigDecimal(item.get("price").toString()));
+            }
+            return null;
+        })
+            .when(productMergeService)
+            .mergeLedgerlyItem(any(), any(), any(), any());
+    }
 
     @Test
     void syncProduct_success_setsSyncedFields() {
@@ -53,6 +85,7 @@ class LedgerlySyncServiceTest {
         assertThat(product.getLedgerlyItemId()).isEqualTo("item-99");
         assertThat(product.getLedgerlySyncError()).isNull();
         assertThat(product.getLedgerlyLastSyncedAt()).isNotNull();
+        verify(productMergeService).buildPushPayload(eq(product), any());
     }
 
     @Test
@@ -66,6 +99,28 @@ class LedgerlySyncServiceTest {
 
         assertThat(product.getLedgerlySyncStatus()).isEqualTo(LedgerlySyncStatus.FAILED);
         assertThat(product.getLedgerlySyncError()).contains("503");
+    }
+
+    @Test
+    void pullProducts_upsertsViaMergeService() {
+        when(ledgerlyClient.pullProducts()).thenReturn(
+            Map.of("products", List.of(Map.of("sku", "SKU-1", "name", "Item 1", "price", 100, "stock", 5)))
+        );
+        when(ledgerlySettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+        when(productRepository.findOneBySku("SKU-1")).thenReturn(Optional.empty());
+        when(productRepository.findMaxSortOrder()).thenReturn(0);
+        when(productRepository.save(any())).thenAnswer(inv -> {
+            Product p = inv.getArgument(0);
+            if (p.getId() == null) {
+                p.setId(99L);
+            }
+            return p;
+        });
+
+        Map<String, Object> result = service.pullProducts();
+
+        assertThat(result).containsEntry("successCount", 1);
+        verify(productMergeService).mergeLedgerlyItem(any(Product.class), any(), any(), any());
     }
 
     @Test

@@ -14,8 +14,6 @@ import com.miniandmore.app.repository.ProductRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
@@ -27,14 +25,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class LedgerlySyncService {
 
     private static final Logger LOG = LoggerFactory.getLogger(LedgerlySyncService.class);
-    private static final Pattern CATEGORY_PREFIX = Pattern.compile("^Category:\\s*(.+?)(?:\\r?\\n|$)", Pattern.CASE_INSENSITIVE);
 
     private final LedgerlyIntegrationClient ledgerlyClient;
     private final ProductRepository productRepository;
     private final CustomerOrderRepository customerOrderRepository;
     private final LedgerlySettingRepository ledgerlySettingRepository;
     private final CategoryRepository categoryRepository;
-    private final LedgerlyItemImageSync itemImageSync;
+    private final LedgerlyProductMergeService productMergeService;
 
     public LedgerlySyncService(
         LedgerlyIntegrationClient ledgerlyClient,
@@ -42,14 +39,14 @@ public class LedgerlySyncService {
         CustomerOrderRepository customerOrderRepository,
         LedgerlySettingRepository ledgerlySettingRepository,
         CategoryRepository categoryRepository,
-        LedgerlyItemImageSync itemImageSync
+        LedgerlyProductMergeService productMergeService
     ) {
         this.ledgerlyClient = ledgerlyClient;
         this.productRepository = productRepository;
         this.customerOrderRepository = customerOrderRepository;
         this.ledgerlySettingRepository = ledgerlySettingRepository;
         this.categoryRepository = categoryRepository;
-        this.itemImageSync = itemImageSync;
+        this.productMergeService = productMergeService;
     }
 
     @Async
@@ -239,34 +236,16 @@ public class LedgerlySyncService {
             }
         }
 
-        if (item.get("price") != null) {
-            product.setPrice(toBigDecimal(item.get("price")));
-        }
-        if (item.get("stock") != null) {
-            product.setStock(toInteger(item.get("stock")));
-        }
-        if (ledgerlyItemId != null && !ledgerlyItemId.isBlank()) {
-            product.setLedgerlyItemId(ledgerlyItemId);
-        }
-        product.setLedgerlySyncStatus(LedgerlySyncStatus.SYNCED);
-        product.setLedgerlyLastSyncedAt(Instant.now());
-        product.setLedgerlySyncError(null);
-
-        String description = stringValue(item.get("description"));
-        if (description != null) {
-            product.setDescription(description);
-            resolveCategory(description, autoCreateCategory).ifPresent(category -> {
-                product.setCategory(category);
+        productMergeService.mergeLedgerlyItem(
+            product,
+            item,
+            categoryName -> resolveCategory(categoryName, autoCreateCategory),
+            (noticeSku, message) -> {
                 if (created) {
-                    builder.notice(sku, "Assigned category " + category.getName());
+                    builder.notice(noticeSku, message);
                 }
-            });
-        }
-
-        String imageUrl = stringValue(item.get("imageUrl"));
-        if (imageUrl != null && !imageUrl.isBlank()) {
-            itemImageSync.importItemImage(product, imageUrl);
-        }
+            }
+        );
 
         productRepository.save(product);
         builder.success();
@@ -285,13 +264,8 @@ public class LedgerlySyncService {
         return Optional.empty();
     }
 
-    private Optional<Category> resolveCategory(String description, boolean autoCreateCategory) {
-        Matcher matcher = CATEGORY_PREFIX.matcher(description.trim());
-        if (!matcher.find()) {
-            return Optional.empty();
-        }
-        String categoryName = matcher.group(1).trim();
-        if (categoryName.isEmpty()) {
+    private Optional<Category> resolveCategory(String categoryName, boolean autoCreateCategory) {
+        if (categoryName == null || categoryName.isBlank()) {
             return Optional.empty();
         }
         String slug = slugify(categoryName);
@@ -359,20 +333,8 @@ public class LedgerlySyncService {
     }
 
     private Map<String, Object> buildProductPayload(Product product) {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("sku", product.getSku() != null ? product.getSku() : "P-" + product.getId());
-        payload.put("name", product.getName());
-        payload.put("price", product.getPrice());
-        payload.put("stock", product.getStock());
-        payload.put("taxPct", BigDecimal.valueOf(5));
-        if (product.getDescription() != null) {
-            payload.put("description", product.getDescription());
-        }
-        String firstImage = itemImageSync.firstImageUrl(product.getImagesJson());
-        if (firstImage != null) {
-            payload.put("imageUrl", firstImage);
-        }
-        return payload;
+        String categoryName = product.getCategory() != null ? product.getCategory().getName() : null;
+        return productMergeService.buildPushPayload(product, categoryName);
     }
 
     private Map<String, Object> buildOrderPayload(CustomerOrder order) {

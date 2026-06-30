@@ -10,7 +10,6 @@ import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.LedgerlyWebhookEventRepository;
 import com.miniandmore.app.repository.ProductRepository;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.HexFormat;
@@ -35,7 +34,7 @@ public class LedgerlyWebhookHandlerService {
     private final ProductRepository productRepository;
     private final CustomerOrderRepository customerOrderRepository;
     private final ObjectMapper objectMapper;
-    private final LedgerlyItemImageSync itemImageSync;
+    private final LedgerlyProductMergeService productMergeService;
 
     public LedgerlyWebhookHandlerService(
         LedgerlyCredentialsProvider credentialsProvider,
@@ -43,14 +42,14 @@ public class LedgerlyWebhookHandlerService {
         ProductRepository productRepository,
         CustomerOrderRepository customerOrderRepository,
         ObjectMapper objectMapper,
-        LedgerlyItemImageSync itemImageSync
+        LedgerlyProductMergeService productMergeService
     ) {
         this.credentialsProvider = credentialsProvider;
         this.webhookEventRepository = webhookEventRepository;
         this.productRepository = productRepository;
         this.customerOrderRepository = customerOrderRepository;
         this.objectMapper = objectMapper;
-        this.itemImageSync = itemImageSync;
+        this.productMergeService = productMergeService;
     }
 
     public Map<String, Object> handle(String rawBody, String signature, String eventHeader) {
@@ -98,22 +97,7 @@ public class LedgerlyWebhookHandlerService {
             })
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No product for SKU " + sku));
 
-        if (data.get("price") != null) {
-            product.setPrice(toBigDecimal(data.get("price")));
-        }
-        if (data.get("stock") != null) {
-            product.setStock(toInteger(data.get("stock")));
-        }
-        String ledgerlyItemId = stringValue(data.get("ledgerlyItemId"));
-        if (ledgerlyItemId != null && !ledgerlyItemId.isBlank()) {
-            product.setLedgerlyItemId(ledgerlyItemId);
-        }
-        String imageUrl = stringValue(data.get("imageUrl"));
-        if (imageUrl != null && !imageUrl.isBlank()) {
-            itemImageSync.importItemImage(product, imageUrl);
-        }
-        product.setLedgerlySyncStatus(LedgerlySyncStatus.SYNCED);
-        product.setLedgerlyLastSyncedAt(Instant.now());
+        productMergeService.mergeLedgerlyItem(product, data, categoryName -> java.util.Optional.empty(), null);
         productRepository.save(product);
     }
 
@@ -182,19 +166,5 @@ public class LedgerlyWebhookHandlerService {
 
     private String stringValue(Object value) {
         return value == null ? null : value.toString();
-    }
-
-    private BigDecimal toBigDecimal(Object value) {
-        if (value instanceof BigDecimal bd) {
-            return bd;
-        }
-        return new BigDecimal(value.toString());
-    }
-
-    private int toInteger(Object value) {
-        if (value instanceof Number number) {
-            return number.intValue();
-        }
-        return new BigDecimal(value.toString()).intValue();
     }
 }
