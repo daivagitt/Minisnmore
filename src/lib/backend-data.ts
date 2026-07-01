@@ -424,6 +424,8 @@ export type ProductRow = {
   colors: string[];
   images: string[];
   badge: string | null;
+  hsn: string | null;
+  tax_pct: number | null;
   stock: number | null;
   sort_order: number | null;
   featured: boolean;
@@ -450,6 +452,8 @@ type ProductDto = {
   colorsJson?: string | null;
   imagesJson?: string | null;
   badge?: string | null;
+  hsn?: string | null;
+  taxPct?: number | null;
   stock?: number;
   sortOrder?: number;
   featured?: boolean;
@@ -485,6 +489,8 @@ export const fromProductDto = (dto: ProductDto): ProductRow => ({
   colors: parseJson<string[]>(dto.colorsJson, []),
   images: parseJson<string[]>(dto.imagesJson, []),
   badge: dto.badge ?? null,
+  hsn: dto.hsn ?? null,
+  tax_pct: dto.taxPct == null ? null : Number(dto.taxPct),
   stock: dto.stock == null ? null : Number(dto.stock),
   sort_order: dto.sortOrder != null ? Number(dto.sortOrder) : null,
   featured: !!dto.featured,
@@ -514,6 +520,8 @@ const toProductDto = (row: ProductRow): ProductDto => ({
   colorsJson: JSON.stringify(row.colors ?? []),
   imagesJson: JSON.stringify(row.images ?? []),
   badge: nullable(row.badge) as string | null,
+  hsn: nullable(row.hsn) as string | null,
+  taxPct: row.tax_pct == null ? undefined : Number(row.tax_pct),
   stock: Number(row.stock) || 0,
   sortOrder: Number(row.sort_order) || 0,
   featured: !!row.featured,

@@ -66,6 +66,8 @@ const empty: Product = {
   colors: [],
   images: [],
   badge: "",
+  hsn: null,
+  tax_pct: 5,
   stock: null,
   sort_order: null,
   featured: false,
@@ -585,6 +587,30 @@ function ProductsPage() {
                         min={0}
                         placeholder="0"
                       />
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      <Field label="HSN / SAC code">
+                        <input
+                          className={inputCls()}
+                          value={p.hsn ?? ""}
+                          onChange={(e) => update(i, { hsn: e.target.value || null })}
+                          placeholder="e.g. 61112000"
+                          maxLength={20}
+                        />
+                      </Field>
+                      <Field label="GST Tax %">
+                        <select
+                          className={inputCls()}
+                          value={p.tax_pct ?? 5}
+                          onChange={(e) => update(i, { tax_pct: Number(e.target.value) })}
+                        >
+                          <option value={0}>0%</option>
+                          <option value={5}>5%</option>
+                          <option value={12}>12%</option>
+                          <option value={18}>18%</option>
+                          <option value={28}>28%</option>
+                        </select>
+                      </Field>
                     </div>
                     <div className="grid sm:grid-cols-2 gap-3">
                       <AgeRangeField

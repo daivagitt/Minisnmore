@@ -25,7 +25,8 @@
 #       ('20260701130000-2','miniandmore','config/liquibase/changelog/20260701130000_rename_zoho_to_ledgerly.xml',now(),1000,'EXECUTED',null,'renameColumn x13','','',null,null,null,'manual_uat_cutover'),
 #       ('20260701130000-3','miniandmore','config/liquibase/changelog/20260701130000_rename_zoho_to_ledgerly.xml',now(),1001,'EXECUTED',null,'dropTable tableName=zoho_setting','','',null,null,null,'manual_uat_cutover'),
 #       ('20260701140000-1','ledgerly','config/liquibase/changelog/20260701140000_ledgerly_webhook_secret.xml',now(),1002,'EXECUTED',null,'addColumn tableName=ledgerly_setting','','',null,null,null,'manual_uat_cutover'),
-#       ('20260701140000-2','ledgerly','config/liquibase/changelog/20260701140000_ledgerly_webhook_secret.xml',now(),1003,'EXECUTED',null,'createTable tableName=ledgerly_webhook_event','','',null,null,null,'manual_uat_cutover');
+#       ('20260701140000-2','ledgerly','config/liquibase/changelog/20260701140000_ledgerly_webhook_secret.xml',now(),1003,'EXECUTED',null,'createTable tableName=ledgerly_webhook_event','','',null,null,null,'manual_uat_cutover'),
+#       ('20260630200000-1','miniandmore','config/liquibase/changelog/20260630200000_add_tax_pct_hsn_to_product.xml',now(),1004,'EXECUTED',null,'addColumn tableName=product (hsn, tax_pct)','','',null,null,null,'manual_uat_cutover');
 #
 set -euo pipefail
 
@@ -59,6 +60,8 @@ fi
 CHANGELOGS=(
   "config/liquibase/changelog/20260701130000_rename_zoho_to_ledgerly.xml"
   "config/liquibase/changelog/20260701140000_ledgerly_webhook_secret.xml"
+  "config/liquibase/changelog/20260630200000_add_tax_pct_hsn_to_product.xml"
+  "config/liquibase/changelog/20260701150000_fix_tax_pct_default_to_5.xml"
 )
 
 echo "=== Ledgerly Liquibase migration ==="

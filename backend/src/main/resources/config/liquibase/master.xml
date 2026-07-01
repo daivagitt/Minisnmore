@@ -57,4 +57,6 @@
     <include file="config/liquibase/changelog/20260606120000_drop_hybrid_order_return_user_id.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260701130000_rename_zoho_to_ledgerly.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260701140000_ledgerly_webhook_secret.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260630200000_add_tax_pct_hsn_to_product.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260701150000_fix_tax_pct_default_to_5.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>

@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class LedgerlyProductMergeService {
 
-    private static final BigDecimal DEFAULT_TAX_PCT = BigDecimal.valueOf(18);
+    private static final BigDecimal DEFAULT_TAX_PCT = BigDecimal.valueOf(5);
 
     private final ProductDescriptionCodec descriptionCodec;
     private final LedgerlyItemImageSync itemImageSync;
@@ -77,9 +77,11 @@ public class LedgerlyProductMergeService {
         payload.put("name", product.getName());
         payload.put("price", product.getPrice());
         payload.put("stock", product.getStock());
-        payload.put("taxPct", DEFAULT_TAX_PCT);
+        BigDecimal taxPct = product.getTaxPct() != null ? product.getTaxPct() : DEFAULT_TAX_PCT;
+        payload.put("taxPct", taxPct);
         payload.put("unit", "ea");
-        payload.put("hsn", "");
+        String hsn = product.getHsn() != null ? product.getHsn() : "";
+        payload.put("hsn", hsn);
 
         BigDecimal cost = product.getCompareAtPrice();
         if (cost == null || cost.compareTo(BigDecimal.ZERO) <= 0) {

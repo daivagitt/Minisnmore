@@ -114,6 +114,14 @@ public class Product implements Serializable {
     @Column(name = "active", nullable = false)
     private Boolean active;
 
+    @Size(max = 20)
+    @Column(name = "hsn", length = 20)
+    private String hsn;
+
+    @DecimalMin(value = "0")
+    @Column(name = "tax_pct", precision = 5, scale = 2)
+    private BigDecimal taxPct;
+
     @Size(max = 120)
     @Column(name = "ledgerly_item_id", length = 120, unique = true)
     private String ledgerlyItemId;
@@ -131,6 +139,32 @@ public class Product implements Serializable {
 
     @ManyToOne(fetch = FetchType.LAZY)
     private Category category;
+
+    public String getHsn() {
+        return this.hsn;
+    }
+
+    public Product hsn(String hsn) {
+        this.setHsn(hsn);
+        return this;
+    }
+
+    public void setHsn(String hsn) {
+        this.hsn = hsn;
+    }
+
+    public BigDecimal getTaxPct() {
+        return this.taxPct;
+    }
+
+    public Product taxPct(BigDecimal taxPct) {
+        this.setTaxPct(taxPct);
+        return this;
+    }
+
+    public void setTaxPct(BigDecimal taxPct) {
+        this.taxPct = taxPct;
+    }
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 

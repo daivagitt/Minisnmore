@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Corrects the tax_pct default: the earlier migration set it to 18 for all existing
+        products. Mini's n More sells baby clothing under chapter 61/62 which attracts 5% GST,
+        so reset any product that still holds the 18 default to 5.
+        Products the admin has already set to a deliberate value (0, 12, 28) are left alone.
+    -->
+    <changeSet id="20260701150000-1" author="miniandmore">
+        <sql>
+            UPDATE product SET tax_pct = 5 WHERE tax_pct = 18;
+        </sql>
+        <rollback>
+            UPDATE product SET tax_pct = 18 WHERE tax_pct = 5;
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
