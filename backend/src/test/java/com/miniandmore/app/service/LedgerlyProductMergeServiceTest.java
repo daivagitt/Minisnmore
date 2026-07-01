@@ -78,11 +78,43 @@ class LedgerlyProductMergeServiceTest {
 
         assertThat(product.getPrice()).isEqualByComparingTo(BigDecimal.valueOf(499));
         assertThat(product.getStock()).isEqualTo(8);
+        assertThat(product.getCompareAtPrice()).isEqualByComparingTo(BigDecimal.valueOf(499));
         assertThat(product.getTaxPct()).isEqualByComparingTo(BigDecimal.valueOf(12));
         assertThat(product.getCategory()).isEqualTo(category);
         assertThat(product.getFabricType()).isEqualTo("Organic Cotton");
         assertThat(product.getSizesJson()).contains("0-3M").contains("3-6M");
         assertThat(product.getColorsJson()).contains("Blush").contains("Sand");
+    }
+
+    @Test
+    void mergeLedgerlyItem_usesSellingPriceForCompareAt_notPurchaseCost() {
+        Product product = new Product().sku("SKU-1").price(BigDecimal.ZERO).stock(0);
+        Map<String, Object> item = Map.of("price", 499, "cost", 150, "stock", 5);
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+
+        assertThat(product.getPrice()).isEqualByComparingTo(BigDecimal.valueOf(499));
+        assertThat(product.getCompareAtPrice()).isEqualByComparingTo(BigDecimal.valueOf(499));
+    }
+
+    @Test
+    void mergeLedgerlyItem_prefersCompareAtLineInDescription() {
+        Product product = new Product().sku("SKU-1").price(BigDecimal.ZERO).stock(0);
+        Map<String, Object> item = Map.of(
+            "price",
+            499,
+            "cost",
+            150,
+            "stock",
+            5,
+            "description",
+            "CompareAt: 799\n\nSoft cotton"
+        );
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+
+        assertThat(product.getPrice()).isEqualByComparingTo(BigDecimal.valueOf(499));
+        assertThat(product.getCompareAtPrice()).isEqualByComparingTo(BigDecimal.valueOf(799));
     }
 
     @Test

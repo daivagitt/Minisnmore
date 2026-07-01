@@ -28,8 +28,9 @@ public class LedgerlyProductMergeService {
     }
 
     public void mergeLedgerlyItem(Product product, Map<String, Object> item, CategoryResolver categoryResolver, NoticeCallback notice) {
-        if (item.get("price") != null) {
-            product.setPrice(toBigDecimal(item.get("price")));
+        BigDecimal sellingPrice = item.get("price") != null ? toBigDecimal(item.get("price")) : null;
+        if (sellingPrice != null) {
+            product.setPrice(sellingPrice);
         }
         if (item.get("stock") != null) {
             product.setStock(toInteger(item.get("stock")));
@@ -39,18 +40,18 @@ public class LedgerlyProductMergeService {
             product.setLedgerlyItemId(ledgerlyItemId);
         }
 
-        if (item.get("cost") != null) {
-            BigDecimal cost = toBigDecimal(item.get("cost"));
-            if (cost.compareTo(BigDecimal.ZERO) > 0 && product.getCompareAtPrice() == null) {
-                product.setCompareAtPrice(cost);
-            }
-        }
-
         ProductDescriptionCodec.Decoded decoded = null;
         String description = stringValue(item.get("description"));
         if (description != null) {
             decoded = descriptionCodec.decode(description);
             descriptionCodec.applyDecoded(product, decoded);
+        }
+
+        // Compare-at = Ledgerly selling price (rate), not purchase cost. CompareAt: in description wins.
+        if (decoded == null || decoded.compareAtPrice() == null) {
+            if (sellingPrice != null && sellingPrice.compareTo(BigDecimal.ZERO) > 0) {
+                product.setCompareAtPrice(sellingPrice);
+            }
         }
 
         if (item.get("taxPct") != null) {

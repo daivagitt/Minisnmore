@@ -111,7 +111,10 @@ function mapProduct(row: DbProductRow): Product {
     name: row.name,
     tagline: (row.description ?? row.story ?? "").trim(),
     price: Number(row.price) || 0,
-    compareAt: row.compare_at_price ? Number(row.compare_at_price) : undefined,
+    compareAt:
+      row.compare_at_price && Number(row.compare_at_price) > Number(row.price)
+        ? Number(row.compare_at_price)
+        : undefined,
     image: img,
     gallery: images.length ? images : [img],
     ages: agesFromSizes(sizes, { min: row.age_min_months, max: row.age_max_months }),
