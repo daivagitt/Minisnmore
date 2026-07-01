@@ -8,6 +8,7 @@ import lifestyle from "@/assets/lifestyle-mother.webp";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { toast } from "sonner";
 import { OrderTrackingCard } from "@/components/OrderTrackingCard";
+import { StorefrontPageHeader } from "@/components/StorefrontPageHeader";
 import { trackOrderPublic } from "@/lib/orders.functions";
 
 export const Route = createFileRoute("/track")({
@@ -48,10 +49,14 @@ function Track() {
   return (
     <div className="px-4 md:px-6 max-w-7xl mx-auto grid lg:grid-cols-[1fr_280px] gap-6 lg:gap-10">
       <div className="space-y-10 min-w-0">
-      <div className="glass-strong rounded-[2rem] p-8">
-        <h1 className="font-display text-3xl md:text-5xl">Track your order</h1>
-        <p className="text-sm text-muted-foreground mt-2 max-w-xl">Hand-wrapped, tissue-tucked, and on its way. Pop in your order number to follow the journey.</p>
-        <div className="mt-5 glass rounded-full p-1.5 flex items-center">
+      <StorefrontPageHeader
+        eyebrow="Your order"
+        heading="Track your order"
+        subtitle="Hand-wrapped, tissue-tucked, and on its way. Pop in your order number to follow the journey."
+        className="mb-0"
+        animate={false}
+      >
+        <div className="mt-4 glass rounded-full p-1.5 flex items-center">
           <input value={code} onChange={(e) => setCode(e.target.value)}
             className="flex-1 bg-transparent px-4 py-2.5 text-sm outline-none" placeholder="Order ID" />
           <button
@@ -63,7 +68,7 @@ function Track() {
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Track
           </button>
         </div>
-      </div>
+      </StorefrontPageHeader>
 
       <div className="glass-strong rounded-[2rem] p-8">
         {!trackedOrder && !error && (

@@ -176,11 +176,51 @@ public class ApplicationProperties {
         }
     }
 
-    // jhipster-needle-application-properties-property-class
-
     public static class Ledgerly {
 
+        private String apiBaseUrl;
+
+        private String apiToken;
+
+        private String orgId;
+
+        private String webhookSecret;
+
         private boolean syncProductImages = false;
+
+        private final Schedulers schedulers = new Schedulers();
+
+        public String getApiBaseUrl() {
+            return apiBaseUrl;
+        }
+
+        public void setApiBaseUrl(String apiBaseUrl) {
+            this.apiBaseUrl = apiBaseUrl;
+        }
+
+        public String getApiToken() {
+            return apiToken;
+        }
+
+        public void setApiToken(String apiToken) {
+            this.apiToken = apiToken;
+        }
+
+        public String getOrgId() {
+            return orgId;
+        }
+
+        public void setOrgId(String orgId) {
+            this.orgId = orgId;
+        }
+
+        public String getWebhookSecret() {
+            return webhookSecret;
+        }
+
+        public void setWebhookSecret(String webhookSecret) {
+            this.webhookSecret = webhookSecret;
+        }
 
         public boolean isSyncProductImages() {
             return syncProductImages;
@@ -188,6 +228,43 @@ public class ApplicationProperties {
 
         public void setSyncProductImages(boolean syncProductImages) {
             this.syncProductImages = syncProductImages;
+        }
+
+        public Schedulers getSchedulers() {
+            return schedulers;
+        }
+
+        public static class Schedulers {
+
+            private Long retryOrdersMs = 300_000L;
+
+            private Long pullTrackingMs = 3_600_000L;
+
+            private Long pullInventoryMs;
+
+            public Long getRetryOrdersMs() {
+                return retryOrdersMs;
+            }
+
+            public void setRetryOrdersMs(Long retryOrdersMs) {
+                this.retryOrdersMs = retryOrdersMs;
+            }
+
+            public Long getPullTrackingMs() {
+                return pullTrackingMs;
+            }
+
+            public void setPullTrackingMs(Long pullTrackingMs) {
+                this.pullTrackingMs = pullTrackingMs;
+            }
+
+            public Long getPullInventoryMs() {
+                return pullInventoryMs;
+            }
+
+            public void setPullInventoryMs(Long pullInventoryMs) {
+                this.pullInventoryMs = pullInventoryMs;
+            }
         }
     }
 }

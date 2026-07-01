@@ -79,10 +79,7 @@ public class LedgerlySyncService {
             .findById(orderId)
             .ifPresent(order -> {
                 try {
-                    Map<String, Object> response = ledgerlyClient.syncOrderPayload(
-                        buildOrderPayload(order),
-                        order.getRazorpayPaymentId()
-                    );
+                    Map<String, Object> response = syncOrderPayloadWithRetry(order);
                     order.setLedgerlyInvoiceId(String.valueOf(response.getOrDefault("ledgerlyInvoiceId", "")));
                     order.setLedgerlySalesOrderId(String.valueOf(response.getOrDefault("ledgerlySalesOrderId", order.getOrderNumber())));
                     order.setLedgerlySyncStatus(LedgerlySyncStatus.SYNCED);
@@ -96,6 +93,40 @@ public class LedgerlySyncService {
                     customerOrderRepository.save(order);
                 }
             });
+    }
+
+    /**
+     * Ledgerly creates the invoice on the first sync call but can fail applying Razorpay payment
+     * (sales invoice payment {@code mode} null). An immediate idempotent retry returns the invoice id.
+     */
+    private Map<String, Object> syncOrderPayloadWithRetry(CustomerOrder order) {
+        Map<String, Object> payload = buildOrderPayload(order);
+        String idempotencyKey = order.getRazorpayPaymentId();
+        try {
+            return ledgerlyClient.syncOrderPayload(payload, idempotencyKey);
+        } catch (Exception first) {
+            if (!shouldRetryAfterInvoicePaymentFailure(first)) {
+                throw first;
+            }
+            LOG.info(
+                "Ledgerly order {} invoice payment step failed; retrying idempotent sync (orderId={})",
+                order.getOrderNumber(),
+                order.getId()
+            );
+            return ledgerlyClient.syncOrderPayload(payload, idempotencyKey);
+        }
+    }
+
+    static boolean shouldRetryAfterInvoicePaymentFailure(Exception error) {
+        String message = error.getMessage();
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+        if (!message.contains("invoicePaymentRequest") || !message.contains("/invoices/")) {
+            return false;
+        }
+        // Ledgerly invoice payment step rejects null mode; upstream errors embed escaped JSON.
+        return message.contains("mode") && message.contains("must not be null");
     }
 
     public void pullOrderTracking(Long orderId) {
@@ -342,7 +373,14 @@ public class LedgerlySyncService {
         payload.put("externalRef", order.getOrderNumber());
         payload.put("total", order.getTotal());
         payload.put("paymentId", order.getRazorpayPaymentId());
+        payload.put("paymentMode", "Razorpay");
         payload.put("currency", "INR");
+        Map<String, Object> payment = new LinkedHashMap<>();
+        payment.put("mode", "Razorpay");
+        payment.put("paymentId", order.getRazorpayPaymentId());
+        payment.put("reference", order.getRazorpayPaymentId());
+        payment.put("amount", order.getTotal());
+        payload.put("payment", payment);
         Map<String, Object> customer = new LinkedHashMap<>();
         customer.put("name", order.getUserLogin());
         customer.put("email", order.getUserLogin());

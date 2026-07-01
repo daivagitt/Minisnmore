@@ -4,7 +4,7 @@ import { AnimatePresence, type MotionValue } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight, Leaf, Sparkles, Gift, Star, Truck, BadgePercent,
-  Heart, ShieldCheck, Quote, BookOpen, ChevronRight, PackageCheck, Flame, Tag, Play, ShoppingBag,
+  Heart, ShieldCheck, Quote, ChevronRight, PackageCheck, Flame, Tag, Play, ShoppingBag,
   ChevronLeft, Download,
   Smile, Feather, Wind, Droplets, RefreshCw,
 } from "lucide-react";
@@ -12,20 +12,13 @@ import { products, reviews } from "@/data/products";
 import { useProducts, useProductsLoaded } from "@/hooks/useProducts";
 import { ProductGridSkeleton } from "@/components/ProductGridSkeleton";
 import { WatchShopSkeleton } from "@/components/WatchShopSkeleton";
-import { useBlogPosts } from "@/hooks/useBlogPosts";
 import { ProductCard } from "@/components/ProductCard";
 import { SectionDivider } from "@/components/SectionDivider";
 import { FloatingDecor } from "@/components/FloatingDecor";
-import { listBlogPosts } from "@/lib/backend-data";
 import { useBanners } from "@/hooks/useBanners";
 import { useHomeSections } from "@/hooks/useHomeSections";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { resolveHomeByAgeCards } from "@/lib/home-by-age";
-import {
-  resolveHomeBlogStripPosts,
-  sectionBlogSlugs,
-  type HomeBlogStripPost,
-} from "@/lib/home-blog-strip";
 import {
   HOME_SECTION_PRODUCT_LIMIT,
   resolveHomeSectionProducts,
@@ -36,6 +29,7 @@ import { parseFabricStoryVideo } from "@/lib/asset-url";
 import { toDirectDownloadUrl } from "@/lib/utils";
 import heroBaby from "@/assets/hero-smiling-baby.jpg";
 import lifestyle from "@/assets/lifestyle-mother.webp";
+import heroComfort from "@/assets/hero-comfort-carousel.webp";
 import newborn from "@/assets/cat-newborn.webp";
 import infant from "@/assets/cat-infant.webp";
 import toddler from "@/assets/cat-toddler.webp";
@@ -79,7 +73,6 @@ const offers = [
   { icon: Wind, t: "Comfort First Design — soft, breathable fabrics" },
 ];
 
-type BlogPost = { slug: string; title: string; excerpt: string | null; cover_url: string | null; published_at: string | null };
 type HeroSlide = {
   id: string;
   eyebrow: string;
@@ -122,15 +115,15 @@ const defaultHeroSlides: HeroSlide[] = [
       "Crafted with soft, breathable fabrics and child-friendly stitching — built around the way little ones move, play and rest.",
     cta: "Shop the collection",
     link: "/shop",
-    image: lifestyle,
+    image: heroComfort,
     align: "left",
   },
   {
     id: "slide-founders",
     eyebrow: "A note from the founders",
-    title: "Stitched with a mother's promise.",
+    title: "Crafted with care. Made to last.",
     subtitle:
-      "Mini's n More began as a quiet promise between two mothers — clothing as gentle as a parent's hand, made slowly by artisan mamas in Jaipur and Tirupur.",
+      "Premium children's clothing built on certified organic cotton, azo-free dyes and child-safe finishing — thoughtfully designed for comfort, quality and the way little ones really live.",
     cta: "Read our story",
     link: "/about",
     image: heroFounders,
@@ -145,8 +138,6 @@ function Home() {
   const heroScale = useTransform(heroProgress, [0, 1], [1, 1.06]);
 
   const { banners } = useBanners();
-  const [posts, setPosts] = useState<BlogPost[]>([]);
-  const seedPosts = useBlogPosts();
   const { isEnabled, titleFor, subtitleFor, byKey } = useHomeSections();
   const settings = useSiteSettings();
   const liveProducts = useProducts();
@@ -160,27 +151,6 @@ function Home() {
     );
   }, [byKey]);
 
-  useEffect(() => {
-    listBlogPosts()
-      .then((rows) => {
-        const published = rows
-          .filter((p) => p.published)
-          .map((p) => ({
-            slug: p.slug,
-            title: p.title,
-            excerpt: p.excerpt,
-            cover_url: p.cover_url,
-            published_at: p.published_at,
-          }));
-        setPosts(published);
-      })
-      .catch((err) => {
-        if (import.meta.env.DEV) {
-          console.error("Failed to load blog posts", err);
-        }
-        setPosts([]);
-      });
-  }, []);
 
   const heroSlides: HeroSlide[] = useMemo(() => {
     const fromCms: HeroSlide[] = banners
@@ -349,9 +319,6 @@ function Home() {
       </section>
       )}
 
-      {/* WATCH & SHOP — shoppable video reels */}
-      {isEnabled("watch_shop") && <WatchAndShop />}
-
       {/* FABRIC STORY — video reel + copy */}
       {isEnabled("fabric_story") && (
         <FabricStorySection
@@ -383,7 +350,7 @@ function Home() {
             <div className="text-xs uppercase tracking-[0.28em] text-primary">Our story</div>
             <h2 className="font-display text-3xl md:text-5xl mt-3 text-balance">Slowly stitched, <span className="font-script text-primary">softly</span> held.</h2>
             <p className="mt-4 text-foreground/80 leading-relaxed">
-              Mini's n More began as a quiet promise between two mothers — that every baby deserves clothing as gentle as a parent's hand. Today, every piece is hand-finished by a small circle of artisan mothers in Jaipur and Tirupur, using only what nature gives best.
+              At Mini&apos;s n More, we craft thoughtfully designed baby essentials that bring together comfort, quality and conscious care — built on certified organic cotton, azo-free dyes and child-safe finishing for the most delicate skin.
             </p>
             <div className="flex flex-col gap-4 mt-6">
               <div className="glass rounded-2xl p-5 w-full">
@@ -445,97 +412,6 @@ function Home() {
       </section>
       )}
 
-      {/* BLOG */}
-      {isEnabled("journal_strip") && (
-        <section className="px-4 md:px-6">
-          <div className="flex items-end justify-between mb-6">
-            <div>
-              <div className="text-xs uppercase tracking-[0.28em] text-muted-foreground inline-flex items-center gap-2">
-                <BookOpen className="h-3.5 w-3.5 text-primary" /> Blog
-              </div>
-              <h2 className="font-display text-3xl md:text-4xl mt-2">
-                {titleFor("journal_strip", "Organic care, gentle on baby skin")}
-              </h2>
-              {subtitleFor(
-                "journal_strip",
-                "Why certified organic cotton, chemical-free dyes and breathable fabrics matter most in the first 24 months.",
-              ) ? (
-                <p className="mt-2 text-sm text-muted-foreground max-w-xl">
-                  {subtitleFor(
-                    "journal_strip",
-                    "Why certified organic cotton, chemical-free dyes and breathable fabrics matter most in the first 24 months.",
-                  )}
-                </p>
-              ) : null}
-            </div>
-            <Link to="/blog" className="story-link text-sm hidden md:inline">View all posts</Link>
-          </div>
-          {(() => {
-            const toCard = (p: {
-              slug: string;
-              title: string;
-              excerpt: string | null;
-              cover: string | null;
-              date: string;
-              tag?: string;
-            }): HomeBlogStripPost => ({
-              slug: p.slug,
-              title: p.title,
-              excerpt: p.excerpt,
-              cover: p.cover,
-              date: p.date,
-              tag: p.tag ?? "Blog",
-            });
-            const cmsPosts = posts.map((p) =>
-              toCard({
-                slug: p.slug,
-                title: p.title,
-                excerpt: p.excerpt,
-                cover: p.cover_url,
-                date: p.published_at
-                  ? new Date(p.published_at).toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })
-                  : "Blog",
-              }),
-            );
-            const organicSeed = seedPosts
-              .filter((p) =>
-                /organic|cotton|skin|rash|fabric|chemical|sensitive|sleep/i.test(
-                  p.title + " " + p.excerpt + " " + p.tag,
-                ),
-              )
-              .map((p) => toCard({ ...p, cover: p.cover, tag: p.tag }));
-            const blogPayload = byKey.get("journal_strip")?.payload;
-            const pickedSlugs = sectionBlogSlugs(
-              blogPayload && typeof blogPayload === "object"
-                ? (blogPayload as Record<string, unknown>)
-                : undefined,
-            );
-            const list = resolveHomeBlogStripPosts(cmsPosts, pickedSlugs, organicSeed);
-            if (list.length === 0) return null;
-            return (
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
-                {list.map((p) => (
-                  <Link key={p.slug} to="/blog/$slug" params={{ slug: p.slug }} className="glass rounded-3xl p-3 hover-lift group block h-full">
-                    <div className="aspect-5/3 overflow-hidden rounded-2xl bg-secondary/40">
-                      {p.cover ? <img src={p.cover} alt={p.title} loading="lazy" className="img-zoom h-full w-full object-cover" /> : <div className="h-full w-full bg-linear-to-br from-secondary to-muted" />}
-                    </div>
-                    <div className="p-3">
-                      <div className="text-[10px] uppercase tracking-[0.22em] text-primary">{p.tag} · {p.date}</div>
-                      <h3 className="font-display text-xl mt-1 leading-tight line-clamp-2">{p.title}</h3>
-                      {p.excerpt && <p className="text-sm text-muted-foreground mt-1.5 line-clamp-2">{p.excerpt}</p>}
-                      <div className="mt-3 inline-flex items-center gap-1 text-sm text-primary">Read story <ChevronRight className="h-3.5 w-3.5" /></div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            );
-          })()}
-        </section>
-      )}
     </div>
   );
 }
@@ -965,7 +841,7 @@ const trustBadges = [
   { icon: RefreshCw, title: "Prewash", desc: "Pre-shrunk and ready to wear straight out of the box" },
   { icon: ShieldCheck, title: "Quality Assured", desc: "Tested for safety & softness" },
   { icon: Heart, title: "Loved by Parents", desc: "Rated 4.9★ by little families" },
-  { icon: Gift, title: "Gift Ready", desc: "Hand-tied keepsake wrapping" },
+  { icon: Gift, title: "Plantable Seed Tags", desc: "A small step towards environmental responsibility with every purchase." },
   { icon: Sparkles, title: "Smart Wear", desc: "Thoughtful cuts for play & rest" },
 ] as const;
 

@@ -25,7 +25,7 @@ function WishlistPage() {
           <Link to="/shop" className="mt-4 inline-block rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm">Browse the edit</Link>
         </div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
           {items.map((p, i) => <ProductCard key={p.id} product={p} index={i} />)}
         </div>
       )}

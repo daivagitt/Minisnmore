@@ -4,6 +4,7 @@ import com.miniandmore.gateway.config.Constants;
 import com.miniandmore.gateway.domain.Authority;
 import com.miniandmore.gateway.domain.User;
 import com.miniandmore.gateway.repository.AuthorityRepository;
+import com.miniandmore.gateway.repository.UserAuthoritiesLoader;
 import com.miniandmore.gateway.repository.UserRepository;
 import com.miniandmore.gateway.security.AuthoritiesConstants;
 import com.miniandmore.gateway.service.dto.AdminUserDTO;
@@ -32,11 +33,18 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final AuthorityRepository authorityRepository;
+    private final UserAuthoritiesLoader userAuthoritiesLoader;
     private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository, AuthorityRepository authorityRepository, PasswordEncoder passwordEncoder) {
+    public UserService(
+        UserRepository userRepository,
+        AuthorityRepository authorityRepository,
+        UserAuthoritiesLoader userAuthoritiesLoader,
+        PasswordEncoder passwordEncoder
+    ) {
         this.userRepository = userRepository;
         this.authorityRepository = authorityRepository;
+        this.userAuthoritiesLoader = userAuthoritiesLoader;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -252,13 +260,14 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public Mono<User> getUserWithAuthoritiesByLogin(String login) {
-        return userRepository.findOneByLogin(login);
+        return userRepository.findOneByLogin(login).flatMap(userAuthoritiesLoader::withAuthorities);
     }
 
     @Transactional(readOnly = true)
     public Mono<User> getUserWithAuthorities() {
         return com.miniandmore.gateway.security.SecurityUtils.getCurrentUserLogin()
-            .flatMap(userRepository::findOneByLogin);
+            .flatMap(userRepository::findOneByLogin)
+            .flatMap(userAuthoritiesLoader::withAuthorities);
     }
 
     @Scheduled(cron = "0 0 1 * * ?")

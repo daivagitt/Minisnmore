@@ -20,6 +20,10 @@ spring:
       server:
         webflux:
           routes:
+            - id: miniandmore-ledgerly-webhooks
+              uri: http://127.0.0.1:9184
+              predicates:
+                - Path=/internal/v1/ledgerly/webhooks
             - id: miniandmore-ledgerly-api
               uri: http://127.0.0.1:9181
               predicates:

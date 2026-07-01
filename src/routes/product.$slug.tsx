@@ -1,12 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
 import type { Product } from "@/data/products";
 import { useProduct, useProducts } from "@/hooks/useProducts";
 import { useShop } from "@/store/shop";
 import { Heart, Truck, Leaf, ChevronRight, MessageCircle, Ruler, Plus, Minus, Share2, X, BadgeCheck, Banknote, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { ProductCard } from "@/components/ProductCard";
+import { ProductGallery } from "@/components/ProductGallery";
 import { checkSizeFit, clampQuantity } from "@/lib/product-fit";
 import { lookupPincode, normalizePincode } from "@/lib/pincode";
 
@@ -32,7 +32,6 @@ function ProductPage() {
   const { addToCart, toggleWish, wishlist } = useShop();
   const [size, setSize] = useState<string | null>(() => product?.sizes?.[0] ?? null);
   const [color, setColor] = useState<string | null>(() => product?.colors?.[0]?.name ?? null);
-  const [active, setActive] = useState(0);
   const [heightCm, setHeightCm] = useState<string>("");
   const [chestCm, setChestCm] = useState<string>("");
   const [sizeChart, setSizeChart] = useState(false);
@@ -68,12 +67,12 @@ function ProductPage() {
     .filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i)
     .slice(0, 4);
 
-  type MediaItem = { type: "image"; src: string };
-  const media: MediaItem[] = [
-    { type: "image", src: product.image },
-    ...product.gallery.map((g) => ({ type: "image" as const, src: g })),
-  ];
-  const activeMedia = media[Math.min(active, media.length - 1)] ?? media[0];
+  const trustBadges = [
+    { i: Leaf, t: "Organic" },
+    { i: Banknote, t: "COD" },
+    { i: Truck, t: "Free ₹1499+" },
+    { i: RotateCcw, t: "30 days" },
+  ] as const;
 
   const checkPin = async () => {
     setPinLoading(true);
@@ -89,52 +88,29 @@ function ProductPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto w-full px-4 md:px-6 space-y-10 pb-24 lg:pb-12">
+    <div className="max-w-7xl mx-auto w-full px-3 sm:px-4 md:px-6 space-y-6 sm:space-y-8 md:space-y-10 pb-28 sm:pb-24 lg:pb-12 overflow-x-hidden">
       <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
         <Link to="/" className="hover:text-foreground">Home</Link><ChevronRight className="h-3 w-3" />
         <Link to="/shop" className="hover:text-foreground">Shop</Link><ChevronRight className="h-3 w-3" />
         <span className="truncate">{product.name}</span>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6 lg:gap-8 lg:items-start">
-        <div className="space-y-3 w-full min-w-0">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6 }}
-            className="glass rounded-[2rem] p-3 relative w-full"
-          >
-            <div className="relative aspect-square overflow-hidden rounded-2xl bg-secondary/40">
-              <img
-                src={activeMedia?.src}
-                alt={product.name}
-                className="h-full w-full object-cover"
-              />
-            </div>
-          </motion.div>
-          {media.length > 1 && (
-            <div className="grid grid-cols-4 gap-2">
-              {media.map((m, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setActive(i)}
-                  className={`glass rounded-xl p-1.5 transition ${active === i ? "ring-2 ring-primary" : ""}`}
-                >
-                  <img src={m.src} alt="" className="h-full w-full object-cover rounded-lg aspect-square" loading="lazy" />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+      <div className="grid lg:grid-cols-2 gap-x-6 lg:gap-x-8 gap-y-4 lg:gap-y-3 lg:items-stretch">
+        <ProductGallery
+          name={product.name}
+          image={product.image}
+          gallery={product.gallery}
+          className="lg:h-full lg:min-h-0"
+        />
 
+        <div className="flex flex-col gap-3 min-w-0 w-full lg:h-full">
         {/* Purchase card — compact, fully visible like reference PDP */}
-        <div className="glass-strong rounded-3xl p-4 md:p-5 space-y-4 w-full min-w-0">
+        <div className="glass-strong rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 md:p-5 space-y-3.5 sm:space-y-4 w-full min-w-0">
           <div className="space-y-1.5">
             <div className="text-[10px] uppercase tracking-[0.24em] text-primary">{product.fabric} · {product.category}</div>
-            <h1 className="font-display text-xl md:text-2xl lg:text-[1.65rem] leading-tight text-balance">{product.name}</h1>
-            <div className="flex flex-wrap items-baseline gap-2 pt-0.5">
-              <span className="font-display text-2xl">&#8377;{product.price.toLocaleString("en-IN")}</span>
+            <h1 className="font-display text-lg sm:text-xl md:text-2xl lg:text-[1.65rem] leading-tight text-balance">{product.name}</h1>
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 pt-0.5">
+              <span className="font-display text-xl sm:text-2xl">&#8377;{product.price.toLocaleString("en-IN")}</span>
               {product.compareAt && <span className="line-through text-muted-foreground text-sm">&#8377;{product.compareAt.toLocaleString("en-IN")}</span>}
               {product.compareAt && (
                 <span className="rounded-md bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary uppercase tracking-wide">
@@ -192,7 +168,7 @@ function ProductPage() {
             ) : sizeFit && "error" in sizeFit ? (
               <p className="text-destructive text-xs leading-snug line-clamp-2">{sizeFit.error}</p>
             ) : null}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-2">
               <input
                 type="number"
                 inputMode="decimal"
@@ -202,7 +178,7 @@ function ProductPage() {
                 onChange={(e) => setHeightCm(e.target.value)}
                 placeholder="Height (cm)"
                 aria-label="Height in centimetres"
-                className="h-10 glass rounded-full px-4 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40 min-w-0"
+                className="h-10 glass rounded-full px-3 sm:px-4 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40 min-w-0 w-full"
               />
               <input
                 type="number"
@@ -211,14 +187,14 @@ function ProductPage() {
                 max={70}
                 value={chestCm}
                 onChange={(e) => setChestCm(e.target.value)}
-                placeholder="Chest (cm) · optional"
+                placeholder="Chest (cm)"
                 aria-label="Chest in centimetres (optional)"
-                className="h-10 glass rounded-full px-4 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40 min-w-0"
+                className="h-10 glass rounded-full px-3 sm:px-4 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40 min-w-0 w-full"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-[auto_1fr] gap-3 items-end">
+          <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-3 sm:items-end">
             <div>
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Quantity</div>
               <div className="glass rounded-full inline-flex items-center">
@@ -265,15 +241,21 @@ function ProductPage() {
             </div>
           </div>
 
-          <div className="flex gap-2">
-            <button type="button" onClick={() => addToCart(product, { size: size ?? product.sizes[0], color: color ?? product.colors[0].name, qty })}
-              className="flex-1 rounded-full bg-primary text-primary-foreground py-3 text-sm font-semibold uppercase tracking-wide hover:shadow-glow transition">
+          <div className="hidden sm:flex gap-2">
+            <button
+              type="button"
+              onClick={() => addToCart(product, { size: size ?? product.sizes[0], color: color ?? product.colors[0].name, qty })}
+              className="flex-1 rounded-full bg-primary text-primary-foreground py-3 text-sm font-semibold uppercase tracking-wide hover:shadow-glow transition"
+            >
               Add to basket
             </button>
-            <button type="button" onClick={() => toggleWish(product.id)}
+            <button
+              type="button"
+              onClick={() => toggleWish(product.id)}
               aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
               aria-pressed={wished}
-              className={`h-11 w-11 shrink-0 grid place-items-center rounded-full glass transition ${wished ? "text-primary bg-primary/10" : ""}`}>
+              className={`h-11 w-11 shrink-0 grid place-items-center rounded-full glass transition ${wished ? "text-primary bg-primary/10" : ""}`}
+            >
               <Heart className={`h-4 w-4 ${wished ? "fill-primary" : ""}`} />
             </button>
             <button
@@ -288,30 +270,29 @@ function ProductPage() {
                 }
               }}
               aria-label="Share"
-              className="h-11 w-11 shrink-0 grid place-items-center rounded-full glass hover:scale-105 transition">
+              className="h-11 w-11 shrink-0 grid place-items-center rounded-full glass hover:scale-105 transition"
+            >
               <Share2 className="h-4 w-4" />
             </button>
           </div>
+        </div>
 
-          <div className="grid grid-cols-4 gap-1 sm:gap-2 pt-1 border-t border-border/40">
-            {[
-              { i: Leaf, t: "Organic" },
-              { i: Banknote, t: "COD" },
-              { i: Truck, t: "Free ₹1499+" },
-              { i: RotateCcw, t: "7-Day Return" },
-            ].map((b) => (
-              <div key={b.t} className="flex flex-col items-center text-center gap-1 min-w-0 py-1">
-                <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-full border border-primary/35 grid place-items-center bg-white/60">
-                  <b.i className="h-4 w-4 text-primary" />
+        <div className="glass rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 w-full min-w-0 shrink-0">
+          <div className="grid grid-cols-4 gap-2 sm:gap-3 md:gap-4 w-full">
+            {trustBadges.map((b) => (
+              <div key={b.t} className="flex flex-col items-center text-center gap-1 min-w-0 px-0.5">
+                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg border border-primary/35 grid place-items-center bg-white/60 shrink-0">
+                  <b.i className="h-3 w-3 text-primary" />
                 </div>
-                <div className="text-[9px] sm:text-[10px] font-medium text-primary leading-tight">{b.t}</div>
+                <div className="text-[7px] min-[360px]:text-[8px] sm:text-[9px] font-medium text-primary leading-tight">{b.t}</div>
               </div>
             ))}
           </div>
         </div>
+        </div>
       </div>
 
-      <div className="glass-strong rounded-3xl p-4 md:p-5 space-y-3">
+      <div className="glass-strong rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 md:p-5 space-y-3">
         <details open className="glass rounded-2xl p-4 group">
           <summary className="flex items-center justify-between cursor-pointer text-sm font-semibold list-none">
             <span>Product Details</span>
@@ -366,36 +347,42 @@ function ProductPage() {
       </div>
 
       <section className="space-y-6">
-        <div className="flex items-end justify-between mb-6">
-          <div>
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4 sm:mb-6">
+          <div className="min-w-0">
             <div className="text-xs uppercase tracking-[0.28em] text-muted-foreground">You may also love</div>
-            <h2 className="font-display text-3xl md:text-4xl mt-2">Pieces that pair beautifully</h2>
+            <h2 className="font-display text-2xl sm:text-3xl md:text-4xl mt-1.5 sm:mt-2">Pieces that pair beautifully</h2>
           </div>
-          <Link to="/shop" className="story-link text-sm hidden md:inline">Browse all</Link>
+          <Link to="/shop" className="story-link text-sm shrink-0">Browse all</Link>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
           {recommendedProducts.map((p, i) => (
             <ProductCard key={p.id} product={p} index={i} />
           ))}
         </div>
       </section>
 
-      <div className="lg:hidden fixed bottom-3 left-3 right-3 z-30">
-        <div className="glass-strong rounded-full p-2 flex items-center gap-3">
-          <div className="pl-3 flex-1">
-            <div className="text-[11px] text-muted-foreground">{product.name}</div>
+      <div className="lg:hidden fixed inset-x-0 bottom-0 z-30 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="glass-strong rounded-full p-2 flex items-center gap-2 sm:gap-3 max-w-7xl mx-auto">
+          <div className="pl-2 sm:pl-3 flex-1 min-w-0">
+            <div className="text-[11px] text-muted-foreground truncate">{product.name}</div>
             <div className="font-medium text-sm">&#8377;{product.price.toLocaleString("en-IN")}</div>
           </div>
-          <button onClick={() => addToCart(product, { size: size ?? product.sizes[0], color: color ?? product.colors[0].name, qty })}
-            className="rounded-full bg-primary text-primary-foreground px-5 py-3 text-sm font-medium">
+          <button
+            type="button"
+            onClick={() => addToCart(product, { size: size ?? product.sizes[0], color: color ?? product.colors[0].name, qty })}
+            className="shrink-0 rounded-full bg-primary text-primary-foreground px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-medium"
+          >
             Add to basket
           </button>
         </div>
       </div>
 
       {sizeChart && (
-        <div className="fixed inset-0 z-70 grid place-items-center p-4 bg-foreground/30 backdrop-blur-sm" onClick={() => setSizeChart(false)}>
-          <div onClick={(e) => e.stopPropagation()} className="glass-strong rounded-3xl max-w-md w-full p-6">
+        <div className="fixed inset-0 z-70 grid place-items-end sm:place-items-center p-0 sm:p-4 bg-foreground/30 backdrop-blur-sm" onClick={() => setSizeChart(false)}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="glass-strong rounded-t-3xl sm:rounded-3xl max-w-md w-full p-5 sm:p-6 max-h-[85vh] overflow-y-auto"
+          >
             <div className="flex items-center justify-between mb-4">
               <div className="font-display text-2xl">Size guide</div>
               <button onClick={() => setSizeChart(false)} className="h-9 w-9 grid place-items-center rounded-full hover:bg-white/40"><X className="h-4 w-4" /></button>

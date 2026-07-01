@@ -26,9 +26,15 @@ const COLLECTION_LINKS = [
   { to: "/trending" as const, label: "Trending" },
 ];
 
+const QUICK_LINKS = [
+  { to: "/privacy" as const, label: "Privacy" },
+  { to: "/terms" as const, label: "Terms" },
+  { to: "/shipping" as const, label: "Shipping & returns" },
+];
+
 type FooterShopLink =
   | { key: string; label: string; to: "/shop"; category: string }
-  | { key: string; label: string; to: "/gift" | "/blog" };
+  | { key: string; label: string; to: "/gift" };
 
 function formatShopLabel(label: string) {
   const text = label.trim();
@@ -38,8 +44,8 @@ function formatShopLabel(label: string) {
 
 const FOOTER_LINK_ROW = "h-5 flex items-center text-sm leading-none";
 const FOOTER_LINK_STACK = "flex flex-col gap-2";
-const FOOTER_GRID =
-  "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-y-10 gap-x-6 lg:gap-x-8 items-start";
+const FOOTER_TOP_GRID =
+  "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-y-6 gap-x-4 sm:gap-x-5 lg:gap-x-6 xl:gap-x-8 items-start";
 
 function splitShopColumns(links: FooterShopLink[]) {
   const mid = Math.ceil(links.length / 2);
@@ -74,9 +80,13 @@ function FooterHeading({ children, className = "" }: { children: ReactNode; clas
   );
 }
 
-function FooterSubheading({ children }: { children: ReactNode }) {
+function FooterSubheading({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground mb-1.5">{children}</div>
+    <span
+      className={`text-[11px] uppercase tracking-[0.22em] text-muted-foreground shrink-0 ${className}`.trim()}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -148,9 +158,6 @@ export function Footer() {
     if (isVisible("gift")) {
       links.push({ key: "gift", label: "Gifting", to: "/gift" });
     }
-    if (isVisible("blog")) {
-      links.push({ key: "blog", label: "Blogs", to: "/blog" });
-    }
     return links;
   }, [categories, isVisible]);
   const [shopColLeft, shopColRight] = splitShopColumns(shopLinks);
@@ -177,8 +184,8 @@ export function Footer() {
           aria-hidden
         />
 
-        <div className={`relative ${FOOTER_GRID}`}>
-          <FooterColumn className="sm:col-span-2 lg:col-span-1">
+        <div className={`relative ${FOOTER_TOP_GRID}`}>
+            <FooterColumn className="sm:col-span-2 lg:col-span-1">
             <div className="mx-auto w-full max-w-[13rem] sm:max-w-[14rem] text-left lg:mx-0">
               <img
                 src={logo}
@@ -216,184 +223,153 @@ export function Footer() {
                 </div>
               ) : null}
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-              <div className="glass rounded-xl px-3 py-2">
-                <div className="text-primary font-medium">Free shipping</div>
-                <div className="text-muted-foreground">on orders ₹1,499+</div>
-              </div>
-              <div className="glass rounded-xl px-3 py-2">
-                <div className="text-primary font-medium">WELCOME10</div>
-                <div className="text-muted-foreground">10% off first order</div>
-              </div>
-            </div>
               </div>
             </div>
           </FooterColumn>
 
-          <FooterColumn>
-            <FooterHeading>Shop</FooterHeading>
-            <div
-              className="grid w-fit max-w-full grid-cols-[auto_auto] gap-x-2 sm:gap-x-3 gap-y-2"
-              aria-label="Shop categories"
-            >
-              {Array.from({ length: shopRowCount }, (_, row) => (
-                <Fragment key={`shop-row-${row}`}>
-                  <div className={FOOTER_LINK_ROW}>
-                    {shopColLeft[row] ? <ShopFooterLink item={shopColLeft[row]} /> : null}
-                  </div>
-                  <div className={FOOTER_LINK_ROW}>
-                    {shopColRight[row] ? <ShopFooterLink item={shopColRight[row]} /> : null}
-                  </div>
-                </Fragment>
-              ))}
-            </div>
-          </FooterColumn>
-
-          <FooterColumn>
-            <FooterHeading>Collections</FooterHeading>
-            <FooterNavList>
-              {COLLECTION_LINKS.map((item) => (
-                <FooterNavItem key={item.to}>
-                  <Link to={item.to} className="story-link text-muted-foreground hover:text-foreground">
-                    {item.label}
-                  </Link>
-                </FooterNavItem>
-              ))}
-            </FooterNavList>
-            <div className="mt-4">
-              <FooterSubheading>Follow us</FooterSubheading>
-              <div className="flex flex-col gap-2">
-                <div className="flex flex-wrap gap-2">
-                  <SocialIconLink href={socialHref(settings.instagram_url)} label="Instagram">
-                    <Instagram className="h-4 w-4" />
-                  </SocialIconLink>
-                  <SocialIconLink href={socialHref(settings.facebook_url)} label="Facebook">
-                    <Facebook className="h-4 w-4" />
-                  </SocialIconLink>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <SocialIconLink href={socialHref(settings.linkedin_url)} label="LinkedIn">
-                    <Linkedin className="h-4 w-4" />
-                  </SocialIconLink>
-                  <SocialIconLink href={socialHref(settings.youtube_url)} label="YouTube">
-                    <Youtube className="h-4 w-4" />
-                  </SocialIconLink>
-                </div>
-              </div>
-            </div>
-          </FooterColumn>
-
-          <FooterColumn>
-            <FooterHeading>Care</FooterHeading>
-            <FooterNavList>
-              {isVisible("track") ? (
-                <FooterNavItem>
-                  <Link to="/track" className="story-link text-muted-foreground hover:text-foreground">
-                    Order tracking
-                  </Link>
-                </FooterNavItem>
-              ) : null}
-              {isVisible("subscribe") ? (
-                <FooterNavItem>
-                  <Link to="/subscribe" className="story-link text-muted-foreground hover:text-foreground">
-                    Subscriptions
-                  </Link>
-                </FooterNavItem>
-              ) : null}
-              <FooterNavItem>
-                <Link to="/account" className="story-link text-muted-foreground hover:text-foreground">
-                  My account
-                </Link>
-              </FooterNavItem>
-              <FooterNavItem>
-                <Link to="/shipping" className="story-link text-muted-foreground hover:text-foreground">
-                  Shipping &amp; returns
-                </Link>
-              </FooterNavItem>
-              <FooterNavItem>
-                <Link to="/about" className="story-link text-muted-foreground hover:text-foreground">
-                  About us
-                </Link>
-              </FooterNavItem>
-              <FooterNavItem>
-                <a
-                  href={toDirectDownloadUrl(settings.ecatalogue_url) || "/e-catalogue.pdf"}
-                  download
-                  className="story-link text-muted-foreground hover:text-foreground"
+          <FooterColumn className="shrink-0">
+                <FooterHeading>Shop</FooterHeading>
+                <div
+                  className="grid w-fit max-w-full grid-cols-[auto_auto] gap-x-2 sm:gap-x-3 gap-y-2"
+                  aria-label="Shop categories"
                 >
-                  Download e-catalogue
-                </a>
-              </FooterNavItem>
-            </FooterNavList>
-            <div className="mt-4">
-              <FooterSubheading>Contact us</FooterSubheading>
-              <div className="flex flex-wrap gap-2">
-                {settings.contact_email ? (
-                  <a
-                    href={`mailto:${settings.contact_email}`}
-                    aria-label="Email"
-                    className="h-9 w-9 grid place-items-center rounded-full bg-primary text-primary-foreground shadow-sm hover:scale-110 hover:shadow-md transition"
-                  >
-                    <Mail className="h-4 w-4" />
-                  </a>
-                ) : null}
-                {settings.contact_phone ? (
-                  <a
-                    href={`tel:${settings.contact_phone.replace(/\s+/g, "")}`}
-                    aria-label="Call us"
-                    className="h-9 w-9 grid place-items-center rounded-full bg-primary text-primary-foreground shadow-sm hover:scale-110 hover:shadow-md transition"
-                  >
-                    <Phone className="h-4 w-4" />
-                  </a>
-                ) : null}
-                {waHref ? (
-                  <a
-                    href={waHref}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label="WhatsApp"
-                    className="h-9 w-9 grid place-items-center rounded-full bg-[#25D366] text-white shadow-sm hover:scale-110 hover:shadow-md transition"
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                  </a>
-                ) : null}
-              </div>
-            </div>
-          </FooterColumn>
+                  {Array.from({ length: shopRowCount }, (_, row) => (
+                    <Fragment key={`shop-row-${row}`}>
+                      <div className={FOOTER_LINK_ROW}>
+                        {shopColLeft[row] ? <ShopFooterLink item={shopColLeft[row]} /> : null}
+                      </div>
+                      <div className={FOOTER_LINK_ROW}>
+                        {shopColRight[row] ? <ShopFooterLink item={shopColRight[row]} /> : null}
+                      </div>
+                    </Fragment>
+                  ))}
+                </div>
+              </FooterColumn>
 
-          <FooterColumn className="sm:col-span-2 lg:col-span-1">
-            <FooterHeading>Letters from us</FooterHeading>
-            <p className="text-sm text-muted-foreground mb-2">
-              Soft mornings, slow Sundays — delivered monthly.
-            </p>
-            <form
-              className="glass rounded-full p-1.5 flex items-center w-full"
-              onSubmit={(e) => e.preventDefault()}
-            >
-              <input
-                className="bg-transparent flex-1 min-w-0 px-3 py-2 text-sm outline-none placeholder:text-muted-foreground"
-                placeholder="you@email.com"
-                type="email"
-                autoComplete="email"
-                aria-label="Email for newsletter"
-              />
-              <button
-                type="submit"
-                className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm shrink-0"
-              >
-                Join
-              </button>
-            </form>
-            <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
-              <li>· Early access to new drops</li>
-              <li>· Subscriber-only offers</li>
-              <li>· Care tips from our team</li>
-            </ul>
-          </FooterColumn>
+          <FooterColumn className="shrink-0">
+                <FooterHeading>Collections</FooterHeading>
+                <FooterNavList>
+                  {COLLECTION_LINKS.map((item) => (
+                    <FooterNavItem key={item.to}>
+                      <Link to={item.to} className="story-link text-muted-foreground hover:text-foreground">
+                        {item.label}
+                      </Link>
+                    </FooterNavItem>
+                  ))}
+                </FooterNavList>
+              </FooterColumn>
+
+          <FooterColumn className="shrink-0">
+                <FooterHeading>Care</FooterHeading>
+                <FooterNavList>
+                  {isVisible("track") ? (
+                    <FooterNavItem>
+                      <Link to="/track" className="story-link text-muted-foreground hover:text-foreground">
+                        Order tracking
+                      </Link>
+                    </FooterNavItem>
+                  ) : null}
+                  {isVisible("subscribe") ? (
+                    <FooterNavItem>
+                      <Link to="/subscribe" className="story-link text-muted-foreground hover:text-foreground">
+                        Subscriptions
+                      </Link>
+                    </FooterNavItem>
+                  ) : null}
+                  <FooterNavItem>
+                    <Link to="/account" className="story-link text-muted-foreground hover:text-foreground">
+                      My account
+                    </Link>
+                  </FooterNavItem>
+                  <FooterNavItem>
+                    <Link to="/about" className="story-link text-muted-foreground hover:text-foreground">
+                      About us
+                    </Link>
+                  </FooterNavItem>
+                  <FooterNavItem>
+                    <a
+                      href={toDirectDownloadUrl(settings.ecatalogue_url) || "/e-catalogue.pdf"}
+                      download
+                      className="story-link text-muted-foreground hover:text-foreground"
+                    >
+                      Download e-catalogue
+                    </a>
+                  </FooterNavItem>
+                </FooterNavList>
+              </FooterColumn>
+
+          <FooterColumn className="shrink-0">
+                <FooterHeading>Quick links</FooterHeading>
+                <FooterNavList>
+                  {QUICK_LINKS.map((item) => {
+                    if ("page" in item && item.page && !isVisible(item.page)) return null;
+                    return (
+                      <FooterNavItem key={item.to}>
+                        <Link to={item.to} className="story-link text-muted-foreground hover:text-foreground">
+                          {item.label}
+                        </Link>
+                      </FooterNavItem>
+                    );
+                  })}
+                </FooterNavList>
+              </FooterColumn>
+
+
+          <div className="sm:col-span-2 lg:col-span-4 lg:col-start-2 lg:row-start-2 flex items-center flex-nowrap w-fit max-w-full gap-2">
+              <FooterSubheading>Follow us</FooterSubheading>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <SocialIconLink href={socialHref(settings.instagram_url)} label="Instagram">
+                  <Instagram className="h-4 w-4" />
+                </SocialIconLink>
+                <SocialIconLink href={socialHref(settings.facebook_url)} label="Facebook">
+                  <Facebook className="h-4 w-4" />
+                </SocialIconLink>
+                <SocialIconLink href={socialHref(settings.linkedin_url)} label="LinkedIn">
+                  <Linkedin className="h-4 w-4" />
+                </SocialIconLink>
+                <SocialIconLink href={socialHref(settings.youtube_url)} label="YouTube">
+                  <Youtube className="h-4 w-4" />
+                </SocialIconLink>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 ml-2 pl-2 border-l border-border/40">
+                <FooterSubheading>Contact us</FooterSubheading>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {settings.contact_email ? (
+                    <a
+                      href={`mailto:${settings.contact_email}`}
+                      aria-label="Email"
+                      className="h-9 w-9 shrink-0 grid place-items-center rounded-full bg-primary text-primary-foreground shadow-sm hover:scale-110 hover:shadow-md transition"
+                    >
+                      <Mail className="h-4 w-4" />
+                    </a>
+                  ) : null}
+                  {settings.contact_phone ? (
+                    <a
+                      href={`tel:${settings.contact_phone.replace(/\s+/g, "")}`}
+                      aria-label="Call us"
+                      className="h-9 w-9 shrink-0 grid place-items-center rounded-full bg-primary text-primary-foreground shadow-sm hover:scale-110 hover:shadow-md transition"
+                    >
+                      <Phone className="h-4 w-4" />
+                    </a>
+                  ) : null}
+                  {waHref ? (
+                    <a
+                      href={waHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="WhatsApp"
+                      className="h-9 w-9 shrink-0 grid place-items-center rounded-full bg-[#25D366] text-white shadow-sm hover:scale-110 hover:shadow-md transition"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+          </div>
         </div>
 
-        <div className="relative mt-3 pt-2.5 border-t border-border/60 flex flex-col sm:flex-row sm:justify-between items-center gap-2 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5 text-center sm:text-left">
+        <div className="relative mt-3 pt-2.5 border-t border-border/60 space-y-2 text-xs text-muted-foreground">
+          <div className="flex items-center justify-center gap-1.5 text-center">
             {settings.footer_copyright ? (
               <span>{settings.footer_copyright}</span>
             ) : (
@@ -407,16 +383,14 @@ export function Footer() {
               </>
             )}
           </div>
-          <div className="flex items-center gap-4">
-            <Link to="/privacy" className="story-link hover:text-foreground">
+          <div className="grid grid-cols-3 items-center gap-2 w-full">
+            <Link to="/privacy" className="story-link hover:text-foreground justify-self-start">
               Privacy
             </Link>
-            <span aria-hidden>&middot;</span>
-            <Link to="/terms" className="story-link hover:text-foreground">
+            <Link to="/terms" className="story-link hover:text-foreground justify-self-center text-center">
               Terms
             </Link>
-            <span aria-hidden>&middot;</span>
-            <Link to="/shipping" className="story-link hover:text-foreground">
+            <Link to="/shipping" className="story-link hover:text-foreground justify-self-end text-right">
               Shipping &amp; returns
             </Link>
           </div>

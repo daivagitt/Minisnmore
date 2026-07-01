@@ -2,6 +2,7 @@ package com.miniandmore.gateway.security;
 
 import com.miniandmore.gateway.domain.Authority;
 import com.miniandmore.gateway.domain.User;
+import com.miniandmore.gateway.repository.UserAuthoritiesLoader;
 import com.miniandmore.gateway.repository.UserRepository;
 import java.util.Collection;
 import java.util.Locale;
@@ -28,9 +29,11 @@ public class DomainUserDetailsService implements ReactiveUserDetailsService {
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$", Pattern.CASE_INSENSITIVE);
 
     private final UserRepository userRepository;
+    private final UserAuthoritiesLoader userAuthoritiesLoader;
 
-    public DomainUserDetailsService(UserRepository userRepository) {
+    public DomainUserDetailsService(UserRepository userRepository, UserAuthoritiesLoader userAuthoritiesLoader) {
         this.userRepository = userRepository;
+        this.userAuthoritiesLoader = userAuthoritiesLoader;
     }
 
     @Override
@@ -57,12 +60,17 @@ public class DomainUserDetailsService implements ReactiveUserDetailsService {
     }
 
     private Mono<UserDetails> withPasswordHash(User user, String lowercaseLogin) {
-        return userRepository
-            .findPasswordHashByUserId(user.getId())
-            .map(password -> {
-                user.setPassword(password);
-                return createSpringSecurityUser(lowercaseLogin, user);
-            });
+        return userAuthoritiesLoader
+            .withAuthorities(user)
+            .flatMap(
+                loaded ->
+                    userRepository
+                        .findPasswordHashByUserId(loaded.getId())
+                        .map(password -> {
+                            loaded.setPassword(password);
+                            return createSpringSecurityUser(lowercaseLogin, loaded);
+                        })
+            );
     }
 
     private org.springframework.security.core.userdetails.User createSpringSecurityUser(String lowercaseLogin, User user) {

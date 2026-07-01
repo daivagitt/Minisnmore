@@ -17,7 +17,6 @@ const NAV_ITEMS = [
   { to: "/gift", label: "Gift", key: "gift" },
   { to: "/about", label: "About", key: null as string | null },
   { to: "/track", label: "Track", key: "track" },
-  { to: "/blog", label: "Blogs", key: "blog" },
 ] as const;
 
 export function Navbar() {
@@ -85,13 +84,13 @@ export function Navbar() {
           <img
             src={logo}
             alt={settings.brand_name}
-            className="h-9 sm:h-10 md:h-12 lg:h-14 w-auto object-contain transition-transform duration-500 group-hover:scale-[1.03]"
+            className="h-8 sm:h-9 md:h-10 lg:h-11 w-auto object-contain transition-transform duration-500 group-hover:scale-[1.02]"
             loading="eager"
             decoding="async"
           />
         </Link>
 
-        <nav className="hidden lg:flex items-center gap-8 text-[15px] font-semibold tracking-wide">
+        <nav className="hidden lg:flex items-center gap-8 text-sm font-medium tracking-wider">
           {nav.map((n) => {
             if (n.to === "/shop") {
               return (
@@ -102,7 +101,7 @@ export function Navbar() {
                   onMouseLeave={() => setShopHover(false)}
                 >
                   <Link to={n.to} className="story-link text-foreground hover:text-primary transition-colors drop-shadow-[0_1px_0_rgba(255,255,255,0.6)]"
-                    activeProps={{ className: "text-primary font-bold" }}>
+                    activeProps={{ className: "text-primary font-semibold" }}>
                     {n.label}
                   </Link>
                   <AnimatePresence>
@@ -148,43 +147,40 @@ export function Navbar() {
             }
             return (
               <Link key={n.to} to={n.to} className="story-link text-foreground hover:text-primary transition-colors drop-shadow-[0_1px_0_rgba(255,255,255,0.6)]"
-                activeProps={{ className: "text-primary font-bold" }}>
+                activeProps={{ className: "text-primary font-semibold" }}>
                 {n.label}
               </Link>
             );
           })}
         </nav>
 
-        <div className="flex items-end gap-1 sm:gap-2 md:gap-3">
+        <div className="flex items-center gap-1 sm:gap-2">
           <button onClick={() => setSearchOpen(true)} title="Search" className="hidden md:grid h-10 w-10 place-items-center rounded-full hover:bg-white/40 transition" aria-label="Search">
             <Search className="h-4.5 w-4.5" />
           </button>
-          <Link to={profileTo} title={profileLabel} className="hidden md:flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-xl hover:bg-white/40 transition" aria-label={profileLabel}>
+          <Link to={profileTo} title={profileLabel} className="hidden md:grid h-10 w-10 place-items-center rounded-full hover:bg-white/40 transition" aria-label={profileLabel}>
             <User className="h-5 w-5" strokeWidth={1.6} />
-            <span className="text-[10px] font-medium tracking-wide text-foreground/80 leading-none">{profileLabel}</span>
           </Link>
-          <Link to="/wishlist" title="Wishlist" className="relative flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-xl hover:bg-white/40 transition" aria-label="Wishlist">
+          <Link to="/wishlist" title="Wishlist" className="relative h-10 w-10 grid place-items-center rounded-full hover:bg-white/40 transition" aria-label="Wishlist">
             <span className="relative">
               <Heart className="h-5 w-5" strokeWidth={1.6} />
               {wishlist.length > 0 && (
-                <span className="absolute -top-1.5 -right-2 h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] grid place-items-center">{wishlist.length}</span>
+                <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-bold grid place-items-center">{wishlist.length}</span>
               )}
             </span>
-            <span className="hidden md:block text-[10px] font-medium tracking-wide text-foreground/80 leading-none">Wishlist</span>
           </Link>
           <button
             onClick={() => setCartOpen(true)}
             onContextMenu={(e) => e.preventDefault()}
             title="Bag"
-            className="relative flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-xl hover:bg-white/40 transition"
+            className="relative h-10 w-10 grid place-items-center rounded-full hover:bg-white/40 transition"
             aria-label="Bag">
             <span className="relative">
               <ShoppingBag className="h-5 w-5" strokeWidth={1.6} />
               {cartCount > 0 && (
-                <span className="absolute -top-1.5 -right-2 h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] grid place-items-center font-medium">{cartCount}</span>
+                <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-bold grid place-items-center">{cartCount}</span>
               )}
             </span>
-            <span className="hidden md:block text-[10px] font-medium tracking-wide text-foreground/80 leading-none">Bag</span>
           </button>
           <button onClick={() => setOpen((v) => !v)} title="Menu" className="lg:hidden grid h-9 w-9 md:h-10 md:w-10 place-items-center rounded-full hover:bg-white/40 transition" aria-label="Menu">
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
