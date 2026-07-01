@@ -589,15 +589,6 @@ function ProductsPage() {
                       />
                     </div>
                     <div className="grid sm:grid-cols-2 gap-3">
-                      <Field label="HSN / SAC code">
-                        <input
-                          className={inputCls()}
-                          value={p.hsn ?? ""}
-                          onChange={(e) => update(i, { hsn: e.target.value || null })}
-                          placeholder="e.g. 61112000"
-                          maxLength={20}
-                        />
-                      </Field>
                       <Field label="GST Tax %">
                         <select
                           className={inputCls()}

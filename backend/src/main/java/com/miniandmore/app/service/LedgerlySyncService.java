@@ -1,13 +1,11 @@
 package com.miniandmore.app.service;
 
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
-import com.miniandmore.app.domain.Category;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.LedgerlySetting;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.Product;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
-import com.miniandmore.app.repository.CategoryRepository;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.LedgerlySettingRepository;
 import com.miniandmore.app.repository.ProductRepository;
@@ -30,23 +28,23 @@ public class LedgerlySyncService {
     private final ProductRepository productRepository;
     private final CustomerOrderRepository customerOrderRepository;
     private final LedgerlySettingRepository ledgerlySettingRepository;
-    private final CategoryRepository categoryRepository;
     private final LedgerlyProductMergeService productMergeService;
+    private final LedgerlyCategoryResolver categoryResolver;
 
     public LedgerlySyncService(
         LedgerlyIntegrationClient ledgerlyClient,
         ProductRepository productRepository,
         CustomerOrderRepository customerOrderRepository,
         LedgerlySettingRepository ledgerlySettingRepository,
-        CategoryRepository categoryRepository,
-        LedgerlyProductMergeService productMergeService
+        LedgerlyProductMergeService productMergeService,
+        LedgerlyCategoryResolver categoryResolver
     ) {
         this.ledgerlyClient = ledgerlyClient;
         this.productRepository = productRepository;
         this.customerOrderRepository = customerOrderRepository;
         this.ledgerlySettingRepository = ledgerlySettingRepository;
-        this.categoryRepository = categoryRepository;
         this.productMergeService = productMergeService;
+        this.categoryResolver = categoryResolver;
     }
 
     @Async
@@ -270,7 +268,7 @@ public class LedgerlySyncService {
         productMergeService.mergeLedgerlyItem(
             product,
             item,
-            categoryName -> resolveCategory(categoryName, autoCreateCategory),
+            categoryName -> categoryResolver.resolve(categoryName, autoCreateCategory),
             (noticeSku, message) -> {
                 if (created) {
                     builder.notice(noticeSku, message);
@@ -295,48 +293,14 @@ public class LedgerlySyncService {
         return Optional.empty();
     }
 
-    private Optional<Category> resolveCategory(String categoryName, boolean autoCreateCategory) {
-        if (categoryName == null || categoryName.isBlank()) {
-            return Optional.empty();
-        }
-        String slug = slugify(categoryName);
-        Optional<Category> existing = categoryRepository.findOneBySlug(slug);
-        if (existing.isPresent()) {
-            return existing;
-        }
-        if (!autoCreateCategory) {
-            return Optional.empty();
-        }
-        Category category = new Category();
-        category.setName(categoryName);
-        category.setSlug(uniqueCategorySlug(slug));
-        category.setSortOrder(categoryRepository.findAll().size());
-        category.setActive(true);
-        return Optional.of(categoryRepository.save(category));
-    }
-
     private String uniqueSlug(String sku, String name) {
-        String base = slugify(name != null && !name.isBlank() ? name : sku);
+        String base = LedgerlyCategoryResolver.slugify(name != null && !name.isBlank() ? name : sku);
         String candidate = base;
         int suffix = 1;
         while (productRepository.findOneBySlug(candidate).isPresent()) {
             candidate = base + "-" + suffix++;
         }
         return candidate;
-    }
-
-    private String uniqueCategorySlug(String base) {
-        String candidate = base;
-        int suffix = 1;
-        while (categoryRepository.findOneBySlug(candidate).isPresent()) {
-            candidate = base + "-" + suffix++;
-        }
-        return candidate;
-    }
-
-    private String slugify(String input) {
-        String slug = input.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("^-+|-+$", "");
-        return slug.isBlank() ? "item" : slug;
     }
 
     private String stringValue(Object value) {

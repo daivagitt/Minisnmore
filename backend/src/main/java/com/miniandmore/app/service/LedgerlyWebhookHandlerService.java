@@ -35,6 +35,7 @@ public class LedgerlyWebhookHandlerService {
     private final CustomerOrderRepository customerOrderRepository;
     private final ObjectMapper objectMapper;
     private final LedgerlyProductMergeService productMergeService;
+    private final LedgerlyCategoryResolver categoryResolver;
 
     public LedgerlyWebhookHandlerService(
         LedgerlyCredentialsProvider credentialsProvider,
@@ -42,7 +43,8 @@ public class LedgerlyWebhookHandlerService {
         ProductRepository productRepository,
         CustomerOrderRepository customerOrderRepository,
         ObjectMapper objectMapper,
-        LedgerlyProductMergeService productMergeService
+        LedgerlyProductMergeService productMergeService,
+        LedgerlyCategoryResolver categoryResolver
     ) {
         this.credentialsProvider = credentialsProvider;
         this.webhookEventRepository = webhookEventRepository;
@@ -50,6 +52,7 @@ public class LedgerlyWebhookHandlerService {
         this.customerOrderRepository = customerOrderRepository;
         this.objectMapper = objectMapper;
         this.productMergeService = productMergeService;
+        this.categoryResolver = categoryResolver;
     }
 
     public Map<String, Object> handle(String rawBody, String signature, String eventHeader) {
@@ -97,7 +100,7 @@ public class LedgerlyWebhookHandlerService {
             })
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No product for SKU " + sku));
 
-        productMergeService.mergeLedgerlyItem(product, data, categoryName -> java.util.Optional.empty(), null);
+        productMergeService.mergeLedgerlyItem(product, data, categoryResolver::resolve, null);
         productRepository.save(product);
     }
 

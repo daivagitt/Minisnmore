@@ -46,19 +46,40 @@ public class LedgerlyProductMergeService {
             }
         }
 
+        ProductDescriptionCodec.Decoded decoded = null;
         String description = stringValue(item.get("description"));
         if (description != null) {
-            ProductDescriptionCodec.Decoded decoded = descriptionCodec.decode(description);
+            decoded = descriptionCodec.decode(description);
             descriptionCodec.applyDecoded(product, decoded);
-            String categoryName = descriptionCodec.categoryNameFrom(decoded);
-            if (categoryName != null && !categoryName.isBlank()) {
-                categoryResolver.resolve(categoryName).ifPresent(category -> {
-                    product.setCategory(category);
-                    if (notice != null) {
-                        notice.onNotice(product.getSku(), "Assigned category " + category.getName());
-                    }
-                });
-            }
+        }
+
+        if (item.get("taxPct") != null) {
+            product.setTaxPct(toBigDecimal(item.get("taxPct")));
+        }
+
+        String fabric = firstNonBlank(stringValue(item.get("fabricType")), stringValue(item.get("fabric")));
+        if (fabric != null) {
+            product.setFabricType(fabric);
+        }
+
+        List<String> sizes = descriptionCodec.parseDelimitedOrJson(stringValue(item.get("sizes")));
+        if (!sizes.isEmpty()) {
+            product.setSizesJson(descriptionCodec.toJsonList(sizes));
+        }
+
+        List<String> colors = descriptionCodec.parseDelimitedOrJson(stringValue(item.get("colors")));
+        if (!colors.isEmpty()) {
+            product.setColorsJson(descriptionCodec.toJsonList(colors));
+        }
+
+        String categoryName = firstNonBlank(stringValue(item.get("category")), descriptionCodec.categoryNameFrom(decoded));
+        if (categoryName != null) {
+            categoryResolver.resolve(categoryName).ifPresent(category -> {
+                product.setCategory(category);
+                if (notice != null) {
+                    notice.onNotice(product.getSku(), "Assigned category " + category.getName());
+                }
+            });
         }
 
         String imageUrl = stringValue(item.get("imageUrl"));
@@ -80,8 +101,6 @@ public class LedgerlyProductMergeService {
         BigDecimal taxPct = product.getTaxPct() != null ? product.getTaxPct() : DEFAULT_TAX_PCT;
         payload.put("taxPct", taxPct);
         payload.put("unit", "ea");
-        String hsn = product.getHsn() != null ? product.getHsn() : "";
-        payload.put("hsn", hsn);
 
         BigDecimal cost = product.getCompareAtPrice();
         if (cost == null || cost.compareTo(BigDecimal.ZERO) <= 0) {
@@ -96,6 +115,21 @@ public class LedgerlyProductMergeService {
         String encoded = descriptionCodec.encode(product, categoryName);
         if (encoded != null && !encoded.isBlank()) {
             payload.put("description", encoded);
+        }
+
+        if (categoryName != null && !categoryName.isBlank()) {
+            payload.put("category", categoryName.trim());
+        }
+        List<String> sizes = descriptionCodec.parseDelimitedOrJson(product.getSizesJson());
+        if (!sizes.isEmpty()) {
+            payload.put("sizes", String.join(", ", sizes));
+        }
+        List<String> colors = descriptionCodec.parseDelimitedOrJson(product.getColorsJson());
+        if (!colors.isEmpty()) {
+            payload.put("colors", String.join(", ", colors));
+        }
+        if (product.getFabricType() != null && !product.getFabricType().isBlank()) {
+            payload.put("fabricType", product.getFabricType().trim());
         }
 
         String firstImage = itemImageSync.firstImageUrl(product.getImagesJson());
@@ -113,6 +147,15 @@ public class LedgerlyProductMergeService {
     @FunctionalInterface
     public interface NoticeCallback {
         void onNotice(String sku, String message);
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     private String stringValue(Object value) {

@@ -177,6 +177,22 @@ public class ProductDescriptionCodec {
         return decoded != null ? decoded.categoryName() : null;
     }
 
+    /** Comma-separated text or JSON array from Ledgerly item columns. */
+    public List<String> parseDelimitedOrJson(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return List.of();
+        }
+        String trimmed = raw.trim();
+        if (trimmed.startsWith("[")) {
+            return parseJsonList(trimmed);
+        }
+        return splitList(trimmed);
+    }
+
+    public String toJsonList(List<String> values) {
+        return writeJsonList(values != null ? values : List.of());
+    }
+
     private List<String> parseJsonList(String json) {
         if (json == null || json.isBlank()) {
             return List.of();

@@ -44,10 +44,10 @@ class LedgerlySyncServiceTest {
     private LedgerlySettingRepository ledgerlySettingRepository;
 
     @Mock
-    private CategoryRepository categoryRepository;
+    private LedgerlyProductMergeService productMergeService;
 
     @Mock
-    private LedgerlyProductMergeService productMergeService;
+    private LedgerlyCategoryResolver categoryResolver;
 
     @InjectMocks
     private LedgerlySyncService service;

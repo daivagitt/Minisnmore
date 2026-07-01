@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.miniandmore.app.domain.Category;
 import com.miniandmore.app.domain.Product;
 import java.math.BigDecimal;
 import java.util.Map;
@@ -38,6 +39,7 @@ class LedgerlyProductMergeServiceTest {
             .stock(10)
             .compareAtPrice(BigDecimal.valueOf(699))
             .fabricType("Cotton")
+            .taxPct(BigDecimal.valueOf(18))
             .description("Soft");
 
         Map<String, Object> payload = mergeService.buildPushPayload(product, "Baby");
@@ -48,6 +50,39 @@ class LedgerlyProductMergeServiceTest {
         assertThat(payload.get("cost")).isEqualTo(BigDecimal.valueOf(699));
         assertThat(payload.get("imageUrl")).isEqualTo("https://cdn.example.com/p.jpg");
         assertThat(payload.get("description").toString()).contains("Category: Baby").contains("Fabric: Cotton");
+        assertThat(payload).doesNotContainKey("hsn");
+    }
+
+    @Test
+    void mergeLedgerlyItem_appliesTopLevelMerchandisingFields() {
+        Product product = new Product().sku("SKU-1").price(BigDecimal.ZERO).stock(0);
+        Category category = new Category().name("Babywear").slug("babywear");
+        Map<String, Object> item = Map.of(
+            "price",
+            499,
+            "stock",
+            8,
+            "taxPct",
+            12,
+            "category",
+            "Babywear",
+            "sizes",
+            "0-3M, 3-6M",
+            "colors",
+            "Blush, Sand",
+            "fabricType",
+            "Organic Cotton"
+        );
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.of(category), null);
+
+        assertThat(product.getPrice()).isEqualByComparingTo(BigDecimal.valueOf(499));
+        assertThat(product.getStock()).isEqualTo(8);
+        assertThat(product.getTaxPct()).isEqualByComparingTo(BigDecimal.valueOf(12));
+        assertThat(product.getCategory()).isEqualTo(category);
+        assertThat(product.getFabricType()).isEqualTo("Organic Cotton");
+        assertThat(product.getSizesJson()).contains("0-3M").contains("3-6M");
+        assertThat(product.getColorsJson()).contains("Blush").contains("Sand");
     }
 
     @Test
