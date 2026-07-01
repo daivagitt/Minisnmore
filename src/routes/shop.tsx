@@ -1,6 +1,5 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
 import { ProductCard } from "@/components/ProductCard";
 import { type Fabric } from "@/data/products";
 import { useCategories } from "@/hooks/useCategories";
@@ -14,6 +13,7 @@ import {
   type ShopSearch,
 } from "@/lib/shop-filters";
 import { SlidersHorizontal, X } from "lucide-react";
+import { StorefrontPageHeader } from "@/components/StorefrontPageHeader";
 
 export const Route = createFileRoute("/shop")({
   validateSearch: (s) => parseShopSearch(s),
@@ -62,25 +62,21 @@ function Shop() {
 
   return (
     <div className="px-4 md:px-6">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="glass-strong rounded-[2rem] p-6 md:p-10 mb-6"
+      <StorefrontPageHeader
+        eyebrow="All pieces"
+        heading={
+          <>
+            The <span className="font-script text-primary">Collection</span>
+          </>
+        }
+        subtitle="Considered, organic, and made to be loved beyond a single season."
       >
-        <div className="text-xs uppercase tracking-[0.28em] text-primary">All pieces</div>
-        <h1 className="font-display text-3xl md:text-5xl mt-2">
-          The <span className="font-script text-primary">Collection</span>
-        </h1>
-        <p className="mt-3 text-muted-foreground max-w-xl">
-          Considered, organic, and made to be loved beyond a single season.
-        </p>
-        {activeFilters && (
-          <p className="mt-3 text-sm text-primary">
+        {activeFilters ? (
+          <p className="mt-2 text-sm text-primary">
             Showing {filtered.length} {filtered.length === 1 ? "piece" : "pieces"} matching your filters.
           </p>
-        )}
-      </motion.div>
+        ) : null}
+      </StorefrontPageHeader>
 
       <div className="flex flex-wrap items-center gap-3 mb-6">
         <button
@@ -138,7 +134,7 @@ function Shop() {
         </select>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-5">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
         {filtered.map((p, i) => (
           <ProductCard key={p.id} product={p} index={i} />
         ))}

@@ -325,8 +325,12 @@ function assertValidSiteSettings(row: SiteSettingsRow) {
   if (errors.length) throw new Error(errors.join("\n"));
 }
 
+function ensureArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
 async function listAdmin<T>(resource: string) {
-  return api.get<T[]>(adminPath(resource), { auth: true });
+  return ensureArray<T>(await api.get<T[]>(adminPath(resource), { auth: true }));
 }
 
 async function createAdmin<T>(resource: string, payload: unknown) {
@@ -384,7 +388,9 @@ const toCategoryDto = (row: CategoryRow): CategoryDto => ({
 export const listCategories = (admin = false) =>
   admin
     ? listAdmin<CategoryDto>("categories").then((rows) => rows.map(fromCategoryDto))
-    : api.get<CategoryDto[]>("/api/v1/categories").then((rows) => rows.map(fromCategoryDto));
+    : api
+        .get<CategoryDto[]>("/api/v1/categories")
+        .then((rows) => ensureArray<CategoryDto>(rows).map(fromCategoryDto));
 
 export const saveCategory = (row: CategoryRow) => {
   assertValidCategory(row);
@@ -534,7 +540,7 @@ const toProductDto = (row: ProductRow): ProductDto => ({
 
 export const listProducts = (admin = false) =>
   (admin ? listAdmin<ProductDto>("products") : api.get<ProductDto[]>("/api/v1/products")).then(
-    (rows) => rows.map(fromProductDto),
+    (rows) => ensureArray<ProductDto>(rows).map(fromProductDto),
   );
 
 export const saveProduct = (row: ProductRow) => {
@@ -620,7 +626,7 @@ export const listBlogPosts = (admin = false) =>
   (admin
     ? listAdmin<BlogPostDto>("blog-posts")
     : api.get<BlogPostDto[]>("/api/v1/blog-posts")
-  ).then((rows) => rows.map(fromBlogPostDto));
+  ).then((rows) => ensureArray<BlogPostDto>(rows).map(fromBlogPostDto));
 
 export const getBlogPost = (slug: string) =>
   api
@@ -692,7 +698,7 @@ const toBannerDto = (row: BannerRow): BannerDto => ({
 
 export const listBanners = (admin = false) =>
   (admin ? listAdmin<BannerDto>("banners") : api.get<BannerDto[]>("/api/v1/banners")).then((rows) =>
-    rows.map(fromBannerDto),
+    ensureArray<BannerDto>(rows).map(fromBannerDto),
   );
 
 export const saveBanner = (row: BannerRow) => {
@@ -756,7 +762,7 @@ export const listHomeSections = (admin = false) =>
   (admin
     ? listAdmin<HomeSectionDto>("home-sections")
     : api.get<HomeSectionDto[]>("/api/v1/home-sections")
-  ).then((rows) => rows.map(fromHomeSectionDto));
+  ).then((rows) => ensureArray<HomeSectionDto>(rows).map(fromHomeSectionDto));
 
 export const saveHomeSection = (row: HomeSectionRow) => {
   assertValidHomeSection(row);
@@ -788,7 +794,7 @@ export const listPageVisibility = (admin = false) =>
   (admin
     ? listAdmin<PageVisibilityDto>("page-visibility")
     : api.get<PageVisibilityDto[]>("/api/v1/page-visibility")
-  ).then((rows) => rows.map(fromPageVisibilityDto));
+  ).then((rows) => ensureArray<PageVisibilityDto>(rows).map(fromPageVisibilityDto));
 
 export const savePageVisibility = (row: PageVisibilityRow) =>
   updateAdmin<PageVisibilityDto>("page-visibility", row.id, toPageVisibilityDto(row)).then(

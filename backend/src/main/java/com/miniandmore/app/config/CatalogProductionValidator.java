@@ -18,7 +18,8 @@ public class CatalogProductionValidator {
         JHipsterProperties jHipsterProperties,
         ApplicationProperties applicationProperties,
         @org.springframework.beans.factory.annotation.Value("${razorpay.key-id:DEMO}") String razorpayKeyId,
-        @org.springframework.beans.factory.annotation.Value("${razorpay.key-secret:}") String razorpayKeySecret
+        @org.springframework.beans.factory.annotation.Value("${razorpay.key-secret:}") String razorpayKeySecret,
+        @org.springframework.beans.factory.annotation.Value("${razorpay.payment-demo:false}") boolean razorpayPaymentDemo
     ) {
         if (!environment.acceptsProfiles(Profiles.of("prod"))) {
             return;
@@ -32,6 +33,9 @@ public class CatalogProductionValidator {
         }
         if (StringUtils.isBlank(applicationProperties.getInternalApiKey())) {
             throw new IllegalStateException("application.internal-api-key must be set in production");
+        }
+        if (razorpayPaymentDemo) {
+            return;
         }
         if ("DEMO".equalsIgnoreCase(razorpayKeyId) || StringUtils.isBlank(razorpayKeySecret)) {
             throw new IllegalStateException("razorpay.key-id and razorpay.key-secret must be set in production");

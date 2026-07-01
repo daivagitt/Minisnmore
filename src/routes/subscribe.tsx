@@ -163,10 +163,10 @@ function Subscribe() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="glass-strong rounded-[1.75rem] md:rounded-[2.5rem] p-6 sm:p-8 md:p-12 lg:p-14 flex flex-col justify-center"
+          className="glass-strong rounded-[1.75rem] md:rounded-[2rem] p-5 md:p-8 flex flex-col justify-center"
         >
-          <div className="text-[10px] sm:text-xs uppercase tracking-[0.28em] text-primary">Grow with us</div>
-          <h1 className="font-display text-3xl sm:text-4xl md:text-5xl lg:text-6xl mt-3 text-balance">
+          <div className="text-xs uppercase tracking-[0.28em] text-primary">Grow with us</div>
+          <h1 className="font-display text-3xl md:text-5xl mt-1.5 text-balance">
             {heroTitle.includes("every month") ? (
               <>
                 A soft little box, <span className="font-script text-primary">every month</span>.
@@ -175,8 +175,8 @@ function Subscribe() {
               heroTitle
             )}
           </h1>
-          <p className="mt-3 sm:mt-4 text-sm sm:text-base text-muted-foreground max-w-lg">{heroSubtitle}</p>
-          <div className="mt-5 sm:mt-6 flex flex-wrap gap-2 text-[11px] sm:text-xs">
+          <p className="mt-2 text-sm md:text-base text-muted-foreground max-w-lg">{heroSubtitle}</p>
+          <div className="mt-4 sm:mt-5 flex flex-wrap gap-2 text-[11px] sm:text-xs">
             {badgeRow.map((b) => (
               <span key={b.t} className="glass rounded-full px-3 py-1.5 inline-flex items-center gap-1.5">
                 <b.i className="h-3 w-3 text-primary" /> {b.t}

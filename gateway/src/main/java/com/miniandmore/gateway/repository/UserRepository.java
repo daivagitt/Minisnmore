@@ -62,4 +62,7 @@ public interface UserRepository extends R2dbcRepository<User, Long> {
 
     @Query("SELECT password_hash FROM jhi_user WHERE id = :userId")
     Mono<String> findPasswordHashByUserId(Long userId);
+
+    @Query("SELECT authority_name FROM jhi_user_authority WHERE user_id = :userId")
+    reactor.core.publisher.Flux<String> findAuthorityNamesByUserId(Long userId);
 }

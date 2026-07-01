@@ -66,15 +66,15 @@ function About() {
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7 }}
-        className="relative glass-strong rounded-[2rem] overflow-hidden"
+        className="relative glass-strong rounded-[1.75rem] overflow-hidden"
       >
         <div className="grid md:grid-cols-2 gap-0 items-stretch">
-          <div className="p-8 md:p-14 flex flex-col justify-center">
+          <div className="p-5 md:p-8 flex flex-col justify-center">
             <div className="text-xs uppercase tracking-[0.28em] text-primary">Our story</div>
-            <h1 className="font-display text-4xl md:text-6xl mt-3 text-balance leading-tight">
+            <h1 className="font-display text-3xl md:text-5xl mt-1.5 text-balance leading-tight">
               Crafted with <span className="font-script text-primary">love</span> for your minis.
             </h1>
-            <p className="mt-5 text-base text-foreground/85 leading-relaxed">
+            <p className="mt-3 text-sm md:text-base text-foreground/85 leading-relaxed">
               A baby's skin is incredibly delicate — softer, thinner and far more sensitive than we often realise. What we choose for them in those early days plays a bigger role than we think.
             </p>
           </div>

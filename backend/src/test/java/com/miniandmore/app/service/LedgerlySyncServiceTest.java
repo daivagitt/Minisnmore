@@ -140,6 +140,45 @@ class LedgerlySyncServiceTest {
     }
 
     @Test
+    void syncOrder_retriesWhenLedgerlyInvoicePaymentModeMissing() {
+        CustomerOrder order = order(15L, "ORD-15", LedgerlySyncStatus.PENDING);
+        when(customerOrderRepository.findById(15L)).thenReturn(Optional.of(order));
+        when(ledgerlyClient.syncOrderPayload(any(), eq("pay_15")))
+            .thenThrow(
+                new RuntimeException(
+                    "500 on POST /invoices/1058/payments invoicePaymentRequest \"mode\" must not be null"
+                )
+            )
+            .thenReturn(Map.of("idempotent", true, "ledgerlyInvoiceId", "inv-15"));
+        when(customerOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.syncOrder(15L);
+
+        assertThat(order.getLedgerlySyncStatus()).isEqualTo(LedgerlySyncStatus.SYNCED);
+        assertThat(order.getLedgerlyInvoiceId()).isEqualTo("inv-15");
+        verify(ledgerlyClient, times(2)).syncOrderPayload(any(), eq("pay_15"));
+    }
+
+    @Test
+    void shouldRetryAfterInvoicePaymentFailure_matchesLedgerlyModeValidationError() {
+        assertThat(
+            LedgerlySyncService.shouldRetryAfterInvoicePaymentFailure(
+                new RuntimeException(
+                    "400 on POST http://sales/api/invoices/1058/payments invoicePaymentRequest fieldErrors \"mode\" must not be null"
+                )
+            )
+        ).isTrue();
+        assertThat(
+            LedgerlySyncService.shouldRetryAfterInvoicePaymentFailure(
+                new RuntimeException(
+                    "500 Internal Server Error: \"{\\\"fieldErrors\\\":[{\\\"field\\\":\\\"mode\\\",\\\"message\\\":\\\"must not be null\\\",\\\"objectName\\\":\\\"invoicePaymentRequest\\\"}]}\", path=/api/invoices/1074/payments"
+                )
+            )
+        ).isTrue();
+        assertThat(LedgerlySyncService.shouldRetryAfterInvoicePaymentFailure(new RuntimeException("upstream timeout"))).isFalse();
+    }
+
+    @Test
     void pullOrderTracking_whenFound_updatesStatus() {
         CustomerOrder order = order(11L, "ORD-11", LedgerlySyncStatus.SYNCED);
         when(customerOrderRepository.findById(11L)).thenReturn(Optional.of(order));
