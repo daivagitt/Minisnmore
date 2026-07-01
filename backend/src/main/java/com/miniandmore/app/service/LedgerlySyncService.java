@@ -268,7 +268,7 @@ public class LedgerlySyncService {
         productMergeService.mergeLedgerlyItem(
             product,
             item,
-            categoryName -> categoryResolver.resolve(categoryName, autoCreateCategory),
+            categoryName -> categoryResolver.resolve(categoryName),
             (noticeSku, message) -> {
                 if (created) {
                     builder.notice(noticeSku, message);

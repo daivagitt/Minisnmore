@@ -39,14 +39,12 @@ class LedgerlyProductMergeServiceTest {
             .stock(10)
             .compareAtPrice(BigDecimal.valueOf(699))
             .fabricType("Cotton")
-            .taxPct(BigDecimal.valueOf(18))
             .description("Soft");
 
         Map<String, Object> payload = mergeService.buildPushPayload(product, "Baby");
 
         assertThat(payload.get("sku")).isEqualTo("MNM-1");
         assertThat(payload.get("unit")).isEqualTo("ea");
-        assertThat(payload.get("taxPct")).isEqualTo(BigDecimal.valueOf(18));
         assertThat(payload.get("cost")).isEqualTo(BigDecimal.valueOf(699));
         assertThat(payload.get("imageUrl")).isEqualTo("https://cdn.example.com/p.jpg");
         assertThat(payload.get("description").toString()).contains("Category: Baby").contains("Fabric: Cotton");
@@ -79,7 +77,7 @@ class LedgerlyProductMergeServiceTest {
         assertThat(product.getPrice()).isEqualByComparingTo(BigDecimal.valueOf(499));
         assertThat(product.getStock()).isEqualTo(8);
         assertThat(product.getCompareAtPrice()).isEqualByComparingTo(BigDecimal.valueOf(499));
-        assertThat(product.getTaxPct()).isEqualByComparingTo(BigDecimal.valueOf(12));
+        assertThat(product.getTaxPct()).isNull();
         assertThat(product.getCategory()).isEqualTo(category);
         assertThat(product.getFabricType()).isEqualTo("Organic Cotton");
         assertThat(product.getSizesJson()).contains("0-3M").contains("3-6M");

@@ -17,8 +17,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class LedgerlyProductMergeService {
 
-    private static final BigDecimal DEFAULT_TAX_PCT = BigDecimal.valueOf(5);
-
     private final ProductDescriptionCodec descriptionCodec;
     private final LedgerlyItemImageSync itemImageSync;
 
@@ -54,14 +52,12 @@ public class LedgerlyProductMergeService {
             }
         }
 
-        if (item.get("taxPct") != null) {
-            product.setTaxPct(toBigDecimal(item.get("taxPct")));
-        }
-
         String fabric = firstNonBlank(stringValue(item.get("fabricType")), stringValue(item.get("fabric")));
         if (fabric != null) {
             product.setFabricType(fabric);
         }
+
+        applyAgeFromItem(product, item, decoded);
 
         List<String> sizes = descriptionCodec.parseDelimitedOrJson(stringValue(item.get("sizes")));
         if (!sizes.isEmpty()) {
@@ -99,8 +95,6 @@ public class LedgerlyProductMergeService {
         payload.put("name", product.getName());
         payload.put("price", product.getPrice());
         payload.put("stock", product.getStock());
-        BigDecimal taxPct = product.getTaxPct() != null ? product.getTaxPct() : DEFAULT_TAX_PCT;
-        payload.put("taxPct", taxPct);
         payload.put("unit", "ea");
 
         BigDecimal cost = product.getCompareAtPrice();
@@ -131,6 +125,12 @@ public class LedgerlyProductMergeService {
         }
         if (product.getFabricType() != null && !product.getFabricType().isBlank()) {
             payload.put("fabricType", product.getFabricType().trim());
+        }
+        if (product.getAgeMinMonths() != null) {
+            payload.put("ageMinMonths", product.getAgeMinMonths());
+        }
+        if (product.getAgeMaxMonths() != null) {
+            payload.put("ageMaxMonths", product.getAgeMaxMonths());
         }
 
         String firstImage = itemImageSync.firstImageUrl(product.getImagesJson());
@@ -181,5 +181,38 @@ public class LedgerlyProductMergeService {
             return number.intValue();
         }
         return new BigDecimal(value.toString()).intValue();
+    }
+
+    private void applyAgeFromItem(Product product, Map<String, Object> item, ProductDescriptionCodec.Decoded decoded) {
+        Integer min = intValue(item.get("ageMinMonths"));
+        Integer max = intValue(item.get("ageMaxMonths"));
+        if (min != null) {
+            product.setAgeMinMonths(min);
+        }
+        if (max != null) {
+            product.setAgeMaxMonths(max);
+        }
+        if (min == null && max == null && decoded != null) {
+            if (decoded.ageMinMonths() != null) {
+                product.setAgeMinMonths(decoded.ageMinMonths());
+            }
+            if (decoded.ageMaxMonths() != null) {
+                product.setAgeMaxMonths(decoded.ageMaxMonths());
+            }
+        }
+    }
+
+    private Integer intValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        String text = value.toString().trim();
+        if (text.isEmpty()) {
+            return null;
+        }
+        return new BigDecimal(text).intValue();
     }
 }

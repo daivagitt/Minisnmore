@@ -1,9 +1,7 @@
 package com.miniandmore.app.service;
 
 import com.miniandmore.app.domain.Category;
-import com.miniandmore.app.domain.LedgerlySetting;
 import com.miniandmore.app.repository.CategoryRepository;
-import com.miniandmore.app.repository.LedgerlySettingRepository;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -15,27 +13,27 @@ public class LedgerlyCategoryResolver {
     private static final Pattern NON_SLUG = Pattern.compile("[^a-z0-9]+");
 
     private final CategoryRepository categoryRepository;
-    private final LedgerlySettingRepository ledgerlySettingRepository;
 
-    public LedgerlyCategoryResolver(CategoryRepository categoryRepository, LedgerlySettingRepository ledgerlySettingRepository) {
+    public LedgerlyCategoryResolver(CategoryRepository categoryRepository) {
         this.categoryRepository = categoryRepository;
-        this.ledgerlySettingRepository = ledgerlySettingRepository;
     }
 
+    /** Resolve Ledgerly category name to a store category, creating one when missing. */
     public Optional<Category> resolve(String categoryName) {
-        boolean autoCreate = ledgerlySettingRepository
-            .findFirstByOrderByIdAsc()
-            .map(LedgerlySetting::getPullProductsAutoCreateCategory)
-            .orElse(false);
-        return resolve(categoryName, autoCreate);
+        return resolve(categoryName, true);
     }
 
     public Optional<Category> resolve(String categoryName, boolean autoCreateCategory) {
         if (categoryName == null || categoryName.isBlank()) {
             return Optional.empty();
         }
-        String slug = slugify(categoryName);
+        String trimmed = categoryName.trim();
+        String slug = slugify(trimmed);
         Optional<Category> existing = categoryRepository.findOneBySlug(slug);
+        if (existing.isPresent()) {
+            return existing;
+        }
+        existing = categoryRepository.findOneByNameIgnoreCase(trimmed);
         if (existing.isPresent()) {
             return existing;
         }
@@ -43,7 +41,7 @@ public class LedgerlyCategoryResolver {
             return Optional.empty();
         }
         Category category = new Category();
-        category.setName(categoryName.trim());
+        category.setName(trimmed);
         category.setSlug(uniqueCategorySlug(slug));
         category.setSortOrder(categoryRepository.findAll().size());
         category.setActive(true);

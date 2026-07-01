@@ -48,27 +48,26 @@ public class LedgerlyItemImageSync {
     }
 
     /**
-     * When enabled, download the Ledgerly image URL and upload to R2, then prepend the CDN URL to images_json.
-     * Skips when the URL is already on store CDN or already present in images_json.
+     * Sync Ledgerly's primary image URL onto the product. Replaces slot 0 so repeated pulls do not grow the gallery.
      */
     public void importItemImage(Product product, String sourceUrl) {
         if (sourceUrl == null || sourceUrl.isBlank()) {
             return;
         }
         String trimmed = sourceUrl.trim();
-        if (alreadyInImagesJson(product, trimmed)) {
+        if (alreadyPrimaryImage(product, trimmed)) {
             return;
         }
         if (isOnStoreCdn(trimmed)) {
-            mergeImageUrl(product, trimmed);
+            setPrimaryImage(product, trimmed);
             return;
         }
         if (isEnabled()) {
             try {
                 DownloadedImage downloaded = download(trimmed);
-                String filename = filenameFor(product, trimmed, downloaded.contentType());
+                String filename = filenameFor(product, downloaded.contentType());
                 String publicUrl = s3StorageService.uploadObject("products", filename, downloaded.body(), downloaded.contentType());
-                mergeImageUrl(product, publicUrl);
+                setPrimaryImage(product, publicUrl);
                 return;
             } catch (Exception e) {
                 LOG.warn(
@@ -79,15 +78,7 @@ public class LedgerlyItemImageSync {
                 );
             }
         }
-        passthroughImageUrl(product, trimmed);
-    }
-
-    /** Use Ledgerly's public image URL on the storefront when R2 import is off or fails. */
-    private void passthroughImageUrl(Product product, String sourceUrl) {
-        if (sourceUrl == null || sourceUrl.isBlank()) {
-            return;
-        }
-        mergeImageUrl(product, sourceUrl.trim());
+        setPrimaryImage(product, trimmed);
     }
 
     /** First image URL from images_json for push to Ledgerly (prefer store CDN URL). */
@@ -103,18 +94,27 @@ public class LedgerlyItemImageSync {
         }
     }
 
-    private void mergeImageUrl(Product product, String publicUrl) {
-        List<String> images = new ArrayList<>();
-        if (product.getImagesJson() != null && !product.getImagesJson().isBlank()) {
-            try {
-                images = new ArrayList<>(objectMapper.readValue(product.getImagesJson(), new TypeReference<List<String>>() {}));
-            } catch (Exception ignored) {
-                // unparseable existing value — start fresh
-            }
+    private void setPrimaryImage(Product product, String url) {
+        writeImages(product, List.of(url));
+    }
+
+    private boolean alreadyPrimaryImage(Product product, String url) {
+        List<String> images = readImages(product);
+        return !images.isEmpty() && url.equals(images.get(0));
+    }
+
+    private List<String> readImages(Product product) {
+        if (product.getImagesJson() == null || product.getImagesJson().isBlank()) {
+            return new ArrayList<>();
         }
-        if (!images.contains(publicUrl)) {
-            images.add(0, publicUrl);
+        try {
+            return new ArrayList<>(objectMapper.readValue(product.getImagesJson(), new TypeReference<List<String>>() {}));
+        } catch (Exception ignored) {
+            return new ArrayList<>();
         }
+    }
+
+    private void writeImages(Product product, List<String> images) {
         try {
             product.setImagesJson(objectMapper.writeValueAsString(images));
         } catch (Exception e) {
@@ -129,18 +129,6 @@ public class LedgerlyItemImageSync {
         }
         String normalizedBase = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
         return url.startsWith(normalizedBase + "/") || url.equals(normalizedBase);
-    }
-
-    private boolean alreadyInImagesJson(Product product, String url) {
-        if (product.getImagesJson() == null || product.getImagesJson().isBlank()) {
-            return false;
-        }
-        try {
-            List<String> images = objectMapper.readValue(product.getImagesJson(), new TypeReference<List<String>>() {});
-            return images.contains(url);
-        } catch (Exception ignored) {
-            return false;
-        }
     }
 
     private DownloadedImage download(String url) throws IOException, InterruptedException {
@@ -181,12 +169,8 @@ public class LedgerlyItemImageSync {
         return "image/jpeg";
     }
 
-    private String filenameFor(Product product, String sourceUrl, String contentType) {
-        String path = URI.create(sourceUrl).getPath();
-        String name = path.contains("/") ? path.substring(path.lastIndexOf('/') + 1) : "";
-        if (!name.isBlank() && name.contains(".")) {
-            return sanitizeFilename(name);
-        }
+    /** Stable per-SKU filename so re-pull overwrites the same R2 object instead of appending new URLs. */
+    private String filenameFor(Product product, String contentType) {
         String sku = product.getSku() != null && !product.getSku().isBlank() ? product.getSku() : "item";
         String ext = switch (contentType) {
             case "image/png" -> "png";
