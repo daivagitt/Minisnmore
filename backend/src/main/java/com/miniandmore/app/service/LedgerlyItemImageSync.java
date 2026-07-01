@@ -52,29 +52,42 @@ public class LedgerlyItemImageSync {
      * Skips when the URL is already on store CDN or already present in images_json.
      */
     public void importItemImage(Product product, String sourceUrl) {
-        if (!isEnabled()) {
-            return;
-        }
         if (sourceUrl == null || sourceUrl.isBlank()) {
             return;
         }
         String trimmed = sourceUrl.trim();
-        if (isOnStoreCdn(trimmed) || alreadyInImagesJson(product, trimmed)) {
+        if (alreadyInImagesJson(product, trimmed)) {
             return;
         }
-        try {
-            DownloadedImage downloaded = download(trimmed);
-            String filename = filenameFor(product, trimmed, downloaded.contentType());
-            String publicUrl = s3StorageService.uploadObject("products", filename, downloaded.body(), downloaded.contentType());
-            mergeImageUrl(product, publicUrl);
-        } catch (Exception e) {
-            LOG.warn(
-                "Ledgerly image import failed for product {} ({}): {}",
-                product.getId(),
-                product.getSku(),
-                e.getMessage()
-            );
+        if (isOnStoreCdn(trimmed)) {
+            mergeImageUrl(product, trimmed);
+            return;
         }
+        if (isEnabled()) {
+            try {
+                DownloadedImage downloaded = download(trimmed);
+                String filename = filenameFor(product, trimmed, downloaded.contentType());
+                String publicUrl = s3StorageService.uploadObject("products", filename, downloaded.body(), downloaded.contentType());
+                mergeImageUrl(product, publicUrl);
+                return;
+            } catch (Exception e) {
+                LOG.warn(
+                    "Ledgerly image import failed for product {} ({}): {}",
+                    product.getId(),
+                    product.getSku(),
+                    e.getMessage()
+                );
+            }
+        }
+        passthroughImageUrl(product, trimmed);
+    }
+
+    /** Use Ledgerly's public image URL on the storefront when R2 import is off or fails. */
+    private void passthroughImageUrl(Product product, String sourceUrl) {
+        if (sourceUrl == null || sourceUrl.isBlank()) {
+            return;
+        }
+        mergeImageUrl(product, sourceUrl.trim());
     }
 
     /** First image URL from images_json for push to Ledgerly (prefer store CDN URL). */

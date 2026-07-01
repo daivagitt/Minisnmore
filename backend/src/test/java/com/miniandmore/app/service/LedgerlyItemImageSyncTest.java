@@ -31,25 +31,27 @@ class LedgerlyItemImageSyncTest {
     }
 
     @Test
-    void importItemImage_whenDisabled_doesNothing() {
+    void importItemImage_whenDisabled_passthroughsLedgerlyUrl() throws Exception {
         applicationProperties.getLedgerly().setSyncProductImages(false);
         Product product = new Product().sku("SKU-1");
 
         itemImageSync.importItemImage(product, "https://external.example.com/a.jpg");
 
         verifyNoInteractions(s3StorageService);
-        assertThat(product.getImagesJson()).isNull();
+        assertThat(new ObjectMapper().readValue(product.getImagesJson(), String[].class))
+            .containsExactly("https://external.example.com/a.jpg");
     }
 
     @Test
-    void importItemImage_whenAlreadyOnCdn_skipsUpload() {
+    void importItemImage_whenAlreadyOnCdn_skipsUploadAndLinksUrl() throws Exception {
         applicationProperties.getLedgerly().setSyncProductImages(true);
         Product product = new Product().sku("SKU-1");
 
         itemImageSync.importItemImage(product, "https://cdn.example.com/uat/products/existing.jpg");
 
         verifyNoInteractions(s3StorageService);
-        assertThat(product.getImagesJson()).isNull();
+        assertThat(new ObjectMapper().readValue(product.getImagesJson(), String[].class))
+            .containsExactly("https://cdn.example.com/uat/products/existing.jpg");
     }
 
     @Test
