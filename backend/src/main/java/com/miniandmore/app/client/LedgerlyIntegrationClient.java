@@ -1,5 +1,7 @@
 package com.miniandmore.app.client;
 
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.http.MediaType;
@@ -47,10 +49,19 @@ public class LedgerlyIntegrationClient {
     }
 
     public Optional<String> createCreditNote(String externalRef, String returnNumber) {
+        return createCreditNote(externalRef, returnNumber, null);
+    }
+
+    public Optional<String> createCreditNote(String externalRef, String returnNumber, BigDecimal amount) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("returnNumber", returnNumber);
+        if (amount != null) {
+            body.put("amount", amount);
+        }
         @SuppressWarnings("unchecked")
         Map<String, String> response = post(
             "/v1/integrations/commerce/orders/" + externalRef + "/credit-notes",
-            Map.of("returnNumber", returnNumber)
+            body
         );
         if (response == null) {
             return Optional.empty();

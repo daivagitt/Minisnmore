@@ -176,7 +176,7 @@ public class OrderReturnService {
             if (StringUtils.isBlank(orderReturn.getLedgerlyCreditNoteId())) {
                 try {
                     ledgerlyIntegrationClient
-                        .createCreditNote(order.getOrderNumber(), orderReturn.getReturnNumber())
+                        .createCreditNote(order.getOrderNumber(), orderReturn.getReturnNumber(), refundAmount)
                         .ifPresent(orderReturn::setLedgerlyCreditNoteId);
                 } catch (RuntimeException e) {
                     LOG.warn("Ledgerly credit note failed for return {}: {}", orderReturn.getReturnNumber(), e.getMessage());

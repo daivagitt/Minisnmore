@@ -14,6 +14,7 @@ import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.CustomerProfileRepository;
 import com.miniandmore.app.repository.LedgerlySettingRepository;
 import com.miniandmore.app.repository.ProductRepository;
+import com.miniandmore.app.repository.SiteSettingRepository;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -53,12 +54,16 @@ class LedgerlySyncServiceTest {
     @Mock
     private LedgerlyCategoryResolver categoryResolver;
 
+    @Mock
+    private SiteSettingRepository siteSettingRepository;
+
     @InjectMocks
     private LedgerlySyncService service;
 
     @BeforeEach
     void stubMergeService() {
         when(customerProfileRepository.findOneByUserLogin(any())).thenReturn(Optional.empty());
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
         when(productMergeService.buildPushPayload(any(), any()))
             .thenAnswer(inv -> {
                 Product p = inv.getArgument(0);
@@ -205,6 +210,25 @@ class LedgerlySyncServiceTest {
         service.pullOrderTracking(12L);
 
         verify(customerOrderRepository, never()).save(any());
+    }
+
+    @Test
+    void buildOrderPayload_includesAuthoritativeTotals() {
+        CustomerOrder order = order(40L, "ORD-TAX", LedgerlySyncStatus.PENDING);
+        order.subtotal(new BigDecimal("399"));
+        order.shipping(new BigDecimal("1"));
+        order.tax(new BigDecimal("4"));
+        order.total(new BigDecimal("404"));
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "buildOrderPayload", order);
+
+        assertThat(payload.get("subtotal")).isEqualTo(new BigDecimal("399"));
+        assertThat(payload.get("shipping")).isEqualTo(new BigDecimal("1"));
+        assertThat(payload.get("tax")).isEqualTo(new BigDecimal("4"));
+        assertThat(payload.get("total")).isEqualTo(new BigDecimal("404"));
+        assertThat(payload.get("pricesIncludeGst")).isEqualTo(true);
     }
 
     @Test

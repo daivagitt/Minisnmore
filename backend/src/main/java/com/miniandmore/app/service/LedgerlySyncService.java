@@ -11,6 +11,7 @@ import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.CustomerProfileRepository;
 import com.miniandmore.app.repository.LedgerlySettingRepository;
 import com.miniandmore.app.repository.ProductRepository;
+import com.miniandmore.app.repository.SiteSettingRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.*;
@@ -31,6 +32,7 @@ public class LedgerlySyncService {
     private final CustomerOrderRepository customerOrderRepository;
     private final CustomerProfileRepository customerProfileRepository;
     private final LedgerlySettingRepository ledgerlySettingRepository;
+    private final SiteSettingRepository siteSettingRepository;
     private final LedgerlyProductMergeService productMergeService;
     private final LedgerlyCategoryResolver categoryResolver;
 
@@ -40,6 +42,7 @@ public class LedgerlySyncService {
         CustomerOrderRepository customerOrderRepository,
         CustomerProfileRepository customerProfileRepository,
         LedgerlySettingRepository ledgerlySettingRepository,
+        SiteSettingRepository siteSettingRepository,
         LedgerlyProductMergeService productMergeService,
         LedgerlyCategoryResolver categoryResolver
     ) {
@@ -48,6 +51,7 @@ public class LedgerlySyncService {
         this.customerOrderRepository = customerOrderRepository;
         this.customerProfileRepository = customerProfileRepository;
         this.ledgerlySettingRepository = ledgerlySettingRepository;
+        this.siteSettingRepository = siteSettingRepository;
         this.productMergeService = productMergeService;
         this.categoryResolver = categoryResolver;
     }
@@ -357,7 +361,13 @@ public class LedgerlySyncService {
     private Map<String, Object> buildOrderPayload(CustomerOrder order) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("externalRef", order.getOrderNumber());
+        payload.put("subtotal", order.getSubtotal());
+        payload.put("discount", order.getDiscount());
+        payload.put("shipping", order.getShipping());
+        payload.put("tax", order.getTax());
+        payload.put("donation", order.getDonation());
         payload.put("total", order.getTotal());
+        payload.put("pricesIncludeGst", pricesIncludeGst());
         payload.put("paymentId", order.getRazorpayPaymentId());
         payload.put("paymentMode", "Razorpay");
         payload.put("currency", "INR");
@@ -369,18 +379,33 @@ public class LedgerlySyncService {
         payload.put("payment", payment);
         Map<String, Object> customer = buildCustomerPayload(order);
         payload.put("customer", customer);
+        BigDecimal lineTaxPct = pricesIncludeGst() ? BigDecimal.ZERO : siteGstRate();
         List<Map<String, Object>> lines = new ArrayList<>();
         for (OrderItem item : order.getItemses()) {
             Map<String, Object> line = new LinkedHashMap<>();
             line.put("sku", item.getProductSlug() != null ? item.getProductSlug() : item.getProductId());
             line.put("qty", item.getQty());
             line.put("rate", item.getPrice());
-            line.put("taxPct", BigDecimal.valueOf(5));
+            line.put("taxPct", lineTaxPct);
             line.put("description", item.getProductName());
             lines.add(line);
         }
         payload.put("lines", lines);
         return payload;
+    }
+
+    private boolean pricesIncludeGst() {
+        return siteSettingRepository
+            .findFirstByOrderByIdAsc()
+            .map(settings -> Boolean.TRUE.equals(settings.getPricesIncludeGst()))
+            .orElse(true);
+    }
+
+    private BigDecimal siteGstRate() {
+        return siteSettingRepository
+            .findFirstByOrderByIdAsc()
+            .map(settings -> settings.getGstRate() != null ? settings.getGstRate() : BigDecimal.valueOf(5))
+            .orElse(BigDecimal.valueOf(5));
     }
 
     private Map<String, Object> buildCustomerPayload(CustomerOrder order) {
