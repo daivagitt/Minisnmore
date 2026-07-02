@@ -108,6 +108,7 @@ public class InternalAccountOrderResource {
         profile.setFullName(StringUtils.trimToNull(request.full_name()));
         profile.setPhone(StringUtils.trimToNull(request.phone()));
         dataAccess.customerProfileRepository().save(profile);
+        ledgerlySyncService.syncCustomerProfileAsync(login);
         return ApiResponse.ok(Map.of("ok", true));
     }
 

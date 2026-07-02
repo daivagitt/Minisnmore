@@ -11,6 +11,7 @@ import com.miniandmore.app.domain.Product;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import com.miniandmore.app.repository.CategoryRepository;
 import com.miniandmore.app.repository.CustomerOrderRepository;
+import com.miniandmore.app.repository.CustomerProfileRepository;
 import com.miniandmore.app.repository.LedgerlySettingRepository;
 import com.miniandmore.app.repository.ProductRepository;
 import java.math.BigDecimal;
@@ -41,6 +42,9 @@ class LedgerlySyncServiceTest {
     private CustomerOrderRepository customerOrderRepository;
 
     @Mock
+    private CustomerProfileRepository customerProfileRepository;
+
+    @Mock
     private LedgerlySettingRepository ledgerlySettingRepository;
 
     @Mock
@@ -54,6 +58,7 @@ class LedgerlySyncServiceTest {
 
     @BeforeEach
     void stubMergeService() {
+        when(customerProfileRepository.findOneByUserLogin(any())).thenReturn(Optional.empty());
         when(productMergeService.buildPushPayload(any(), any()))
             .thenAnswer(inv -> {
                 Product p = inv.getArgument(0);

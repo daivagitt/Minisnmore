@@ -75,6 +75,10 @@ public class LedgerlyIntegrationClient {
         return post("/v1/integrations/commerce/inventory/pull", Map.of());
     }
 
+    public Map<String, Object> syncCustomerPayload(Map<String, Object> payload) {
+        return post("/v1/integrations/commerce/customers/sync", payload);
+    }
+
     public Map<String, Object> syncOrderPayload(Map<String, Object> payload, String idempotencyKey) {
         RestClient.RequestBodySpec spec = authorizedPost("/v1/integrations/commerce/orders/sync").contentType(MediaType.APPLICATION_JSON);
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {

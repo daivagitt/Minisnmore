@@ -2,11 +2,13 @@ package com.miniandmore.app.service;
 
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
 import com.miniandmore.app.domain.CustomerOrder;
+import com.miniandmore.app.domain.CustomerProfile;
 import com.miniandmore.app.domain.LedgerlySetting;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.Product;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import com.miniandmore.app.repository.CustomerOrderRepository;
+import com.miniandmore.app.repository.CustomerProfileRepository;
 import com.miniandmore.app.repository.LedgerlySettingRepository;
 import com.miniandmore.app.repository.ProductRepository;
 import java.math.BigDecimal;
@@ -27,6 +29,7 @@ public class LedgerlySyncService {
     private final LedgerlyIntegrationClient ledgerlyClient;
     private final ProductRepository productRepository;
     private final CustomerOrderRepository customerOrderRepository;
+    private final CustomerProfileRepository customerProfileRepository;
     private final LedgerlySettingRepository ledgerlySettingRepository;
     private final LedgerlyProductMergeService productMergeService;
     private final LedgerlyCategoryResolver categoryResolver;
@@ -35,6 +38,7 @@ public class LedgerlySyncService {
         LedgerlyIntegrationClient ledgerlyClient,
         ProductRepository productRepository,
         CustomerOrderRepository customerOrderRepository,
+        CustomerProfileRepository customerProfileRepository,
         LedgerlySettingRepository ledgerlySettingRepository,
         LedgerlyProductMergeService productMergeService,
         LedgerlyCategoryResolver categoryResolver
@@ -42,6 +46,7 @@ public class LedgerlySyncService {
         this.ledgerlyClient = ledgerlyClient;
         this.productRepository = productRepository;
         this.customerOrderRepository = customerOrderRepository;
+        this.customerProfileRepository = customerProfileRepository;
         this.ledgerlySettingRepository = ledgerlySettingRepository;
         this.productMergeService = productMergeService;
         this.categoryResolver = categoryResolver;
@@ -68,6 +73,23 @@ public class LedgerlySyncService {
                     product.setLedgerlySyncStatus(LedgerlySyncStatus.FAILED);
                     product.setLedgerlySyncError(e.getMessage());
                     productRepository.save(product);
+                }
+            });
+    }
+
+    @Async
+    public void syncCustomerProfileAsync(String userLogin) {
+        syncCustomerProfile(userLogin);
+    }
+
+    public void syncCustomerProfile(String userLogin) {
+        customerProfileRepository
+            .findOneByUserLogin(userLogin)
+            .ifPresent(profile -> {
+                try {
+                    ledgerlyClient.syncCustomerPayload(buildCustomerPayload(userLogin, profile));
+                } catch (Exception e) {
+                    LOG.warn("Ledgerly customer sync failed for {}: {}", userLogin, e.getMessage());
                 }
             });
     }
@@ -345,10 +367,7 @@ public class LedgerlySyncService {
         payment.put("reference", order.getRazorpayPaymentId());
         payment.put("amount", order.getTotal());
         payload.put("payment", payment);
-        Map<String, Object> customer = new LinkedHashMap<>();
-        customer.put("name", order.getUserLogin());
-        customer.put("email", order.getUserLogin());
-        customer.put("shippingAddress", order.getShippingAddressJson());
+        Map<String, Object> customer = buildCustomerPayload(order);
         payload.put("customer", customer);
         List<Map<String, Object>> lines = new ArrayList<>();
         for (OrderItem item : order.getItemses()) {
@@ -362,5 +381,30 @@ public class LedgerlySyncService {
         }
         payload.put("lines", lines);
         return payload;
+    }
+
+    private Map<String, Object> buildCustomerPayload(CustomerOrder order) {
+        CustomerProfile profile = customerProfileRepository.findOneByUserLogin(order.getUserLogin()).orElse(null);
+        return buildCustomerPayload(order.getUserLogin(), profile, order.getShippingAddressJson());
+    }
+
+    private Map<String, Object> buildCustomerPayload(String userLogin, CustomerProfile profile) {
+        return buildCustomerPayload(userLogin, profile, null);
+    }
+
+    private Map<String, Object> buildCustomerPayload(String userLogin, CustomerProfile profile, String shippingAddressJson) {
+        Map<String, Object> customer = new LinkedHashMap<>();
+        String name = profile != null && profile.getFullName() != null && !profile.getFullName().isBlank()
+            ? profile.getFullName()
+            : userLogin;
+        customer.put("name", name);
+        customer.put("email", userLogin);
+        if (profile != null && profile.getPhone() != null && !profile.getPhone().isBlank()) {
+            customer.put("phone", profile.getPhone());
+        }
+        if (shippingAddressJson != null && !shippingAddressJson.isBlank()) {
+            customer.put("shippingAddress", shippingAddressJson);
+        }
+        return customer;
     }
 }
