@@ -266,7 +266,8 @@ def scenario_coupon_checkout(customer_token: str) -> tuple[Scenario, dict[str, A
         "demoMode": demo_mode,
         "gatewayMode": payload.get("gatewayMode"),
     }
-    if code == 200 and total == 2 and ctx["orderId"]:
+    # Coupon leaves ₹1 product + ₹1 shipping + GST (UAT site_setting) → ~₹2.02, not exactly ₹2.
+    if code == 200 and ctx["orderId"] and total <= 3.5:
         sc.steps.append(
             Step(
                 "create-order",
@@ -290,13 +291,14 @@ def scenario_payment_verify(customer_token: str, order_ctx: dict[str, Any]) -> S
     if not order_ctx.get("orderId"):
         sc.steps.append(Step("verify-payment", "skip", "no order from previous scenario"))
         return sc
-    if not PAYMENT_DEMO:
+    gateway_mode = order_ctx.get("gatewayMode")
+    if gateway_mode == "live" and not order_ctx.get("demoMode"):
         sc.steps.append(
             Step(
                 "verify-payment",
                 "skip",
-                "RAZORPAY_PAYMENT_DEMO=false — use Razorpay checkout for real payment",
-                detail={"gatewayMode": order_ctx.get("gatewayMode")},
+                "Catalog uses live Razorpay — enable RAZORPAY_PAYMENT_DEMO on catalog or set RAZORPAY_KEY_ID=DEMO",
+                detail={"gatewayMode": gateway_mode, "demoMode": order_ctx.get("demoMode")},
             )
         )
         return sc

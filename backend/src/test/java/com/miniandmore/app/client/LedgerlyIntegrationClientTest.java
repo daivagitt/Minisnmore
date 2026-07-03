@@ -111,4 +111,37 @@ class LedgerlyIntegrationClientTest {
         assertThat(response).containsEntry("found", true).containsEntry("status", "shipped");
         server.verify();
     }
+
+    @Test
+    void syncCustomerPayload_postsCustomerBody() {
+        when(credentials.baseUrl()).thenReturn("http://ledgerly.test/api");
+        when(credentials.token()).thenReturn("lt_test");
+
+        server
+            .expect(requestTo("http://ledgerly.test/api/v1/integrations/commerce/customers/sync"))
+            .andExpect(header("Authorization", "Bearer lt_test"))
+            .andExpect(content().json("{\"email\":\"buyer@example.com\",\"name\":\"Buyer\"}"))
+            .andRespond(withSuccess("{\"ledgerlyContactId\":\"contact-1\"}", MediaType.APPLICATION_JSON));
+
+        Map<String, Object> response = client.syncCustomerPayload(Map.of("email", "buyer@example.com", "name", "Buyer"));
+
+        assertThat(response).containsEntry("ledgerlyContactId", "contact-1");
+        server.verify();
+    }
+
+    @Test
+    void createCreditNote_withAmount_includesAmountInBody() {
+        when(credentials.baseUrl()).thenReturn("http://ledgerly.test/api");
+        when(credentials.token()).thenReturn("lt_test");
+
+        server
+            .expect(requestTo("http://ledgerly.test/api/v1/integrations/commerce/orders/ORD-1/credit-notes"))
+            .andExpect(content().json("{\"returnNumber\":\"RET-ORD-1\",\"amount\":52.52}"))
+            .andRespond(withSuccess("{\"ledgerlyCreditNoteId\":\"cn-99\"}", MediaType.APPLICATION_JSON));
+
+        Optional<String> id = client.createCreditNote("ORD-1", "RET-ORD-1", new java.math.BigDecimal("52.52"));
+
+        assertThat(id).contains("cn-99");
+        server.verify();
+    }
 }

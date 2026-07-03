@@ -137,4 +137,40 @@ class LedgerlyProductMergeServiceTest {
         assertThat(product.getFabricType()).isEqualTo("Wool");
         assertThat(product.getDescription()).isEqualTo("Body text");
     }
+
+    @Test
+    void mergeLedgerlyItem_importsImageWhenPresent() {
+        Product product = new Product().sku("SKU-1").price(BigDecimal.ZERO).stock(0);
+        Map<String, Object> item = Map.of("price", 100, "stock", 1, "imageUrl", "https://ledgerly.example.com/item.jpg");
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+
+        verify(itemImageSync).importItemImage(product, "https://ledgerly.example.com/item.jpg");
+    }
+
+    @Test
+    void mergeLedgerlyItem_appliesAgeFromItemFields() {
+        Product product = new Product().sku("SKU-1").price(BigDecimal.ZERO).stock(0);
+        Map<String, Object> item = Map.of("price", 100, "stock", 1, "ageMinMonths", 0, "ageMaxMonths", 6);
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+
+        assertThat(product.getAgeMinMonths()).isEqualTo(0);
+        assertThat(product.getAgeMaxMonths()).isEqualTo(6);
+    }
+
+    @Test
+    void buildPushPayload_usesCompareAtForCostWhenPresent() {
+        when(itemImageSync.firstImageUrl(any())).thenReturn(null);
+        Product product = new Product()
+            .sku("MNM-2")
+            .name("Onesie")
+            .price(BigDecimal.valueOf(499))
+            .compareAtPrice(BigDecimal.valueOf(699))
+            .stock(10);
+
+        Map<String, Object> payload = mergeService.buildPushPayload(product, "Baby");
+
+        assertThat(payload.get("cost")).isEqualTo(BigDecimal.valueOf(699));
+    }
 }

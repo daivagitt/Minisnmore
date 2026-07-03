@@ -64,6 +64,9 @@ public class InternalAccountOrderResource {
     @Value("${razorpay.key-secret:}")
     private String razorpayKeySecret;
 
+    @Value("${razorpay.payment-demo:false}")
+    private boolean razorpayPaymentDemo;
+
     public InternalAccountOrderResource(
         AccountOrderDataAccess dataAccess,
         ObjectMapper objectMapper,
@@ -705,7 +708,9 @@ public class InternalAccountOrderResource {
     }
 
     private boolean isDemoMode() {
-        return "DEMO".equalsIgnoreCase(StringUtils.trimToEmpty(razorpayKeyId));
+        return razorpayPaymentDemo
+            || "DEMO".equalsIgnoreCase(StringUtils.trimToEmpty(razorpayKeyId))
+            || StringUtils.isBlank(StringUtils.trimToEmpty(razorpayKeySecret));
     }
 
     private String gatewayMode() {

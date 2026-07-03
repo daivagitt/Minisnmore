@@ -6,10 +6,11 @@ import static org.mockito.Mockito.*;
 
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
 import com.miniandmore.app.domain.CustomerOrder;
+import com.miniandmore.app.domain.CustomerProfile;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.Product;
+import com.miniandmore.app.domain.SiteSetting;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
-import com.miniandmore.app.repository.CategoryRepository;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.CustomerProfileRepository;
 import com.miniandmore.app.repository.LedgerlySettingRepository;
@@ -263,6 +264,105 @@ class LedgerlySyncServiceTest {
         assertThat(result).containsEntry("successCount", 2).containsEntry("failureCount", 0);
         assertThat((List<?>) result.get("failures")).isEmpty();
         assertThat(bad.getLedgerlySyncStatus()).isEqualTo(LedgerlySyncStatus.FAILED);
+    }
+
+    @Test
+    void syncCustomerProfile_success_callsLedgerlyClient() {
+        CustomerProfile profile = new CustomerProfile().userLogin("buyer@example.com").fullName("Buyer").phone("9999999999");
+        when(customerProfileRepository.findOneByUserLogin("buyer@example.com")).thenReturn(Optional.of(profile));
+
+        service.syncCustomerProfile("buyer@example.com");
+
+        verify(ledgerlyClient).syncCustomerPayload(
+            org.mockito.ArgumentMatchers.argThat(payload ->
+                "buyer@example.com".equals(payload.get("email")) &&
+                "Buyer".equals(payload.get("name")) &&
+                "9999999999".equals(payload.get("phone"))
+            )
+        );
+    }
+
+    @Test
+    void syncCustomerProfile_missingProfile_doesNothing() {
+        when(customerProfileRepository.findOneByUserLogin("missing@example.com")).thenReturn(Optional.empty());
+
+        service.syncCustomerProfile("missing@example.com");
+
+        verify(ledgerlyClient, never()).syncCustomerPayload(any());
+    }
+
+    @Test
+    void buildOrderPayload_includesCustomerPaymentAndLineTax() {
+        CustomerOrder order = order(50L, "MNM-50", LedgerlySyncStatus.PENDING);
+        order.subtotal(new BigDecimal("399"));
+        order.shipping(new BigDecimal("1"));
+        order.tax(new BigDecimal("4"));
+        order.total(new BigDecimal("404"));
+        order.shippingAddressJson("{\"city\":\"Hyderabad\"}");
+        CustomerProfile profile = new CustomerProfile().userLogin("customer1").fullName("Test Buyer").phone("9876543210");
+        SiteSetting settings = new SiteSetting().pricesIncludeGst(false).gstRate(new BigDecimal("5"));
+        when(customerProfileRepository.findOneByUserLogin("customer1")).thenReturn(Optional.of(profile));
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.of(settings));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "buildOrderPayload", order);
+
+        assertThat(payload.get("paymentMode")).isEqualTo("Razorpay");
+        assertThat(payload.get("pricesIncludeGst")).isEqualTo(false);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payment = (Map<String, Object>) payload.get("payment");
+        assertThat(payment.get("mode")).isEqualTo("Razorpay");
+        assertThat(payment.get("paymentId")).isEqualTo("pay_50");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> customer = (Map<String, Object>) payload.get("customer");
+        assertThat(customer.get("name")).isEqualTo("Test Buyer");
+        assertThat(customer.get("phone")).isEqualTo("9876543210");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> lines = (List<Map<String, Object>>) payload.get("lines");
+        assertThat(lines).hasSize(1);
+        assertThat(lines.get(0).get("taxPct")).isEqualTo(new BigDecimal("5"));
+    }
+
+    @Test
+    void syncOrder_doesNotRetryOnInvoiceCreationFailure() {
+        CustomerOrder order = order(16L, "ORD-16", LedgerlySyncStatus.PENDING);
+        when(customerOrderRepository.findById(16L)).thenReturn(Optional.of(order));
+        when(ledgerlyClient.syncOrderPayload(any(), eq("pay_16")))
+            .thenThrow(new RuntimeException("500 on POST request for http://sales/api/invoices Unexpected runtime exception"));
+        when(customerOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.syncOrder(16L);
+
+        assertThat(order.getLedgerlySyncStatus()).isEqualTo(LedgerlySyncStatus.FAILED);
+        verify(ledgerlyClient, times(1)).syncOrderPayload(any(), eq("pay_16"));
+    }
+
+    @Test
+    void pullInventory_updatesLinkedProductStock() {
+        Product product = product(70L).ledgerlyItemId("item-70");
+        when(ledgerlyClient.pullInventory()).thenReturn(
+            Map.of("inventory", List.of(Map.of("sku", "SKU-70", "ledgerlyItemId", "item-70", "stock", 12)))
+        );
+        when(productRepository.findOneByLedgerlyItemId("item-70")).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+
+        Map<String, Object> result = service.pullInventory();
+
+        assertThat(result).containsEntry("successCount", 1);
+        assertThat(product.getStock()).isEqualTo(12);
+    }
+
+    @Test
+    void pullInventory_unknownSku_recordsFailure() {
+        when(ledgerlyClient.pullInventory()).thenReturn(
+            Map.of("inventory", List.of(Map.of("sku", "UNKNOWN", "stock", 3)))
+        );
+        when(productRepository.findOneBySku("UNKNOWN")).thenReturn(Optional.empty());
+
+        Map<String, Object> result = service.pullInventory();
+
+        assertThat(result).containsEntry("failureCount", 1);
+        assertThat((List<?>) result.get("failures")).isNotEmpty();
     }
 
     private static Product product(Long id) {

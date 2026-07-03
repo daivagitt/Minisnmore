@@ -98,4 +98,20 @@ public class LedgerlySetting implements Serializable {
     public void setWebhookSecret(String webhookSecret) {
         this.webhookSecret = webhookSecret;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof LedgerlySetting)) {
+            return false;
+        }
+        return getId() != null && getId().equals(((LedgerlySetting) o).getId());
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
+    }
 }

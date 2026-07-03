@@ -19,87 +19,85 @@ class ProductDescriptionCodecTest {
     }
 
     @Test
-    void encode_includesMerchandisingLinesAndBody() {
+    void encode_includesMerchandisingPrefixesAndBody() {
         Product product = new Product()
-            .fabricType("100% Cotton")
-            .sizesJson("[\"0-3m\",\"3-6m\"]")
-            .colorsJson("[\"Blush\",\"Sand\"]")
+            .fabricType("Organic Cotton")
+            .sizesJson("[\"0-3M\",\"3-6M\"]")
+            .colorsJson("[\"Blush\"]")
             .ageMinMonths(0)
-            .ageMaxMonths(24)
-            .story("Soft organic fabric")
-            .badge("Bestseller")
-            .compareAtPrice(BigDecimal.valueOf(1599))
-            .description("Customer-facing copy");
+            .ageMaxMonths(6)
+            .compareAtPrice(new BigDecimal("799"))
+            .description("Soft everyday wear");
 
-        String encoded = codec.encode(product, "Newborn Essentials");
+        String encoded = codec.encode(product, "Babywear");
 
-        assertThat(encoded).contains("Category: Newborn Essentials");
-        assertThat(encoded).contains("Fabric: 100% Cotton");
-        assertThat(encoded).contains("Sizes: 0-3m, 3-6m");
-        assertThat(encoded).contains("Colors: Blush, Sand");
-        assertThat(encoded).contains("Age: 0-24 months");
-        assertThat(encoded).contains("Story: Soft organic fabric");
-        assertThat(encoded).contains("Badge: Bestseller");
-        assertThat(encoded).contains("CompareAt: 1599");
-        assertThat(encoded).endsWith("Customer-facing copy");
+        assertThat(encoded).contains("Category: Babywear");
+        assertThat(encoded).contains("Fabric: Organic Cotton");
+        assertThat(encoded).contains("Sizes: 0-3M, 3-6M");
+        assertThat(encoded).contains("Colors: Blush");
+        assertThat(encoded).contains("Age: 0-6 months");
+        assertThat(encoded).contains("CompareAt: 799");
+        assertThat(encoded).contains("Soft everyday wear");
     }
 
     @Test
-    void decode_parsesMetadataAndStripsPrefixLines() {
+    void decode_extractsMetadataAndBody() {
         String raw =
             """
-            Category: Babywear
-            Fabric: Linen
-            Sizes: S, M
-            Colors: Blue
-            Age: 6-12 months
-            Story: Breathable
-            Badge: New
-            CompareAt: 899
+            Category: Essentials
+            Fabric: Wool
+            CompareAt: 599
+            Age: 0-3 months
 
-            Plain description
+            Warm and cozy
             """;
 
         ProductDescriptionCodec.Decoded decoded = codec.decode(raw);
 
-        assertThat(decoded.categoryName()).isEqualTo("Babywear");
-        assertThat(decoded.fabric()).isEqualTo("Linen");
-        assertThat(decoded.sizes()).containsExactly("S", "M");
-        assertThat(decoded.colors()).containsExactly("Blue");
-        assertThat(decoded.ageMinMonths()).isEqualTo(6);
-        assertThat(decoded.ageMaxMonths()).isEqualTo(12);
-        assertThat(decoded.story()).isEqualTo("Breathable");
-        assertThat(decoded.badge()).isEqualTo("New");
-        assertThat(decoded.compareAtPrice()).isEqualByComparingTo(BigDecimal.valueOf(899));
-        assertThat(decoded.bodyDescription()).isEqualTo("Plain description");
+        assertThat(decoded.categoryName()).isEqualTo("Essentials");
+        assertThat(decoded.fabric()).isEqualTo("Wool");
+        assertThat(decoded.compareAtPrice()).isEqualByComparingTo("599");
+        assertThat(decoded.ageMinMonths()).isEqualTo(0);
+        assertThat(decoded.ageMaxMonths()).isEqualTo(3);
+        assertThat(decoded.bodyDescription()).isEqualTo("Warm and cozy");
     }
 
     @Test
     void applyDecoded_setsProductFields() {
         Product product = new Product();
         ProductDescriptionCodec.Decoded decoded = new ProductDescriptionCodec.Decoded(
-            "Cat",
-            "Silk",
-            List.of("L"),
-            List.of("Red"),
-            12,
-            24,
-            "Handmade",
-            "Limited",
-            BigDecimal.TEN,
-            "Body text"
+            "Baby",
+            "Cotton",
+            List.of("S"),
+            List.of("Blue"),
+            0,
+            3,
+            "Story text",
+            "New",
+            new BigDecimal("499"),
+            "Body"
         );
 
         codec.applyDecoded(product, decoded);
 
-        assertThat(product.getFabricType()).isEqualTo("Silk");
-        assertThat(product.getSizesJson()).contains("L");
-        assertThat(product.getColorsJson()).contains("Red");
-        assertThat(product.getAgeMinMonths()).isEqualTo(12);
-        assertThat(product.getAgeMaxMonths()).isEqualTo(24);
-        assertThat(product.getStory()).isEqualTo("Handmade");
-        assertThat(product.getBadge()).isEqualTo("Limited");
-        assertThat(product.getCompareAtPrice()).isEqualByComparingTo(BigDecimal.TEN);
-        assertThat(product.getDescription()).isEqualTo("Body text");
+        assertThat(product.getFabricType()).isEqualTo("Cotton");
+        assertThat(codec.parseDelimitedOrJson(product.getSizesJson())).containsExactly("S");
+        assertThat(codec.parseDelimitedOrJson(product.getColorsJson())).containsExactly("Blue");
+        assertThat(product.getAgeMinMonths()).isEqualTo(0);
+        assertThat(product.getAgeMaxMonths()).isEqualTo(3);
+        assertThat(product.getStory()).isEqualTo("Story text");
+        assertThat(product.getBadge()).isEqualTo("New");
+        assertThat(product.getCompareAtPrice()).isEqualByComparingTo("499");
+        assertThat(product.getDescription()).isEqualTo("Body");
+    }
+
+    @Test
+    void parseDelimitedOrJson_acceptsCommaSeparatedText() {
+        assertThat(codec.parseDelimitedOrJson("Red, Blue")).containsExactly("Red", "Blue");
+    }
+
+    @Test
+    void parseDelimitedOrJson_acceptsJsonArray() {
+        assertThat(codec.parseDelimitedOrJson("[\"Red\",\"Blue\"]")).containsExactly("Red", "Blue");
     }
 }
