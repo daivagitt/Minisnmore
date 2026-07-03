@@ -221,6 +221,7 @@ class LedgerlySyncServiceTest {
         order.tax(new BigDecimal("4"));
         order.total(new BigDecimal("404"));
         when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product(1L)));
 
         @SuppressWarnings("unchecked")
         Map<String, Object> payload = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "buildOrderPayload", order);
@@ -230,6 +231,26 @@ class LedgerlySyncServiceTest {
         assertThat(payload.get("tax")).isEqualTo(new BigDecimal("4"));
         assertThat(payload.get("total")).isEqualTo(new BigDecimal("404"));
         assertThat(payload.get("pricesIncludeGst")).isEqualTo(true);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> lines = (List<Map<String, Object>>) payload.get("lines");
+        assertThat(lines.get(0).get("sku")).isEqualTo("SKU-1");
+    }
+
+    @Test
+    void buildOrderPayload_usesCatalogSkuNotUrlSlug() {
+        CustomerOrder order = order(41L, "ORD-SKU", LedgerlySyncStatus.PENDING);
+        OrderItem line = order.getItemses().iterator().next();
+        line.setProductSlug("organic-cotton-onesie");
+        Product product = product(1L).sku("MNM-BPB-001");
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "buildOrderPayload", order);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> lines = (List<Map<String, Object>>) payload.get("lines");
+        assertThat(lines.get(0).get("sku")).isEqualTo("MNM-BPB-001");
     }
 
     @Test

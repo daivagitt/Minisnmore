@@ -381,9 +381,10 @@ public class LedgerlySyncService {
         payload.put("customer", customer);
         BigDecimal lineTaxPct = pricesIncludeGst() ? BigDecimal.ZERO : siteGstRate();
         List<Map<String, Object>> lines = new ArrayList<>();
+        Map<Long, String> skuByProductId = new HashMap<>();
         for (OrderItem item : order.getItemses()) {
             Map<String, Object> line = new LinkedHashMap<>();
-            line.put("sku", item.getProductSlug() != null ? item.getProductSlug() : item.getProductId());
+            line.put("sku", resolveLineSku(item, skuByProductId));
             line.put("qty", item.getQty());
             line.put("rate", item.getPrice());
             line.put("taxPct", lineTaxPct);
@@ -392,6 +393,37 @@ public class LedgerlySyncService {
         }
         payload.put("lines", lines);
         return payload;
+    }
+
+    /**
+     * Ledgerly items are keyed by catalog SKU; order lines store URL slug separately.
+     */
+    private String resolveLineSku(OrderItem item, Map<Long, String> skuByProductId) {
+        String productId = item.getProductId();
+        if (productId != null && !productId.isBlank()) {
+            try {
+                long id = Long.parseLong(productId.trim());
+                String cached = skuByProductId.get(id);
+                if (cached != null) {
+                    return cached;
+                }
+                Optional<Product> product = productRepository.findById(id);
+                if (product.isPresent()) {
+                    String sku = product.orElseThrow().getSku();
+                    if (sku != null && !sku.isBlank()) {
+                        skuByProductId.put(id, sku);
+                        return sku;
+                    }
+                }
+            } catch (NumberFormatException ignored) {
+                // fall through to slug / product id
+            }
+        }
+        String slug = item.getProductSlug();
+        if (slug != null && !slug.isBlank()) {
+            return slug;
+        }
+        return productId;
     }
 
     private boolean pricesIncludeGst() {
