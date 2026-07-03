@@ -298,6 +298,111 @@ def scenario_public_track_api(order_ctx: dict[str, Any]) -> Scenario:
     return sc
 
 
+def scenario_ledgerly_return_credit_note(
+    customer_token: str, admin_token: str, order_ctx: dict[str, Any]
+) -> Scenario:
+    sc = Scenario(
+        "ledgerly-return-credit-note",
+        "Return → refund → Ledgerly credit note",
+        "Full return on demo-paid order synced to Ledgerly; verifies Razorpay demo refund and ledgerly_credit_note_id.",
+    )
+    order_number = order_ctx.get("orderNumber")
+    if not order_ctx.get("paid"):
+        sc.steps.append(Step("return-flow", "skip", "order not paid"))
+        return sc
+    if not order_number:
+        sc.steps.append(Step("return-flow", "skip", "no checkout order number"))
+        return sc
+    if not (scenario_common.REFUND_DEMO or PAYMENT_DEMO):
+        sc.steps.append(
+            Step(
+                "return-flow",
+                "skip",
+                "Enable RAZORPAY_PAYMENT_DEMO or RAZORPAY_REFUND_DEMO for demo refunds",
+            )
+        )
+        return sc
+
+    code, data, ms = api("GET", f"/api/v1/order-returns/eligibility/{order_number}", customer_token)
+    payload = unwrap(data) if isinstance(data, dict) else {}
+    if code == 200 and payload.get("eligible"):
+        sc.steps.append(Step("return-eligibility", "pass", "eligible", ms))
+    elif code == 200:
+        sc.steps.append(
+            Step(
+                "return-eligibility",
+                "skip",
+                payload.get("message") or "not eligible (needs delivery anchor)",
+                ms,
+            )
+        )
+        return sc
+    else:
+        sc.steps.append(Step("return-eligibility", "fail", f"HTTP {code}", ms))
+        return sc
+
+    code, data, ms = api(
+        "POST",
+        "/api/v1/order-returns",
+        customer_token,
+        {"order_number": order_number, "reason": "Ledgerly scenario integration test return"},
+    )
+    payload = unwrap(data) if isinstance(data, dict) else {}
+    return_number = payload.get("return_number")
+    if code not in (200, 201) or not return_number:
+        sc.steps.append(Step("request-return", "fail", f"HTTP {code}", ms, {"body": str(data)[:300]}))
+        return sc
+    sc.steps.append(Step("request-return", "pass", return_number, ms))
+    order_ctx["returnNumber"] = return_number
+
+    for step_name, path in [
+        ("approve", f"/api/v1/admin/order-returns/{return_number}/approve"),
+        ("mark-received", f"/api/v1/admin/order-returns/{return_number}/mark-received"),
+        ("refund", f"/api/v1/admin/order-returns/{return_number}/refund"),
+    ]:
+        code, data, ms = api("POST", path, admin_token, {"admin_notes": "Ledgerly scenario test"})
+        payload = unwrap(data) if isinstance(data, dict) else {}
+        status = (payload.get("status") or "").lower()
+        if code != 200:
+            sc.steps.append(Step(step_name, "fail", f"HTTP {code}", ms, {"body": str(data)[:300]}))
+            return sc
+        sc.steps.append(
+            Step(
+                step_name,
+                "pass",
+                status or "ok",
+                ms,
+                {
+                    "refund_amount": payload.get("refund_amount"),
+                    "razorpay_refund_id": payload.get("razorpay_refund_id"),
+                    "ledgerly_credit_note_id": payload.get("ledgerly_credit_note_id"),
+                },
+            )
+        )
+
+    refund_payload = unwrap(data) if isinstance(data, dict) else {}
+    cn_id = refund_payload.get("ledgerly_credit_note_id") or refund_payload.get("ledgerlyCreditNoteId")
+    refund_id = refund_payload.get("razorpay_refund_id")
+    if refund_payload.get("status", "").lower() == "refunded" and refund_id:
+        if cn_id:
+            sc.steps.append(Step("ledgerly-credit-note", "pass", f"credit note {cn_id}", 0, refund_payload))
+            order_ctx["ledgerlyCreditNoteId"] = cn_id
+        else:
+            sc.steps.append(
+                Step(
+                    "ledgerly-credit-note",
+                    "fail",
+                    "refunded but ledgerly_credit_note_id missing (sync invoice to Ledgerly first)",
+                    0,
+                    refund_payload,
+                )
+            )
+    else:
+        sc.steps.append(Step("ledgerly-credit-note", "fail", "refund step did not complete", 0, refund_payload))
+
+    return sc
+
+
 def build_ledgerly_html(report: dict) -> str:
     sys.path.insert(0, str(ROOT / "jenkins" / "scripts"))
     from report_theme import PROJECT_NAME  # noqa: E402
@@ -308,7 +413,7 @@ def build_ledgerly_html(report: dict) -> str:
             f"{PROJECT_NAME} scenario integration",
             f"{PROJECT_NAME} Ledgerly scenario integration",
         )
-        .replace("Coupon · Zoho · shipment · returns", "Coupon · Ledgerly sync · inventory · tracking · returns")
+        .replace("Coupon · Zoho · shipment · returns", "Coupon · Ledgerly sync · inventory · tracking · returns · credit notes")
         .replace("Scenario integration summary", "Ledgerly scenario integration summary")
     )
 
@@ -348,6 +453,7 @@ def main() -> int:
     scenarios.append(scenario_ledgerly_order_sync(admin_token, order_ctx))
     scenarios.append(scenario_ledgerly_inventory(admin_token))
     scenarios.append(scenario_ledgerly_tracking(admin_token, order_ctx))
+    scenarios.append(scenario_ledgerly_return_credit_note(customer_token, admin_token, order_ctx))
     scenarios.append(scenario_public_track_api(order_ctx))
     scenarios.append(scenario_reference_orders())
 

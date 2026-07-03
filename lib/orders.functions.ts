@@ -142,7 +142,7 @@ export async function cancelOrderReturn(returnNumber: string): Promise<OrderRetu
 export type AdminOrderReturnRow = OrderReturnRow & {
   admin_notes?: string | null;
   razorpay_refund_id?: string | null;
-  zoho_credit_note_id?: string | null;
+  ledgerly_credit_note_id?: string | null;
   customer_login?: string | null;
   order_id?: number;
 };

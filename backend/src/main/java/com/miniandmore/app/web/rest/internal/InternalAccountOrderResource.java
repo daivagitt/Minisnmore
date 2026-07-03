@@ -25,6 +25,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -45,6 +47,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class InternalAccountOrderResource {
 
     private static final Logger LOG = LoggerFactory.getLogger(InternalAccountOrderResource.class);
+    private static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
     private static final Duration INVENTORY_RESERVATION_TTL = Duration.ofMinutes(30);
     private static final Duration TRACKING_REFRESH_TTL = Duration.ofHours(1);
     private static final String FIELD_PHONE = "phone";
@@ -223,6 +226,7 @@ public class InternalAccountOrderResource {
                 .razorpaySignature(request.razorpay_signature())
                 .inventoryReserved(false)
                 .inventoryReleasedAt(null);
+            stampDemoDeliveryAnchor(order);
             dataAccess.customerOrderRepository().save(order);
         } else {
             order
@@ -711,6 +715,14 @@ public class InternalAccountOrderResource {
         return razorpayPaymentDemo
             || "DEMO".equalsIgnoreCase(StringUtils.trimToEmpty(razorpayKeyId))
             || StringUtils.isBlank(StringUtils.trimToEmpty(razorpayKeySecret));
+    }
+
+    /** Demo/UAT: mark paid orders as delivered so return + Ledgerly credit-note scenarios can run. */
+    private void stampDemoDeliveryAnchor(CustomerOrder order) {
+        if (!isDemoMode() || StringUtils.isNotBlank(order.getShipmentDate())) {
+            return;
+        }
+        order.setShipmentDate(LocalDate.now(INDIA).toString());
     }
 
     private String gatewayMode() {
