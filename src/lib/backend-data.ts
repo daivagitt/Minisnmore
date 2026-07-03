@@ -1226,9 +1226,14 @@ export async function bulkSave<T extends { id?: string }>(
 
 export type LedgerlySettingsRow = {
   api_base_url?: string | null;
+  apiBaseUrl?: string | null;
   api_token?: string | null;
   org_id?: string | null;
+  orgId?: string | null;
   connected?: boolean;
+  hasToken?: boolean;
+  hasWebhookSecret?: boolean;
+  pullProductsAutoCreateCategory?: boolean;
 };
 
 export type LedgerlyIntegrationStatus = {
