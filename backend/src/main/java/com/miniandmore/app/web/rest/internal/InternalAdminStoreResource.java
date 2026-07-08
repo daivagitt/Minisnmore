@@ -184,6 +184,7 @@ public class InternalAdminStoreResource {
     @DeleteMapping("/products/{id}")
     public ApiResponse<Map<String, Boolean>> deleteProduct(@PathVariable Long id) {
         requireExists(id, productRepository::existsById, "Product");
+        ledgerlySyncService.notifyLedgerlyBeforeStoreDelete(id);
         productService.delete(id);
         return ApiResponse.ok(Map.of("deleted", true));
     }

@@ -77,6 +77,24 @@ public class LedgerlySyncService {
             });
     }
 
+    /**
+     * When the store admin deletes a product, mark the linked Ledgerly item inactive before the
+     * local row is removed (historical invoices keep the Ledgerly item).
+     */
+    public void notifyLedgerlyBeforeStoreDelete(Long productId) {
+        productRepository
+            .findById(productId)
+            .ifPresent(product -> {
+                try {
+                    if (isLedgerlyLinked(product)) {
+                        deactivateInLedgerly(product);
+                    }
+                } catch (Exception e) {
+                    LOG.warn("Ledgerly deactivation before store delete failed for {}: {}", productId, e.getMessage());
+                }
+            });
+    }
+
     @Async
     public void syncCustomerProfileAsync(String userLogin) {
         syncCustomerProfile(userLogin);
