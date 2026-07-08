@@ -328,7 +328,7 @@ function LedgerlySyncPanel({ connected }: { connected: boolean }) {
       id: "products",
       label: "Sync products to Ledgerly",
       description:
-        "Push all active products (SKU and category required). Syncs stock and product details to Ledgerly.",
+        "Push active store products to Ledgerly (SKU and category required). Inactive products previously linked to Ledgerly are marked inactive there — they are not recreated.",
       icon: Upload,
       run: syncAllLedgerlyProducts,
     },

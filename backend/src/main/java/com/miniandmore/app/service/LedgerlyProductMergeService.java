@@ -137,6 +137,7 @@ public class LedgerlyProductMergeService {
         if (firstImage != null) {
             payload.put("imageUrl", firstImage);
         }
+        payload.put("active", Boolean.TRUE.equals(product.getActive()));
         return payload;
     }
 

@@ -85,7 +85,7 @@ class LedgerlySyncServiceTest {
 
     @Test
     void syncProduct_success_setsSyncedFields() {
-        Product product = product(1L);
+        Product product = product(1L).active(true);
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
         when(ledgerlyClient.syncProductPayload(any())).thenReturn(Map.of("ledgerlyItemId", "item-99"));
         when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -101,7 +101,7 @@ class LedgerlySyncServiceTest {
 
     @Test
     void syncProduct_clientFailure_setsFailedStatus() {
-        Product product = product(2L);
+        Product product = product(2L).active(true);
         when(productRepository.findById(2L)).thenReturn(Optional.of(product));
         when(ledgerlyClient.syncProductPayload(any())).thenThrow(new RuntimeException("upstream 503"));
         when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -302,11 +302,9 @@ class LedgerlySyncServiceTest {
 
     @Test
     void syncAllProducts_aggregatesFailures() {
-        Product ok = product(30L);
-        Product bad = product(31L);
+        Product ok = product(30L).active(true);
+        Product bad = product(31L).active(true);
         when(productRepository.findAll()).thenReturn(List.of(ok, bad));
-        when(productRepository.findById(30L)).thenReturn(Optional.of(ok));
-        when(productRepository.findById(31L)).thenReturn(Optional.of(bad));
         when(ledgerlyClient.syncProductPayload(any()))
             .thenReturn(Map.of("ledgerlyItemId", "item-30"))
             .thenThrow(new RuntimeException("sync failed"));
@@ -314,9 +312,33 @@ class LedgerlySyncServiceTest {
 
         Map<String, Object> result = service.syncAllProducts();
 
-        assertThat(result).containsEntry("successCount", 2).containsEntry("failureCount", 0);
-        assertThat((List<?>) result.get("failures")).isEmpty();
+        assertThat(result).containsEntry("successCount", 1).containsEntry("failureCount", 1);
+        assertThat((List<?>) result.get("failures")).isNotEmpty();
         assertThat(bad.getLedgerlySyncStatus()).isEqualTo(LedgerlySyncStatus.FAILED);
+    }
+
+    @Test
+    void syncAllProducts_skipsInactiveNeverLinked_andDeactivatesInactiveLinked() {
+        Product active = product(90L).active(true);
+        Product inactiveLocal = product(91L).active(false);
+        Product inactiveLinked = product(92L).active(false).ledgerlyItemId("item-92");
+        inactiveLinked.setLedgerlySyncStatus(LedgerlySyncStatus.SYNCED);
+        when(productRepository.findAll()).thenReturn(List.of(active, inactiveLocal, inactiveLinked));
+        when(ledgerlyClient.syncProductPayload(any()))
+            .thenReturn(Map.of("ledgerlyItemId", "item-90"))
+            .thenReturn(Map.of("ok", true));
+        when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Map<String, Object> result = service.syncAllProducts();
+
+        assertThat(result).containsEntry("successCount", 1);
+        verify(ledgerlyClient, times(2)).syncProductPayload(any());
+        verify(ledgerlyClient)
+            .syncProductPayload(
+                org.mockito.ArgumentMatchers.argThat(
+                    payload -> Boolean.FALSE.equals(payload.get("active")) && "SKU-92".equals(payload.get("sku"))
+                )
+            );
     }
 
     @Test

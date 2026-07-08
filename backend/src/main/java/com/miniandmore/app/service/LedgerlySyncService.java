@@ -67,12 +67,7 @@ public class LedgerlySyncService {
             .findById(productId)
             .ifPresent(product -> {
                 try {
-                    Map<String, Object> response = ledgerlyClient.syncProductPayload(buildProductPayload(product));
-                    product.setLedgerlyItemId(String.valueOf(response.getOrDefault("ledgerlyItemId", "")));
-                    product.setLedgerlySyncStatus(LedgerlySyncStatus.SYNCED);
-                    product.setLedgerlyLastSyncedAt(Instant.now());
-                    product.setLedgerlySyncError(null);
-                    productRepository.save(product);
+                    pushProductToLedgerly(product);
                 } catch (Exception e) {
                     LOG.warn("Ledgerly product sync failed for {}: {}", productId, e.getMessage());
                     product.setLedgerlySyncStatus(LedgerlySyncStatus.FAILED);
@@ -175,9 +170,23 @@ public class LedgerlySyncService {
         LedgerlySyncSummary.Builder builder = LedgerlySyncSummary.builder();
         for (Product product : productRepository.findAll()) {
             try {
-                syncProduct(product.getId());
+                if (StringUtils.isBlank(product.getSku())) {
+                    builder.notice(product.getName(), "Skipped — SKU required");
+                    continue;
+                }
+                if (!Boolean.TRUE.equals(product.getActive())) {
+                    if (isLedgerlyLinked(product)) {
+                        deactivateInLedgerly(product);
+                        builder.notice(product.getSku(), "Deactivated in Ledgerly");
+                    }
+                    continue;
+                }
+                pushProductToLedgerly(product);
                 builder.success();
             } catch (Exception e) {
+                product.setLedgerlySyncStatus(LedgerlySyncStatus.FAILED);
+                product.setLedgerlySyncError(e.getMessage());
+                productRepository.save(product);
                 builder.failure(product.getId(), product.getName(), e.getMessage());
             }
         }
@@ -400,6 +409,45 @@ public class LedgerlySyncService {
     private Map<String, Object> buildProductPayload(Product product) {
         String categoryName = product.getCategory() != null ? product.getCategory().getName() : null;
         return productMergeService.buildPushPayload(product, categoryName);
+    }
+
+    /**
+     * Push one catalog row to Ledgerly: active products upsert item data; inactive linked products
+     * send {@code active:false} so pull-deactivated rows are not recreated in Ledgerly.
+     */
+    private void pushProductToLedgerly(Product product) {
+        if (StringUtils.isBlank(product.getSku())) {
+            throw new IllegalStateException("SKU is required for Ledgerly sync");
+        }
+        if (!Boolean.TRUE.equals(product.getActive())) {
+            if (isLedgerlyLinked(product)) {
+                deactivateInLedgerly(product);
+            }
+            return;
+        }
+        Map<String, Object> response = ledgerlyClient.syncProductPayload(buildProductPayload(product));
+        product.setLedgerlyItemId(String.valueOf(response.getOrDefault("ledgerlyItemId", "")));
+        product.setLedgerlySyncStatus(LedgerlySyncStatus.SYNCED);
+        product.setLedgerlyLastSyncedAt(Instant.now());
+        product.setLedgerlySyncError(null);
+        productRepository.save(product);
+    }
+
+    private void deactivateInLedgerly(Product product) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("sku", product.getSku());
+        payload.put("active", false);
+        if (StringUtils.isNotBlank(product.getLedgerlyItemId())) {
+            payload.put("ledgerlyItemId", product.getLedgerlyItemId());
+        }
+        ledgerlyClient.syncProductPayload(payload);
+        product.setLedgerlyLastSyncedAt(Instant.now());
+        product.setLedgerlySyncError(null);
+        productRepository.save(product);
+    }
+
+    private static boolean isLedgerlyLinked(Product product) {
+        return StringUtils.isNotBlank(product.getLedgerlyItemId()) || product.getLedgerlySyncStatus() == LedgerlySyncStatus.SYNCED;
     }
 
     private Map<String, Object> buildOrderPayload(CustomerOrder order) {

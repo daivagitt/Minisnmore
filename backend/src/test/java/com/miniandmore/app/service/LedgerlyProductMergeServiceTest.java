@@ -39,7 +39,8 @@ class LedgerlyProductMergeServiceTest {
             .stock(10)
             .compareAtPrice(BigDecimal.valueOf(699))
             .fabricType("Cotton")
-            .description("Soft");
+            .description("Soft")
+            .active(true);
 
         Map<String, Object> payload = mergeService.buildPushPayload(product, "Baby");
 
@@ -48,6 +49,7 @@ class LedgerlyProductMergeServiceTest {
         assertThat(payload.get("cost")).isEqualTo(BigDecimal.valueOf(699));
         assertThat(payload.get("imageUrl")).isEqualTo("https://cdn.example.com/p.jpg");
         assertThat(payload.get("description").toString()).contains("Category: Baby").contains("Fabric: Cotton");
+        assertThat(payload.get("active")).isEqualTo(true);
         assertThat(payload).doesNotContainKey("hsn");
     }
 
