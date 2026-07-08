@@ -116,7 +116,11 @@ public class InternalAdminStoreResource {
     public ApiResponse<Map<String, Object>> dashboard() {
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("categories", categoryRepository.count());
-        stats.put("products", productRepository.count());
+        long productTotal = productRepository.count();
+        long activeProducts = productRepository.countByActiveTrue();
+        stats.put("products", productTotal);
+        stats.put("activeProducts", activeProducts);
+        stats.put("inactiveProducts", Math.max(0, productTotal - activeProducts));
         stats.put("productsWithSku", productRepository.countWithSku());
         stats.put("coupons", couponRepository.count());
         stats.put("blogPosts", blogPostRepository.count());

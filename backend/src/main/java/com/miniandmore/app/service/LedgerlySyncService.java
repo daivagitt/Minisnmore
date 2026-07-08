@@ -458,9 +458,12 @@ public class LedgerlySyncService {
         if (StringUtils.isNotBlank(product.getLedgerlyItemId())) {
             payload.put("ledgerlyItemId", product.getLedgerlyItemId());
         }
-        ledgerlyClient.syncProductPayload(payload);
+        Map<String, Object> response = ledgerlyClient.syncProductPayload(payload);
         product.setLedgerlyLastSyncedAt(Instant.now());
         product.setLedgerlySyncError(null);
+        if (Boolean.TRUE.equals(response.get("noop"))) {
+            product.setLedgerlyItemId(null);
+        }
         productRepository.save(product);
     }
 

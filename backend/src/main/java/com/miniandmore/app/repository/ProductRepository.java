@@ -64,6 +64,9 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     @Query("select count(product) from Product product where product.sku is not null")
     long countWithSku();
 
+    @Query("select count(product) from Product product where product.active = true")
+    long countByActiveTrue();
+
     List<Product> findAllByActiveTrue();
 
     List<Product> findAllByLedgerlyItemIdIsNotNull();

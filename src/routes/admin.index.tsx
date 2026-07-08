@@ -28,6 +28,8 @@ export const Route = createFileRoute("/admin/")({
 type Stats = {
   categories: number;
   products: number;
+  activeProducts: number;
+  inactiveProducts: number;
   skus: number;
   coupons: number;
   blogs: number;
@@ -42,6 +44,8 @@ function AdminDashboard() {
   const [s, setS] = useState<Stats>({
     categories: 0,
     products: 0,
+    activeProducts: 0,
+    inactiveProducts: 0,
     skus: 0,
     coupons: 0,
     blogs: 0,
@@ -62,6 +66,8 @@ function AdminDashboard() {
         setS({
           categories: Number(dashboard.categories ?? 0),
           products: Number(dashboard.products ?? 0),
+          activeProducts: Number(dashboard.activeProducts ?? 0),
+          inactiveProducts: Number(dashboard.inactiveProducts ?? 0),
           skus: Number(dashboard.productsWithSku ?? 0),
           coupons: Number(dashboard.coupons ?? 0),
           blogs: Number(dashboard.blogPosts ?? 0),
@@ -78,7 +84,7 @@ function AdminDashboard() {
     })();
   }, []);
 
-  const stats: { label: string; n: number | string; icon: LucideIcon; tint: string }[] = [
+  const stats: { label: string; n: number | string; sub?: string; icon: LucideIcon; tint: string }[] = [
     {
       label: "Total categories",
       n: s.categories,
@@ -88,6 +94,7 @@ function AdminDashboard() {
     {
       label: "Total products",
       n: s.products,
+      sub: `${s.activeProducts} active · ${s.inactiveProducts} inactive`,
       icon: Package,
       tint: "from-amber-400/20 to-amber-200/10",
     },
@@ -155,6 +162,9 @@ function AdminDashboard() {
               {c.label}
             </div>
             <div className="font-display text-2xl md:text-3xl mt-1">{c.n}</div>
+            {c.sub ? (
+              <div className="text-xs text-muted-foreground mt-1">{c.sub}</div>
+            ) : null}
           </div>
         ))}
       </div>

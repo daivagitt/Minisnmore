@@ -326,7 +326,7 @@ class LedgerlySyncServiceTest {
         when(productRepository.findAll()).thenReturn(List.of(active, inactiveLocal, inactiveLinked));
         when(ledgerlyClient.syncProductPayload(any()))
             .thenReturn(Map.of("ledgerlyItemId", "item-90"))
-            .thenReturn(Map.of("ok", true));
+            .thenReturn(Map.of("noop", true));
         when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Map<String, Object> result = service.syncAllProducts();
