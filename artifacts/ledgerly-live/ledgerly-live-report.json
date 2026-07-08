@@ -1,0 +1,69 @@
+{
+  "baseUrl": "http://127.0.0.1:9180",
+  "startedAt": "2026-07-03T12:35:16.259240+00:00",
+  "finishedAt": "2026-07-03T12:35:57.927926+00:00",
+  "results": [
+    {
+      "method": "POST",
+      "path": "/api/authenticate (admin)",
+      "ok": true,
+      "code": 200,
+      "ms": 0,
+      "note": "admin login"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/ledgerly/integration-status",
+      "ok": true,
+      "code": 200,
+      "ms": 42,
+      "note": "",
+      "body": "{\"serverConfigured\": true, \"connected\": true, \"pullProductsAutoCreateCategory\": false}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/ledgerly/settings",
+      "ok": true,
+      "code": 200,
+      "ms": 38,
+      "note": "",
+      "body": "{\"apiBaseUrl\": \"https://lender.qualityoutsidethebox.org/api\", \"orgId\": \"1001\", \"connected\": true, \"pullProductsAutoCreateCategory\": false, \"hasToken\": true, \"hasWebhookSecret\": true}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/ledgerly/test",
+      "ok": true,
+      "code": 200,
+      "ms": 1168,
+      "note": "",
+      "body": "{\"activeKeys\": 3, \"activeWebhooks\": 0, \"connected\": true, \"message\": \"Integration API ready\", \"organizationId\": 1001, \"scopes\": []}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/ledgerly/pull-inventory",
+      "ok": true,
+      "code": 200,
+      "ms": 1350,
+      "note": "",
+      "body": "{\"successCount\": 29, \"failureCount\": 3, \"failures\": [{\"message\": \"No linked store product for SKU or Ledgerly item id\", \"sku\": \"SKU-70215\"}, {\"message\": \"No linked store product for SKU or Ledgerly item id\", \"sku\": \"SKU-81115618\"}, {\"message\": \"No linked store product for SKU or Ledgerly item id\", \"sku\": \"SKU-81310724\"}], \"notices\": []}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/ledgerly/retry-orders",
+      "ok": true,
+      "code": 200,
+      "ms": 48,
+      "note": "",
+      "body": "{\"successCount\": 0, \"failureCount\": 0, \"failures\": [], \"notices\": []}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/ledgerly/pull-order-tracking",
+      "ok": true,
+      "code": 200,
+      "ms": 38913,
+      "note": "",
+      "body": "{\"successCount\": 39, \"failureCount\": 0, \"failures\": [], \"notices\": []}"
+    }
+  ]
+}

@@ -1,0 +1,407 @@
+{
+  "baseUrl": "http://127.0.0.1:9180",
+  "startedAt": "2026-07-03T12:35:58.067280+00:00",
+  "finishedAt": "2026-07-03T12:36:49.117154+00:00",
+  "paymentDemo": true,
+  "refundDemo": true,
+  "credentials": {
+    "customer": "saikedar2003@gmail.com",
+    "admin": "admin@uat.minisnmore.com"
+  },
+  "orderContext": {
+    "orderId": 34702,
+    "orderNumber": "MNM-7632BDDAE0AB",
+    "total": 2.02,
+    "demoMode": true,
+    "gatewayMode": "demo",
+    "paid": true,
+    "ledgerlySyncTriggered": true,
+    "returnNumber": "RET-MNM-7632BDDAE0AB-D9F2EE",
+    "ledgerlyCreditNoteId": "2552"
+  },
+  "scenarios": [
+    {
+      "id": "auth",
+      "title": "Authentication",
+      "description": "Customer + admin JWT for Ledgerly scenario steps.",
+      "status": "pass",
+      "steps": [
+        {
+          "name": "customer-login",
+          "status": "pass",
+          "note": "HTTP 200",
+          "ms": 0,
+          "detail": {}
+        },
+        {
+          "name": "admin-login",
+          "status": "pass",
+          "note": "HTTP 200",
+          "ms": 0,
+          "detail": {}
+        }
+      ]
+    },
+    {
+      "id": "coupon-checkout",
+      "title": "Coupon checkout (WELCOM10 \u2192 \u20b92 total)",
+      "description": "Validate flat coupon on Baby Swaddle and create checkout order with correct totals.",
+      "status": "pass",
+      "steps": [
+        {
+          "name": "validate-coupon",
+          "status": "pass",
+          "note": "discount \u20b9348",
+          "ms": 48,
+          "detail": {
+            "discount": 348.0
+          }
+        },
+        {
+          "name": "create-order",
+          "status": "pass",
+          "note": "order MNM-7632BDDAE0AB total \u20b92 (demoMode=True)",
+          "ms": 74,
+          "detail": {
+            "orderId": 34702,
+            "orderNumber": "MNM-7632BDDAE0AB",
+            "razorpayOrderId": "order_demo_MNM-7632BDDAE0AB",
+            "total": 2.02,
+            "demoMode": true,
+            "gatewayMode": "demo",
+            "paid": true,
+            "ledgerlySyncTriggered": true,
+            "returnNumber": "RET-MNM-7632BDDAE0AB-D9F2EE",
+            "ledgerlyCreditNoteId": "2552"
+          }
+        }
+      ]
+    },
+    {
+      "id": "payment-verify",
+      "title": "Payment verify",
+      "description": "Demo bypass when RAZORPAY_PAYMENT_DEMO=true; otherwise skipped (live Razorpay required).",
+      "status": "pass",
+      "steps": [
+        {
+          "name": "verify-payment",
+          "status": "pass",
+          "note": "PAID MNM-7632BDDAE0AB",
+          "ms": 1519,
+          "detail": {
+            "zohoSynced": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "ledgerly-connection",
+      "title": "Ledgerly connection & settings",
+      "description": "Integration status and live connection test against Ledgerly commerce API.",
+      "status": "pass",
+      "steps": [
+        {
+          "name": "integration-status",
+          "status": "pass",
+          "note": "connected=true",
+          "ms": 62,
+          "detail": {
+            "serverConfigured": true,
+            "connected": true,
+            "pullProductsAutoCreateCategory": false
+          }
+        },
+        {
+          "name": "test-connection",
+          "status": "pass",
+          "note": "Ledgerly API reachable",
+          "ms": 854,
+          "detail": {
+            "activeKeys": 3,
+            "activeWebhooks": 0,
+            "connected": true,
+            "message": "Integration API ready",
+            "organizationId": 1001,
+            "scopes": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "ledgerly-order-sync",
+      "title": "Ledgerly invoice + sales order sync",
+      "description": "Admin sync after payment; falls back to a known synced reference order when checkout is unpaid.",
+      "status": "pass",
+      "steps": [
+        {
+          "name": "sync-order",
+          "status": "pass",
+          "note": "sync OK for MNM-7632BDDAE0AB",
+          "ms": 978,
+          "detail": {
+            "orderNumber": "MNM-7632BDDAE0AB",
+            "ok": true
+          }
+        },
+        {
+          "name": "verify-sync-status",
+          "status": "pass",
+          "note": "paid order MNM-7632BDDAE0AB trackable after sync",
+          "ms": 817,
+          "detail": {
+            "order_number": "MNM-7632BDDAE0AB",
+            "status": "confirmed",
+            "tracking_status": "shipped",
+            "tracking_number": "",
+            "tracking_carrier": "",
+            "shipment_date": "2026-07-03"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ledgerly-inventory",
+      "title": "Pull inventory from Ledgerly",
+      "description": "Live inventory pull updates catalog stock from Ledgerly.",
+      "status": "pass",
+      "steps": [
+        {
+          "name": "pull-inventory",
+          "status": "pass",
+          "note": "ok",
+          "ms": 1367,
+          "detail": {
+            "successCount": 29,
+            "failureCount": 3,
+            "failures": [
+              {
+                "message": "No linked store product for SKU or Ledgerly item id",
+                "sku": "SKU-70215"
+              },
+              {
+                "message": "No linked store product for SKU or Ledgerly item id",
+                "sku": "SKU-81115618"
+              },
+              {
+                "message": "No linked store product for SKU or Ledgerly item id",
+                "sku": "SKU-81310724"
+              }
+            ],
+            "notices": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "ledgerly-shipment-tracking",
+      "title": "Shipment tracking pull",
+      "description": "Pull order tracking from Ledgerly and verify public track API on a known shipped order.",
+      "status": "pass",
+      "steps": [
+        {
+          "name": "pull-tracking",
+          "status": "pass",
+          "note": "tracking pull completed",
+          "ms": 39246,
+          "detail": {
+            "successCount": 40,
+            "failureCount": 0,
+            "failures": [],
+            "notices": []
+          }
+        },
+        {
+          "name": "public-track-shipped-ref",
+          "status": "pass",
+          "note": "MNM-2606-A4A0B \u2192 delivered",
+          "ms": 36,
+          "detail": {
+            "order_number": "MNM-2606-A4A0B",
+            "status": "fulfilled",
+            "tracking_status": "delivered",
+            "tracking_number": "",
+            "tracking_carrier": "Delhivery",
+            "shipment_date": "2026-06-06"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ledgerly-return-credit-note",
+      "title": "Return \u2192 refund \u2192 Ledgerly credit note",
+      "description": "Full return on demo-paid order synced to Ledgerly; verifies Razorpay demo refund and ledgerly_credit_note_id.",
+      "status": "pass",
+      "steps": [
+        {
+          "name": "return-eligibility",
+          "status": "pass",
+          "note": "eligible",
+          "ms": 38,
+          "detail": {}
+        },
+        {
+          "name": "request-return",
+          "status": "pass",
+          "note": "RET-MNM-7632BDDAE0AB-D9F2EE",
+          "ms": 47,
+          "detail": {}
+        },
+        {
+          "name": "approve",
+          "status": "pass",
+          "note": "approved",
+          "ms": 47,
+          "detail": {
+            "refund_amount": null,
+            "razorpay_refund_id": null,
+            "ledgerly_credit_note_id": null
+          }
+        },
+        {
+          "name": "mark-received",
+          "status": "pass",
+          "note": "received",
+          "ms": 49,
+          "detail": {
+            "refund_amount": null,
+            "razorpay_refund_id": null,
+            "ledgerly_credit_note_id": null
+          }
+        },
+        {
+          "name": "refund",
+          "status": "pass",
+          "note": "refunded",
+          "ms": 1044,
+          "detail": {
+            "refund_amount": 2.02,
+            "razorpay_refund_id": "rfnd_demo_MNM-7632BDDAE0AB",
+            "ledgerly_credit_note_id": "2552"
+          }
+        },
+        {
+          "name": "ledgerly-credit-note",
+          "status": "pass",
+          "note": "credit note 2552",
+          "ms": 0,
+          "detail": {
+            "id": 34802,
+            "return_number": "RET-MNM-7632BDDAE0AB-D9F2EE",
+            "status": "refunded",
+            "reason": "Ledgerly scenario integration test return",
+            "admin_notes": "Ledgerly scenario test\nLedgerly scenario test\nLedgerly scenario test",
+            "rejection_reason": null,
+            "refund_amount": 2.02,
+            "razorpay_refund_id": "rfnd_demo_MNM-7632BDDAE0AB",
+            "ledgerly_credit_note_id": "2552",
+            "requested_at": "2026-07-03T12:36:45.343011Z",
+            "resolved_at": "2026-07-03T12:36:46.482597950Z",
+            "order_id": 34702,
+            "order_number": "MNM-7632BDDAE0AB",
+            "order_total": 2.02,
+            "customer_login": "saikedar2003@gmail.com"
+          }
+        }
+      ]
+    },
+    {
+      "id": "public-track-api",
+      "title": "Public track API (no login)",
+      "description": "GET /api/v1/orders/track/{orderNumber} \u2014 delivery timeline only; no JWT required.",
+      "status": "pass",
+      "steps": [
+        {
+          "name": "shipped-order",
+          "status": "pass",
+          "note": "MNM-2606-A4A0B \u2192 delivered",
+          "ms": 35,
+          "detail": {
+            "order_number": "MNM-2606-A4A0B",
+            "status": "fulfilled",
+            "tracking_status": "delivered",
+            "tracking_number": "",
+            "tracking_carrier": "Delhivery",
+            "shipment_date": "2026-06-06"
+          }
+        },
+        {
+          "name": "returned-order",
+          "status": "pass",
+          "note": "MNM-2606-86EA3 shipment_date=2026-06-06",
+          "ms": 1289,
+          "detail": {
+            "order_number": "MNM-2606-86EA3",
+            "status": "confirmed",
+            "tracking_status": "pending",
+            "tracking_number": "",
+            "tracking_carrier": "",
+            "shipment_date": "2026-06-06"
+          }
+        },
+        {
+          "name": "checkout-order",
+          "status": "pass",
+          "note": "MNM-7632BDDAE0AB \u2192 pending (public fields OK)",
+          "ms": 29,
+          "detail": {
+            "order_number": "MNM-7632BDDAE0AB",
+            "status": "confirmed",
+            "tracking_status": "pending",
+            "tracking_number": "",
+            "tracking_carrier": "",
+            "shipment_date": "2026-07-03"
+          }
+        },
+        {
+          "name": "unknown-order",
+          "status": "pass",
+          "note": "404 for invalid order number",
+          "ms": 31,
+          "detail": {}
+        }
+      ]
+    },
+    {
+      "id": "reference-orders",
+      "title": "Previously verified UAT orders (read-only)",
+      "description": "Regression checks on orders from manual scenario runs \u2014 no mutations.",
+      "status": "pass",
+      "steps": [
+        {
+          "name": "shipped-order-track",
+          "status": "pass",
+          "note": "MNM-2606-A4A0B \u2192 delivered",
+          "ms": 32,
+          "detail": {
+            "order_number": "MNM-2606-A4A0B",
+            "status": "fulfilled",
+            "tracking_status": "delivered",
+            "tracking_number": "",
+            "tracking_carrier": "Delhivery",
+            "shipment_date": "2026-06-06"
+          }
+        },
+        {
+          "name": "returned-order-track",
+          "status": "pass",
+          "note": "MNM-2606-86EA3 shipment_date=2026-06-06",
+          "ms": 1202,
+          "detail": {
+            "order_number": "MNM-2606-86EA3",
+            "status": "confirmed",
+            "tracking_status": "pending",
+            "tracking_number": "",
+            "tracking_carrier": "",
+            "shipment_date": "2026-06-06"
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total": 10,
+    "passed": 10,
+    "failed": 0,
+    "skipped": 0
+  }
+}

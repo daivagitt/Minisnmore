@@ -13,6 +13,7 @@ export type SiteSettings = {
   instagram_url: string | null;
   facebook_url: string | null;
   youtube_url: string | null;
+  linkedin_url: string | null;
   twitter_url: string | null;
   footer_tagline: string | null;
   footer_copyright: string | null;
@@ -25,6 +26,27 @@ export type SiteSettings = {
   free_shipping_min_inr: number;
 };
 
+const DEFAULT_SOCIAL = {
+  instagram_url: "https://www.instagram.com/minis_n_more_official/",
+  facebook_url: "https://www.facebook.com/profile.php?id=61590495838027",
+  youtube_url: "https://www.youtube.com/@Minis_n_More_official",
+  linkedin_url: "https://www.linkedin.com/in/minis-n-more/",
+} as const;
+
+function coalesceUrl(value: string | null | undefined, fallback: string | null): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : fallback;
+}
+
+function mergeSiteSettings(data: Partial<SiteSettings> | null | undefined): SiteSettings {
+  const merged = { ...DEFAULTS, ...(data ?? {}) } as SiteSettings;
+  merged.instagram_url = coalesceUrl(merged.instagram_url, DEFAULT_SOCIAL.instagram_url);
+  merged.facebook_url = coalesceUrl(merged.facebook_url, DEFAULT_SOCIAL.facebook_url);
+  merged.youtube_url = coalesceUrl(merged.youtube_url, DEFAULT_SOCIAL.youtube_url);
+  merged.linkedin_url = coalesceUrl(merged.linkedin_url, DEFAULT_SOCIAL.linkedin_url);
+  return merged;
+}
+
 const DEFAULTS: SiteSettings = {
   brand_name: "Minis n More",
   legal_entity_name: "Stolt Global Private Limited",
@@ -34,9 +56,10 @@ const DEFAULTS: SiteSettings = {
   contact_phone: "+91 76765 25139",
   care_label: "Care",
   whatsapp_number: null,
-  instagram_url: null,
-  facebook_url: null,
-  youtube_url: null,
+  instagram_url: DEFAULT_SOCIAL.instagram_url,
+  facebook_url: DEFAULT_SOCIAL.facebook_url,
+  youtube_url: DEFAULT_SOCIAL.youtube_url,
+  linkedin_url: DEFAULT_SOCIAL.linkedin_url,
   twitter_url: null,
   footer_tagline:
     "Minis today, memories forever. Heirloom-quality clothing for the first 24 months — softly made in India, gently loved everywhere.",
@@ -60,7 +83,7 @@ async function load(): Promise<SiteSettings> {
   inflight = (async () => {
     try {
       const data = await getSiteSettings();
-      const merged: SiteSettings = { ...DEFAULTS, ...(data ?? {}) } as SiteSettings;
+      const merged = mergeSiteSettings(data ?? undefined);
       cache = merged;
       subs.forEach((fn) => fn(merged));
       return merged;

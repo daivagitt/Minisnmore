@@ -102,6 +102,4 @@ export function hasActiveFilters(filters: ShopSearch): boolean {
   return !!(filters.category || filters.age || filters.fabric);
 }
 
-export const SHOP_FILTER_FABRICS: Fabric[] = fabrics.filter(
-  (f) => f === "Organic Cotton" || f === "Muslin",
-);
+export const SHOP_FILTER_FABRICS: Fabric[] = fabrics.filter((f) => f === "Organic Cotton");
