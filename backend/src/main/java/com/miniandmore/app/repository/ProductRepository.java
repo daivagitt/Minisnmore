@@ -69,6 +69,12 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     List<Product> findAllByLedgerlyItemIdIsNotNull();
 
     @Query(
+        "select product from Product product where product.active = true and " +
+        "(product.ledgerlyItemId is not null or product.ledgerlySyncStatus = com.miniandmore.app.domain.enumeration.LedgerlySyncStatus.SYNCED)"
+    )
+    List<Product> findAllActiveLedgerlyLinked();
+
+    @Query(
         "select product from Product product where product.active = true and (product.ledgerlyItemId is not null or product.sku is not null)"
     )
     List<Product> findAllActiveEligibleForLedgerlyInventoryPull();

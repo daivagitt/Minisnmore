@@ -15,6 +15,7 @@ import com.miniandmore.app.repository.SiteSettingRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.*;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
@@ -192,12 +193,25 @@ public class LedgerlySyncService {
             .map(LedgerlySetting::getPullProductsAutoCreateCategory)
             .orElse(false);
         LedgerlySyncSummary.Builder builder = LedgerlySyncSummary.builder();
+        Set<String> pulledSkus = new HashSet<>();
+        Set<String> pulledLedgerlyItemIds = new HashSet<>();
         for (Map<String, Object> item : products) {
+            String sku = stringValue(item.get("sku"));
+            if (sku != null && !sku.isBlank()) {
+                pulledSkus.add(sku.trim());
+            }
+            String ledgerlyItemId = stringValue(item.get("ledgerlyItemId"));
+            if (ledgerlyItemId != null && !ledgerlyItemId.isBlank()) {
+                pulledLedgerlyItemIds.add(ledgerlyItemId.trim());
+            }
             try {
                 upsertPulledProduct(item, autoCreateCategory, builder);
             } catch (Exception e) {
                 builder.failure(stringValue(item.get("sku")), e.getMessage());
             }
+        }
+        if (!products.isEmpty()) {
+            deactivateStaleLedgerlyProducts(pulledSkus, pulledLedgerlyItemIds, builder);
         }
         return builder.build().toMap();
     }
@@ -302,8 +316,38 @@ public class LedgerlySyncService {
             }
         );
 
+        product.setActive(true);
         productRepository.save(product);
         builder.success();
+    }
+
+    /**
+     * Ledgerly pull is the catalogue source of truth for linked items. Store products that were
+     * previously synced but no longer appear in Ledgerly are hidden from the storefront.
+     */
+    private void deactivateStaleLedgerlyProducts(
+        Set<String> pulledSkus,
+        Set<String> pulledLedgerlyItemIds,
+        LedgerlySyncSummary.Builder builder
+    ) {
+        for (Product product : productRepository.findAllActiveLedgerlyLinked()) {
+            if (!isStillInLedgerlyPull(product, pulledSkus, pulledLedgerlyItemIds)) {
+                product.setActive(false);
+                product.setLedgerlySyncError("No longer in Ledgerly catalog (deactivated on pull)");
+                productRepository.save(product);
+                String label = StringUtils.defaultIfBlank(StringUtils.trimToNull(product.getSku()), product.getLedgerlyItemId());
+                builder.notice(label, "Deactivated — removed from Ledgerly");
+            }
+        }
+    }
+
+    private static boolean isStillInLedgerlyPull(Product product, Set<String> pulledSkus, Set<String> pulledLedgerlyItemIds) {
+        String itemId = StringUtils.trimToNull(product.getLedgerlyItemId());
+        if (itemId != null && pulledLedgerlyItemIds.contains(itemId)) {
+            return true;
+        }
+        String sku = StringUtils.trimToNull(product.getSku());
+        return sku != null && pulledSkus.contains(sku);
     }
 
     private Optional<Product> findProductForInventoryPull(String sku, String ledgerlyItemId) {

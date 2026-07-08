@@ -135,6 +135,38 @@ class LedgerlySyncServiceTest {
     }
 
     @Test
+    void pullProducts_deactivatesStoreProductsMissingFromLedgerlyPull() {
+        when(ledgerlyClient.pullProducts()).thenReturn(
+            Map.of("products", List.of(Map.of("sku", "SKU-KEEP", "ledgerlyItemId", "item-keep", "name", "Keep", "price", 100)))
+        );
+        when(ledgerlySettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+        when(productRepository.findOneBySku("SKU-KEEP")).thenReturn(Optional.empty());
+        when(productRepository.findMaxSortOrder()).thenReturn(0);
+        when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Product stale = product(80L).sku("SKU-GONE").ledgerlyItemId("item-gone").active(true);
+        stale.setLedgerlySyncStatus(LedgerlySyncStatus.SYNCED);
+        when(productRepository.findAllActiveLedgerlyLinked()).thenReturn(List.of(stale));
+
+        Map<String, Object> result = service.pullProducts();
+
+        assertThat(stale.getActive()).isFalse();
+        assertThat(result).containsEntry("successCount", 1);
+        assertThat((List<?>) result.get("notices")).isNotEmpty();
+    }
+
+    @Test
+    void pullProducts_emptyLedgerlyResponse_doesNotDeactivate() {
+        when(ledgerlyClient.pullProducts()).thenReturn(Map.of("products", List.of()));
+        when(ledgerlySettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+
+        Map<String, Object> result = service.pullProducts();
+
+        assertThat(result).containsEntry("successCount", 0);
+        verify(productRepository, never()).findAllActiveLedgerlyLinked();
+    }
+
+    @Test
     void syncOrder_success_setsInvoiceAndSalesOrderIds() {
         CustomerOrder order = order(10L, "ORD-10", LedgerlySyncStatus.PENDING);
         when(customerOrderRepository.findById(10L)).thenReturn(Optional.of(order));

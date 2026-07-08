@@ -336,7 +336,7 @@ function LedgerlySyncPanel({ connected }: { connected: boolean }) {
       id: "productsPull",
       label: "Pull products from Ledgerly",
       description:
-        "Import or update items from Ledgerly into Admin products. Matches by Ledgerly item id, then SKU.",
+        "Import or update items from Ledgerly into Admin products. Matches by Ledgerly item id, then SKU. Products removed in Ledgerly are deactivated on the storefront.",
       icon: Download,
       run: pullLedgerlyProducts,
     },
