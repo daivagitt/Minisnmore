@@ -17,6 +17,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class LedgerlyProductMergeService {
 
+    /** Storefront UAT price = selling price minus this discount (compare-at / Ledgerly rate). */
+    private static final BigDecimal STORE_UAT_DISCOUNT_MULTIPLIER = new BigDecimal("0.80");
+
+    private static final BigDecimal ESTIMATED_COST_RATIO = new BigDecimal("0.60");
     private final ProductDescriptionCodec descriptionCodec;
     private final LedgerlyItemImageSync itemImageSync;
 
@@ -26,10 +30,7 @@ public class LedgerlyProductMergeService {
     }
 
     public void mergeLedgerlyItem(Product product, Map<String, Object> item, CategoryResolver categoryResolver, NoticeCallback notice) {
-        BigDecimal sellingPrice = item.get("price") != null ? toBigDecimal(item.get("price")) : null;
-        if (sellingPrice != null) {
-            product.setPrice(sellingPrice);
-        }
+        BigDecimal ledgerlySellingRate = item.get("price") != null ? toBigDecimal(item.get("price")) : null;
         if (item.get("stock") != null) {
             product.setStock(toInteger(item.get("stock")));
         }
@@ -45,11 +46,13 @@ public class LedgerlyProductMergeService {
             descriptionCodec.applyDecoded(product, decoded);
         }
 
-        // Compare-at = Ledgerly selling price (rate), not purchase cost. CompareAt: in description wins.
-        if (decoded == null || decoded.compareAtPrice() == null) {
-            if (sellingPrice != null && sellingPrice.compareTo(BigDecimal.ZERO) > 0) {
-                product.setCompareAtPrice(sellingPrice);
-            }
+        BigDecimal sellingPrice = ledgerlySellingRate;
+        if (decoded != null && decoded.compareAtPrice() != null && decoded.compareAtPrice().compareTo(BigDecimal.ZERO) > 0) {
+            sellingPrice = decoded.compareAtPrice();
+        }
+        if (sellingPrice != null && sellingPrice.compareTo(BigDecimal.ZERO) > 0) {
+            product.setCompareAtPrice(sellingPrice);
+            product.setPrice(storeUatPrice(sellingPrice));
         }
 
         String fabric = firstNonBlank(stringValue(item.get("fabricType")), stringValue(item.get("fabric")));
@@ -93,18 +96,12 @@ public class LedgerlyProductMergeService {
         java.util.LinkedHashMap<String, Object> payload = new java.util.LinkedHashMap<>();
         payload.put("sku", product.getSku() != null ? product.getSku() : "P-" + product.getId());
         payload.put("name", product.getName());
-        payload.put("price", product.getPrice());
+        BigDecimal sellingPrice = storeSellingPrice(product);
+        payload.put("price", sellingPrice);
         payload.put("stock", product.getStock());
         payload.put("unit", "ea");
 
-        BigDecimal cost = product.getCompareAtPrice();
-        if (cost == null || cost.compareTo(BigDecimal.ZERO) <= 0) {
-            if (product.getPrice() != null && product.getPrice().compareTo(BigDecimal.ZERO) > 0) {
-                cost = product.getPrice().multiply(BigDecimal.valueOf(0.6)).setScale(2, RoundingMode.HALF_UP);
-            } else {
-                cost = BigDecimal.ZERO;
-            }
-        }
+        BigDecimal cost = sellingPrice.multiply(ESTIMATED_COST_RATIO).setScale(2, RoundingMode.HALF_UP);
         payload.put("cost", cost);
 
         String encoded = descriptionCodec.encode(product, categoryName);
@@ -215,5 +212,24 @@ public class LedgerlyProductMergeService {
             return null;
         }
         return new BigDecimal(text).intValue();
+    }
+
+    /** Compare-at in the store is the real selling price synced to Ledgerly as item rate. */
+    BigDecimal storeSellingPrice(Product product) {
+        if (product.getCompareAtPrice() != null && product.getCompareAtPrice().compareTo(BigDecimal.ZERO) > 0) {
+            return product.getCompareAtPrice();
+        }
+        if (product.getPrice() != null && product.getPrice().compareTo(BigDecimal.ZERO) > 0) {
+            return product.getPrice();
+        }
+        return BigDecimal.ZERO;
+    }
+
+    /** UAT storefront price applies a fixed 20% discount to the selling price. */
+    BigDecimal storeUatPrice(BigDecimal sellingPrice) {
+        if (sellingPrice == null || sellingPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return sellingPrice.multiply(STORE_UAT_DISCOUNT_MULTIPLIER).setScale(2, RoundingMode.HALF_UP);
     }
 }

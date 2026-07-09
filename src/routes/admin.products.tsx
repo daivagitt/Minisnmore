@@ -258,8 +258,8 @@ function ProductsPage() {
                 example: "newborn-essentials",
                 note: "Must match an existing category slug",
               },
-              { key: "price", required: true, example: 1299 },
-              { key: "compare_at_price", example: 1599, note: "Original / pre-discount price" },
+              { key: "price", required: true, example: 1039, note: "UAT storefront price (20% off selling price)" },
+              { key: "compare_at_price", example: 1299, note: "Actual selling price — synced to Ledgerly as item rate" },
               {
                 key: "age_range",
                 required: true,
@@ -298,7 +298,13 @@ function ProductsPage() {
               const catSlug = String(lookup("category_slug") ?? "")
                 .trim()
                 .toLowerCase();
-              const price = Number(lookup("price"));
+              const compareAtRaw = lookup("compare_at_price");
+              const compare_at_price =
+                compareAtRaw === "" || compareAtRaw == null ? null : Number(compareAtRaw);
+              let price = Number(lookup("price"));
+              if ((!isFinite(price) || price <= 0) && compare_at_price != null && compare_at_price > 0) {
+                price = Math.round(compare_at_price * 0.8);
+              }
               const ageRangeRaw = String(lookup("age_range") ?? "").trim();
               let ageMin: number;
               let ageMax: number;
@@ -349,10 +355,7 @@ function ProductsPage() {
                 category_slug: catSlug,
                 category_id: cat?.id ?? null,
                 price,
-                compare_at_price:
-                  lookup("compare_at_price") === "" || lookup("compare_at_price") == null
-                    ? null
-                    : Number(lookup("compare_at_price")),
+                compare_at_price,
                 age_min_months: ageMin,
                 age_max_months: ageMax,
                 fabric_type: fabric,
@@ -563,15 +566,23 @@ function ProductsPage() {
                     </div>
                     <div className="grid sm:grid-cols-4 gap-3">
                       <NumberField
-                        label="Price (₹)"
+                        label="UAT price (₹)"
                         value={p.price}
                         onChange={(price) => update(i, { price })}
                         required
                       />
                       <NumberField
-                        label="Compare at (₹)"
+                        label="Selling price (₹)"
                         value={p.compare_at_price}
-                        onChange={(compare_at_price) => update(i, { compare_at_price })}
+                        onChange={(compare_at_price) =>
+                          update(i, {
+                            compare_at_price,
+                            price:
+                              compare_at_price != null && compare_at_price !== ""
+                                ? Math.round(Number(compare_at_price) * 0.8)
+                                : p.price,
+                          })
+                        }
                       />
                       <NumberField
                         label="Stock"
