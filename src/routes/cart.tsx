@@ -81,8 +81,8 @@ function CartPage() {
                   <button onClick={() => updateQty(item.product.id, item.qty + 1, item.size, item.color)} className="h-8 w-8 grid place-items-center" aria-label="Increase"><Plus className="h-3.5 w-3.5" /></button>
                 </div>
                 <div className="text-right">
-                  <div className="font-medium">₹{(item.qty * item.product.price).toLocaleString("en-IN")}</div>
-                  <div className="text-[11px] text-muted-foreground">₹{item.product.price.toLocaleString("en-IN")} each</div>
+                  <div className="font-medium">₹{(item.qty * item.unitPrice).toLocaleString("en-IN")}</div>
+                  <div className="text-[11px] text-muted-foreground">₹{item.unitPrice.toLocaleString("en-IN")} each</div>
                 </div>
               </div>
             </div>

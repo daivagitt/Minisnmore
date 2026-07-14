@@ -37,6 +37,23 @@ export function trackingStatusLabel(order: OrderTrackingFields) {
   return (order.tracking_status ?? order.status ?? "pending").replace(/_/g, " ");
 }
 
+const TERMINAL_TRACKING_STATUSES = new Set(["delivered", "fulfilled", "cancelled", "canceled"]);
+
+export function isTerminalTrackingState(order: OrderTrackingFields | null | undefined): boolean {
+  if (!order) return false;
+  const tracking = String(order.tracking_status ?? "").toLowerCase();
+  const status = String(order.status ?? "").toLowerCase();
+  return TERMINAL_TRACKING_STATUSES.has(tracking) || TERMINAL_TRACKING_STATUSES.has(status);
+}
+
+export function shouldPollOrderTracking(
+  order: (OrderTrackingFields & { payment_status?: string }) | null | undefined,
+): boolean {
+  if (!order) return false;
+  if (order.payment_status && order.payment_status !== "paid") return false;
+  return !isTerminalTrackingState(order);
+}
+
 export function trackingStageIcon(key: string): LucideIcon {
   return TRACKING_STAGES.find((s) => s.key === key)?.icon ?? Package;
 }

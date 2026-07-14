@@ -72,9 +72,10 @@ public class RazorpayRefundService {
             HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() >= 300) {
+                RazorpayErrorMapper.ParsedRazorpayError razorpayError = RazorpayErrorMapper.parse(objectMapper, response.body());
                 throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY,
-                    "Razorpay refund failed: HTTP " + response.statusCode() + " " + response.body()
+                    RazorpayErrorMapper.refundHttpStatus(razorpayError, response.statusCode()),
+                    RazorpayErrorMapper.refundUserMessage(razorpayError, response.statusCode())
                 );
             }
             JsonNode root = objectMapper.readTree(response.body());
@@ -85,7 +86,7 @@ public class RazorpayRefundService {
             Thread.currentThread().interrupt();
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Razorpay refund interrupted");
         } catch (IOException | ArithmeticException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Razorpay refund failed: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Refund could not be processed. Please try again.");
         }
     }
 }

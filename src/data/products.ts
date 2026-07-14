@@ -4,6 +4,7 @@ import dress from "@/assets/p-dress-pink.jpg";
 import overalls from "@/assets/p-overalls-beige.jpg";
 import cardigan from "@/assets/p-cardigan-cream.jpg";
 import sleepsuit from "@/assets/p-sleepsuit-sage.jpg";
+import type { ProductVariant } from "@/lib/product-variants";
 
 export type AgeRange = "0-3m" | "3-6m" | "6-12m" | "12-18m" | "18-24m";
 export type Fabric = "Organic Cotton" | "Muslin" | "Linen" | "Knit" | "Bamboo";
@@ -18,6 +19,8 @@ export type Product = {
   categorySlug?: string;
   categoryName?: string;
   sku?: string;
+  itemStructure?: string;
+  variants?: ProductVariant[];
   isNew?: boolean;
   isBestseller?: boolean;
   isTrending?: boolean;

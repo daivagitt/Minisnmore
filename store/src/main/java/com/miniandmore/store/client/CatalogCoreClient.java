@@ -55,7 +55,12 @@ public class CatalogCoreClient {
             spec = spec.body(body);
         }
 
-        return spec.retrieve().toEntity(byte[].class);
+        return spec.exchange((httpRequest, response) -> {
+            byte[] responseBody = response.getBody().readAllBytes();
+            HttpHeaders headers = copyResponseHeaders(response.getHeaders());
+            headers.setContentLength(responseBody.length);
+            return new ResponseEntity<>(responseBody, headers, response.getStatusCode());
+        });
     }
 
     /**
@@ -81,7 +86,22 @@ public class CatalogCoreClient {
             spec = spec.header(HttpHeaders.AUTHORIZATION, auth);
         }
 
-        return spec.body(parts).retrieve().toEntity(byte[].class);
+        return spec.body(parts).exchange((httpRequest, response) -> {
+            byte[] responseBody = response.getBody().readAllBytes();
+            HttpHeaders headers = copyResponseHeaders(response.getHeaders());
+            headers.setContentLength(responseBody.length);
+            return new ResponseEntity<>(responseBody, headers, response.getStatusCode());
+        });
+    }
+
+    private static HttpHeaders copyResponseHeaders(HttpHeaders upstream) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.putAll(upstream);
+        // Hop-by-hop headers break gateway re-encoding (surface as "Connection prematurely closed").
+        headers.remove(HttpHeaders.TRANSFER_ENCODING);
+        headers.remove(HttpHeaders.CONTENT_LENGTH);
+        headers.remove(HttpHeaders.CONNECTION);
+        return headers;
     }
 
     private static String toCatalogPath(String requestPath) {

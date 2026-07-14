@@ -57,4 +57,18 @@ class OrderTrackingStatusResolverTest {
 
         assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("processing");
     }
+
+    @Test
+    void resolve_deliveredWhenLedgerlyReportsDelivered() {
+        CustomerOrder order = paidOrder().ledgerlyOrderStatus("delivered");
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivered");
+    }
+
+    @Test
+    void resolve_shippedWhenLedgerlyReportsInTransit() {
+        CustomerOrder order = paidOrder().ledgerlyOrderStatus("in_transit");
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("shipped");
+    }
 }

@@ -36,7 +36,7 @@ function CartPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="font-medium">₹{(it.qty * it.product.price).toLocaleString("en-IN")}</div>
+                  <div className="font-medium">₹{(it.qty * it.unitPrice).toLocaleString("en-IN")}</div>
                   <button onClick={() => removeFromCart(it.product.id, it.size, it.color)} className="text-xs text-muted-foreground hover:text-destructive inline-flex items-center gap-1 mt-1"><X className="h-3 w-3" /> Remove</button>
                 </div>
               </div>

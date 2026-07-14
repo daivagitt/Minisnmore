@@ -76,6 +76,8 @@ public class LedgerlyWebhookHandlerService {
         switch (event) {
             case "item.updated", "item.created" -> handleItemUpdated(data);
             case "invoice.paid" -> handleInvoicePaid(data);
+            case "order.fulfilled", "order.delivered", "salesorder.fulfilled", "shipment.updated", "shipment.delivered" ->
+                handleOrderTrackingUpdated(data);
             default -> LOG.debug("Ignoring unhandled Ledgerly webhook event {}", event);
         }
 
@@ -124,10 +126,34 @@ public class LedgerlyWebhookHandlerService {
         if (ledgerlyInvoiceId != null && !ledgerlyInvoiceId.isBlank()) {
             order.setLedgerlyInvoiceId(ledgerlyInvoiceId);
         }
-        order.setLedgerlyOrderStatus("Paid");
+        if (LedgerlyOrderStatus.shouldReplace(order.getLedgerlyOrderStatus(), "Paid")) {
+            order.setLedgerlyOrderStatus("Paid");
+        }
         order.setLedgerlySyncStatus(LedgerlySyncStatus.SYNCED);
         order.setLedgerlyLastSyncedAt(Instant.now());
         order.setLedgerlySyncError(null);
+        customerOrderRepository.save(order);
+    }
+
+    private void handleOrderTrackingUpdated(Map<String, Object> data) {
+        String externalRef = stringValue(data.get("externalRef"));
+        if (externalRef == null || externalRef.isBlank()) {
+            externalRef = stringValue(data.get("orderNumber"));
+        }
+        if (externalRef == null || externalRef.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "tracking webhook requires externalRef");
+        }
+        final String orderNumber = externalRef;
+        CustomerOrder order = customerOrderRepository
+            .findOneByOrderNumber(orderNumber)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No order for " + orderNumber));
+
+        String incoming = LedgerlyOrderStatus.resolveFromPullResponse(data);
+        if (incoming != null && LedgerlyOrderStatus.shouldReplace(order.getLedgerlyOrderStatus(), incoming)) {
+            order.setLedgerlyOrderStatus(incoming);
+        }
+        LedgerlyOrderStatus.applyTrackingFields(order, data);
+        order.setLedgerlyTrackingLastPulledAt(Instant.now());
         customerOrderRepository.save(order);
     }
 

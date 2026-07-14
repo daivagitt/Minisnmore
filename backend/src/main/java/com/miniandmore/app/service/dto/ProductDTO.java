@@ -54,6 +54,11 @@ public class ProductDTO implements Serializable {
 
     private String colorsJson;
 
+    @Size(max = 40)
+    private String itemStructure;
+
+    private String variantsJson;
+
     private String imagesJson;
 
     @Size(max = 80)
@@ -204,6 +209,22 @@ public class ProductDTO implements Serializable {
 
     public void setColorsJson(String colorsJson) {
         this.colorsJson = colorsJson;
+    }
+
+    public String getItemStructure() {
+        return itemStructure;
+    }
+
+    public void setItemStructure(String itemStructure) {
+        this.itemStructure = itemStructure;
+    }
+
+    public String getVariantsJson() {
+        return variantsJson;
+    }
+
+    public void setVariantsJson(String variantsJson) {
+        this.variantsJson = variantsJson;
     }
 
     public String getImagesJson() {
@@ -357,6 +378,8 @@ public class ProductDTO implements Serializable {
             ", ageMaxMonths=" + getAgeMaxMonths() +
             ", sizesJson='" + getSizesJson() + "'" +
             ", colorsJson='" + getColorsJson() + "'" +
+            ", itemStructure='" + getItemStructure() + "'" +
+            ", variantsJson='" + getVariantsJson() + "'" +
             ", imagesJson='" + getImagesJson() + "'" +
             ", badge='" + getBadge() + "'" +
             ", stock=" + getStock() +

@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { Loader2, Package, CreditCard, Heart, ArrowRight, Truck } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccountData } from "@/lib/account";
+import { formatOrderDate } from "@/lib/dates";
 import { useShop } from "@/store/shop";
 
 export const Route = createFileRoute("/account/")({
@@ -53,7 +54,7 @@ function Dashboard() {
               <div className="min-w-0">
                 <div className="font-medium">{o.order_number}</div>
                 <div className="text-xs text-muted-foreground">
-                  {new Date(o.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                  {formatOrderDate(o.created_at)}
                   {" · "}{o.order_items?.length || 0} item(s)
                 </div>
               </div>

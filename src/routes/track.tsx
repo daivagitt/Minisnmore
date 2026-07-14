@@ -6,10 +6,11 @@ import babyInfant from "@/assets/cat-infant.webp";
 import babyToddler from "@/assets/cat-toddler.webp";
 import lifestyle from "@/assets/lifestyle-mother.webp";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { useOrderTrackingPoll } from "@/hooks/useOrderTrackingPoll";
 import { toast } from "sonner";
 import { OrderTrackingCard } from "@/components/OrderTrackingCard";
+import { TrackingRefreshHint } from "@/components/TrackingRefreshHint";
 import { StorefrontPageHeader } from "@/components/StorefrontPageHeader";
-import { trackOrderPublic } from "@/lib/orders.functions";
 
 export const Route = createFileRoute("/track")({
   head: () => ({ meta: [{ title: "Track Order · Mini's n More" }] }),
@@ -18,34 +19,22 @@ export const Route = createFileRoute("/track")({
 
 function Track() {
   const [code, setCode] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [trackedOrder, setTrackedOrder] = useState<any | null>(null);
+  const [activeOrderNumber, setActiveOrderNumber] = useState<string | null>(null);
   const settings = useSiteSettings();
-  const handleTrack = async () => {
-    if (loading) return;
+  const { order: trackedOrder, loading, error, lastUpdated, polling } = useOrderTrackingPoll(
+    activeOrderNumber,
+    "public",
+  );
+
+  const handleTrack = () => {
     const next = code.trim();
     if (!next) {
       toast.error("Enter an order ID to track");
       return;
     }
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await trackOrderPublic({ data: { orderNumber: next } });
-      setTrackedOrder(response.order ?? null);
-      setCode(next.toUpperCase());
-      if (!response.order) {
-        setError("No tracking details found for that order.");
-      }
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "Could not load tracking details.";
-      setTrackedOrder(null);
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
+    setActiveOrderNumber(next.toUpperCase());
   };
+
   return (
     <div className="px-4 md:px-6 max-w-7xl mx-auto grid lg:grid-cols-[1fr_280px] gap-6 lg:gap-10">
       <div className="space-y-10 min-w-0">
@@ -57,30 +46,46 @@ function Track() {
         animate={false}
       >
         <div className="mt-4 glass rounded-full p-1.5 flex items-center">
-          <input value={code} onChange={(e) => setCode(e.target.value)}
-            className="flex-1 bg-transparent px-4 py-2.5 text-sm outline-none" placeholder="Order ID" />
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleTrack();
+            }}
+            className="flex-1 bg-transparent px-4 py-2.5 text-sm outline-none"
+            placeholder="Order ID"
+          />
           <button
             type="button"
             onClick={handleTrack}
-            disabled={loading}
+            disabled={loading && !trackedOrder}
             className="rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm flex items-center gap-2 disabled:opacity-60 disabled:pointer-events-none"
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Track
+            {loading && !trackedOrder ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Track
           </button>
         </div>
       </StorefrontPageHeader>
 
       <div className="glass-strong rounded-[2rem] p-8">
-        {!trackedOrder && !error && (
+        {!trackedOrder && !error && !loading && (
           <div className="text-sm text-muted-foreground">
             Enter your order number and tap Track to see the latest delivery timeline.
           </div>
         )}
+        {loading && !trackedOrder && (
+          <div className="grid place-items-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        )}
         {error && <div className="text-sm text-destructive">{error}</div>}
-        {trackedOrder && <OrderTrackingCard order={trackedOrder} />}
+        {trackedOrder && (
+          <>
+            <OrderTrackingCard order={trackedOrder} />
+            <TrackingRefreshHint lastUpdated={lastUpdated} polling={polling} />
+          </>
+        )}
       </div>
 
-      {/* What to expect — featured cards with imagery */}
       <div>
         <div className="text-xs uppercase tracking-[0.28em] text-primary mb-3">What to expect</div>
         <div className="grid sm:grid-cols-3 gap-4">
@@ -101,7 +106,6 @@ function Track() {
       </div>
       </div>
 
-      {/* Side rail with imagery (desktop only) */}
       <aside className="hidden lg:flex flex-col gap-4">
         <div className="glass-strong rounded-3xl overflow-hidden">
           <img src={lifestyle} alt="" loading="lazy" className="w-full h-72 object-cover" />

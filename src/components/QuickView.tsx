@@ -1,10 +1,52 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Star } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { useShop } from "@/store/shop";
+import {
+  colorsForSize,
+  defaultSellableSelection,
+  findVariant,
+  isVariantSellable,
+  isVariantsProduct,
+} from "@/lib/product-variants";
 
 export function QuickView() {
   const { quickView, setQuickView, addToCart } = useShop();
+  const [size, setSize] = useState<string | null>(null);
+  const [color, setColor] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!quickView) return;
+    const next = defaultSellableSelection(quickView);
+    setSize(next.size);
+    setColor(next.color);
+  }, [quickView]);
+
+  useEffect(() => {
+    if (!quickView || !size) return;
+    const available = colorsForSize(quickView, size);
+    setColor((prev) => (prev && available.includes(prev) ? prev : available[0] ?? null));
+  }, [quickView, size]);
+
+  const selectedVariant = useMemo(
+    () => (quickView ? findVariant(quickView, { size, color }) : undefined),
+    [quickView, size, color],
+  );
+  const displayPrice = selectedVariant?.price ?? quickView?.price ?? 0;
+  const displayCompareAt = selectedVariant?.compareAt ?? quickView?.compareAt;
+  const canAdd = !quickView
+    ? false
+    : isVariantsProduct(quickView)
+      ? isVariantSellable(selectedVariant)
+      : true;
+  const availableColors = useMemo(() => {
+    if (!quickView) return [];
+    const names = colorsForSize(quickView, size);
+    if (!isVariantsProduct(quickView)) return quickView.colors;
+    return quickView.colors.filter((c) => names.includes(c.name));
+  }, [quickView, size]);
+
   return (
     <AnimatePresence>
       {quickView && (
@@ -32,21 +74,57 @@ export function QuickView() {
                 </div>
                 <p className="text-sm text-muted-foreground mt-4 leading-relaxed">{quickView.description}</p>
                 <div className="mt-5 flex items-baseline gap-3">
-                  <span className="text-2xl font-medium">&#8377;{quickView.price.toLocaleString("en-IN")}</span>
-                  {quickView.compareAt && <span className="text-sm line-through text-muted-foreground">&#8377;{quickView.compareAt.toLocaleString("en-IN")}</span>}
+                  <span className="text-2xl font-medium">&#8377;{displayPrice.toLocaleString("en-IN")}</span>
+                  {displayCompareAt && displayCompareAt > displayPrice && (
+                    <span className="text-sm line-through text-muted-foreground">&#8377;{displayCompareAt.toLocaleString("en-IN")}</span>
+                  )}
                 </div>
                 <div className="mt-5">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Sizes</div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Size</div>
                   <div className="flex flex-wrap gap-2">
                     {quickView.sizes.map((s) => (
-                      <span key={s} className="glass rounded-full px-3 py-1.5 text-xs">{s}</span>
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setSize(s)}
+                        className={`rounded-full px-3 py-1.5 text-xs transition ${size === s ? "bg-primary text-primary-foreground" : "glass"}`}
+                      >
+                        {s}
+                      </button>
                     ))}
                   </div>
                 </div>
+                <div className="mt-4">
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Color · {color}</div>
+                  <div className="flex flex-wrap gap-2">
+                    {availableColors.map((c) => {
+                      const row = findVariant(quickView, { size, color: c.name });
+                      const disabled = isVariantsProduct(quickView) && !isVariantSellable(row);
+                      return (
+                        <button
+                          key={c.name}
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => setColor(c.name)}
+                          className={`h-8 w-8 rounded-full border-2 transition ${color === c.name ? "border-primary scale-110" : "border-white/70"} ${disabled ? "opacity-30" : ""}`}
+                          style={{ background: c.hex }}
+                          aria-label={c.name}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
                 <div className="mt-auto pt-6 flex gap-2">
-                  <button onClick={() => { addToCart(quickView); setQuickView(null); }}
-                    className="flex-1 rounded-full bg-primary text-primary-foreground py-3 font-medium hover:shadow-glow transition">
-                    Add to basket
+                  <button
+                    disabled={!canAdd}
+                    onClick={() => {
+                      if (!canAdd) return;
+                      addToCart(quickView, { size: size ?? undefined, color: color ?? undefined, variantSku: selectedVariant?.sku });
+                      setQuickView(null);
+                    }}
+                    className="flex-1 rounded-full bg-primary text-primary-foreground py-3 font-medium hover:shadow-glow transition disabled:opacity-50"
+                  >
+                    {canAdd ? "Add to basket" : "Out of stock"}
                   </button>
                   <Link to="/product/$slug" params={{ slug: quickView.slug }} onClick={() => setQuickView(null)}
                     className="rounded-full glass px-5 py-3 text-sm font-medium hover:bg-white/60 transition">

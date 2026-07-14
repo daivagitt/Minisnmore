@@ -2,6 +2,7 @@ import { listProducts, listBlogPosts, getPolicy, listCategories } from "@/lib/ba
 import { agesFromSizes } from "@/lib/product-ages";
 import { products as seedProducts, type Product, type Fabric } from "@/data/products";
 import { posts as seedPosts, type BlogPost } from "@/data/blog";
+import { parseVariantsJson } from "@/lib/product-variants";
 
 /**
  * Storefront data layer.
@@ -74,6 +75,9 @@ type DbProductRow = {
   category_name?: string | null;
   fabric_type?: string | null;
   sku?: string | null;
+  item_structure?: string | null;
+  variants_json?: string | null;
+  variants?: unknown;
 };
 
 type CategoryLookup = Map<string, { slug: string; name: string }>;
@@ -105,6 +109,8 @@ function mapProduct(row: DbProductRow): Product {
   const img = images[0] ?? fallbackImg;
   const sizes = normalizeSizes(row.sizes);
   const badge = (row.badge ?? "").toLowerCase();
+  const variants = parseVariantsJson(row.variants ?? row.variants_json);
+  const itemStructure = (row.item_structure ?? (variants.length ? "VARIANTS" : "SIMPLE")).toUpperCase();
   return {
     id: row.id,
     slug: row.slug,
@@ -127,6 +133,8 @@ function mapProduct(row: DbProductRow): Product {
     categorySlug: row.category_slug?.trim().toLowerCase() || undefined,
     categoryName: row.category_name?.trim() || undefined,
     sku: row.sku?.trim() || undefined,
+    itemStructure,
+    variants: variants.length ? variants : undefined,
     isNew: !!row.new_arrival || badge.includes("new"),
     isBestseller: !!row.best_seller || badge.includes("best"),
     isTrending: !!row.trending,
@@ -175,6 +183,8 @@ export async function loadProducts(): Promise<Product[]> {
             category_name,
             fabric_type: row.fabric_type,
             sku: row.sku,
+            item_structure: row.item_structure,
+            variants_json: row.variants_json,
           });
         });
       const list = mapped.length > 0 ? mapped : seedProducts;

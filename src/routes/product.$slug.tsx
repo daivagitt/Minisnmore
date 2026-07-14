@@ -9,6 +9,13 @@ import { ProductCard } from "@/components/ProductCard";
 import { ProductGallery } from "@/components/ProductGallery";
 import { checkSizeFit, clampQuantity } from "@/lib/product-fit";
 import { lookupPincode, normalizePincode } from "@/lib/pincode";
+import {
+  colorsForSize,
+  defaultSellableSelection,
+  findVariant,
+  isVariantSellable,
+  isVariantsProduct,
+} from "@/lib/product-variants";
 
 export const Route = createFileRoute("/product/$slug")({
   head: ({ params }) => ({
@@ -30,8 +37,9 @@ function ProductPage() {
   const products = useProducts();
   const product = useProduct(slug) as Product | undefined;
   const { addToCart, toggleWish, wishlist } = useShop();
-  const [size, setSize] = useState<string | null>(() => product?.sizes?.[0] ?? null);
-  const [color, setColor] = useState<string | null>(() => product?.colors?.[0]?.name ?? null);
+  const defaults = product ? defaultSellableSelection(product) : { size: null as string | null, color: null as string | null };
+  const [size, setSize] = useState<string | null>(() => defaults.size);
+  const [color, setColor] = useState<string | null>(() => defaults.color);
   const [heightCm, setHeightCm] = useState<string>("");
   const [chestCm, setChestCm] = useState<string>("");
   const [sizeChart, setSizeChart] = useState(false);
@@ -44,15 +52,52 @@ function ProductPage() {
 
   useEffect(() => {
     if (!product) return;
-    setSize((prev) => (prev && product.sizes.includes(prev) ? prev : product.sizes[0] ?? null));
-    setColor((prev) => (prev && product.colors.some((c) => c.name === prev) ? prev : product.colors[0]?.name ?? null));
+    const next = defaultSellableSelection(product);
+    setSize((prev) => (prev && product.sizes.includes(prev) ? prev : next.size));
   }, [product]);
+
+  useEffect(() => {
+    if (!product || !size) return;
+    const available = colorsForSize(product, size);
+    setColor((prev) => (prev && available.includes(prev) ? prev : available[0] ?? null));
+  }, [product, size]);
+
+  const selectedVariant = useMemo(
+    () => (product ? findVariant(product, { size, color }) : undefined),
+    [product, size, color],
+  );
+  const displayPrice = selectedVariant?.price ?? product?.price ?? 0;
+  const displayCompareAt = selectedVariant?.compareAt ?? product?.compareAt;
+  const canAdd = !product
+    ? false
+    : isVariantsProduct(product)
+      ? isVariantSellable(selectedVariant)
+      : true;
+  const availableColors = useMemo(() => {
+    if (!product) return [];
+    const names = colorsForSize(product, size);
+    if (!isVariantsProduct(product)) return product.colors;
+    return product.colors.filter((c) => names.includes(c.name));
+  }, [product, size]);
 
   const sizeFit = useMemo(() => {
     if (!product || !heightCm.trim()) return null;
     const result = checkSizeFit({ heightCm, chestCm, sizes: product.sizes });
     return result.ok ? { size: result.size } : { error: result.error };
   }, [heightCm, chestCm, product]);
+
+  const handleAdd = () => {
+    if (!product || !canAdd) {
+      toast.error("Selected size/color is unavailable");
+      return;
+    }
+    addToCart(product, {
+      size: size ?? product.sizes[0],
+      color: color ?? product.colors[0]?.name,
+      qty,
+      variantSku: selectedVariant?.sku,
+    });
+  };
 
   if (!product) {
     return (
@@ -110,27 +155,25 @@ function ProductPage() {
             <div className="text-[10px] uppercase tracking-[0.24em] text-primary">{product.fabric} · {product.category}</div>
             <h1 className="font-display text-lg sm:text-xl md:text-2xl lg:text-[1.65rem] leading-tight text-balance">{product.name}</h1>
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 pt-0.5">
-              <span className="font-display text-xl sm:text-2xl">&#8377;{product.price.toLocaleString("en-IN")}</span>
-              {product.compareAt && <span className="line-through text-muted-foreground text-sm">&#8377;{product.compareAt.toLocaleString("en-IN")}</span>}
-              {product.compareAt && (
+              <span className="font-display text-xl sm:text-2xl">&#8377;{displayPrice.toLocaleString("en-IN")}</span>
+              {displayCompareAt && displayCompareAt > displayPrice && (
+                <span className="line-through text-muted-foreground text-sm">&#8377;{displayCompareAt.toLocaleString("en-IN")}</span>
+              )}
+              {displayCompareAt && displayCompareAt > displayPrice && (
                 <span className="rounded-md bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary uppercase tracking-wide">
-                  Save &#8377;{(product.compareAt - product.price).toLocaleString("en-IN")}
+                  Save &#8377;{(displayCompareAt - displayPrice).toLocaleString("en-IN")}
                 </span>
               )}
             </div>
+            {isVariantsProduct(product) && selectedVariant && (
+              <div className="text-[11px] text-muted-foreground">
+                {canAdd ? `${selectedVariant.stock} in stock` : "Out of stock"}
+                {selectedVariant.sku ? ` · ${selectedVariant.sku}` : ""}
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">
-            <div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Color · {color}</div>
-              <div className="flex gap-2">
-                {product.colors.map((c) => (
-                  <button key={c.name} onClick={() => setColor(c.name)}
-                    className={`h-8 w-8 rounded-full border-2 transition ${color === c.name ? "border-primary scale-110" : "border-white/70"}`}
-                    style={{ background: c.hex }} aria-label={c.name} />
-                ))}
-              </div>
-            </div>
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Size</div>
@@ -143,6 +186,27 @@ function ProductPage() {
                     {s}
                   </button>
                 ))}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Color · {color}</div>
+              <div className="flex gap-2 flex-wrap">
+                {availableColors.map((c) => {
+                  const row = findVariant(product, { size, color: c.name });
+                  const disabled = isVariantsProduct(product) && !isVariantSellable(row);
+                  return (
+                    <button
+                      key={c.name}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => setColor(c.name)}
+                      className={`h-8 w-8 rounded-full border-2 transition ${color === c.name ? "border-primary scale-110" : "border-white/70"} ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}
+                      style={{ background: c.hex }}
+                      aria-label={c.name}
+                      title={disabled ? `${c.name} unavailable` : c.name}
+                    />
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -244,10 +308,11 @@ function ProductPage() {
           <div className="hidden sm:flex gap-2">
             <button
               type="button"
-              onClick={() => addToCart(product, { size: size ?? product.sizes[0], color: color ?? product.colors[0].name, qty })}
-              className="flex-1 rounded-full bg-primary text-primary-foreground py-3 text-sm font-semibold uppercase tracking-wide hover:shadow-glow transition"
+              disabled={!canAdd}
+              onClick={handleAdd}
+              className="flex-1 rounded-full bg-primary text-primary-foreground py-3 text-sm font-semibold uppercase tracking-wide hover:shadow-glow transition disabled:opacity-50"
             >
-              Add to basket
+              {canAdd ? "Add to basket" : "Out of stock"}
             </button>
             <button
               type="button"
@@ -365,14 +430,15 @@ function ProductPage() {
         <div className="glass-strong rounded-full p-2 flex items-center gap-2 sm:gap-3 max-w-7xl mx-auto">
           <div className="pl-2 sm:pl-3 flex-1 min-w-0">
             <div className="text-[11px] text-muted-foreground truncate">{product.name}</div>
-            <div className="font-medium text-sm">&#8377;{product.price.toLocaleString("en-IN")}</div>
+            <div className="font-medium text-sm">&#8377;{displayPrice.toLocaleString("en-IN")}</div>
           </div>
           <button
             type="button"
-            onClick={() => addToCart(product, { size: size ?? product.sizes[0], color: color ?? product.colors[0].name, qty })}
-            className="shrink-0 rounded-full bg-primary text-primary-foreground px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-medium"
+            disabled={!canAdd}
+            onClick={handleAdd}
+            className="shrink-0 rounded-full bg-primary text-primary-foreground px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-medium disabled:opacity-50"
           >
-            Add to basket
+            {canAdd ? "Add to basket" : "Out of stock"}
           </button>
         </div>
       </div>

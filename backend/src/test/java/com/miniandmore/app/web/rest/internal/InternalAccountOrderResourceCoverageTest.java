@@ -180,6 +180,50 @@ class InternalAccountOrderResourceCoverageTest {
     }
 
     @Test
+    void syncPayment_alreadyPaid_returnsPaidWithoutCallingRazorpay() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(53L)
+            .userLogin("customer1")
+            .orderNumber("MNM-PAID")
+            .paymentStatus(PaymentStatus.PAID)
+            .total(BigDecimal.TEN);
+        when(customerOrderRepository.findById(53L)).thenReturn(Optional.of(order));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders/sync-payment")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"orderId\":53}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.paid").value(true))
+            .andExpect(jsonPath("$.data.orderNumber").value("MNM-PAID"));
+    }
+
+    @Test
+    void syncPayment_pendingWithoutRazorpayOrder_returnsNotPaid() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(54L)
+            .userLogin("customer1")
+            .orderNumber("MNM-PENDING")
+            .paymentStatus(PaymentStatus.PENDING)
+            .total(BigDecimal.TEN);
+        when(customerOrderRepository.findById(54L)).thenReturn(Optional.of(order));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders/sync-payment")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"orderId\":54}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.paid").value(false))
+            .andExpect(jsonPath("$.data.payment_status").value("pending"));
+    }
+
+    @Test
     void trackOrder_ledgerlyRefreshFailure_returnsOrderAnyway() throws Exception {
         CustomerOrder order = new CustomerOrder()
             .id(6L)
@@ -331,6 +375,11 @@ class InternalAccountOrderResourceCoverageTest {
         @Bean
         ObjectMapper objectMapper() {
             return new ObjectMapper();
+        }
+
+        @Bean
+        com.miniandmore.app.service.ProductVariantSupport productVariantSupport(ObjectMapper objectMapper) {
+            return new com.miniandmore.app.service.ProductVariantSupport(objectMapper);
         }
 
         @Bean

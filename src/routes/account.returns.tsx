@@ -10,6 +10,7 @@ import {
   type OrderReturnRow,
 } from "@/lib/orders.functions";
 import { showApiError } from "@/lib/ui-errors";
+import { formatOrderDate } from "@/lib/dates";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/account/returns")({
@@ -177,11 +178,7 @@ function ReturnsPage() {
                       {o.order_number}
                     </Link>
                     <div className="text-xs text-muted-foreground">
-                      {new Date(o.created_at).toLocaleDateString("en-IN", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}{" "}
+                      {formatOrderDate(o.created_at)}{" "}
                       · ₹{Number(o.total).toLocaleString("en-IN")}
                     </div>
                   </div>

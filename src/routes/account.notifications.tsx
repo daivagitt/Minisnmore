@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Bell, Package, CreditCard, Heart, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccountData } from "@/lib/account";
+import { formatOrderDate } from "@/lib/dates";
 
 export const Route = createFileRoute("/account/notifications")({
   head: () => ({ meta: [{ title: "Notifications · Mini's n More" }] }),
@@ -63,7 +64,9 @@ function NotificationsPage() {
                   <div className="text-sm font-medium">{n.title}</div>
                   <div className="text-xs text-muted-foreground">{n.body}</div>
                 </div>
-                <div className="text-[11px] text-muted-foreground whitespace-nowrap">{new Date(n.at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</div>
+                <div className="text-[11px] text-muted-foreground whitespace-nowrap">
+                  {formatOrderDate(n.at, { day: "numeric", month: "short" })}
+                </div>
               </div>
             );
           })}

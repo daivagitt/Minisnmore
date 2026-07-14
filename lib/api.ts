@@ -82,10 +82,10 @@ const FIELD_LABELS: Record<string, string> = {
   pricesIncludeGst: "Product prices include GST",
   description: "Description",
   sku: "SKU",
-  price: "Price",
+  price: "UAT price (₹)",
   stock: "Stock",
   fabricType: "Fabric type",
-  compareAtPrice: "Compare at price",
+  compareAtPrice: "Selling price (₹)",
   ageMinMonths: "Age min (months)",
   ageMaxMonths: "Age max (months)",
   sortOrder: "Sort order",
@@ -130,7 +130,7 @@ const FIELD_LABELS: Record<string, string> = {
   dataCenter: "Zoho data centre",
   categoryId: "Category",
   fabric_type: "Fabric type",
-  compare_at_price: "Compare at price",
+  compare_at_price: "Selling price (₹)",
   age_min_months: "Age min (months)",
   age_max_months: "Age max (months)",
   sort_order: "Sort order",
@@ -247,6 +247,54 @@ function isUnsafeErrorText(text: string) {
   );
 }
 
+function sanitizeRazorpayRefundDetail(detail: string): string | null {
+  const trimmed = detail.trim();
+  if (!trimmed) return null;
+
+  const jsonStart = trimmed.indexOf("{");
+  const payload = jsonStart >= 0 ? trimmed.slice(jsonStart) : trimmed;
+  if (!payload.startsWith("{")) return null;
+
+  try {
+    const parsed = JSON.parse(payload) as { error?: { description?: string; code?: string } };
+    const description = parsed.error?.description?.trim();
+    if (!description) return null;
+
+    const normalized = description.toLowerCase();
+    if (normalized.includes("enough balance") || normalized.includes("insufficient balance")) {
+      return (
+        "Refund could not be processed because your Razorpay account does not have enough balance. " +
+        "Add funds in the Razorpay Dashboard or wait for recent payments to settle, then try again."
+      );
+    }
+    if (normalized.includes("already been refunded") || normalized.includes("fully refunded")) {
+      return "This payment has already been refunded.";
+    }
+    if (normalized.includes("not captured")) {
+      return "Refund cannot be issued because the payment has not been captured yet.";
+    }
+    return description;
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeProblemDetail(detail: string): string | null {
+  const trimmed = detail.trim();
+  if (!trimmed) return null;
+
+  const razorpayMessage = sanitizeRazorpayRefundDetail(trimmed);
+  if (razorpayMessage) return razorpayMessage;
+
+  const withoutHttpPrefix = trimmed.replace(/^Razorpay refund failed:\s*HTTP\s+\d+\s*/i, "").trim();
+  if (withoutHttpPrefix && withoutHttpPrefix !== trimmed) {
+    const fromStripped = sanitizeRazorpayRefundDetail(withoutHttpPrefix);
+    if (fromStripped) return fromStripped;
+  }
+
+  return null;
+}
+
 function isGenericHttpTitle(title: string) {
   return GENERIC_HTTP_TITLES.has(title.trim().toLowerCase());
 }
@@ -304,7 +352,12 @@ export function extractEmbeddedProblemReason(detail: string): string | null {
 function safeProblemText(value: unknown) {
   if (typeof value !== "string") return null;
   const sanitized = value.trim();
-  if (!sanitized || isUnsafeErrorText(sanitized)) return null;
+  if (!sanitized) return null;
+
+  const razorpaySanitized = sanitizeProblemDetail(sanitized);
+  if (razorpaySanitized) return razorpaySanitized;
+
+  if (isUnsafeErrorText(sanitized)) return null;
   if (isGenericHttpTitle(sanitized) || isGenericDetail(sanitized)) return null;
   return sanitized;
 }
@@ -327,6 +380,9 @@ export function formatProblemBody(status: number, body: unknown): string {
     if (validationMessage) return validationMessage;
 
     if (typeof record.detail === "string") {
+      const sanitized = sanitizeProblemDetail(record.detail);
+      if (sanitized) return sanitized;
+
       const embedded = extractEmbeddedProblemReason(record.detail);
       if (embedded) return embedded;
     }

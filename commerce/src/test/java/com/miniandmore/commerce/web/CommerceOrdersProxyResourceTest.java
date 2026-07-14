@@ -61,6 +61,7 @@ class CommerceOrdersProxyResourceTest {
         when(catalog.get("/internal/v1/orders/ORD-1")).thenReturn(ResponseEntity.ok("{}"));
         when(catalog.post(eq("/internal/v1/orders"), any())).thenReturn(ResponseEntity.ok("{}"));
         when(catalog.post(eq("/internal/v1/orders/verify-payment"), any())).thenReturn(ResponseEntity.ok("{}"));
+        when(catalog.post(eq("/internal/v1/orders/sync-payment"), any())).thenReturn(ResponseEntity.ok("{}"));
         when(catalog.put(eq("/internal/v1/account/profile"), any())).thenReturn(ResponseEntity.ok("{}"));
 
         mockMvc.perform(get("/api/v1/orders")).andExpect(status().isOk());
@@ -70,6 +71,9 @@ class CommerceOrdersProxyResourceTest {
         mockMvc.perform(post("/api/v1/orders").contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isOk());
         mockMvc
             .perform(post("/api/v1/orders/verify-payment").contentType(MediaType.APPLICATION_JSON).content("{}"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(post("/api/v1/orders/sync-payment").contentType(MediaType.APPLICATION_JSON).content("{}"))
             .andExpect(status().isOk());
         mockMvc
             .perform(

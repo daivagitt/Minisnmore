@@ -49,6 +49,22 @@ const product: Product = {
   description: "Soft romper",
 };
 
+const pricedVariantProduct: Product = {
+  ...product,
+  id: "p-var",
+  sku: "HORIZON",
+  itemStructure: "VARIANTS",
+  colors: [
+    { name: "Navy", hex: "#2c3e58" },
+    { name: "Ivory", hex: "#f2eee8" },
+  ],
+  sizes: ["S", "M"],
+  variants: [
+    { sku: "HORIZON-S-NAVY", size: "S", color: "Navy", price: 799.2, compareAt: 999, stock: 3, active: true },
+    { sku: "HORIZON-M-NAVY", size: "M", color: "Navy", price: 959.2, compareAt: 1199, stock: 4, active: true },
+  ],
+};
+
 function Harness() {
   const shop = useShop();
   return (
@@ -59,6 +75,18 @@ function Harness() {
       <span data-testid="wishlist">{shop.wishlist.join(",")}</span>
       <button onClick={() => shop.addToCart(product)}>add</button>
       <button onClick={() => shop.addToCart(product, { size: "3-6m", color: "Cream", qty: 2 })}>add-variant</button>
+      <button
+        onClick={() =>
+          shop.addToCart(pricedVariantProduct, {
+            size: "M",
+            color: "Navy",
+            qty: 2,
+            variantSku: "HORIZON-M-NAVY",
+          })
+        }
+      >
+        add-priced-variant
+      </button>
       <button onClick={() => shop.updateQty("p1", 3)}>qty</button>
       <button onClick={() => shop.updateQty("p1", 4, "3-6m", "Cream")}>qty-variant</button>
       <button onClick={() => shop.updateQty("p1", 0)}>zero</button>
@@ -237,6 +265,18 @@ describe("ShopProvider", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "remove-variant" }));
     expect(screen.getByTestId("count")).toHaveTextContent("1");
+  });
+
+  it("totals cart using variant unit prices", async () => {
+    render(
+      <ShopProvider>
+        <Harness />
+      </ShopProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+    await userEvent.click(screen.getByRole("button", { name: "add-priced-variant" }));
+    expect(screen.getByTestId("count")).toHaveTextContent("2");
+    expect(screen.getByTestId("total")).toHaveTextContent("1918");
   });
 
   it("returns empty storage reads and clears legacy guest keys", async () => {

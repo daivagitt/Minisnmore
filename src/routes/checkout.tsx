@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { Check, ChevronLeft, Heart, Loader2, Smartphone, CreditCard, Building2, Wallet, Banknote, Shield, MapPin, Plus, Zap, Minus, X, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
-import { createOrder, verifyPayment, getMyProfile, updateMyProfile, getFirstOrderEligibility } from "@/lib/orders.functions";
+import { createOrder, verifyPayment, syncPaymentStatus, getMyProfile, updateMyProfile, getFirstOrderEligibility } from "@/lib/orders.functions";
 import { validateCoupon } from "@/lib/coupons.functions";
 import { commerceFromSiteSettings } from "@/lib/commerce";
 import { orderTotals } from "@/lib/money";
@@ -250,8 +250,9 @@ function Checkout() {
             product_image: i.product.image,
             size: i.size,
             color: i.color,
+            sku: i.variantSku ?? "",
             qty: i.qty,
-            price: i.product.price,
+            price: i.unitPrice,
           })),
           shipping_address: {
             full_name: fullName, email, phone, line1, line2, city, state, pincode: pin, baby_name: babyName,
@@ -299,6 +300,54 @@ function Checkout() {
       const ok = await loadRazorpay();
       if (!ok) throw new Error("Could not load Razorpay");
 
+      let paymentHandled = false;
+      let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+      const finishSuccessfulPayment = async (orderNumber: string) => {
+        if (paymentHandled) return;
+        paymentHandled = true;
+        if (pollTimer) clearInterval(pollTimer);
+        clearCart();
+        setDone({ orderNumber });
+        toast.success("Payment successful ✨");
+        setTimeout(() => {
+          nav({ to: "/account/orders/$orderNumber", params: { orderNumber } });
+        }, 2500);
+      };
+
+      const handleRazorpaySuccess = async (resp: {
+        razorpay_order_id: string;
+        razorpay_payment_id: string;
+        razorpay_signature: string;
+      }) => {
+        if (paymentHandled) return;
+        try {
+          const v = await verifyPayment({
+            data: {
+              orderId: init.orderId,
+              razorpay_order_id: resp.razorpay_order_id,
+              razorpay_payment_id: resp.razorpay_payment_id,
+              razorpay_signature: resp.razorpay_signature,
+            },
+          });
+          await finishSuccessfulPayment(v.orderNumber);
+        } catch (e: any) {
+          toast.error(e?.message || "Payment verification failed. Please contact support if amount was debited.");
+        }
+      };
+
+      const pollPaymentStatus = async () => {
+        if (paymentHandled) return;
+        try {
+          const res = await syncPaymentStatus({ data: { orderId: init.orderId } });
+          if (res.paid) {
+            await finishSuccessfulPayment(res.orderNumber);
+          }
+        } catch {
+          // Razorpay may not have confirmed yet — keep polling until modal closes or payment succeeds.
+        }
+      };
+
       const rzp = new window.Razorpay({
         key: init.keyId,
         amount: init.amount,
@@ -322,37 +371,29 @@ function Checkout() {
           },
         },
         handler: async (resp: any) => {
-          try {
-            const v = await verifyPayment({
-              data: {
-                orderId: init.orderId,
-                razorpay_order_id: resp.razorpay_order_id,
-                razorpay_payment_id: resp.razorpay_payment_id,
-                razorpay_signature: resp.razorpay_signature,
-              },
-            });
-            clearCart();
-            setDone({ orderNumber: v.orderNumber });
-            toast.success("Payment successful ✨");
-            // auto-redirect to the order details page after a short pause
-            setTimeout(() => {
-              nav({ to: "/account/orders/$orderNumber", params: { orderNumber: v.orderNumber } });
-            }, 2500);
-          } catch (e: any) {
-            toast.error(e?.message || "Payment verification failed. Please contact support if amount was debited.");
-          }
+          await handleRazorpaySuccess(resp);
         },
         modal: {
           ondismiss: () => {
-            toast("Payment cancelled — your cart is saved, you can retry anytime.", { icon: "🛒" });
+            if (pollTimer) clearInterval(pollTimer);
+            if (!paymentHandled) {
+              toast("Payment cancelled — your cart is saved, you can retry anytime.", { icon: "🛒" });
+            }
           },
         },
+      });
+      rzp.on("payment.success", (resp: any) => {
+        void handleRazorpaySuccess(resp);
       });
       rzp.on("payment.failed", (r: any) => {
         const reason = r?.error?.description || r?.error?.reason || "Payment failed";
         toast.error(`${reason}. Please try a different payment method.`);
       });
       rzp.open();
+      void pollPaymentStatus();
+      pollTimer = setInterval(() => {
+        void pollPaymentStatus();
+      }, 3000);
     } catch (e: any) {
       toast.error(e?.message || "Could not start payment");
     } finally {
@@ -639,7 +680,7 @@ function Checkout() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm font-medium">₹{(i.qty * i.product.price).toLocaleString("en-IN")}</div>
+                      <div className="text-sm font-medium">₹{(i.qty * i.unitPrice).toLocaleString("en-IN")}</div>
                       <button onClick={() => removeFromCart(i.product.id, i.size, i.color)} className="text-[11px] text-muted-foreground hover:text-destructive inline-flex items-center gap-1 mt-1">
                         <X className="h-3 w-3" /> Remove
                       </button>
@@ -679,7 +720,7 @@ function Checkout() {
                   <button onClick={() => removeFromCart(i.product.id, i.size, i.color)} aria-label="Remove" className="ml-1 h-5 w-5 grid place-items-center rounded-full text-muted-foreground hover:text-destructive"><X className="h-2.5 w-2.5" /></button>
                 </div>
               </div>
-              <div className="text-right">₹{(i.qty * i.product.price).toLocaleString("en-IN")}</div>
+              <div className="text-right">₹{(i.qty * i.unitPrice).toLocaleString("en-IN")}</div>
             </div>
           ))}
           {cart.length === 0 && <div className="text-sm text-muted-foreground">Basket is empty.</div>}

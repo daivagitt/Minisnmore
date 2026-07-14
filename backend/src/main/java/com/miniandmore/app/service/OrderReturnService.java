@@ -55,6 +55,7 @@ public class OrderReturnService {
     private final ProductRepository productRepository;
     private final RazorpayRefundService razorpayRefundService;
     private final LedgerlyIntegrationClient ledgerlyIntegrationClient;
+    private final ProductVariantSupport variantSupport;
 
     public OrderReturnService(
         OrderReturnRepository orderReturnRepository,
@@ -62,7 +63,8 @@ public class OrderReturnService {
         OrderItemRepository orderItemRepository,
         ProductRepository productRepository,
         RazorpayRefundService razorpayRefundService,
-        LedgerlyIntegrationClient ledgerlyIntegrationClient
+        LedgerlyIntegrationClient ledgerlyIntegrationClient,
+        ProductVariantSupport variantSupport
     ) {
         this.orderReturnRepository = orderReturnRepository;
         this.customerOrderRepository = customerOrderRepository;
@@ -70,6 +72,7 @@ public class OrderReturnService {
         this.productRepository = productRepository;
         this.razorpayRefundService = razorpayRefundService;
         this.ledgerlyIntegrationClient = ledgerlyIntegrationClient;
+        this.variantSupport = variantSupport;
     }
 
     public List<OrderReturn> listForUser(String login) {
@@ -287,7 +290,22 @@ public class OrderReturnService {
                     .findOneForInventoryUpdate(productId)
                     .ifPresent(product -> {
                         int qty = Optional.ofNullable(item.getQty()).orElse(0);
-                        product.setStock(Optional.ofNullable(product.getStock()).orElse(0) + qty);
+                        if (qty <= 0) {
+                            return;
+                        }
+                        if (StringUtils.isNotBlank(item.getVariantSku()) && variantSupport.isVariants(product)) {
+                            if (!variantSupport.incrementVariantStock(
+                                product,
+                                item.getVariantSku(),
+                                item.getItemSize(),
+                                item.getColor(),
+                                qty
+                            )) {
+                                product.setStock(Optional.ofNullable(product.getStock()).orElse(0) + qty);
+                            }
+                        } else {
+                            product.setStock(Optional.ofNullable(product.getStock()).orElse(0) + qty);
+                        }
                         productRepository.save(product);
                     });
             } catch (NumberFormatException ignored) {

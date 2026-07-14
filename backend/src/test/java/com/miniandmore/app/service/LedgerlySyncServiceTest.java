@@ -2,6 +2,8 @@ package com.miniandmore.app.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
@@ -26,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.quality.Strictness;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -58,6 +61,9 @@ class LedgerlySyncServiceTest {
     @Mock
     private SiteSettingRepository siteSettingRepository;
 
+    @Spy
+    private ProductVariantSupport variantSupport = new ProductVariantSupport(new com.fasterxml.jackson.databind.ObjectMapper());
+
     @InjectMocks
     private LedgerlySyncService service;
 
@@ -88,15 +94,35 @@ class LedgerlySyncServiceTest {
         Product product = product(1L).active(true);
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
         when(ledgerlyClient.syncProductPayload(any())).thenReturn(Map.of("ledgerlyItemId", "item-99"));
-        when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.syncProduct(1L);
 
-        assertThat(product.getLedgerlySyncStatus()).isEqualTo(LedgerlySyncStatus.SYNCED);
-        assertThat(product.getLedgerlyItemId()).isEqualTo("item-99");
-        assertThat(product.getLedgerlySyncError()).isNull();
-        assertThat(product.getLedgerlyLastSyncedAt()).isNotNull();
         verify(productMergeService).buildPushPayload(eq(product), any());
+        verify(productRepository).updateLedgerlySyncSuccess(
+            eq(1L),
+            eq("item-99"),
+            eq(LedgerlySyncStatus.SYNCED),
+            any()
+        );
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void syncProduct_success_updatesMetadataWithoutSavingStaleSnapshot() {
+        Product snapshot = product(1L).active(true).stock(8);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(snapshot));
+        when(ledgerlyClient.syncProductPayload(any())).thenReturn(Map.of("ledgerlyItemId", "item-99"));
+
+        service.syncProduct(1L);
+
+        verify(productRepository).updateLedgerlySyncSuccess(
+            eq(1L),
+            eq("item-99"),
+            eq(LedgerlySyncStatus.SYNCED),
+            any()
+        );
+        verify(productRepository, never()).save(any());
+        assertThat(snapshot.getStock()).isEqualTo(8);
     }
 
     @Test
@@ -104,12 +130,11 @@ class LedgerlySyncServiceTest {
         Product product = product(2L).active(true);
         when(productRepository.findById(2L)).thenReturn(Optional.of(product));
         when(ledgerlyClient.syncProductPayload(any())).thenThrow(new RuntimeException("upstream 503"));
-        when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.syncProduct(2L);
 
-        assertThat(product.getLedgerlySyncStatus()).isEqualTo(LedgerlySyncStatus.FAILED);
-        assertThat(product.getLedgerlySyncError()).contains("503");
+        verify(productRepository).updateLedgerlySyncFailure(eq(2L), eq(LedgerlySyncStatus.FAILED), contains("503"));
+        verify(productRepository, never()).save(any());
     }
 
     @Test
@@ -222,16 +247,43 @@ class LedgerlySyncServiceTest {
     }
 
     @Test
-    void pullOrderTracking_whenFound_updatesStatus() {
+    void pullOrderTracking_whenFound_updatesStatusAndTrackingFields() {
         CustomerOrder order = order(11L, "ORD-11", LedgerlySyncStatus.SYNCED);
         when(customerOrderRepository.findById(11L)).thenReturn(Optional.of(order));
-        when(ledgerlyClient.pullOrderTracking("ORD-11")).thenReturn(Map.of("found", true, "status", "delivered"));
+        when(ledgerlyClient.pullOrderTracking("ORD-11")).thenReturn(
+            Map.of(
+                "found",
+                true,
+                "status",
+                "Paid",
+                "fulfillmentStatus",
+                "delivered",
+                "trackingNumber",
+                "AWB-11",
+                "shipmentDate",
+                "2026-07-13"
+            )
+        );
         when(customerOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.pullOrderTracking(11L);
 
         assertThat(order.getLedgerlyOrderStatus()).isEqualTo("delivered");
+        assertThat(order.getTrackingNumber()).isEqualTo("AWB-11");
+        assertThat(order.getShipmentDate()).isEqualTo("2026-07-13");
         assertThat(order.getLedgerlyTrackingLastPulledAt()).isNotNull();
+    }
+
+    @Test
+    void pullOrderTracking_whenFound_doesNotDowngradeDeliveredToPaid() {
+        CustomerOrder order = order(11L, "ORD-11", LedgerlySyncStatus.SYNCED).ledgerlyOrderStatus("delivered");
+        when(customerOrderRepository.findById(11L)).thenReturn(Optional.of(order));
+        when(ledgerlyClient.pullOrderTracking("ORD-11")).thenReturn(Map.of("found", true, "status", "Paid"));
+        when(customerOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.pullOrderTracking(11L);
+
+        assertThat(order.getLedgerlyOrderStatus()).isEqualTo("delivered");
     }
 
     @Test
@@ -261,11 +313,36 @@ class LedgerlySyncServiceTest {
         assertThat(payload.get("subtotal")).isEqualTo(new BigDecimal("399"));
         assertThat(payload.get("shipping")).isEqualTo(new BigDecimal("1"));
         assertThat(payload.get("tax")).isEqualTo(new BigDecimal("4"));
+        assertThat(payload.get("discount")).isEqualTo(BigDecimal.ZERO);
         assertThat(payload.get("total")).isEqualTo(new BigDecimal("404"));
+        assertThat(payload.get("couponCode")).isNull();
         assertThat(payload.get("pricesIncludeGst")).isEqualTo(true);
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> lines = (List<Map<String, Object>>) payload.get("lines");
         assertThat(lines.get(0).get("sku")).isEqualTo("SKU-1");
+    }
+
+    @Test
+    void buildOrderPayload_includesCouponDiscountAndTotalAfterCoupon() {
+        CustomerOrder order = order(42L, "ORD-COUPON", LedgerlySyncStatus.PENDING);
+        order.subtotal(new BigDecimal("231"));
+        order.discount(new BigDecimal("229"));
+        order.shipping(BigDecimal.ZERO);
+        order.tax(BigDecimal.ZERO);
+        order.total(new BigDecimal("2"));
+        order.couponCode("WELCOM10");
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product(1L)));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "buildOrderPayload", order);
+
+        assertThat(payload.get("discount")).isEqualTo(new BigDecimal("229"));
+        assertThat(payload.get("total")).isEqualTo(new BigDecimal("2"));
+        assertThat(payload.get("couponCode")).isEqualTo("WELCOM10");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payment = (Map<String, Object>) payload.get("payment");
+        assertThat(payment.get("amount")).isEqualTo(new BigDecimal("2"));
     }
 
     @Test
@@ -283,6 +360,23 @@ class LedgerlySyncServiceTest {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> lines = (List<Map<String, Object>>) payload.get("lines");
         assertThat(lines.get(0).get("sku")).isEqualTo("MNM-BPB-001");
+    }
+
+    @Test
+    void buildOrderPayload_prefersVariantSkuOverParent() {
+        CustomerOrder order = order(42L, "ORD-VAR", LedgerlySyncStatus.PENDING);
+        OrderItem line = order.getItemses().iterator().next();
+        line.setVariantSku("HORIZON-M-NAVY");
+        Product product = product(1L).sku("HORIZON").itemStructure("VARIANTS");
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "buildOrderPayload", order);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> lines = (List<Map<String, Object>>) payload.get("lines");
+        assertThat(lines.get(0).get("sku")).isEqualTo("HORIZON-M-NAVY");
     }
 
     @Test
@@ -308,13 +402,12 @@ class LedgerlySyncServiceTest {
         when(ledgerlyClient.syncProductPayload(any()))
             .thenReturn(Map.of("ledgerlyItemId", "item-30"))
             .thenThrow(new RuntimeException("sync failed"));
-        when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Map<String, Object> result = service.syncAllProducts();
 
         assertThat(result).containsEntry("successCount", 1).containsEntry("failureCount", 1);
         assertThat((List<?>) result.get("failures")).isNotEmpty();
-        assertThat(bad.getLedgerlySyncStatus()).isEqualTo(LedgerlySyncStatus.FAILED);
+        verify(productRepository).updateLedgerlySyncFailure(eq(31L), eq(LedgerlySyncStatus.FAILED), contains("sync failed"));
     }
 
     @Test
@@ -327,7 +420,6 @@ class LedgerlySyncServiceTest {
         when(ledgerlyClient.syncProductPayload(any()))
             .thenReturn(Map.of("ledgerlyItemId", "item-90"))
             .thenReturn(Map.of("noop", true));
-        when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Map<String, Object> result = service.syncAllProducts();
 
@@ -339,6 +431,8 @@ class LedgerlySyncServiceTest {
                     payload -> Boolean.FALSE.equals(payload.get("active")) && "SKU-92".equals(payload.get("sku"))
                 )
             );
+        verify(productRepository).updateLedgerlyDeactivateMeta(eq(92L), any(), eq(true));
+        verify(productRepository).updateLedgerlySyncSuccess(eq(90L), eq("item-90"), eq(LedgerlySyncStatus.SYNCED), any());
     }
 
     @Test
@@ -388,6 +482,7 @@ class LedgerlySyncServiceTest {
         Map<String, Object> payment = (Map<String, Object>) payload.get("payment");
         assertThat(payment.get("mode")).isEqualTo("Razorpay");
         assertThat(payment.get("paymentId")).isEqualTo("pay_50");
+        assertThat(payment.get("amount")).isEqualTo(new BigDecimal("404"));
         @SuppressWarnings("unchecked")
         Map<String, Object> customer = (Map<String, Object>) payload.get("customer");
         assertThat(customer.get("name")).isEqualTo("Test Buyer");

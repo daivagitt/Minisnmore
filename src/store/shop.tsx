@@ -11,16 +11,30 @@ import {
 import type { Product } from "@/data/products";
 import { useAuth } from "@/hooks/useAuth";
 import { roundInr } from "@/lib/money";
+import {
+  defaultSellableSelection,
+  findVariant,
+  isVariantSellable,
+  isVariantsProduct,
+  lineUnitPrice,
+} from "@/lib/product-variants";
 import { toast } from "sonner";
 
-export type CartItem = { product: Product; qty: number; size: string; color: string };
+export type CartItem = {
+  product: Product;
+  qty: number;
+  size: string;
+  color: string;
+  variantSku?: string;
+  unitPrice: number;
+};
 
 type ShopState = {
   cart: CartItem[];
   wishlist: string[];
-  addToCart: (p: Product, opts?: { size?: string; color?: string; qty?: number }) => void;
-  removeFromCart: (id: string, size?: string, color?: string) => void;
-  updateQty: (id: string, qty: number, size?: string, color?: string) => void;
+  addToCart: (p: Product, opts?: { size?: string; color?: string; qty?: number; variantSku?: string }) => void;
+  removeFromCart: (id: string, size?: string, color?: string, variantSku?: string) => void;
+  updateQty: (id: string, qty: number, size?: string, color?: string, variantSku?: string) => void;
   toggleWish: (id: string) => void;
   pruneWishlist: (validIds: Iterable<string>) => void;
   clearCart: () => void;
@@ -50,6 +64,14 @@ function readJson<T>(key: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+function normalizeCartItem(raw: CartItem): CartItem {
+  const unitPrice =
+    typeof raw.unitPrice === "number" && Number.isFinite(raw.unitPrice)
+      ? raw.unitPrice
+      : lineUnitPrice(raw.product, { size: raw.size, color: raw.color, sku: raw.variantSku });
+  return { ...raw, unitPrice };
 }
 
 function requireSignedIn() {
@@ -96,7 +118,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     let nextCart: CartItem[] = [];
     let nextWish: string[] = [];
     if (userId != null) {
-      nextCart = readJson<CartItem[]>(cKey, []);
+      nextCart = readJson<CartItem[]>(cKey, []).map(normalizeCartItem);
       nextWish = readJson<string[]>(wKey, []).map(String);
     } else {
       localStorage.setItem(cartStorageKey(null), "[]");
@@ -127,30 +149,43 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       requireSignedIn();
       return;
     }
-    const size = opts.size ?? p.sizes[0];
-    const color = opts.color ?? p.colors[0].name;
+    const defaults = defaultSellableSelection(p);
+    const size = opts.size ?? defaults.size;
+    const color = opts.color ?? defaults.color;
+    const variant = findVariant(p, { size, color, sku: opts.variantSku });
+    if (isVariantsProduct(p) && !isVariantSellable(variant)) {
+      toast.error("That size/color is out of stock");
+      return;
+    }
+    const variantSku = variant?.sku ?? opts.variantSku;
+    const unitPrice = lineUnitPrice(p, { size, color, sku: variantSku });
     const qty = opts.qty ?? 1;
     setCart((c) => {
-      const i = c.findIndex((x) => x.product.id === p.id && x.size === size && x.color === color);
+      const i = c.findIndex(
+        (x) =>
+          x.product.id === p.id &&
+          (variantSku ? x.variantSku === variantSku : x.size === size && x.color === color),
+      );
       if (i >= 0) {
         const next = [...c];
-        next[i] = { ...next[i], qty: next[i].qty + qty };
+        next[i] = { ...next[i], qty: next[i].qty + qty, unitPrice, variantSku };
         return next;
       }
-      return [...c, { product: p, qty, size, color }];
+      return [...c, { product: p, qty, size, color, variantSku, unitPrice }];
     });
     setCartOpen(true);
   };
-  const matches = (x: CartItem, id: string, size?: string, color?: string) =>
+  const matches = (x: CartItem, id: string, size?: string, color?: string, variantSku?: string) =>
     x.product.id === id &&
-    (size === undefined || x.size === size) &&
-    (color === undefined || x.color === color);
-  const removeFromCart = (id: string, size?: string, color?: string) =>
-    setCart((c) => c.filter((x) => !matches(x, id, size, color)));
-  const updateQty = (id: string, qty: number, size?: string, color?: string) =>
+    (variantSku !== undefined
+      ? x.variantSku === variantSku
+      : (size === undefined || x.size === size) && (color === undefined || x.color === color));
+  const removeFromCart = (id: string, size?: string, color?: string, variantSku?: string) =>
+    setCart((c) => c.filter((x) => !matches(x, id, size, color, variantSku)));
+  const updateQty = (id: string, qty: number, size?: string, color?: string, variantSku?: string) =>
     setCart((c) =>
       c.flatMap((x) => {
-        if (!matches(x, id, size, color)) return [x];
+        if (!matches(x, id, size, color, variantSku)) return [x];
         const n = Math.max(0, qty);
         return n === 0 ? [] : [{ ...x, qty: n }];
       }),
@@ -173,7 +208,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   const clearCart = () => setCart([]);
 
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
-  const cartTotal = cart.reduce((s, i) => s + roundInr(i.qty * i.product.price), 0);
+  const cartTotal = cart.reduce((s, i) => s + roundInr(i.qty * i.unitPrice), 0);
 
   return (
     <Ctx.Provider

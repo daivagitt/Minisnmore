@@ -20,6 +20,7 @@ const ItemSchema = z.object({
   product_image: z.string().max(600).optional().default(""),
   size: z.string().max(40).optional().default(""),
   color: z.string().max(40).optional().default(""),
+  sku: z.string().max(120).optional().default(""),
   qty: z.number().int().min(1).max(50),
   price: z.number().min(0).max(1_000_000),
 });
@@ -48,6 +49,15 @@ const VerifyInput = z.object({
 export async function verifyPayment(input: { data: z.infer<typeof VerifyInput> }) {
   const parsed = VerifyInput.parse(input.data);
   return api.post("/api/v1/orders/verify-payment", parsed, { auth: true });
+}
+
+const SyncPaymentInput = z.object({
+  orderId: z.coerce.number().int().positive(),
+});
+
+export async function syncPaymentStatus(input: { data: z.infer<typeof SyncPaymentInput> }) {
+  const parsed = SyncPaymentInput.parse(input.data);
+  return api.post("/api/v1/orders/sync-payment", parsed, { auth: true });
 }
 
 export async function listMyOrders(): Promise<{ orders: any[] }> {

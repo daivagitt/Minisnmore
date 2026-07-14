@@ -36,6 +36,7 @@ public class LedgerlySyncService {
     private final SiteSettingRepository siteSettingRepository;
     private final LedgerlyProductMergeService productMergeService;
     private final LedgerlyCategoryResolver categoryResolver;
+    private final ProductVariantSupport variantSupport;
 
     public LedgerlySyncService(
         LedgerlyIntegrationClient ledgerlyClient,
@@ -45,7 +46,8 @@ public class LedgerlySyncService {
         LedgerlySettingRepository ledgerlySettingRepository,
         SiteSettingRepository siteSettingRepository,
         LedgerlyProductMergeService productMergeService,
-        LedgerlyCategoryResolver categoryResolver
+        LedgerlyCategoryResolver categoryResolver,
+        ProductVariantSupport variantSupport
     ) {
         this.ledgerlyClient = ledgerlyClient;
         this.productRepository = productRepository;
@@ -55,6 +57,7 @@ public class LedgerlySyncService {
         this.siteSettingRepository = siteSettingRepository;
         this.productMergeService = productMergeService;
         this.categoryResolver = categoryResolver;
+        this.variantSupport = variantSupport;
     }
 
     @Async
@@ -70,9 +73,9 @@ public class LedgerlySyncService {
                     pushProductToLedgerly(product);
                 } catch (Exception e) {
                     LOG.warn("Ledgerly product sync failed for {}: {}", productId, e.getMessage());
-                    product.setLedgerlySyncStatus(LedgerlySyncStatus.FAILED);
-                    product.setLedgerlySyncError(e.getMessage());
-                    productRepository.save(product);
+                    // Bulk UPDATE — never save the in-memory snapshot (it can be stale vs concurrent
+                    // stock/matrix writes from checkout reservation).
+                    productRepository.updateLedgerlySyncFailure(productId, LedgerlySyncStatus.FAILED, e.getMessage());
                 }
             });
     }
@@ -174,7 +177,11 @@ public class LedgerlySyncService {
                 try {
                     Map<String, Object> response = ledgerlyClient.pullOrderTracking(order.getOrderNumber());
                     if (Boolean.TRUE.equals(response.get("found"))) {
-                        order.setLedgerlyOrderStatus(String.valueOf(response.getOrDefault("status", "")));
+                        String incoming = LedgerlyOrderStatus.resolveFromPullResponse(response);
+                        if (incoming != null && LedgerlyOrderStatus.shouldReplace(order.getLedgerlyOrderStatus(), incoming)) {
+                            order.setLedgerlyOrderStatus(incoming);
+                        }
+                        LedgerlyOrderStatus.applyTrackingFields(order, response);
                         order.setLedgerlyTrackingLastPulledAt(Instant.now());
                         customerOrderRepository.save(order);
                     }
@@ -202,9 +209,7 @@ public class LedgerlySyncService {
                 pushProductToLedgerly(product);
                 builder.success();
             } catch (Exception e) {
-                product.setLedgerlySyncStatus(LedgerlySyncStatus.FAILED);
-                product.setLedgerlySyncError(e.getMessage());
-                productRepository.save(product);
+                productRepository.updateLedgerlySyncFailure(product.getId(), LedgerlySyncStatus.FAILED, e.getMessage());
                 builder.failure(product.getId(), product.getName(), e.getMessage());
             }
         }
@@ -248,22 +253,51 @@ public class LedgerlySyncService {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> levels = (List<Map<String, Object>>) response.getOrDefault("inventory", List.of());
         LedgerlySyncSummary.Builder builder = LedgerlySyncSummary.builder();
+        List<Product> variantProducts = productRepository
+            .findAll()
+            .stream()
+            .filter(variantSupport::isVariants)
+            .toList();
         for (Map<String, Object> level : levels) {
             String sku = stringValue(level.get("sku"));
             String ledgerlyItemId = stringValue(level.get("ledgerlyItemId"));
-            Optional<Product> product = findProductForInventoryPull(sku, ledgerlyItemId);
-            if (product.isEmpty()) {
+            Object variantsRaw = level.containsKey("variantsJson") ? level.get("variantsJson") : level.get("variants_json");
+            try {
+                Optional<Product> parent = findProductForInventoryPull(sku, ledgerlyItemId);
+                if (parent.isPresent()) {
+                    Product p = parent.orElseThrow();
+                    if (variantSupport.isVariants(p) && variantsRaw != null) {
+                        String variantsJson = variantSupport.coerceVariantsJson(variantsRaw);
+                        if (variantsJson == null || !variantSupport.applyMatrixToProduct(p, ProductVariantSupport.STRUCTURE_VARIANTS, variantsJson)) {
+                            builder.failure(sku != null ? sku : ledgerlyItemId, "Invalid variantsJson on inventory level");
+                            continue;
+                        }
+                    } else if (variantSupport.isVariants(p) && level.get("stock") != null) {
+                        // Parent-level stock only — keep matrix; re-aggregate would wipe rates. Skip stock overwrite.
+                        builder.success();
+                        continue;
+                    } else {
+                        p.setStock(toInteger(level.get("stock")));
+                    }
+                    productRepository.save(p);
+                    builder.success();
+                    continue;
+                }
+                Optional<Product> byVariant = variantSupport.findProductContainingVariantSku(variantProducts, sku);
+                if (byVariant.isPresent() && sku != null) {
+                    Product p = byVariant.orElseThrow();
+                    if (variantSupport.updateVariantStockBySku(p, sku, toInteger(level.get("stock")))) {
+                        productRepository.save(p);
+                        builder.success();
+                    } else {
+                        builder.failure(sku, "Variant row not found on parent " + p.getSku());
+                    }
+                    continue;
+                }
                 String ref = sku != null ? sku : ledgerlyItemId;
                 builder.failure(ref, "No linked store product for SKU or Ledgerly item id");
-                continue;
-            }
-            try {
-                Product p = product.orElseThrow();
-                p.setStock(toInteger(level.get("stock")));
-                productRepository.save(p);
-                builder.success();
             } catch (Exception e) {
-                builder.failure(product.orElseThrow().getSku(), e.getMessage());
+                builder.failure(sku != null ? sku : ledgerlyItemId, e.getMessage());
             }
         }
         return builder.build().toMap();
@@ -443,12 +477,9 @@ public class LedgerlySyncService {
             }
             return;
         }
+        Long productId = product.getId();
         Map<String, Object> response = ledgerlyClient.syncProductPayload(buildProductPayload(product));
-        product.setLedgerlyItemId(String.valueOf(response.getOrDefault("ledgerlyItemId", "")));
-        product.setLedgerlySyncStatus(LedgerlySyncStatus.SYNCED);
-        product.setLedgerlyLastSyncedAt(Instant.now());
-        product.setLedgerlySyncError(null);
-        productRepository.save(product);
+        applyLedgerlyPushSuccess(productId, response);
     }
 
     private void deactivateInLedgerly(Product product) {
@@ -458,13 +489,29 @@ public class LedgerlySyncService {
         if (StringUtils.isNotBlank(product.getLedgerlyItemId())) {
             payload.put("ledgerlyItemId", product.getLedgerlyItemId());
         }
+        Long productId = product.getId();
         Map<String, Object> response = ledgerlyClient.syncProductPayload(payload);
-        product.setLedgerlyLastSyncedAt(Instant.now());
-        product.setLedgerlySyncError(null);
-        if (Boolean.TRUE.equals(response.get("noop"))) {
-            product.setLedgerlyItemId(null);
+        if (productId == null) {
+            return;
         }
-        productRepository.save(product);
+        productRepository.updateLedgerlyDeactivateMeta(
+            productId,
+            Instant.now(),
+            Boolean.TRUE.equals(response.get("noop"))
+        );
+    }
+
+    private void applyLedgerlyPushSuccess(Long productId, Map<String, Object> response) {
+        if (productId == null) {
+            return;
+        }
+        // Bulk UPDATE only touches Ledgerly metadata columns so concurrent stock/matrix changes survive.
+        productRepository.updateLedgerlySyncSuccess(
+            productId,
+            String.valueOf(response.getOrDefault("ledgerlyItemId", "")),
+            LedgerlySyncStatus.SYNCED,
+            Instant.now()
+        );
     }
 
     private static boolean isLedgerlyLinked(Product product) {
@@ -473,13 +520,16 @@ public class LedgerlySyncService {
 
     private Map<String, Object> buildOrderPayload(CustomerOrder order) {
         Map<String, Object> payload = new LinkedHashMap<>();
+        BigDecimal discount = moneyOrZero(order.getDiscount());
+        BigDecimal total = moneyOrZero(order.getTotal());
         payload.put("externalRef", order.getOrderNumber());
         payload.put("subtotal", order.getSubtotal());
-        payload.put("discount", order.getDiscount());
+        payload.put("discount", discount);
         payload.put("shipping", order.getShipping());
         payload.put("tax", order.getTax());
         payload.put("donation", order.getDonation());
-        payload.put("total", order.getTotal());
+        payload.put("total", total);
+        payload.put("couponCode", StringUtils.trimToNull(order.getCouponCode()));
         payload.put("pricesIncludeGst", pricesIncludeGst());
         payload.put("paymentId", order.getRazorpayPaymentId());
         payload.put("paymentMode", "Razorpay");
@@ -488,7 +538,7 @@ public class LedgerlySyncService {
         payment.put("mode", "Razorpay");
         payment.put("paymentId", order.getRazorpayPaymentId());
         payment.put("reference", order.getRazorpayPaymentId());
-        payment.put("amount", order.getTotal());
+        payment.put("amount", total);
         payload.put("payment", payment);
         Map<String, Object> customer = buildCustomerPayload(order);
         payload.put("customer", customer);
@@ -509,27 +559,38 @@ public class LedgerlySyncService {
     }
 
     /**
-     * Ledgerly items are keyed by catalog SKU; order lines store URL slug separately.
+     * Ledgerly order lines must use variant SKU for VARIANTS parents; never the parent SKU.
      */
     private String resolveLineSku(OrderItem item, Map<Long, String> skuByProductId) {
+        String variantSku = StringUtils.trimToNull(item.getVariantSku());
+        if (variantSku != null) {
+            return variantSku;
+        }
         String productId = item.getProductId();
+        Product product = null;
         if (productId != null && !productId.isBlank()) {
             try {
                 long id = Long.parseLong(productId.trim());
-                String cached = skuByProductId.get(id);
-                if (cached != null) {
-                    return cached;
-                }
-                Optional<Product> product = productRepository.findById(id);
-                if (product.isPresent()) {
-                    String sku = product.orElseThrow().getSku();
+                Optional<Product> found = productRepository.findById(id);
+                if (found.isPresent()) {
+                    product = found.orElseThrow();
+                    if (variantSupport.isVariants(product)) {
+                        throw new IllegalStateException(
+                            "Order line missing variantSku for VARIANTS product " + product.getSku()
+                        );
+                    }
+                    String cached = skuByProductId.get(id);
+                    if (cached != null) {
+                        return cached;
+                    }
+                    String sku = product.getSku();
                     if (sku != null && !sku.isBlank()) {
                         skuByProductId.put(id, sku);
                         return sku;
                     }
                 }
             } catch (NumberFormatException ignored) {
-                // fall through to slug / product id
+                // fall through
             }
         }
         String slug = item.getProductSlug();
@@ -576,5 +637,9 @@ public class LedgerlySyncService {
             customer.put("shippingAddress", shippingAddressJson);
         }
         return customer;
+    }
+
+    private static BigDecimal moneyOrZero(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
     }
 }

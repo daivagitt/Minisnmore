@@ -11,6 +11,8 @@ import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import com.miniandmore.app.security.SecurityUtils;
 import com.miniandmore.app.service.LedgerlySyncService;
 import com.miniandmore.app.service.OrderTrackingStatusResolver;
+import com.miniandmore.app.service.ProductVariantSupport;
+import com.miniandmore.app.service.ProductVariantSupport.VariantRow;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import com.miniandmore.app.web.rest.v1.ApiResponse;
 import jakarta.validation.Valid;
@@ -49,7 +51,7 @@ public class InternalAccountOrderResource {
     private static final Logger LOG = LoggerFactory.getLogger(InternalAccountOrderResource.class);
     private static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
     private static final Duration INVENTORY_RESERVATION_TTL = Duration.ofMinutes(30);
-    private static final Duration TRACKING_REFRESH_TTL = Duration.ofHours(1);
+    private static final Duration TRACKING_REFRESH_TTL = Duration.ofMinutes(5);
     private static final String FIELD_PHONE = "phone";
     private static final String FIELD_ERROR = "error";
     private static final String FIELD_ORDER_NUMBER = "orderNumber";
@@ -60,6 +62,7 @@ public class InternalAccountOrderResource {
     private final AccountOrderDataAccess dataAccess;
     private final ObjectMapper objectMapper;
     private final LedgerlySyncService ledgerlySyncService;
+    private final ProductVariantSupport variantSupport;
 
     @Value("${razorpay.key-id:DEMO}")
     private String razorpayKeyId;
@@ -73,11 +76,13 @@ public class InternalAccountOrderResource {
     public InternalAccountOrderResource(
         AccountOrderDataAccess dataAccess,
         ObjectMapper objectMapper,
-        LedgerlySyncService ledgerlySyncService
+        LedgerlySyncService ledgerlySyncService,
+        ProductVariantSupport variantSupport
     ) {
         this.dataAccess = dataAccess;
         this.objectMapper = objectMapper;
         this.ledgerlySyncService = ledgerlySyncService;
+        this.variantSupport = variantSupport;
     }
 
     @PostMapping("/coupons/validate")
@@ -151,7 +156,8 @@ public class InternalAccountOrderResource {
             .shippingAddressJson(toJson(request.shipping_address()))
             .notes(blankToNull(request.notes()))
             .inventoryReserved(true)
-            .inventoryReservedUntil(Instant.now().plus(INVENTORY_RESERVATION_TTL));
+            .inventoryReservedUntil(Instant.now().plus(INVENTORY_RESERVATION_TTL))
+            .placedAt(Instant.now());
         CustomerOrder saved = dataAccess.customerOrderRepository().save(order);
         List<OrderItem> orderItems = new ArrayList<>();
         for (ReservedOrderItem reservedItem : reserved) {
@@ -164,8 +170,9 @@ public class InternalAccountOrderResource {
                 .productImage(blankToNull(itemRequest.product_image()))
                 .itemSize(blankToNull(itemRequest.size()))
                 .color(blankToNull(itemRequest.color()))
+                .variantSku(blankToNull(reservedItem.variantSku()))
                 .qty(itemRequest.qty())
-                .price(itemRequest.price());
+                .price(reservedItem.unitPrice());
             orderItems.add(item);
         }
         dataAccess.orderItemRepository().saveAll(orderItems);
@@ -203,40 +210,54 @@ public class InternalAccountOrderResource {
     @Transactional
     public ApiResponse<Map<String, Object>> verifyPayment(@Valid @RequestBody VerifyPaymentRequest request) {
         String login = requireLogin();
-        CustomerOrder order = dataAccess
-            .customerOrderRepository()
-            .findById(request.orderId())
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
-        if (!login.equals(order.getUserLogin())) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found");
-        }
+        CustomerOrder order = requireOwnedOrder(request.orderId(), login);
         if (!validRazorpaySignature(request)) {
             order.setPaymentStatus(PaymentStatus.FAILED);
             releaseInventoryReservation(order);
             dataAccess.customerOrderRepository().save(order);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid payment signature");
         }
-        if (order.getPaymentStatus() != PaymentStatus.PAID) {
-            ensureInventoryStillReserved(order);
-            order
-                .paymentStatus(PaymentStatus.PAID)
-                .status(OrderStatus.CONFIRMED)
-                .razorpayOrderId(request.razorpay_order_id())
-                .razorpayPaymentId(request.razorpay_payment_id())
-                .razorpaySignature(request.razorpay_signature())
-                .inventoryReserved(false)
-                .inventoryReleasedAt(null);
-            stampDemoDeliveryAnchor(order);
-            dataAccess.customerOrderRepository().save(order);
-        } else {
-            order
-                .razorpayOrderId(request.razorpay_order_id())
-                .razorpayPaymentId(request.razorpay_payment_id())
-                .razorpaySignature(request.razorpay_signature());
-            dataAccess.customerOrderRepository().save(order);
-        }
-        attemptLedgerlyOrderSync(order);
+        confirmOrderPayment(order, request.razorpay_order_id(), request.razorpay_payment_id(), request.razorpay_signature());
         return ApiResponse.ok(verifyPaymentResponse(order));
+    }
+
+    /**
+     * Poll Razorpay for UPI QR / async payments where the checkout handler may not fire after the bank debits the customer.
+     */
+    @PostMapping("/orders/sync-payment")
+    @Transactional
+    public ApiResponse<Map<String, Object>> syncPayment(@Valid @RequestBody SyncPaymentRequest request) {
+        String login = requireLogin();
+        CustomerOrder order = requireOwnedOrder(request.orderId(), login);
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            return ApiResponse.ok(syncPaymentResponse(order, true));
+        }
+        if (isDemoMode() || StringUtils.isBlank(order.getRazorpayOrderId())) {
+            return ApiResponse.ok(syncPaymentResponse(order, false));
+        }
+        Optional<JsonNode> paidPayment = findSuccessfulRazorpayPayment(order.getRazorpayOrderId());
+        if (paidPayment.isEmpty()) {
+            return ApiResponse.ok(syncPaymentResponse(order, false));
+        }
+        JsonNode payment = paidPayment.orElseThrow();
+        String razorpayPaymentId = payment.path("id").asText(null);
+        if (StringUtils.isBlank(razorpayPaymentId)) {
+            return ApiResponse.ok(syncPaymentResponse(order, false));
+        }
+        long amountPaise = payment.path("amount").asLong(0);
+        if (amountPaise != toPaise(order.getTotal())) {
+            LOG.warn(
+                "Razorpay payment amount mismatch for order {}: expected {} paise, got {}",
+                order.getOrderNumber(),
+                toPaise(order.getTotal()),
+                amountPaise
+            );
+            return ApiResponse.ok(syncPaymentResponse(order, false));
+        }
+        String razorpayOrderId = order.getRazorpayOrderId();
+        String signature = computeRazorpaySignature(razorpayOrderId, razorpayPaymentId);
+        confirmOrderPayment(order, razorpayOrderId, razorpayPaymentId, signature);
+        return ApiResponse.ok(syncPaymentResponse(order, true));
     }
 
     @Scheduled(fixedDelayString = "${application.inventory.reservation-release.fixed-delay-ms:300000}")
@@ -305,6 +326,52 @@ public class InternalAccountOrderResource {
         return data;
     }
 
+    private Map<String, Object> syncPaymentResponse(CustomerOrder order, boolean paid) {
+        Map<String, Object> data = verifyPaymentResponse(order);
+        data.put("paid", paid);
+        data.put("payment_status", lower(order.getPaymentStatus()));
+        return data;
+    }
+
+    private CustomerOrder requireOwnedOrder(Long orderId, String login) {
+        CustomerOrder order = dataAccess
+            .customerOrderRepository()
+            .findById(orderId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+        if (!login.equals(order.getUserLogin())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found");
+        }
+        return order;
+    }
+
+    private void confirmOrderPayment(
+        CustomerOrder order,
+        String razorpayOrderId,
+        String razorpayPaymentId,
+        String razorpaySignature
+    ) {
+        if (order.getPaymentStatus() != PaymentStatus.PAID) {
+            ensureInventoryStillReserved(order);
+            order
+                .paymentStatus(PaymentStatus.PAID)
+                .status(OrderStatus.CONFIRMED)
+                .razorpayOrderId(razorpayOrderId)
+                .razorpayPaymentId(razorpayPaymentId)
+                .razorpaySignature(razorpaySignature)
+                .inventoryReserved(false)
+                .inventoryReleasedAt(null);
+            stampDemoDeliveryAnchor(order);
+            dataAccess.customerOrderRepository().save(order);
+        } else {
+            order
+                .razorpayOrderId(razorpayOrderId)
+                .razorpayPaymentId(razorpayPaymentId)
+                .razorpaySignature(razorpaySignature);
+            dataAccess.customerOrderRepository().save(order);
+        }
+        attemptLedgerlyOrderSync(order);
+    }
+
     private void attemptLedgerlyOrderSync(CustomerOrder order) {
         if (order.getPaymentStatus() != PaymentStatus.PAID) {
             return;
@@ -359,7 +426,7 @@ public class InternalAccountOrderResource {
     ) {
         BigDecimal subtotal = items
             .stream()
-            .map(item -> item.request().price().multiply(BigDecimal.valueOf(item.request().qty())))
+            .map(item -> item.unitPrice().multiply(BigDecimal.valueOf(item.request().qty())))
             .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal discount = calculateCouponDiscount(couponCode, subtotal).map(m -> (BigDecimal) m.get(FIELD_DISCOUNT)).orElse(BigDecimal.ZERO);
         BigDecimal afterDiscount = subtotal.subtract(discount).max(BigDecimal.ZERO);
@@ -429,15 +496,15 @@ public class InternalAccountOrderResource {
     }
 
     private List<ReservedOrderItem> reserveInventory(List<OrderItemRequest> items) {
-        Map<Long, Integer> qtyByProduct = new LinkedHashMap<>();
+        // First pass: load products and validate / resolve variant lines (grouped by product for locking).
+        Map<Long, List<OrderItemRequest>> itemsByProduct = new LinkedHashMap<>();
         for (OrderItemRequest item : items) {
             Long productId = parseProductId(item.product_id());
-            qtyByProduct.merge(productId, item.qty(), Integer::sum);
+            itemsByProduct.computeIfAbsent(productId, id -> new ArrayList<>()).add(item);
         }
+
         Map<Long, Product> productsById = new LinkedHashMap<>();
-        for (Map.Entry<Long, Integer> entry : qtyByProduct.entrySet()) {
-            Long productId = entry.getKey();
-            int needed = entry.getValue();
+        for (Long productId : itemsByProduct.keySet()) {
             Product product = dataAccess
                 .productRepository()
                 .findOneForInventoryUpdate(productId)
@@ -445,7 +512,64 @@ public class InternalAccountOrderResource {
             if (!Boolean.TRUE.equals(product.getActive())) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Product unavailable");
             }
+            productsById.put(productId, product);
+        }
+
+        List<ReservedOrderItem> reserved = new ArrayList<>();
+        for (OrderItemRequest item : items) {
+            Long productId = parseProductId(item.product_id());
+            Product product = productsById.get(productId);
+            if (variantSupport.isVariants(product)) {
+                Optional<VariantRow> row = variantSupport.resolveSellable(product, item.sku(), item.size(), item.color());
+                if (row.isEmpty()) {
+                    throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Selected size/color is unavailable for " + product.getName()
+                    );
+                }
+                VariantRow variant = row.orElseThrow();
+                if (StringUtils.isBlank(variant.sku())) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Variant SKU missing for " + product.getName());
+                }
+                if (variant.stock() < item.qty()) {
+                    throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        stockAvailabilityMessage(variant.stock()) + " for " + product.getName() + " (" + variant.sku() + ")"
+                    );
+                }
+                if (!variantSupport.decrementVariantStock(product, variant.sku(), variant.size(), variant.color(), item.qty())) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Unable to reserve stock for " + product.getName());
+                }
+                BigDecimal unitPrice = variantSupport.storefrontPrice(variant.rate());
+                reserved.add(new ReservedOrderItem(product, item, variant.sku(), unitPrice));
+            } else {
+                int available = Optional.ofNullable(product.getStock()).orElse(0);
+                if (available < item.qty()) {
+                    // Check cumulative later via running stock on product
+                }
+                reserved.add(
+                    new ReservedOrderItem(
+                        product,
+                        item,
+                        null,
+                        item.price() != null ? item.price() : Optional.ofNullable(product.getPrice()).orElse(BigDecimal.ZERO)
+                    )
+                );
+            }
+        }
+
+        // Simple products: aggregate qty and decrement parent stock once.
+        Map<Long, Integer> simpleQty = new LinkedHashMap<>();
+        for (ReservedOrderItem reservedItem : reserved) {
+            if (reservedItem.variantSku() == null) {
+                Long id = reservedItem.product().getId();
+                simpleQty.merge(id, reservedItem.request().qty(), Integer::sum);
+            }
+        }
+        for (Map.Entry<Long, Integer> entry : simpleQty.entrySet()) {
+            Product product = productsById.get(entry.getKey());
             int available = Optional.ofNullable(product.getStock()).orElse(0);
+            int needed = entry.getValue();
             if (available < needed) {
                 throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
@@ -453,24 +577,12 @@ public class InternalAccountOrderResource {
                 );
             }
             product.setStock(available - needed);
-            dataAccess.productRepository().save(product);
-            productsById.put(productId, product);
         }
-        List<ReservedOrderItem> reserved = new ArrayList<>();
-        for (OrderItemRequest item : items) {
-            reserved.add(new ReservedOrderItem(productsById.get(parseProductId(item.product_id())), item));
+
+        for (Product product : productsById.values()) {
+            dataAccess.productRepository().save(product);
         }
         return reserved;
-    }
-
-    private void ensureInventoryStillReserved(CustomerOrder order) {
-        if (!Boolean.TRUE.equals(order.getInventoryReserved())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Inventory reservation expired — please place a new order");
-        }
-        if (order.getInventoryReservedUntil() != null && order.getInventoryReservedUntil().isBefore(Instant.now())) {
-            releaseInventoryReservation(order);
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Inventory reservation expired — please place a new order");
-        }
     }
 
     private void releaseInventoryReservation(CustomerOrder order) {
@@ -478,16 +590,38 @@ public class InternalAccountOrderResource {
             return;
         }
         List<OrderItem> items = dataAccess.orderItemRepository().findAllByOrderId(order.getId());
-        Map<Long, Integer> qtyByProduct = new LinkedHashMap<>();
+        Map<Long, Integer> simpleQtyByProduct = new LinkedHashMap<>();
         for (OrderItem item : items) {
             try {
                 Long productId = parseProductId(item.getProductId());
-                qtyByProduct.merge(productId, Optional.ofNullable(item.getQty()).orElse(0), Integer::sum);
+                Product product = dataAccess
+                    .productRepository()
+                    .findOneForInventoryUpdate(productId)
+                    .orElse(null);
+                if (product == null) {
+                    continue;
+                }
+                int qty = Optional.ofNullable(item.getQty()).orElse(0);
+                if (qty <= 0) {
+                    continue;
+                }
+                if (StringUtils.isNotBlank(item.getVariantSku()) && variantSupport.isVariants(product)) {
+                    variantSupport.incrementVariantStock(
+                        product,
+                        item.getVariantSku(),
+                        item.getItemSize(),
+                        item.getColor(),
+                        qty
+                    );
+                    dataAccess.productRepository().save(product);
+                } else {
+                    simpleQtyByProduct.merge(productId, qty, Integer::sum);
+                }
             } catch (ResponseStatusException ignored) {
                 // skip invalid product id
             }
         }
-        for (Map.Entry<Long, Integer> entry : qtyByProduct.entrySet()) {
+        for (Map.Entry<Long, Integer> entry : simpleQtyByProduct.entrySet()) {
             dataAccess
                 .productRepository()
                 .findOneForInventoryUpdate(entry.getKey())
@@ -499,6 +633,16 @@ public class InternalAccountOrderResource {
         order.setInventoryReserved(false);
         order.setInventoryReleasedAt(Instant.now());
         dataAccess.customerOrderRepository().save(order);
+    }
+
+    private void ensureInventoryStillReserved(CustomerOrder order) {
+        if (!Boolean.TRUE.equals(order.getInventoryReserved())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Inventory reservation expired — please place a new order");
+        }
+        if (order.getInventoryReservedUntil() != null && order.getInventoryReservedUntil().isBefore(Instant.now())) {
+            releaseInventoryReservation(order);
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Inventory reservation expired — please place a new order");
+        }
     }
 
     private Long parseProductId(String productId) {
@@ -523,35 +667,91 @@ public class InternalAccountOrderResource {
                     Map.of("user_login", login)
                 )
             );
-            String token = Base64.getEncoder().encodeToString((razorpayKeyId + ":" + razorpayKeySecret).getBytes(StandardCharsets.UTF_8));
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("https://api.razorpay.com/v1/orders"))
-                .header(HttpHeaders.CONTENT_TYPE, "application/json")
-                .header(HttpHeaders.AUTHORIZATION, "Basic " + token)
-                .timeout(Duration.ofSeconds(10))
-                .POST(HttpRequest.BodyPublishers.ofString(body))
-                .build();
-            HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() >= 300) {
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY,
-                    "Razorpay order creation failed: HTTP " + response.statusCode()
-                );
-            }
-            JsonNode root = objectMapper.readTree(response.body());
+            JsonNode root = razorpayPost("/v1/orders", body);
             String id = root.path("id").asText(null);
             if (StringUtils.isBlank(id)) {
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Razorpay order response missing id");
             }
             return id;
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Razorpay order creation interrupted");
+        } catch (ResponseStatusException ex) {
+            throw ex;
         } catch (JsonProcessingException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Razorpay order creation failed: " + ex.getMessage());
+        }
+    }
+
+    private Optional<JsonNode> findSuccessfulRazorpayPayment(String razorpayOrderId) {
+        try {
+            JsonNode root = razorpayGet("/v1/orders/" + razorpayOrderId + "/payments");
+            for (JsonNode payment : root.path("items")) {
+                String status = payment.path("status").asText("");
+                if ("captured".equalsIgnoreCase(status) || "authorized".equalsIgnoreCase(status)) {
+                    return Optional.of(payment);
+                }
+            }
+            return Optional.empty();
+        } catch (ResponseStatusException ex) {
+            if (ex.getStatusCode() == HttpStatus.BAD_GATEWAY) {
+                LOG.warn("Could not fetch Razorpay payments for {}: {}", razorpayOrderId, ex.getReason());
+                return Optional.empty();
+            }
+            throw ex;
+        }
+    }
+
+    private JsonNode razorpayGet(String path) {
+        return razorpayRequest("GET", path, null);
+    }
+
+    private JsonNode razorpayPost(String path, String body) throws JsonProcessingException {
+        return razorpayRequest("POST", path, body);
+    }
+
+    private JsonNode razorpayRequest(String method, String path, String body) {
+        try {
+            String token = Base64.getEncoder().encodeToString((razorpayKeyId + ":" + razorpayKeySecret).getBytes(StandardCharsets.UTF_8));
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create("https://api.razorpay.com" + path))
+                .header(HttpHeaders.AUTHORIZATION, "Basic " + token)
+                .timeout(Duration.ofSeconds(10));
+            if ("POST".equals(method)) {
+                builder
+                    .header(HttpHeaders.CONTENT_TYPE, "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(StringUtils.defaultString(body)));
+            } else {
+                builder.GET();
+            }
+            HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+            HttpResponse<String> response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 300) {
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "Razorpay request failed: HTTP " + response.statusCode()
+                );
+            }
+            return objectMapper.readTree(response.body());
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Razorpay request interrupted");
+        } catch (JsonProcessingException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Razorpay response parse failed: " + ex.getMessage());
         } catch (java.io.IOException ex) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Razorpay order creation failed: " + ex.getMessage());
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Razorpay request failed: " + ex.getMessage());
+        }
+    }
+
+    private String computeRazorpaySignature(String razorpayOrderId, String razorpayPaymentId) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(razorpayKeySecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] digest = mac.doFinal((razorpayOrderId + "|" + razorpayPaymentId).getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte value : digest) {
+                hex.append(String.format(Locale.ROOT, "%02x", value));
+            }
+            return hex.toString();
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to compute payment signature");
         }
     }
 
@@ -598,6 +798,7 @@ public class InternalAccountOrderResource {
         data.put("status", lower(order.getStatus()));
         data.put("payment_status", lower(order.getPaymentStatus()));
         data.put(FIELD_TOTAL, order.getTotal());
+        data.put("created_at", orderCreatedAtIso(order));
         data.put("order_items", dataAccess.orderItemRepository().findAllByOrderId(order.getId()).stream().map(this::orderItem).toList());
         trackingFields(order).forEach(data::putIfAbsent);
         return data;
@@ -674,6 +875,7 @@ public class InternalAccountOrderResource {
         data.put(FIELD_ORDER_NUMBER_SNAKE, order.getOrderNumber());
         data.put("payment_status", lower(order.getPaymentStatus()));
         data.put(FIELD_TOTAL, order.getTotal());
+        data.put("created_at", orderCreatedAtIso(order));
         data.put("razorpay_payment_id", order.getRazorpayPaymentId());
         return data;
     }
@@ -687,6 +889,7 @@ public class InternalAccountOrderResource {
         data.put("product_image", item.getProductImage());
         data.put("size", item.getItemSize());
         data.put("color", item.getColor());
+        data.put("sku", item.getVariantSku());
         data.put("qty", item.getQty());
         data.put("price", item.getPrice());
         return data;
@@ -759,6 +962,21 @@ public class InternalAccountOrderResource {
         return value == null ? "" : value.name().toLowerCase(Locale.ROOT);
     }
 
+    private Instant resolveOrderPlacedAt(CustomerOrder order) {
+        if (order.getPlacedAt() != null) {
+            return order.getPlacedAt();
+        }
+        if (order.getInventoryReservedUntil() != null) {
+            return order.getInventoryReservedUntil().minus(INVENTORY_RESERVATION_TTL);
+        }
+        return null;
+    }
+
+    private String orderCreatedAtIso(CustomerOrder order) {
+        Instant placed = resolveOrderPlacedAt(order);
+        return placed == null ? "" : placed.toString();
+    }
+
     private static long toPaise(BigDecimal total) {
         return total.multiply(BigDecimal.valueOf(100)).setScale(0, RoundingMode.HALF_UP).longValueExact();
     }
@@ -796,6 +1014,7 @@ public class InternalAccountOrderResource {
         @Size(max = 600) String product_image,
         @Size(max = 40) String size,
         @Size(max = 40) String color,
+        @Size(max = 120) String sku,
         @NotNull @Min(1) @Max(50) Integer qty,
         @NotNull @DecimalMin("0") BigDecimal price
     ) {}
@@ -816,6 +1035,8 @@ public class InternalAccountOrderResource {
         @NotBlank @Size(max = 500) String razorpay_signature
     ) {}
 
+    public record SyncPaymentRequest(@NotNull Long orderId) {}
+
     private record CommerceSettings(
         BigDecimal gstRate,
         boolean pricesIncludeGst,
@@ -826,5 +1047,5 @@ public class InternalAccountOrderResource {
 
     private record Totals(BigDecimal subtotal, BigDecimal discount, BigDecimal shipping, BigDecimal tax, BigDecimal total) {}
 
-    private record ReservedOrderItem(Product product, OrderItemRequest request) {}
+    private record ReservedOrderItem(Product product, OrderItemRequest request, String variantSku, BigDecimal unitPrice) {}
 }

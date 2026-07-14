@@ -112,6 +112,9 @@ public class CustomerOrder implements Serializable {
     @Column(name = "inventory_released_at")
     private Instant inventoryReleasedAt;
 
+    @Column(name = "placed_at")
+    private Instant placedAt;
+
     @Size(max = 120)
     @Column(name = "ledgerly_sales_order_id", length = 120, unique = true)
     private String ledgerlySalesOrderId;
@@ -401,6 +404,19 @@ public class CustomerOrder implements Serializable {
 
     public void setInventoryReleasedAt(Instant inventoryReleasedAt) {
         this.inventoryReleasedAt = inventoryReleasedAt;
+    }
+
+    public Instant getPlacedAt() {
+        return this.placedAt;
+    }
+
+    public CustomerOrder placedAt(Instant placedAt) {
+        this.setPlacedAt(placedAt);
+        return this;
+    }
+
+    public void setPlacedAt(Instant placedAt) {
+        this.placedAt = placedAt;
     }
 
     public String getLedgerlySalesOrderId() {

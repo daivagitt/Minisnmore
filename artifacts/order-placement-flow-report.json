@@ -1,0 +1,111 @@
+{
+  "startedAt": "2026-07-09T06:58:46.359971+00:00",
+  "baseUrl": "https://uat.minisnmore.com",
+  "product": {
+    "id": "26523",
+    "slug": "baby-swaddle",
+    "name": "Baby Swaddle",
+    "price": 229.0
+  },
+  "summary": {
+    "passed": 10,
+    "failed": 0,
+    "total": 10
+  },
+  "steps": [
+    {
+      "step": "1. Customer login",
+      "status": "PASS",
+      "note": "saikedar2003@gmail.com",
+      "ms": 0,
+      "detail": {}
+    },
+    {
+      "step": "2. Admin login",
+      "status": "PASS",
+      "note": "admin@uat.minisnmore.com",
+      "ms": 0,
+      "detail": {}
+    },
+    {
+      "step": "3. Validate coupon WELCOM10",
+      "status": "PASS",
+      "note": "discount \u20b9229",
+      "ms": 50,
+      "detail": {}
+    },
+    {
+      "step": "4. Place order (checkout)",
+      "status": "PASS",
+      "note": "MNM-3DE4828BD389 total \u20b90.00 demoMode=True",
+      "ms": 328,
+      "detail": {
+        "orderNumber": "MNM-3DE4828BD389",
+        "total": 0.0
+      }
+    },
+    {
+      "step": "5. Verify payment",
+      "status": "PASS",
+      "note": "payment=? ledgerlySynced=None",
+      "ms": 3024,
+      "detail": {
+        "ok": true,
+        "orderNumber": "MNM-3DE4828BD389",
+        "orderId": 35001
+      }
+    },
+    {
+      "step": "6. Sync order to Ledgerly",
+      "status": "PASS",
+      "note": "{'orderNumber': 'MNM-3DE4828BD389', 'ok': True}",
+      "ms": 450,
+      "detail": {
+        "orderNumber": "MNM-3DE4828BD389",
+        "ok": true
+      }
+    },
+    {
+      "step": "7. Public track (post-sync)",
+      "status": "PASS",
+      "note": "status=confirmed payment=confirmed tracking=shipped",
+      "ms": 457,
+      "detail": {
+        "order_number": "MNM-3DE4828BD389",
+        "status": "confirmed",
+        "tracking_status": "shipped",
+        "tracking_number": "",
+        "tracking_carrier": "",
+        "shipment_date": "2026-07-09"
+      }
+    },
+    {
+      "step": "8. Pull shipment tracking from Ledgerly",
+      "status": "PASS",
+      "note": "success=41 failures=0",
+      "ms": 20160,
+      "detail": {}
+    },
+    {
+      "step": "9. Public track (post-pull)",
+      "status": "PASS",
+      "note": "tracking=shipped carrier=\u2014 shipment=2026-07-09",
+      "ms": 43,
+      "detail": {
+        "order_number": "MNM-3DE4828BD389",
+        "status": "confirmed",
+        "tracking_status": "shipped",
+        "tracking_number": "",
+        "tracking_carrier": "",
+        "shipment_date": "2026-07-09"
+      }
+    },
+    {
+      "step": "10. Ledgerly connection",
+      "status": "PASS",
+      "note": "connected=True",
+      "ms": 39,
+      "detail": {}
+    }
+  ]
+}

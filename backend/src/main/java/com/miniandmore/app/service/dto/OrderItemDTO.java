@@ -33,6 +33,9 @@ public class OrderItemDTO implements Serializable {
     @Size(max = 40)
     private String color;
 
+    @Size(max = 120)
+    private String variantSku;
+
     @NotNull
     @Min(value = 1)
     private Integer qty;
@@ -98,6 +101,14 @@ public class OrderItemDTO implements Serializable {
 
     public void setColor(String color) {
         this.color = color;
+    }
+
+    public String getVariantSku() {
+        return variantSku;
+    }
+
+    public void setVariantSku(String variantSku) {
+        this.variantSku = variantSku;
     }
 
     public Integer getQty() {

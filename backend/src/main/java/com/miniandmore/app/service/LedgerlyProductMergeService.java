@@ -23,14 +23,20 @@ public class LedgerlyProductMergeService {
     private static final BigDecimal ESTIMATED_COST_RATIO = new BigDecimal("0.60");
     private final ProductDescriptionCodec descriptionCodec;
     private final LedgerlyItemImageSync itemImageSync;
+    private final ProductVariantSupport variantSupport;
 
-    public LedgerlyProductMergeService(ProductDescriptionCodec descriptionCodec, LedgerlyItemImageSync itemImageSync) {
+    public LedgerlyProductMergeService(
+        ProductDescriptionCodec descriptionCodec,
+        LedgerlyItemImageSync itemImageSync,
+        ProductVariantSupport variantSupport
+    ) {
         this.descriptionCodec = descriptionCodec;
         this.itemImageSync = itemImageSync;
+        this.variantSupport = variantSupport;
     }
 
     public void mergeLedgerlyItem(Product product, Map<String, Object> item, CategoryResolver categoryResolver, NoticeCallback notice) {
-        BigDecimal ledgerlySellingRate = item.get("price") != null ? toBigDecimal(item.get("price")) : null;
+        BigDecimal ledgerlySellingRate = firstPrice(item);
         if (item.get("stock") != null) {
             product.setStock(toInteger(item.get("stock")));
         }
@@ -72,6 +78,8 @@ public class LedgerlyProductMergeService {
             product.setColorsJson(descriptionCodec.toJsonList(colors));
         }
 
+        applyVariantsFromItem(product, item);
+
         String categoryName = firstNonBlank(stringValue(item.get("category")), descriptionCodec.categoryNameFrom(decoded));
         if (categoryName != null) {
             categoryResolver.resolve(categoryName).ifPresent(category -> {
@@ -92,6 +100,36 @@ public class LedgerlyProductMergeService {
         product.setLedgerlySyncError(null);
     }
 
+    private void applyVariantsFromItem(Product product, Map<String, Object> item) {
+        String itemStructure = firstNonBlank(stringValue(item.get("itemStructure")), stringValue(item.get("item_structure")));
+        Object variantsRaw = item.containsKey("variantsJson") ? item.get("variantsJson") : item.get("variants_json");
+        if (itemStructure == null && variantsRaw == null) {
+            return;
+        }
+        String variantsJson = variantSupport.coerceVariantsJson(variantsRaw);
+        if (itemStructure == null) {
+            itemStructure = variantsJson != null && !variantsJson.isBlank() && !"[]".equals(variantsJson.trim())
+                ? ProductVariantSupport.STRUCTURE_VARIANTS
+                : ProductVariantSupport.STRUCTURE_SIMPLE;
+        }
+        if (!variantSupport.applyMatrixToProduct(product, itemStructure, variantsJson)) {
+            // Keep previously merged parent fields; do not wipe matrix on bad payload.
+            if (product.getItemStructure() == null || product.getItemStructure().isBlank()) {
+                product.setItemStructure(itemStructure);
+            }
+        }
+    }
+
+    private BigDecimal firstPrice(Map<String, Object> item) {
+        if (item.get("price") != null) {
+            return toBigDecimal(item.get("price"));
+        }
+        if (item.get("rate") != null) {
+            return toBigDecimal(item.get("rate"));
+        }
+        return null;
+    }
+
     public Map<String, Object> buildPushPayload(Product product, String categoryName) {
         java.util.LinkedHashMap<String, Object> payload = new java.util.LinkedHashMap<>();
         payload.put("sku", product.getSku() != null ? product.getSku() : "P-" + product.getId());
@@ -104,9 +142,9 @@ public class LedgerlyProductMergeService {
         BigDecimal cost = sellingPrice.multiply(ESTIMATED_COST_RATIO).setScale(2, RoundingMode.HALF_UP);
         payload.put("cost", cost);
 
-        String encoded = descriptionCodec.encode(product, categoryName);
-        if (encoded != null && !encoded.isBlank()) {
-            payload.put("description", encoded);
+        String description = product.getDescription();
+        if (description != null && !description.isBlank()) {
+            payload.put("description", description.trim());
         }
 
         if (categoryName != null && !categoryName.isBlank()) {
@@ -135,6 +173,11 @@ public class LedgerlyProductMergeService {
             payload.put("imageUrl", firstImage);
         }
         payload.put("active", Boolean.TRUE.equals(product.getActive()));
+        String itemStructure = product.getItemStructure() != null ? product.getItemStructure() : ProductVariantSupport.STRUCTURE_SIMPLE;
+        payload.put("itemStructure", itemStructure);
+        if (product.getVariantsJson() != null && !product.getVariantsJson().isBlank()) {
+            payload.put("variantsJson", product.getVariantsJson());
+        }
         return payload;
     }
 

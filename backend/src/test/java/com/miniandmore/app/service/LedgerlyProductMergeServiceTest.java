@@ -26,11 +26,14 @@ class LedgerlyProductMergeServiceTest {
     @Spy
     private ProductDescriptionCodec descriptionCodec = new ProductDescriptionCodec(new ObjectMapper());
 
+    @Spy
+    private ProductVariantSupport variantSupport = new ProductVariantSupport(new ObjectMapper());
+
     @InjectMocks
     private LedgerlyProductMergeService mergeService;
 
     @Test
-    void buildPushPayload_includesCostUnitTaxAndEncodedDescription() {
+    void buildPushPayload_includesCostUnitTaxAndPlainDescription() {
         when(itemImageSync.firstImageUrl(any())).thenReturn("https://cdn.example.com/p.jpg");
         Product product = new Product()
             .sku("MNM-1")
@@ -49,9 +52,40 @@ class LedgerlyProductMergeServiceTest {
         assertThat(payload.get("unit")).isEqualTo("ea");
         assertThat(payload.get("cost")).isEqualTo(new BigDecimal("419.40"));
         assertThat(payload.get("imageUrl")).isEqualTo("https://cdn.example.com/p.jpg");
-        assertThat(payload.get("description").toString()).contains("Category: Baby").contains("Fabric: Cotton");
+        assertThat(payload.get("description")).isEqualTo("Soft");
         assertThat(payload.get("active")).isEqualTo(true);
         assertThat(payload).doesNotContainKey("hsn");
+        assertThat(payload.get("itemStructure")).isEqualTo("SIMPLE");
+    }
+
+    @Test
+    void mergeAndPush_variantsMatrix() {
+        when(itemImageSync.firstImageUrl(any())).thenReturn(null);
+        Product product = new Product().sku("HORIZON").name("Horizon Tee").price(BigDecimal.ZERO).stock(0).active(true);
+        String variantsJson =
+            "[{\"sku\":\"HORIZON-S-NAVY\",\"size\":\"S\",\"color\":\"Navy\",\"rate\":999,\"stock\":3,\"active\":true}," +
+            "{\"sku\":\"HORIZON-M-NAVY\",\"size\":\"M\",\"color\":\"Navy\",\"rate\":1199,\"stock\":4,\"active\":true}]";
+        Map<String, Object> item = Map.of(
+            "price",
+            999,
+            "stock",
+            7,
+            "itemStructure",
+            "VARIANTS",
+            "variantsJson",
+            variantsJson
+        );
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+
+        assertThat(product.getItemStructure()).isEqualTo("VARIANTS");
+        assertThat(product.getStock()).isEqualTo(7);
+        assertThat(product.getCompareAtPrice()).isEqualByComparingTo("999");
+        assertThat(product.getPrice()).isEqualByComparingTo("799.20");
+
+        Map<String, Object> payload = mergeService.buildPushPayload(product, "Baby");
+        assertThat(payload.get("itemStructure")).isEqualTo("VARIANTS");
+        assertThat(payload.get("variantsJson").toString()).contains("HORIZON-M-NAVY");
     }
 
     @Test

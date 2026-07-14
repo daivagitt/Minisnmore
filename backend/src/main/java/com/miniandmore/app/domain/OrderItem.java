@@ -50,6 +50,10 @@ public class OrderItem implements Serializable {
     @Column(name = "color", length = 40)
     private String color;
 
+    @Size(max = 120)
+    @Column(name = "variant_sku", length = 120)
+    private String variantSku;
+
     @NotNull
     @Min(value = 1)
     @Column(name = "qty", nullable = false)
@@ -158,6 +162,19 @@ public class OrderItem implements Serializable {
         this.color = color;
     }
 
+    public String getVariantSku() {
+        return this.variantSku;
+    }
+
+    public OrderItem variantSku(String variantSku) {
+        this.setVariantSku(variantSku);
+        return this;
+    }
+
+    public void setVariantSku(String variantSku) {
+        this.variantSku = variantSku;
+    }
+
     public Integer getQty() {
         return this.qty;
     }
@@ -227,6 +244,7 @@ public class OrderItem implements Serializable {
             ", productImage='" + getProductImage() + "'" +
             ", itemSize='" + getItemSize() + "'" +
             ", color='" + getColor() + "'" +
+            ", variantSku='" + getVariantSku() + "'" +
             ", qty=" + getQty() +
             ", price=" + getPrice() +
             "}";

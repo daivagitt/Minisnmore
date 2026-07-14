@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260713150000-1" author="miniandmore">
+        <addColumn tableName="customer_order">
+            <column name="placed_at" type="timestamp"/>
+        </addColumn>
+        <sql>
+            UPDATE customer_order
+            SET placed_at = inventory_reserved_until - INTERVAL '30 minutes'
+            WHERE placed_at IS NULL AND inventory_reserved_until IS NOT NULL;
+        </sql>
+        <sql>
+            UPDATE customer_order
+            SET placed_at = CURRENT_TIMESTAMP
+            WHERE placed_at IS NULL;
+        </sql>
+    </changeSet>
+</databaseChangeLog>

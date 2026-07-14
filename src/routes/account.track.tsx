@@ -1,7 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { Truck, Package, CheckCircle2, Home, Loader2, Search, Baby, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Truck, Loader2, Search, Baby, Sparkles } from "lucide-react";
 import { useAccountData } from "@/lib/account";
+import { useOrderTrackingPoll } from "@/hooks/useOrderTrackingPoll";
+import { OrderTrackingCard } from "@/components/OrderTrackingCard";
+import { TrackingRefreshHint } from "@/components/TrackingRefreshHint";
 import heroBaby from "@/assets/hero-smiling-baby.jpg";
 
 export const Route = createFileRoute("/account/track")({
@@ -9,39 +12,32 @@ export const Route = createFileRoute("/account/track")({
   component: TrackPage,
 });
 
-const STAGES = [
-  { key: "pending", icon: CheckCircle2, label: "Order placed" },
-  { key: "processing", icon: Package, label: "Hand-wrapped" },
-  { key: "shipped", icon: Truck, label: "On the way" },
-  { key: "delivered", icon: Home, label: "Delivered" },
-];
-const STATUS_INDEX: Record<string, number> = { pending: 0, processing: 1, shipped: 2, delivered: 3 };
-
-function getStatusIndex(status?: string) {
-  const normalized = (status || "").toLowerCase();
-  const aliases: Record<string, keyof typeof STATUS_INDEX> = {
-    confirmed: "pending",
-    fulfilled: "delivered",
-  };
-  if (normalized === "cancelled" || normalized === "canceled") return 0;
-  const key = (aliases[normalized] ?? normalized) as keyof typeof STATUS_INDEX;
-  return STATUS_INDEX[key] ?? 0;
-}
-
 function TrackPage() {
-  const { orders, loadingOrders } = useAccountData();
+  const { orders, loadingOrders, refreshOrders } = useAccountData();
   const [code, setCode] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
+  const [activeOrderNumber, setActiveOrderNumber] = useState<string | null>(null);
+
+  const { order, loading, error, lastUpdated, polling } = useOrderTrackingPoll(
+    activeOrderNumber,
+    "authenticated",
+  );
 
   useEffect(() => {
-    if (orders?.[0] && !selected) {
-      setSelected(orders[0].order_number);
+    if (orders === null && !loadingOrders) void refreshOrders();
+  }, [orders, loadingOrders, refreshOrders]);
+
+  useEffect(() => {
+    if (orders?.[0] && !activeOrderNumber) {
+      setActiveOrderNumber(orders[0].order_number);
       setCode(orders[0].order_number);
     }
-  }, [orders, selected]);
+  }, [orders, activeOrderNumber]);
 
-  const order = useMemo(() => orders?.find((o) => o.order_number === selected) ?? null, [orders, selected]);
-  const idx = order ? getStatusIndex(order.status) : 0;
+  const handleTrack = () => {
+    const next = code.trim();
+    if (!next) return;
+    setActiveOrderNumber(next.toUpperCase());
+  };
 
   return (
     <div className="space-y-4">
@@ -58,40 +54,47 @@ function TrackPage() {
       <div className="glass-strong rounded-[2rem] p-6 md:p-8">
         <h2 className="font-display text-3xl mb-1 flex items-center gap-2"><Truck className="h-6 w-6 text-primary" /> Track your order</h2>
         <div className="mt-4 glass rounded-full p-1.5 flex items-center max-w-md">
-          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Order ID" className="flex-1 bg-transparent px-4 py-2.5 text-sm outline-none" />
-          <button onClick={() => setSelected(code.trim())} className="rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm flex items-center gap-2"><Search className="h-4 w-4" /> Track</button>
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleTrack();
+            }}
+            placeholder="Order ID"
+            className="flex-1 bg-transparent px-4 py-2.5 text-sm outline-none"
+          />
+          <button
+            type="button"
+            onClick={handleTrack}
+            disabled={loading && !order}
+            className="rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm flex items-center gap-2 disabled:opacity-60"
+          >
+            {loading && !order ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Track
+          </button>
         </div>
       </div>
 
       <div className="glass-strong rounded-[2rem] p-6 md:p-8">
-        {loadingOrders && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
-        {orders && !order && <div className="text-sm text-muted-foreground">No matching order. Pick one from <Link to="/account/orders" className="text-primary story-link">your orders</Link>.</div>}
+        {loadingOrders && !order && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+        {loading && !order && !loadingOrders && (
+          <div className="grid place-items-center py-6">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        )}
+        {error && (
+          <div className="text-sm text-destructive">
+            {error}. Pick one from <Link to="/account/orders" className="text-primary story-link">your orders</Link>.
+          </div>
+        )}
+        {!loading && !order && !error && activeOrderNumber && (
+          <div className="text-sm text-muted-foreground">
+            No matching order. Pick one from <Link to="/account/orders" className="text-primary story-link">your orders</Link>.
+          </div>
+        )}
         {order && (
           <>
-            <div className="text-xs uppercase tracking-wider text-muted-foreground">Order {order.order_number}</div>
-            <div className="font-display text-2xl mt-1 capitalize">{order.status}</div>
-
-            <div className="mt-8 relative">
-              <div className="absolute left-5 top-0 bottom-0 w-px bg-border" />
-              <div className="space-y-5">
-                {STAGES.map((s, i) => {
-                  const Icon = s.icon;
-                  const done = i <= idx;
-                  const current = i === idx;
-                  return (
-                    <div key={s.key} className="flex gap-4 items-start relative">
-                      <div className={`h-10 w-10 rounded-full grid place-items-center flex-shrink-0 transition ${done ? "bg-primary text-primary-foreground" : "glass text-muted-foreground"}`}>
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div className={`glass rounded-2xl p-4 flex-1 ${current ? "ring-2 ring-primary/40" : ""}`}>
-                        <div className="font-medium text-sm">{s.label}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">{done ? "Completed" : "Upcoming"}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <OrderTrackingCard order={order} />
+            <TrackingRefreshHint lastUpdated={lastUpdated} polling={polling} />
           </>
         )}
       </div>
@@ -104,7 +107,15 @@ function TrackPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             {orders.slice(0, 6).map((o) => (
-              <button key={o.id} onClick={() => { setSelected(o.order_number); setCode(o.order_number); }} className={`text-xs rounded-full border border-border px-3 py-1.5 hover:bg-muted ${selected === o.order_number ? "bg-primary text-primary-foreground border-primary" : ""}`}>
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => {
+                  setActiveOrderNumber(o.order_number);
+                  setCode(o.order_number);
+                }}
+                className={`text-xs rounded-full border border-border px-3 py-1.5 hover:bg-muted ${activeOrderNumber === o.order_number ? "bg-primary text-primary-foreground border-primary" : ""}`}
+              >
                 {o.order_number}
               </button>
             ))}

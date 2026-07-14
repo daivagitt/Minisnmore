@@ -113,6 +113,40 @@ class LedgerlyWebhookHandlerServiceTest {
     }
 
     @Test
+    void handle_invoicePaid_doesNotDowngradeDeliveredStatus() throws Exception {
+        String body = "{\"id\":\"evt-6\",\"data\":{\"externalRef\":\"MNM-102\",\"ledgerlyInvoiceId\":\"inv-102\"}}";
+        CustomerOrder order = new CustomerOrder()
+            .orderNumber("MNM-102")
+            .paymentStatus(PaymentStatus.PAID)
+            .ledgerlyOrderStatus("delivered")
+            .ledgerlySyncStatus(LedgerlySyncStatus.SYNCED);
+        when(webhookEventRepository.existsByEventId("evt-6")).thenReturn(false);
+        when(customerOrderRepository.findOneByOrderNumber("MNM-102")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        handler.handle(body, sign(body), "invoice.paid");
+
+        assertThat(order.getLedgerlyOrderStatus()).isEqualTo("delivered");
+        assertThat(order.getLedgerlyInvoiceId()).isEqualTo("inv-102");
+    }
+
+    @Test
+    void handle_orderDelivered_updatesTrackingFields() throws Exception {
+        String body =
+            "{\"id\":\"evt-5\",\"data\":{\"externalRef\":\"MNM-101\",\"status\":\"delivered\",\"trackingNumber\":\"AWB-9\",\"shipmentDate\":\"2026-07-13\"}}";
+        CustomerOrder order = new CustomerOrder().orderNumber("MNM-101").paymentStatus(PaymentStatus.PAID);
+        when(webhookEventRepository.existsByEventId("evt-5")).thenReturn(false);
+        when(customerOrderRepository.findOneByOrderNumber("MNM-101")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        handler.handle(body, sign(body), "order.delivered");
+
+        assertThat(order.getLedgerlyOrderStatus()).isEqualTo("delivered");
+        assertThat(order.getTrackingNumber()).isEqualTo("AWB-9");
+        assertThat(order.getShipmentDate()).isEqualTo("2026-07-13");
+    }
+
+    @Test
     void handle_invalidSignature_throwsUnauthorized() {
         String body = "{\"id\":\"evt-4\",\"event\":\"item.updated\",\"data\":{}}";
 

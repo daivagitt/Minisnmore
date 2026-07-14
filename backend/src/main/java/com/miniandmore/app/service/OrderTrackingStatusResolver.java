@@ -10,16 +10,21 @@ public final class OrderTrackingStatusResolver {
     private OrderTrackingStatusResolver() {}
 
     public static String resolve(CustomerOrder order) {
-        if (order.getStatus() == OrderStatus.CANCELLED || "void".equalsIgnoreCase(StringUtils.defaultString(order.getLedgerlyOrderStatus()))) {
+        String ledgerlyStatus = order.getLedgerlyOrderStatus();
+        if (order.getStatus() == OrderStatus.CANCELLED || LedgerlyOrderStatus.isCancelled(ledgerlyStatus)) {
             return "cancelled";
         }
         if (order.getPaymentStatus() != PaymentStatus.PAID) {
             return "pending";
         }
-        if (order.getStatus() == OrderStatus.FULFILLED || "closed".equalsIgnoreCase(StringUtils.defaultString(order.getLedgerlyOrderStatus()))) {
+        if (order.getStatus() == OrderStatus.FULFILLED || LedgerlyOrderStatus.isDelivered(ledgerlyStatus)) {
             return "delivered";
         }
-        if (StringUtils.isNotBlank(order.getTrackingNumber()) || StringUtils.isNotBlank(order.getShipmentDate())) {
+        if (
+            LedgerlyOrderStatus.isShipped(ledgerlyStatus) ||
+            StringUtils.isNotBlank(order.getTrackingNumber()) ||
+            StringUtils.isNotBlank(order.getShipmentDate())
+        ) {
             return "shipped";
         }
         if (order.getStatus() == OrderStatus.CONFIRMED || order.getStatus() == OrderStatus.PENDING) {

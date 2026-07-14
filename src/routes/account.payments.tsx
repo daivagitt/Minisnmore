@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { CreditCard, Loader2 } from "lucide-react";
 import { useAccountData } from "@/lib/account";
+import { formatOrderDate } from "@/lib/dates";
 
 export const Route = createFileRoute("/account/payments")({
   head: () => ({ meta: [{ title: "Payments · Mini's n More" }] }),
@@ -34,7 +35,9 @@ function PaymentsPage() {
               <div className="text-xs text-muted-foreground break-all">
                 {p.razorpay_payment_id ? `Txn: ${p.razorpay_payment_id}` : "Awaiting payment"}
               </div>
-              <div className="text-xs text-muted-foreground mt-0.5">{new Date(p.created_at).toLocaleString("en-IN")}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                {formatOrderDate(p.created_at, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+              </div>
             </div>
             <div className="text-right">
               <div className="font-medium">₹{Number(p.total).toLocaleString("en-IN")}</div>

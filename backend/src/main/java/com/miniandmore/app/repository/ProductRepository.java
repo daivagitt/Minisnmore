@@ -83,4 +83,53 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     List<Product> findAllActiveEligibleForLedgerlyInventoryPull();
 
     long countByCategory_Id(Long categoryId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+        """
+        update Product p
+           set p.ledgerlyItemId = :ledgerlyItemId,
+               p.ledgerlySyncStatus = :status,
+               p.ledgerlyLastSyncedAt = :syncedAt,
+               p.ledgerlySyncError = null
+         where p.id = :id
+        """
+    )
+    int updateLedgerlySyncSuccess(
+        @Param("id") Long id,
+        @Param("ledgerlyItemId") String ledgerlyItemId,
+        @Param("status") com.miniandmore.app.domain.enumeration.LedgerlySyncStatus status,
+        @Param("syncedAt") java.time.Instant syncedAt
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+        """
+        update Product p
+           set p.ledgerlySyncStatus = :status,
+               p.ledgerlySyncError = :error
+         where p.id = :id
+        """
+    )
+    int updateLedgerlySyncFailure(
+        @Param("id") Long id,
+        @Param("status") com.miniandmore.app.domain.enumeration.LedgerlySyncStatus status,
+        @Param("error") String error
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+        """
+        update Product p
+           set p.ledgerlyLastSyncedAt = :syncedAt,
+               p.ledgerlySyncError = null,
+               p.ledgerlyItemId = case when :clearItemId = true then null else p.ledgerlyItemId end
+         where p.id = :id
+        """
+    )
+    int updateLedgerlyDeactivateMeta(
+        @Param("id") Long id,
+        @Param("syncedAt") java.time.Instant syncedAt,
+        @Param("clearItemId") boolean clearItemId
+    );
 }

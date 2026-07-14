@@ -9,8 +9,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Service Implementation for managing {@link com.miniandmore.app.domain.Product}.
@@ -25,9 +27,16 @@ public class ProductService {
 
     private final ProductMapper productMapper;
 
-    public ProductService(ProductRepository productRepository, ProductMapper productMapper) {
+    private final ProductVariantSupport variantSupport;
+
+    public ProductService(
+        ProductRepository productRepository,
+        ProductMapper productMapper,
+        ProductVariantSupport variantSupport
+    ) {
         this.productRepository = productRepository;
         this.productMapper = productMapper;
+        this.variantSupport = variantSupport;
     }
 
     /**
@@ -39,6 +48,7 @@ public class ProductService {
     public ProductDTO save(ProductDTO productDTO) {
         LOG.debug("Request to save Product : {}", productDTO);
         Product product = productMapper.toEntity(productDTO);
+        normalizeVariants(product);
         product = productRepository.save(product);
         return productMapper.toDto(product);
     }
@@ -52,6 +62,7 @@ public class ProductService {
     public ProductDTO update(ProductDTO productDTO) {
         LOG.debug("Request to update Product : {}", productDTO);
         Product product = productMapper.toEntity(productDTO);
+        normalizeVariants(product);
         product = productRepository.save(product);
         return productMapper.toDto(product);
     }
@@ -69,11 +80,33 @@ public class ProductService {
             .findById(productDTO.getId())
             .map(existingProduct -> {
                 productMapper.partialUpdate(existingProduct, productDTO);
-
+                normalizeVariants(existingProduct);
                 return existingProduct;
             })
             .map(productRepository::save)
             .map(productMapper::toDto);
+    }
+
+    private void normalizeVariants(Product product) {
+        if (product == null) {
+            return;
+        }
+        String structure = product.getItemStructure();
+        if (structure == null || structure.isBlank()) {
+            product.setItemStructure(ProductVariantSupport.STRUCTURE_SIMPLE);
+            structure = ProductVariantSupport.STRUCTURE_SIMPLE;
+        }
+        if (variantSupport.isVariantsStructure(structure)) {
+            if (!variantSupport.applyMatrixToProduct(product, structure, product.getVariantsJson())) {
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Invalid variants matrix JSON for VARIANTS product"
+                );
+            }
+        } else {
+            product.setItemStructure(ProductVariantSupport.STRUCTURE_SIMPLE);
+            product.setVariantsJson(null);
+        }
     }
 
     /**

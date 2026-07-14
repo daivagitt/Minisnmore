@@ -1,5 +1,6 @@
 import { api, ApiError } from "@/lib/api";
 import { numberFieldOr, requireNumberField } from "@/lib/admin-number-field";
+import { validateVariantRows } from "@/lib/admin-variants";
 import { internalSitePathError } from "@/lib/internal-links";
 import {
   isPrivateObjectStorageUrl,
@@ -141,6 +142,10 @@ export function getProductValidationErrors(row: ProductRow): string[] {
 
   const fabric = row.fabric_type?.trim() ?? "";
   if (!fabric) errors.push("Fabric type is required.");
+
+  if ((row.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS") {
+    errors.push(...validateVariantRows(row.variants_json));
+  }
 
   const descriptionError = bodyFieldError(row.description ?? "", "Product description");
   if (descriptionError) errors.push(descriptionError);
@@ -428,6 +433,8 @@ export type ProductRow = {
   age_max_months: number | null;
   sizes: string[];
   colors: string[];
+  item_structure: string | null;
+  variants_json: string | null;
   images: string[];
   badge: string | null;
   hsn: string | null;
@@ -456,6 +463,8 @@ type ProductDto = {
   ageMaxMonths?: number | null;
   sizesJson?: string | null;
   colorsJson?: string | null;
+  itemStructure?: string | null;
+  variantsJson?: string | null;
   imagesJson?: string | null;
   badge?: string | null;
   hsn?: string | null;
@@ -493,6 +502,8 @@ export const fromProductDto = (dto: ProductDto): ProductRow => ({
   age_max_months: dto.ageMaxMonths ?? null,
   sizes: parseJson<string[]>(dto.sizesJson, []),
   colors: parseJson<string[]>(dto.colorsJson, []),
+  item_structure: dto.itemStructure ?? null,
+  variants_json: dto.variantsJson ?? null,
   images: parseJson<string[]>(dto.imagesJson, []),
   badge: dto.badge ?? null,
   hsn: dto.hsn ?? null,
@@ -524,6 +535,8 @@ const toProductDto = (row: ProductRow): ProductDto => ({
   ageMaxMonths: row.age_max_months,
   sizesJson: JSON.stringify(row.sizes ?? []),
   colorsJson: JSON.stringify(row.colors ?? []),
+  itemStructure: row.item_structure ?? "SIMPLE",
+  variantsJson: row.variants_json ?? null,
   imagesJson: JSON.stringify(row.images ?? []),
   badge: nullable(row.badge) as string | null,
   hsn: nullable(row.hsn) as string | null,

@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { Loader2, Package, ChevronRight } from "lucide-react";
 import { useAccountData } from "@/lib/account";
+import { formatOrderDate } from "@/lib/dates";
 
 export const Route = createFileRoute("/account/orders")({
   head: () => ({ meta: [{ title: "Your orders · Mini's n More" }] }),
@@ -44,7 +45,7 @@ function OrdersPage() {
               <div className="min-w-0">
                 <div className="font-medium truncate">{o.order_number}</div>
                 <div className="text-xs text-muted-foreground">
-                  {new Date(o.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                  {formatOrderDate(o.created_at)}
                   {" · "}{o.order_items?.length || 0} item(s)
                 </div>
               </div>

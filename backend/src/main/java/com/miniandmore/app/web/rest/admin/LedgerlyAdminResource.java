@@ -9,8 +9,12 @@ import com.miniandmore.app.client.LedgerlyIntegrationClient;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/v1/admin/ledgerly")
@@ -48,7 +52,78 @@ public class LedgerlyAdminResource {
 
     @GetMapping("/test")
     public Map<String, Object> testConnection() {
-        return ledgerlyClient.testConnection();
+        try {
+            Map<String, Object> remote = ledgerlyClient.testConnection();
+            Map<String, Object> result = new LinkedHashMap<>();
+            if (remote != null) {
+                result.putAll(remote);
+            }
+            boolean connected =
+                Boolean.TRUE.equals(result.get("connected")) ||
+                Boolean.TRUE.equals(result.get("ok")) ||
+                "ok".equalsIgnoreCase(String.valueOf(result.get("status")));
+            if (!result.containsKey("connected")) {
+                result.put("connected", connected || !result.isEmpty());
+            }
+            if (!result.containsKey("ok")) {
+                result.put("ok", Boolean.TRUE.equals(result.get("connected")));
+            }
+            if (Boolean.TRUE.equals(result.get("connected"))) {
+                markConnected(true);
+            }
+            return result;
+        } catch (RestClientResponseException ex) {
+            markConnected(false);
+            int status = ex.getStatusCode().value();
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("ok", false);
+            result.put("connected", false);
+            result.put("status", status);
+            if (status == 401 || status == 403) {
+                result.put(
+                    "message",
+                    "Ledgerly rejected the API token (HTTP " +
+                    status +
+                    "). Generate a new developer token in Ledgerly and paste it under API & Webhooks, then save and test again."
+                );
+                result.put("error", "unauthorized");
+            } else {
+                result.put(
+                    "message",
+                    "Ledgerly returned HTTP " + status + ". Check the API Base URL and token, then try again."
+                );
+                result.put("error", "http_" + status);
+            }
+            return result;
+        } catch (ResourceAccessException ex) {
+            markConnected(false);
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("ok", false);
+            result.put("connected", false);
+            result.put("error", "unreachable");
+            result.put(
+                "message",
+                "Could not reach Ledgerly at the configured API Base URL. Verify the URL (host must resolve) and network access, then try again."
+            );
+            return result;
+        } catch (Exception ex) {
+            markConnected(false);
+            throw new ResponseStatusException(
+                HttpStatus.BAD_GATEWAY,
+                "Ledgerly connection test failed: " + (ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName())
+            );
+        }
+    }
+
+    private void markConnected(boolean connected) {
+        settingRepository
+            .findFirstByOrderByIdAsc()
+            .ifPresent(setting -> {
+                if (!java.util.Objects.equals(setting.getConnected(), connected)) {
+                    setting.setConnected(connected);
+                    settingRepository.save(setting);
+                }
+            });
     }
 
     @GetMapping("/settings")

@@ -59,4 +59,6 @@
     <include file="config/liquibase/changelog/20260701140000_ledgerly_webhook_secret.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260630200000_add_tax_pct_hsn_to_product.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260701150000_fix_tax_pct_default_to_5.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260713150000_add_customer_order_placed_at.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260714150000_add_product_variants_and_order_item_variant_sku.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>

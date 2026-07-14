@@ -1,7 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { getOrder } from "@/lib/orders.functions";
-import { Loader2, ArrowLeft, MapPin, CreditCard, Package2, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { useState } from "react";
+import { syncPaymentStatus } from "@/lib/orders.functions";
+import { formatOrderDate } from "@/lib/dates";
+import { useOrderTrackingPoll } from "@/hooks/useOrderTrackingPoll";
+import { Loader2, ArrowLeft, MapPin, CreditCard, Package2, CheckCircle2, Clock, XCircle, Truck } from "lucide-react";
+import { toast } from "sonner";
+import { OrderTrackingCard } from "@/components/OrderTrackingCard";
+import { TrackingRefreshHint } from "@/components/TrackingRefreshHint";
 
 export const Route = createFileRoute("/account/orders/$orderNumber")({
   head: ({ params }) => ({ meta: [{ title: `Order ${params.orderNumber} · Mini's n More` }] }),
@@ -10,17 +15,40 @@ export const Route = createFileRoute("/account/orders/$orderNumber")({
 
 function OrderDetail() {
   const { orderNumber } = Route.useParams();
-  const [order, setOrder] = useState<any | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const { order, loading, error, lastUpdated, polling, refresh } = useOrderTrackingPoll(
+    orderNumber,
+    "authenticated",
+  );
 
-  useEffect(() => {
-    getOrder({ data: { orderNumber } })
-      .then((r) => setOrder(r.order))
-      .catch((e) => setErr(e?.message || "Could not load order"));
-  }, [orderNumber]);
+  const checkPaymentStatus = async () => {
+    if (!order?.id) return;
+    setSyncing(true);
+    try {
+      const res = await syncPaymentStatus({ data: { orderId: order.id } });
+      if (res.paid) {
+        toast.success("Payment confirmed — your order is now placed.");
+        await refresh({ silent: true });
+      } else {
+        toast("Payment not confirmed yet. If money was debited, wait a minute and try again.", { icon: "⏳" });
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Could not check payment status");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
-  if (err) return <div className="glass-strong rounded-[2rem] p-8 text-sm text-destructive">{err}</div>;
-  if (!order) return <div className="glass-strong rounded-[2rem] p-12 grid place-items-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
+  if (error && !order) {
+    return <div className="glass-strong rounded-[2rem] p-8 text-sm text-destructive">{error}</div>;
+  }
+  if (!order) {
+    return (
+      <div className="glass-strong rounded-[2rem] p-12 grid place-items-center">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const addr = order.shipping_address || {};
   const StatusIcon = order.payment_status === "paid" ? CheckCircle2 : order.payment_status === "failed" ? XCircle : Clock;
@@ -35,7 +63,7 @@ function OrderDetail() {
             <div className="text-xs uppercase tracking-[0.28em] text-primary">Order</div>
             <h1 className="font-display text-3xl mt-1">{order.order_number}</h1>
             <div className="text-xs text-muted-foreground mt-1">
-              Placed {new Date(order.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+              Placed {formatOrderDate(order.created_at, { day: "numeric", month: "long", year: "numeric" })}
             </div>
           </div>
           <div className="inline-flex items-center gap-2 glass rounded-full px-4 py-2 text-sm">
@@ -46,6 +74,16 @@ function OrderDetail() {
           </div>
         </div>
       </div>
+
+      {order.payment_status === "paid" && (
+        <div className="glass-strong rounded-[2rem] p-6 md:p-8">
+          <h2 className="font-display text-xl mb-4 flex items-center gap-2">
+            <Truck className="h-5 w-5 text-primary" /> Delivery tracking
+          </h2>
+          <OrderTrackingCard order={order} showHeader={false} />
+          <TrackingRefreshHint lastUpdated={lastUpdated} polling={polling} />
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-[1fr_320px] gap-4">
         <div className="glass-strong rounded-[2rem] p-6 md:p-8">
@@ -77,6 +115,17 @@ function OrderDetail() {
               <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground mb-2"><CreditCard className="h-4 w-4 text-primary" /> Payment</div>
               <div className="text-sm font-medium capitalize">{order.payment_status}</div>
               {order.razorpay_payment_id && <div className="text-xs text-muted-foreground break-all">ID: {order.razorpay_payment_id}</div>}
+              {order.payment_status === "pending" && (
+                <button
+                  type="button"
+                  onClick={checkPaymentStatus}
+                  disabled={syncing}
+                  className="mt-3 rounded-full bg-primary text-primary-foreground px-4 py-2 text-xs inline-flex items-center gap-2 disabled:opacity-50"
+                >
+                  {syncing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {syncing ? "Checking…" : "I paid — refresh status"}
+                </button>
+              )}
               {order.coupon_code && <div className="text-xs text-primary mt-1">Coupon: {order.coupon_code}</div>}
             </div>
           </div>
@@ -94,6 +143,10 @@ function OrderDetail() {
           </div>
         </aside>
       </div>
+
+      {loading && (
+        <p className="text-[11px] text-muted-foreground text-center">Refreshing order details…</p>
+      )}
     </div>
   );
 }

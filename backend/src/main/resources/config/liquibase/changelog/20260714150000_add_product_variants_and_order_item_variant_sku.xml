@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260714150000-1" author="miniandmore">
+        <addColumn tableName="product">
+            <column name="item_structure" type="varchar(40)" defaultValue="SIMPLE">
+                <constraints nullable="true"/>
+            </column>
+            <column name="variants_json" type="${clobType}">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20260714150000-2" author="miniandmore">
+        <addColumn tableName="order_item">
+            <column name="variant_sku" type="varchar(120)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>

@@ -49,7 +49,7 @@ export function CartDrawer() {
                           <span className="text-xs w-6 text-center">{item.qty}</span>
                           <button onClick={() => updateQty(item.product.id, item.qty + 1, item.size, item.color)} className="h-7 w-7 grid place-items-center"><Plus className="h-3 w-3" /></button>
                         </div>
-                        <div className="text-sm font-medium">&#8377;{(item.qty * item.product.price).toLocaleString("en-IN")}</div>
+                        <div className="text-sm font-medium">&#8377;{(item.qty * item.unitPrice).toLocaleString("en-IN")}</div>
                       </div>
                     </div>
                   </div>

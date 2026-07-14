@@ -77,6 +77,13 @@ public class Product implements Serializable {
     @Column(name = "colors_json", columnDefinition = "text")
     private String colorsJson;
 
+    @Size(max = 40)
+    @Column(name = "item_structure", length = 40)
+    private String itemStructure;
+
+    @Column(name = "variants_json", columnDefinition = "text")
+    private String variantsJson;
+
     @Column(name = "images_json", columnDefinition = "text")
     private String imagesJson;
 
@@ -350,6 +357,32 @@ public class Product implements Serializable {
         this.colorsJson = colorsJson;
     }
 
+    public String getItemStructure() {
+        return this.itemStructure;
+    }
+
+    public Product itemStructure(String itemStructure) {
+        this.setItemStructure(itemStructure);
+        return this;
+    }
+
+    public void setItemStructure(String itemStructure) {
+        this.itemStructure = itemStructure;
+    }
+
+    public String getVariantsJson() {
+        return this.variantsJson;
+    }
+
+    public Product variantsJson(String variantsJson) {
+        this.setVariantsJson(variantsJson);
+        return this;
+    }
+
+    public void setVariantsJson(String variantsJson) {
+        this.variantsJson = variantsJson;
+    }
+
     public String getImagesJson() {
         return this.imagesJson;
     }
@@ -569,6 +602,8 @@ public class Product implements Serializable {
             ", ageMaxMonths=" + getAgeMaxMonths() +
             ", sizesJson='" + getSizesJson() + "'" +
             ", colorsJson='" + getColorsJson() + "'" +
+            ", itemStructure='" + getItemStructure() + "'" +
+            ", variantsJson='" + getVariantsJson() + "'" +
             ", imagesJson='" + getImagesJson() + "'" +
             ", badge='" + getBadge() + "'" +
             ", stock=" + getStock() +

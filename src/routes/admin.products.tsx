@@ -4,6 +4,7 @@ import { AdminPage, Field, inputCls } from "@/components/admin/AdminPage";
 import { AgeRangeField } from "@/components/admin/AgeRangeField";
 import { CommaListField } from "@/components/admin/CommaListField";
 import { NumberField } from "@/components/admin/NumberField";
+import { VariantsMatrixEditor, validateVariantRows } from "@/components/admin/VariantsMatrixEditor";
 import { parseAgeRangeField } from "@/lib/comma-list-field";
 import { ImageSpecHint } from "@/components/admin/ImageSpecHint";
 import { ADMIN_IMAGE_SPECS } from "@/lib/admin-image-specs";
@@ -64,6 +65,8 @@ const empty: Product = {
   age_max_months: null,
   sizes: [],
   colors: [],
+  item_structure: "SIMPLE",
+  variants_json: null,
   images: [],
   badge: "",
   hsn: null,
@@ -566,28 +569,47 @@ function ProductsPage() {
                     </div>
                     <div className="grid sm:grid-cols-4 gap-3">
                       <NumberField
-                        label="UAT price (₹)"
+                        label={
+                          (p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS"
+                            ? "UAT price (from variants)"
+                            : "UAT price (₹)"
+                        }
                         value={p.price}
-                        onChange={(price) => update(i, { price })}
+                        onChange={(price) => {
+                          if ((p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS") return;
+                          update(i, { price });
+                        }}
                         required
                       />
                       <NumberField
-                        label="Selling price (₹)"
+                        label={
+                          (p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS"
+                            ? "Selling price (min rate)"
+                            : "Selling price (₹)"
+                        }
                         value={p.compare_at_price}
-                        onChange={(compare_at_price) =>
+                        onChange={(compare_at_price) => {
+                          if ((p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS") return;
                           update(i, {
                             compare_at_price,
                             price:
                               compare_at_price != null && compare_at_price !== ""
                                 ? Math.round(Number(compare_at_price) * 0.8)
                                 : p.price,
-                          })
-                        }
+                          });
+                        }}
                       />
                       <NumberField
-                        label="Stock"
+                        label={
+                          (p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS"
+                            ? "Stock (sum of variants)"
+                            : "Stock"
+                        }
                         value={p.stock}
-                        onChange={(stock) => update(i, { stock })}
+                        onChange={(stock) => {
+                          if ((p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS") return;
+                          update(i, { stock });
+                        }}
                         min={0}
                         required
                       />
@@ -615,18 +637,49 @@ function ProductsPage() {
                         />
                       </Field>
                     </div>
-                    <CommaListField
-                      label="Sizes (comma-separated)"
-                      value={p.sizes}
-                      onChange={(sizes) => update(i, { sizes })}
-                      placeholder="0-3m, 3-6m, 6-12m"
-                    />
-                    <CommaListField
-                      label="Colors (optional, comma-separated)"
-                      value={p.colors}
-                      onChange={(colors) => update(i, { colors })}
-                      placeholder="Cream, Sage, Peach — optional"
-                    />
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      <Field label="Item structure">
+                        <select
+                          className={inputCls()}
+                          value={p.item_structure ?? "SIMPLE"}
+                          onChange={(e) =>
+                            update(i, {
+                              item_structure: e.target.value,
+                              ...(e.target.value === "SIMPLE"
+                                ? { variants_json: null }
+                                : {
+                                    variants_json: p.variants_json?.trim() ? p.variants_json : "[]",
+                                  }),
+                            })
+                          }
+                        >
+                          <option value="SIMPLE">SIMPLE (one SKU / price)</option>
+                          <option value="VARIANTS">VARIANTS (size × color × price)</option>
+                        </select>
+                      </Field>
+                    </div>
+                    {(p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS" ? (
+                      <VariantsMatrixEditor
+                        parentSku={p.sku ?? ""}
+                        value={p.variants_json}
+                        onChange={(next) => update(i, next)}
+                      />
+                    ) : (
+                      <>
+                        <CommaListField
+                          label="Sizes (comma-separated)"
+                          value={p.sizes}
+                          onChange={(sizes) => update(i, { sizes })}
+                          placeholder="0-3m, 3-6m, 6-12m"
+                        />
+                        <CommaListField
+                          label="Colors (optional, comma-separated)"
+                          value={p.colors}
+                          onChange={(colors) => update(i, { colors })}
+                          placeholder="Cream, Sage, Peach — optional"
+                        />
+                      </>
+                    )}
                     <Field label="Description">
                       <textarea
                         rows={3}

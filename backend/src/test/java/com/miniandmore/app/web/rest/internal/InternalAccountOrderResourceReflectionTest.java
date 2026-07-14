@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
 import com.miniandmore.app.repository.*;
 import com.miniandmore.app.service.LedgerlySyncService;
+import com.miniandmore.app.service.ProductVariantSupport;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import com.miniandmore.app.web.rest.internal.InternalAccountOrderResource.VerifyPaymentRequest;
 import java.nio.charset.StandardCharsets;
@@ -62,7 +63,12 @@ class InternalAccountOrderResourceReflectionTest {
             siteSettingRepository,
             ledgerlyIntegrationClient
         );
-        resource = new InternalAccountOrderResource(dataAccess, new ObjectMapper(), ledgerlySyncService);
+        resource = new InternalAccountOrderResource(
+            dataAccess,
+            new ObjectMapper(),
+            ledgerlySyncService,
+            new ProductVariantSupport(new ObjectMapper())
+        );
         ReflectionTestUtils.setField(resource, "razorpayKeyId", "rzp_live_abc");
         ReflectionTestUtils.setField(resource, "razorpayKeySecret", SECRET);
     }

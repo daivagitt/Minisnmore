@@ -62,6 +62,9 @@ public class CatalogInternalClient {
             String text = bytes.length == 0 ? null : new String(bytes, StandardCharsets.UTF_8);
             HttpHeaders headers = new HttpHeaders();
             response.getHeaders().forEach(headers::addAll);
+            headers.remove(HttpHeaders.TRANSFER_ENCODING);
+            headers.remove(HttpHeaders.CONTENT_LENGTH);
+            headers.remove(HttpHeaders.CONNECTION);
             return ResponseEntity.status(response.getStatusCode()).headers(headers).body(text);
         });
     }
