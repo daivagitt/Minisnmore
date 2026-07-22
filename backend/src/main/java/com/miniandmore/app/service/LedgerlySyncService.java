@@ -67,7 +67,7 @@ public class LedgerlySyncService {
 
     public void syncProduct(Long productId) {
         productRepository
-            .findById(productId)
+            .findOneWithEagerRelationships(productId)
             .ifPresent(product -> {
                 try {
                     pushProductToLedgerly(product);
@@ -86,7 +86,7 @@ public class LedgerlySyncService {
      */
     public void notifyLedgerlyBeforeStoreDelete(Long productId) {
         productRepository
-            .findById(productId)
+            .findOneWithEagerRelationships(productId)
             .ifPresent(product -> {
                 try {
                     if (isLedgerlyLinked(product)) {
@@ -193,7 +193,9 @@ public class LedgerlySyncService {
 
     public Map<String, Object> syncAllProducts() {
         LedgerlySyncSummary.Builder builder = LedgerlySyncSummary.builder();
-        for (Product product : productRepository.findAll()) {
+        // Eager-fetch category: sync success/failure UPDATEs clear the persistence context
+        // (clearAutomatically), which would otherwise leave lazy Category proxies unusable.
+        for (Product product : productRepository.findAllWithEagerRelationships()) {
             try {
                 if (StringUtils.isBlank(product.getSku())) {
                     builder.notice(product.getName(), "Skipped — SKU required");
@@ -459,7 +461,15 @@ public class LedgerlySyncService {
     }
 
     private Map<String, Object> buildProductPayload(Product product) {
-        String categoryName = product.getCategory() != null ? product.getCategory().getName() : null;
+        String categoryName = null;
+        if (product.getCategory() != null) {
+            try {
+                categoryName = product.getCategory().getName();
+            } catch (RuntimeException ex) {
+                // Detached / lazy Category after a prior Modifying UPDATE cleared the session.
+                LOG.debug("Category name unavailable for product {}: {}", product.getId(), ex.getMessage());
+            }
+        }
         return productMergeService.buildPushPayload(product, categoryName);
     }
 

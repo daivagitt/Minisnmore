@@ -92,7 +92,7 @@ class LedgerlySyncServiceTest {
     @Test
     void syncProduct_success_setsSyncedFields() {
         Product product = product(1L).active(true);
-        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(productRepository.findOneWithEagerRelationships(1L)).thenReturn(Optional.of(product));
         when(ledgerlyClient.syncProductPayload(any())).thenReturn(Map.of("ledgerlyItemId", "item-99"));
 
         service.syncProduct(1L);
@@ -110,7 +110,7 @@ class LedgerlySyncServiceTest {
     @Test
     void syncProduct_success_updatesMetadataWithoutSavingStaleSnapshot() {
         Product snapshot = product(1L).active(true).stock(8);
-        when(productRepository.findById(1L)).thenReturn(Optional.of(snapshot));
+        when(productRepository.findOneWithEagerRelationships(1L)).thenReturn(Optional.of(snapshot));
         when(ledgerlyClient.syncProductPayload(any())).thenReturn(Map.of("ledgerlyItemId", "item-99"));
 
         service.syncProduct(1L);
@@ -128,7 +128,7 @@ class LedgerlySyncServiceTest {
     @Test
     void syncProduct_clientFailure_setsFailedStatus() {
         Product product = product(2L).active(true);
-        when(productRepository.findById(2L)).thenReturn(Optional.of(product));
+        when(productRepository.findOneWithEagerRelationships(2L)).thenReturn(Optional.of(product));
         when(ledgerlyClient.syncProductPayload(any())).thenThrow(new RuntimeException("upstream 503"));
 
         service.syncProduct(2L);
@@ -398,7 +398,7 @@ class LedgerlySyncServiceTest {
     void syncAllProducts_aggregatesFailures() {
         Product ok = product(30L).active(true);
         Product bad = product(31L).active(true);
-        when(productRepository.findAll()).thenReturn(List.of(ok, bad));
+        when(productRepository.findAllWithEagerRelationships()).thenReturn(List.of(ok, bad));
         when(ledgerlyClient.syncProductPayload(any()))
             .thenReturn(Map.of("ledgerlyItemId", "item-30"))
             .thenThrow(new RuntimeException("sync failed"));
@@ -416,7 +416,7 @@ class LedgerlySyncServiceTest {
         Product inactiveLocal = product(91L).active(false);
         Product inactiveLinked = product(92L).active(false).ledgerlyItemId("item-92");
         inactiveLinked.setLedgerlySyncStatus(LedgerlySyncStatus.SYNCED);
-        when(productRepository.findAll()).thenReturn(List.of(active, inactiveLocal, inactiveLinked));
+        when(productRepository.findAllWithEagerRelationships()).thenReturn(List.of(active, inactiveLocal, inactiveLinked));
         when(ledgerlyClient.syncProductPayload(any()))
             .thenReturn(Map.of("ledgerlyItemId", "item-90"))
             .thenReturn(Map.of("noop", true));
