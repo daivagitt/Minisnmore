@@ -5,10 +5,12 @@ import { AgeRangeField } from "@/components/admin/AgeRangeField";
 import { CommaListField } from "@/components/admin/CommaListField";
 import { NumberField } from "@/components/admin/NumberField";
 import { VariantsMatrixEditor, validateVariantRows } from "@/components/admin/VariantsMatrixEditor";
+import { suggestParentSku } from "@/lib/admin-variants";
 import { parseAgeRangeField } from "@/lib/comma-list-field";
 import { ImageSpecHint } from "@/components/admin/ImageSpecHint";
 import { ADMIN_IMAGE_SPECS } from "@/lib/admin-image-specs";
 import { BulkImport } from "@/components/admin/BulkImport";
+import { ColorImagesEditor } from "@/components/admin/ColorImagesEditor";
 import { toast } from "sonner";
 import {
   Plus,
@@ -24,8 +26,8 @@ import {
   CloudUpload,
 } from "lucide-react";
 import { getUserErrorMessage, showApiError, showValidationErrors } from "@/lib/ui-errors";
-import { sanitizePublicUrl, toDirectDownloadUrl } from "@/lib/utils";
-import { IMAGE_ACCEPT } from "@/lib/admin-image";
+import { sanitizePublicUrl } from "@/lib/utils";
+import { IMAGE_ACCEPT, validateAdminImageFile } from "@/lib/admin-image";
 import {
   ADMIN_NAME_MAX_LEN,
   bulkSave,
@@ -37,6 +39,8 @@ import {
   disambiguateProductImportSlugs,
   parseSpreadsheetActive,
   parseSpreadsheetBoolean,
+  parseSpreadsheetImageUrls,
+  normalizeProductImageUrl,
   saveCategory,
   saveProduct,
   slugifyProductSlug,
@@ -46,6 +50,8 @@ import {
 } from "@/lib/backend-data";
 import { invalidateProducts } from "@/lib/storefront";
 import { isBestsellerFromBadge } from "@/lib/product-flags";
+import { filterAdminProductsByQuery } from "@/lib/product-search";
+import { colorNames, ensureColorEntries, mergeColorNames, normalizeColorEntries, resolveProductImages, type ProductColorEntry } from "@/lib/product-colors";
 
 export const Route = createFileRoute("/admin/products")({ component: ProductsPage });
 
@@ -86,14 +92,7 @@ const slugify = (s: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
-const normalizeImageUrl = (value: string) => {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const withProtocol =
-    /^https?:\/\//i.test(trimmed) || trimmed.startsWith("/") ? trimmed : `https://${trimmed}`;
-  const direct = toDirectDownloadUrl(withProtocol);
-  return sanitizePublicUrl(direct);
-};
+const normalizeImageUrl = (value: string) => normalizeProductImageUrl(value);
 
 function ProductsPage() {
   const [rows, setRows] = useState<Product[]>([]);
@@ -102,6 +101,7 @@ function ProductsPage() {
   const [filter, setFilter] = useState("");
   const [editing, setEditing] = useState<number | null>(null);
   const [ledgerlySyncing, setLedgerlySyncing] = useState<Set<number>>(() => new Set());
+  const [imageUploading, setImageUploading] = useState<number | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -119,22 +119,49 @@ function ProductsPage() {
   }, []);
 
   const upload = async (files: FileList, i: number) => {
-    const urls: string[] = [];
-    for (const f of Array.from(files)) {
-      try {
-        urls.push(await uploadAdminImage("products", f));
-      } catch (error) {
-        showApiError(error, "Upload failed");
-      }
+    const accepted: File[] = [];
+    for (const file of Array.from(files)) {
+      const result = validateAdminImageFile(file);
+      if (result.ok) accepted.push(file);
+      else toast.error(result.error);
     }
-    if (urls.length) {
-      setRows((r) => r.map((x, j) => (j === i ? { ...x, images: [...x.images, ...urls] } : x)));
-      toast.success(`${urls.length} image(s) uploaded`);
+    if (!accepted.length) return;
+
+    setImageUploading(i);
+    const urls: string[] = [];
+    try {
+      for (const f of accepted) {
+        try {
+          urls.push(await uploadAdminImage("products", f));
+        } catch (error) {
+          showApiError(error, "Upload failed");
+        }
+      }
+      if (urls.length) {
+        setRows((r) => r.map((x, j) => (j === i ? { ...x, images: [...x.images, ...urls] } : x)));
+        toast.success(`${urls.length} image(s) uploaded. Click Save to keep them.`);
+      }
+    } finally {
+      setImageUploading(null);
     }
   };
 
   const update = (i: number, patch: Partial<Product>) =>
     setRows((r) => r.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+
+  const patchProductColor = (rowIndex: number, colorIndex: number, patch: Partial<ProductColorEntry>) => {
+    setRows((rows) =>
+      rows.map((row, j) => {
+        if (j !== rowIndex) return row;
+        const colors = ensureColorEntries(row.colors).map((entry, ci) => {
+          if (ci !== colorIndex) return entry;
+          const merged = { ...entry, ...patch };
+          return normalizeColorEntries([merged])[0] ?? merged;
+        });
+        return { ...row, colors };
+      }),
+    );
+  };
 
   const syncToLedgerly = async (i: number, p: Product) => {
     if (!p.id) {
@@ -176,14 +203,18 @@ function ProductsPage() {
   const save = async (p: Product) => {
     const name = p.name.trim();
     const slug = (p.slug.trim() || slugify(name)).toLowerCase();
-    const normalizedImages = (p.images ?? [])
-      .map((url) => normalizeImageUrl(String(url)))
-      .filter((url): url is string => !!url);
+    const sku = p.sku?.trim() || suggestParentSku(name);
+    const normalizedImages = resolveProductImages(
+      (p.images ?? [])
+        .map((url) => normalizeImageUrl(String(url)))
+        .filter((url): url is string => !!url),
+      p.colors,
+    );
     const payload = {
       ...p,
       name,
       slug,
-      sku: p.sku?.trim() ?? "",
+      sku,
       price: p.price,
       stock: p.stock,
       sort_order: p.sort_order,
@@ -221,17 +252,8 @@ function ProductsPage() {
     }
   };
 
-  const filtered = useMemo(() => {
-    const q = filter.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter(
-      (r) =>
-        r.name.toLowerCase().includes(q) ||
-        r.slug.toLowerCase().includes(q) ||
-        (r.sku ?? "").toLowerCase().includes(q) ||
-        (r.description ?? "").toLowerCase().includes(q),
-    );
-  }, [rows, filter]);
+  const filtered = useMemo(() => filterAdminProductsByQuery(rows, filter), [rows, filter]);
+  const filterActive = filter.trim().length > 0;
 
   const rowIndexFor = (product: Product) =>
     rows.findIndex((row) => (product.id ? row.id === product.id : row === product));
@@ -261,8 +283,8 @@ function ProductsPage() {
                 example: "newborn-essentials",
                 note: "Must match an existing category slug",
               },
-              { key: "price", required: true, example: 1039, note: "UAT storefront price (20% off selling price)" },
-              { key: "compare_at_price", example: 1299, note: "Actual selling price — synced to Ledgerly as item rate" },
+              { key: "price", required: true, example: 1039, note: "Selling price (storefront; 20% off MRP)" },
+              { key: "compare_at_price", example: 1299, note: "MRP — synced to Ledgerly as mrp (not rate)" },
               {
                 key: "age_range",
                 required: true,
@@ -275,15 +297,35 @@ function ProductsPage() {
               { key: "stock", required: true, example: 50 },
               {
                 key: "images",
-                example: "https://…/1.jpg | https://…/2.jpg",
-                note: "Optional. Pipe (|) separated URLs",
+                example: "https://cdn.example.com/1.jpg | https://cdn.example.com/2.jpg",
+                note: "Optional. Pipe (|), comma, or semicolon separated. Also accepts columns: image, image_url, image_urls",
               },
-              { key: "description", required: true, example: "Soft organic cotton bodysuit…" },
+              { key: "description", example: "Soft organic cotton bodysuit…", note: "Optional" },
               { key: "active", required: true, example: "TRUE", note: "TRUE = visible on store" },
               { key: "colors", example: "Blush, Sand", note: "Optional. Comma-separated" },
               { key: "sizes", example: "0-3m, 3-6m", note: "Comma-separated" },
               { key: "badge", example: "Bestseller" },
               { key: "featured", example: "FALSE" },
+            ]}
+          />
+          <BulkImport
+            entityLabel="product variants"
+            templateName="product-variants-sku"
+            fields={[
+              {
+                key: "parent_sku",
+                required: true,
+                example: "MNM-BPB-001",
+                note: "Parent product SKU — must exist",
+              },
+              { key: "variant_sku", required: true, example: "MNM-BPB-001-S-NAVY", note: "Unique variant SKU" },
+              { key: "size", example: "S", note: "Size (e.g. S, M, L or 0-3m, 3-6m)" },
+              { key: "color", example: "Navy", note: "Color name" },
+              { key: "rate", example: 1039, note: "Selling price (rate)" },
+              { key: "mrp", example: 1299, note: "MRP" },
+              { key: "cost", example: 400, note: "Cost price (optional)" },
+              { key: "stock", required: true, example: 50, note: "Stock quantity" },
+              { key: "active", example: "TRUE", note: "TRUE = active variant" },
             ]}
             transform={(r) => {
               const lookup = (key: string) => {
@@ -295,142 +337,103 @@ function ProductsPage() {
                 return "";
               };
 
-              const name = String(lookup("name") ?? "").trim();
-              const slug = slugifyProductSlug(String(lookup("slug") ?? "").trim() || name);
-              const sku = String(lookup("sku") ?? "").trim();
-              const catSlug = String(lookup("category_slug") ?? "")
-                .trim()
-                .toLowerCase();
-              const compareAtRaw = lookup("compare_at_price");
-              const compare_at_price =
-                compareAtRaw === "" || compareAtRaw == null ? null : Number(compareAtRaw);
-              let price = Number(lookup("price"));
-              if ((!isFinite(price) || price <= 0) && compare_at_price != null && compare_at_price > 0) {
-                price = Math.round(compare_at_price * 0.8);
-              }
-              const ageRangeRaw = String(lookup("age_range") ?? "").trim();
-              let ageMin: number;
-              let ageMax: number;
-              if (ageRangeRaw) {
-                const parsed = parseAgeRangeField(ageRangeRaw);
-                if (parsed.min == null || parsed.max == null) {
-                  throw new Error('age_range must be two numbers like "0, 24"');
-                }
-                ageMin = parsed.min;
-                ageMax = parsed.max;
-              } else {
-                ageMin = Number(lookup("age_min_months"));
-                ageMax = Number(lookup("age_max_months"));
-              }
-              const fabric = String(lookup("fabric_type") ?? "").trim();
+              const parentSku = String(lookup("parent_sku") ?? "").trim();
+              const variantSku = String(lookup("variant_sku") ?? "").trim();
+              const size = String(lookup("size") ?? "").trim();
+              const color = String(lookup("color") ?? "").trim();
+              const rate = Number(lookup("rate"));
+              const mrp = lookup("mrp") === "" || lookup("mrp") == null ? null : Number(lookup("mrp"));
+              const cost = lookup("cost") === "" || lookup("cost") == null ? null : Number(lookup("cost"));
               const stock = Number(lookup("stock"));
-              const imagesRaw = String(lookup("images") ?? "").trim();
-              const description = String(lookup("description") ?? "").trim();
-              if (!slug) throw new Error("slug is required");
-              if (!name) throw new Error("name is required");
-              if (name.length > ADMIN_NAME_MAX_LEN) {
-                throw new Error(`name must be ${ADMIN_NAME_MAX_LEN} characters or fewer`);
-              }
-              if (!sku) throw new Error("sku is required");
-              if (!catSlug) throw new Error("category_slug is required");
-              const cat = cats.find((c) => c.slug.toLowerCase() === catSlug);
-              if (!isFinite(price) || price <= 0) throw new Error("price must be > 0");
-              if (!isFinite(ageMin)) throw new Error("age_min_months required");
-              if (!isFinite(ageMax)) throw new Error("age_max_months required");
-              if (!fabric) throw new Error("fabric_type is required");
+              const active = parseSpreadsheetBoolean(lookup("active"), true);
+
+              if (!parentSku) throw new Error("parent_sku is required");
+              if (!variantSku) throw new Error("variant_sku is required");
+              if (!isFinite(rate) || rate <= 0) throw new Error("rate must be > 0");
               if (!isFinite(stock) || stock < 0) throw new Error("stock must be ≥ 0");
-              if (!description) throw new Error("description is required");
-              let images: string[] = [];
-              if (imagesRaw) {
-                images = imagesRaw
-                  .split(/[|,;\n]/)
-                  .map((s) => s.trim())
-                  .map((url) => normalizeImageUrl(url))
-                  .filter((url): url is string => !!url);
-                if (images.length === 0) {
-                  throw new Error("images must contain valid http(s) or site-relative URLs");
-                }
-              }
+
               return {
-                slug,
-                name,
-                sku,
-                category_slug: catSlug,
-                category_id: cat?.id ?? null,
-                price,
-                compare_at_price,
-                age_min_months: ageMin,
-                age_max_months: ageMax,
-                fabric_type: fabric,
+                parent_sku: parentSku,
+                variant_sku: variantSku,
+                size,
+                color,
+                rate,
+                mrp,
+                cost,
                 stock,
-                images,
-                description,
-                active: parseSpreadsheetActive(lookup("active"), true),
-                colors: lookup("colors")
-                  ? String(lookup("colors"))
-                      .split(",")
-                      .map((s: string) => s.trim())
-                      .filter(Boolean)
-                  : [],
-                sizes: lookup("sizes")
-                  ? String(lookup("sizes"))
-                      .split(",")
-                      .map((s: string) => s.trim())
-                      .filter(Boolean)
-                  : [],
-                badge: lookup("badge") ? String(lookup("badge")) : null,
-                best_seller:
-                  parseSpreadsheetBoolean(lookup("best_seller"), false) ||
-                  isBestsellerFromBadge(String(lookup("badge") ?? "")),
-                featured: parseSpreadsheetBoolean(lookup("featured"), false),
-                currency: "INR",
+                active,
               };
             }}
             persist={async (payloads) => {
-              type ImportRow = Product & { category_slug?: string };
-              const prepErrors: string[] = [];
-              const ready: Product[] = [];
-              let knownCats = [...cats];
+              type VariantImportRow = {
+                parent_sku: string;
+                variant_sku: string;
+                size: string;
+                color: string;
+                rate: number;
+                mrp: number | null;
+                cost: number | null;
+                stock: number;
+                active: boolean;
+              };
 
-              for (const raw of payloads as ImportRow[]) {
-                const catSlug = raw.category_slug?.trim().toLowerCase();
-                if (!catSlug) {
-                  prepErrors.push(`"${raw.slug}": category_slug is required`);
-                  continue;
-                }
-                let cat = knownCats.find((c) => c.slug.toLowerCase() === catSlug);
-                if (!cat) {
-                  try {
-                    const created = await saveCategory({
-                      slug: catSlug,
-                      name: categoryNameFromSlug(catSlug),
-                      description: null,
-                      image_url: null,
-                      sort_order: 0,
-                      active: true,
-                    });
-                    cat = { id: created.id!, name: created.name, slug: created.slug };
-                    knownCats = [...knownCats, cat];
-                  } catch (error) {
-                    prepErrors.push(
-                      `"${raw.slug}": could not create category "${catSlug}" — ${getUserErrorMessage(error, "save failed")}`,
-                    );
+              const errors: string[] = [];
+              let updated = 0;
+
+              for (const variant of payloads as VariantImportRow[]) {
+                try {
+                  const product = rows.find((p) => p.sku === variant.parent_sku);
+                  if (!product) {
+                    errors.push(`Variant "${variant.variant_sku}": parent product with SKU "${variant.parent_sku}" not found`);
                     continue;
                   }
+
+                  const parsedVariants = product.variants_json ? JSON.parse(product.variants_json) : [];
+                  const variantIndex = parsedVariants.findIndex((v: any) => v.sku === variant.variant_sku);
+
+                  if (variantIndex >= 0) {
+                    parsedVariants[variantIndex] = {
+                      ...parsedVariants[variantIndex],
+                      sku: variant.variant_sku,
+                      size: variant.size,
+                      color: variant.color,
+                      rate: variant.rate,
+                      mrp: variant.mrp,
+                      cost: variant.cost,
+                      stock: variant.stock,
+                      active: variant.active,
+                    };
+                  } else {
+                    parsedVariants.push({
+                      sku: variant.variant_sku,
+                      size: variant.size,
+                      color: variant.color,
+                      rate: variant.rate,
+                      mrp: variant.mrp,
+                      cost: variant.cost,
+                      stock: variant.stock,
+                      active: variant.active,
+                    });
+                  }
+
+                  const updatedProduct = {
+                    ...product,
+                    item_structure: "VARIANTS",
+                    variants_json: JSON.stringify(parsedVariants),
+                  };
+
+                  await saveProduct(updatedProduct);
+                  updated++;
+                } catch (error) {
+                  errors.push(
+                    `Variant "${variant.variant_sku}": ${getUserErrorMessage(error, "Failed to save variant")}`,
+                  );
                 }
-                const { category_slug: _categorySlug, ...product } = raw;
-                ready.push({ ...product, category_id: cat.id });
               }
 
-              const { rows: deduped, warnings: slugWarnings } = disambiguateProductImportSlugs(
-                ready,
-                rows,
-              );
-              const res = await bulkSave(deduped, rows, "slug", saveProduct);
               return {
-                inserted: res.inserted,
-                errors: [...prepErrors, ...res.errors],
-                warnings: slugWarnings,
+                inserted: updated,
+                errors,
               };
             }}
             onDone={() => {
@@ -455,7 +458,7 @@ function ProductsPage() {
           className={inputCls()}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Search by name, slug, SKU, or description…"
+          placeholder="Search by name, slug, SKU, variant SKU, or description…"
         />
       </div>
 
@@ -465,13 +468,29 @@ function ProductsPage() {
         <div className="space-y-3">
           {filtered.length === 0 && (
             <div className="glass rounded-2xl p-6 text-sm text-muted-foreground text-center">
-              No products yet — start with “New product” above.
+              {filterActive
+                ? `No products match “${filter.trim()}”.`
+                : rows.length === 0
+                  ? "No products yet — start with “New product” above."
+                  : "No products to show."}
+              {filterActive ? (
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={() => setFilter("")}
+                    className="text-primary story-link text-sm"
+                  >
+                    Clear search
+                  </button>
+                </div>
+              ) : null}
             </div>
           )}
           {filtered.map((p) => {
             const i = rowIndexFor(p);
             if (i < 0) return null;
             const isOpen = editing === i;
+            const previewImage = resolveProductImages(p.images, p.colors)[0];
             return (
               <div key={p.id ?? `new-${i}`} className="glass-strong rounded-3xl overflow-hidden">
                 <button
@@ -479,9 +498,9 @@ function ProductsPage() {
                   className="w-full p-4 flex items-center gap-4 text-left hover:bg-white/30"
                 >
                   <div className="h-14 w-14 rounded-xl bg-muted overflow-hidden grid place-items-center text-xs text-muted-foreground">
-                    {p.images[0] ? (
+                    {previewImage ? (
                       <img
-                        src={normalizeImageUrl(String(p.images[0])) ?? ""}
+                        src={normalizeImageUrl(String(previewImage)) ?? ""}
                         alt=""
                         className="h-full w-full object-cover"
                       />
@@ -551,12 +570,22 @@ function ProductsPage() {
                     </div>
                     <div className="grid sm:grid-cols-2 gap-3">
                       <Field label="SKU (required)">
-                        <input
-                          className={inputCls()}
-                          value={p.sku ?? ""}
-                          onChange={(e) => update(i, { sku: e.target.value })}
-                          placeholder="MNM-XXX-001"
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            className={inputCls()}
+                            value={p.sku ?? ""}
+                            onChange={(e) => update(i, { sku: e.target.value })}
+                            placeholder={suggestParentSku(p.name || "Product")}
+                          />
+                          <button
+                            type="button"
+                            title="Generate from product name (Ledgerly parity)"
+                            onClick={() => update(i, { sku: suggestParentSku(p.name || "") })}
+                            className="shrink-0 rounded-full glass px-3 py-2 text-xs font-medium hover:bg-white/60"
+                          >
+                            Generate
+                          </button>
+                        </div>
                       </Field>
                       <Field label="Fabric type (required)">
                         <input
@@ -571,25 +600,23 @@ function ProductsPage() {
                       <NumberField
                         label={
                           (p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS"
-                            ? "UAT price (from variants)"
-                            : "UAT price (₹)"
+                            ? "Selling price (from variants)"
+                            : "Selling price (₹)"
                         }
                         value={p.price}
-                        onChange={(price) => {
-                          if ((p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS") return;
-                          update(i, { price });
-                        }}
+                        readOnly={(p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS"}
+                        onChange={(price) => update(i, { price })}
                         required
                       />
                       <NumberField
                         label={
                           (p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS"
-                            ? "Selling price (min rate)"
-                            : "Selling price (₹)"
+                            ? "MRP (min from variants)"
+                            : "MRP (₹)"
                         }
                         value={p.compare_at_price}
+                        readOnly={(p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS"}
                         onChange={(compare_at_price) => {
-                          if ((p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS") return;
                           update(i, {
                             compare_at_price,
                             price:
@@ -606,10 +633,8 @@ function ProductsPage() {
                             : "Stock"
                         }
                         value={p.stock}
-                        onChange={(stock) => {
-                          if ((p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS") return;
-                          update(i, { stock });
-                        }}
+                        readOnly={(p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS"}
+                        onChange={(stock) => update(i, { stock })}
                         min={0}
                         required
                       />
@@ -654,16 +679,43 @@ function ProductsPage() {
                           }
                         >
                           <option value="SIMPLE">SIMPLE (one SKU / price)</option>
-                          <option value="VARIANTS">VARIANTS (size × color × price)</option>
+                          <option value="VARIANTS">VARIANTS (size × color matrix)</option>
                         </select>
                       </Field>
                     </div>
                     {(p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS" ? (
-                      <VariantsMatrixEditor
-                        parentSku={p.sku ?? ""}
-                        value={p.variants_json}
-                        onChange={(next) => update(i, next)}
-                      />
+                      <>
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          <CommaListField
+                            label="Sizes (comma-separated)"
+                            value={p.sizes}
+                            onChange={(sizes) => update(i, { sizes })}
+                            placeholder="S, M, L or 0-3m, 3-6m"
+                          />
+                          <CommaListField
+                            label="Colors (comma-separated)"
+                            value={colorNames(p.colors)}
+                            onChange={(names) => update(i, { colors: mergeColorNames(p.colors, names) })}
+                            placeholder="Navy, Ivory, Blush"
+                          />
+                        </div>
+                        <ColorImagesEditor
+                          colors={p.colors ?? []}
+                          onPatchColor={(colorIndex, patch) => patchProductColor(i, colorIndex, patch)}
+                        />
+                        <VariantsMatrixEditor
+                          parentSku={p.sku?.trim() || suggestParentSku(p.name || "")}
+                          sizes={p.sizes ?? []}
+                          colors={colorNames(p.colors)}
+                          value={p.variants_json}
+                          onChange={(next) =>
+                            update(i, {
+                              ...next,
+                              colors: mergeColorNames(p.colors, next.colors),
+                            })
+                          }
+                        />
+                      </>
                     ) : (
                       <>
                         <CommaListField
@@ -674,10 +726,16 @@ function ProductsPage() {
                         />
                         <CommaListField
                           label="Colors (optional, comma-separated)"
-                          value={p.colors}
-                          onChange={(colors) => update(i, { colors })}
+                          value={colorNames(p.colors)}
+                          onChange={(names) => update(i, { colors: mergeColorNames(p.colors, names) })}
                           placeholder="Cream, Sage, Peach — optional"
                         />
+                        {colorNames(p.colors).length > 0 ? (
+                          <ColorImagesEditor
+                            colors={p.colors ?? []}
+                            onPatchColor={(colorIndex, patch) => patchProductColor(i, colorIndex, patch)}
+                          />
+                        ) : null}
                       </>
                     )}
                     <Field label="Description">
@@ -699,19 +757,30 @@ function ProductsPage() {
 
                     <Field label="Images">
                       <ImageSpecHint spec={ADMIN_IMAGE_SPECS.productGallery} className="mb-2" />
+                      {(() => {
+                        const displayImages = resolveProductImages(p.images, p.colors);
+                        const fromColorGalleries = !(p.images ?? []).length && displayImages.length > 0;
+                        return (
                       <div className="space-y-3">
+                        {fromColorGalleries ? (
+                          <p className="text-xs text-muted-foreground rounded-lg glass px-3 py-2 leading-snug">
+                            Showing photos from colour galleries below. They sync into main images when you Save (for shop cards and Ledgerly).
+                          </p>
+                        ) : null}
                         <div className="flex flex-wrap gap-2">
-                          {p.images.map((url, k) => (
+                          {displayImages.map((url, k) => (
                             <div
-                              key={k}
-                              className="relative h-24 w-24 rounded-xl overflow-hidden ring-1 ring-border group"
+                              key={`${url}-${k}`}
+                              className={`relative h-24 w-24 rounded-xl overflow-hidden ring-1 ring-border group ${fromColorGalleries ? "ring-primary/30" : ""}`}
                             >
                               <img
                                 src={normalizeImageUrl(String(url)) ?? ""}
                                 alt=""
                                 className="h-full w-full object-cover"
                               />
+                              {!fromColorGalleries ? (
                               <button
+                                type="button"
                                 onClick={() =>
                                   update(i, { images: p.images.filter((_, j) => j !== k) })
                                 }
@@ -719,23 +788,38 @@ function ProductsPage() {
                               >
                                 <X className="h-3 w-3" />
                               </button>
+                              ) : null}
                             </div>
                           ))}
-                          <label className="h-24 w-24 grid place-items-center rounded-xl border-2 border-dashed border-border text-muted-foreground hover:bg-white/30 cursor-pointer">
-                            <div className="text-center">
-                              <Upload className="h-4 w-4 mx-auto" />
-                              <div className="text-[10px] mt-0.5">Upload</div>
-                            </div>
+                          <div className={`relative h-24 w-24 shrink-0 rounded-xl border-2 border-dashed border-border text-muted-foreground overflow-hidden hover:bg-white/30 ${imageUploading === i ? "opacity-50" : ""}`}>
                             <input
                               type="file"
                               accept={IMAGE_ACCEPT}
                               multiple
-                              className="hidden"
-                              onChange={(e) => e.target.files && upload(e.target.files, i)}
+                              disabled={imageUploading === i}
+                              aria-label="Upload product images"
+                              className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+                              onChange={(e) => {
+                                const files = e.target.files;
+                                e.target.value = "";
+                                if (files?.length) void upload(files, i);
+                              }}
                             />
-                          </label>
+                            <div className="pointer-events-none absolute inset-0 grid place-items-center">
+                              {imageUploading === i ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                              <div className="text-center">
+                                <Upload className="h-4 w-4 mx-auto" />
+                                <div className="text-[10px] mt-0.5">Upload</div>
+                              </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
+                        );
+                      })()}
                     </Field>
 
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm">
