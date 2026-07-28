@@ -26,7 +26,6 @@ XLSX_CANDIDATES = [
     REPO / "SKU WISE PRINT  FINAL DETAILS AS ON 21-07-26 (1).xlsx",
     REPO / "SKU WISE PRINT  FINAL DETAILS AS ON 21-07-26.xlsx",
 ]
-XLSX = next((p for p in XLSX_CANDIDATES if p.is_file()), XLSX_CANDIDATES[-1])
 GATEWAY = os.environ.get("GATEWAY_URL", "http://127.0.0.1:9180").rstrip("/")
 ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
 ADMIN_PASS = os.environ.get("ADMIN_PASS", "admin6")
@@ -126,7 +125,7 @@ def variant_sku(parent: str, size: str, color: str) -> str:
     return "-".join(parts)[:120]
 
 
-def parse_xlsx() -> dict[str, Any]:
+def parse_xlsx(xlsx_path: Path) -> dict[str, Any]:
     node = r"""
 const XLSX = require('xlsx');
 const path = process.argv[1];
@@ -141,7 +140,7 @@ for (const row of whcRows.slice(1)) {
 }
 console.log(JSON.stringify({ main, whc }));
 """
-    out = subprocess.check_output(["node", "-e", node, str(XLSX)], cwd=str(REPO), text=True)
+    out = subprocess.check_output(["node", "-e", node, str(xlsx_path)], cwd=str(REPO), text=True)
     return json.loads(out)
 
 
@@ -307,16 +306,18 @@ def insert_products(token: str, payloads: list[dict], dry_run: bool) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true", help="Parse and preview only")
+    parser.add_argument("--file", type=str, default=None, help="Path to the SKU WISE PRINT xlsx (defaults to repo-root candidates)")
     args = parser.parse_args()
 
-    if not XLSX.is_file():
-        print(f"Missing spreadsheet: {XLSX}", file=sys.stderr)
+    xlsx_path = Path(args.file) if args.file else next((p for p in XLSX_CANDIDATES if p.is_file()), XLSX_CANDIDATES[-1])
+    if not xlsx_path.is_file():
+        print(f"Missing spreadsheet: {xlsx_path}", file=sys.stderr)
         return 1
 
     print(f"=== SKU-wise print import @ {GATEWAY} ===")
-    print(f"Spreadsheet: {XLSX.name}")
+    print(f"Spreadsheet: {xlsx_path.name}")
 
-    parsed = parse_xlsx()
+    parsed = parse_xlsx(xlsx_path)
     payloads = build_products(parsed)
     print(f"Parsed {len(payloads)} styles from spreadsheet")
 

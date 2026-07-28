@@ -94,6 +94,36 @@ public class CatalogCoreClient {
         });
     }
 
+    /**
+     * Forward a multipart file to catalog core's SKU-wise print import endpoint.
+     */
+    public ResponseEntity<byte[]> forwardSkuWiseImport(MultipartFile file) throws IOException {
+        LinkedMultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
+        parts.add("file", new org.springframework.core.io.ByteArrayResource(file.getBytes()) {
+            @Override
+            public String getFilename() {
+                return file.getOriginalFilename();
+            }
+        });
+
+        RestClient.RequestBodySpec spec = restClient
+            .post()
+            .uri("/internal/v1/admin/import/sku-wise-print")
+            .contentType(MediaType.MULTIPART_FORM_DATA);
+
+        String auth = SecurityUtils.currentBearerToken();
+        if (auth != null) {
+            spec = spec.header(HttpHeaders.AUTHORIZATION, auth);
+        }
+
+        return spec.body(parts).exchange((httpRequest, response) -> {
+            byte[] responseBody = response.getBody().readAllBytes();
+            HttpHeaders headers = copyResponseHeaders(response.getHeaders());
+            headers.setContentLength(responseBody.length);
+            return new ResponseEntity<>(responseBody, headers, response.getStatusCode());
+        });
+    }
+
     private static HttpHeaders copyResponseHeaders(HttpHeaders upstream) {
         HttpHeaders headers = new HttpHeaders();
         headers.putAll(upstream);
