@@ -6,6 +6,8 @@ import {
   isVariantsProduct,
   lineUnitPrice,
   parseVariantsJson,
+  sizeHasSellableVariants,
+  variantStockMessage,
 } from "./product-variants";
 import type { Product } from "@/data/products";
 
@@ -55,5 +57,17 @@ describe("product-variants", () => {
     expect(lineUnitPrice(matrixProduct, { size: "M", color: "Navy" })).toBe(959.2);
     expect(isVariantSellable(findVariant(matrixProduct, { size: "M", color: "Navy" }))).toBe(true);
     expect(isVariantSellable(findVariant(matrixProduct, { size: "L", color: "Ivory" }))).toBe(false);
+  });
+
+  it("flags sold-out sizes and surfaces stock copy for shoppers", () => {
+    expect(sizeHasSellableVariants(matrixProduct, "M")).toBe(true);
+    expect(sizeHasSellableVariants(matrixProduct, "L")).toBe(false);
+    expect(
+      variantStockMessage(matrixProduct, findVariant(matrixProduct, { size: "L", color: "Ivory" }), {
+        size: "L",
+        color: "Ivory",
+      }),
+    ).toMatch(/sold out/i);
+    expect(variantStockMessage(matrixProduct, undefined, { size: "S", color: "Ivory" })).toMatch(/not available/i);
   });
 });

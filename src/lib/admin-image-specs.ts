@@ -50,7 +50,12 @@ export const ADMIN_IMAGE_SPECS = {
   productGallery: {
     ratio: "4 : 5",
     recommendedPx: "1200 × 1500 px",
-    notes: "First image is the main photo on product cards and PDP.",
+    notes: "Main product gallery and shop cards — lifestyle/product photos only.",
+  },
+  printSwatch: {
+    ratio: "1 : 1",
+    recommendedPx: "200 × 200 px",
+    notes: "Print preview for the colour picker on the product page. Not used in the main gallery.",
   },
   logoSquare: {
     ratio: "1 : 1",

@@ -11,8 +11,10 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -79,6 +81,60 @@ public class LedgerlyItemImageSync {
             }
         }
         setPrimaryImage(product, trimmed);
+    }
+
+    /**
+     * Import per-colour image URLs from Ledgerly into store R2 (when enabled). Returns map with final URLs.
+     */
+    public Map<String, List<String>> importColorImages(Product product, Map<String, List<String>> source) {
+        LinkedHashMap<String, List<String>> out = new LinkedHashMap<>();
+        if (source == null || source.isEmpty()) {
+            return out;
+        }
+        for (Map.Entry<String, List<String>> entry : source.entrySet()) {
+            String colorName = entry.getKey() == null ? "" : entry.getKey().trim();
+            if (colorName.isEmpty() || entry.getValue() == null) {
+                continue;
+            }
+            List<String> imported = new ArrayList<>();
+            int index = 0;
+            for (String url : entry.getValue()) {
+                String next = importColorImageUrl(product, colorName, index++, url);
+                if (next != null && !next.isBlank()) {
+                    imported.add(next.trim());
+                }
+            }
+            if (!imported.isEmpty()) {
+                out.put(colorName, imported);
+            }
+        }
+        return out;
+    }
+
+    private String importColorImageUrl(Product product, String colorName, int index, String sourceUrl) {
+        if (sourceUrl == null || sourceUrl.isBlank()) {
+            return null;
+        }
+        String trimmed = sourceUrl.trim();
+        if (isOnStoreCdn(trimmed)) {
+            return trimmed;
+        }
+        if (isEnabled()) {
+            try {
+                DownloadedImage downloaded = download(trimmed);
+                String filename = filenameForColor(product, colorName, index, downloaded.contentType());
+                return s3StorageService.uploadObject("products", filename, downloaded.body(), downloaded.contentType());
+            } catch (Exception e) {
+                LOG.warn(
+                    "Ledgerly colour image import failed for product {} ({}) colour {}: {}",
+                    product.getId(),
+                    product.getSku(),
+                    colorName,
+                    e.getMessage()
+                );
+            }
+        }
+        return trimmed;
     }
 
     /** First image URL from images_json for push to Ledgerly (prefer store CDN URL). */
@@ -179,6 +235,18 @@ public class LedgerlyItemImageSync {
             default -> "jpg";
         };
         return sanitizeFilename(sku + "-ledgerly." + ext);
+    }
+
+    private String filenameForColor(Product product, String colorName, int index, String contentType) {
+        String sku = product.getSku() != null && !product.getSku().isBlank() ? product.getSku() : "item";
+        String color = sanitizeFilename(colorName.toLowerCase(Locale.ROOT).replace(' ', '-'));
+        String ext = switch (contentType) {
+            case "image/png" -> "png";
+            case "image/webp" -> "webp";
+            case "image/gif" -> "gif";
+            default -> "jpg";
+        };
+        return sanitizeFilename(sku + "-" + color + "-" + (index + 1) + "." + ext);
     }
 
     private String sanitizeFilename(String filename) {

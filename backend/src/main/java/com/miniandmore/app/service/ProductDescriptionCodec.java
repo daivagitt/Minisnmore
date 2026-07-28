@@ -166,8 +166,8 @@ public class ProductDescriptionCodec {
         if (decoded.compareAtPrice() != null) {
             product.setCompareAtPrice(decoded.compareAtPrice());
         }
-        if (decoded.bodyDescription() != null) {
-            product.setDescription(decoded.bodyDescription());
+        if (decoded.bodyDescription() != null && !decoded.bodyDescription().isBlank()) {
+            product.setDescription(decoded.bodyDescription().trim());
         } else if (decoded.categoryName() == null && decoded.fabric() == null && decoded.story() == null) {
             // description was only metadata lines — clear stale body if everything parsed out
         }

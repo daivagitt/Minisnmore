@@ -301,9 +301,10 @@ function LedgerlySyncPanel({ connected }: { connected: boolean }) {
       setLastResult({ label, summary });
       const failed = summary.failureCount ?? 0;
       const success = summary.successCount ?? 0;
+      const skipped = summary.skippedCount ?? 0;
       if (failed > 0) {
         toast.warning(formatLedgerlySyncSummary(summary, label));
-      } else if ((summary.notices ?? []).length > 0) {
+      } else if ((summary.notices ?? []).length > 0 || skipped > 0) {
         toast.info(formatLedgerlySyncSummary(summary, label));
       } else if (success > 0) {
         toast.success(formatLedgerlySyncSummary(summary, label));
@@ -343,7 +344,7 @@ function LedgerlySyncPanel({ connected }: { connected: boolean }) {
     {
       id: "inventory",
       label: "Pull inventory from Ledgerly",
-      description: "Update stock for active products linked to Ledgerly (by item id or store SKU).",
+      description: "Update stock for active products linked to Ledgerly (by item id or store SKU). Response shows updated / failed / skipped unlinked.",
       icon: Warehouse,
       run: pullLedgerlyInventory,
     },

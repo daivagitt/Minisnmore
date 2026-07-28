@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import {
   ADMIN_NAME_MAX_LEN,
+  PRODUCT_NAME_MAX_LEN,
   bulkSave,
   disambiguateProductImportSlugs,
   fromBannerDto,
@@ -13,6 +14,7 @@ import {
   fromPolicyDto,
   fromProductDto,
   getProductValidationErrors,
+  parseSpreadsheetImageUrls,
   formatLedgerlySyncFailures,
   formatLedgerlySyncSummary,
   getAdminSiteSettings,
@@ -55,6 +57,30 @@ vi.mock("@/lib/api", async (importOriginal) => {
 });
 
 const mockedApi = vi.mocked(api);
+
+describe("spreadsheet image URLs", () => {
+  it("parses multiple URLs from a single cell", () => {
+    const urls = parseSpreadsheetImageUrls(
+      "https://cdn.example.com/a.jpg | https://cdn.example.com/b.jpg",
+    );
+    expect(urls).toEqual(["https://cdn.example.com/a.jpg", "https://cdn.example.com/b.jpg"]);
+  });
+
+  it("adds https for bare host paths and strips Excel quotes", () => {
+    const urls = parseSpreadsheetImageUrls('"cdn.example.com/products/1.png"');
+    expect(urls).toEqual(["https://cdn.example.com/products/1.png"]);
+  });
+
+  it("accepts public R2 URLs for storefront display", () => {
+    const url =
+      "https://pub-f227d5520be64479a318380ac346334d.r2.dev/uat/products/sample.png";
+    expect(parseSpreadsheetImageUrls(url)).toEqual([url]);
+  });
+
+  it("ignores placeholder template URLs", () => {
+    expect(parseSpreadsheetImageUrls("https://…/1.jpg")).toEqual([]);
+  });
+});
 
 describe("backend data mappers", () => {
   beforeEach(() => {
@@ -318,7 +344,6 @@ describe("backend data API calls", () => {
         "Age min (months) is required.",
         "Age max (months) is required.",
         "Fabric type is required.",
-        "Product description is required.",
       ]),
     );
     expect(() => saveProduct(emptyProduct)).toThrow(/Product name is required/);
@@ -391,6 +416,9 @@ describe("backend data API calls", () => {
     expect(formatLedgerlySyncSummary({ successCount: 5, failureCount: 0 }, "Products")).toBe(
       "Products: 5 succeeded",
     );
+    expect(formatLedgerlySyncSummary({ successCount: 3, failureCount: 0, skippedCount: 2 }, "Inventory")).toBe(
+      "Inventory: 3 succeeded, 2 skipped",
+    );
     expect(
       formatLedgerlySyncFailures({
         successCount: 0,
@@ -398,6 +426,13 @@ describe("backend data API calls", () => {
         failures: [{ productName: "Dress", message: "No stock" }],
       }),
     ).toEqual(["Dress: No stock"]);
+    expect(
+      formatLedgerlySyncFailures({
+        successCount: 0,
+        skippedCount: 1,
+        skipped: [{ sku: "X", message: "No linked store product" }],
+      }),
+    ).toEqual(["Skipped — X: No linked store product"]);
   });
 
   it("calls Ledgerly status and settings admin endpoints", async () => {
@@ -614,7 +649,7 @@ describe("backend data API calls", () => {
     expect(mockedApi.post).not.toHaveBeenCalled();
   });
 
-  it("rejects names and titles longer than 50 characters", () => {
+  it("keeps 50-character limits for shared admin labels but allows longer product names", () => {
     const longName = "A".repeat(ADMIN_NAME_MAX_LEN + 1);
     expect(() =>
       saveCategory({
@@ -638,7 +673,20 @@ describe("backend data API calls", () => {
         age_max_months: 12,
         images: ["/img.jpg"],
       } as Parameters<typeof getProductValidationErrors>[0]),
-    ).toEqual(expect.arrayContaining(["Product name must be 50 characters or fewer."]));
+    ).not.toEqual(expect.arrayContaining(["Product name must be 50 characters or fewer."]));
+    expect(
+      getProductValidationErrors({
+        name: "A".repeat(PRODUCT_NAME_MAX_LEN + 1),
+        slug: "test-product",
+        sku: "SKU-1",
+        category_id: "1",
+        price: 100,
+        stock: 1,
+        age_min_months: 0,
+        age_max_months: 12,
+        images: ["/img.jpg"],
+      } as Parameters<typeof getProductValidationErrors>[0]),
+    ).toEqual(expect.arrayContaining([`Product name must be ${PRODUCT_NAME_MAX_LEN} characters or fewer.`]));
     expect(mockedApi.post).not.toHaveBeenCalled();
   });
 

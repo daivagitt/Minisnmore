@@ -17,26 +17,28 @@ import org.springframework.stereotype.Component;
 @Component
 public class LedgerlyProductMergeService {
 
-    /** Storefront UAT price = selling price minus this discount (compare-at / Ledgerly rate). */
+    /** Storefront selling price = MRP × this multiplier (20% off MRP / Ledgerly rate). */
     private static final BigDecimal STORE_UAT_DISCOUNT_MULTIPLIER = new BigDecimal("0.80");
 
     private static final BigDecimal ESTIMATED_COST_RATIO = new BigDecimal("0.60");
     private final ProductDescriptionCodec descriptionCodec;
     private final LedgerlyItemImageSync itemImageSync;
     private final ProductVariantSupport variantSupport;
+    private final ProductColorImagesSupport colorImagesSupport;
 
     public LedgerlyProductMergeService(
         ProductDescriptionCodec descriptionCodec,
         LedgerlyItemImageSync itemImageSync,
-        ProductVariantSupport variantSupport
+        ProductVariantSupport variantSupport,
+        ProductColorImagesSupport colorImagesSupport
     ) {
         this.descriptionCodec = descriptionCodec;
         this.itemImageSync = itemImageSync;
         this.variantSupport = variantSupport;
+        this.colorImagesSupport = colorImagesSupport;
     }
 
     public void mergeLedgerlyItem(Product product, Map<String, Object> item, CategoryResolver categoryResolver, NoticeCallback notice) {
-        BigDecimal ledgerlySellingRate = firstPrice(item);
         if (item.get("stock") != null) {
             product.setStock(toInteger(item.get("stock")));
         }
@@ -47,19 +49,13 @@ public class LedgerlyProductMergeService {
 
         ProductDescriptionCodec.Decoded decoded = null;
         String description = stringValue(item.get("description"));
-        if (description != null) {
+        // Description is optional on Ledgerly pull/webhook — blank/missing must not block save.
+        if (description != null && !description.isBlank()) {
             decoded = descriptionCodec.decode(description);
             descriptionCodec.applyDecoded(product, decoded);
         }
 
-        BigDecimal sellingPrice = ledgerlySellingRate;
-        if (decoded != null && decoded.compareAtPrice() != null && decoded.compareAtPrice().compareTo(BigDecimal.ZERO) > 0) {
-            sellingPrice = decoded.compareAtPrice();
-        }
-        if (sellingPrice != null && sellingPrice.compareTo(BigDecimal.ZERO) > 0) {
-            product.setCompareAtPrice(sellingPrice);
-            product.setPrice(storeUatPrice(sellingPrice));
-        }
+        applyPricingFromItem(product, item, decoded);
 
         String fabric = firstNonBlank(stringValue(item.get("fabricType")), stringValue(item.get("fabric")));
         if (fabric != null) {
@@ -93,6 +89,18 @@ public class LedgerlyProductMergeService {
         String imageUrl = stringValue(item.get("imageUrl"));
         if (imageUrl != null && !imageUrl.isBlank()) {
             itemImageSync.importItemImage(product, imageUrl);
+        }
+
+        Object colorImagesRaw = item.containsKey("colorImagesJson") ? item.get("colorImagesJson") : item.get("color_images_json");
+        if (colorImagesRaw != null) {
+            Map<String, List<String>> source = colorImagesSupport.coerceMap(colorImagesRaw);
+            if (!source.isEmpty()) {
+                Map<String, List<String>> imported = itemImageSync.importColorImages(product, source);
+                if (!imported.isEmpty()) {
+                    product.setColorImagesJson(colorImagesSupport.serializeMap(imported));
+                    product.setColorsJson(colorImagesSupport.applyGalleryMapToColorsJson(product.getColorsJson(), imported));
+                }
+            }
         }
 
         product.setLedgerlySyncStatus(LedgerlySyncStatus.SYNCED);
@@ -134,8 +142,14 @@ public class LedgerlyProductMergeService {
         java.util.LinkedHashMap<String, Object> payload = new java.util.LinkedHashMap<>();
         payload.put("sku", product.getSku() != null ? product.getSku() : "P-" + product.getId());
         payload.put("name", product.getName());
-        BigDecimal sellingPrice = storeSellingPrice(product);
+        BigDecimal sellingPrice = product.getPrice() != null && product.getPrice().compareTo(BigDecimal.ZERO) > 0
+            ? product.getPrice()
+            : BigDecimal.ZERO;
         payload.put("price", sellingPrice);
+        if (product.getCompareAtPrice() != null && product.getCompareAtPrice().compareTo(BigDecimal.ZERO) > 0) {
+            payload.put("mrp", product.getCompareAtPrice());
+            payload.put("compareAtPrice", product.getCompareAtPrice());
+        }
         payload.put("stock", product.getStock());
         payload.put("unit", "ea");
 
@@ -143,6 +157,7 @@ public class LedgerlyProductMergeService {
         payload.put("cost", cost);
 
         String description = product.getDescription();
+        // Description is optional on push — omit when blank (do not fail sync).
         if (description != null && !description.isBlank()) {
             payload.put("description", description.trim());
         }
@@ -169,14 +184,33 @@ public class LedgerlyProductMergeService {
         }
 
         String firstImage = itemImageSync.firstImageUrl(product.getImagesJson());
+        if (firstImage == null) {
+            List<String> fromColors = colorImagesSupport.collectGalleryUrlsFromColorsJson(product.getColorsJson());
+            if (!fromColors.isEmpty()) {
+                firstImage = fromColors.get(0);
+            }
+        }
         if (firstImage != null) {
             payload.put("imageUrl", firstImage);
+        }
+        Map<String, List<String>> colorGallery = colorImagesSupport.parseMap(product.getColorImagesJson());
+        if (colorGallery.isEmpty()) {
+            colorGallery = colorImagesSupport.galleryMapFromColorsJson(product.getColorsJson());
+        }
+        if (!colorGallery.isEmpty()) {
+            payload.put("colorImagesJson", colorGallery);
         }
         payload.put("active", Boolean.TRUE.equals(product.getActive()));
         String itemStructure = product.getItemStructure() != null ? product.getItemStructure() : ProductVariantSupport.STRUCTURE_SIMPLE;
         payload.put("itemStructure", itemStructure);
         if (product.getVariantsJson() != null && !product.getVariantsJson().isBlank()) {
             payload.put("variantsJson", product.getVariantsJson());
+        }
+        if (product.getHsn() != null && !product.getHsn().isBlank()) {
+            payload.put("hsn", product.getHsn().trim());
+        }
+        if (product.getTaxPct() != null) {
+            payload.put("taxPct", product.getTaxPct());
         }
         return payload;
     }
@@ -257,22 +291,49 @@ public class LedgerlyProductMergeService {
         return new BigDecimal(text).intValue();
     }
 
-    /** Compare-at in the store is the real selling price synced to Ledgerly as item rate. */
-    BigDecimal storeSellingPrice(Product product) {
-        if (product.getCompareAtPrice() != null && product.getCompareAtPrice().compareTo(BigDecimal.ZERO) > 0) {
-            return product.getCompareAtPrice();
+    private void applyPricingFromItem(Product product, Map<String, Object> item, ProductDescriptionCodec.Decoded decoded) {
+        BigDecimal selling = firstPrice(item);
+        BigDecimal mrp = item.get("mrp") != null ? toBigDecimal(item.get("mrp")) : null;
+        if ((mrp == null || mrp.compareTo(BigDecimal.ZERO) <= 0) && item.get("compareAtPrice") != null) {
+            mrp = toBigDecimal(item.get("compareAtPrice"));
         }
+        if (decoded != null && decoded.compareAtPrice() != null && decoded.compareAtPrice().compareTo(BigDecimal.ZERO) > 0) {
+            if (mrp == null || mrp.compareTo(BigDecimal.ZERO) <= 0) {
+                mrp = decoded.compareAtPrice();
+            }
+        }
+
+        if (mrp != null && mrp.compareTo(BigDecimal.ZERO) > 0) {
+            product.setCompareAtPrice(mrp);
+            if (selling != null && selling.compareTo(BigDecimal.ZERO) > 0) {
+                product.setPrice(selling);
+            } else {
+                product.setPrice(storeUatPrice(mrp));
+            }
+        } else if (selling != null && selling.compareTo(BigDecimal.ZERO) > 0) {
+            product.setPrice(selling);
+            product.setCompareAtPrice(
+                selling.divide(STORE_UAT_DISCOUNT_MULTIPLIER, 2, RoundingMode.HALF_UP)
+            );
+        }
+    }
+
+    /** @deprecated use product.getPrice() — selling maps to Ledgerly rate */
+    BigDecimal storeSellingPrice(Product product) {
         if (product.getPrice() != null && product.getPrice().compareTo(BigDecimal.ZERO) > 0) {
             return product.getPrice();
+        }
+        if (product.getCompareAtPrice() != null && product.getCompareAtPrice().compareTo(BigDecimal.ZERO) > 0) {
+            return storeUatPrice(product.getCompareAtPrice());
         }
         return BigDecimal.ZERO;
     }
 
-    /** UAT storefront price applies a fixed 20% discount to the selling price. */
-    BigDecimal storeUatPrice(BigDecimal sellingPrice) {
-        if (sellingPrice == null || sellingPrice.compareTo(BigDecimal.ZERO) <= 0) {
+    /** Storefront selling price = 20% off MRP. */
+    BigDecimal storeUatPrice(BigDecimal mrp) {
+        if (mrp == null || mrp.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
-        return sellingPrice.multiply(STORE_UAT_DISCOUNT_MULTIPLIER).setScale(2, RoundingMode.HALF_UP);
+        return mrp.multiply(STORE_UAT_DISCOUNT_MULTIPLIER).setScale(2, RoundingMode.HALF_UP);
     }
 }

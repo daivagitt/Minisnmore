@@ -132,6 +132,18 @@ Gateway route: `/api/v1/admin/ledgerly/**` → store (`:8081`) → catalog core 
 | Mini's n More ops | | |
 | Ledgerly admin | | |
 
+### Prompt 10 smoke log (2026-07-22)
+
+| # | Step | Result | Notes |
+|---|------|--------|-------|
+| 1 | Test connection (`GET …/v1/platform/integration/status`) | **Fail** | HTTP **401** from `lender.qualityoutsidethebox.org` with current UAT `LEDGERLY_API_TOKEN` — regenerate token / confirm org before sync |
+| 2 | Sync simple product | Blocked | Depends on step 1 |
+| 3 | Sync variant product | Blocked | Depends on step 1 |
+| 4 | Pull inventory | Blocked | Depends on step 1 |
+| 5 | Checkout + invoice line SKU | Not run | Manual after auth fixed |
+| — | Catalog core health (`:9184`) | **Pass** | HTTP 200 |
+| — | Eager category fetch in `LedgerlySyncService` | **Pass** | `findOneWithEagerRelationships` / `findAllWithEagerRelationships` on deploy branch |
+
 ---
 
 ## Related docs

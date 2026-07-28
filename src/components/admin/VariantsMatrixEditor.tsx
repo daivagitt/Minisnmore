@@ -2,9 +2,14 @@ import { Plus, Trash2 } from "lucide-react";
 import { Field, inputCls } from "@/components/admin/AdminPage";
 import {
   aggregateFromVariantRows,
+  buildVariantMatrixFromSizesColors,
+  regenerateVariantSkus,
   rowsFromVariantsJson,
   serializeVariantRows,
   suggestVariantSku,
+  variantAmountBlur,
+  variantAmountDisplay,
+  variantAmountInput,
   type VariantEditorRow,
 } from "@/lib/admin-variants";
 
@@ -12,10 +17,14 @@ export { validateVariantRows } from "@/lib/admin-variants";
 
 export function VariantsMatrixEditor({
   parentSku,
+  sizes,
+  colors,
   value,
   onChange,
 }: {
   parentSku: string;
+  sizes: string[];
+  colors: string[];
   value: string | null;
   onChange: (next: {
     variants_json: string;
@@ -54,6 +63,7 @@ export function VariantsMatrixEditor({
         size: "",
         color: "",
         rate: rows.find((r) => Number(r.rate) > 0)?.rate ?? "",
+        mrp: rows.find((r) => Number(r.mrp) > 0)?.mrp ?? "",
         cost: "",
         stock: 0,
         active: true,
@@ -72,6 +82,7 @@ export function VariantsMatrixEditor({
               size: "",
               color: "",
               rate: "",
+              mrp: "",
               cost: "",
               stock: 0,
               active: true,
@@ -89,20 +100,29 @@ export function VariantsMatrixEditor({
     );
   };
 
+  const refreshMatrix = () => {
+    if (!sizes.length || !colors.length) return;
+    commit(buildVariantMatrixFromSizesColors(sizes, colors, parentSku, rows));
+  };
+
+  const refreshSkus = () => {
+    if (!parentSku.trim()) return;
+    commit(regenerateVariantSkus(rows, parentSku));
+  };
+
+  const canRefreshMatrix = sizes.length > 0 && colors.length > 0;
+
   return (
     <Field label="Variants (size × color matrix)">
-      <p className="text-[11px] text-muted-foreground mb-2">
-        Each row is a sellable SKU with its own price (Ledgerly rate), cost, and stock. Missing combos are not sold.
-        Parent price/stock update from these rows automatically. Sync to Ledgerly after saving.
-      </p>
       <div className="overflow-x-auto rounded-xl border border-border/60">
-        <table className="w-full text-xs min-w-[720px]">
+        <table className="w-full text-xs min-w-[820px]">
           <thead>
             <tr className="bg-muted/40 text-left">
               <th className="p-2 font-medium">Size</th>
               <th className="p-2 font-medium">Color</th>
               <th className="p-2 font-medium">Variant SKU</th>
-              <th className="p-2 font-medium">Rate (₹)</th>
+              <th className="p-2 font-medium">Selling (₹)</th>
+              <th className="p-2 font-medium">MRP (₹)</th>
               <th className="p-2 font-medium">Cost (₹)</th>
               <th className="p-2 font-medium">Stock</th>
               <th className="p-2 font-medium">Active</th>
@@ -148,39 +168,64 @@ export function VariantsMatrixEditor({
                 </td>
                 <td className="p-1.5">
                   <input
-                    type="number"
-                    min={0}
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     className={inputCls() + " !text-xs"}
-                    value={r.rate}
-                    onChange={(e) =>
-                      patchRow(index, { rate: e.target.value === "" ? "" : Number(e.target.value) })
-                    }
+                    value={variantAmountDisplay(r.rate)}
+                    aria-label="Selling price"
+                    onChange={(e) => patchRow(index, { rate: variantAmountInput(e.target.value) })}
+                    onBlur={() => patchRow(index, { rate: variantAmountBlur(r.rate) })}
                   />
                 </td>
                 <td className="p-1.5">
                   <input
-                    type="number"
-                    min={0}
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     className={inputCls() + " !text-xs"}
-                    value={r.cost}
-                    onChange={(e) =>
-                      patchRow(index, { cost: e.target.value === "" ? "" : Number(e.target.value) })
-                    }
+                    value={variantAmountDisplay(r.mrp)}
+                    aria-label="MRP"
+                    onChange={(e) => patchRow(index, { mrp: variantAmountInput(e.target.value) })}
+                    onBlur={() => {
+                      const mrp = variantAmountBlur(r.mrp);
+                      const rate = variantAmountBlur(r.rate);
+                      const patch: Partial<VariantEditorRow> = { mrp };
+                      if (mrp !== "" && rate === "") {
+                        patch.rate = Math.round(mrp * 0.8 * 100) / 100;
+                      }
+                      patchRow(index, patch);
+                    }}
                   />
                 </td>
                 <td className="p-1.5">
                   <input
-                    type="number"
-                    min={0}
-                    step={1}
+                    type="text"
+                    inputMode="decimal"
                     className={inputCls() + " !text-xs"}
-                    value={r.stock}
-                    onChange={(e) =>
-                      patchRow(index, { stock: e.target.value === "" ? "" : Number(e.target.value) })
-                    }
+                    value={variantAmountDisplay(r.cost)}
+                    onChange={(e) => patchRow(index, { cost: variantAmountInput(e.target.value) })}
+                    onBlur={() => patchRow(index, { cost: variantAmountBlur(r.cost) })}
                   />
+                </td>
+                <td className="p-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      className={`${inputCls()} !text-xs ${Number(r.stock) <= 0 && r.active ? "border-destructive/60" : ""}`}
+                      value={variantAmountDisplay(r.stock)}
+                      aria-label="Stock"
+                      onChange={(e) => patchRow(index, { stock: variantAmountInput(e.target.value) })}
+                      onBlur={() => {
+                        const stock = variantAmountBlur(r.stock);
+                        patchRow(index, { stock: stock === "" ? 0 : Math.max(0, Math.floor(stock)) });
+                      }}
+                    />
+                    {Number(r.stock) <= 0 && r.active && (
+                      <span className="shrink-0 text-[10px] font-medium text-destructive whitespace-nowrap">
+                        Sold out
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="p-1.5 text-center">
                   <input
@@ -219,6 +264,23 @@ export function VariantsMatrixEditor({
           className="inline-flex items-center gap-1.5 rounded-full glass px-3 py-1.5 text-xs font-medium hover:bg-white/60"
         >
           Fill missing SKUs
+        </button>
+        <button
+          type="button"
+          onClick={refreshMatrix}
+          disabled={!canRefreshMatrix}
+          title={canRefreshMatrix ? undefined : "Add sizes and colours above first"}
+          className="inline-flex items-center gap-1.5 rounded-full glass px-3 py-1.5 text-xs font-medium hover:bg-white/60 disabled:opacity-40"
+        >
+          Generate / refresh matrix
+        </button>
+        <button
+          type="button"
+          onClick={refreshSkus}
+          disabled={!parentSku.trim()}
+          className="inline-flex items-center gap-1.5 rounded-full glass px-3 py-1.5 text-xs font-medium hover:bg-white/60 disabled:opacity-40"
+        >
+          Regenerate variant SKUs
         </button>
       </div>
     </Field>

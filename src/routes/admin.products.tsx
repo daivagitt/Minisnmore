@@ -102,6 +102,7 @@ function ProductsPage() {
   const [editing, setEditing] = useState<number | null>(null);
   const [ledgerlySyncing, setLedgerlySyncing] = useState<Set<number>>(() => new Set());
   const [imageUploading, setImageUploading] = useState<number | null>(null);
+  const [skuWiseImporting, setSkuWiseImporting] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -114,6 +115,31 @@ function ProductsPage() {
     }
     setLoading(false);
   };
+
+  const importSkuWisePrint = async (file: File) => {
+    setSkuWiseImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/v1/admin/import/sku-wise-print", {
+        method: "POST",
+        body: formData,
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        toast.error((result.error || "Import failed") + (result.details ? ": " + result.details : ""));
+        return;
+      }
+      toast.success("SKU-wise print import completed! Reloading products...");
+      await new Promise(r => setTimeout(r, 1000));
+      load();
+    } catch (error) {
+      showApiError(error, "SKU-wise print import failed");
+    } finally {
+      setSkuWiseImporting(false);
+    }
+  };
+
   useEffect(() => {
     load();
   }, []);
@@ -450,6 +476,30 @@ function ProductsPage() {
           >
             <Plus className="h-4 w-4" /> New product
           </button>
+          <label
+            className={`rounded-full border border-amber-600 bg-amber-50 text-amber-900 px-4 py-2.5 text-sm flex items-center gap-2 cursor-pointer hover:bg-amber-100 transition ${
+              skuWiseImporting ? "opacity-60 pointer-events-none" : ""
+            }`}
+            title="Import products from SKU WISE PRINT spreadsheet (clears existing products)"
+          >
+            {skuWiseImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            {skuWiseImporting ? "Importing..." : "SKU-wise Print Import"}
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              disabled={skuWiseImporting}
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  if (confirm("This will delete all existing products and import from the spreadsheet. Continue?")) {
+                    importSkuWisePrint(file);
+                  }
+                }
+                e.target.value = "";
+              }}
+            />
+          </label>
         </div>
       }
     >

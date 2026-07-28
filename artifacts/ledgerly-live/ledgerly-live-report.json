@@ -1,7 +1,7 @@
 {
   "baseUrl": "http://127.0.0.1:9180",
-  "startedAt": "2026-07-09T03:06:41.005433+00:00",
-  "finishedAt": "2026-07-09T03:06:59.308437+00:00",
+  "startedAt": "2026-07-25T03:32:08.115459+00:00",
+  "finishedAt": "2026-07-25T03:36:48.214620+00:00",
   "results": [
     {
       "method": "POST",
@@ -16,54 +16,54 @@
       "path": "/api/v1/admin/ledgerly/integration-status",
       "ok": true,
       "code": 200,
-      "ms": 153,
+      "ms": 29,
       "note": "",
-      "body": "{\"serverConfigured\": true, \"connected\": true, \"pullProductsAutoCreateCategory\": false}"
+      "body": "{\"serverConfigured\": true, \"connected\": false, \"pullProductsAutoCreateCategory\": false}"
     },
     {
       "method": "GET",
       "path": "/api/v1/admin/ledgerly/settings",
       "ok": true,
       "code": 200,
-      "ms": 32,
+      "ms": 24,
       "note": "",
-      "body": "{\"apiBaseUrl\": \"https://lender.qualityoutsidethebox.org/api\", \"orgId\": \"1001\", \"connected\": true, \"pullProductsAutoCreateCategory\": false, \"hasToken\": true, \"hasWebhookSecret\": true}"
+      "body": "{\"apiBaseUrl\": \"https://lender.qualityoutsidethebox.org/api\", \"orgId\": \"1001\", \"connected\": false, \"pullProductsAutoCreateCategory\": false, \"hasToken\": true, \"hasWebhookSecret\": true}"
     },
     {
       "method": "GET",
       "path": "/api/v1/admin/ledgerly/test",
       "ok": true,
       "code": 200,
-      "ms": 938,
+      "ms": 20794,
       "note": "",
-      "body": "{\"activeKeys\": 4, \"activeWebhooks\": 0, \"connected\": true, \"message\": \"Integration API ready\", \"organizationId\": null, \"scopes\": []}"
+      "body": "{\"ok\": false, \"connected\": false, \"status\": 401, \"message\": \"Ledgerly rejected the API token (HTTP 401). Generate a new developer token in Ledgerly and paste it under API & Webhooks, then save and test again.\", \"error\": \"unauthorized\"}"
     },
     {
       "method": "POST",
       "path": "/api/v1/admin/ledgerly/pull-inventory",
       "ok": true,
       "code": 200,
-      "ms": 550,
+      "ms": 18956,
       "note": "",
-      "body": "{\"successCount\": 23, \"failureCount\": 0, \"failures\": [], \"notices\": []}"
+      "body": "{\"successCount\": 0, \"failureCount\": 1, \"skippedCount\": 0, \"failures\": [{\"message\": \"Ledgerly inventory pull failed (HTTP 401): Unauthorized\"}], \"notices\": [], \"skipped\": []}"
     },
     {
       "method": "POST",
       "path": "/api/v1/admin/ledgerly/retry-orders",
-      "ok": true,
-      "code": 200,
-      "ms": 48,
-      "note": "",
-      "body": "{\"successCount\": 0, \"failureCount\": 0, \"failures\": [], \"notices\": []}"
+      "ok": false,
+      "code": 0,
+      "ms": 120097,
+      "note": "timed out",
+      "body": ""
     },
     {
       "method": "POST",
       "path": "/api/v1/admin/ledgerly/pull-order-tracking",
-      "ok": true,
-      "code": 200,
-      "ms": 16277,
-      "note": "",
-      "body": "{\"successCount\": 40, \"failureCount\": 0, \"failures\": [], \"notices\": []}"
+      "ok": false,
+      "code": 0,
+      "ms": 120099,
+      "note": "timed out",
+      "body": ""
     }
   ]
 }

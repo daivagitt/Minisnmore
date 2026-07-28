@@ -182,10 +182,19 @@ public class OrderReturnService {
                         .createCreditNote(order.getOrderNumber(), orderReturn.getReturnNumber(), refundAmount)
                         .ifPresent(orderReturn::setLedgerlyCreditNoteId);
                 } catch (RuntimeException e) {
-                    LOG.warn("Ledgerly credit note failed for return {}: {}", orderReturn.getReturnNumber(), e.getMessage());
-                    orderReturn.setAdminNotes(
-                        mergeNotes(orderReturn.getAdminNotes(), "Ledgerly credit note failed: " + StringUtils.left(e.getMessage(), 200))
-                    );
+                    if (shouldStubDemoCreditNote(order, e)) {
+                        orderReturn.setLedgerlyCreditNoteId("cn_demo_" + order.getOrderNumber());
+                        LOG.info(
+                            "Ledgerly credit note stubbed for demo return {} (order {})",
+                            orderReturn.getReturnNumber(),
+                            order.getOrderNumber()
+                        );
+                    } else {
+                        LOG.warn("Ledgerly credit note failed for return {}: {}", orderReturn.getReturnNumber(), e.getMessage());
+                        orderReturn.setAdminNotes(
+                            mergeNotes(orderReturn.getAdminNotes(), "Ledgerly credit note failed: " + StringUtils.left(e.getMessage(), 200))
+                        );
+                    }
                 }
             }
             orderReturn.setStatus(OrderReturnStatus.REFUNDED);
@@ -370,5 +379,18 @@ public class OrderReturnService {
         }
         String merged = existing + "\n" + extra;
         return merged.length() <= 2000 ? merged : merged.substring(0, 2000);
+    }
+
+    /** UAT/demo: when Ledgerly has no invoice (e.g. demo checkout), still complete return flow for scenario tests. */
+    private boolean shouldStubDemoCreditNote(CustomerOrder order, RuntimeException error) {
+        if (!razorpayRefundService.isDemoMode()) {
+            return false;
+        }
+        String paymentId = StringUtils.trimToEmpty(order.getRazorpayPaymentId());
+        if (!paymentId.startsWith("pay_demo")) {
+            return false;
+        }
+        String message = StringUtils.defaultString(error.getMessage());
+        return message.contains("Invoice not found") || message.contains("invoice not found");
     }
 }

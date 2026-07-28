@@ -21,6 +21,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientResponseException;
 
 @Service
 @Transactional
@@ -38,6 +40,8 @@ public class LedgerlySyncService {
     private final LedgerlyCategoryResolver categoryResolver;
     private final ProductVariantSupport variantSupport;
 
+    private final ProductColorImagesSupport colorImagesSupport;
+
     public LedgerlySyncService(
         LedgerlyIntegrationClient ledgerlyClient,
         ProductRepository productRepository,
@@ -47,7 +51,8 @@ public class LedgerlySyncService {
         SiteSettingRepository siteSettingRepository,
         LedgerlyProductMergeService productMergeService,
         LedgerlyCategoryResolver categoryResolver,
-        ProductVariantSupport variantSupport
+        ProductVariantSupport variantSupport,
+        ProductColorImagesSupport colorImagesSupport
     ) {
         this.ledgerlyClient = ledgerlyClient;
         this.productRepository = productRepository;
@@ -58,6 +63,7 @@ public class LedgerlySyncService {
         this.productMergeService = productMergeService;
         this.categoryResolver = categoryResolver;
         this.variantSupport = variantSupport;
+        this.colorImagesSupport = colorImagesSupport;
     }
 
     @Async
@@ -251,7 +257,19 @@ public class LedgerlySyncService {
     }
 
     public Map<String, Object> pullInventory() {
-        Map<String, Object> response = ledgerlyClient.pullInventory();
+        final Map<String, Object> response;
+        try {
+            response = ledgerlyClient.pullInventory();
+        } catch (RestClientResponseException ex) {
+            String message =
+                "Ledgerly inventory pull failed (HTTP " + ex.getStatusCode().value() + "): " + StringUtils.defaultString(ex.getStatusText());
+            LOG.warn(message);
+            return LedgerlySyncSummary.builder().failure(message).build().toMap();
+        } catch (ResourceAccessException ex) {
+            String message = "Ledgerly integration unreachable: " + ex.getMessage();
+            LOG.warn(message);
+            return LedgerlySyncSummary.builder().failure(message).build().toMap();
+        }
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> levels = (List<Map<String, Object>>) response.getOrDefault("inventory", List.of());
         LedgerlySyncSummary.Builder builder = LedgerlySyncSummary.builder();
@@ -297,12 +315,19 @@ public class LedgerlySyncService {
                     continue;
                 }
                 String ref = sku != null ? sku : ledgerlyItemId;
-                builder.failure(ref, "No linked store product for SKU or Ledgerly item id");
+                builder.skipped(ref, "No linked store product for SKU or Ledgerly item id");
             } catch (Exception e) {
                 builder.failure(sku != null ? sku : ledgerlyItemId, e.getMessage());
             }
         }
-        return builder.build().toMap();
+        LedgerlySyncSummary summary = builder.build();
+        LOG.info(
+            "Ledgerly inventory pull finished: updated={}, failed={}, skippedUnlinked={}",
+            summary.successCount(),
+            summary.failureCount(),
+            summary.skippedCount()
+        );
+        return summary.toMap();
     }
 
     public Map<String, Object> retryFailedOrders() {
@@ -366,6 +391,7 @@ public class LedgerlySyncService {
             if (product.getPrice() == null) {
                 product.setPrice(BigDecimal.ZERO);
             }
+            // description / fabric remain optional when Ledgerly omits them
         }
 
         productMergeService.mergeLedgerlyItem(
@@ -461,6 +487,7 @@ public class LedgerlySyncService {
     }
 
     private Map<String, Object> buildProductPayload(Product product) {
+        colorImagesSupport.syncProductColorImages(product);
         String categoryName = null;
         if (product.getCategory() != null) {
             try {
@@ -585,6 +612,15 @@ public class LedgerlySyncService {
                 if (found.isPresent()) {
                     product = found.orElseThrow();
                     if (variantSupport.isVariants(product)) {
+                        Optional<ProductVariantSupport.VariantRow> bySizeColor = variantSupport.resolveSellable(
+                            product,
+                            null,
+                            item.getItemSize(),
+                            item.getColor()
+                        );
+                        if (bySizeColor.isPresent()) {
+                            return bySizeColor.orElseThrow().sku();
+                        }
                         throw new IllegalStateException(
                             "Order line missing variantSku for VARIANTS product " + product.getSku()
                         );

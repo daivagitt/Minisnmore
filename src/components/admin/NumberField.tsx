@@ -3,6 +3,7 @@ import { numberFieldDisplay, parseNumberField } from "@/lib/admin-number-field";
 
 export function NumberField({
   label,
+  hint,
   value,
   onChange,
   min,
@@ -10,8 +11,10 @@ export function NumberField({
   step,
   placeholder,
   required,
+  readOnly,
 }: {
   label: string;
+  hint?: string;
   value: number | null | undefined;
   onChange: (value: number | null) => void;
   min?: number;
@@ -19,19 +22,24 @@ export function NumberField({
   step?: number | string;
   placeholder?: string;
   required?: boolean;
+  readOnly?: boolean;
 }) {
   return (
-    <Field label={label} required={required}>
+    <Field label={label} hint={hint}>
       <input
         type="number"
-        className={inputCls()}
+        className={`${inputCls()}${readOnly ? " opacity-70 cursor-default" : ""}`}
         value={numberFieldDisplay(value)}
         min={min}
         max={max}
         step={step}
         placeholder={placeholder}
         required={required}
-        onChange={(e) => onChange(parseNumberField(e.target.value))}
+        readOnly={readOnly}
+        onChange={(e) => {
+          if (readOnly) return;
+          onChange(parseNumberField(e.target.value));
+        }}
       />
     </Field>
   );

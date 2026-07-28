@@ -77,6 +77,9 @@ public class Product implements Serializable {
     @Column(name = "colors_json", columnDefinition = "text")
     private String colorsJson;
 
+    @Column(name = "color_images_json", columnDefinition = "text")
+    private String colorImagesJson;
+
     @Size(max = 40)
     @Column(name = "item_structure", length = 40)
     private String itemStructure;
@@ -355,6 +358,19 @@ public class Product implements Serializable {
 
     public void setColorsJson(String colorsJson) {
         this.colorsJson = colorsJson;
+    }
+
+    public String getColorImagesJson() {
+        return this.colorImagesJson;
+    }
+
+    public Product colorImagesJson(String colorImagesJson) {
+        this.setColorImagesJson(colorImagesJson);
+        return this;
+    }
+
+    public void setColorImagesJson(String colorImagesJson) {
+        this.colorImagesJson = colorImagesJson;
     }
 
     public String getItemStructure() {

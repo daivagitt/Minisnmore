@@ -178,7 +178,7 @@ public class InternalAccountOrderResource {
         dataAccess.orderItemRepository().saveAll(orderItems);
 
         String razorpayOrderId;
-        if (isDemoMode()) {
+        if (isDemoMode() || totals.total().compareTo(BigDecimal.ZERO) <= 0) {
             razorpayOrderId = "order_demo_" + orderNumber;
         } else {
             razorpayOrderId = createRazorpayOrder(orderNumber, totals.total(), login);
@@ -540,7 +540,10 @@ public class InternalAccountOrderResource {
                 if (!variantSupport.decrementVariantStock(product, variant.sku(), variant.size(), variant.color(), item.qty())) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Unable to reserve stock for " + product.getName());
                 }
-                BigDecimal unitPrice = variantSupport.storefrontPrice(variant.rate());
+                BigDecimal unitPrice = variantSupport.variantSellingPrice(variant);
+                if (unitPrice.compareTo(BigDecimal.ZERO) <= 0) {
+                    unitPrice = Optional.ofNullable(product.getPrice()).orElse(BigDecimal.ZERO);
+                }
                 reserved.add(new ReservedOrderItem(product, item, variant.sku(), unitPrice));
             } else {
                 int available = Optional.ofNullable(product.getStock()).orElse(0);

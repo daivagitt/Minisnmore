@@ -1,5 +1,6 @@
 import { listProducts, listBlogPosts, getPolicy, listCategories } from "@/lib/backend-data";
 import { agesFromSizes } from "@/lib/product-ages";
+import { normalizeStorefrontColors, resolveProductImages } from "@/lib/product-colors";
 import { products as seedProducts, type Product, type Fabric } from "@/data/products";
 import { posts as seedPosts, type BlogPost } from "@/data/blog";
 import { parseVariantsJson } from "@/lib/product-variants";
@@ -9,24 +10,6 @@ import { parseVariantsJson } from "@/lib/product-variants";
  * Live data is fetched from the Spring Boot API; if empty, static seed data is used.
  * Module-level caches dedupe in-flight requests across components.
  */
-
-const COLOR_PALETTE: Record<string, string> = {
-  cream: "#f7e3d5", ivory: "#f2eee8", white: "#ffffff", pearl: "#efe5d3",
-  cloud: "#f2eee8", sand: "#d9bfa6", beige: "#e5d4bf", taupe: "#c7a991",
-  tan: "#c18459", brick: "#b0693c", terracotta: "#b0693c",
-  peach: "#f4c5a6", blush: "#f1cfc6", rose: "#d49a92", petal: "#e7c3c0",
-  pink: "#f1bdc3", coral: "#e89a82",
-  butter: "#e7c76b", yellow: "#e7c76b", mustard: "#c89e3b",
-  sage: "#a8c0a0", "sage green": "#a8c0a0", mint: "#bcd9c4", olive: "#8a8c5a",
-  sky: "#bcd5e3", blue: "#7aa6c4", navy: "#2c3e58",
-  grey: "#b8b1a7", gray: "#b8b1a7", charcoal: "#3a3a3a", black: "#1a1a1a",
-  lavender: "#c9b8d7", purple: "#9c7fb5",
-};
-
-function hexFor(name: string): string {
-  const key = name.trim().toLowerCase();
-  return COLOR_PALETTE[key] ?? "#d9bfa6";
-}
 
 function fabricFromText(...inputs: (string | null | undefined)[]): Fabric {
   const hay = inputs.filter(Boolean).join(" ").toLowerCase();
@@ -45,16 +28,8 @@ function categoryFromAge(min: number | null | undefined): Product["category"] {
   return "Toddler";
 }
 
-function normalizeColors(raw: unknown): { name: string; hex: string }[] {
-  if (!Array.isArray(raw) || raw.length === 0) return [{ name: "Natural", hex: "#d9bfa6" }];
-  return raw.map((c) => {
-    if (typeof c === "string") return { name: c, hex: hexFor(c) };
-    if (c && typeof c === "object" && "name" in (c as any)) {
-      const o = c as { name: string; hex?: string };
-      return { name: o.name, hex: o.hex ?? hexFor(o.name) };
-    }
-    return { name: String(c), hex: "#d9bfa6" };
-  });
+function normalizeColors(raw: unknown) {
+  return normalizeStorefrontColors(raw);
 }
 
 function normalizeSizes(raw: unknown): string[] {
@@ -104,7 +79,10 @@ function resolveCategoryFields(
 }
 
 function mapProduct(row: DbProductRow): Product {
-  const images = Array.isArray(row.images) ? (row.images as string[]).filter((x) => typeof x === "string" && x.length > 0) : [];
+  const images = resolveProductImages(
+    Array.isArray(row.images) ? (row.images as string[]) : [],
+    row.colors,
+  );
   const fallbackImg = seedProducts[0]?.image ?? "";
   const img = images[0] ?? fallbackImg;
   const sizes = normalizeSizes(row.sizes);

@@ -4,6 +4,8 @@ import com.miniandmore.app.domain.Product;
 import com.miniandmore.app.repository.ProductRepository;
 import com.miniandmore.app.service.dto.ProductDTO;
 import com.miniandmore.app.service.mapper.ProductMapper;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,14 +31,18 @@ public class ProductService {
 
     private final ProductVariantSupport variantSupport;
 
+    private final ProductColorImagesSupport colorImagesSupport;
+
     public ProductService(
         ProductRepository productRepository,
         ProductMapper productMapper,
-        ProductVariantSupport variantSupport
+        ProductVariantSupport variantSupport,
+        ProductColorImagesSupport colorImagesSupport
     ) {
         this.productRepository = productRepository;
         this.productMapper = productMapper;
         this.variantSupport = variantSupport;
+        this.colorImagesSupport = colorImagesSupport;
     }
 
     /**
@@ -91,6 +97,11 @@ public class ProductService {
         if (product == null) {
             return;
         }
+        Map<String, List<String>> galleryMap = colorImagesSupport.galleryMapFromColorsJson(product.getColorsJson());
+        if (galleryMap.isEmpty()) {
+            galleryMap = colorImagesSupport.parseMap(product.getColorImagesJson());
+        }
+
         String structure = product.getItemStructure();
         if (structure == null || structure.isBlank()) {
             product.setItemStructure(ProductVariantSupport.STRUCTURE_SIMPLE);
@@ -103,10 +114,16 @@ public class ProductService {
                     "Invalid variants matrix JSON for VARIANTS product"
                 );
             }
+            if (!galleryMap.isEmpty()) {
+                product.setColorsJson(colorImagesSupport.applyGalleryMapToColorsJson(product.getColorsJson(), galleryMap));
+            }
         } else {
             product.setItemStructure(ProductVariantSupport.STRUCTURE_SIMPLE);
             product.setVariantsJson(null);
         }
+
+        colorImagesSupport.syncProductColorImages(product);
+        colorImagesSupport.ensureProductImagesFromColorGalleries(product);
     }
 
     /**

@@ -188,7 +188,8 @@ public class ProductVariantSupport {
     }
 
     public Aggregates aggregates(List<VariantRow> rows) {
-        BigDecimal minRate = null;
+        BigDecimal minSelling = null;
+        BigDecimal minMrp = null;
         BigDecimal minCost = null;
         int stockSum = 0;
         for (VariantRow row : rows) {
@@ -196,17 +197,34 @@ public class ProductVariantSupport {
                 continue;
             }
             if (row.rate() != null && row.rate().compareTo(BigDecimal.ZERO) > 0) {
-                minRate = minRate == null ? row.rate() : minRate.min(row.rate());
+                minSelling = minSelling == null ? row.rate() : minSelling.min(row.rate());
+            }
+            if (row.mrp() != null && row.mrp().compareTo(BigDecimal.ZERO) > 0) {
+                minMrp = minMrp == null ? row.mrp() : minMrp.min(row.mrp());
             }
             if (row.cost() != null && row.cost().compareTo(BigDecimal.ZERO) > 0) {
                 minCost = minCost == null ? row.cost() : minCost.min(row.cost());
             }
             stockSum += Math.max(0, row.stock());
         }
-        return new Aggregates(minRate, minCost, stockSum);
+        return new Aggregates(minSelling, minMrp, minCost, stockSum);
     }
 
-    /** Storefront selling price after UAT discount, matching parent merge rules. */
+    /** Variant selling price for checkout (rate is selling; legacy rows may only have mrp). */
+    public BigDecimal variantSellingPrice(VariantRow row) {
+        if (row == null) {
+            return BigDecimal.ZERO;
+        }
+        if (row.rate() != null && row.rate().compareTo(BigDecimal.ZERO) > 0) {
+            return row.rate();
+        }
+        if (row.mrp() != null && row.mrp().compareTo(BigDecimal.ZERO) > 0) {
+            return storefrontPrice(row.mrp());
+        }
+        return BigDecimal.ZERO;
+    }
+
+    /** Storefront selling price after 20% off MRP, matching parent merge rules. */
     public BigDecimal storefrontPrice(BigDecimal rate) {
         if (rate == null || rate.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
@@ -253,9 +271,15 @@ public class ProductVariantSupport {
         }
 
         Aggregates agg = aggregates(rows);
-        if (agg.minRate() != null) {
-            product.setCompareAtPrice(agg.minRate());
-            product.setPrice(storefrontPrice(agg.minRate()));
+        if (agg.minSelling() != null) {
+            product.setPrice(agg.minSelling());
+        }
+        if (agg.minMrp() != null) {
+            product.setCompareAtPrice(agg.minMrp());
+        } else if (agg.minSelling() != null) {
+            product.setCompareAtPrice(
+                agg.minSelling().divide(STORE_UAT_DISCOUNT_MULTIPLIER, 2, RoundingMode.HALF_UP)
+            );
         }
         product.setStock(agg.stockSum());
         return true;
@@ -285,7 +309,7 @@ public class ProductVariantSupport {
         List<VariantRow> updated = replaceRowAt(
             rows,
             targetIndex,
-            new VariantRow(row.id(), row.sku(), row.size(), row.color(), row.rate(), row.cost(), row.stock() - qty, row.active())
+            new VariantRow(row.id(), row.sku(), row.size(), row.color(), row.rate(), row.mrp(), row.cost(), row.stock() - qty, row.active())
         );
         product.setVariantsJson(serialize(updated));
         product.setStock(aggregates(updated).stockSum());
@@ -312,7 +336,7 @@ public class ProductVariantSupport {
         List<VariantRow> updated = replaceRowAt(
             rows,
             targetIndex,
-            new VariantRow(row.id(), row.sku(), row.size(), row.color(), row.rate(), row.cost(), row.stock() + qty, row.active())
+            new VariantRow(row.id(), row.sku(), row.size(), row.color(), row.rate(), row.mrp(), row.cost(), row.stock() + qty, row.active())
         );
         product.setVariantsJson(serialize(updated));
         product.setStock(aggregates(updated).stockSum());
@@ -333,7 +357,7 @@ public class ProductVariantSupport {
         List<VariantRow> updated = replaceRowAt(
             rows,
             targetIndex,
-            new VariantRow(row.id(), row.sku(), row.size(), row.color(), row.rate(), row.cost(), Math.max(0, stock), row.active())
+            new VariantRow(row.id(), row.sku(), row.size(), row.color(), row.rate(), row.mrp(), row.cost(), Math.max(0, stock), row.active())
         );
         product.setVariantsJson(serialize(updated));
         product.setStock(aggregates(updated).stockSum());
@@ -377,7 +401,7 @@ public class ProductVariantSupport {
         return n == null ? "" : n.toLowerCase(Locale.ROOT);
     }
 
-    public record Aggregates(BigDecimal minRate, BigDecimal minCost, int stockSum) {}
+    public record Aggregates(BigDecimal minSelling, BigDecimal minMrp, BigDecimal minCost, int stockSum) {}
 
     public record VariantRow(
         String id,
@@ -385,17 +409,36 @@ public class ProductVariantSupport {
         String size,
         String color,
         BigDecimal rate,
+        BigDecimal mrp,
         BigDecimal cost,
         int stock,
         boolean active
     ) {
         static VariantRow fromMap(Map<String, Object> map) {
+            BigDecimal rateRaw = toBigDecimal(map.get("rate"));
+            BigDecimal mrpRaw = map.containsKey("mrp") ? toBigDecimal(map.get("mrp")) : null;
+            BigDecimal priceRaw = map.get("price") != null ? toBigDecimal(map.get("price")) : null;
+            boolean hasExplicitMrp = mrpRaw != null && mrpRaw.compareTo(BigDecimal.ZERO) > 0;
+            boolean hasExplicitSelling = priceRaw != null && priceRaw.compareTo(BigDecimal.ZERO) > 0;
+            boolean legacyRateIsMrp =
+                rateRaw.compareTo(BigDecimal.ZERO) > 0 && !hasExplicitMrp && !hasExplicitSelling && !map.containsKey("mrp");
+
+            BigDecimal rate;
+            BigDecimal mrp;
+            if (legacyRateIsMrp) {
+                mrp = rateRaw;
+                rate = rateRaw.multiply(STORE_UAT_DISCOUNT_MULTIPLIER).setScale(2, RoundingMode.HALF_UP);
+            } else {
+                rate = hasExplicitSelling ? priceRaw : rateRaw;
+                mrp = hasExplicitMrp ? mrpRaw : null;
+            }
             return new VariantRow(
                 stringValue(map.get("id")),
                 stringValue(map.get("sku")),
                 stringValue(map.get("size")),
                 stringValue(map.get("color")),
-                toBigDecimal(map.get("rate")),
+                rate,
+                mrp,
                 toBigDecimal(map.get("cost")),
                 toInt(map.get("stock")),
                 toBoolean(map.get("active"), true)
@@ -417,6 +460,9 @@ public class ProductVariantSupport {
                 map.put("color", color);
             }
             map.put("rate", rate != null ? rate : BigDecimal.ZERO);
+            if (mrp != null && mrp.compareTo(BigDecimal.ZERO) > 0) {
+                map.put("mrp", mrp);
+            }
             map.put("cost", cost != null ? cost : BigDecimal.ZERO);
             map.put("stock", stock);
             map.put("active", active);

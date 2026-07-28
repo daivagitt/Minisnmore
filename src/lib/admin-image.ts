@@ -33,7 +33,9 @@ export function imageTooLargeMessage(fileSizeBytes: number) {
 
 export function isAllowedImageFile(file: File): boolean {
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-  return ALLOWED_IMAGE_EXTENSIONS.has(ext);
+  if (ALLOWED_IMAGE_EXTENSIONS.has(ext)) return true;
+  const mime = (file.type || "").toLowerCase();
+  return ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(mime);
 }
 
 export type AdminImageValidationResult = { ok: true } | { ok: false; error: string };

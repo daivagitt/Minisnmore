@@ -33,7 +33,8 @@ function makeProduct(overrides: Partial<Product> & Pick<Product, "id" | "slug">)
 
 describe("parseShopSearch", () => {
   it("accepts valid filters and defaults sort to new", () => {
-    expect(parseShopSearch({ category: "dresses", age: "3-6m", fabric: "Muslin", sort: "lo" })).toEqual({
+    expect(parseShopSearch({ category: "dresses", age: "3-6m", fabric: "Muslin", sort: "lo", q: "Romper" })).toEqual({
+      q: "romper",
       category: "dresses",
       age: "3-6m",
       fabric: "Muslin",
@@ -47,25 +48,39 @@ describe("parseShopSearch", () => {
       sort: "new",
     });
   });
+
+  it("trims and lowercases q", () => {
+    expect(parseShopSearch({ q: "  Cloud Muslin  " }).q).toBe("cloud muslin");
+  });
 });
 
 describe("buildShopSearch", () => {
   it("omits empty filter keys for clean URLs", () => {
-    expect(buildShopSearch({ category: "", age: undefined, fabric: undefined, sort: "hi" })).toEqual({
+    expect(buildShopSearch({ category: "", age: undefined, fabric: undefined, sort: "hi", q: "  " })).toEqual({
       sort: "hi",
     });
+  });
+
+  it("keeps q when present", () => {
+    expect(buildShopSearch({ q: "swaddle", sort: "new" })).toEqual({ q: "swaddle", sort: "new" });
   });
 });
 
 describe("shop product filters", () => {
   const products = [
-    makeProduct({ id: "1", slug: "a", categorySlug: "swaddles", ages: ["0-3m"], fabric: "Muslin", price: 200 }),
-    makeProduct({ id: "2", slug: "b", categorySlug: "dresses", ages: ["6-12m"], fabric: "Organic Cotton", price: 100 }),
-    makeProduct({ id: "3", slug: "c", categorySlug: "swaddles", ages: ["3-6m"], fabric: "Muslin", price: 300, isNew: true }),
+    makeProduct({ id: "1", slug: "a", name: "Cloud Swaddle", categorySlug: "swaddles", ages: ["0-3m"], fabric: "Muslin", price: 200 }),
+    makeProduct({ id: "2", slug: "b", name: "Rose Dress", categorySlug: "dresses", ages: ["6-12m"], fabric: "Organic Cotton", price: 100 }),
+    makeProduct({ id: "3", slug: "c", name: "Muslin Bib", categorySlug: "swaddles", ages: ["3-6m"], fabric: "Muslin", price: 300, isNew: true }),
   ];
 
   it("filters by category slug case-insensitively", () => {
     expect(filterProducts(products, { category: "Swaddles", sort: "new" }).map((p) => p.slug)).toEqual(["a", "c"]);
+  });
+
+  it("filters by free-text q together with other filters", () => {
+    expect(filterProducts(products, { q: "bib", category: "swaddles", sort: "new" }).map((p) => p.slug)).toEqual([
+      "c",
+    ]);
   });
 
   it("falls back to category label when slug is missing", () => {

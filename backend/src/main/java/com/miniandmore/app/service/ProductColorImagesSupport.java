@@ -1,0 +1,372 @@
+package com.miniandmore.app.service;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.miniandmore.app.domain.Product;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import org.springframework.stereotype.Component;
+
+/**
+ * Keeps {@code color_images_json} (Ledgerly gallery map) in sync with gallery URLs embedded in {@code colors_json}.
+ * Print swatches ({@code swatchUrl}) stay in {@code colors_json} only — never in the Ledgerly gallery map.
+ */
+@Component
+public class ProductColorImagesSupport {
+
+    static final int MAX_IMAGES_PER_COLOR = 10;
+
+    private final ObjectMapper objectMapper;
+
+    public ProductColorImagesSupport(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
+
+    /** Normalize colours JSON and derive {@code color_images_json} from gallery URLs before persist. */
+    public void syncProductColorImages(Product product) {
+        if (product == null) {
+            return;
+        }
+        Map<String, List<String>> existingGallery = parseMap(product.getColorImagesJson());
+        String normalizedColors = normalizeColorsJson(product.getColorsJson());
+        Map<String, List<String>> gallery = galleryMapFromColorsJson(normalizedColors);
+        if (gallery.isEmpty() && !existingGallery.isEmpty()) {
+            normalizedColors = applyGalleryMapToColorsJson(normalizedColors, existingGallery);
+            gallery = galleryMapFromColorsJson(normalizedColors);
+            if (gallery.isEmpty()) {
+                gallery = existingGallery;
+            }
+        }
+        product.setColorsJson(normalizedColors);
+        if (gallery.isEmpty()) {
+            product.setColorImagesJson(null);
+        } else {
+            product.setColorImagesJson(serializeMap(gallery));
+        }
+    }
+
+    /** When {@code images_json} is empty, copy unique per-colour gallery URLs for shop cards / Ledgerly hero. */
+    public void ensureProductImagesFromColorGalleries(Product product) {
+        if (product == null || !isImagesJsonEmpty(product.getImagesJson())) {
+            return;
+        }
+        List<String> fromColors = collectGalleryUrlsFromColorsJson(product.getColorsJson());
+        if (fromColors.isEmpty()) {
+            return;
+        }
+        product.setImagesJson(serializeStringList(fromColors));
+    }
+
+    public List<String> collectGalleryUrlsFromColorsJson(String colorsJson) {
+        List<String> out = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (ColorEntry entry : parseColorEntries(colorsJson)) {
+            for (String url : entry.galleryUrls()) {
+                if (seen.add(url)) {
+                    out.add(url);
+                }
+            }
+        }
+        return out;
+    }
+
+    private boolean isImagesJsonEmpty(String imagesJson) {
+        if (imagesJson == null || imagesJson.isBlank()) {
+            return true;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(imagesJson);
+            if (!root.isArray() || root.isEmpty()) {
+                return true;
+            }
+            for (JsonNode node : root) {
+                if (node.isTextual() && !node.asText().trim().isEmpty()) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (Exception ignored) {
+            return true;
+        }
+    }
+
+    private String serializeStringList(List<String> urls) {
+        try {
+            return objectMapper.writeValueAsString(urls == null ? List.of() : urls);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Failed to serialize images JSON", e);
+        }
+    }
+
+    /** Colour name → main gallery URLs (excludes {@code swatchUrl}). */
+    public Map<String, List<String>> galleryMapFromColorsJson(String colorsJson) {
+        LinkedHashMap<String, List<String>> out = new LinkedHashMap<>();
+        for (ColorEntry entry : parseColorEntries(colorsJson)) {
+            if (!entry.galleryUrls().isEmpty()) {
+                out.put(entry.name(), entry.galleryUrls());
+            }
+        }
+        return out;
+    }
+
+    public String applyGalleryMapToColorsJson(String colorsJson, Map<String, List<String>> galleryMap) {
+        if (galleryMap == null || galleryMap.isEmpty()) {
+            return normalizeColorsJson(colorsJson);
+        }
+        List<ColorEntry> entries = parseColorEntries(colorsJson);
+        if (entries.isEmpty()) {
+            List<ColorEntry> fromMap = new ArrayList<>();
+            for (Map.Entry<String, List<String>> entry : galleryMap.entrySet()) {
+                String name = entry.getKey() == null ? "" : entry.getKey().trim();
+                if (name.isEmpty()) {
+                    continue;
+                }
+                fromMap.add(new ColorEntry(name, null, uniqueUrls(entry.getValue())));
+            }
+            return writeColorEntries(fromMap);
+        }
+        List<ColorEntry> merged = new ArrayList<>();
+        for (ColorEntry entry : entries) {
+            List<String> urls = galleryMap.get(entry.name());
+            if (urls != null && !urls.isEmpty()) {
+                merged.add(new ColorEntry(entry.name(), entry.swatchUrl(), uniqueUrls(urls)));
+            } else {
+                merged.add(entry);
+            }
+        }
+        return writeColorEntries(merged);
+    }
+
+    public String normalizeColorsJson(String colorsJson) {
+        return writeColorEntries(parseColorEntries(colorsJson));
+    }
+
+    public String serializeMap(Map<String, List<String>> map) {
+        try {
+            return objectMapper.writeValueAsString(map == null ? Map.of() : map);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Failed to serialize colour images map", e);
+        }
+    }
+
+    public Map<String, List<String>> parseMap(String json) {
+        if (json == null || json.isBlank()) {
+            return new LinkedHashMap<>();
+        }
+        try {
+            return sanitizeMap(objectMapper.readValue(json, new TypeReference<Map<String, List<String>>>() {}));
+        } catch (Exception ignored) {
+            return new LinkedHashMap<>();
+        }
+    }
+
+    public Map<String, List<String>> coerceMap(Object raw) {
+        if (raw == null) {
+            return new LinkedHashMap<>();
+        }
+        if (raw instanceof Map<?, ?> map) {
+            LinkedHashMap<String, List<String>> out = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                String key = entry.getKey() == null ? "" : entry.getKey().toString().trim();
+                if (key.isEmpty()) {
+                    continue;
+                }
+                List<String> urls = coerceUrlList(entry.getValue());
+                if (!urls.isEmpty()) {
+                    out.put(key, urls);
+                }
+            }
+            return out;
+        }
+        if (raw instanceof String text) {
+            return parseMap(text);
+        }
+        try {
+            return sanitizeMap(objectMapper.convertValue(raw, new TypeReference<Map<String, List<String>>>() {}));
+        } catch (Exception ignored) {
+            return new LinkedHashMap<>();
+        }
+    }
+
+    private List<String> coerceUrlList(Object value) {
+        if (value == null) {
+            return List.of();
+        }
+        if (value instanceof List<?> list) {
+            List<String> out = new ArrayList<>();
+            for (Object item : list) {
+                if (item == null) {
+                    continue;
+                }
+                String url = item.toString().trim();
+                if (!url.isEmpty()) {
+                    out.add(url);
+                }
+            }
+            return uniqueUrls(out);
+        }
+        String single = value.toString().trim();
+        return single.isEmpty() ? List.of() : List.of(single);
+    }
+
+    private Map<String, List<String>> sanitizeMap(Map<String, List<String>> map) {
+        LinkedHashMap<String, List<String>> out = new LinkedHashMap<>();
+        if (map == null) {
+            return out;
+        }
+        for (Map.Entry<String, List<String>> entry : map.entrySet()) {
+            String key = entry.getKey() == null ? "" : entry.getKey().trim();
+            if (key.isEmpty()) {
+                continue;
+            }
+            List<String> urls = uniqueUrls(entry.getValue());
+            if (!urls.isEmpty()) {
+                out.put(key, urls);
+            }
+        }
+        return out;
+    }
+
+    private List<ColorEntry> parseColorEntries(String colorsJson) {
+        if (colorsJson == null || colorsJson.isBlank()) {
+            return List.of();
+        }
+        try {
+            JsonNode root = objectMapper.readTree(colorsJson);
+            if (!root.isArray()) {
+                return List.of();
+            }
+            List<ColorEntry> out = new ArrayList<>();
+            Set<String> seen = new LinkedHashSet<>();
+            for (JsonNode node : root) {
+                ColorEntry entry = parseColorEntry(node);
+                if (entry == null || entry.name().isBlank()) {
+                    continue;
+                }
+                String key = entry.name().trim().toLowerCase(Locale.ROOT);
+                if (!seen.add(key)) {
+                    continue;
+                }
+                out.add(entry);
+            }
+            return out;
+        } catch (Exception ignored) {
+            return List.of();
+        }
+    }
+
+    private ColorEntry parseColorEntry(JsonNode node) {
+        if (node.isTextual()) {
+            String name = node.asText().trim();
+            return name.isEmpty() ? null : new ColorEntry(name, null, List.of());
+        }
+        if (!node.isObject()) {
+            return null;
+        }
+        String name = textOrNull(node.get("name"));
+        if (name == null || name.isBlank()) {
+            return null;
+        }
+        String swatchUrl = textOrNull(node.get("swatchUrl"));
+        return new ColorEntry(name.trim(), swatchUrl, parseGalleryUrls(node, swatchUrl));
+    }
+
+    private List<String> parseGalleryUrls(JsonNode node, String swatchUrl) {
+        List<String> urls = new ArrayList<>();
+        JsonNode imageUrls = node.get("imageUrls");
+        if (imageUrls != null && imageUrls.isArray()) {
+            for (JsonNode urlNode : imageUrls) {
+                String url = textOrNull(urlNode);
+                if (url != null) {
+                    urls.add(url);
+                }
+            }
+        }
+        String imageUrl = textOrNull(node.get("imageUrl"));
+        if (imageUrl != null) {
+            urls.add(0, imageUrl);
+        }
+        List<String> unique = uniqueUrls(urls);
+        if (swatchUrl != null && !swatchUrl.isBlank()) {
+            unique = unique.stream().filter(url -> !url.equals(swatchUrl.trim())).toList();
+        }
+        if (unique.size() > MAX_IMAGES_PER_COLOR) {
+            return unique.subList(0, MAX_IMAGES_PER_COLOR);
+        }
+        return unique;
+    }
+
+    private String writeColorEntries(List<ColorEntry> entries) {
+        if (entries == null || entries.isEmpty()) {
+            return "[]";
+        }
+        ArrayNode array = objectMapper.createArrayNode();
+        boolean hasRich = entries
+            .stream()
+            .anyMatch(entry -> (entry.swatchUrl() != null && !entry.swatchUrl().isBlank()) || !entry.galleryUrls().isEmpty());
+        for (ColorEntry entry : entries) {
+            if (!hasRich) {
+                array.add(entry.name());
+                continue;
+            }
+            ObjectNode obj = objectMapper.createObjectNode();
+            obj.put("name", entry.name());
+            if (entry.swatchUrl() != null && !entry.swatchUrl().isBlank()) {
+                obj.put("swatchUrl", entry.swatchUrl().trim());
+            }
+            List<String> gallery = entry.galleryUrls();
+            if (gallery.size() == 1) {
+                obj.put("imageUrl", gallery.get(0));
+            } else if (gallery.size() > 1) {
+                ArrayNode urls = obj.putArray("imageUrls");
+                gallery.forEach(urls::add);
+            }
+            array.add(obj);
+        }
+        try {
+            return objectMapper.writeValueAsString(array);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Failed to serialize colours JSON", e);
+        }
+    }
+
+    private List<String> uniqueUrls(List<String> raw) {
+        if (raw == null || raw.isEmpty()) {
+            return List.of();
+        }
+        List<String> out = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (String value : raw) {
+            if (value == null) {
+                continue;
+            }
+            String url = value.trim();
+            if (url.isEmpty() || !seen.add(url)) {
+                continue;
+            }
+            out.add(url);
+        }
+        if (out.size() > MAX_IMAGES_PER_COLOR) {
+            return out.subList(0, MAX_IMAGES_PER_COLOR);
+        }
+        return out;
+    }
+
+    private String textOrNull(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        String text = node.asText().trim();
+        return text.isEmpty() ? null : text;
+    }
+
+    private record ColorEntry(String name, String swatchUrl, List<String> galleryUrls) {}
+}

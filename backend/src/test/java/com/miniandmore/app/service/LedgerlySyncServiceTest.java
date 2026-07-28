@@ -64,6 +64,9 @@ class LedgerlySyncServiceTest {
     @Spy
     private ProductVariantSupport variantSupport = new ProductVariantSupport(new com.fasterxml.jackson.databind.ObjectMapper());
 
+    @Spy
+    private ProductColorImagesSupport colorImagesSupport = new ProductColorImagesSupport(new com.fasterxml.jackson.databind.ObjectMapper());
+
     @InjectMocks
     private LedgerlySyncService service;
 
@@ -513,6 +516,7 @@ class LedgerlySyncServiceTest {
         when(ledgerlyClient.pullInventory()).thenReturn(
             Map.of("inventory", List.of(Map.of("sku", "SKU-70", "ledgerlyItemId", "item-70", "stock", 12)))
         );
+        when(productRepository.findAll()).thenReturn(List.of());
         when(productRepository.findOneByLedgerlyItemId("item-70")).thenReturn(Optional.of(product));
         when(productRepository.save(product)).thenReturn(product);
 
@@ -523,16 +527,41 @@ class LedgerlySyncServiceTest {
     }
 
     @Test
-    void pullInventory_unknownSku_recordsFailure() {
+    void pullInventory_unknownSku_recordsSkipped() {
         when(ledgerlyClient.pullInventory()).thenReturn(
             Map.of("inventory", List.of(Map.of("sku", "UNKNOWN", "stock", 3)))
         );
+        when(productRepository.findAll()).thenReturn(List.of());
         when(productRepository.findOneBySku("UNKNOWN")).thenReturn(Optional.empty());
 
         Map<String, Object> result = service.pullInventory();
 
-        assertThat(result).containsEntry("failureCount", 1);
-        assertThat((List<?>) result.get("failures")).isNotEmpty();
+        assertThat(result).containsEntry("skippedCount", 1).containsEntry("failureCount", 0);
+        assertThat((List<?>) result.get("skipped")).isNotEmpty();
+    }
+
+    @Test
+    void buildOrderPayload_resolvesVariantSkuFromSizeColorWhenVariantSkuMissing() {
+        CustomerOrder order = order(43L, "ORD-SIZE", LedgerlySyncStatus.PENDING);
+        OrderItem line = order.getItemses().iterator().next();
+        line.setVariantSku(null);
+        line.setItemSize("M");
+        line.setColor("Navy");
+        Product product = product(1L)
+            .sku("HORIZON")
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                "[{\"sku\":\"HORIZON-M-NAVY\",\"size\":\"M\",\"color\":\"Navy\",\"rate\":1199,\"stock\":4,\"active\":true}]"
+            );
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "buildOrderPayload", order);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> lines = (List<Map<String, Object>>) payload.get("lines");
+        assertThat(lines.get(0).get("sku")).isEqualTo("HORIZON-M-NAVY");
     }
 
     private static Product product(Long id) {

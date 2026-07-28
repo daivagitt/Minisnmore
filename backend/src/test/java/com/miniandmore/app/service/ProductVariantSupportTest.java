@@ -33,7 +33,8 @@ class ProductVariantSupportTest {
         assertThat(support.colorsForSize(rows, "S")).containsExactly("Navy");
         assertThat(support.colorsForSize(rows, "L")).containsExactly("Ivory");
         assertThat(support.findBySizeColor(rows, "S", "Ivory")).isEmpty();
-        assertThat(support.aggregates(rows).minRate()).isEqualByComparingTo("999.0");
+        assertThat(support.aggregates(rows).minSelling()).isEqualByComparingTo("799.20");
+        assertThat(support.aggregates(rows).minMrp()).isEqualByComparingTo("999.0");
         assertThat(support.aggregates(rows).stockSum()).isEqualTo(11);
     }
 

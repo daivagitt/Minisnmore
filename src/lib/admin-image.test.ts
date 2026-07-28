@@ -14,6 +14,11 @@ describe("admin-image", () => {
     expect(isAllowedImageFile(new File([], "photo.webp"))).toBe(true);
   });
 
+  it("accepts image MIME types when the filename has no extension", () => {
+    expect(isAllowedImageFile(new File([], "photo", { type: "image/jpeg" }))).toBe(true);
+    expect(isAllowedImageFile(new File([], "blob", { type: "image/png" }))).toBe(true);
+  });
+
   it("rejects raw and other unsupported types with a clear message", () => {
     expect(isAllowedImageFile(new File([], "photo.dng"))).toBe(false);
     expect(() => assertAllowedImageFile(new File([], "photo.dng"))).toThrow(

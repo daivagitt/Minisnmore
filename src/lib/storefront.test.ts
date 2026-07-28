@@ -71,6 +71,38 @@ describe("storefront cache", () => {
     await storefront.loadProducts();
   });
 
+  it("keeps print images off the card hero when product gallery is empty", async () => {
+    const storefront = await loadStorefront({
+      products: [
+        {
+          id: "p2",
+          slug: "tying-cap",
+          name: "Tying Cap",
+          description: "Cap",
+          story: null,
+          price: 799,
+          compare_at_price: 999,
+          images: [],
+          sizes: ["0-3 M"],
+          colors: [{ name: "Print 1", imageUrls: ["https://cdn.example.com/print1.jpg"] }],
+          age_min_months: 0,
+          age_max_months: 3,
+          badge: null,
+          featured: false,
+          best_seller: false,
+          new_arrival: true,
+          trending: false,
+          active: true,
+        },
+      ],
+    });
+
+    const products = await storefront.loadProducts();
+    expect(products[0]?.image).not.toBe("https://cdn.example.com/print1.jpg");
+    expect(products[0]?.gallery).toEqual([]);
+    expect(products[0]?.colors[0]?.imageUrls).toEqual(["https://cdn.example.com/print1.jpg"]);
+  });
+
   it("resolves category slug from categories when product DTO omits slug", async () => {
     const storefront = await loadStorefront({
       categories: [

@@ -1,13 +1,15 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { Heart, ShoppingBag, Search, Menu, X, User, ArrowRight, Sparkles, Star, Flame } from "lucide-react";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useId } from "react";
 import { useShop } from "@/store/shop";
 import { useProducts } from "@/hooks/useProducts";
 import { usePageVisibility } from "@/hooks/usePageVisibility";
 import { useCategories, type Category } from "@/hooks/useCategories";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useAuth } from "@/hooks/useAuth";
+import { buildShopSearch } from "@/lib/shop-filters";
+import { filterProductsByQuery } from "@/lib/product-search";
 import defaultLogo from "@/assets/logo-horizontal-optimized.webp";
 
 const NAV_ITEMS = [
@@ -37,7 +39,9 @@ export function Navbar() {
   const [shopHover, setShopHover] = useState(false);
   const [collectionsHover, setCollectionsHover] = useState(false);
   const [q, setQ] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
   const lastY = useRef(0);
+  const listboxId = useId();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -53,17 +57,43 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const results = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return [];
-    return products.filter((p) =>
-      p.name.toLowerCase().includes(s) ||
-      p.tagline.toLowerCase().includes(s) ||
-      p.fabric.toLowerCase().includes(s) ||
-      p.category.toLowerCase().includes(s)
-    ).slice(0, 6);
-  }, [q, products]);
+  useEffect(() => {
+    if (!searchOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [searchOpen]);
 
+  const results = useMemo(
+    () => filterProductsByQuery(products, q, { limit: 8, ranked: true }),
+    [q, products],
+  );
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [q]);
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setQ("");
+    setActiveIndex(0);
+  };
+
+  const goToShopResults = () => {
+    const query = q.trim();
+    navigate({
+      to: "/shop",
+      search: buildShopSearch({ q: query || undefined, sort: "new" }),
+    });
+    closeSearch();
+  };
+
+  const goToResult = (slug: string) => {
+    navigate({ to: "/product/$slug", params: { slug } });
+    closeSearch();
+  };
   return (
     <motion.header
       initial={{ y: -40, opacity: 0 }}
@@ -155,7 +185,7 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center gap-1 sm:gap-2">
-          <button onClick={() => setSearchOpen(true)} title="Search" className="hidden md:grid h-10 w-10 place-items-center rounded-full hover:bg-white/40 transition" aria-label="Search">
+          <button onClick={() => setSearchOpen(true)} title="Search" className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/40 transition" aria-label="Search">
             <Search className="h-4.5 w-4.5" />
           </button>
           <Link to={profileTo} title={profileLabel} className="hidden md:grid h-10 w-10 place-items-center rounded-full hover:bg-white/40 transition" aria-label={profileLabel}>
@@ -207,54 +237,110 @@ export function Navbar() {
       <AnimatePresence>
         {searchOpen && (
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Search products"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-[80] bg-foreground/30 backdrop-blur-md grid place-items-start pt-24 px-4"
-            onClick={() => { setSearchOpen(false); setQ(""); }}>
+            onClick={closeSearch}>
             <motion.div
               initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -20, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
               className="w-full max-w-2xl mx-auto glass-strong rounded-3xl p-3">
               <div className="flex items-center gap-2 px-3">
-                <Search className="h-4 w-4 text-muted-foreground" />
+                <Search className="h-4 w-4 text-muted-foreground" aria-hidden />
                 <input
-                  autoFocus value={q} onChange={(e) => setQ(e.target.value)}
-                  placeholder="Search rompers, swaddles, gifts…"
+                  autoFocus
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Search name, category, fabric, or SKU…"
                   className="flex-1 bg-transparent outline-none py-3 text-base"
+                  role="combobox"
+                  aria-expanded={!!q.trim()}
+                  aria-controls={listboxId}
+                  aria-autocomplete="list"
+                  aria-activedescendant={results[activeIndex] ? `${listboxId}-option-${activeIndex}` : undefined}
                   onKeyDown={(e) => {
-                    if (e.key === "Escape") { setSearchOpen(false); setQ(""); }
-                    if (e.key === "Enter" && results[0]) {
-                      navigate({ to: "/product/$slug", params: { slug: results[0].slug } });
-                      setSearchOpen(false); setQ("");
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      closeSearch();
+                      return;
+                    }
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      if (!results.length) return;
+                      setActiveIndex((i) => (i + 1) % results.length);
+                      return;
+                    }
+                    if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      if (!results.length) return;
+                      setActiveIndex((i) => (i - 1 + results.length) % results.length);
+                      return;
+                    }
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      if (results[activeIndex]) {
+                        goToResult(results[activeIndex].slug);
+                      } else if (q.trim()) {
+                        goToShopResults();
+                      }
                     }
                   }}
                 />
-                <button onClick={() => { setSearchOpen(false); setQ(""); }} className="h-9 w-9 grid place-items-center rounded-full hover:bg-white/40">
+                <button type="button" onClick={closeSearch} className="h-9 w-9 grid place-items-center rounded-full hover:bg-white/40" aria-label="Close search">
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              {q && (
+              {q.trim() ? (
                 <div className="mt-2 max-h-[60vh] overflow-y-auto">
-                  {results.length === 0 && <div className="px-3 py-6 text-sm text-muted-foreground">No little pieces match "{q}".</div>}
-                  {results.map((p) => (
-                    <Link
-                      key={p.id} to="/product/$slug" params={{ slug: p.slug }}
-                      onClick={() => { setSearchOpen(false); setQ(""); }}
-                      className="flex items-center gap-3 p-2 rounded-2xl hover:bg-white/40 transition">
-                      <img src={p.image} alt="" className="h-12 w-12 rounded-xl object-cover" />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{p.name}</div>
-                        <div className="text-xs text-muted-foreground truncate">{p.tagline}</div>
-                      </div>
-                      <div className="text-sm">₹{p.price.toLocaleString("en-IN")}</div>
-                    </Link>
-                  ))}
+                  {results.length === 0 ? (
+                    <div className="px-3 py-6 text-sm text-muted-foreground">
+                      No little pieces match “{q.trim()}”.
+                      <button type="button" onClick={goToShopResults} className="block mt-3 text-primary story-link text-sm">
+                        Browse shop anyway
+                      </button>
+                    </div>
+                  ) : (
+                    <ul id={listboxId} role="listbox" className="space-y-0.5">
+                      {results.map((p, index) => (
+                        <li key={p.id} role="option" id={`${listboxId}-option-${index}`} aria-selected={index === activeIndex}>
+                          <Link
+                            to="/product/$slug"
+                            params={{ slug: p.slug }}
+                            onClick={closeSearch}
+                            onMouseEnter={() => setActiveIndex(index)}
+                            className={`flex items-center gap-3 p-2 rounded-2xl transition ${index === activeIndex ? "bg-white/50" : "hover:bg-white/40"}`}
+                          >
+                            <img src={p.image} alt="" className="h-12 w-12 rounded-xl object-cover" />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium truncate">{p.name}</div>
+                              <div className="text-xs text-muted-foreground truncate">
+                                {p.sku ? `${p.sku} · ` : ""}
+                                {p.tagline}
+                              </div>
+                            </div>
+                            <div className="text-sm">₹{p.price.toLocaleString("en-IN")}</div>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {results.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={goToShopResults}
+                      className="w-full mt-2 px-3 py-2.5 text-sm text-primary flex items-center justify-center gap-1.5 rounded-2xl hover:bg-white/40"
+                    >
+                      View all results in shop <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
                 </div>
-              )}
-              {!q && (
+              ) : (
                 <div className="px-3 py-3 text-xs text-muted-foreground">
-                  Try: <button onClick={() => setQ("muslin")} className="underline mx-1">muslin</button>·
-                  <button onClick={() => setQ("romper")} className="underline mx-1">romper</button>·
-                  <button onClick={() => setQ("newborn")} className="underline mx-1">newborn</button>
+                  Try: <button type="button" onClick={() => setQ("muslin")} className="underline mx-1">muslin</button>·
+                  <button type="button" onClick={() => setQ("romper")} className="underline mx-1">romper</button>·
+                  <button type="button" onClick={() => setQ("newborn")} className="underline mx-1">newborn</button>
                 </div>
               )}
             </motion.div>

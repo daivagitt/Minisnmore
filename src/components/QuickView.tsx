@@ -10,6 +10,7 @@ import {
   isVariantSellable,
   isVariantsProduct,
 } from "@/lib/product-variants";
+import { galleryForSelectedColor } from "@/lib/product-gallery";
 
 export function QuickView() {
   const { quickView, setQuickView, addToCart } = useShop();
@@ -47,6 +48,11 @@ export function QuickView() {
     return quickView.colors.filter((c) => names.includes(c.name));
   }, [quickView, size]);
 
+  const colorGallery = useMemo(
+    () => (quickView ? galleryForSelectedColor(quickView, color) : { image: "", gallery: [] as string[] }),
+    [quickView, color],
+  );
+
   return (
     <AnimatePresence>
       {quickView && (
@@ -59,7 +65,7 @@ export function QuickView() {
             className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-[71] md:w-[820px] max-h-[90vh]">
             <div className="glass-strong rounded-[2rem] overflow-hidden grid md:grid-cols-2 h-full">
               <div className="relative aspect-square md:aspect-auto bg-secondary/40">
-                <img src={quickView.image} alt={quickView.name} className="h-full w-full object-cover" />
+                <img src={colorGallery.image || quickView.image} alt={quickView.name} className="h-full w-full object-cover" />
               </div>
               <div className="p-6 md:p-8 flex flex-col overflow-y-auto relative">
                 <button onClick={() => setQuickView(null)} className="absolute top-4 right-4 h-9 w-9 grid place-items-center rounded-full glass hover:scale-105 transition">

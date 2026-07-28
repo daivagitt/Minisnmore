@@ -2,12 +2,14 @@ package com.miniandmore.app.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.domain.Category;
 import com.miniandmore.app.domain.Product;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -29,6 +31,9 @@ class LedgerlyProductMergeServiceTest {
     @Spy
     private ProductVariantSupport variantSupport = new ProductVariantSupport(new ObjectMapper());
 
+    @Spy
+    private ProductColorImagesSupport colorImagesSupport = new ProductColorImagesSupport(new ObjectMapper());
+
     @InjectMocks
     private LedgerlyProductMergeService mergeService;
 
@@ -48,14 +53,36 @@ class LedgerlyProductMergeServiceTest {
         Map<String, Object> payload = mergeService.buildPushPayload(product, "Baby");
 
         assertThat(payload.get("sku")).isEqualTo("MNM-1");
-        assertThat(payload.get("price")).isEqualTo(BigDecimal.valueOf(699));
+        assertThat(payload.get("price")).isEqualTo(BigDecimal.valueOf(499));
+        assertThat(payload.get("mrp")).isEqualTo(BigDecimal.valueOf(699));
+        assertThat(payload.get("compareAtPrice")).isEqualTo(BigDecimal.valueOf(699));
         assertThat(payload.get("unit")).isEqualTo("ea");
-        assertThat(payload.get("cost")).isEqualTo(new BigDecimal("419.40"));
+        assertThat(payload.get("cost")).isEqualTo(new BigDecimal("299.40"));
         assertThat(payload.get("imageUrl")).isEqualTo("https://cdn.example.com/p.jpg");
         assertThat(payload.get("description")).isEqualTo("Soft");
         assertThat(payload.get("active")).isEqualTo(true);
         assertThat(payload).doesNotContainKey("hsn");
+        assertThat(payload).doesNotContainKey("taxPct");
         assertThat(payload.get("itemStructure")).isEqualTo("SIMPLE");
+    }
+
+    @Test
+    void buildPushPayload_includesHsnAndTaxPctWhenSet() {
+        when(itemImageSync.firstImageUrl(any())).thenReturn(null);
+        Product product = new Product()
+            .sku("MNM-TAX")
+            .name("Taxed")
+            .price(BigDecimal.valueOf(400))
+            .compareAtPrice(BigDecimal.valueOf(500))
+            .stock(1)
+            .hsn("6109")
+            .taxPct(new BigDecimal("5.00"))
+            .active(true);
+
+        Map<String, Object> payload = mergeService.buildPushPayload(product, "Baby");
+
+        assertThat(payload.get("hsn")).isEqualTo("6109");
+        assertThat((BigDecimal) payload.get("taxPct")).isEqualByComparingTo("5.00");
     }
 
     @Test
@@ -95,6 +122,8 @@ class LedgerlyProductMergeServiceTest {
         Map<String, Object> item = Map.of(
             "price",
             499,
+            "mrp",
+            699,
             "stock",
             8,
             "taxPct",
@@ -111,9 +140,9 @@ class LedgerlyProductMergeServiceTest {
 
         mergeService.mergeLedgerlyItem(product, item, name -> Optional.of(category), null);
 
-        assertThat(product.getPrice()).isEqualByComparingTo(new BigDecimal("399.20"));
+        assertThat(product.getPrice()).isEqualByComparingTo(BigDecimal.valueOf(499));
         assertThat(product.getStock()).isEqualTo(8);
-        assertThat(product.getCompareAtPrice()).isEqualByComparingTo(BigDecimal.valueOf(499));
+        assertThat(product.getCompareAtPrice()).isEqualByComparingTo(BigDecimal.valueOf(699));
         assertThat(product.getTaxPct()).isNull();
         assertThat(product.getCategory()).isEqualTo(category);
         assertThat(product.getFabricType()).isEqualTo("Organic Cotton");
@@ -122,14 +151,14 @@ class LedgerlyProductMergeServiceTest {
     }
 
     @Test
-    void mergeLedgerlyItem_usesSellingPriceForCompareAt_notPurchaseCost() {
+    void mergeLedgerlyItem_mapsSellingAndMrpSeparately() {
         Product product = new Product().sku("SKU-1").price(BigDecimal.ZERO).stock(0);
-        Map<String, Object> item = Map.of("price", 499, "cost", 150, "stock", 5);
+        Map<String, Object> item = Map.of("price", 499, "mrp", 699, "cost", 150, "stock", 5);
 
         mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
 
-        assertThat(product.getPrice()).isEqualByComparingTo(new BigDecimal("399.20"));
-        assertThat(product.getCompareAtPrice()).isEqualByComparingTo(BigDecimal.valueOf(499));
+        assertThat(product.getPrice()).isEqualByComparingTo(new BigDecimal("499"));
+        assertThat(product.getCompareAtPrice()).isEqualByComparingTo(BigDecimal.valueOf(699));
     }
 
     @Test
@@ -148,7 +177,7 @@ class LedgerlyProductMergeServiceTest {
 
         mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
 
-        assertThat(product.getPrice()).isEqualByComparingTo(new BigDecimal("639.20"));
+        assertThat(product.getPrice()).isEqualByComparingTo(new BigDecimal("499"));
         assertThat(product.getCompareAtPrice()).isEqualByComparingTo(BigDecimal.valueOf(799));
     }
 
@@ -158,6 +187,8 @@ class LedgerlyProductMergeServiceTest {
         Map<String, Object> item = Map.of(
             "price",
             120,
+            "mrp",
+            150,
             "stock",
             4,
             "ledgerlyItemId",
@@ -168,8 +199,8 @@ class LedgerlyProductMergeServiceTest {
 
         mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
 
-        assertThat(product.getPrice()).isEqualByComparingTo(new BigDecimal("96.00"));
-        assertThat(product.getCompareAtPrice()).isEqualByComparingTo(BigDecimal.valueOf(120));
+        assertThat(product.getPrice()).isEqualByComparingTo(new BigDecimal("120"));
+        assertThat(product.getCompareAtPrice()).isEqualByComparingTo(BigDecimal.valueOf(150));
         assertThat(product.getStock()).isEqualTo(4);
         assertThat(product.getLedgerlyItemId()).isEqualTo("42");
         assertThat(product.getFabricType()).isEqualTo("Wool");
@@ -198,6 +229,45 @@ class LedgerlyProductMergeServiceTest {
     }
 
     @Test
+    void mergeLedgerlyItem_allowsMissingDescription() {
+        Product product = new Product().sku("SKU-NODESC").price(BigDecimal.ZERO).stock(0);
+        Map<String, Object> item = Map.of("price", 100, "stock", 2, "name", "No Desc Item");
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+
+        assertThat(product.getDescription()).isNull();
+        assertThat(product.getPrice()).isEqualByComparingTo("100");
+        assertThat(product.getStock()).isEqualTo(2);
+    }
+
+    @Test
+    void mergeLedgerlyItem_allowsBlankDescription() {
+        Product product = new Product().sku("SKU-BLANK").price(BigDecimal.ZERO).stock(0);
+        Map<String, Object> item = Map.of("price", 100, "stock", 1, "description", "   ");
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+
+        assertThat(product.getDescription()).isNull();
+    }
+
+    @Test
+    void buildPushPayload_omitsBlankDescription() {
+        when(itemImageSync.firstImageUrl(any())).thenReturn(null);
+        Product product = new Product()
+            .sku("MNM-NODESC")
+            .name("No Desc")
+            .price(BigDecimal.valueOf(199))
+            .stock(3)
+            .description("  ")
+            .active(true);
+
+        Map<String, Object> payload = mergeService.buildPushPayload(product, "Baby");
+
+        assertThat(payload).doesNotContainKey("description");
+        assertThat(payload.get("sku")).isEqualTo("MNM-NODESC");
+    }
+
+    @Test
     void buildPushPayload_usesSellingPriceForLedgerlyRateAndEstimatedCost() {
         when(itemImageSync.firstImageUrl(any())).thenReturn(null);
         Product product = new Product()
@@ -209,7 +279,29 @@ class LedgerlyProductMergeServiceTest {
 
         Map<String, Object> payload = mergeService.buildPushPayload(product, "Baby");
 
-        assertThat(payload.get("price")).isEqualTo(BigDecimal.valueOf(699));
-        assertThat(payload.get("cost")).isEqualTo(new BigDecimal("419.40"));
+        assertThat(payload.get("price")).isEqualTo(BigDecimal.valueOf(499));
+        assertThat(payload.get("mrp")).isEqualTo(BigDecimal.valueOf(699));
+        assertThat(payload.get("cost")).isEqualTo(new BigDecimal("299.40"));
+    }
+
+    @Test
+    void buildPushPayload_includesColorGalleryMap() {
+        when(itemImageSync.firstImageUrl(any())).thenReturn(null);
+        Product product = new Product()
+            .sku("MNM-GALLERY")
+            .name("Gallery Tee")
+            .price(BigDecimal.valueOf(499))
+            .stock(5)
+            .active(true)
+            .colorsJson(
+                "[{\"name\":\"Print 1\",\"swatchUrl\":\"https://cdn.example.com/swatch.jpg\",\"imageUrls\":[\"https://cdn.example.com/g1.jpg\"]}]"
+            );
+
+        Map<String, Object> payload = mergeService.buildPushPayload(product, "Baby");
+
+        @SuppressWarnings("unchecked")
+        Map<String, List<String>> colorImages = (Map<String, List<String>>) payload.get("colorImagesJson");
+        assertThat(colorImages).containsEntry("Print 1", List.of("https://cdn.example.com/g1.jpg"));
+        assertThat(colorImages.get("Print 1")).doesNotContain("https://cdn.example.com/swatch.jpg");
     }
 }

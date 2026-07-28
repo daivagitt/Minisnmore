@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ProductCard } from "@/components/ProductCard";
-import { type Fabric } from "@/data/products";
+import { type AgeRange, type Fabric } from "@/data/products";
 import { useCategories } from "@/hooks/useCategories";
 import { useProducts } from "@/hooks/useProducts";
 import {
@@ -9,10 +9,11 @@ import {
   filterAndSortProducts,
   hasActiveFilters,
   parseShopSearch,
+  SHOP_AGE_FILTERS,
   SHOP_FILTER_FABRICS,
   type ShopSearch,
 } from "@/lib/shop-filters";
-import { SlidersHorizontal, X } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import { StorefrontPageHeader } from "@/components/StorefrontPageHeader";
 
 export const Route = createFileRoute("/shop")({
@@ -20,7 +21,10 @@ export const Route = createFileRoute("/shop")({
   head: () => ({
     meta: [
       { title: "Shop · Mini's n More" },
-      { name: "description", content: "Browse heirloom baby clothing — filter by category and fabric." },
+      {
+        name: "description",
+        content: "Browse heirloom baby clothing — search and filter by category, age, and fabric.",
+      },
     ],
   }),
   component: Shop,
@@ -32,9 +36,29 @@ function Shop() {
   const search = useSearch({ from: "/shop" });
   const navigate = useNavigate({ from: "/shop" });
   const [showFilters, setShowFilters] = useState(false);
+  const [queryDraft, setQueryDraft] = useState(() => parseShopSearch(search).q ?? "");
 
   const filters = useMemo(() => parseShopSearch(search), [search]);
   const filtered = useMemo(() => filterAndSortProducts(products, filters), [products, filters]);
+
+  // Keep draft in sync when URL changes (back/forward, header “view all”).
+  useEffect(() => {
+    setQueryDraft(filters.q ?? "");
+  }, [filters.q]);
+
+  // Debounce writing `q` into the URL so typing stays smooth.
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      const nextQ = queryDraft.trim();
+      const currentQ = filters.q ?? "";
+      if (nextQ.toLowerCase() === currentQ.toLowerCase()) return;
+      navigate({
+        search: buildShopSearch({ ...filters, q: nextQ || undefined }),
+        replace: true,
+      });
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [queryDraft, filters, navigate]);
 
   const patchSearch = (patch: Partial<ShopSearch>) => {
     navigate({
@@ -51,7 +75,12 @@ function Shop() {
     patchSearch({ category: filters.category === slug ? undefined : slug });
   };
 
+  const toggleAge = (age: AgeRange) => {
+    patchSearch({ age: filters.age === age ? undefined : age });
+  };
+
   const clearFilters = () => {
+    setQueryDraft("");
     navigate({
       search: buildShopSearch({ sort: filters.sort ?? "new" }),
       replace: true,
@@ -78,6 +107,34 @@ function Shop() {
         ) : null}
       </StorefrontPageHeader>
 
+      <div className="mb-4">
+        <label className="relative block max-w-xl">
+          <span className="sr-only">Search products</span>
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={queryDraft}
+            onChange={(e) => setQueryDraft(e.target.value)}
+            placeholder="Search by name, category, fabric, or SKU…"
+            className="w-full glass rounded-full pl-11 pr-10 py-2.5 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/30"
+            autoComplete="off"
+            enterKeyHint="search"
+          />
+          {queryDraft ? (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => {
+                setQueryDraft("");
+                patchSearch({ q: undefined });
+              }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 grid place-items-center rounded-full hover:bg-white/50"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </label>
+      </div>
+
       <div className="flex flex-wrap items-center gap-3 mb-6">
         <button
           type="button"
@@ -102,6 +159,17 @@ function Shop() {
               ))}
             </>
           )}
+          <span className="text-xs uppercase tracking-wider text-muted-foreground ml-1 mr-1">Age</span>
+          {SHOP_AGE_FILTERS.map((a) => (
+            <button
+              key={a.value}
+              type="button"
+              onClick={() => toggleAge(a.value)}
+              className={`rounded-full px-3.5 py-1.5 text-xs transition ${filters.age === a.value ? "bg-primary text-primary-foreground" : "glass hover:bg-white/60"}`}
+            >
+              {a.label}
+            </button>
+          ))}
           <span className="text-xs uppercase tracking-wider text-muted-foreground ml-1 mr-1">Fabric</span>
           {SHOP_FILTER_FABRICS.map((f) => (
             <button
@@ -141,11 +209,13 @@ function Shop() {
       </div>
       {filtered.length === 0 && (
         <div className="glass-strong rounded-3xl p-16 text-center text-muted-foreground">
-          Nothing matches just yet. Try a different category or fabric.
+          {activeFilters
+            ? "Nothing matches your search or filters yet."
+            : "No products are available right now."}
           {activeFilters && (
             <div className="mt-4">
               <button type="button" onClick={clearFilters} className="text-primary story-link text-sm">
-                Clear all filters
+                Clear search and filters
               </button>
             </div>
           )}

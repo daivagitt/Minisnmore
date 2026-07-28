@@ -14,6 +14,7 @@ import {
   deleteCategory,
   getCategoryValidationErrors,
   listCategories,
+  normalizeProductImageUrl,
   saveCategory,
   type CategoryRow,
 } from "@/lib/backend-data";
@@ -131,7 +132,7 @@ function CategoriesPage() {
                 slug,
                 name,
                 description: r.description ? String(r.description) : null,
-                image_url: r.image_url ? String(r.image_url) : null,
+                image_url: normalizeProductImageUrl(r.image_url) ?? null,
                 sort_order: coerceNonNegativeIntFromUnknown(r.sort_order),
                 active: String(r.active ?? "true").toLowerCase() !== "false",
               };

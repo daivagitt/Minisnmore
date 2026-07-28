@@ -54,6 +54,8 @@ public class ProductDTO implements Serializable {
 
     private String colorsJson;
 
+    private String colorImagesJson;
+
     @Size(max = 40)
     private String itemStructure;
 
@@ -209,6 +211,14 @@ public class ProductDTO implements Serializable {
 
     public void setColorsJson(String colorsJson) {
         this.colorsJson = colorsJson;
+    }
+
+    public String getColorImagesJson() {
+        return colorImagesJson;
+    }
+
+    public void setColorImagesJson(String colorImagesJson) {
+        this.colorImagesJson = colorImagesJson;
     }
 
     public String getItemStructure() {

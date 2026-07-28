@@ -1,6 +1,7 @@
 package com.miniandmore.app.web.rest.admin;
 
 import com.miniandmore.app.domain.LedgerlySetting;
+import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.LedgerlySettingRepository;
 import com.miniandmore.app.repository.ProductRepository;
@@ -9,6 +10,7 @@ import com.miniandmore.app.client.LedgerlyIntegrationClient;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -226,7 +228,18 @@ public class LedgerlyAdminResource {
             .findOneByOrderNumber(orderNumber)
             .map(order -> {
                 syncService.syncOrder(order.getId());
-                return Map.<String, Object>of("ok", true, "orderNumber", orderNumber);
+                return customerOrderRepository
+                    .findOneByOrderNumber(orderNumber)
+                    .map(refreshed -> {
+                        Map<String, Object> result = new LinkedHashMap<>();
+                        result.put("orderNumber", orderNumber);
+                        LedgerlySyncStatus status = refreshed.getLedgerlySyncStatus();
+                        result.put("ledgerlySyncStatus", status != null ? status.name() : null);
+                        result.put("ledgerlySyncError", StringUtils.defaultString(refreshed.getLedgerlySyncError()));
+                        result.put("ok", status == LedgerlySyncStatus.SYNCED);
+                        return result;
+                    })
+                    .orElse(Map.of("ok", false, "orderNumber", orderNumber, "error", "not found after sync"));
             })
             .orElse(Map.of("ok", false, "orderNumber", orderNumber, "error", "not found"));
     }

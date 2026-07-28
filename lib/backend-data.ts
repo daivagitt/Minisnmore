@@ -1,7 +1,9 @@
 import { api, ApiError } from "@/lib/api";
 import { numberFieldOr, requireNumberField } from "@/lib/admin-number-field";
+import { validateVariantRows } from "@/lib/admin-variants";
 import { internalSitePathError } from "@/lib/internal-links";
 import {
+  isExampleOrPlaceholderUrl,
   isPrivateObjectStorageUrl,
   optionalPublicUrlFieldError,
   requiredPublicUrlFieldError,
@@ -9,6 +11,14 @@ import {
   toDirectDownloadUrl,
 } from "@/lib/utils";
 import { assertAllowedImageFile, type AdminImageFolder } from "@/lib/admin-image";
+import {
+  collectColorGalleryImages,
+  normalizeColorEntries,
+  parseProductColors,
+  resolveProductImages,
+  serializeProductColors,
+  type ProductColorEntry,
+} from "@/lib/product-colors";
 
 type Id = string | number;
 type JsonRecord = Record<string, unknown>;
@@ -39,6 +49,7 @@ function idValue(id?: Id) {
 }
 
 export const ADMIN_NAME_MAX_LEN = 50;
+export const PRODUCT_NAME_MAX_LEN = 200;
 
 const LABEL_MIN_LEN = 2;
 const LABEL_MAX_LEN = ADMIN_NAME_MAX_LEN;
@@ -100,15 +111,52 @@ function assertValidCategory(row: CategoryRow) {
 }
 
 function normalizeProductImageUrl(raw: unknown) {
-  const trimmed = String(raw ?? "").trim();
+  let trimmed = String(raw ?? "").trim();
   if (!trimmed) return null;
-  if (isPrivateObjectStorageUrl(trimmed)) {
-    return null;
-  }
+  trimmed = trimmed.replace(/^["']+|["']+$/g, "").trim();
+  if (!trimmed) return null;
+  if (isPrivateObjectStorageUrl(trimmed)) return null;
+
   const withProtocol =
     /^https?:\/\//i.test(trimmed) || trimmed.startsWith("/") ? trimmed : `https://${trimmed}`;
-  return sanitizePublicUrl(toDirectDownloadUrl(withProtocol));
+  const direct = toDirectDownloadUrl(withProtocol);
+  if (isExampleOrPlaceholderUrl(direct)) return null;
+
+  const sanitized = sanitizePublicUrl(direct);
+  if (sanitized) return sanitized;
+
+  if (direct.startsWith("/")) return direct;
+  try {
+    const url = new URL(direct);
+    if (["localhost", "127.0.0.1", "0.0.0.0"].includes(url.hostname)) return null;
+    if (!/^https?:$/i.test(url.protocol)) return null;
+    return direct;
+  } catch {
+    return null;
+  }
 }
+
+/** Parse pipe/comma/semicolon/newline-separated image URLs from spreadsheet cells. */
+export function parseSpreadsheetImageUrls(raw: unknown): string[] {
+  const text = String(raw ?? "").trim();
+  if (!text) return [];
+  const parts = text
+    .split(/[|,;\n]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const part of parts) {
+    const url = normalizeProductImageUrl(part);
+    if (url && !seen.has(url)) {
+      seen.add(url);
+      out.push(url);
+    }
+  }
+  return out;
+}
+
+export { normalizeProductImageUrl };
 
 export function getProductValidationErrors(row: ProductRow): string[] {
   const errors: string[] = [];
@@ -116,7 +164,7 @@ export function getProductValidationErrors(row: ProductRow): string[] {
   const slug = row.slug?.trim().toLowerCase() ?? "";
   const sku = row.sku?.trim() ?? "";
 
-  const nameError = labelFieldError(name, "Product name");
+  const nameError = labelFieldError(name, "Product name", LABEL_MIN_LEN, PRODUCT_NAME_MAX_LEN);
   if (nameError) errors.push(nameError);
   const slugError = slugFieldError(slug, "Product slug");
   if (slugError) errors.push(slugError);
@@ -142,8 +190,11 @@ export function getProductValidationErrors(row: ProductRow): string[] {
   const fabric = row.fabric_type?.trim() ?? "";
   if (!fabric) errors.push("Fabric type is required.");
 
-  const descriptionError = bodyFieldError(row.description ?? "", "Product description");
-  if (descriptionError) errors.push(descriptionError);
+  if ((row.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS") {
+    errors.push(...validateVariantRows(row.variants_json));
+  }
+
+  // Product description is optional (CSV import + Ledgerly pull may omit it).
 
   const images = Array.isArray(row.images) ? row.images : [];
   if (images.length > 0) {
@@ -427,7 +478,7 @@ export type ProductRow = {
   age_min_months: number | null;
   age_max_months: number | null;
   sizes: string[];
-  colors: string[];
+  colors: ProductColorEntry[];
   item_structure: string | null;
   variants_json: string | null;
   images: string[];
@@ -496,7 +547,7 @@ export const fromProductDto = (dto: ProductDto): ProductRow => ({
   age_min_months: dto.ageMinMonths ?? null,
   age_max_months: dto.ageMaxMonths ?? null,
   sizes: parseJson<string[]>(dto.sizesJson, []),
-  colors: parseJson<string[]>(dto.colorsJson, []),
+  colors: normalizeColorEntries(parseProductColors(parseJson(dto.colorsJson, []))),
   item_structure: dto.itemStructure ?? null,
   variants_json: dto.variantsJson ?? null,
   images: parseJson<string[]>(dto.imagesJson, []),
@@ -529,7 +580,7 @@ const toProductDto = (row: ProductRow): ProductDto => ({
   ageMinMonths: row.age_min_months,
   ageMaxMonths: row.age_max_months,
   sizesJson: JSON.stringify(row.sizes ?? []),
-  colorsJson: JSON.stringify(row.colors ?? []),
+  colorsJson: JSON.stringify(serializeProductColors(row.colors ?? [])),
   itemStructure: row.item_structure ?? "SIMPLE",
   variantsJson: row.variants_json ?? null,
   imagesJson: JSON.stringify(row.images ?? []),
@@ -552,12 +603,22 @@ export const listProducts = (admin = false) =>
   );
 
 export const saveProduct = (row: ProductRow) => {
+  const normalizedColors = normalizeColorEntries(parseProductColors(row.colors)).map((entry) => ({
+    ...entry,
+    name: entry.name.trim(),
+    swatchUrl: entry.swatchUrl?.trim() || undefined,
+  }));
+  const explicitImages = (row.images ?? [])
+    .map((url) => normalizeProductImageUrl(url))
+    .filter((url): url is string => !!url);
+  const images = explicitImages.length ? explicitImages : collectColorGalleryImages(normalizedColors);
   const prepared: ProductRow = {
     ...row,
     name: row.name?.trim() ?? "",
     slug: row.slug?.trim().toLowerCase() ?? "",
     sku: row.sku?.trim() ?? "",
-    images: (row.images ?? []).map((url) => normalizeProductImageUrl(url)).filter((url): url is string => !!url),
+    colors: normalizedColors,
+    images,
   };
   assertValidProduct(prepared);
   const normalized: ProductRow = {
@@ -1021,7 +1082,16 @@ type PresignedUpload = {
 async function uploadAdminImageViaBackend(folder: AdminImageFolder, file: File) {
   const form = new FormData();
   form.append("folder", folder);
-  form.append("file", file, file.name);
+  const filename =
+    file.name?.trim() ||
+    (file.type === "image/png"
+      ? "upload.png"
+      : file.type === "image/webp"
+        ? "upload.webp"
+        : file.type === "image/gif"
+          ? "upload.gif"
+          : "upload.jpg");
+  form.append("file", file, filename);
   const uploaded = await api.post<unknown>("/api/v1/admin/uploads", form, { auth: true });
   if (
     !uploaded ||
@@ -1255,14 +1325,17 @@ export type LedgerlySyncFailure = {
   productId?: number;
   productName?: string;
   orderNumber?: string;
+  sku?: string;
   message?: string;
 };
 
 export type LedgerlySyncSummary = {
   successCount?: number;
   failureCount?: number;
+  skippedCount?: number;
   failures?: LedgerlySyncFailure[];
   notices?: LedgerlySyncFailure[];
+  skipped?: LedgerlySyncFailure[];
 };
 
 export type LedgerlyProductSyncResult = {
@@ -1321,19 +1394,20 @@ export const pullLedgerlyOrderTracking = () =>
 export function formatLedgerlySyncSummary(summary: LedgerlySyncSummary, label: string) {
   const success = summary.successCount ?? 0;
   const failed = summary.failureCount ?? 0;
+  const skipped = summary.skippedCount ?? 0;
   const noticeCount = (summary.notices ?? []).length;
-  if (failed === 0) {
-    return noticeCount > 0
-      ? `${label}: ${success} succeeded, ${noticeCount} notes`
-      : `${label}: ${success} succeeded`;
-  }
-  return `${label}: ${success} succeeded, ${failed} failed`;
+  const parts = [`${success} succeeded`];
+  if (failed > 0) parts.push(`${failed} failed`);
+  if (skipped > 0) parts.push(`${skipped} skipped`);
+  if (failed === 0 && skipped === 0 && noticeCount > 0) parts.push(`${noticeCount} notes`);
+  return `${label}: ${parts.join(", ")}`;
 }
 
 export function formatLedgerlySyncFailures(summary: LedgerlySyncSummary): string[] {
   const label = (f: LedgerlySyncFailure) =>
-    f.productName ?? f.orderNumber ?? (f.id != null ? String(f.id) : "Item");
+    f.productName ?? f.orderNumber ?? f.sku ?? (f.id != null ? String(f.id) : "Item");
   const failures = (summary.failures ?? []).map((f) => `${label(f)}: ${f.message ?? "Failed"}`);
+  const skipped = (summary.skipped ?? []).map((f) => `Skipped — ${label(f)}: ${f.message ?? ""}`);
   const notices = (summary.notices ?? []).map((f) => `Note — ${label(f)}: ${f.message ?? ""}`);
-  return [...failures, ...notices];
+  return [...failures, ...skipped, ...notices];
 }

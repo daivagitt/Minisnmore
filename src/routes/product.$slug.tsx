@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductGallery } from "@/components/ProductGallery";
 import { checkSizeFit, clampQuantity } from "@/lib/product-fit";
+import { galleryForSelectedColor } from "@/lib/product-gallery";
 import { lookupPincode, normalizePincode } from "@/lib/pincode";
 import {
   colorsForSize,
@@ -15,6 +16,8 @@ import {
   findVariant,
   isVariantSellable,
   isVariantsProduct,
+  sizeHasSellableVariants,
+  variantStockMessage,
 } from "@/lib/product-variants";
 
 export const Route = createFileRoute("/product/$slug")({
@@ -73,12 +76,22 @@ function ProductPage() {
     : isVariantsProduct(product)
       ? isVariantSellable(selectedVariant)
       : true;
+  const stockMessage = useMemo(
+    () => (product ? variantStockMessage(product, selectedVariant, { size, color }) : null),
+    [product, selectedVariant, size, color],
+  );
+  const stockIsSoldOut = !!stockMessage?.startsWith("Sold out");
   const availableColors = useMemo(() => {
     if (!product) return [];
     const names = colorsForSize(product, size);
     if (!isVariantsProduct(product)) return product.colors;
     return product.colors.filter((c) => names.includes(c.name));
   }, [product, size]);
+
+  const colorGallery = useMemo(
+    () => (product ? galleryForSelectedColor(product, color) : { image: "", gallery: [] as string[] }),
+    [product, color],
+  );
 
   const sizeFit = useMemo(() => {
     if (!product || !heightCm.trim()) return null;
@@ -143,8 +156,8 @@ function ProductPage() {
       <div className="grid lg:grid-cols-2 gap-x-6 lg:gap-x-8 gap-y-4 lg:gap-y-3 lg:items-stretch">
         <ProductGallery
           name={product.name}
-          image={product.image}
-          gallery={product.gallery}
+          image={colorGallery.image}
+          gallery={colorGallery.gallery}
           className="lg:h-full lg:min-h-0"
         />
 
@@ -165,10 +178,13 @@ function ProductPage() {
                 </span>
               )}
             </div>
-            {isVariantsProduct(product) && selectedVariant && (
-              <div className="text-[11px] text-muted-foreground">
-                {canAdd ? `${selectedVariant.stock} in stock` : "Out of stock"}
-                {selectedVariant.sku ? ` · ${selectedVariant.sku}` : ""}
+            {isVariantsProduct(product) && stockMessage && (
+              <div
+                className={`text-[11px] leading-snug ${stockIsSoldOut ? "text-destructive font-medium" : "text-muted-foreground"}`}
+                role="status"
+              >
+                {stockMessage}
+                {selectedVariant?.sku ? ` · ${selectedVariant.sku}` : ""}
               </div>
             )}
           </div>
@@ -180,12 +196,23 @@ function ProductPage() {
                 <button type="button" onClick={() => setSizeChart(true)} className="text-[11px] text-primary underline-offset-2 hover:underline">Size chart</button>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {product.sizes.map((s) => (
-                  <button key={s} type="button" onClick={() => setSize(s)}
-                    className={`rounded-full px-3 py-1.5 text-xs transition ${size === s ? "bg-primary text-primary-foreground" : "glass hover:bg-white/60"}`}>
-                    {s}
-                  </button>
-                ))}
+                {product.sizes.map((s) => {
+                  const sizeDisabled = isVariantsProduct(product) && !sizeHasSellableVariants(product, s);
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      disabled={sizeDisabled}
+                      onClick={() => setSize(s)}
+                      className={`rounded-full px-3 py-1.5 text-xs transition ${
+                        size === s ? "bg-primary text-primary-foreground" : "glass hover:bg-white/60"
+                      } ${sizeDisabled ? "opacity-30 cursor-not-allowed line-through" : ""}`}
+                      title={sizeDisabled ? `${s} — sold out in all colours` : s}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <div>
@@ -209,6 +236,11 @@ function ProductPage() {
                 })}
               </div>
             </div>
+            {isVariantsProduct(product) && size && color && stockIsSoldOut && (
+              <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2 leading-snug">
+                This size and colour is sold out. Choose another combination or check back later.
+              </p>
+            )}
           </div>
 
           <div className="glass rounded-xl p-3 space-y-2">

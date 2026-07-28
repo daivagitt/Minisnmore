@@ -1,4 +1,5 @@
 import { ages, fabrics, type AgeRange, type Fabric, type Product } from "@/data/products";
+import { productMatchesQuery, normalizeSearchQuery } from "@/lib/product-search";
 import { z } from "zod";
 
 const SORT_VALUES = ["new", "lo", "hi"] as const;
@@ -9,6 +10,7 @@ const fabricEnum = z.enum(fabrics as [Fabric, ...Fabric[]]);
 const sortEnum = z.enum(SORT_VALUES);
 
 export type ShopSearch = {
+  q?: string;
   category?: string;
   age?: AgeRange;
   fabric?: Fabric;
@@ -17,12 +19,14 @@ export type ShopSearch = {
 
 export function parseShopSearch(raw: unknown): ShopSearch {
   const input = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const qRaw = typeof input.q === "string" ? normalizeSearchQuery(input.q) : "";
   const category =
     typeof input.category === "string" && input.category.trim() ? input.category.trim() : undefined;
   const age = ageEnum.safeParse(input.age).success ? ageEnum.parse(input.age) : undefined;
   const fabric = fabricEnum.safeParse(input.fabric).success ? fabricEnum.parse(input.fabric) : undefined;
   const sort = sortEnum.safeParse(input.sort).success ? sortEnum.parse(input.sort) : "new";
   const out: ShopSearch = { sort };
+  if (qRaw) out.q = qRaw;
   if (category) out.category = category;
   if (age) out.age = age;
   if (fabric) out.fabric = fabric;
@@ -66,6 +70,7 @@ export function productMatchesFabric(product: Product, fabric?: Fabric): boolean
 export function filterProducts(products: Product[], filters: ShopSearch): Product[] {
   return products.filter(
     (p) =>
+      productMatchesQuery(p, filters.q ?? "") &&
       productMatchesCategory(p, filters.category) &&
       productMatchesAge(p, filters.age) &&
       productMatchesFabric(p, filters.fabric),
@@ -92,6 +97,7 @@ export function filterAndSortProducts(products: Product[], filters: ShopSearch):
 export function buildShopSearch(next: Partial<ShopSearch>): ShopSearch {
   const parsed = parseShopSearch(next);
   const out: ShopSearch = { sort: parsed.sort ?? "new" };
+  if (parsed.q) out.q = parsed.q;
   if (parsed.category) out.category = parsed.category;
   if (parsed.age) out.age = parsed.age;
   if (parsed.fabric) out.fabric = parsed.fabric;
@@ -99,7 +105,17 @@ export function buildShopSearch(next: Partial<ShopSearch>): ShopSearch {
 }
 
 export function hasActiveFilters(filters: ShopSearch): boolean {
-  return !!(filters.category || filters.age || filters.fabric);
+  return !!(filters.q || filters.category || filters.age || filters.fabric);
 }
 
-export const SHOP_FILTER_FABRICS: Fabric[] = fabrics.filter((f) => f === "Organic Cotton");
+/** All catalog fabrics available as shop chips. */
+export const SHOP_FILTER_FABRICS: Fabric[] = [...fabrics];
+
+/** Human labels for age filter chips (aligned with homepage age bands). */
+export const SHOP_AGE_FILTERS: { value: AgeRange; label: string }[] = [
+  { value: "0-3m", label: "0–3M" },
+  { value: "3-6m", label: "3–6M" },
+  { value: "6-12m", label: "6–12M" },
+  { value: "12-18m", label: "12–18M" },
+  { value: "18-24m", label: "18–24M" },
+];
