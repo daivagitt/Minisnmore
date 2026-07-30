@@ -13,7 +13,7 @@ export type Product = {
   id: string; slug: string; name: string; tagline: string;
   price: number; compareAt?: number; image: string; gallery: string[];
   ages: AgeRange[]; fabric: Fabric;
-  colors: { name: string; hex: string; imageUrl?: string; imageUrls?: string[] }[]; sizes: string[];
+  colors: { name: string; hex: string; swatchUrl?: string; imageUrl?: string; imageUrls?: string[] }[]; sizes: string[];
   rating: number; reviewCount: number;
   category: "Newborn" | "Infant" | "Toddler";
   categorySlug?: string;

@@ -11,6 +11,7 @@ import {
   isVariantsProduct,
 } from "@/lib/product-variants";
 import { galleryForSelectedColor } from "@/lib/product-gallery";
+import { swatchImageForColor } from "@/lib/product-colors";
 
 export function QuickView() {
   const { quickView, setQuickView, addToCart } = useShop();
@@ -101,21 +102,28 @@ export function QuickView() {
                   </div>
                 </div>
                 <div className="mt-4">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Color · {color}</div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Print · {color}</div>
+                  <div className="flex flex-wrap gap-2.5">
                     {availableColors.map((c) => {
                       const row = findVariant(quickView, { size, color: c.name });
                       const disabled = isVariantsProduct(quickView) && !isVariantSellable(row);
+                      const selected = color === c.name;
+                      const swatchImage = swatchImageForColor(c);
                       return (
                         <button
                           key={c.name}
                           type="button"
                           disabled={disabled}
                           onClick={() => setColor(c.name)}
-                          className={`h-8 w-8 rounded-full border-2 transition ${color === c.name ? "border-primary scale-110" : "border-white/70"} ${disabled ? "opacity-30" : ""}`}
-                          style={{ background: c.hex }}
+                          className={`h-11 w-11 rounded-xl border-2 overflow-hidden transition ${selected ? "border-primary ring-2 ring-primary/30" : "border-white/70"} ${disabled ? "opacity-30" : ""}`}
+                          style={swatchImage ? undefined : { background: c.hex }}
                           aria-label={c.name}
-                        />
+                          aria-pressed={selected}
+                        >
+                          {swatchImage ? (
+                            <img src={swatchImage} alt={c.name} className="h-full w-full object-cover" loading="lazy" />
+                          ) : null}
+                        </button>
                       );
                     })}
                   </div>

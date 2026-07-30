@@ -101,6 +101,13 @@ export function swatchUrlForEntry(
   return swatch || null;
 }
 
+/** Swatch thumbnail for a colour: explicit print swatch, else its own first photo. */
+export function swatchImageForColor(
+  entry: { swatchUrl?: string; imageUrl?: string; imageUrls?: string[] },
+): string | undefined {
+  return entry.swatchUrl?.trim() || entry.imageUrl?.trim() || entry.imageUrls?.[0]?.trim() || undefined;
+}
+
 export function parseProductColors(raw: unknown): ProductColorEntry[] {
   if (!Array.isArray(raw) || raw.length === 0) return [];
   const out: ProductColorEntry[] = [];

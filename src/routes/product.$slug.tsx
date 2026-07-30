@@ -9,6 +9,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { ProductGallery } from "@/components/ProductGallery";
 import { checkSizeFit, clampQuantity } from "@/lib/product-fit";
 import { galleryForSelectedColor } from "@/lib/product-gallery";
+import { swatchImageForColor } from "@/lib/product-colors";
 import { lookupPincode, normalizePincode } from "@/lib/pincode";
 import {
   colorsForSize,
@@ -216,22 +217,29 @@ function ProductPage() {
               </div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Color · {color}</div>
-              <div className="flex gap-2 flex-wrap">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Print · {color}</div>
+              <div className="flex gap-2.5 flex-wrap">
                 {availableColors.map((c) => {
                   const row = findVariant(product, { size, color: c.name });
                   const disabled = isVariantsProduct(product) && !isVariantSellable(row);
+                  const selected = color === c.name;
+                  const swatchImage = swatchImageForColor(c);
                   return (
                     <button
                       key={c.name}
                       type="button"
                       disabled={disabled}
                       onClick={() => setColor(c.name)}
-                      className={`h-8 w-8 rounded-full border-2 transition ${color === c.name ? "border-primary scale-110" : "border-white/70"} ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}
-                      style={{ background: c.hex }}
+                      className={`h-12 w-12 sm:h-14 sm:w-14 rounded-xl border-2 overflow-hidden transition ${selected ? "border-primary ring-2 ring-primary/30" : "border-white/70 hover:border-primary/50"} ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}
+                      style={swatchImage ? undefined : { background: c.hex }}
                       aria-label={c.name}
+                      aria-pressed={selected}
                       title={disabled ? `${c.name} unavailable` : c.name}
-                    />
+                    >
+                      {swatchImage ? (
+                        <img src={swatchImage} alt={c.name} className="h-full w-full object-cover" loading="lazy" />
+                      ) : null}
+                    </button>
                   );
                 })}
               </div>
