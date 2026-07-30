@@ -125,9 +125,17 @@ function ProductsPage() {
         method: "POST",
         body: formData,
       });
-      const result = await response.json();
+      const text = await response.text();
+      let result: { error?: string; details?: string } = {};
+      if (text) {
+        try {
+          result = JSON.parse(text);
+        } catch {
+          result = { error: text.slice(0, 200) };
+        }
+      }
       if (!response.ok) {
-        toast.error((result.error || "Import failed") + (result.details ? ": " + result.details : ""));
+        toast.error((result.error || `Import failed (${response.status})`) + (result.details ? ": " + result.details : ""));
         return;
       }
       toast.success("SKU-wise print import completed! Reloading products...");
