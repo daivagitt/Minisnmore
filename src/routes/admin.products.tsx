@@ -26,6 +26,7 @@ import {
   CloudUpload,
 } from "lucide-react";
 import { getUserErrorMessage, showApiError, showValidationErrors } from "@/lib/ui-errors";
+import { api } from "@/lib/api";
 import { sanitizePublicUrl } from "@/lib/utils";
 import { IMAGE_ACCEPT, validateAdminImageFile } from "@/lib/admin-image";
 import {
@@ -121,23 +122,7 @@ function ProductsPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const response = await fetch("/api/v1/admin/import/sku-wise-print", {
-        method: "POST",
-        body: formData,
-      });
-      const text = await response.text();
-      let result: { error?: string; details?: string } = {};
-      if (text) {
-        try {
-          result = JSON.parse(text);
-        } catch {
-          result = { error: text.slice(0, 200) };
-        }
-      }
-      if (!response.ok) {
-        toast.error((result.error || `Import failed (${response.status})`) + (result.details ? ": " + result.details : ""));
-        return;
-      }
+      await api.post("/api/v1/admin/import/sku-wise-print", formData, { auth: true });
       toast.success("SKU-wise print import completed! Reloading products...");
       await new Promise(r => setTimeout(r, 1000));
       load();
