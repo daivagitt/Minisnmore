@@ -141,12 +141,10 @@ public class ProductVariantSupport {
         return findBySizeColor(rows, size, color).filter(VariantRow::active);
     }
 
+    /** Includes sizes from inactive rows too, so the storefront can render them as disabled instead of hiding them. */
     public List<String> sizes(List<VariantRow> rows) {
         Set<String> sizes = new LinkedHashSet<>();
         for (VariantRow row : rows) {
-            if (!row.active()) {
-                continue;
-            }
             String size = normalize(row.size());
             if (size != null) {
                 sizes.add(row.size().trim());
@@ -285,6 +283,40 @@ public class ProductVariantSupport {
         return true;
     }
 
+    /** Keep variant matrix colour labels in sync after print names are realigned to gallery keys. */
+    public void renameVariantColors(Product product, Map<String, String> rename) {
+        if (product == null || rename == null || rename.isEmpty() || !isVariants(product)) {
+            return;
+        }
+        List<VariantRow> rows = new ArrayList<>(parseProduct(product));
+        boolean changed = false;
+        for (int i = 0; i < rows.size(); i++) {
+            VariantRow row = rows.get(i);
+            String nextColor = rename.getOrDefault(row.color(), row.color());
+            if (!Objects.equals(row.color(), nextColor)) {
+                rows.set(
+                    i,
+                    new VariantRow(
+                        row.id(),
+                        row.sku(),
+                        row.size(),
+                        nextColor,
+                        row.rate(),
+                        row.mrp(),
+                        row.cost(),
+                        row.stock(),
+                        row.active(),
+                        row.swatchUrl()
+                    )
+                );
+                changed = true;
+            }
+        }
+        if (changed) {
+            product.setVariantsJson(serialize(rows));
+        }
+    }
+
     /**
      * Decrement stock for a variant SKU (or size+color) and re-aggregate parent stock.
      * @return false if the row could not be found or stock is insufficient
@@ -309,7 +341,18 @@ public class ProductVariantSupport {
         List<VariantRow> updated = replaceRowAt(
             rows,
             targetIndex,
-            new VariantRow(row.id(), row.sku(), row.size(), row.color(), row.rate(), row.mrp(), row.cost(), row.stock() - qty, row.active())
+            new VariantRow(
+                row.id(),
+                row.sku(),
+                row.size(),
+                row.color(),
+                row.rate(),
+                row.mrp(),
+                row.cost(),
+                row.stock() - qty,
+                row.active(),
+                row.swatchUrl()
+            )
         );
         product.setVariantsJson(serialize(updated));
         product.setStock(aggregates(updated).stockSum());
@@ -336,7 +379,18 @@ public class ProductVariantSupport {
         List<VariantRow> updated = replaceRowAt(
             rows,
             targetIndex,
-            new VariantRow(row.id(), row.sku(), row.size(), row.color(), row.rate(), row.mrp(), row.cost(), row.stock() + qty, row.active())
+            new VariantRow(
+                row.id(),
+                row.sku(),
+                row.size(),
+                row.color(),
+                row.rate(),
+                row.mrp(),
+                row.cost(),
+                row.stock() + qty,
+                row.active(),
+                row.swatchUrl()
+            )
         );
         product.setVariantsJson(serialize(updated));
         product.setStock(aggregates(updated).stockSum());
@@ -357,7 +411,18 @@ public class ProductVariantSupport {
         List<VariantRow> updated = replaceRowAt(
             rows,
             targetIndex,
-            new VariantRow(row.id(), row.sku(), row.size(), row.color(), row.rate(), row.mrp(), row.cost(), Math.max(0, stock), row.active())
+            new VariantRow(
+                row.id(),
+                row.sku(),
+                row.size(),
+                row.color(),
+                row.rate(),
+                row.mrp(),
+                row.cost(),
+                Math.max(0, stock),
+                row.active(),
+                row.swatchUrl()
+            )
         );
         product.setVariantsJson(serialize(updated));
         product.setStock(aggregates(updated).stockSum());
@@ -412,7 +477,8 @@ public class ProductVariantSupport {
         BigDecimal mrp,
         BigDecimal cost,
         int stock,
-        boolean active
+        boolean active,
+        String swatchUrl
     ) {
         static VariantRow fromMap(Map<String, Object> map) {
             BigDecimal rateRaw = toBigDecimal(map.get("rate"));
@@ -441,7 +507,8 @@ public class ProductVariantSupport {
                 mrp,
                 toBigDecimal(map.get("cost")),
                 toInt(map.get("stock")),
-                toBoolean(map.get("active"), true)
+                toBoolean(map.get("active"), true),
+                swatchUrlValue(map)
             );
         }
 
@@ -466,7 +533,18 @@ public class ProductVariantSupport {
             map.put("cost", cost != null ? cost : BigDecimal.ZERO);
             map.put("stock", stock);
             map.put("active", active);
+            if (swatchUrl != null && !swatchUrl.isBlank()) {
+                map.put("swatchUrl", swatchUrl.trim());
+            }
             return map;
+        }
+
+        private static String swatchUrlValue(Map<String, Object> map) {
+            String camel = stringValue(map.get("swatchUrl"));
+            if (camel != null) {
+                return camel;
+            }
+            return stringValue(map.get("swatch_url"));
         }
 
         private static String stringValue(Object value) {

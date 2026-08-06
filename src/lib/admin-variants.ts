@@ -208,9 +208,10 @@ export function aggregateFromVariantRows(rows: VariantEditorRow[]): {
   let minMrp: number | null = null;
   let stock = 0;
   for (const r of rows) {
-    if (!r.active) continue;
+    // Sizes/colors include inactive rows so the storefront can render them disabled instead of hiding them.
     if (r.size.trim() && !sizes.includes(r.size.trim())) sizes.push(r.size.trim());
     if (r.color.trim() && !colors.includes(r.color.trim())) colors.push(r.color.trim());
+    if (!r.active) continue;
     const selling = variantAmount(r.rate);
     if (Number.isFinite(selling) && selling > 0) {
       minSelling = minSelling == null ? selling : Math.min(minSelling, selling);
