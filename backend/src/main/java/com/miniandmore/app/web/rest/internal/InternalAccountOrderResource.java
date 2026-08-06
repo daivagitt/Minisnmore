@@ -57,6 +57,7 @@ public class InternalAccountOrderResource {
     private static final String FIELD_ORDER_NUMBER = "orderNumber";
     private static final String FIELD_ORDER_NUMBER_SNAKE = "order_number";
     private static final String FIELD_DISCOUNT = "discount";
+    private static final BigDecimal FIRST_ORDER_DISCOUNT_PERCENT = BigDecimal.TEN;
     private static final String FIELD_TOTAL = "total";
 
     private final AccountOrderDataAccess dataAccess;
@@ -138,7 +139,8 @@ public class InternalAccountOrderResource {
             reserved,
             blankToNull(request.coupon_code()),
             request.donation(),
-            request.shipping_mode()
+            request.shipping_mode(),
+            login
         );
         String orderNumber = generateOrderNumber();
         CustomerOrder order = new CustomerOrder()
@@ -385,6 +387,10 @@ public class InternalAccountOrderResource {
         ledgerlySyncService.syncOrder(order.getId());
     }
 
+    private boolean isFirstOrderEligible(String login) {
+        return !dataAccess.customerOrderRepository().existsByUserLoginAndPaymentStatus(login, PaymentStatus.PAID);
+    }
+
     private Optional<Map<String, Object>> calculateCouponDiscount(String code, BigDecimal subtotal) {
         if (StringUtils.isBlank(code)) {
             return Optional.empty();
@@ -422,13 +428,20 @@ public class InternalAccountOrderResource {
         List<ReservedOrderItem> items,
         String couponCode,
         BigDecimal donation,
-        String shippingMode
+        String shippingMode,
+        String login
     ) {
         BigDecimal subtotal = items
             .stream()
             .map(item -> item.unitPrice().multiply(BigDecimal.valueOf(item.request().qty())))
             .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal discount = calculateCouponDiscount(couponCode, subtotal).map(m -> (BigDecimal) m.get(FIELD_DISCOUNT)).orElse(BigDecimal.ZERO);
+        BigDecimal couponDiscount = calculateCouponDiscount(couponCode, subtotal)
+            .map(m -> (BigDecimal) m.get(FIELD_DISCOUNT))
+            .orElse(BigDecimal.ZERO);
+        BigDecimal firstOrderDiscount = isFirstOrderEligible(login)
+            ? subtotal.multiply(FIRST_ORDER_DISCOUNT_PERCENT).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
+            : BigDecimal.ZERO;
+        BigDecimal discount = couponDiscount.max(firstOrderDiscount);
         BigDecimal afterDiscount = subtotal.subtract(discount).max(BigDecimal.ZERO);
         CommerceSettings commerce = commerceSettings();
         BigDecimal shipping = calculateShipping(afterDiscount, shippingMode, commerce);

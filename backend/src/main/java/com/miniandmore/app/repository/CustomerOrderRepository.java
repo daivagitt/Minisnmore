@@ -55,6 +55,8 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     Optional<CustomerOrder> findOneByOrderNumber(String orderNumber);
 
+    boolean existsByUserLoginAndPaymentStatus(String userLogin, PaymentStatus paymentStatus);
+
     @Query(
         value = "select customerOrder from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
         "customerOrder.inventoryReserved = true and customerOrder.inventoryReleasedAt is null and " +
