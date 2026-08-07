@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { getMyProfile, updateMyProfile } from "@/lib/orders.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccountData } from "@/lib/account";
@@ -46,11 +47,19 @@ function ProfilePage() {
 
   const onSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!fullName.trim()) {
+      toast.error("Full name is required");
+      return;
+    }
+    if (!phone.trim()) {
+      toast.error("Phone number is required");
+      return;
+    }
     setSaving(true);
     setSaved(false);
     try {
-      await updateMyProfile({ data: { full_name: fullName, phone } });
-      setCachedProfile({ full_name: fullName, phone });
+      await updateMyProfile({ data: { full_name: fullName.trim(), phone: phone.trim() } });
+      setCachedProfile({ full_name: fullName.trim(), phone: phone.trim() });
       await refreshProfile();
       setSaved(true);
       setTimeout(() => setSaved(false), 2200);
@@ -61,14 +70,8 @@ function ProfilePage() {
 
   return (
     <div className="glass-strong rounded-[2rem] p-6 md:p-8">
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
-        <div>
-          <h1 className="font-display text-3xl mb-1 flex items-center gap-2"><UserIcon className="h-6 w-6 text-primary" /> Your profile</h1>
-          <p className="text-sm text-muted-foreground">Keep your details up to date for faster checkout.</p>
-        </div>
-        <div className="glass rounded-2xl px-4 py-3 text-xs text-muted-foreground">
-          Synced to your account for faster checkout and order updates.
-        </div>
+      <div className="mb-6">
+        <h1 className="font-display text-3xl mb-1 flex items-center gap-2"><UserIcon className="h-6 w-6 text-primary" /> Your profile</h1>
       </div>
 
       {loading ? (
@@ -81,15 +84,12 @@ function ProfilePage() {
             <input value={user?.email ?? ""} disabled className="mt-1 w-full rounded-2xl border border-white/50 bg-white/50 px-4 py-3 text-sm" />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wider text-muted-foreground">Full name</label>
-            <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="mt-1 w-full rounded-2xl border border-white/50 bg-white/70 px-4 py-3 text-sm" />
+            <label className="text-xs uppercase tracking-wider text-muted-foreground">Full name *</label>
+            <input required value={fullName} onChange={(e) => setFullName(e.target.value)} className="mt-1 w-full rounded-2xl border border-white/50 bg-white/70 px-4 py-3 text-sm" />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wider text-muted-foreground">Phone</label>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-1 w-full rounded-2xl border border-white/50 bg-white/70 px-4 py-3 text-sm" />
-          </div>
-          <div className="glass rounded-2xl p-4 text-sm text-muted-foreground self-end">
-            Use the same Google account anytime and your saved profile will be ready instantly.
+            <label className="text-xs uppercase tracking-wider text-muted-foreground">Phone *</label>
+            <input required value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-1 w-full rounded-2xl border border-white/50 bg-white/70 px-4 py-3 text-sm" />
           </div>
           </div>
           <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm disabled:opacity-60">

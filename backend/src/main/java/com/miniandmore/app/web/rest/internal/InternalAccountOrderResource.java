@@ -998,7 +998,7 @@ public class InternalAccountOrderResource {
         @NotNull @DecimalMin("0") BigDecimal subtotal
     ) {}
 
-    public record ProfileUpdateRequest(@NotNull @Size(max = 120) String full_name, @NotNull @Size(max = 20) String phone) {}
+    public record ProfileUpdateRequest(@NotBlank @Size(max = 120) String full_name, @NotBlank @Size(max = 20) String phone) {}
 
     public record AddressRequest(
         @NotBlank @Size(max = 120) String full_name,
