@@ -53,11 +53,12 @@ function AccountLayout() {
   const nav = useNavigate();
   const { pathname } = useLocation();
   const isActivationRedirect = pathname === "/account/activate";
+  const isPasswordResetRedirect = pathname === "/account/reset/finish";
 
   useEffect(() => {
-    if (isActivationRedirect) return;
+    if (isActivationRedirect || isPasswordResetRedirect) return;
     if (!loading && !user) nav({ to: "/login", search: { redirect: "/account" } });
-  }, [user, loading, nav, isActivationRedirect]);
+  }, [user, loading, nav, isActivationRedirect, isPasswordResetRedirect]);
 
   return (
     <AccountDataProvider>

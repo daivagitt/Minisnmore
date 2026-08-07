@@ -16,6 +16,7 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SubscribeRouteImport } from './routes/subscribe'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as ShippingRouteImport } from './routes/shipping'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as NewArrivalsRouteImport } from './routes/new-arrivals'
 import { Route as LoginRouteImport } from './routes/login'
@@ -58,6 +59,7 @@ import { Route as AccountCartRouteImport } from './routes/account.cart'
 import { Route as AccountAddressesRouteImport } from './routes/account.addresses'
 import { Route as AccountActivateRouteImport } from './routes/account.activate'
 import { Route as AdminIntegrationsLedgerlyRouteImport } from './routes/admin.integrations.ledgerly'
+import { Route as AccountResetFinishRouteImport } from './routes/account.reset.finish'
 import { Route as AccountOrdersOrderNumberRouteImport } from './routes/account.orders.$orderNumber'
 
 const WishlistRoute = WishlistRouteImport.update({
@@ -93,6 +95,11 @@ const ShopRoute = ShopRouteImport.update({
 const ShippingRoute = ShippingRouteImport.update({
   id: '/shipping',
   path: '/shipping',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -306,6 +313,11 @@ const AdminIntegrationsLedgerlyRoute =
     path: '/integrations/ledgerly',
     getParentRoute: () => AdminRoute,
   } as any)
+const AccountResetFinishRoute = AccountResetFinishRouteImport.update({
+  id: '/reset/finish',
+  path: '/reset/finish',
+  getParentRoute: () => AccountRoute,
+} as any)
 const AccountOrdersOrderNumberRoute =
   AccountOrdersOrderNumberRouteImport.update({
     id: '/$orderNumber',
@@ -327,6 +339,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/new-arrivals': typeof NewArrivalsRoute
   '/privacy': typeof PrivacyRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/shipping': typeof ShippingRoute
   '/shop': typeof ShopRoute
   '/subscribe': typeof SubscribeRoute
@@ -363,6 +376,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/blog/': typeof BlogIndexRoute
   '/account/orders/$orderNumber': typeof AccountOrdersOrderNumberRoute
+  '/account/reset/finish': typeof AccountResetFinishRoute
   '/admin/integrations/ledgerly': typeof AdminIntegrationsLedgerlyRoute
 }
 export interface FileRoutesByTo {
@@ -376,6 +390,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/new-arrivals': typeof NewArrivalsRoute
   '/privacy': typeof PrivacyRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/shipping': typeof ShippingRoute
   '/shop': typeof ShopRoute
   '/subscribe': typeof SubscribeRoute
@@ -412,6 +427,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/blog': typeof BlogIndexRoute
   '/account/orders/$orderNumber': typeof AccountOrdersOrderNumberRoute
+  '/account/reset/finish': typeof AccountResetFinishRoute
   '/admin/integrations/ledgerly': typeof AdminIntegrationsLedgerlyRoute
 }
 export interface FileRoutesById {
@@ -429,6 +445,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/new-arrivals': typeof NewArrivalsRoute
   '/privacy': typeof PrivacyRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/shipping': typeof ShippingRoute
   '/shop': typeof ShopRoute
   '/subscribe': typeof SubscribeRoute
@@ -465,6 +482,7 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/blog/': typeof BlogIndexRoute
   '/account/orders/$orderNumber': typeof AccountOrdersOrderNumberRoute
+  '/account/reset/finish': typeof AccountResetFinishRoute
   '/admin/integrations/ledgerly': typeof AdminIntegrationsLedgerlyRoute
 }
 export interface FileRouteTypes {
@@ -483,6 +501,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/new-arrivals'
     | '/privacy'
+    | '/reset-password'
     | '/shipping'
     | '/shop'
     | '/subscribe'
@@ -519,6 +538,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/blog/'
     | '/account/orders/$orderNumber'
+    | '/account/reset/finish'
     | '/admin/integrations/ledgerly'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -532,6 +552,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/new-arrivals'
     | '/privacy'
+    | '/reset-password'
     | '/shipping'
     | '/shop'
     | '/subscribe'
@@ -568,6 +589,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/blog'
     | '/account/orders/$orderNumber'
+    | '/account/reset/finish'
     | '/admin/integrations/ledgerly'
   id:
     | '__root__'
@@ -584,6 +606,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/new-arrivals'
     | '/privacy'
+    | '/reset-password'
     | '/shipping'
     | '/shop'
     | '/subscribe'
@@ -620,6 +643,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/blog/'
     | '/account/orders/$orderNumber'
+    | '/account/reset/finish'
     | '/admin/integrations/ledgerly'
   fileRoutesById: FileRoutesById
 }
@@ -637,6 +661,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   NewArrivalsRoute: typeof NewArrivalsRoute
   PrivacyRoute: typeof PrivacyRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   ShippingRoute: typeof ShippingRoute
   ShopRoute: typeof ShopRoute
   SubscribeRoute: typeof SubscribeRoute
@@ -697,6 +722,13 @@ declare module '@tanstack/react-router' {
       path: '/shipping'
       fullPath: '/shipping'
       preLoaderRoute: typeof ShippingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -993,6 +1025,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIntegrationsLedgerlyRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/account/reset/finish': {
+      id: '/account/reset/finish'
+      path: '/reset/finish'
+      fullPath: '/account/reset/finish'
+      preLoaderRoute: typeof AccountResetFinishRouteImport
+      parentRoute: typeof AccountRoute
+    }
     '/account/orders/$orderNumber': {
       id: '/account/orders/$orderNumber'
       path: '/$orderNumber'
@@ -1027,6 +1066,7 @@ interface AccountRouteChildren {
   AccountTrackRoute: typeof AccountTrackRoute
   AccountWishlistRoute: typeof AccountWishlistRoute
   AccountIndexRoute: typeof AccountIndexRoute
+  AccountResetFinishRoute: typeof AccountResetFinishRoute
 }
 
 const AccountRouteChildren: AccountRouteChildren = {
@@ -1041,6 +1081,7 @@ const AccountRouteChildren: AccountRouteChildren = {
   AccountTrackRoute: AccountTrackRoute,
   AccountWishlistRoute: AccountWishlistRoute,
   AccountIndexRoute: AccountIndexRoute,
+  AccountResetFinishRoute: AccountResetFinishRoute,
 }
 
 const AccountRouteWithChildren =
@@ -1108,6 +1149,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   NewArrivalsRoute: NewArrivalsRoute,
   PrivacyRoute: PrivacyRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   ShippingRoute: ShippingRoute,
   ShopRoute: ShopRoute,
   SubscribeRoute: SubscribeRoute,

@@ -75,6 +75,21 @@ export function activationErrorMessage(error: unknown): string {
   return authErrorMessage(error);
 }
 
+/** Reset-password-page copy for API failures. */
+export function resetPasswordErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    const errorKey = problemText(error.body, "errorKey");
+    const title = problemText(error.body, "title");
+    if (errorKey === "invalidresetkey" || /invalid reset key/i.test(title) || /invalid reset key/i.test(error.message)) {
+      return "This password reset link is invalid or has expired. Request a new one.";
+    }
+    if (/invalid password|password.*invalid/i.test(`${title} ${error.message}`.toLowerCase())) {
+      return "Password must be at least 4 characters. Please choose a stronger password.";
+    }
+  }
+  return authErrorMessage(error);
+}
+
 /**
  * Sanitize OAuth callback `error` query values so users never see Java/SQL dumps.
  */
