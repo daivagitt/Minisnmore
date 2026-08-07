@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Plus, Minus, ShoppingBag } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { FIT_LIMITS } from "@/lib/product-fit";
 import { useShop } from "@/store/shop";
 
 export function CartDrawer() {
@@ -48,7 +49,7 @@ export function CartDrawer() {
                         <div className="glass rounded-full flex items-center">
                           <button onClick={() => updateQty(item.product.id, item.qty - 1, item.size, item.color)} className="h-7 w-7 grid place-items-center"><Minus className="h-3 w-3" /></button>
                           <span className="text-xs w-6 text-center">{item.qty}</span>
-                          <button onClick={() => updateQty(item.product.id, item.qty + 1, item.size, item.color)} className="h-7 w-7 grid place-items-center"><Plus className="h-3 w-3" /></button>
+                          <button onClick={() => updateQty(item.product.id, item.qty + 1, item.size, item.color)} disabled={item.qty >= FIT_LIMITS.qtyMax} className="h-7 w-7 grid place-items-center disabled:opacity-30"><Plus className="h-3 w-3" /></button>
                         </div>
                         <div className="text-sm font-medium">&#8377;{(item.qty * item.unitPrice).toLocaleString("en-IN")}</div>
                       </div>

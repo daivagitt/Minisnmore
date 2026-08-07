@@ -3,6 +3,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Plus, Minus, X, Tag, ShieldCheck, Truck } from "lucide-react";
 import { useShop } from "@/store/shop";
+import { FIT_LIMITS } from "@/lib/product-fit";
 import { toast } from "sonner";
 import { validateCoupon } from "@/lib/coupons.functions";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -78,7 +79,7 @@ function CartPage() {
                 <div className="glass rounded-full flex items-center">
                   <button onClick={() => updateQty(item.product.id, item.qty - 1, item.size, item.color)} className="h-8 w-8 grid place-items-center" aria-label="Decrease"><Minus className="h-3.5 w-3.5" /></button>
                   <span className="text-sm w-7 text-center">{item.qty}</span>
-                  <button onClick={() => updateQty(item.product.id, item.qty + 1, item.size, item.color)} className="h-8 w-8 grid place-items-center" aria-label="Increase"><Plus className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => updateQty(item.product.id, item.qty + 1, item.size, item.color)} disabled={item.qty >= FIT_LIMITS.qtyMax} className="h-8 w-8 grid place-items-center disabled:opacity-30" aria-label="Increase"><Plus className="h-3.5 w-3.5" /></button>
                 </div>
                 <div className="text-right">
                   <div className="font-medium">₹{(item.qty * item.unitPrice).toLocaleString("en-IN")}</div>

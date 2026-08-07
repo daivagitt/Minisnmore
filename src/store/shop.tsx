@@ -10,6 +10,7 @@ import {
 } from "react";
 import type { Product } from "@/data/products";
 import { useAuth } from "@/hooks/useAuth";
+import { FIT_LIMITS } from "@/lib/product-fit";
 import { roundInr } from "@/lib/money";
 import {
   defaultSellableSelection,
@@ -169,10 +170,10 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       );
       if (i >= 0) {
         const next = [...c];
-        next[i] = { ...next[i], qty: next[i].qty + qty, unitPrice, variantSku };
+        next[i] = { ...next[i], qty: Math.min(FIT_LIMITS.qtyMax, next[i].qty + qty), unitPrice, variantSku };
         return next;
       }
-      return [...c, { product: p, qty, size, color, variantSku, unitPrice }];
+      return [...c, { product: p, qty: Math.min(FIT_LIMITS.qtyMax, qty), size, color, variantSku, unitPrice }];
     });
     setCartOpen(true);
   };
@@ -194,7 +195,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     setCart((c) =>
       c.flatMap((x) => {
         if (!matches(x, id, size, color, variantSku)) return [x];
-        const n = Math.max(0, qty);
+        const n = Math.max(0, Math.min(FIT_LIMITS.qtyMax, qty));
         return n === 0 ? [] : [{ ...x, qty: n }];
       }),
     );
