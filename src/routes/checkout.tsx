@@ -226,6 +226,10 @@ function Checkout() {
 
   const place = async () => {
     if (cart.length === 0) return;
+    if (!fullName.trim()) { setStep(0); return toast.error("Please enter your full name"); }
+    if (!/^\S+@\S+\.\S+$/.test(email)) { setStep(0); return toast.error("Please enter a valid email"); }
+    if (phone.replace(/\D/g, "").length < 10) { setStep(0); return toast.error("Please enter a valid phone number"); }
+    if (!line1.trim() || pin.length !== 6 || !city.trim() || !state.trim()) { setStep(1); return toast.error("Please complete the address"); }
     setBusy(true);
     try {
       const init = await createOrder({
@@ -483,9 +487,9 @@ function Checkout() {
                     </button>
                   </div>
                 )}
-                <Field label="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ananya Sharma" />
-                <Field label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ananya@email.com" />
-                <Field label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 99999 99999" />
+                <Field label="Full name" required value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ananya Sharma" />
+                <Field label="Email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ananya@email.com" />
+                <Field label="Phone" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 99999 99999" />
                 <Field label="Baby's name (optional)" value={babyName} onChange={(e) => setBabyName(e.target.value)} placeholder="Aarav" />
               </div>
             )}
@@ -526,21 +530,21 @@ function Checkout() {
                     </div>
                   </div>
                 )}
-                <Field label="Address line 1" value={line1} onChange={(e) => setLine1(e.target.value)} placeholder="Flat 12, Tulip Apartments" />
+                <Field label="Address line 1" required value={line1} onChange={(e) => setLine1(e.target.value)} placeholder="Flat 12, Tulip Apartments" />
                 <Field label="Address line 2" value={line2} onChange={(e) => setLine2(e.target.value)} placeholder="MG Road" />
                 <label className="block">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">Pincode {pinLoading && <span className="text-primary normal-case">· looking up…</span>}</div>
-                  <input value={pin} onChange={(e) => onPinChange(e.target.value)} inputMode="numeric" placeholder="400001"
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">Pincode * {pinLoading && <span className="text-primary normal-case">· looking up…</span>}</div>
+                  <input required value={pin} onChange={(e) => onPinChange(e.target.value)} inputMode="numeric" placeholder="400001"
                     className="glass w-full rounded-full px-4 py-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40" />
                 </label>
                 <label className="block">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">City</div>
-                  <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Mumbai"
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">City *</div>
+                  <input required value={city} onChange={(e) => setCity(e.target.value)} placeholder="Mumbai"
                     className="glass w-full rounded-full px-4 py-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40" />
                 </label>
                 <label className="block md:col-span-2">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">State</div>
-                  <input value={state} onChange={(e) => setStateName(e.target.value)} placeholder="Maharashtra"
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">State *</div>
+                  <input required value={state} onChange={(e) => setStateName(e.target.value)} placeholder="Maharashtra"
                     className="glass w-full rounded-full px-4 py-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40" />
                 </label>
                 <div className="md:col-span-2">
@@ -710,11 +714,11 @@ function Checkout() {
   );
 }
 
-function Field({ label, ...rest }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+function Field({ label, required, ...rest }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <label className="block">
-      <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">{label}</div>
-      <input {...rest} className="glass w-full rounded-full px-4 py-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40" />
+      <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">{label}{required && " *"}</div>
+      <input required={required} {...rest} className="glass w-full rounded-full px-4 py-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40" />
     </label>
   );
 }
