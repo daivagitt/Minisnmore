@@ -57,7 +57,7 @@ public class OAuth2UserTokenService {
                             user.setActivated(true);
                         }
                         return ensureUserAuthority(user).flatMap(resolved -> {
-                            if (resolved.getId() != null && resolved.isActivated() && hasUserRole(resolved)) {
+                            if (resolved.getId() != null && !needsActivation && hasUserRole(resolved)) {
                                 LOG.info("OAuth sign-in reusing existing account for {}", email);
                                 return Mono.just(resolved);
                             }
