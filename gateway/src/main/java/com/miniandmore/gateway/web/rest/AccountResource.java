@@ -176,7 +176,7 @@ public class AccountResource {
     @PostMapping(path = "/account/resend-activation")
     public Mono<Void> resendActivationEmail(@RequestBody String mail) {
         return userService
-            .requestActivationResend(mail)
+            .requestActivationResend(unwrapPlainStringBody(mail))
             .flatMap(user -> {
                 if (Objects.nonNull(user)) {
                     return Mono.fromRunnable(() -> mailService.sendActivationEmail(user)).subscribeOn(Schedulers.boundedElastic());
@@ -195,7 +195,7 @@ public class AccountResource {
     @PostMapping(path = "/account/reset-password/init")
     public Mono<Void> requestPasswordReset(@RequestBody String mail) {
         return userService
-            .requestPasswordReset(mail)
+            .requestPasswordReset(unwrapPlainStringBody(mail))
             .doOnSuccess(user -> {
                 if (Objects.nonNull(user)) {
                     mailService.sendPasswordResetMail(user);
@@ -232,5 +232,15 @@ public class AccountResource {
             password.length() < ManagedUserVM.PASSWORD_MIN_LENGTH ||
             password.length() > ManagedUserVM.PASSWORD_MAX_LENGTH
         );
+    }
+
+    /**
+     * WebFlux decodes a plain {@code @RequestBody String} verbatim from the raw bytes, without
+     * JSON-parsing it, even when Content-Type is application/json. Clients that send a JSON string
+     * literal (e.g. {@code "user@example.com"}, via {@code JSON.stringify(email)}) end up with the
+     * literal quote characters inside this method's argument. Strip a single matching pair before use.
+     */
+    private static String unwrapPlainStringBody(String raw) {
+        return StringUtils.trimToEmpty(StringUtils.unwrap(StringUtils.trim(raw), '"'));
     }
 }
