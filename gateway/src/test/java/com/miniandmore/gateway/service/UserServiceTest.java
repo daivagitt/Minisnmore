@@ -121,6 +121,19 @@ class UserServiceTest {
     }
 
     @Test
+    void requestPasswordReset_fallsBackToLoginWhenEmailColumnDoesNotMatch() {
+        user.setActivated(true);
+        when(userRepository.findOneByEmailIgnoreCase("user@localhost")).thenReturn(Mono.empty());
+        when(userRepository.findOneByLogin("user@localhost")).thenReturn(Mono.just(user));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(userRepository.saveUserAuthority(anyLong(), anyString())).thenReturn(Mono.empty());
+
+        StepVerifier.create(userService.requestPasswordReset("user@localhost").contextWrite(securityContext()))
+            .assertNext(updated -> assertThat(updated.getResetKey()).isNotBlank())
+            .verifyComplete();
+    }
+
+    @Test
     void registerUser_createsNewUser() {
         AdminUserDTO dto = adminDto("newuser", "new@localhost");
         Authority authority = new Authority();

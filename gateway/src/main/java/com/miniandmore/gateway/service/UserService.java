@@ -105,6 +105,9 @@ public class UserService {
     public Mono<User> requestPasswordReset(String mail) {
         return userRepository
             .findOneByEmailIgnoreCase(mail)
+            // OAuth-linked accounts are matched by login-derived-from-email during sign-in;
+            // fall back the same way here so a stale/mismatched email column doesn't hide them.
+            .switchIfEmpty(Mono.defer(() -> userRepository.findOneByLogin(mail.toLowerCase().trim())))
             .filter(User::isActivated)
             .publishOn(Schedulers.boundedElastic())
             .flatMap(user -> {
