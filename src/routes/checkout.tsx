@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { Check, ChevronLeft, Loader2, Smartphone, CreditCard, Building2, Wallet, Banknote, Shield, MapPin, Plus, Zap, Minus, X, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
-import { createOrder, verifyPayment, syncPaymentStatus, getMyProfile, updateMyProfile, getFirstOrderEligibility } from "@/lib/orders.functions";
+import { createOrder, verifyPayment, syncPaymentStatus, getMyProfile, updateMyProfile } from "@/lib/orders.functions";
 import { validateCoupon } from "@/lib/coupons.functions";
 import { commerceFromSiteSettings } from "@/lib/commerce";
 import { orderTotals } from "@/lib/money";
@@ -75,7 +75,6 @@ function Checkout() {
   const [selectedAddrId, setSelectedAddrId] = useState<string>("");
   const [saveAddress, setSaveAddress] = useState(true);
   const [profileLoaded, setProfileLoaded] = useState(false);
-  const [firstOrder, setFirstOrder] = useState<{ eligible: boolean; pct: number } | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -98,13 +97,6 @@ function Checkout() {
       .catch(() => {})
       .finally(() => setProfileLoaded(true));
   }, [user, profileLoaded, fullName, phone]);
-
-  useEffect(() => {
-    if (!user) return;
-    getFirstOrderEligibility()
-      .then((r) => setFirstOrder({ eligible: r.eligible, pct: r.discount_pct }))
-      .catch(() => {});
-  }, [user]);
 
   // Load saved addresses + last preferences from localStorage
   useEffect(() => {
@@ -183,14 +175,9 @@ function Checkout() {
   };
 
   const commerce = commerceFromSiteSettings(settings);
-  const firstOrderOff = firstOrder?.eligible
-    ? Math.round((cartTotal * (firstOrder.pct || 10)) / 100)
-    : 0;
-  // Server uses the larger of coupon vs first-order (when a coupon is present).
-  const effectiveDiscount = couponOff > 0 ? Math.max(couponOff, firstOrderOff) : firstOrderOff;
   const totals = orderTotals({
     subtotal: cartTotal,
-    discount: effectiveDiscount,
+    discount: couponOff,
     donation,
     shipMode,
     commerce,
@@ -449,11 +436,11 @@ function Checkout() {
   return (
     <div className="px-4 md:px-6 grid lg:grid-cols-[1fr_360px] gap-6 max-w-6xl mx-auto">
       <div className="glass-strong rounded-[2rem] p-6 md:p-10">
-        {firstOrder?.eligible && (
+        {couponOff === 0 && (
           <div className="mb-5 rounded-2xl border border-primary/30 bg-primary/10 text-primary px-4 py-3 text-sm flex items-center gap-2">
             <Zap className="h-4 w-4" />
             <span>
-              First-order bonus — <strong>{firstOrder.pct}% off</strong> applied automatically at payment.
+              First order? Use code <strong>WELCOME10</strong> at checkout for 10% off.
             </span>
           </div>
         )}
@@ -713,9 +700,6 @@ function Checkout() {
         <div className="border-t border-border/60 mt-4 pt-4 space-y-1.5 text-sm">
           <div className="flex justify-between"><span>Subtotal</span><span>₹{cartTotal.toLocaleString("en-IN")}</span></div>
           {couponOff > 0 && <div className="flex justify-between text-primary"><span>Discount ({coupon})</span><span>− ₹{couponOff.toLocaleString("en-IN")}</span></div>}
-          {firstOrder?.eligible && firstOrderOff > 0 && couponOff === 0 && (
-            <div className="flex justify-between text-primary"><span>First-order ({firstOrder.pct}%)</span><span>− ₹{firstOrderOff.toLocaleString("en-IN")}</span></div>
-          )}
           <div className="flex justify-between text-muted-foreground"><span>Shipping</span><span>{shipping === 0 ? "Free" : `₹${shipping}`}</span></div>
           <div className="flex justify-between text-muted-foreground"><span>GST ({commerce.gstRate}%)</span><span>₹{gst.toLocaleString("en-IN")}</span></div>
           {donation > 0 && <div className="flex justify-between text-primary"><span>Donation ♥</span><span>₹{donation.toLocaleString("en-IN")}</span></div>}

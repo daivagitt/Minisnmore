@@ -97,14 +97,6 @@ export async function updateMyProfile(input: { data: z.infer<typeof ProfileUpdat
   return api.put("/api/v1/account/profile", { full_name: parsed.full_name, phone: parsed.phone }, { auth: true });
 }
 
-// Returns whether the signed-in user qualifies for the first-order discount.
-// A user qualifies if they have no prior paid orders.
-export async function getFirstOrderEligibility(): Promise<{ eligible: boolean; discount_pct: number }> {
-  const res = await listMyOrders();
-  const hasPaid = (res.orders ?? []).some((o) => o?.payment_status === "paid");
-  return { eligible: !hasPaid, discount_pct: 10 };
-}
-
 export type OrderReturnRow = {
   id: number;
   return_number: string;

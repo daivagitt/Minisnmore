@@ -291,47 +291,14 @@ class InternalAccountOrderResourceCoverageTest {
     }
 
     @Test
-    void createOrder_firstOrderEligible_appliesAutomaticDiscount() throws Exception {
+    void createOrder_firstOrderWithoutCoupon_noAutomaticDiscount() throws Exception {
         ReflectionTestUtils.setField(resource, "razorpayKeyId", "DEMO");
         ReflectionTestUtils.setField(resource, "razorpayKeySecret", "");
         Product product = new Product().id(1L).name("Dress").slug("dress").price(BigDecimal.valueOf(1000)).stock(5).active(true);
         when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
         when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
-        when(customerOrderRepository.existsByUserLoginAndPaymentStatus("customer1", PaymentStatus.PAID)).thenReturn(false);
-        CustomerOrder saved = new CustomerOrder().id(400L).orderNumber("MNM-FIRST").total(BigDecimal.valueOf(999));
-        when(customerOrderRepository.save(any(CustomerOrder.class))).thenReturn(saved);
-        when(orderItemRepository.saveAll(any())).thenReturn(List.of());
-
-        mockMvc
-            .perform(
-                post("/internal/v1/orders")
-                    .with(user("customer1"))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(
-                        """
-                        {
-                          "items":[{"product_id":"1","product_name":"Dress","qty":1,"price":1000}],
-                          "shipping_address":{"full_name":"Jane","email":"j@example.com","phone":"9876543210","line1":"Line 1","city":"City","state":"State","pincode":"560001"},
-                          "donation":0
-                        }
-                        """
-                    )
-            )
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.totals.discount").value(100.0));
-    }
-
-    @Test
-    void createOrder_hasPriorPaidOrder_noAutomaticDiscount() throws Exception {
-        ReflectionTestUtils.setField(resource, "razorpayKeyId", "DEMO");
-        ReflectionTestUtils.setField(resource, "razorpayKeySecret", "");
-        Product product = new Product().id(1L).name("Dress").slug("dress").price(BigDecimal.valueOf(1000)).stock(5).active(true);
-        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
-        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
-        when(customerOrderRepository.existsByUserLoginAndPaymentStatus("customer1", PaymentStatus.PAID)).thenReturn(true);
-        CustomerOrder saved = new CustomerOrder().id(401L).orderNumber("MNM-REPEAT").total(BigDecimal.valueOf(1099));
+        CustomerOrder saved = new CustomerOrder().id(400L).orderNumber("MNM-FIRST").total(BigDecimal.valueOf(1099));
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenReturn(saved);
         when(orderItemRepository.saveAll(any())).thenReturn(List.of());
 
@@ -352,6 +319,45 @@ class InternalAccountOrderResourceCoverageTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.totals.discount").value(0.0));
+    }
+
+    @Test
+    void createOrder_welcome10Coupon_appliesTenPercentDiscount() throws Exception {
+        ReflectionTestUtils.setField(resource, "razorpayKeyId", "DEMO");
+        ReflectionTestUtils.setField(resource, "razorpayKeySecret", "");
+        Product product = new Product().id(1L).name("Dress").slug("dress").price(BigDecimal.valueOf(1000)).stock(5).active(true);
+        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+        Coupon coupon = new Coupon()
+            .code("WELCOME10")
+            .active(true)
+            .discountType(com.miniandmore.app.domain.enumeration.DiscountType.PERCENT)
+            .discountValue(BigDecimal.TEN)
+            .minOrder(BigDecimal.ZERO);
+        when(couponRepository.findOneByCodeIgnoreCase("WELCOME10")).thenReturn(Optional.of(coupon));
+        CustomerOrder saved = new CustomerOrder().id(401L).orderNumber("MNM-COUPON").total(BigDecimal.valueOf(999));
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenReturn(saved);
+        when(orderItemRepository.saveAll(any())).thenReturn(List.of());
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "items":[{"product_id":"1","product_name":"Dress","qty":1,"price":1000}],
+                          "shipping_address":{"full_name":"Jane","email":"j@example.com","phone":"9876543210","line1":"Line 1","city":"City","state":"State","pincode":"560001"},
+                          "donation":0,
+                          "coupon_code":"WELCOME10"
+                        }
+                        """
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.totals.discount").value(100.0));
     }
 
     private static String hmacSignature(String orderId, String paymentId, String secret) throws Exception {
