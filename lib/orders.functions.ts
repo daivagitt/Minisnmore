@@ -88,21 +88,13 @@ export async function getMyProfile(): Promise<{ profile: { full_name: string; ph
 }
 
 const ProfileUpdate = z.object({
-  full_name: z.string().trim().max(120).default(""),
-  phone: z.string().trim().max(20).default(""),
+  full_name: z.string().trim().min(1, "Full name is required").max(120),
+  phone: z.string().trim().min(1, "Phone number is required").max(20),
 });
 
 export async function updateMyProfile(input: { data: z.infer<typeof ProfileUpdate> }): Promise<{ ok: boolean }> {
   const parsed = ProfileUpdate.parse(input.data);
   return api.put("/api/v1/account/profile", { full_name: parsed.full_name, phone: parsed.phone }, { auth: true });
-}
-
-// Returns whether the signed-in user qualifies for the first-order discount.
-// A user qualifies if they have no prior paid orders.
-export async function getFirstOrderEligibility(): Promise<{ eligible: boolean; discount_pct: number }> {
-  const res = await listMyOrders();
-  const hasPaid = (res.orders ?? []).some((o) => o?.payment_status === "paid");
-  return { eligible: !hasPaid, discount_pct: 10 };
 }
 
 export type OrderReturnRow = {

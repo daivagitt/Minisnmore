@@ -31,7 +31,7 @@ class LedgerlyIntegrationClientTest {
     void setUp() {
         restClientBuilder = RestClient.builder();
         server = MockRestServiceServer.bindTo(restClientBuilder).build();
-        client = new LedgerlyIntegrationClient(restClientBuilder, credentials);
+        client = new LedgerlyIntegrationClient(restClientBuilder, credentials, new com.fasterxml.jackson.databind.ObjectMapper());
     }
 
     @Test

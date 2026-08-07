@@ -125,7 +125,7 @@ export function ProductGallery({ name, image, gallery = [], className }: Props) 
         className="order-1 lg:order-2 glass rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden relative min-w-0 w-full lg:flex-1"
       >
         <div
-          className="relative w-full overflow-hidden max-h-[min(92vw,28rem)] sm:max-h-[min(80vw,32rem)] lg:max-h-[min(42vw,36rem)]"
+          className="relative w-full overflow-hidden max-h-[85vh]"
           style={{ aspectRatio: heroAspect }}
         >
           <AnimatePresence mode="wait">

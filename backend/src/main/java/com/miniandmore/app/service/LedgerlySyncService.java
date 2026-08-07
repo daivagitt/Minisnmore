@@ -13,6 +13,8 @@ import com.miniandmore.app.repository.CustomerProfileRepository;
 import com.miniandmore.app.repository.LedgerlySettingRepository;
 import com.miniandmore.app.repository.ProductRepository;
 import com.miniandmore.app.repository.SiteSettingRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.*;
@@ -31,6 +33,60 @@ public class LedgerlySyncService {
 
     private static final Logger LOG = LoggerFactory.getLogger(LedgerlySyncService.class);
 
+    /**
+     * GST place-of-supply codes Ledgerly (Zoho Books) expects for the "in" (India) edition.
+     * Keyed by normalized (lowercase, no spaces/punctuation) state/UT name; a few common aliases
+     * (old names, alternate spellings) are included since checkout state is free-text.
+     */
+    private static final Map<String, String> INDIA_PLACE_OF_SUPPLY_CODES = buildIndiaPlaceOfSupplyCodes();
+
+    private static Map<String, String> buildIndiaPlaceOfSupplyCodes() {
+        Map<String, String> codes = new HashMap<>();
+        codes.put("andamanandnicobarislands", "AN");
+        codes.put("andhrapradesh", "AP");
+        codes.put("arunachalpradesh", "AR");
+        codes.put("assam", "AS");
+        codes.put("bihar", "BR");
+        codes.put("chandigarh", "CH");
+        codes.put("chhattisgarh", "CT");
+        codes.put("dadraandnagarhaveliaanddamananddiu", "DN");
+        codes.put("dadraandnagarhaveli", "DN");
+        codes.put("damananddiu", "DD");
+        codes.put("delhi", "DL");
+        codes.put("newdelhi", "DL");
+        codes.put("goa", "GA");
+        codes.put("gujarat", "GJ");
+        codes.put("haryana", "HR");
+        codes.put("himachalpradesh", "HP");
+        codes.put("jammuandkashmir", "JK");
+        codes.put("jharkhand", "JH");
+        codes.put("karnataka", "KA");
+        codes.put("kerala", "KL");
+        codes.put("ladakh", "LA");
+        codes.put("lakshadweep", "LD");
+        codes.put("madhyapradesh", "MP");
+        codes.put("maharashtra", "MH");
+        codes.put("manipur", "MN");
+        codes.put("meghalaya", "ML");
+        codes.put("mizoram", "MZ");
+        codes.put("nagaland", "NL");
+        codes.put("odisha", "OR");
+        codes.put("orissa", "OR");
+        codes.put("puducherry", "PY");
+        codes.put("pondicherry", "PY");
+        codes.put("punjab", "PB");
+        codes.put("rajasthan", "RJ");
+        codes.put("sikkim", "SK");
+        codes.put("tamilnadu", "TN");
+        codes.put("telangana", "TG");
+        codes.put("tripura", "TR");
+        codes.put("uttarpradesh", "UP");
+        codes.put("uttarakhand", "UT");
+        codes.put("uttaranchal", "UT");
+        codes.put("westbengal", "WB");
+        return Collections.unmodifiableMap(codes);
+    }
+
     private final LedgerlyIntegrationClient ledgerlyClient;
     private final ProductRepository productRepository;
     private final CustomerOrderRepository customerOrderRepository;
@@ -43,6 +99,7 @@ public class LedgerlySyncService {
 
     private final ProductColorImagesSupport colorImagesSupport;
     private final ApplicationProperties applicationProperties;
+    private final ObjectMapper objectMapper;
 
     public LedgerlySyncService(
         LedgerlyIntegrationClient ledgerlyClient,
@@ -55,7 +112,8 @@ public class LedgerlySyncService {
         LedgerlyCategoryResolver categoryResolver,
         ProductVariantSupport variantSupport,
         ProductColorImagesSupport colorImagesSupport,
-        ApplicationProperties applicationProperties
+        ApplicationProperties applicationProperties,
+        ObjectMapper objectMapper
     ) {
         this.ledgerlyClient = ledgerlyClient;
         this.productRepository = productRepository;
@@ -68,6 +126,7 @@ public class LedgerlySyncService {
         this.variantSupport = variantSupport;
         this.colorImagesSupport = colorImagesSupport;
         this.applicationProperties = applicationProperties;
+        this.objectMapper = objectMapper;
     }
 
     @Async
@@ -579,6 +638,15 @@ public class LedgerlySyncService {
         payload.put("paymentId", order.getRazorpayPaymentId());
         payload.put("paymentMode", "Razorpay");
         payload.put("currency", "INR");
+        String placeOfSupply = resolvePlaceOfSupply(order.getShippingAddressJson());
+        if (placeOfSupply != null) {
+            payload.put("placeOfSupply", placeOfSupply);
+        } else {
+            LOG.warn(
+                "Ledgerly order {} has no resolvable place of supply from shipping address; Ledgerly will reject the sales order",
+                order.getOrderNumber()
+            );
+        }
         Map<String, Object> payment = new LinkedHashMap<>();
         payment.put("mode", "Razorpay");
         payment.put("paymentId", order.getRazorpayPaymentId());
@@ -691,6 +759,39 @@ public class LedgerlySyncService {
             customer.put("shippingAddress", shippingAddressJson);
         }
         return customer;
+    }
+
+    /**
+     * Ledgerly's sales-order API requires placeOfSupply (the GST state code of the delivery
+     * address) on every order; it does not fall back to the customer's saved state. We only have
+     * a free-text "state" inside the stored shippingAddressJson, so normalize it against the
+     * standard GST state/UT code table.
+     */
+    private String resolvePlaceOfSupply(String shippingAddressJson) {
+        if (StringUtils.isBlank(shippingAddressJson)) {
+            return null;
+        }
+        String state;
+        try {
+            JsonNode node = objectMapper.readTree(shippingAddressJson);
+            state = node.path("state").asText(null);
+        } catch (Exception e) {
+            LOG.warn("Unable to parse shipping address JSON for place of supply: {}", e.getMessage());
+            return null;
+        }
+        return placeOfSupplyCode(state);
+    }
+
+    private static String placeOfSupplyCode(String state) {
+        if (StringUtils.isBlank(state)) {
+            return null;
+        }
+        String trimmed = state.trim();
+        if (trimmed.length() == 2 && INDIA_PLACE_OF_SUPPLY_CODES.containsValue(trimmed.toUpperCase(Locale.ROOT))) {
+            return trimmed.toUpperCase(Locale.ROOT);
+        }
+        String normalized = trimmed.toLowerCase(Locale.ROOT).replaceAll("[^a-z]", "");
+        return INDIA_PLACE_OF_SUPPLY_CODES.get(normalized);
     }
 
     private static BigDecimal moneyOrZero(BigDecimal value) {

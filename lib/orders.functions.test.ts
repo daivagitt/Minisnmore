@@ -39,7 +39,6 @@ import {
   cancelOrderReturn,
   checkReturnEligibility,
   createOrder,
-  getFirstOrderEligibility,
   getMyProfile,
   getOrder,
   listAdminOrderReturns,
@@ -165,27 +164,6 @@ describe("orders functions", () => {
     const res = await getOrder({ data: { orderNumber: "MNM-1" } });
     expect(res.order.order_number).toBe("MNM-1");
     expect(getMock).toHaveBeenCalledWith("/api/v1/orders/MNM-1", { auth: true });
-  });
-
-  it("returns first-order eligibility when no paid orders", async () => {
-    getMock.mockResolvedValueOnce({ orders: [{ payment_status: "pending" }] });
-
-    const res = await getFirstOrderEligibility();
-    expect(res).toEqual({ eligible: true, discount_pct: 10 });
-  });
-
-  it("returns first-order ineligibility when a paid order exists", async () => {
-    getMock.mockResolvedValueOnce({ orders: [{ payment_status: "paid" }] });
-
-    const res = await getFirstOrderEligibility();
-    expect(res).toEqual({ eligible: false, discount_pct: 10 });
-  });
-
-  it("treats missing order lists as first-order eligible", async () => {
-    getMock.mockResolvedValueOnce({});
-
-    const res = await getFirstOrderEligibility();
-    expect(res).toEqual({ eligible: true, discount_pct: 10 });
   });
 
   it("tracks orders publicly and manages return workflows", async () => {

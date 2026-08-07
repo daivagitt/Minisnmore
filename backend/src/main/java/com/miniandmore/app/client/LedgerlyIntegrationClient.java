@@ -1,25 +1,34 @@
 package com.miniandmore.app.client;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 @Component
 public class LedgerlyIntegrationClient {
 
+    private static final Logger LOG = LoggerFactory.getLogger(LedgerlyIntegrationClient.class);
+
     private final RestClient.Builder restClientBuilder;
     private final com.miniandmore.app.service.LedgerlyCredentialsProvider credentials;
+    private final ObjectMapper objectMapper;
 
     public LedgerlyIntegrationClient(
         RestClient.Builder builder,
-        com.miniandmore.app.service.LedgerlyCredentialsProvider credentials
+        com.miniandmore.app.service.LedgerlyCredentialsProvider credentials,
+        ObjectMapper objectMapper
     ) {
         this.restClientBuilder = builder;
         this.credentials = credentials;
+        this.objectMapper = objectMapper;
     }
 
     private RestClient client() {
@@ -75,7 +84,22 @@ public class LedgerlyIntegrationClient {
     }
 
     public Map<String, Object> syncProductPayload(Map<String, Object> payload) {
-        return post("/v1/integrations/commerce/products/sync", payload);
+        try {
+            return post("/v1/integrations/commerce/products/sync", payload);
+        } catch (RestClientResponseException ex) {
+            // TEMP DEBUG (remove once "Failed to read request" on inventory/api/items is root-caused):
+            // logs the exact outbound body so it can be diffed against Ledgerly's inventory schema.
+            LOG.warn("Ledgerly product sync payload that failed ({}): {}", ex.getStatusCode(), toDebugJson(payload));
+            throw ex;
+        }
+    }
+
+    private String toDebugJson(Object payload) {
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (Exception e) {
+            return String.valueOf(payload);
+        }
     }
 
     public Map<String, Object> pullProducts() {

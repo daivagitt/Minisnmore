@@ -30,6 +30,8 @@ type Ctx = {
   signOut: () => Promise<void>;
   completeOAuthSignIn: (token: string) => Promise<{ error: string | null }>;
   resendActivationEmail: (email: string) => Promise<{ error: string | null }>;
+  requestPasswordReset: (email: string) => Promise<{ error: string | null }>;
+  completePasswordReset: (key: string, newPassword: string) => Promise<{ error: string | null }>;
   refreshSession: () => Promise<void>;
 };
 
@@ -224,6 +226,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const requestPasswordReset = async (email: string) => {
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed) return { error: "Enter your email address first." };
+    try {
+      await api.post("/api/account/reset-password/init", JSON.stringify(trimmed), {
+        unwrap: false,
+        headers: { "Content-Type": "application/json" },
+      });
+      return { error: null };
+    } catch (error) {
+      return { error: authErrorMessage(error) };
+    }
+  };
+
+  const completePasswordReset = async (key: string, newPassword: string) => {
+    try {
+      await api.post("/api/account/reset-password/finish", { key, newPassword }, { unwrap: false });
+      return { error: null };
+    } catch (error) {
+      return { error: authErrorMessage(error) };
+    }
+  };
+
   return (
     <AuthCtx.Provider
       value={{
@@ -237,6 +262,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
         completeOAuthSignIn,
         resendActivationEmail,
+        requestPasswordReset,
+        completePasswordReset,
         refreshSession,
       }}
     >

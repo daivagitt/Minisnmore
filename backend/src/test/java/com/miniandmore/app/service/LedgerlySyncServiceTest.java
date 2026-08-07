@@ -68,6 +68,9 @@ class LedgerlySyncServiceTest {
     @Spy
     private ProductColorImagesSupport colorImagesSupport = new ProductColorImagesSupport(new com.fasterxml.jackson.databind.ObjectMapper());
 
+    @Spy
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+
     @Mock
     private ApplicationProperties applicationProperties;
 
@@ -502,6 +505,32 @@ class LedgerlySyncServiceTest {
         List<Map<String, Object>> lines = (List<Map<String, Object>>) payload.get("lines");
         assertThat(lines).hasSize(1);
         assertThat(lines.get(0).get("taxPct")).isEqualTo(new BigDecimal("5"));
+    }
+
+    @Test
+    void buildOrderPayload_resolvesPlaceOfSupplyFromShippingState() {
+        CustomerOrder order = order(51L, "MNM-51", LedgerlySyncStatus.PENDING);
+        order.shippingAddressJson("{\"city\":\"Chennai\",\"state\":\"Tamil Nadu\"}");
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product(1L)));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "buildOrderPayload", order);
+
+        assertThat(payload.get("placeOfSupply")).isEqualTo("TN");
+    }
+
+    @Test
+    void buildOrderPayload_omitsPlaceOfSupplyWhenStateUnresolvable() {
+        CustomerOrder order = order(52L, "MNM-52", LedgerlySyncStatus.PENDING);
+        order.shippingAddressJson("{\"city\":\"Hyderabad\"}");
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product(1L)));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "buildOrderPayload", order);
+
+        assertThat(payload).doesNotContainKey("placeOfSupply");
     }
 
     @Test
