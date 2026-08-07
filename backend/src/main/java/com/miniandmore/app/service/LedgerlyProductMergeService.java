@@ -42,6 +42,10 @@ public class LedgerlyProductMergeService {
         if (item.get("stock") != null) {
             product.setStock(toInteger(item.get("stock")));
         }
+        String unit = firstNonBlank(stringValue(item.get("unit")), stringValue(item.get("units")));
+        if (unit != null) {
+            product.setUnits(unit);
+        }
         String ledgerlyItemId = stringValue(item.get("ledgerlyItemId"));
         if (ledgerlyItemId != null && !ledgerlyItemId.isBlank()) {
             product.setLedgerlyItemId(ledgerlyItemId);
@@ -151,7 +155,8 @@ public class LedgerlyProductMergeService {
             payload.put("compareAtPrice", product.getCompareAtPrice());
         }
         payload.put("stock", product.getStock());
-        payload.put("unit", "ea");
+        String unit = product.getUnits();
+        payload.put("unit", unit != null && !unit.isBlank() ? unit.trim() : "ea");
 
         BigDecimal cost = sellingPrice.multiply(ESTIMATED_COST_RATIO).setScale(2, RoundingMode.HALF_UP);
         payload.put("cost", cost);

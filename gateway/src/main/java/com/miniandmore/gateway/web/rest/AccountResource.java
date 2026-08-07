@@ -93,7 +93,15 @@ public class AccountResource {
     public Mono<Void> activateAccount(@RequestParam(value = "key") String key) {
         return userService
             .activateRegistration(key)
-            .switchIfEmpty(Mono.error(new BadRequestAlertException("Invalid activation key", "userManagement", "invalidactivationkey")))
+            .switchIfEmpty(
+                Mono.error(
+                    new BadRequestAlertException(
+                        "This activation link is invalid or has already been used.",
+                        "userManagement",
+                        "invalidactivationkey"
+                    )
+                )
+            )
             .then();
     }
 

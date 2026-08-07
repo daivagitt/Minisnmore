@@ -26,6 +26,7 @@ import {
 } from "@/lib/home-products";
 import { parseWatchReels, resolveWatchShopReels } from "@/lib/watch-reels";
 import { parseFabricStoryVideo } from "@/lib/asset-url";
+import { productMatchesCategory } from "@/lib/shop-filters";
 import { toDirectDownloadUrl } from "@/lib/utils";
 import heroBaby from "@/assets/hero-smiling-baby.jpg";
 import lifestyle from "@/assets/lifestyle-mother.webp";
@@ -135,7 +136,7 @@ function Home() {
   const heroRef = useRef<HTMLDivElement | null>(null);
   const { scrollYProgress: heroProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
   const heroY = useTransform(heroProgress, [0, 1], ["0%", "12%"]);
-  const heroScale = useTransform(heroProgress, [0, 1], [1, 1.06]);
+  const heroScale = useTransform(heroProgress, [0, 1], [1, 1.02]);
 
   const { banners } = useBanners();
   const { isEnabled, titleFor, subtitleFor, byKey } = useHomeSections();
@@ -186,6 +187,15 @@ function Home() {
         liveProducts,
         sectionProductSlugs(byKey.get("trending")?.payload as Record<string, unknown>),
         (ps) => [...ps].sort((a, b) => b.reviewCount - a.reviewCount),
+      ),
+    [liveProducts, byKey],
+  );
+  const gifts = useMemo(
+    () =>
+      resolveHomeSectionProducts(
+        liveProducts,
+        sectionProductSlugs(byKey.get("gifts")?.payload as Record<string, unknown>),
+        (ps) => ps.filter((p) => productMatchesCategory(p, "gift-sets")),
       ),
     [liveProducts, byKey],
   );
@@ -308,6 +318,32 @@ function Home() {
         {productsLoaded ? (
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
             {trending
+              .slice(0, HOME_SECTION_PRODUCT_LIMIT)
+              .map((p, i) => (
+                <ProductCard key={p.id} product={p} index={i} />
+              ))}
+          </div>
+        ) : (
+          <ProductGridSkeleton />
+        )}
+      </section>
+      )}
+
+      {/* GIFTS */}
+      {isEnabled("gifts") && (
+      <section className="px-4 md:px-6">
+        <div className="flex items-end justify-between mb-5">
+          <div>
+            <div className="text-xs uppercase tracking-[0.28em] text-muted-foreground inline-flex items-center gap-2">
+              <Gift className="h-3.5 w-3.5 text-primary" /> {subtitleFor("gifts", "Thoughtful bundles for every occasion")}
+            </div>
+            <h2 className="font-display text-2xl md:text-3xl mt-2">{titleFor("gifts", "Gift with love")}</h2>
+          </div>
+          <Link to="/gift" className="story-link text-sm hidden md:inline">Build a gift</Link>
+        </div>
+        {productsLoaded ? (
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
+            {gifts
               .slice(0, HOME_SECTION_PRODUCT_LIMIT)
               .map((p, i) => (
                 <ProductCard key={p.id} product={p} index={i} />
@@ -703,10 +739,13 @@ function HeroCarousel({
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       className="relative rounded-[2rem] md:rounded-[2.5rem] overflow-hidden flex items-end
-                 h-[min(92vh,720px)] sm:h-[min(88vh,760px)] md:h-[min(86vh,820px)]"
+                 h-[min(92vh,720px)] sm:h-[min(88vh,760px)] md:h-[min(86vh,820px)] bg-[hsl(var(--secondary)/0.25)]"
     >
       {/* All slides mounted up front so images load in parallel */}
-      <motion.div style={{ y: heroY, scale: heroScale }} className="absolute inset-0">
+      <motion.div
+        style={{ y: heroY, scale: heroScale }}
+        className="absolute inset-0"
+      >
         {slides.map((s, i) => (
           <img
             key={s.id}
@@ -716,7 +755,7 @@ function HeroCarousel({
             fetchPriority={i === 0 ? "high" : i === 1 ? "low" : "auto"}
             loading={i <= 1 ? "eager" : "lazy"}
             decoding="async"
-            className={`absolute inset-0 h-full w-full object-cover object-center md:object-right transition-opacity duration-500 ease-out ${
+            className={`absolute inset-0 h-full w-full object-cover object-[center_20%] md:object-[right_20%] transition-opacity duration-500 ease-out ${
               i === index ? "opacity-100" : "opacity-0"
             }`}
           />
@@ -724,8 +763,8 @@ function HeroCarousel({
       </motion.div>
 
       <FloatingDecor count={8} variant="petals" />
-      <div className="absolute inset-0 bg-linear-to-r from-background/90 via-background/45 to-transparent md:from-background/80 md:via-background/20 md:to-transparent" />
-      <div className="absolute inset-0 bg-linear-to-t from-background/60 via-transparent to-transparent md:hidden" />
+      <div className="absolute inset-0 bg-linear-to-r from-background/95 via-background/55 to-transparent md:from-background/85 md:via-background/35 md:to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-linear-to-t from-background/70 via-transparent to-transparent md:hidden pointer-events-none" />
 
       {/* Top-right brand pill — click to download e-catalogue */}
       <motion.a
@@ -761,7 +800,7 @@ function HeroCarousel({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.35, ease: [0.2, 0.8, 0.2, 1] }}
-            className="glass-strong rounded-[1.5rem] md:rounded-[2rem] p-5 sm:p-7 md:p-9 lg:p-10"
+            className="glass-strong rounded-[1.5rem] md:rounded-[2rem] p-5 sm:p-7 md:p-9 lg:p-10 max-w-xl backdrop-blur-md bg-white/75 dark:bg-background/75 border border-white/50 shadow-lg"
           >
             <div className="text-[11px] sm:text-xs uppercase tracking-[0.28em] text-primary">
               {slide.eyebrow}

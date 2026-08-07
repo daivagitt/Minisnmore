@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { api, backendOAuthUrl, getAuthToken, setAuthToken, ApiError } from "@/lib/api";
+import { api, backendOAuthUrl, getAuthToken, setAuthToken } from "@/lib/api";
+import { authErrorMessage } from "@/lib/auth-errors";
 
 export type AuthUser = {
   id: number;
@@ -33,27 +34,6 @@ type Ctx = {
 };
 
 const AuthCtx = createContext<Ctx | null>(null);
-
-function authErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) {
-    if (error.status === 401) {
-      const detail =
-        typeof error.body === "object" &&
-        error.body !== null &&
-        "detail" in error.body &&
-        typeof (error.body as { detail?: unknown }).detail === "string"
-          ? (error.body as { detail: string }).detail
-          : "";
-      if (/not activated/i.test(detail)) {
-        return "Your account is not activated yet. Open the activation link from your email, or resend it below.";
-      }
-      return "Invalid email or password. New accounts must open the activation link from email before signing in.";
-    }
-    return error.message;
-  }
-  if (error instanceof Error && error.message) return error.message;
-  return "Something went wrong. Please try again.";
-}
 
 async function loadAccountFromToken(token: string): Promise<{ user: AuthUser; isAdmin: boolean } | null> {
   setAuthToken(token);

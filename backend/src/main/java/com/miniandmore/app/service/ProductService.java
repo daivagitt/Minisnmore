@@ -97,7 +97,11 @@ public class ProductService {
         if (product == null) {
             return;
         }
-        Map<String, List<String>> galleryMap = colorImagesSupport.galleryMapFromColorsJson(product.getColorsJson());
+        if (product.getUnits() == null || product.getUnits().isBlank()) {
+            product.setUnits("ea");
+        }
+        String adminColorsJson = product.getColorsJson();
+        Map<String, List<String>> galleryMap = colorImagesSupport.galleryMapFromColorsJson(adminColorsJson);
         if (galleryMap.isEmpty()) {
             galleryMap = colorImagesSupport.parseMap(product.getColorImagesJson());
         }
@@ -117,12 +121,15 @@ public class ProductService {
             if (!galleryMap.isEmpty()) {
                 product.setColorsJson(colorImagesSupport.applyGalleryMapToColorsJson(product.getColorsJson(), galleryMap));
             }
+            product.setColorsJson(colorImagesSupport.mergeRichColorMetadata(product.getColorsJson(), adminColorsJson));
         } else {
             product.setItemStructure(ProductVariantSupport.STRUCTURE_SIMPLE);
             product.setVariantsJson(null);
         }
 
+        String colorsBeforeSync = product.getColorsJson();
         colorImagesSupport.syncProductColorImages(product);
+        variantSupport.renameVariantColors(product, colorImagesSupport.buildPositionalColorRename(colorsBeforeSync, product.getColorsJson()));
         colorImagesSupport.ensureProductImagesFromColorGalleries(product);
     }
 

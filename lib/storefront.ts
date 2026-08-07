@@ -1,6 +1,6 @@
 import { listProducts, listBlogPosts, getPolicy, listCategories } from "@/lib/backend-data";
-import { agesFromSizes } from "@/lib/product-ages";
-import { normalizeStorefrontColors, resolveProductImages } from "@/lib/product-colors";
+import { agesFromSizes, sortSizesAsc } from "@/lib/product-ages";
+import { normalizeStorefrontColors, resolveStorefrontProductImages, hasPerColorGalleries } from "@/lib/product-colors";
 import { products as seedProducts, type Product, type Fabric } from "@/data/products";
 import { posts as seedPosts, type BlogPost } from "@/data/blog";
 import { parseVariantsJson } from "@/lib/product-variants";
@@ -34,7 +34,7 @@ function normalizeColors(raw: unknown) {
 
 function normalizeSizes(raw: unknown): string[] {
   if (!Array.isArray(raw) || raw.length === 0) return ["One Size"];
-  return raw.map((s) => String(s));
+  return sortSizesAsc(raw.map((s) => String(s)));
 }
 
 type DbProductRow = {
@@ -79,16 +79,17 @@ function resolveCategoryFields(
 }
 
 function mapProduct(row: DbProductRow): Product {
-  const images = resolveProductImages(
+  const colors = normalizeColors(row.colors);
+  const { image: img, gallery } = resolveStorefrontProductImages(
     Array.isArray(row.images) ? (row.images as string[]) : [],
-    row.colors,
+    colors,
   );
-  const fallbackImg = seedProducts[0]?.image ?? "";
-  const img = images[0] ?? fallbackImg;
-  const sizes = normalizeSizes(row.sizes);
+  const heroImage = img || "";
+  const perPrint = hasPerColorGalleries(colors);
   const badge = (row.badge ?? "").toLowerCase();
   const variants = parseVariantsJson(row.variants ?? row.variants_json);
   const itemStructure = (row.item_structure ?? (variants.length ? "VARIANTS" : "SIMPLE")).toUpperCase();
+  const sizes = normalizeSizes(row.sizes);
   return {
     id: row.id,
     slug: row.slug,
@@ -99,8 +100,8 @@ function mapProduct(row: DbProductRow): Product {
       row.compare_at_price && Number(row.compare_at_price) > Number(row.price)
         ? Number(row.compare_at_price)
         : undefined,
-    image: img,
-    gallery: images.length ? images : [img],
+    image: heroImage,
+    gallery: gallery.length ? gallery : perPrint ? [] : heroImage ? [heroImage] : [],
     ages: agesFromSizes(sizes, { min: row.age_min_months, max: row.age_max_months }),
     fabric: fabricFromText(row.fabric_type, row.description, row.story, row.name, row.badge),
     colors: normalizeColors(row.colors),

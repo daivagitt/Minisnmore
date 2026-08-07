@@ -2,6 +2,7 @@ package com.miniandmore.app.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.LedgerlyWebhookEvent;
 import com.miniandmore.app.domain.Product;
@@ -36,6 +37,7 @@ public class LedgerlyWebhookHandlerService {
     private final ObjectMapper objectMapper;
     private final LedgerlyProductMergeService productMergeService;
     private final LedgerlyCategoryResolver categoryResolver;
+    private final ApplicationProperties applicationProperties;
 
     public LedgerlyWebhookHandlerService(
         LedgerlyCredentialsProvider credentialsProvider,
@@ -44,7 +46,8 @@ public class LedgerlyWebhookHandlerService {
         CustomerOrderRepository customerOrderRepository,
         ObjectMapper objectMapper,
         LedgerlyProductMergeService productMergeService,
-        LedgerlyCategoryResolver categoryResolver
+        LedgerlyCategoryResolver categoryResolver,
+        ApplicationProperties applicationProperties
     ) {
         this.credentialsProvider = credentialsProvider;
         this.webhookEventRepository = webhookEventRepository;
@@ -53,6 +56,7 @@ public class LedgerlyWebhookHandlerService {
         this.objectMapper = objectMapper;
         this.productMergeService = productMergeService;
         this.categoryResolver = categoryResolver;
+        this.applicationProperties = applicationProperties;
     }
 
     public Map<String, Object> handle(String rawBody, String signature, String eventHeader) {
@@ -74,10 +78,27 @@ public class LedgerlyWebhookHandlerService {
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) payload.getOrDefault("data", Map.of());
         switch (event) {
-            case "item.updated", "item.created" -> handleItemUpdated(data);
-            case "invoice.paid" -> handleInvoicePaid(data);
-            case "order.fulfilled", "order.delivered", "salesorder.fulfilled", "shipment.updated", "shipment.delivered" ->
-                handleOrderTrackingUpdated(data);
+            case "item.updated", "item.created" -> {
+                if (!applicationProperties.getLedgerly().isAutoPullEnabled()) {
+                    LOG.info("Ignoring Ledgerly {} — auto-pull disabled", event);
+                } else {
+                    handleItemUpdated(data);
+                }
+            }
+            case "invoice.paid" -> {
+                if (!applicationProperties.getLedgerly().isAutoSyncEnabled()) {
+                    LOG.info("Ignoring Ledgerly invoice.paid — auto-sync disabled");
+                } else {
+                    handleInvoicePaid(data);
+                }
+            }
+            case "order.fulfilled", "order.delivered", "salesorder.fulfilled", "shipment.updated", "shipment.delivered" -> {
+                if (!applicationProperties.getLedgerly().isAutoSyncEnabled()) {
+                    LOG.info("Ignoring Ledgerly {} — auto-sync disabled", event);
+                } else {
+                    handleOrderTrackingUpdated(data);
+                }
+            }
             default -> LOG.debug("Ignoring unhandled Ledgerly webhook event {}", event);
         }
 

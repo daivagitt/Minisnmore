@@ -49,16 +49,31 @@ public class UserService {
     }
 
     public Mono<User> saveUser(User user) {
-        return userRepository
-            .save(user)
-            .flatMap(saved -> {
-                Set<Authority> authorities = user.getAuthorities();
-                if (authorities == null || authorities.isEmpty()) {
-                    return Mono.just(saved);
-                }
-                saved.setAuthorities(authorities);
-                return Mono.just(saved);
-            });
+        Mono<User> withId = user.getId() == null
+            ? userRepository.nextUserId().map(id -> {
+                user.setId(id);
+                return user;
+            })
+            : Mono.just(user);
+        return withId.flatMap(toSave ->
+            userRepository
+                .save(toSave)
+                .flatMap(saved -> {
+                    Set<Authority> authorities = toSave.getAuthorities();
+                    if (authorities == null || authorities.isEmpty()) {
+                        return Mono.just(saved);
+                    }
+                    saved.setAuthorities(authorities);
+                    return userRepository
+                        .deleteUserAuthorities(saved.getId())
+                        .thenMany(
+                            Flux.fromIterable(authorities).flatMap(authority ->
+                                userRepository.saveUserAuthority(saved.getId(), authority.getName())
+                            )
+                        )
+                        .then(Mono.just(saved));
+                })
+        );
     }
 
     public Mono<User> activateRegistration(String key) {
@@ -66,6 +81,7 @@ public class UserService {
         return userRepository
             .findOneByActivationKey(key)
             .flatMap(user -> {
+                user.setIsPersisted();
                 user.setActivated(true);
                 user.setActivationKey(null);
                 return saveUser(user);
@@ -113,7 +129,9 @@ public class UserService {
             .findOneByLogin(userDTO.getLogin().toLowerCase())
             .flatMap(existingUser -> {
                 if (!existingUser.isActivated()) {
-                    return userRepository.delete(existingUser);
+                    return userRepository
+                        .deleteUserAuthorities(existingUser.getId())
+                        .then(userRepository.delete(existingUser));
                 } else {
                     return Mono.error(new UsernameAlreadyUsedException());
                 }
@@ -121,7 +139,9 @@ public class UserService {
             .then(userRepository.findOneByEmailIgnoreCase(userDTO.getEmail()))
             .flatMap(existingUser -> {
                 if (!existingUser.isActivated()) {
-                    return userRepository.delete(existingUser);
+                    return userRepository
+                        .deleteUserAuthorities(existingUser.getId())
+                        .then(userRepository.delete(existingUser));
                 } else {
                     return Mono.error(new EmailAlreadyUsedException());
                 }
@@ -140,6 +160,8 @@ public class UserService {
                     newUser.setLangKey(userDTO.getLangKey() != null ? userDTO.getLangKey() : Constants.DEFAULT_LANGUAGE);
                     newUser.setActivated(false);
                     newUser.setActivationKey(generateActivationKey());
+                    newUser.setCreatedBy(Constants.SYSTEM);
+                    newUser.setLastModifiedBy(Constants.SYSTEM);
                     Set<Authority> authorities = new HashSet<>();
                     return authorityRepository
                         .findById(AuthoritiesConstants.USER)
@@ -166,6 +188,8 @@ public class UserService {
         user.setResetKey(generateResetKey());
         user.setResetDate(Instant.now());
         user.setActivated(true);
+        user.setCreatedBy(Constants.SYSTEM);
+        user.setLastModifiedBy(Constants.SYSTEM);
         Set<Authority> authorities = new HashSet<>();
         if (userDTO.getAuthorities() != null) {
             userDTO.getAuthorities().forEach(a -> {
@@ -287,10 +311,11 @@ public class UserService {
     }
 
     private static String generateActivationKey() {
-        return RandomStringUtils.randomNumeric(20);
+        // Must stay a non-JSON-number string: TanStack parseSearch JSON-parses pure digits.
+        return RandomStringUtils.randomAlphanumeric(20);
     }
 
     private static String generateResetKey() {
-        return RandomStringUtils.randomNumeric(20);
+        return RandomStringUtils.randomAlphanumeric(20);
     }
 }

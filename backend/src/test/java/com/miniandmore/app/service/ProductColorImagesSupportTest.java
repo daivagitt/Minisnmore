@@ -87,6 +87,69 @@ class ProductColorImagesSupportTest {
     }
 
     @Test
+    void applyGalleryMapToColorsJson_matchesGalleryKeysCaseInsensitively() {
+        String colorsJson = "[\"Navy\",\"Blush\"]";
+        Map<String, List<String>> map = Map.of("navy", List.of("https://cdn.example.com/navy-1.jpg"));
+
+        String merged = support.applyGalleryMapToColorsJson(colorsJson, map);
+
+        assertThat(merged).contains("navy-1.jpg").contains("\"name\":\"Navy\"");
+    }
+
+    @Test
+    void mergeRichColorMetadata_restoresSwatchesAfterMatrixPlainNames() {
+        String adminColors =
+            "[{\"name\":\"BEE\",\"swatchUrl\":\"https://cdn.example.com/bee-swatch.jpg\"}," +
+            "{\"name\":\"BLUE\",\"swatchUrl\":\"https://cdn.example.com/blue-swatch.jpg\"}]";
+        String matrixColors = "[\"BEE\",\"BLUE\",\"FISH\"]";
+
+        String merged = support.mergeRichColorMetadata(matrixColors, adminColors);
+
+        assertThat(merged).contains("bee-swatch.jpg").contains("blue-swatch.jpg");
+        assertThat(merged).contains("\"name\":\"FISH\"");
+        assertThat(merged).doesNotContain("fish-swatch");
+    }
+
+    @Test
+    void ensureProductImagesFromColorGalleries_usesSwatchesWhenNoGallery() {
+        Product product = new Product()
+            .colorsJson("[{\"name\":\"BEE\",\"swatchUrl\":\"https://cdn.example.com/bee-swatch.jpg\"}]")
+            .imagesJson("[]");
+
+        support.ensureProductImagesFromColorGalleries(product);
+
+        assertThat(product.getImagesJson()).contains("bee-swatch.jpg");
+    }
+
+    @Test
+    void syncProductColorImages_realignsGenericPrintSlotsToGalleryKeys() {
+        Product product = new Product()
+            .colorsJson("[\"Print 3\",\"Print 4\",\"Print 5\"]")
+            .colorImagesJson(
+                "{\"BROWN SWADDLE\":[\"https://cdn.example.com/brown.jpg\"]," +
+                "\"GREEN SWADDLE\":[\"https://cdn.example.com/green.jpg\"]," +
+                "\"WHITE SWADDLE\":[\"https://cdn.example.com/white.jpg\"]}"
+            );
+
+        support.syncProductColorImages(product);
+
+        assertThat(product.getColorsJson()).contains("BROWN SWADDLE").contains("brown.jpg").doesNotContain("Print 3");
+        assertThat(support.parseMap(product.getColorImagesJson()))
+            .containsEntry("BROWN SWADDLE", List.of("https://cdn.example.com/brown.jpg"));
+    }
+
+    @Test
+    void buildPositionalColorRename_mapsOldPrintSlotsToGalleryNames() {
+        Map<String, String> rename = support.buildPositionalColorRename(
+            "[\"Print 3\",\"Print 4\"]",
+            "[{\"name\":\"BROWN SWADDLE\",\"imageUrls\":[\"https://cdn.example.com/brown.jpg\"]}," +
+            "{\"name\":\"GREEN SWADDLE\",\"imageUrls\":[\"https://cdn.example.com/green.jpg\"]}]"
+        );
+
+        assertThat(rename).containsEntry("Print 3", "BROWN SWADDLE").containsEntry("Print 4", "GREEN SWADDLE");
+    }
+
+    @Test
     void serializeAndParse_roundTrip() {
         Map<String, List<String>> map = Map.of("Navy", List.of("https://cdn.example.com/navy.jpg"));
         String json = support.serializeMap(map);

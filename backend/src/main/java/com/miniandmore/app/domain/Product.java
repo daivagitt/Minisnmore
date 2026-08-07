@@ -125,6 +125,10 @@ public class Product implements Serializable {
     private Boolean active;
 
     @Size(max = 20)
+    @Column(name = "units", length = 20)
+    private String units;
+
+    @Size(max = 20)
     @Column(name = "hsn", length = 20)
     private String hsn;
 
@@ -149,6 +153,19 @@ public class Product implements Serializable {
 
     @ManyToOne(fetch = FetchType.LAZY)
     private Category category;
+
+    public String getUnits() {
+        return this.units;
+    }
+
+    public Product units(String units) {
+        this.setUnits(units);
+        return this;
+    }
+
+    public void setUnits(String units) {
+        this.units = units;
+    }
 
     public String getHsn() {
         return this.hsn;

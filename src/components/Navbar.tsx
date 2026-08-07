@@ -11,15 +11,22 @@ import { useAuth } from "@/hooks/useAuth";
 import { buildShopSearch } from "@/lib/shop-filters";
 import { filterProductsByQuery } from "@/lib/product-search";
 import defaultLogo from "@/assets/logo-horizontal-optimized.webp";
+import type { FileRoutesByTo } from '@/routeTree.gen';
 
-const NAV_ITEMS = [
+type NavItem = {
+  to: keyof FileRoutesByTo;
+  label: string;
+  key: string | null;
+};
+
+const NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Home", key: null as string | null },
   { to: "/shop", label: "Shop", key: "shop" },
-  { to: "/collections", label: "Collections", key: null as string | null },
+  { to: "/best-sellers", label: "Collections", key: null as string | null },
   { to: "/gift", label: "Gift", key: "gift" },
   { to: "/about", label: "About", key: null as string | null },
   { to: "/track", label: "Track", key: "track" },
-] as const;
+];
 
 export function Navbar() {
   const { cartCount, setCartOpen, wishlist } = useShop();
@@ -147,7 +154,7 @@ export function Navbar() {
                 </div>
               );
             }
-            if (n.to === "/collections") {
+            if (n.to === "/best-sellers") {
               return (
                 <div
                   key={n.to}
@@ -191,14 +198,14 @@ export function Navbar() {
           <Link to={profileTo} title={profileLabel} className="hidden md:grid h-10 w-10 place-items-center rounded-full hover:bg-white/40 transition" aria-label={profileLabel}>
             <User className="h-5 w-5" strokeWidth={1.6} />
           </Link>
-          <Link to="/wishlist" title="Wishlist" className="relative h-10 w-10 grid place-items-center rounded-full hover:bg-white/40 transition" aria-label="Wishlist">
-            <span className="relative">
-              <Heart className="h-5 w-5" strokeWidth={1.6} />
-              {wishlist.length > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-bold grid place-items-center">{wishlist.length}</span>
-              )}
-            </span>
-          </Link>
+           <Link to={user ? "/wishlist" : "/login"} title="Wishlist" className="relative h-10 w-10 grid place-items-center rounded-full hover:bg-white/40 transition" aria-label="Wishlist">
+             <span className="relative">
+               <Heart className="h-5 w-5" strokeWidth={1.6} />
+               {wishlist.length > 0 && (
+                 <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-bold grid place-items-center">{wishlist.length}</span>
+               )}
+             </span>
+           </Link>
           <button
             onClick={() => setCartOpen(true)}
             onContextMenu={(e) => e.preventDefault()}

@@ -5,10 +5,12 @@ import com.miniandmore.app.repository.CustomerOrderRepository;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(prefix = "application.ledgerly", name = "auto-sync-enabled", havingValue = "true")
 public class LedgerlySyncScheduler {
 
     private static final Logger LOG = LoggerFactory.getLogger(LedgerlySyncScheduler.class);

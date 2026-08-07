@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useShop } from "@/store/shop";
 import { useAuth } from "@/hooks/useAuth";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
-import { Check, ChevronLeft, Heart, Loader2, Smartphone, CreditCard, Building2, Wallet, Banknote, Shield, MapPin, Plus, Zap, Minus, X, ShoppingBag } from "lucide-react";
+import { Check, ChevronLeft, Loader2, Smartphone, CreditCard, Building2, Wallet, Banknote, Shield, MapPin, Plus, Zap, Minus, X, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { createOrder, verifyPayment, syncPaymentStatus, getMyProfile, updateMyProfile, getFirstOrderEligibility } from "@/lib/orders.functions";
 import { validateCoupon } from "@/lib/coupons.functions";
@@ -46,7 +46,7 @@ function loadRazorpay(): Promise<boolean> {
 }
 
 function Checkout() {
-  const { cart, cartTotal, clearCart, updateQty, removeFromCart } = useShop();
+  const { cart, cartTotal, clearCart, updateQty, promptRemoveFromCart } = useShop();
   const { user, loading: authLoading } = useAuth();
   const settings = useSiteSettings();
   const nav = useNavigate();
@@ -644,21 +644,6 @@ function Checkout() {
                   {couponOff > 0 && <div className="text-xs text-primary mt-1.5">✓ {coupon} applied · −₹{couponOff.toLocaleString("en-IN")}</div>}
                 </div>
 
-                <div className="glass rounded-2xl p-4">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <Heart className="h-4 w-4 text-primary" /> Add a little kindness
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">100% of your contribution funds organic clothing for newborns at partner orphanages.</p>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {[0, 25, 50, 100, 250].map((v) => (
-                      <button key={v} onClick={() => setDonation(v)}
-                        className={`rounded-full px-3.5 py-1.5 text-xs transition ${donation === v ? "bg-primary text-primary-foreground" : "glass hover:bg-white/60"}`}>
-                        {v === 0 ? "No, thanks" : `₹${v}`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 <div className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5">
                   <Shield className="h-3.5 w-3.5 text-primary" /> 256-bit SSL encrypted · Powered by Razorpay
                 </div>
@@ -681,7 +666,7 @@ function Checkout() {
                     </div>
                     <div className="text-right">
                       <div className="text-sm font-medium">₹{(i.qty * i.unitPrice).toLocaleString("en-IN")}</div>
-                      <button onClick={() => removeFromCart(i.product.id, i.size, i.color)} className="text-[11px] text-muted-foreground hover:text-destructive inline-flex items-center gap-1 mt-1">
+                      <button onClick={() => promptRemoveFromCart(i.product.id, i.size, i.color)} className="text-[11px] text-muted-foreground hover:text-destructive inline-flex items-center gap-1 mt-1">
                         <X className="h-3 w-3" /> Remove
                       </button>
                     </div>
@@ -717,7 +702,7 @@ function Checkout() {
                   <button onClick={() => updateQty(i.product.id, i.qty - 1, i.size, i.color)} className="h-5 w-5 grid place-items-center rounded-full glass hover:bg-white/60"><Minus className="h-2.5 w-2.5" /></button>
                   <span className="text-[11px] w-5 text-center">{i.qty}</span>
                   <button onClick={() => updateQty(i.product.id, i.qty + 1, i.size, i.color)} className="h-5 w-5 grid place-items-center rounded-full glass hover:bg-white/60"><Plus className="h-2.5 w-2.5" /></button>
-                  <button onClick={() => removeFromCart(i.product.id, i.size, i.color)} aria-label="Remove" className="ml-1 h-5 w-5 grid place-items-center rounded-full text-muted-foreground hover:text-destructive"><X className="h-2.5 w-2.5" /></button>
+                  <button onClick={() => promptRemoveFromCart(i.product.id, i.size, i.color)} aria-label="Remove" className="ml-1 h-5 w-5 grid place-items-center rounded-full text-muted-foreground hover:text-destructive"><X className="h-2.5 w-2.5" /></button>
                 </div>
               </div>
               <div className="text-right">₹{(i.qty * i.unitPrice).toLocaleString("en-IN")}</div>

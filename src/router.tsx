@@ -1,5 +1,17 @@
-import { createRouter, useRouter } from "@tanstack/react-router";
+import {
+  createRouter,
+  parseSearchWith,
+  stringifySearchWith,
+  useRouter,
+} from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
+
+/**
+ * Keep query values as plain strings. TanStack's default JSON.parse turns
+ * numeric-looking activation keys into numbers (precision loss + Zod crash).
+ */
+const parseSearch = parseSearchWith((value) => value);
+const stringifySearch = stringifySearchWith(JSON.stringify);
 
 function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
@@ -63,6 +75,8 @@ export const getRouter = () => {
     defaultPreloadDelay: 30,
     defaultPreloadStaleTime: 0,
     defaultErrorComponent: DefaultErrorComponent,
+    parseSearch,
+    stringifySearch,
   });
 
   return router;

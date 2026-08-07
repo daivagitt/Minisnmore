@@ -89,6 +89,9 @@ public class ProductDTO implements Serializable {
     @NotNull
     private Boolean active;
 
+    @Size(max = 20)
+    private String units;
+
     @Size(max = 120)
     private String ledgerlyItemId;
 
@@ -307,6 +310,14 @@ public class ProductDTO implements Serializable {
 
     public void setActive(Boolean active) {
         this.active = active;
+    }
+
+    public String getUnits() {
+        return units;
+    }
+
+    public void setUnits(String units) {
+        this.units = units;
     }
 
     public String getLedgerlyItemId() {

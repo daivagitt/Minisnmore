@@ -5,6 +5,7 @@ import { Field } from "@/components/admin/AdminPage";
 import { ImageSpecHint } from "@/components/admin/ImageSpecHint";
 import { ADMIN_IMAGE_SPECS } from "@/lib/admin-image-specs";
 import { IMAGE_ACCEPT, validateAdminImageFile } from "@/lib/admin-image";
+import { prepareProductImageForUpload } from "@/lib/product-image-normalize";
 import { uploadAdminImage } from "@/lib/backend-data";
 import {
   MAX_COLOR_IMAGES,
@@ -69,9 +70,15 @@ function UploadTile({
 export function ColorImagesEditor({
   colors,
   onPatchColor,
+  onGalleryUploaded,
+  onSwatchUploaded,
 }: {
   colors: ProductColorEntry[];
   onPatchColor: (index: number, patch: Partial<ProductColorEntry>) => void;
+  /** Persist gallery URLs immediately so uploads are not lost if Save is skipped. */
+  onGalleryUploaded?: (patch: { index: number; imageUrls: string[] }) => void | Promise<void>;
+  /** Persist swatch URL immediately after upload. */
+  onSwatchUploaded?: (patch: { index: number; swatchUrl: string }) => void | Promise<void>;
 }) {
   const normalizedColors = ensureColorEntries(colors);
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
@@ -102,11 +109,12 @@ export function ColorImagesEditor({
     return accepted;
   };
 
-  const uploadOne = async (key: string, file: File) => {
+  const uploadOne = async (key: string, file: File, role: "gallery" | "swatch") => {
     setUploadingKey(key);
     setStatus("Uploading…");
     try {
-      const url = await uploadAdminImage("products", file);
+      const prepared = await prepareProductImageForUpload(file, role);
+      const url = await uploadAdminImage("products", prepared);
       setStatus(null);
       return url;
     } catch (error) {
@@ -124,9 +132,14 @@ export function ColorImagesEditor({
     if (!file) return;
     const key = `swatch-${index}`;
     try {
-      const url = await uploadOne(key, file);
+      const url = await uploadOne(key, file, "swatch");
       onPatchColor(index, { swatchUrl: url });
       toast.success(`Swatch uploaded for ${normalizedColors[index]?.name ?? "colour"}`);
+      try {
+        await onSwatchUploaded?.({ index, swatchUrl: url });
+      } catch {
+        toast.error("Swatch uploaded but could not auto-save — click Save on the product.");
+      }
     } catch {
       /* toast + inline status already set */
     }
@@ -150,14 +163,20 @@ export function ColorImagesEditor({
     for (const [offset, file] of batch.entries()) {
       const key = `gallery-${index}-${offset}`;
       try {
-        urls.push(await uploadOne(key, file));
+        urls.push(await uploadOne(key, file, "gallery"));
       } catch {
         break;
       }
     }
     if (!urls.length) return;
-    onPatchColor(index, { imageUrls: [...current, ...urls].slice(0, MAX_COLOR_IMAGES) });
-    toast.success(`${urls.length} gallery image(s) uploaded for ${entry.name}. Click Save to keep them.`);
+    const imageUrls = [...current, ...urls].slice(0, MAX_COLOR_IMAGES);
+    onPatchColor(index, { imageUrls });
+    toast.success(`${urls.length} gallery image(s) uploaded for ${entry.name}.`);
+    try {
+      await onGalleryUploaded?.({ index, imageUrls });
+    } catch {
+      toast.error("Gallery uploaded but could not auto-save — click Save on the product.");
+    }
   };
 
   const removeGalleryImage = (index: number, url: string) => {

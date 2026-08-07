@@ -9,17 +9,19 @@ import { ProductCard } from "@/components/ProductCard";
 import { ProductGallery } from "@/components/ProductGallery";
 import { checkSizeFit, clampQuantity } from "@/lib/product-fit";
 import { galleryForSelectedColor } from "@/lib/product-gallery";
-import { swatchImageForColor } from "@/lib/product-colors";
 import { lookupPincode, normalizePincode } from "@/lib/pincode";
 import {
-  colorsForSize,
+  colorNameInList,
   defaultSellableSelection,
   findVariant,
   isVariantSellable,
   isVariantsProduct,
+  sellableColorsForSize,
   sizeHasSellableVariants,
-  variantStockMessage,
 } from "@/lib/product-variants";
+import { StockAvailability, stockAvailabilityState } from "@/components/StockAvailability";
+import { VariantColorButtons, VariantSizeButtons, variantColorsForDisplay } from "@/components/VariantPickers";
+import { sortSizesAsc } from "@/lib/product-ages";
 
 export const Route = createFileRoute("/product/$slug")({
   head: ({ params }) => ({
@@ -57,13 +59,22 @@ function ProductPage() {
   useEffect(() => {
     if (!product) return;
     const next = defaultSellableSelection(product);
-    setSize((prev) => (prev && product.sizes.includes(prev) ? prev : next.size));
+    setSize((prev) => {
+      if (
+        prev &&
+        product.sizes.includes(prev) &&
+        (!isVariantsProduct(product) || sizeHasSellableVariants(product, prev))
+      ) {
+        return prev;
+      }
+      return next.size;
+    });
   }, [product]);
 
   useEffect(() => {
     if (!product || !size) return;
-    const available = colorsForSize(product, size);
-    setColor((prev) => (prev && available.includes(prev) ? prev : available[0] ?? null));
+    const sellable = sellableColorsForSize(product, size);
+    setColor((prev) => (prev && colorNameInList(prev, sellable) ? prev : sellable[0] ?? null));
   }, [product, size]);
 
   const selectedVariant = useMemo(
@@ -77,16 +88,14 @@ function ProductPage() {
     : isVariantsProduct(product)
       ? isVariantSellable(selectedVariant)
       : true;
-  const stockMessage = useMemo(
-    () => (product ? variantStockMessage(product, selectedVariant, { size, color }) : null),
+  const stockState = useMemo(
+    () => (product ? stockAvailabilityState(product, selectedVariant, { size, color }) : null),
     [product, selectedVariant, size, color],
   );
-  const stockIsSoldOut = !!stockMessage?.startsWith("Sold out");
+  const stockIsSoldOut = stockState?.kind === "out_of_stock";
   const availableColors = useMemo(() => {
     if (!product) return [];
-    const names = colorsForSize(product, size);
-    if (!isVariantsProduct(product)) return product.colors;
-    return product.colors.filter((c) => names.includes(c.name));
+    return variantColorsForDisplay(product, size);
   }, [product, size]);
 
   const colorGallery = useMemo(
@@ -96,7 +105,7 @@ function ProductPage() {
 
   const sizeFit = useMemo(() => {
     if (!product || !heightCm.trim()) return null;
-    const result = checkSizeFit({ heightCm, chestCm, sizes: product.sizes });
+    const result = checkSizeFit({ heightCm, chestCm, sizes: sortSizesAsc(product.sizes) });
     return result.ok ? { size: result.size } : { error: result.error };
   }, [heightCm, chestCm, product]);
 
@@ -154,15 +163,16 @@ function ProductPage() {
         <span className="truncate">{product.name}</span>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-x-6 lg:gap-x-8 gap-y-4 lg:gap-y-3 lg:items-stretch">
+      <div className="grid lg:grid-cols-2 gap-x-6 lg:gap-x-8 gap-y-4 lg:gap-y-6 lg:items-start">
         <ProductGallery
+          key={color ?? "default"}
           name={product.name}
           image={colorGallery.image}
           gallery={colorGallery.gallery}
-          className="lg:h-full lg:min-h-0"
+          className="lg:sticky lg:top-24"
         />
 
-        <div className="flex flex-col gap-3 min-w-0 w-full lg:h-full">
+        <div className="flex flex-col gap-3 min-w-0 w-full">
         {/* Purchase card — compact, fully visible like reference PDP */}
         <div className="glass-strong rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 md:p-5 space-y-3.5 sm:space-y-4 w-full min-w-0">
           <div className="space-y-1.5">
@@ -179,14 +189,8 @@ function ProductPage() {
                 </span>
               )}
             </div>
-            {isVariantsProduct(product) && stockMessage && (
-              <div
-                className={`text-[11px] leading-snug ${stockIsSoldOut ? "text-destructive font-medium" : "text-muted-foreground"}`}
-                role="status"
-              >
-                {stockMessage}
-                {selectedVariant?.sku ? ` · ${selectedVariant.sku}` : ""}
-              </div>
+            {isVariantsProduct(product) && stockState && (
+              <StockAvailability state={stockState} className="mt-1" />
             )}
           </div>
 
@@ -196,53 +200,17 @@ function ProductPage() {
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Size</div>
                 <button type="button" onClick={() => setSizeChart(true)} className="text-[11px] text-primary underline-offset-2 hover:underline">Size chart</button>
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {product.sizes.map((s) => {
-                  const sizeDisabled = isVariantsProduct(product) && !sizeHasSellableVariants(product, s);
-                  return (
-                    <button
-                      key={s}
-                      type="button"
-                      disabled={sizeDisabled}
-                      onClick={() => setSize(s)}
-                      className={`rounded-full px-3 py-1.5 text-xs transition ${
-                        size === s ? "bg-primary text-primary-foreground" : "glass hover:bg-white/60"
-                      } ${sizeDisabled ? "opacity-30 cursor-not-allowed line-through" : ""}`}
-                      title={sizeDisabled ? `${s} — sold out in all colours` : s}
-                    >
-                      {s}
-                    </button>
-                  );
-                })}
-              </div>
+              <VariantSizeButtons product={product} size={size} onSizeChange={setSize} />
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Print · {color}</div>
-              <div className="flex gap-2.5 flex-wrap">
-                {availableColors.map((c) => {
-                  const row = findVariant(product, { size, color: c.name });
-                  const disabled = isVariantsProduct(product) && !isVariantSellable(row);
-                  const selected = color === c.name;
-                  const swatchImage = swatchImageForColor(c);
-                  return (
-                    <button
-                      key={c.name}
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => setColor(c.name)}
-                      className={`h-12 w-12 sm:h-14 sm:w-14 rounded-xl border-2 overflow-hidden transition ${selected ? "border-primary ring-2 ring-primary/30" : "border-white/70 hover:border-primary/50"} ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}
-                      style={swatchImage ? undefined : { background: c.hex }}
-                      aria-label={c.name}
-                      aria-pressed={selected}
-                      title={disabled ? `${c.name} unavailable` : c.name}
-                    >
-                      {swatchImage ? (
-                        <img src={swatchImage} alt={c.name} className="h-full w-full object-cover" loading="lazy" />
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
+              <VariantColorButtons
+                product={product}
+                size={size}
+                color={color}
+                onColorChange={setColor}
+                colors={availableColors}
+              />
             </div>
             {isVariantsProduct(product) && size && color && stockIsSoldOut && (
               <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2 leading-snug">

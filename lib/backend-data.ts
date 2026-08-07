@@ -12,7 +12,9 @@ import {
 } from "@/lib/utils";
 import { assertAllowedImageFile, type AdminImageFolder } from "@/lib/admin-image";
 import {
-  collectColorGalleryImages,
+  collectStorefrontCardImages,
+  buildColorImagesJson,
+  mergeColorImagesIntoColors,
   normalizeColorEntries,
   parseProductColors,
   resolveProductImages,
@@ -479,12 +481,14 @@ export type ProductRow = {
   age_max_months: number | null;
   sizes: string[];
   colors: ProductColorEntry[];
+  color_images_json?: string | null;
   item_structure: string | null;
   variants_json: string | null;
   images: string[];
   badge: string | null;
   hsn: string | null;
   tax_pct: number | null;
+  units: string | null;
   stock: number | null;
   sort_order: number | null;
   featured: boolean;
@@ -509,12 +513,14 @@ type ProductDto = {
   ageMaxMonths?: number | null;
   sizesJson?: string | null;
   colorsJson?: string | null;
+  colorImagesJson?: string | null;
   itemStructure?: string | null;
   variantsJson?: string | null;
   imagesJson?: string | null;
   badge?: string | null;
   hsn?: string | null;
   taxPct?: number | null;
+  units?: string | null;
   stock?: number;
   sortOrder?: number;
   featured?: boolean;
@@ -547,13 +553,20 @@ export const fromProductDto = (dto: ProductDto): ProductRow => ({
   age_min_months: dto.ageMinMonths ?? null,
   age_max_months: dto.ageMaxMonths ?? null,
   sizes: parseJson<string[]>(dto.sizesJson, []),
-  colors: normalizeColorEntries(parseProductColors(parseJson(dto.colorsJson, []))),
+  colors: normalizeColorEntries(
+    mergeColorImagesIntoColors(
+      parseProductColors(parseJson(dto.colorsJson, [])),
+      dto.colorImagesJson,
+    ),
+  ),
+  color_images_json: dto.colorImagesJson ?? null,
   item_structure: dto.itemStructure ?? null,
   variants_json: dto.variantsJson ?? null,
   images: parseJson<string[]>(dto.imagesJson, []),
   badge: dto.badge ?? null,
   hsn: dto.hsn ?? null,
   tax_pct: dto.taxPct == null ? null : Number(dto.taxPct),
+  units: dto.units?.trim() || "ea",
   stock: dto.stock == null ? null : Number(dto.stock),
   sort_order: dto.sortOrder != null ? Number(dto.sortOrder) : null,
   featured: !!dto.featured,
@@ -584,9 +597,11 @@ const toProductDto = (row: ProductRow): ProductDto => ({
   itemStructure: row.item_structure ?? "SIMPLE",
   variantsJson: row.variants_json ?? null,
   imagesJson: JSON.stringify(row.images ?? []),
+  colorImagesJson: row.color_images_json ?? buildColorImagesJson(row.colors ?? []),
   badge: nullable(row.badge) as string | null,
   hsn: nullable(row.hsn) as string | null,
   taxPct: row.tax_pct == null ? undefined : Number(row.tax_pct),
+  units: (nullable(row.units) as string | null)?.trim() || "ea",
   stock: Number(row.stock) || 0,
   sortOrder: Number(row.sort_order) || 0,
   featured: !!row.featured,
@@ -611,13 +626,14 @@ export const saveProduct = (row: ProductRow) => {
   const explicitImages = (row.images ?? [])
     .map((url) => normalizeProductImageUrl(url))
     .filter((url): url is string => !!url);
-  const images = explicitImages.length ? explicitImages : collectColorGalleryImages(normalizedColors);
+  const images = explicitImages.length ? explicitImages : collectStorefrontCardImages(normalizedColors);
   const prepared: ProductRow = {
     ...row,
     name: row.name?.trim() ?? "",
     slug: row.slug?.trim().toLowerCase() ?? "",
     sku: row.sku?.trim() ?? "",
     colors: normalizedColors,
+    color_images_json: buildColorImagesJson(normalizedColors),
     images,
   };
   assertValidProduct(prepared);

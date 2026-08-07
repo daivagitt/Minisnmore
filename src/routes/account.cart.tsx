@@ -8,7 +8,7 @@ export const Route = createFileRoute("/account/cart")({
 });
 
 function CartPage() {
-  const { cart, updateQty, removeFromCart, cartTotal, cartCount } = useShop();
+  const { cart, updateQty, promptRemoveFromCart, cartTotal, cartCount } = useShop();
 
   return (
     <div className="glass-strong rounded-[2rem] p-6 md:p-8">
@@ -37,7 +37,7 @@ function CartPage() {
                 </div>
                 <div className="text-right">
                   <div className="font-medium">₹{(it.qty * it.unitPrice).toLocaleString("en-IN")}</div>
-                  <button onClick={() => removeFromCart(it.product.id, it.size, it.color)} className="text-xs text-muted-foreground hover:text-destructive inline-flex items-center gap-1 mt-1"><X className="h-3 w-3" /> Remove</button>
+                  <button onClick={() => promptRemoveFromCart(it.product.id, it.size, it.color)} className="text-xs text-muted-foreground hover:text-destructive inline-flex items-center gap-1 mt-1"><X className="h-3 w-3" /> Remove</button>
                 </div>
               </div>
             ))}

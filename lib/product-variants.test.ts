@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   colorsForSize,
+  defaultSellableSelection,
   findVariant,
   isVariantSellable,
   isVariantsProduct,
   lineUnitPrice,
   parseVariantsJson,
+  sellableColorsForSize,
   sizeHasSellableVariants,
   variantStockMessage,
 } from "./product-variants";
@@ -69,5 +71,24 @@ describe("product-variants", () => {
       }),
     ).toMatch(/sold out/i);
     expect(variantStockMessage(matrixProduct, undefined, { size: "S", color: "Ivory" })).toMatch(/not available/i);
+  });
+
+  it("defaults to first sellable size in ascending order", () => {
+    const ageProduct: Product = {
+      ...matrixProduct,
+      sizes: ["L", "S", "M"],
+      variants: parseVariantsJson([
+        { sku: "HORIZON-S-NAVY", size: "S", color: "Navy", rate: 999, stock: 3, active: true },
+        { sku: "HORIZON-M-NAVY", size: "M", color: "Navy", rate: 1199, stock: 4, active: true },
+        { sku: "HORIZON-L-IVORY", size: "L", color: "Ivory", rate: 1299, stock: 0, active: true },
+      ]),
+    };
+    expect(defaultSellableSelection(ageProduct)).toEqual({
+      size: "S",
+      color: "Navy",
+      variant: findVariant(ageProduct, { size: "S", color: "Navy" }),
+    });
+    expect(sellableColorsForSize(ageProduct, "S")).toEqual(["Navy"]);
+    expect(sellableColorsForSize(ageProduct, "L")).toEqual([]);
   });
 });

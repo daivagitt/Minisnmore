@@ -34,6 +34,7 @@ type ShopState = {
   wishlist: string[];
   addToCart: (p: Product, opts?: { size?: string; color?: string; qty?: number; variantSku?: string }) => void;
   removeFromCart: (id: string, size?: string, color?: string, variantSku?: string) => void;
+  promptRemoveFromCart: (id: string, size?: string, color?: string, variantSku?: string) => void;
   updateQty: (id: string, qty: number, size?: string, color?: string, variantSku?: string) => void;
   toggleWish: (id: string) => void;
   pruneWishlist: (validIds: Iterable<string>) => void;
@@ -182,6 +183,13 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       : (size === undefined || x.size === size) && (color === undefined || x.color === color));
   const removeFromCart = (id: string, size?: string, color?: string, variantSku?: string) =>
     setCart((c) => c.filter((x) => !matches(x, id, size, color, variantSku)));
+  const promptRemoveFromCart = (id: string, size?: string, color?: string, variantSku?: string) => {
+    const item = cart.find((x) => matches(x, id, size, color, variantSku));
+    if (item && window.confirm(`Move "${item.product.name}" to wishlist instead?`)) {
+      toggleWish(item.product.id);
+    }
+    removeFromCart(id, size, color, variantSku);
+  };
   const updateQty = (id: string, qty: number, size?: string, color?: string, variantSku?: string) =>
     setCart((c) =>
       c.flatMap((x) => {
@@ -217,6 +225,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
         wishlist,
         addToCart,
         removeFromCart,
+        promptRemoveFromCart,
         updateQty,
         toggleWish,
         pruneWishlist,

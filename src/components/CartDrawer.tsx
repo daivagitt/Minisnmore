@@ -4,7 +4,8 @@ import { Link } from "@tanstack/react-router";
 import { useShop } from "@/store/shop";
 
 export function CartDrawer() {
-  const { cartOpen, setCartOpen, cart, removeFromCart, updateQty, cartTotal } = useShop();
+  const { cartOpen, setCartOpen, cart, promptRemoveFromCart, updateQty, cartTotal } = useShop();
+
   return (
     <AnimatePresence>
       {cartOpen && (
@@ -38,7 +39,7 @@ export function CartDrawer() {
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between gap-2">
                         <div className="font-medium text-sm leading-tight">{item.product.name}</div>
-                        <button onClick={() => removeFromCart(item.product.id, item.size, item.color)} aria-label="Remove" className="text-muted-foreground hover:text-destructive">
+                        <button onClick={() => promptRemoveFromCart(item.product.id, item.size, item.color)} aria-label="Remove" className="text-muted-foreground hover:text-destructive">
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>

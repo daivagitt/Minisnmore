@@ -42,6 +42,10 @@ public class ProductColorImagesSupport {
             normalizedColors = applyGalleryMapToColorsJson(normalizedColors, existingGallery);
             gallery = galleryMapFromColorsJson(normalizedColors);
             if (gallery.isEmpty()) {
+                normalizedColors = realignColorNamesToGalleryKeys(normalizedColors, existingGallery);
+                gallery = galleryMapFromColorsJson(normalizedColors);
+            }
+            if (gallery.isEmpty()) {
                 gallery = existingGallery;
             }
         }
@@ -60,9 +64,32 @@ public class ProductColorImagesSupport {
         }
         List<String> fromColors = collectGalleryUrlsFromColorsJson(product.getColorsJson());
         if (fromColors.isEmpty()) {
+            List<String> swatches = collectSwatchUrlsFromColorsJson(product.getColorsJson());
+            if (swatches.isEmpty()) {
+                return;
+            }
+            fromColors = List.of(swatches.get(0));
+        }
+        if (fromColors.isEmpty()) {
             return;
         }
         product.setImagesJson(serializeStringList(fromColors));
+    }
+
+    public List<String> collectSwatchUrlsFromColorsJson(String colorsJson) {
+        List<String> out = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (ColorEntry entry : parseColorEntries(colorsJson)) {
+            String swatch = entry.swatchUrl();
+            if (swatch == null || swatch.isBlank()) {
+                continue;
+            }
+            String url = swatch.trim();
+            if (seen.add(url)) {
+                out.add(url);
+            }
+        }
+        return out;
     }
 
     public List<String> collectGalleryUrlsFromColorsJson(String colorsJson) {
@@ -117,6 +144,75 @@ public class ProductColorImagesSupport {
         return out;
     }
 
+    /**
+     * When the variant matrix uses generic slots ({@code Print 1…}) but {@code color_images_json} uses real
+     * print names, rename colours to gallery keys in stable order so storefront and Ledgerly stay linked.
+     */
+    public String realignColorNamesToGalleryKeys(String colorsJson, Map<String, List<String>> galleryMap) {
+        if (galleryMap == null || galleryMap.isEmpty()) {
+            return normalizeColorsJson(colorsJson);
+        }
+        List<ColorEntry> entries = parseColorEntries(colorsJson);
+        List<String> galleryKeys = new ArrayList<>(galleryMap.keySet());
+        if (entries.isEmpty()) {
+            List<ColorEntry> fromMap = new ArrayList<>();
+            for (String key : galleryKeys) {
+                List<String> urls = uniqueUrls(galleryMap.get(key));
+                if (!key.isBlank() && !urls.isEmpty()) {
+                    fromMap.add(new ColorEntry(key, null, urls));
+                }
+            }
+            return writeColorEntries(fromMap);
+        }
+        if (entries.size() != galleryKeys.size()) {
+            return applyGalleryMapToColorsJson(colorsJson, galleryMap);
+        }
+        if (hasGalleryKeyOverlap(entries, galleryMap)) {
+            return applyGalleryMapToColorsJson(colorsJson, galleryMap);
+        }
+        List<ColorEntry> realigned = new ArrayList<>();
+        for (int i = 0; i < entries.size(); i++) {
+            String newName = galleryKeys.get(i);
+            ColorEntry old = entries.get(i);
+            List<String> urls = uniqueUrls(galleryMap.get(newName));
+            realigned.add(new ColorEntry(newName, old.swatchUrl(), urls));
+        }
+        return writeColorEntries(realigned);
+    }
+
+    /** Positional old→new colour renames after {@link #realignColorNamesToGalleryKeys}. */
+    public Map<String, String> buildPositionalColorRename(String colorsBefore, String colorsAfter) {
+        List<ColorEntry> before = parseColorEntries(colorsBefore);
+        List<ColorEntry> after = parseColorEntries(colorsAfter);
+        LinkedHashMap<String, String> out = new LinkedHashMap<>();
+        if (before.size() != after.size()) {
+            return out;
+        }
+        for (int i = 0; i < before.size(); i++) {
+            String oldName = before.get(i).name();
+            String newName = after.get(i).name();
+            if (!oldName.equals(newName)) {
+                out.put(oldName, newName);
+            }
+        }
+        return out;
+    }
+
+    private boolean hasGalleryKeyOverlap(List<ColorEntry> entries, Map<String, List<String>> galleryMap) {
+        Set<String> galleryKeys = new LinkedHashSet<>();
+        for (String key : galleryMap.keySet()) {
+            if (key != null && !key.isBlank()) {
+                galleryKeys.add(key.trim().toLowerCase(Locale.ROOT));
+            }
+        }
+        for (ColorEntry entry : entries) {
+            if (galleryKeys.contains(entry.name().trim().toLowerCase(Locale.ROOT))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public String applyGalleryMapToColorsJson(String colorsJson, Map<String, List<String>> galleryMap) {
         if (galleryMap == null || galleryMap.isEmpty()) {
             return normalizeColorsJson(colorsJson);
@@ -135,7 +231,7 @@ public class ProductColorImagesSupport {
         }
         List<ColorEntry> merged = new ArrayList<>();
         for (ColorEntry entry : entries) {
-            List<String> urls = galleryMap.get(entry.name());
+            List<String> urls = galleryMapLookup(galleryMap, entry.name());
             if (urls != null && !urls.isEmpty()) {
                 merged.add(new ColorEntry(entry.name(), entry.swatchUrl(), uniqueUrls(urls)));
             } else {
@@ -143,6 +239,64 @@ public class ProductColorImagesSupport {
             }
         }
         return writeColorEntries(merged);
+    }
+
+    /**
+     * After the variant matrix rebuilds {@code colors_json} as plain print names, restore swatch and
+     * gallery URLs from the admin payload so print uploads are not lost on Save.
+     */
+    public String mergeRichColorMetadata(String matrixColorsJson, String richColorsJson) {
+        List<ColorEntry> rich = parseColorEntries(richColorsJson);
+        if (rich.isEmpty()) {
+            return normalizeColorsJson(matrixColorsJson);
+        }
+        LinkedHashMap<String, ColorEntry> richByKey = new LinkedHashMap<>();
+        for (ColorEntry entry : rich) {
+            String key = entry.name().trim().toLowerCase(Locale.ROOT);
+            if (!key.isEmpty() && !richByKey.containsKey(key)) {
+                richByKey.put(key, entry);
+            }
+        }
+        List<ColorEntry> matrixEntries = parseColorEntries(matrixColorsJson);
+        if (matrixEntries.isEmpty()) {
+            return writeColorEntries(rich);
+        }
+        List<ColorEntry> merged = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (ColorEntry matrixEntry : matrixEntries) {
+            String name = matrixEntry.name().trim();
+            if (name.isEmpty()) {
+                continue;
+            }
+            String key = name.toLowerCase(Locale.ROOT);
+            if (!seen.add(key)) {
+                continue;
+            }
+            ColorEntry prev = richByKey.get(key);
+            if (prev != null) {
+                merged.add(new ColorEntry(name, prev.swatchUrl(), prev.galleryUrls()));
+            } else {
+                merged.add(new ColorEntry(name, null, List.of()));
+            }
+        }
+        return writeColorEntries(merged);
+    }
+
+    private List<String> galleryMapLookup(Map<String, List<String>> galleryMap, String colorName) {
+        if (galleryMap == null || galleryMap.isEmpty()) {
+            return List.of();
+        }
+        List<String> exact = galleryMap.get(colorName);
+        if (exact != null && !exact.isEmpty()) {
+            return exact;
+        }
+        String key = colorName.trim().toLowerCase(Locale.ROOT);
+        for (Map.Entry<String, List<String>> entry : galleryMap.entrySet()) {
+            if (entry.getKey() != null && entry.getKey().trim().toLowerCase(Locale.ROOT).equals(key) && !entry.getValue().isEmpty()) {
+                return entry.getValue();
+            }
+        }
+        return List.of();
     }
 
     public String normalizeColorsJson(String colorsJson) {

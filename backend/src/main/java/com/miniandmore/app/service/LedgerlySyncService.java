@@ -1,5 +1,6 @@
 package com.miniandmore.app.service;
 
+import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.CustomerProfile;
@@ -41,6 +42,7 @@ public class LedgerlySyncService {
     private final ProductVariantSupport variantSupport;
 
     private final ProductColorImagesSupport colorImagesSupport;
+    private final ApplicationProperties applicationProperties;
 
     public LedgerlySyncService(
         LedgerlyIntegrationClient ledgerlyClient,
@@ -52,7 +54,8 @@ public class LedgerlySyncService {
         LedgerlyProductMergeService productMergeService,
         LedgerlyCategoryResolver categoryResolver,
         ProductVariantSupport variantSupport,
-        ProductColorImagesSupport colorImagesSupport
+        ProductColorImagesSupport colorImagesSupport,
+        ApplicationProperties applicationProperties
     ) {
         this.ledgerlyClient = ledgerlyClient;
         this.productRepository = productRepository;
@@ -64,10 +67,15 @@ public class LedgerlySyncService {
         this.categoryResolver = categoryResolver;
         this.variantSupport = variantSupport;
         this.colorImagesSupport = colorImagesSupport;
+        this.applicationProperties = applicationProperties;
     }
 
     @Async
     public void syncProductAsync(Long productId) {
+        if (!applicationProperties.getLedgerly().isAutoSyncEnabled()) {
+            LOG.debug("Skipping async Ledgerly product sync for {} — auto-sync disabled", productId);
+            return;
+        }
         syncProduct(productId);
     }
 

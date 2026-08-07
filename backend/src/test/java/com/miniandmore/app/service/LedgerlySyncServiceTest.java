@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
+import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.CustomerProfile;
 import com.miniandmore.app.domain.OrderItem;
@@ -67,11 +68,18 @@ class LedgerlySyncServiceTest {
     @Spy
     private ProductColorImagesSupport colorImagesSupport = new ProductColorImagesSupport(new com.fasterxml.jackson.databind.ObjectMapper());
 
+    @Mock
+    private ApplicationProperties applicationProperties;
+
     @InjectMocks
     private LedgerlySyncService service;
 
     @BeforeEach
     void stubMergeService() {
+        ApplicationProperties.Ledgerly ledgerly = new ApplicationProperties.Ledgerly();
+        ledgerly.setAutoSyncEnabled(true);
+        ledgerly.setAutoPullEnabled(true);
+        when(applicationProperties.getLedgerly()).thenReturn(ledgerly);
         when(customerProfileRepository.findOneByUserLogin(any())).thenReturn(Optional.empty());
         when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
         when(productMergeService.buildPushPayload(any(), any()))

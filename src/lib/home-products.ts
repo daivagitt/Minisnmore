@@ -10,6 +10,7 @@ export const HOME_SECTION_PRODUCT_KEYS = [
   "trending",
   "new_arrivals",
   "featured",
+  "gifts",
 ] as const;
 
 export function sectionProductSlugs(payload: Record<string, unknown> | undefined): string[] {

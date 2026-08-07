@@ -226,6 +226,89 @@ export function galleryUrlsForStorefrontColor(color: StorefrontColor | undefined
   return [];
 }
 
+/** Keep only lifestyle URLs whose filename matches this print name (when possible). */
+export function filterGalleryUrlsForPrint(
+  colorName: string,
+  urls: string[],
+  opts?: { strict?: boolean },
+): string[] {
+  if (!urls.length) return [];
+  const key = colorName.trim().toLowerCase();
+  if (!key) return urls;
+
+  const tokens = key
+    .replace(/,/g, " ")
+    .split(/[\s&]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 3 || /^\d+$/.test(t));
+
+  const printSpecific = urls.filter((url) => {
+    const fn = url.toLowerCase();
+    if (tokens.length && tokens.every((t) => fn.includes(t))) return true;
+    if (key.length <= 6 && fn.includes(key.replace(/\s+/g, ""))) return true;
+    const combo = key.match(/^combo\s*(\d+)$/);
+    if (combo && new RegExp(`combo[\\s-]*${combo[1]}`).test(fn)) return true;
+    return false;
+  });
+
+  if (printSpecific.length) return printSpecific;
+  return opts?.strict ? [] : urls;
+}
+
+/** True when any URL in the set matches at least one print name on the product. */
+export function sharedGalleryHasPrintSpecificFilenames(
+  colors: StorefrontColor[] | undefined,
+  urls: string[],
+): boolean {
+  if (!colors?.length || !urls.length) return false;
+  return urls.some((url) =>
+    colors.some((c) => filterGalleryUrlsForPrint(c.name, [url], { strict: true }).length > 0),
+  );
+}
+
+/** True when the same lifestyle URL appears on more than one print. */
+export function colorsHaveOverlappingGalleries(colors: StorefrontColor[] | undefined): boolean {
+  if (!colors?.length) return false;
+  const seen = new Set<string>();
+  for (const color of colors) {
+    for (const url of galleryUrlsForStorefrontColor(color)) {
+      if (seen.has(url)) return true;
+      seen.add(url);
+    }
+  }
+  return false;
+}
+
+/** True when every print has its own gallery with zero URL overlap (strict per-print PDP). */
+export function printsHaveDistinctGalleries(colors: StorefrontColor[] | undefined): boolean {
+  if (!colors?.length) return false;
+  const galleries = colors
+    .map((c) => galleryUrlsForStorefrontColor(c))
+    .filter((urls) => urls.length > 0);
+  if (galleries.length < 2) return false;
+  const seen = new Set<string>();
+  for (const urls of galleries) {
+    for (const url of urls) {
+      if (seen.has(url)) return false;
+      seen.add(url);
+    }
+  }
+  return true;
+}
+
+/** True when two or more colours share the exact same lifestyle URL list. */
+export function colorsShareIdenticalGalleries(colors: StorefrontColor[] | undefined): boolean {
+  if (!colors?.length) return false;
+  const sets = colors.map((c) => [...galleryUrlsForStorefrontColor(c)].sort().join("\0"));
+  const nonEmpty = sets.filter((s) => s.length > 0);
+  return nonEmpty.length > 1 && new Set(nonEmpty).size === 1;
+}
+
+/** True when any colour has lifestyle gallery URLs (not swatch-only). */
+export function hasPerPrintLifestyleGalleries(colors: unknown): boolean {
+  return parseProductColors(colors).some((entry) => colorImageUrls(entry).length > 0);
+}
+
 /** All unique per-colour main-gallery URLs in colour order. */
 export function collectColorGalleryImages(colors: unknown): string[] {
   const out: string[] = [];
@@ -241,6 +324,130 @@ export function collectColorGalleryImages(colors: unknown): string[] {
   return out;
 }
 
+/** First listing hero URL — one swatch max when no lifestyle gallery exists. */
+export function collectStorefrontCardImages(colors: unknown): string[] {
+  const galleries = collectColorGalleryImages(colors);
+  if (galleries.length) return galleries;
+  for (const entry of parseProductColors(colors)) {
+    const swatch = swatchUrlForEntry(entry);
+    if (swatch) return [swatch];
+  }
+  return [];
+}
+
+/** Build API `colorImagesJson` map from per-print gallery URLs (excludes swatches). */
+export function buildColorImagesJson(colors: unknown): string | null {
+  const map: Record<string, string[]> = {};
+  for (const entry of parseProductColors(colors)) {
+    const swatch = entry.swatchUrl?.trim();
+    const urls = colorImageUrls(entry).filter((url) => url !== swatch);
+    if (urls.length) map[entry.name] = urls;
+  }
+  return Object.keys(map).length ? JSON.stringify(map) : null;
+}
+
+/** Parse API `colorImagesJson` — map of colour name → gallery URLs. */
+export function parseColorImagesMap(raw: unknown): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  if (raw == null) return out;
+
+  let parsed: unknown = raw;
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed) return out;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return out;
+    }
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return out;
+  for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+    const name = key.trim();
+    if (!name) continue;
+    const urls = Array.isArray(value)
+      ? value.map((u) => String(u ?? "").trim()).filter(Boolean)
+      : [];
+    if (urls.length) out.set(name, uniqueUrls(urls));
+  }
+  return out;
+}
+
+function galleryMapLookup(map: Map<string, string[]>, colorName: string): string[] {
+  const exact = map.get(colorName);
+  if (exact?.length) return exact;
+  const key = colorKey(colorName);
+  for (const [name, urls] of map) {
+    if (colorKey(name) === key && urls.length) return urls;
+  }
+  return [];
+}
+
+/**
+ * Merge `colorImagesJson` gallery URLs into colour entries (storefront/API parity with backend
+ * {@code ProductColorImagesSupport.applyGalleryMapToColorsJson}).
+ */
+export function mergeColorImagesIntoColors(
+  colors: ProductColorEntry[] | unknown,
+  colorImagesJson: unknown,
+): ProductColorEntry[] {
+  const entries = normalizeColorEntries(parseProductColors(colors));
+  const galleryMap = parseColorImagesMap(colorImagesJson);
+  if (!galleryMap.size) return entries;
+
+  if (!entries.length) {
+    return Array.from(galleryMap.entries()).map(([name, imageUrls]) => ({
+      name,
+      imageUrls,
+    }));
+  }
+
+  return entries.map((entry) => {
+    const urls = galleryMapLookup(galleryMap, entry.name);
+    if (!urls.length) return entry;
+    const swatchUrl = entry.swatchUrl?.trim();
+    const galleryOnly = swatchUrl ? urls.filter((url) => url !== swatchUrl) : urls;
+    return {
+      ...entry,
+      imageUrls: galleryOnly.length ? galleryOnly : urls,
+    };
+  }).map((entry, i, merged) => {
+    if (colorImageUrls(entry).length > 0) return entry;
+    const galleryKeys = Array.from(galleryMap.keys());
+    if (galleryKeys.length !== merged.length) return entry;
+    const anyMatched = merged.some((e) => colorImageUrls(e).length > 0);
+    if (anyMatched) return entry;
+    const key = galleryKeys[i];
+    const urls = galleryMap.get(key) ?? [];
+    const swatchUrl = entry.swatchUrl?.trim();
+    const galleryOnly = swatchUrl ? urls.filter((url) => url !== swatchUrl) : urls;
+    return {
+      ...entry,
+      name: key,
+      imageUrls: galleryOnly.length ? galleryOnly : urls,
+    };
+  });
+}
+
+/** True when colours carry per-print media (lifestyle gallery and/or print swatch). */
+export function hasPerColorGalleries(colors: unknown): boolean {
+  return parseProductColors(colors).some(
+    (entry) => colorImageUrls(entry).length > 0 || Boolean(swatchUrlForEntry(entry)),
+  );
+}
+
+/** Card/listing hero: first photo from the first colour that has a gallery or print swatch. */
+export function storefrontCardImageFromColors(colors: unknown): string | undefined {
+  for (const entry of parseProductColors(colors)) {
+    const urls = colorImageUrls(entry);
+    if (urls[0]) return urls[0];
+    const swatch = swatchUrlForEntry(entry);
+    if (swatch) return swatch;
+  }
+  return undefined;
+}
+
 /** Main product images: explicit gallery first, otherwise per-colour galleries. */
 export function resolveProductImages(
   images: string[] | null | undefined,
@@ -249,6 +456,27 @@ export function resolveProductImages(
   const explicit = (images ?? []).map((url) => url?.trim()).filter((url): url is string => !!url);
   if (explicit.length) return explicit;
   return collectColorGalleryImages(colors);
+}
+
+/**
+ * Storefront listing gallery. When prints have dedicated galleries, avoid mixing every print
+ * into `product.gallery` — the PDP switches galleries per selected print.
+ */
+export function resolveStorefrontProductImages(
+  images: string[] | null | undefined,
+  colors: unknown,
+): { image: string; gallery: string[] } {
+  const perPrint = hasPerColorGalleries(colors);
+  const explicit = (images ?? []).map((url) => url?.trim()).filter((url): url is string => !!url);
+
+  if (perPrint) {
+    const cardImage = storefrontCardImageFromColors(colors) ?? explicit[0] ?? "";
+    return { image: cardImage, gallery: [] };
+  }
+
+  const resolved = resolveProductImages(images, colors);
+  const [hero, ...rest] = resolved;
+  return { image: hero ?? "", gallery: rest };
 }
 
 export function normalizeStorefrontColors(raw: unknown): StorefrontColor[] {

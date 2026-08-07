@@ -1,7 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react";
+/** @vitest-environment jsdom */
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Route } from "./login";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Route, LoginPage } from "./login";
 
 const authMock = vi.hoisted(() => ({
   signIn: vi.fn(),
@@ -12,7 +13,10 @@ const authMock = vi.hoisted(() => ({
 }));
 
 const navigateMock = vi.hoisted(() => vi.fn());
-const searchMock = vi.hoisted(() => ({ redirect: "/account" as string | undefined }));
+const searchMock = vi.hoisted(() => ({
+  redirect: "/account" as string | undefined,
+  error: undefined as string | undefined,
+}));
 
 const toastMock = vi.hoisted(() => ({
   error: vi.fn(),
@@ -22,6 +26,7 @@ const toastMock = vi.hoisted(() => ({
 
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (config: unknown) => config,
+  lazyRouteComponent: (importer: unknown) => importer,
   Link: ({ children, to, ...props }: any) => (
     <a href={to} {...props}>
       {children}
@@ -43,16 +48,20 @@ vi.mock("sonner", () => ({
 }));
 
 function renderLogin() {
-  const Component = (Route as any).component;
-  return render(<Component />);
+  return render(<LoginPage />);
 }
 
 describe("login route", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     authMock.user = null;
     authMock.loading = false;
     searchMock.redirect = "/account";
+    searchMock.error = undefined;
   });
 
   it("validates search params and exposes document metadata", () => {
@@ -97,7 +106,7 @@ describe("login route", () => {
     await waitFor(() =>
       expect(authMock.signIn).toHaveBeenCalledWith("parent@example.com", "secret1"),
     );
-    expect(toastMock.error).toHaveBeenCalledWith("Invalid credentials");
+    expect(toastMock.error).toHaveBeenCalledWith("Invalid credentials", { id: "login-error" });
   });
 
   it("switches to sign up mode and submits full name", async () => {
@@ -114,7 +123,7 @@ describe("login route", () => {
       expect(authMock.signUp).toHaveBeenCalledWith("new@example.com", "secret1", "New Parent"),
     );
     expect(toastMock.success).toHaveBeenCalledWith(
-      "Almost there — check your inbox to confirm.",
+      "Almost there — check your inbox and open the activation link to finish.",
     );
   });
 
@@ -128,11 +137,13 @@ describe("login route", () => {
     await userEvent.type(screen.getByPlaceholderText("Password (min 6)"), "secret1");
     await userEvent.click(screen.getByRole("button", { name: /^Create account$/ }));
 
-    await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Email taken"));
+    await waitFor(() =>
+      expect(toastMock.error).toHaveBeenCalledWith("Email taken", { id: "login-error" }),
+    );
     expect(navigateMock).not.toHaveBeenCalled();
 
     await userEvent.click(screen.getByRole("button", { name: "Have an account? Sign in" }));
-    expect(screen.getByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Sign in" })).toBeTruthy();
   });
 
   it("treats a missing error field as a successful sign in", async () => {
@@ -188,7 +199,7 @@ describe("login route", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
 
-    expect(screen.getByRole("button", { name: "Continue with Google" })).not.toBeDisabled();
+    expect((screen.getByRole("button", { name: "Continue with Google" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("resets Apple busy state when provider redirects fail", async () => {
@@ -199,7 +210,7 @@ describe("login route", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Continue with Apple" }));
 
-    expect(screen.getByRole("button", { name: "Continue with Apple" })).not.toBeDisabled();
+    expect((screen.getByRole("button", { name: "Continue with Apple" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("resets Facebook busy state when provider redirects fail", async () => {
@@ -210,85 +221,58 @@ describe("login route", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Continue with Facebook" }));
 
-    expect(screen.getByRole("button", { name: "Continue with Facebook" })).not.toBeDisabled();
+    expect((screen.getByRole("button", { name: "Continue with Facebook" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("surfaces OAuth provider errors from resolved responses", async () => {
     authMock.signInWithOAuth.mockResolvedValueOnce({ error: "Google unavailable" });
     renderLogin();
     await userEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
-    await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Google unavailable"));
+    await waitFor(() =>
+      expect(toastMock.error).toHaveBeenCalledWith("Google unavailable", { id: "oauth-error" }),
+    );
 
     authMock.signInWithOAuth.mockResolvedValueOnce({ error: "Apple unavailable" });
     await userEvent.click(screen.getByRole("button", { name: "Continue with Apple" }));
-    await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Apple unavailable"));
+    await waitFor(() =>
+      expect(toastMock.error).toHaveBeenCalledWith("Apple unavailable", { id: "oauth-error" }),
+    );
 
     authMock.signInWithOAuth.mockResolvedValueOnce({ error: "Facebook unavailable" });
     await userEvent.click(screen.getByRole("button", { name: "Continue with Facebook" }));
-    await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Facebook unavailable"));
+    await waitFor(() =>
+      expect(toastMock.error).toHaveBeenCalledWith("Facebook unavailable", { id: "oauth-error" }),
+    );
   });
 
-  it("logs OAuth failures in non-production environments", async () => {
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.stubEnv("NODE_ENV", "test");
+  it("toasts a clear message when OAuth redirect throws", async () => {
     authMock.signInWithOAuth.mockRejectedValueOnce(new Error("network"));
     renderLogin();
 
     await userEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
 
     await waitFor(() =>
-      expect(consoleSpy).toHaveBeenCalledWith("Google OAuth failed", expect.any(Error)),
+      expect(toastMock.error).toHaveBeenCalledWith(
+        "Google sign-in could not be started. Please try again or use email instead.",
+        { id: "oauth-error" },
+      ),
     );
-    consoleSpy.mockRestore();
-    vi.unstubAllEnvs();
   });
 
-  it("does not log OAuth failures in production", async () => {
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.stubEnv("NODE_ENV", "production");
-
-    authMock.signInWithOAuth.mockRejectedValueOnce(new Error("google-down"));
-    renderLogin();
-    await userEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Continue with Google" })).not.toBeDisabled(),
-    );
-
-    authMock.signInWithOAuth.mockRejectedValueOnce(new Error("apple-down"));
-    await userEvent.click(screen.getByRole("button", { name: "Continue with Apple" }));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Continue with Apple" })).not.toBeDisabled(),
-    );
-
-    authMock.signInWithOAuth.mockRejectedValueOnce(new Error("facebook-down"));
-    await userEvent.click(screen.getByRole("button", { name: "Continue with Facebook" }));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Continue with Facebook" })).not.toBeDisabled(),
-    );
-
-    expect(consoleSpy).not.toHaveBeenCalled();
-    consoleSpy.mockRestore();
-    vi.unstubAllEnvs();
-  });
-
-  it("logs Apple and Facebook OAuth failures in non-production environments", async () => {
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.stubEnv("NODE_ENV", "development");
-    authMock.signInWithOAuth.mockRejectedValueOnce(new Error("apple-network"));
+  it("shows OAuth callback errors from the login URL", async () => {
+    searchMock.error = "Sign-in was cancelled. You can try again.";
     renderLogin();
 
-    await userEvent.click(screen.getByRole("button", { name: "Continue with Apple" }));
     await waitFor(() =>
-      expect(consoleSpy).toHaveBeenCalledWith("Apple OAuth failed", expect.any(Error)),
+      expect(toastMock.error).toHaveBeenCalledWith(
+        "Sign-in was cancelled. You can try again or create an account with email.",
+        { id: "oauth-error" },
+      ),
     );
-
-    authMock.signInWithOAuth.mockRejectedValueOnce(new Error("facebook-network"));
-    await userEvent.click(screen.getByRole("button", { name: "Continue with Facebook" }));
-    await waitFor(() =>
-      expect(consoleSpy).toHaveBeenCalledWith("Facebook OAuth failed", expect.any(Error)),
-    );
-
-    consoleSpy.mockRestore();
-    vi.unstubAllEnvs();
+    expect(navigateMock).toHaveBeenCalledWith({
+      to: "/login",
+      search: { redirect: "/account" },
+      replace: true,
+    });
   });
 });

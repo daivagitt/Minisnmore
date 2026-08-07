@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.Product;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
@@ -51,11 +52,18 @@ class LedgerlyWebhookHandlerServiceTest {
     @Mock
     private LedgerlyCategoryResolver categoryResolver;
 
+    @Mock
+    private ApplicationProperties applicationProperties;
+
     private LedgerlyWebhookHandlerService handler;
 
     @BeforeEach
     void setUp() {
         when(credentialsProvider.webhookSecret()).thenReturn(SECRET);
+        ApplicationProperties.Ledgerly ledgerly = new ApplicationProperties.Ledgerly();
+        ledgerly.setAutoSyncEnabled(true);
+        ledgerly.setAutoPullEnabled(true);
+        when(applicationProperties.getLedgerly()).thenReturn(ledgerly);
         handler = new LedgerlyWebhookHandlerService(
             credentialsProvider,
             webhookEventRepository,
@@ -63,7 +71,8 @@ class LedgerlyWebhookHandlerServiceTest {
             customerOrderRepository,
             new ObjectMapper(),
             productMergeService,
-            categoryResolver
+            categoryResolver,
+            applicationProperties
         );
     }
 

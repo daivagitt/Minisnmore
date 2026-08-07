@@ -10,8 +10,38 @@ const SIZE_TO_AGE: Record<string, AgeRange> = {
 
 const UNIVERSAL_SIZES = new Set(["freesize", "onesize", "one size", "os", "free", "universal"]);
 
+const LETTER_SIZE_ORDER = ["xxs", "xs", "s", "m", "l", "xl", "xxl", "xxxl"];
+
 function normalizeSizeKey(size: string): string {
   return size.trim().toLowerCase().replace(/\s+/g, "");
+}
+
+/** Ascending sort index for size labels (age bands first, then letter sizes, universal last). */
+export function sizeBandOrderIndex(size: string): number {
+  const key = normalizeSizeKey(size);
+  if (!key) return 9999;
+  if (UNIVERSAL_SIZES.has(key)) return 9000;
+  const band = SIZE_TO_AGE[key];
+  if (band) return ALL_AGE_BANDS.indexOf(band);
+  const letterIdx = LETTER_SIZE_ORDER.indexOf(key);
+  if (letterIdx >= 0) return 100 + letterIdx;
+  const numeric = Number(key.replace(/[^\d.]/g, ""));
+  if (Number.isFinite(numeric) && numeric > 0) return 200 + numeric;
+  return 500;
+}
+
+/** Return sizes in ascending order (youngest age band → oldest; universal sizes last). */
+export function sortSizesAsc(sizes: string[]): string[] {
+  return [...sizes].sort((a, b) => {
+    const orderDiff = sizeBandOrderIndex(a) - sizeBandOrderIndex(b);
+    if (orderDiff !== 0) return orderDiff;
+    return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+  });
+}
+
+/** Sort canonical age bands in ascending order. */
+export function sortAgeBands(bands: AgeRange[]): AgeRange[] {
+  return [...bands].sort((a, b) => ALL_AGE_BANDS.indexOf(a) - ALL_AGE_BANDS.indexOf(b));
 }
 
 /** Map a product size label (e.g. `0-3M`, `6-12m`) to a shop age band. */
@@ -43,7 +73,7 @@ export function agesFromSizes(
     if (band) hits.add(band);
   }
 
-  if (hits.size > 0) return [...hits];
+  if (hits.size > 0) return sortAgeBands([...hits]);
   if (hasUniversal) return [...ALL_AGE_BANDS];
 
   return bandsFromMonths(fallback?.min, fallback?.max);

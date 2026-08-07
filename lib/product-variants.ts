@@ -1,3 +1,5 @@
+import { sortSizesAsc } from "@/lib/product-ages";
+
 export type ProductVariant = {
   id?: string;
   sku: string;
@@ -120,6 +122,27 @@ export function colorsForSize(product: VariantProductLike, size: string | null |
   return Array.from(names);
 }
 
+/** In-stock colours for a size (used for default selection). */
+export function sellableColorsForSize(product: VariantProductLike, size: string | null | undefined): string[] {
+  if (!isVariantsProduct(product)) {
+    return product.colors.map((c) => c.name);
+  }
+  const want = key(size);
+  const names = new Set<string>();
+  for (const v of product.variants ?? []) {
+    if (!isVariantSellable(v)) continue;
+    if (key(v.size) !== want) continue;
+    if (v.color) names.add(v.color);
+  }
+  return Array.from(names);
+}
+
+/** Case-insensitive colour name match for variant matrix ↔ colours_json alignment. */
+export function colorNameInList(colorName: string, names: string[]): boolean {
+  const want = key(colorName);
+  return names.some((n) => key(n) === want);
+}
+
 export function isVariantSellable(variant: ProductVariant | undefined | null): boolean {
   return !!variant && variant.active && variant.stock > 0 && !!variant.sku;
 }
@@ -155,15 +178,25 @@ export function lineUnitPrice(product: VariantProductLike, opts: { size?: string
 }
 
 export function defaultSellableSelection(product: VariantProductLike): { size: string; color: string; variant?: ProductVariant } {
+  const sizes = sortSizesAsc(product.sizes);
   if (!isVariantsProduct(product)) {
     return {
-      size: product.sizes[0] ?? "One Size",
+      size: sizes[0] ?? "One Size",
       color: product.colors[0]?.name ?? "Natural",
     };
   }
+  for (const size of sizes) {
+    if (!sizeHasSellableVariants(product, size)) continue;
+    for (const colorName of sellableColorsForSize(product, size)) {
+      const variant = findVariant(product, { size, color: colorName });
+      if (isVariantSellable(variant)) {
+        return { size, color: colorName, variant };
+      }
+    }
+  }
   const first = (product.variants ?? []).find(isVariantSellable) ?? (product.variants ?? [])[0];
   return {
-    size: first?.size ?? product.sizes[0] ?? "One Size",
+    size: first?.size ?? sizes[0] ?? "One Size",
     color: first?.color ?? product.colors[0]?.name ?? "Natural",
     variant: first,
   };

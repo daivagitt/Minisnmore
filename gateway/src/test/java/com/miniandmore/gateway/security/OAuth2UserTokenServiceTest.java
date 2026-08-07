@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import com.miniandmore.gateway.domain.Authority;
 import com.miniandmore.gateway.domain.User;
 import com.miniandmore.gateway.repository.AuthorityRepository;
+import com.miniandmore.gateway.repository.UserAuthoritiesLoader;
 import com.miniandmore.gateway.repository.UserRepository;
 import com.miniandmore.gateway.service.UserService;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
@@ -40,6 +41,9 @@ class OAuth2UserTokenServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private UserAuthoritiesLoader userAuthoritiesLoader;
+
+    @Mock
     private UserService userService;
 
     @Mock
@@ -55,7 +59,14 @@ class OAuth2UserTokenServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new OAuth2UserTokenService(userRepository, userService, authorityRepository, passwordEncoder, jwtTokenService);
+        service = new OAuth2UserTokenService(
+            userRepository,
+            userAuthoritiesLoader,
+            userService,
+            authorityRepository,
+            passwordEncoder,
+            jwtTokenService
+        );
         org.mockito.Mockito.lenient().when(passwordEncoder.encode(anyString())).thenReturn("encoded");
         org.mockito.Mockito.lenient().when(userService.saveUser(any(User.class))).thenAnswer(inv -> {
             User saved = inv.getArgument(0);
@@ -72,6 +83,9 @@ class OAuth2UserTokenServiceTest {
         org.mockito.Mockito.lenient().when(userRepository.findOneWithAuthoritiesByLoginForOAuth(anyString())).thenReturn(Mono.empty());
         org.mockito.Mockito.lenient().when(userRepository.deleteInactiveByLogin(anyString())).thenReturn(Mono.empty());
         org.mockito.Mockito.lenient().when(userRepository.deleteInactiveByEmail(anyString())).thenReturn(Mono.empty());
+        org.mockito.Mockito.lenient()
+            .when(userAuthoritiesLoader.withAuthorities(any(User.class)))
+            .thenAnswer(inv -> Mono.just(inv.getArgument(0)));
         org.mockito.Mockito.lenient().when(jwtTokenService.createTokenForOAuthUser(any(User.class), any(Boolean.class))).thenReturn("token");
     }
 
@@ -95,7 +109,14 @@ class OAuth2UserTokenServiceTest {
         JwtTokenService realJwtTokenService = new JwtTokenService(encoder);
         ReflectionTestUtils.setField(realJwtTokenService, "tokenValidityInSeconds", 600L);
         ReflectionTestUtils.setField(realJwtTokenService, "tokenValidityInSecondsForRememberMe", 1200L);
-        service = new OAuth2UserTokenService(userRepository, userService, authorityRepository, passwordEncoder, realJwtTokenService);
+        service = new OAuth2UserTokenService(
+            userRepository,
+            userAuthoritiesLoader,
+            userService,
+            authorityRepository,
+            passwordEncoder,
+            realJwtTokenService
+        );
 
         StepVerifier.create(service.tokenFor(oauthUser)).expectNextMatches(token -> token != null && !token.isBlank()).verifyComplete();
         org.mockito.Mockito.verify(userService, org.mockito.Mockito.never()).saveUser(any(User.class));

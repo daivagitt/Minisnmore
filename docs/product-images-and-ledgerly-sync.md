@@ -1,19 +1,25 @@
 # Product images and Ledgerly / Zoho sync
 
+> **Updated 2026-08-03:** Per-print galleries and Ledgerly `colorImagesJson` sync are now implemented.  
+> **See the full guide:** [sku-wise-print-and-ledgerly-images.md](./sku-wise-print-and-ledgerly-images.md)  
+> **Swatch fallback chain:** [swatch-url-fallback.md](./swatch-url-fallback.md)
+
 How product photos reach the Mini's n More storefront, what Ledgerly sync includes, and what the legacy Zoho integration used to do.
 
 **UAT stack:** Ledgerly (Zoho Books integration service stopped).  
-**Last updated:** 2026-06-30
+**Last updated:** 2026-08-03 (pointer added; details in linked doc)
 
 ---
 
-## Short answer
+## Short answer (current behaviour)
 
-**An image you add in Ledgerly or Zoho Books does not automatically appear on the website.**
+**Per-print lifestyle galleries can sync from Ledgerly** via `colorImagesJson` (downloaded to R2 when `LEDGERLY_SYNC_PRODUCT_IMAGES=true`).
 
-Product photos are managed in **Admin → Products**, stored in **Cloudflare R2** (S3-compatible), and saved on each product as `images_json` in the catalog database. The storefront reads those URLs only.
+**Print swatches** (`swatchUrl`) are **not** part of the Ledgerly protocol — upload in Admin or use `uat-restore-print-swatch-images.py`.
 
-Ledgerly commerce sync moves **SKU, name, price, stock, and description** — not images.
+**Listing hero** can sync via Ledgerly `imageUrl`.
+
+For the full data model, xlsx import flow, **swatch mapping**, API schema, and implementation plan, read **[sku-wise-print-and-ledgerly-images.md](./sku-wise-print-and-ledgerly-images.md)** (see §3 Swatch mapping).
 
 ---
 

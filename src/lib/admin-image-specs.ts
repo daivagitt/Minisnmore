@@ -10,11 +10,11 @@ export type ImageSpec = {
 };
 
 export const ADMIN_IMAGE_SPECS = {
-  /** Homepage hero carousel (full-width, object-cover) */
+  /** Homepage hero carousel — object-contain (full photo, no crop) */
   homepageBanner: {
     ratio: "Wide (~2 : 1)",
     recommendedPx: "1920 × 900 px",
-    notes: "Keep the subject center-left — headline text sits on the left.",
+    notes: "Full image is shown (not cropped). Keep the subject on the right; headline text sits on the left.",
   },
   /** Shop by age, gift cards, product cards */
   portraitCard: {
@@ -48,9 +48,10 @@ export const ADMIN_IMAGE_SPECS = {
     notes: "Shown small in the shop menu dropdown.",
   },
   productGallery: {
-    ratio: "4 : 5",
-    recommendedPx: "1200 × 1500 px",
-    notes: "Main product gallery and shop cards — lifestyle/product photos only.",
+    ratio: "Any (landscape or square)",
+    recommendedPx: "1200 px max on longest edge",
+    notes:
+      "Aspect ratio is preserved on upload and on the product page — landscape lifestyle shots fill the frame without letterboxing.",
   },
   printSwatch: {
     ratio: "1 : 1",

@@ -15,7 +15,15 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.model.Delete;
+import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectsResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
+import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Error;
+import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
@@ -114,6 +122,131 @@ public class S3StorageService {
         }
         return publicObjectUrl(objectKey);
     }
+
+    /**
+     * List stored objects under a folder (for gallery recovery). Requires R2 token with ListBucket permission.
+     */
+    public List<StoredObject> listObjects(String folder, String suffix, int maxKeys) {
+        validateConfig();
+        int limit = maxKeys <= 0 ? 1000 : Math.min(maxKeys, 5000);
+        var safeFolder = validateFolder(folder);
+        var prefix = normalizeKeyPrefix(properties.getKeyPrefix());
+        var fullPrefix = prefix.isEmpty() ? safeFolder + "/" : prefix + "/" + safeFolder + "/";
+        var suffixNorm = suffix == null || suffix.isBlank() ? "" : suffix.trim().toLowerCase(Locale.ROOT);
+        List<StoredObject> out = new ArrayList<>();
+        String continuationToken = null;
+        do {
+            var requestBuilder = ListObjectsV2Request.builder()
+                .bucket(properties.getBucket())
+                .prefix(fullPrefix)
+                .maxKeys(Math.min(limit - out.size(), 1000));
+            if (continuationToken != null) {
+                requestBuilder.continuationToken(continuationToken);
+            }
+            ListObjectsV2Response response;
+            try {
+                response = client().listObjectsV2(requestBuilder.build());
+            } catch (Exception ex) {
+                throw storageListException(ex);
+            }
+            for (S3Object object : response.contents()) {
+                if (object.key() == null) {
+                    continue;
+                }
+                String key = object.key();
+                if (!suffixNorm.isEmpty() && !key.toLowerCase(Locale.ROOT).contains(suffixNorm)) {
+                    continue;
+                }
+                out.add(
+                    new StoredObject(
+                        key,
+                        publicObjectUrl(key),
+                        object.lastModified(),
+                        object.size() == null ? 0L : object.size()
+                    )
+                );
+                if (out.size() >= limit) {
+                    return out;
+                }
+            }
+            continuationToken = response.isTruncated() ? response.nextContinuationToken() : null;
+        } while (continuationToken != null && out.size() < limit);
+        return out;
+    }
+
+    /** Delete objects by key. Returns count successfully removed. */
+    public int deleteObjects(List<String> keys) {
+        validateConfig();
+        if (keys == null || keys.isEmpty()) {
+            return 0;
+        }
+        var bucket = properties.getBucket();
+        int deleted = 0;
+        for (int offset = 0; offset < keys.size(); offset += 1000) {
+            var batch = keys.subList(offset, Math.min(offset + 1000, keys.size()));
+            var identifiers = new ArrayList<ObjectIdentifier>();
+            for (String key : batch) {
+                if (key == null || key.isBlank()) {
+                    continue;
+                }
+                identifiers.add(ObjectIdentifier.builder().key(key.trim()).build());
+            }
+            if (identifiers.isEmpty()) {
+                continue;
+            }
+            try {
+                DeleteObjectsResponse response = client()
+                    .deleteObjects(
+                        DeleteObjectsRequest.builder()
+                            .bucket(bucket)
+                            .delete(Delete.builder().objects(identifiers).quiet(true).build())
+                            .build()
+                    );
+                deleted += response.deleted() == null ? 0 : response.deleted().size();
+                if (response.errors() != null) {
+                    for (S3Error error : response.errors()) {
+                        if (error.key() != null && !error.key().isBlank()) {
+                            throw new ResponseStatusException(
+                                HttpStatus.BAD_GATEWAY,
+                                "R2 delete failed for " + error.key() + ": " + error.message()
+                            );
+                        }
+                    }
+                }
+            } catch (ResponseStatusException ex) {
+                throw ex;
+            } catch (Exception ex) {
+                throw storageDeleteException(ex);
+            }
+        }
+        return deleted;
+    }
+
+    private ResponseStatusException storageDeleteException(Exception ex) {
+        var message = ex.getMessage() == null ? "" : ex.getMessage();
+        if (message.contains("AccessDenied") || message.contains("Access Denied") || message.contains("403")) {
+            return new ResponseStatusException(
+                HttpStatus.BAD_GATEWAY,
+                "R2 delete denied — grant Object Read & Write on API token",
+                ex
+            );
+        }
+        return new ResponseStatusException(HttpStatus.BAD_GATEWAY, "R2 delete failed: " + message, ex);
+    }
+
+    private ResponseStatusException storageListException(Exception ex) {
+        var message = ex.getMessage() == null ? "" : ex.getMessage();
+        if (message.contains("AccessDenied") || message.contains("Access Denied") || message.contains("403")) {
+            return new ResponseStatusException(
+                HttpStatus.BAD_GATEWAY,
+                "R2 list denied — grant ListBucket on API token (Cloudflare R2 → Manage API Tokens)",
+                ex
+            );
+        }
+        return new ResponseStatusException(HttpStatus.BAD_GATEWAY, "R2 list failed: " + message, ex);
+    }
+
+    public record StoredObject(String key, String publicUrl, Instant lastModified, long sizeBytes) {}
 
     private Map<String, String> headersForClient(PresignedPutObjectRequest presigned) {
         var headers = new LinkedHashMap<String, String>();

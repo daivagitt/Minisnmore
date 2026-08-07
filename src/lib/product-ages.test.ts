@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agesFromSizes, sizeToAgeBand } from "./product-ages";
+import { agesFromSizes, sizeToAgeBand, sortSizesAsc } from "./product-ages";
 
 describe("product-ages", () => {
   it("maps size labels case-insensitively", () => {
@@ -17,5 +17,15 @@ describe("product-ages", () => {
 
   it("falls back to month range when sizes are missing", () => {
     expect(agesFromSizes([], { min: 6, max: 12 })).toEqual(["6-12m"]);
+  });
+
+  it("sorts sizes in ascending age-band order", () => {
+    expect(sortSizesAsc(["18-24m", "0-3m", "6-12m", "3-6m"])).toEqual([
+      "0-3m",
+      "3-6m",
+      "6-12m",
+      "18-24m",
+    ]);
+    expect(sortSizesAsc(["One Size", "0-3m", "3-6m"])).toEqual(["0-3m", "3-6m", "One Size"]);
   });
 });

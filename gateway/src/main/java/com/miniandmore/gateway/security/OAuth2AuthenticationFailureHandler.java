@@ -36,22 +36,52 @@ public class OAuth2AuthenticationFailureHandler implements ServerAuthenticationF
     static String friendlyMessage(AuthenticationException exception) {
         if (exception instanceof OAuth2AuthenticationException oauth2Ex && oauth2Ex.getError() != null) {
             var code = oauth2Ex.getError().getErrorCode();
+            var mapped = mapOAuthCode(code);
+            if (mapped != null) {
+                return mapped;
+            }
             var description = oauth2Ex.getError().getDescription();
-            if ("invalid_client".equals(code) || "unauthorized_client".equals(code)) {
-                return "Social sign-in is misconfigured on the server (missing or invalid client secret).";
-            }
-            if ("redirect_uri_mismatch".equals(code)) {
-                return "Social sign-in redirect URI is not registered for this site.";
-            }
-            if (description != null && !description.isBlank()) {
+            if (description != null && !description.isBlank() && description.length() <= 180 && !looksTechnical(description)) {
                 return description;
-            }
-            if (code != null && !code.isBlank()) {
-                return code;
             }
         }
         var message = exception.getMessage();
-        return message == null || message.isBlank() ? "Social sign-in failed. Please try again." : message;
+        if (message != null && !message.isBlank() && message.length() <= 180 && !looksTechnical(message)) {
+            return message;
+        }
+        return "Social sign-in failed. Please try again, or create an account with email.";
+    }
+
+    private static String mapOAuthCode(String code) {
+        if (code == null || code.isBlank()) {
+            return null;
+        }
+        return switch (code) {
+            case "invalid_client", "unauthorized_client" ->
+                "Social sign-in is misconfigured on the server. Please try again later or use email sign-up.";
+            case "redirect_uri_mismatch" ->
+                "Social sign-in redirect URI is not registered for this site. Please contact support.";
+            case "access_denied" ->
+                "Sign-in was cancelled. You can try again or create an account with email.";
+            case "invalid_grant", "invalid_token" ->
+                "Social sign-in expired. Please try Continue with Google again.";
+            case "server_error", "temporarily_unavailable" ->
+                "Google or the social provider is temporarily unavailable. Please try again in a moment.";
+            case "invalid_scope", "insufficient_scope" ->
+                "We could not get the permissions needed to sign you in. Please try again and allow email access.";
+            case "account_selection_required", "interaction_required", "login_required" ->
+                "Please complete sign-in with your social account, then try again.";
+            default -> null;
+        };
+    }
+
+    private static boolean looksTechnical(String message) {
+        String lower = message.toLowerCase();
+        return lower.contains("exception") ||
+            lower.contains("oauth2error") ||
+            lower.contains("at org.") ||
+            lower.contains("at com.") ||
+            message.contains("\n");
     }
 
     private Mono<Void> redirect(ServerWebExchange exchange, String location) {

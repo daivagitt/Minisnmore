@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { oauthCallbackErrorMessage } from "@/lib/auth-errors";
 
 const Search = z.object({
   token: z.string().optional(),
@@ -26,21 +27,24 @@ function AuthCallback() {
     handledRef.current = true;
 
     if (search.error) {
-      toast.error(search.error);
-      navigate({ to: "/login", replace: true });
+      const message = oauthCallbackErrorMessage(search.error);
+      toast.error(message, { id: "oauth-error" });
+      navigate({ to: "/login", search: { error: message }, replace: true });
       return;
     }
 
     if (!search.token) {
-      toast.error("Missing login token");
-      navigate({ to: "/login", replace: true });
+      const message = "Social sign-in did not return a login token. Please try again.";
+      toast.error(message, { id: "oauth-error" });
+      navigate({ to: "/login", search: { error: message }, replace: true });
       return;
     }
 
     void completeOAuthSignIn(search.token).then(({ error }) => {
       if (error) {
-        toast.error(error);
-        navigate({ to: "/login", replace: true });
+        const message = oauthCallbackErrorMessage(error);
+        toast.error(message, { id: "oauth-error" });
+        navigate({ to: "/login", search: { error: message }, replace: true });
         return;
       }
       const redirect =

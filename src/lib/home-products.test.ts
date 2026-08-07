@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Product } from "@/data/products";
 import {
+  HOME_SECTION_PRODUCT_KEYS,
   HOME_SECTION_PRODUCT_LIMIT,
   getHomeSectionProductSlugErrors,
   normalizeHomeSectionProductSlugs,
@@ -30,6 +31,10 @@ const sample = (slug: string, flags: Partial<Product> = {}): Product =>
   }) as Product;
 
 describe("home-products", () => {
+  it("includes gifts in product section keys", () => {
+    expect(HOME_SECTION_PRODUCT_KEYS).toContain("gifts");
+  });
+
   it("reads product slugs from section payload", () => {
     expect(sectionProductSlugs({ product_slugs: ["a", "", 1, "b"] })).toEqual(["a", "b"]);
     expect(sectionProductSlugs({})).toEqual([]);

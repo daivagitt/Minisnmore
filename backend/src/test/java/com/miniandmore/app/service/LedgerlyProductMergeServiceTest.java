@@ -285,6 +285,69 @@ class LedgerlyProductMergeServiceTest {
     }
 
     @Test
+    void mergeLedgerlyItem_preservesVariantSwatchUrlsFromStringPayload() {
+        Product product = new Product().sku("BODY-SUIT-HALF-SLEEVE").price(BigDecimal.ZERO).stock(0).active(true);
+        String swatch = "https://cdn.example.com/aqua-swatch.jpg";
+        String variantsJson =
+            "[{\"sku\":\"BODY-SUIT-03-P1\",\"size\":\"0-3 M\",\"color\":\"AQUA\",\"rate\":240,\"mrp\":300,\"stock\":15,\"active\":true,\"swatchUrl\":\""
+                + swatch
+                + "\"}]";
+        Map<String, Object> item = Map.of(
+            "price",
+            240,
+            "stock",
+            15,
+            "itemStructure",
+            "VARIANTS",
+            "variantsJson",
+            variantsJson
+        );
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+
+        assertThat(product.getVariantsJson()).contains("swatchUrl").contains(swatch);
+        assertThat(product.getItemStructure()).isEqualTo("VARIANTS");
+    }
+
+    @Test
+    void mergeLedgerlyItem_preservesVariantSwatchUrlsFromDecodedListPayload() {
+        Product product = new Product().sku("BODY-SUIT-HALF-SLEEVE").price(BigDecimal.ZERO).stock(0).active(true);
+        String swatch = "https://cdn.example.com/bird-swatch.jpg";
+        List<Map<String, Object>> variants = List.of(
+            Map.of(
+                "sku",
+                "BODY-SUIT-03-P2",
+                "size",
+                "0-3 M",
+                "color",
+                "BIRD",
+                "rate",
+                240,
+                "stock",
+                12,
+                "active",
+                true,
+                "swatchUrl",
+                swatch
+            )
+        );
+        Map<String, Object> item = Map.of(
+            "price",
+            240,
+            "stock",
+            12,
+            "itemStructure",
+            "VARIANTS",
+            "variantsJson",
+            variants
+        );
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+
+        assertThat(product.getVariantsJson()).contains("swatchUrl").contains(swatch);
+    }
+
+    @Test
     void buildPushPayload_includesColorGalleryMap() {
         when(itemImageSync.firstImageUrl(any())).thenReturn(null);
         Product product = new Product()

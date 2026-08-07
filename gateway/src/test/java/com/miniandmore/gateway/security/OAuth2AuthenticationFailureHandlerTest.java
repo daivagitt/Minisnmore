@@ -46,22 +46,32 @@ class OAuth2AuthenticationFailureHandlerTest {
     }
 
     @Test
-    void friendlyMessage_usesDescriptionOrCode() {
-        OAuth2Error withDescription = new OAuth2Error("server_error", "provider down", null);
-        assertThat(OAuth2AuthenticationFailureHandler.friendlyMessage(new OAuth2AuthenticationException(withDescription))).isEqualTo(
-            "provider down"
-        );
+    void friendlyMessage_mapsProviderCodesToHumanText() {
+        OAuth2Error accessDenied = new OAuth2Error("access_denied", null, null);
+        assertThat(OAuth2AuthenticationFailureHandler.friendlyMessage(new OAuth2AuthenticationException(accessDenied)))
+            .contains("cancelled");
 
-        OAuth2Error withCode = new OAuth2Error("temporarily_unavailable", null, null);
-        assertThat(OAuth2AuthenticationFailureHandler.friendlyMessage(new OAuth2AuthenticationException(withCode))).isEqualTo(
-            "temporarily_unavailable"
-        );
+        OAuth2Error serverError = new OAuth2Error("server_error", "provider down", null);
+        assertThat(OAuth2AuthenticationFailureHandler.friendlyMessage(new OAuth2AuthenticationException(serverError)))
+            .contains("temporarily unavailable");
+
+        OAuth2Error unknown = new OAuth2Error("custom_code", "Please allow email access", null);
+        assertThat(OAuth2AuthenticationFailureHandler.friendlyMessage(new OAuth2AuthenticationException(unknown)))
+            .isEqualTo("Please allow email access");
     }
 
     @Test
     void friendlyMessage_defaultsWhenBlank() {
         assertThat(OAuth2AuthenticationFailureHandler.friendlyMessage(new org.springframework.security.authentication.BadCredentialsException("")))
             .contains("Social sign-in failed");
+    }
+
+    @Test
+    void friendlyMessage_hidesRawOAuthCodes() {
+        OAuth2Error withCode = new OAuth2Error("temporarily_unavailable", null, null);
+        assertThat(OAuth2AuthenticationFailureHandler.friendlyMessage(new OAuth2AuthenticationException(withCode)))
+            .doesNotContain("temporarily_unavailable")
+            .contains("temporarily unavailable");
     }
 
     @Test

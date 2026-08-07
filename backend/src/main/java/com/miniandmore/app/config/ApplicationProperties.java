@@ -188,6 +188,10 @@ public class ApplicationProperties {
 
         private boolean syncProductImages = false;
 
+        private boolean autoSyncEnabled = false;
+
+        private boolean autoPullEnabled = false;
+
         private final Schedulers schedulers = new Schedulers();
 
         public String getApiBaseUrl() {
@@ -228,6 +232,22 @@ public class ApplicationProperties {
 
         public void setSyncProductImages(boolean syncProductImages) {
             this.syncProductImages = syncProductImages;
+        }
+
+        public boolean isAutoSyncEnabled() {
+            return autoSyncEnabled;
+        }
+
+        public void setAutoSyncEnabled(boolean autoSyncEnabled) {
+            this.autoSyncEnabled = autoSyncEnabled;
+        }
+
+        public boolean isAutoPullEnabled() {
+            return autoPullEnabled;
+        }
+
+        public void setAutoPullEnabled(boolean autoPullEnabled) {
+            this.autoPullEnabled = autoPullEnabled;
         }
 
         public Schedulers getSchedulers() {

@@ -81,7 +81,7 @@ const SECTION_HINTS: Record<string, string> = {
   reviews: "Scrolling mom reviews. Edit review cards in the editor below — at least one row recommended.",
   journal_strip:
     "Blog teaser strip on the homepage. Add up to five blog cards below or leave empty for the latest posts.",
-  gifts: "Gift bundle cards. Title/subtitle customize the section header above the grid.",
+  gifts: "Shows five gift picks on the homepage. Pick up to five below or leave empty for gift-set category items.",
   gift_concierge: "Legacy concierge block — usually hidden on the live storefront.",
 };
 

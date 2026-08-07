@@ -108,6 +108,64 @@ class ProductVariantSupportTest {
     }
 
     @Test
+    void applyMatrixPreservesVariantSwatchUrls() {
+        Product product = new Product().sku("BODY-SUIT").price(BigDecimal.ZERO).stock(0);
+        String swatch = "https://cdn.example.com/aqua-swatch.jpg";
+        String json =
+            """
+            [{"sku":"BODY-SUIT-03-P1","size":"0-3 M","color":"AQUA","rate":240,"mrp":300,"stock":15,"active":true,"swatchUrl":"%s"}]
+            """.formatted(swatch);
+        support.applyMatrixToProduct(product, "VARIANTS", json);
+        assertThat(product.getVariantsJson()).contains("swatchUrl").contains(swatch);
+        List<VariantRow> rows = support.parseProduct(product);
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).swatchUrl()).isEqualTo(swatch);
+    }
+
+    @Test
+    void applyMatrixPreservesSwatchUrlFromSnakeCaseField() {
+        Product product = new Product().sku("BODY-SUIT").price(BigDecimal.ZERO).stock(0);
+        String swatch = "https://cdn.example.com/bird-swatch.jpg";
+        String json =
+            """
+            [{"sku":"BODY-SUIT-03-P2","size":"0-3 M","color":"BIRD","rate":240,"stock":10,"active":true,"swatch_url":"%s"}]
+            """.formatted(swatch);
+        support.applyMatrixToProduct(product, "VARIANTS", json);
+        assertThat(support.parseProduct(product).get(0).swatchUrl()).isEqualTo(swatch);
+        assertThat(product.getVariantsJson()).contains("\"swatchUrl\"").contains(swatch);
+    }
+
+    @Test
+    void coerceVariantsJsonListPreservesSwatchUrlThroughApplyMatrix() {
+        String swatch = "https://cdn.example.com/snail-swatch.jpg";
+        String json = support.coerceVariantsJson(
+            List.of(
+                Map.of(
+                    "sku",
+                    "BODY-SUIT-03-P3",
+                    "size",
+                    "0-3 M",
+                    "color",
+                    "SNAIL",
+                    "rate",
+                    240,
+                    "stock",
+                    8,
+                    "active",
+                    true,
+                    "swatchUrl",
+                    swatch
+                )
+            )
+        );
+        Product product = new Product().sku("BODY-SUIT").price(BigDecimal.ZERO).stock(0);
+        support.applyMatrixToProduct(product, "VARIANTS", json);
+        assertThat(product.getVariantsJson()).contains(swatch);
+        assertThat(support.decrementVariantStock(product, "BODY-SUIT-03-P3", "0-3 M", "SNAIL", 1)).isTrue();
+        assertThat(support.parseProduct(product).get(0).swatchUrl()).isEqualTo(swatch);
+    }
+
+    @Test
     void neverTreatsParentAsVariantWhenSimple() {
         Product product = new Product().sku("SIMPLE-1").itemStructure("SIMPLE").price(BigDecimal.TEN).stock(5);
         assertThat(support.isVariants(product)).isFalse();

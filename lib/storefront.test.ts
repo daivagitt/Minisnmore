@@ -98,8 +98,8 @@ describe("storefront cache", () => {
     });
 
     const products = await storefront.loadProducts();
-    expect(products[0]?.image).not.toBe("https://cdn.example.com/print1.jpg");
-    expect(products[0]?.gallery).toEqual([]);
+    expect(products[0]?.image).toBe("https://cdn.example.com/print1.jpg");
+    expect(products[0]?.gallery).toEqual(["https://cdn.example.com/print1.jpg"]);
     expect(products[0]?.colors[0]?.imageUrls).toEqual(["https://cdn.example.com/print1.jpg"]);
   });
 

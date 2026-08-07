@@ -1,10 +1,14 @@
 import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { oauthCallbackErrorMessage } from "@/lib/auth-errors";
 import { toast } from "sonner";
 import { z } from "zod";
 
-const Search = z.object({ redirect: z.string().optional() });
+const Search = z.object({
+  redirect: z.string().optional(),
+  error: z.string().optional(),
+});
 
 export const Route = createFileRoute("/login")({
   validateSearch: (s) => Search.parse(s),
@@ -12,7 +16,7 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
-function LoginPage() {
+export function LoginPage() {
   const { signIn, signUp, signInWithOAuth, user, loading } = useAuth();
   const defaultAfterLogin = "/account";
   const nav = useNavigate();
@@ -25,10 +29,23 @@ function LoginPage() {
   const [googleBusy, setGoogleBusy] = useState(false);
   const [appleBusy, setAppleBusy] = useState(false);
   const [facebookBusy, setFacebookBusy] = useState(false);
+  const oauthErrorShown = useRef(false);
 
   useEffect(() => {
     if (!loading && user) nav({ to: (search.redirect as any) || defaultAfterLogin });
   }, [user, loading, nav, search.redirect, defaultAfterLogin]);
+
+  useEffect(() => {
+    if (!search.error || oauthErrorShown.current) return;
+    oauthErrorShown.current = true;
+    toast.error(oauthCallbackErrorMessage(search.error), { id: "oauth-error" });
+    // Clear the error from the URL so refresh doesn't re-toast forever.
+    void nav({
+      to: "/login",
+      search: search.redirect ? { redirect: search.redirect } : {},
+      replace: true,
+    });
+  }, [nav, search.error, search.redirect]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,19 +58,33 @@ function LoginPage() {
       toast.error(error, { id: "login-error" });
       return;
     }
-    if (mode === "signup") toast.success("Almost there — check your inbox to confirm.");
-    else nav({ to: (search.redirect as any) || defaultAfterLogin });
+    if (mode === "signup") {
+      toast.success("Almost there — check your inbox and open the activation link to finish.");
+      setMode("signin");
+      return;
+    }
+    nav({ to: (search.redirect as any) || defaultAfterLogin });
+  };
+
+  const startOAuth = async (provider: "google" | "apple" | "facebook", label: string) => {
+    try {
+      const { error } = await signInWithOAuth(provider, "/account");
+      if (error) toast.error(error, { id: "oauth-error" });
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.error(`${label} OAuth failed`, err);
+      }
+      toast.error(
+        `${label} sign-in could not be started. Please try again or use email instead.`,
+        { id: "oauth-error" },
+      );
+    }
   };
 
   const onGoogle = async () => {
     setGoogleBusy(true);
     try {
-      const { error } = await signInWithOAuth("google", "/account");
-      if (error) toast.error(error);
-    } catch (err) {
-      if (process.env.NODE_ENV !== "production") {
-        console.error("Google OAuth failed", err);
-      }
+      await startOAuth("google", "Google");
     } finally {
       setGoogleBusy(false);
     }
@@ -62,12 +93,7 @@ function LoginPage() {
   const onApple = async () => {
     setAppleBusy(true);
     try {
-      const { error } = await signInWithOAuth("apple", "/account");
-      if (error) toast.error(error);
-    } catch (err) {
-      if (process.env.NODE_ENV !== "production") {
-        console.error("Apple OAuth failed", err);
-      }
+      await startOAuth("apple", "Apple");
     } finally {
       setAppleBusy(false);
     }
@@ -76,12 +102,7 @@ function LoginPage() {
   const onFacebook = async () => {
     setFacebookBusy(true);
     try {
-      const { error } = await signInWithOAuth("facebook", "/account");
-      if (error) toast.error(error);
-    } catch (err) {
-      if (process.env.NODE_ENV !== "production") {
-        console.error("Facebook OAuth failed", err);
-      }
+      await startOAuth("facebook", "Facebook");
     } finally {
       setFacebookBusy(false);
     }

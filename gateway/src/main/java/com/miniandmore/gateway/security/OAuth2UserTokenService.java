@@ -4,6 +4,7 @@ import com.miniandmore.gateway.config.Constants;
 import com.miniandmore.gateway.domain.Authority;
 import com.miniandmore.gateway.domain.User;
 import com.miniandmore.gateway.repository.AuthorityRepository;
+import com.miniandmore.gateway.repository.UserAuthoritiesLoader;
 import com.miniandmore.gateway.repository.UserRepository;
 import com.miniandmore.gateway.service.UserService;
 import java.util.*;
@@ -22,6 +23,7 @@ public class OAuth2UserTokenService {
     private static final Logger LOG = LoggerFactory.getLogger(OAuth2UserTokenService.class);
 
     private final UserRepository userRepository;
+    private final UserAuthoritiesLoader userAuthoritiesLoader;
     private final UserService userService;
     private final AuthorityRepository authorityRepository;
     private final PasswordEncoder passwordEncoder;
@@ -29,12 +31,14 @@ public class OAuth2UserTokenService {
 
     public OAuth2UserTokenService(
         UserRepository userRepository,
+        UserAuthoritiesLoader userAuthoritiesLoader,
         UserService userService,
         AuthorityRepository authorityRepository,
         PasswordEncoder passwordEncoder,
         JwtTokenService jwtTokenService
     ) {
         this.userRepository = userRepository;
+        this.userAuthoritiesLoader = userAuthoritiesLoader;
         this.userService = userService;
         this.authorityRepository = authorityRepository;
         this.passwordEncoder = passwordEncoder;
@@ -70,23 +74,37 @@ public class OAuth2UserTokenService {
 
     private Mono<User> loadOrCreateUser(String email, OAuth2User oauthUser) {
         return removeInactiveDuplicate(email)
-            .then(userRepository.findOneWithAuthoritiesByEmailIgnoreCaseForOAuth(email))
-            .switchIfEmpty(Mono.defer(() -> userRepository.findOneWithAuthoritiesByLoginForOAuth(loginForEmail(email))))
+            .then(findExistingUserWithAuthorities(email))
             .switchIfEmpty(Mono.defer(() -> createAndSaveUser(email, oauthUser)))
             .onErrorResume(
                 DataIntegrityErrors::isDuplicateUserIdentity,
                 ex -> {
                     LOG.warn("OAuth account race for {}, loading existing user instead", email);
-                    return userRepository
-                        .findOneWithAuthoritiesByEmailIgnoreCaseForOAuth(email)
-                        .switchIfEmpty(userRepository.findOneWithAuthoritiesByLoginForOAuth(loginForEmail(email)));
+                    return findExistingUserWithAuthorities(email);
                 }
             );
     }
 
+    private Mono<User> findExistingUserWithAuthorities(String email) {
+        return userRepository
+            .findOneWithAuthoritiesByEmailIgnoreCaseForOAuth(email)
+            .switchIfEmpty(Mono.defer(() -> userRepository.findOneWithAuthoritiesByLoginForOAuth(loginForEmail(email))))
+            .flatMap(userAuthoritiesLoader::withAuthorities);
+    }
+
     private Mono<Void> removeInactiveDuplicate(String email) {
         String login = loginForEmail(email);
-        return userRepository.deleteInactiveByLogin(login).then(userRepository.deleteInactiveByEmail(email));
+        return userRepository
+            .findOneByLogin(login)
+            .filter(user -> !user.isActivated())
+            .flatMap(user -> userRepository.deleteUserAuthorities(user.getId()).then(userRepository.delete(user)))
+            .then(
+                userRepository
+                    .findOneByEmailIgnoreCase(email)
+                    .filter(user -> !user.isActivated())
+                    .flatMap(user -> userRepository.deleteUserAuthorities(user.getId()).then(userRepository.delete(user)))
+            )
+            .then();
     }
 
     private Mono<User> createAndSaveUser(String email, OAuth2User oauthUser) {

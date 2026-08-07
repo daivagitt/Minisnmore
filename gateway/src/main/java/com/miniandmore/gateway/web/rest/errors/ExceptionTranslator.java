@@ -230,6 +230,12 @@ public class ExceptionTranslator extends ResponseEntityExceptionHandler implemen
 
     private String getCustomizedTitle(Throwable err) {
         if (err instanceof MethodArgumentNotValidException) return "Method argument not valid";
+        if (err instanceof BadRequestAlertException alert && alert.getBody() != null) {
+            String title = alert.getBody().getTitle();
+            if (title != null && !title.isBlank()) {
+                return title;
+            }
+        }
         return null;
     }
 

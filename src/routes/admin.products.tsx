@@ -29,6 +29,7 @@ import { getUserErrorMessage, showApiError, showValidationErrors } from "@/lib/u
 import { api } from "@/lib/api";
 import { sanitizePublicUrl } from "@/lib/utils";
 import { IMAGE_ACCEPT, validateAdminImageFile } from "@/lib/admin-image";
+import { prepareProductImageForUpload } from "@/lib/product-image-normalize";
 import {
   ADMIN_NAME_MAX_LEN,
   bulkSave,
@@ -78,6 +79,7 @@ const empty: Product = {
   badge: "",
   hsn: null,
   tax_pct: 5,
+  units: "ea",
   stock: null,
   sort_order: null,
   featured: false,
@@ -151,14 +153,15 @@ function ProductsPage() {
     try {
       for (const f of accepted) {
         try {
-          urls.push(await uploadAdminImage("products", f));
+          const prepared = await prepareProductImageForUpload(f, "gallery");
+          urls.push(await uploadAdminImage("products", prepared));
         } catch (error) {
           showApiError(error, "Upload failed");
         }
       }
       if (urls.length) {
         setRows((r) => r.map((x, j) => (j === i ? { ...x, images: [...x.images, ...urls] } : x)));
-        toast.success(`${urls.length} image(s) uploaded. Click Save to keep them.`);
+        toast.success(`${urls.length} image(s) normalized to square and uploaded. Click Save to keep them.`);
       }
     } finally {
       setImageUploading(null);
@@ -217,6 +220,20 @@ function ProductsPage() {
         return next;
       });
     }
+  };
+
+  const saveWithColorGallery = async (p: Product, colorIndex: number, imageUrls: string[]) => {
+    const colors = ensureColorEntries(p.colors).map((entry, ci) =>
+      ci === colorIndex ? { ...entry, imageUrls } : entry,
+    );
+    await save({ ...p, colors });
+  };
+
+  const saveWithColorSwatch = async (p: Product, colorIndex: number, swatchUrl: string) => {
+    const colors = ensureColorEntries(p.colors).map((entry, ci) =>
+      ci === colorIndex ? { ...entry, swatchUrl } : entry,
+    );
+    await save({ ...p, colors });
   };
 
   const save = async (p: Product) => {
@@ -340,7 +357,7 @@ function ProductsPage() {
             className={`rounded-full border border-amber-600 bg-amber-50 text-amber-900 px-4 py-2.5 text-sm flex items-center gap-2 cursor-pointer hover:bg-amber-100 transition ${
               skuWiseImporting ? "opacity-60 pointer-events-none" : ""
             }`}
-            title="Import products from SKU WISE PRINT spreadsheet (clears existing products)"
+            title="Import products from SKU WISE PRINT spreadsheet (upserts by parent SKU)"
           >
             {skuWiseImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
             {skuWiseImporting ? "Importing..." : "SKU-wise Print Import"}
@@ -352,7 +369,7 @@ function ProductsPage() {
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) {
-                  if (confirm("This will delete all existing products and import from the spreadsheet. Continue?")) {
+                  if (confirm("Import from spreadsheet? Existing products with matching parent SKU will be updated; new styles will be added. Products not in the file stay unchanged.")) {
                     importSkuWisePrint(file);
                   }
                 }
@@ -556,6 +573,21 @@ function ProductsPage() {
                         placeholder="0"
                       />
                     </div>
+                    <div className="grid sm:grid-cols-3 gap-3">
+                      <Field label="Units (UOM)">
+                        <select
+                          className={inputCls()}
+                          value={p.units ?? "ea"}
+                          onChange={(e) => update(i, { units: e.target.value })}
+                        >
+                          <option value="ea">ea — each / piece</option>
+                          <option value="pc">pc — piece</option>
+                          <option value="set">set — set</option>
+                          <option value="pair">pair — pair</option>
+                          <option value="pack">pack — pack</option>
+                        </select>
+                      </Field>
+                    </div>
                     <div className="grid sm:grid-cols-2 gap-3">
                       <AgeRangeField
                         min={p.age_min_months}
@@ -612,6 +644,8 @@ function ProductsPage() {
                         <ColorImagesEditor
                           colors={p.colors ?? []}
                           onPatchColor={(colorIndex, patch) => patchProductColor(i, colorIndex, patch)}
+                          onGalleryUploaded={({ index, imageUrls }) => saveWithColorGallery(p, index, imageUrls)}
+                          onSwatchUploaded={({ index, swatchUrl }) => saveWithColorSwatch(p, index, swatchUrl)}
                         />
                         <VariantsMatrixEditor
                           parentSku={p.sku?.trim() || suggestParentSku(p.name || "")}
@@ -644,6 +678,8 @@ function ProductsPage() {
                           <ColorImagesEditor
                             colors={p.colors ?? []}
                             onPatchColor={(colorIndex, patch) => patchProductColor(i, colorIndex, patch)}
+                            onGalleryUploaded={({ index, imageUrls }) => saveWithColorGallery(p, index, imageUrls)}
+                          onSwatchUploaded={({ index, swatchUrl }) => saveWithColorSwatch(p, index, swatchUrl)}
                           />
                         ) : null}
                       </>

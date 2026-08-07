@@ -4,14 +4,16 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useShop } from "@/store/shop";
 import {
-  colorsForSize,
+  colorNameInList,
   defaultSellableSelection,
   findVariant,
   isVariantSellable,
   isVariantsProduct,
+  sellableColorsForSize,
 } from "@/lib/product-variants";
+import { StockAvailability, stockAvailabilityState } from "@/components/StockAvailability";
+import { VariantColorButtons, VariantSizeButtons, variantColorsForDisplay } from "@/components/VariantPickers";
 import { galleryForSelectedColor } from "@/lib/product-gallery";
-import { swatchImageForColor } from "@/lib/product-colors";
 
 export function QuickView() {
   const { quickView, setQuickView, addToCart } = useShop();
@@ -27,8 +29,8 @@ export function QuickView() {
 
   useEffect(() => {
     if (!quickView || !size) return;
-    const available = colorsForSize(quickView, size);
-    setColor((prev) => (prev && available.includes(prev) ? prev : available[0] ?? null));
+    const sellable = sellableColorsForSize(quickView, size);
+    setColor((prev) => (prev && colorNameInList(prev, sellable) ? prev : sellable[0] ?? null));
   }, [quickView, size]);
 
   const selectedVariant = useMemo(
@@ -42,11 +44,13 @@ export function QuickView() {
     : isVariantsProduct(quickView)
       ? isVariantSellable(selectedVariant)
       : true;
+  const stockState = useMemo(
+    () => (quickView ? stockAvailabilityState(quickView, selectedVariant, { size, color }) : null),
+    [quickView, selectedVariant, size, color],
+  );
   const availableColors = useMemo(() => {
     if (!quickView) return [];
-    const names = colorsForSize(quickView, size);
-    if (!isVariantsProduct(quickView)) return quickView.colors;
-    return quickView.colors.filter((c) => names.includes(c.name));
+    return variantColorsForDisplay(quickView, size);
   }, [quickView, size]);
 
   const colorGallery = useMemo(
@@ -65,8 +69,20 @@ export function QuickView() {
             transition={{ duration: 0.4, ease: [0.2, 0.8, 0.2, 1] }}
             className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-[71] md:w-[820px] max-h-[90vh]">
             <div className="glass-strong rounded-[2rem] overflow-hidden grid md:grid-cols-2 h-full">
-              <div className="relative aspect-square md:aspect-auto bg-secondary/40">
-                <img src={colorGallery.image || quickView.image} alt={quickView.name} className="h-full w-full object-cover" />
+              <div className="relative aspect-square md:aspect-auto min-h-0 overflow-hidden bg-secondary/40">
+                <AnimatePresence mode="wait">
+                  <motion.img
+                    key={colorGallery.image || quickView.image}
+                    src={colorGallery.image || quickView.image}
+                    alt={quickView.name}
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                    className="absolute inset-0 h-full w-full object-cover object-center"
+                    decoding="async"
+                  />
+                </AnimatePresence>
               </div>
               <div className="p-6 md:p-8 flex flex-col overflow-y-auto relative">
                 <button onClick={() => setQuickView(null)} className="absolute top-4 right-4 h-9 w-9 grid place-items-center rounded-full glass hover:scale-105 transition">
@@ -86,47 +102,29 @@ export function QuickView() {
                     <span className="text-sm line-through text-muted-foreground">&#8377;{displayCompareAt.toLocaleString("en-IN")}</span>
                   )}
                 </div>
+                {isVariantsProduct(quickView) && stockState && (
+                  <StockAvailability state={stockState} className="mt-3" />
+                )}
                 <div className="mt-5">
                   <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Size</div>
-                  <div className="flex flex-wrap gap-2">
-                    {quickView.sizes.map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => setSize(s)}
-                        className={`rounded-full px-3 py-1.5 text-xs transition ${size === s ? "bg-primary text-primary-foreground" : "glass"}`}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
+                  <VariantSizeButtons
+                    product={quickView}
+                    size={size}
+                    onSizeChange={setSize}
+                    gapClass="gap-2"
+                  />
                 </div>
                 <div className="mt-4">
                   <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Print · {color}</div>
-                  <div className="flex flex-wrap gap-2.5">
-                    {availableColors.map((c) => {
-                      const row = findVariant(quickView, { size, color: c.name });
-                      const disabled = isVariantsProduct(quickView) && !isVariantSellable(row);
-                      const selected = color === c.name;
-                      const swatchImage = swatchImageForColor(c);
-                      return (
-                        <button
-                          key={c.name}
-                          type="button"
-                          disabled={disabled}
-                          onClick={() => setColor(c.name)}
-                          className={`h-11 w-11 rounded-xl border-2 overflow-hidden transition ${selected ? "border-primary ring-2 ring-primary/30" : "border-white/70"} ${disabled ? "opacity-30" : ""}`}
-                          style={swatchImage ? undefined : { background: c.hex }}
-                          aria-label={c.name}
-                          aria-pressed={selected}
-                        >
-                          {swatchImage ? (
-                            <img src={swatchImage} alt={c.name} className="h-full w-full object-cover" loading="lazy" />
-                          ) : null}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <VariantColorButtons
+                    product={quickView}
+                    size={size}
+                    color={color}
+                    onColorChange={setColor}
+                    colors={availableColors}
+                    gapClass="gap-2.5"
+                    swatchClass="h-11 w-11"
+                  />
                 </div>
                 <div className="mt-auto pt-6 flex gap-2">
                   <button

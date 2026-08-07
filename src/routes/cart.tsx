@@ -14,7 +14,7 @@ export const Route = createFileRoute("/cart")({
 });
 
 function CartPage() {
-  const { cart, updateQty, removeFromCart, cartTotal } = useShop();
+  const { cart, updateQty, promptRemoveFromCart, cartTotal } = useShop();
   const settings = useSiteSettings();
   const [code, setCode] = useState("");
   const [applied, setApplied] = useState<{ code: string; off: number } | null>(null);
@@ -69,7 +69,7 @@ function CartPage() {
             <div className="flex-1 min-w-0">
               <div className="flex justify-between gap-2">
                 <Link to="/product/$slug" params={{ slug: item.product.slug }} className="font-medium hover:text-primary">{item.product.name}</Link>
-                <button onClick={() => removeFromCart(item.product.id, item.size, item.color)} className="text-muted-foreground hover:text-destructive" aria-label="Remove">
+                <button onClick={() => promptRemoveFromCart(item.product.id, item.size, item.color)} className="text-muted-foreground hover:text-destructive" aria-label="Remove">
                   <X className="h-4 w-4" />
                 </button>
               </div>
