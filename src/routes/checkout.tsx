@@ -639,6 +639,18 @@ function Checkout() {
             {step === 3 && (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">Almost there. Please review your order, then pay securely.</p>
+                <div className="glass rounded-2xl p-4 flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <MapPin className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                    <div className="text-sm min-w-0">
+                      <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Deliver to</div>
+                      <div className="font-medium">{fullName}</div>
+                      <div className="text-muted-foreground">{line1}{line2 ? `, ${line2}` : ""}, {city}, {state} {pin}</div>
+                      <div className="text-muted-foreground mt-0.5">Phone: {phone}</div>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => setStep(0)} className="text-xs text-primary story-link shrink-0">Edit</button>
+                </div>
                 {cart.map((i) => (
                   <div key={i.product.id + i.size + i.color} className="glass rounded-2xl p-3 flex gap-3 items-center">
                     <img src={i.product.image} alt="" className="h-14 w-14 rounded-xl object-cover" />
