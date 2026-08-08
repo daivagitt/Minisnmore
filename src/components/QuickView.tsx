@@ -80,7 +80,7 @@ export function QuickView() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.98 }}
                     transition={{ type: "spring", stiffness: 400, damping: 32 }}
-                    className="absolute inset-0 h-full w-full object-cover object-center"
+                    className="absolute inset-0 h-full w-full object-contain object-center"
                     decoding="async"
                   />
                 </AnimatePresence>

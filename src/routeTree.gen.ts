@@ -42,6 +42,7 @@ import { Route as AdminReturnsRouteImport } from './routes/admin.returns'
 import { Route as AdminProductsRouteImport } from './routes/admin.products'
 import { Route as AdminPoliciesRouteImport } from './routes/admin.policies'
 import { Route as AdminPagesRouteImport } from './routes/admin.pages'
+import { Route as AdminOrdersRouteImport } from './routes/admin.orders'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminHomeRouteImport } from './routes/admin.home'
 import { Route as AdminCouponsRouteImport } from './routes/admin.coupons'
@@ -58,6 +59,7 @@ import { Route as AccountNotificationsRouteImport } from './routes/account.notif
 import { Route as AccountCartRouteImport } from './routes/account.cart'
 import { Route as AccountAddressesRouteImport } from './routes/account.addresses'
 import { Route as AccountActivateRouteImport } from './routes/account.activate'
+import { Route as AccountOrdersIndexRouteImport } from './routes/account.orders.index'
 import { Route as AdminIntegrationsLedgerlyRouteImport } from './routes/admin.integrations.ledgerly'
 import { Route as AccountResetFinishRouteImport } from './routes/account.reset.finish'
 import { Route as AccountOrdersOrderNumberRouteImport } from './routes/account.orders.$orderNumber'
@@ -227,6 +229,11 @@ const AdminPagesRoute = AdminPagesRouteImport.update({
   path: '/pages',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminOrdersRoute = AdminOrdersRouteImport.update({
+  id: '/orders',
+  path: '/orders',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminLoginRoute = AdminLoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -307,6 +314,11 @@ const AccountActivateRoute = AccountActivateRouteImport.update({
   path: '/activate',
   getParentRoute: () => AccountRoute,
 } as any)
+const AccountOrdersIndexRoute = AccountOrdersIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AccountOrdersRoute,
+} as any)
 const AdminIntegrationsLedgerlyRoute =
   AdminIntegrationsLedgerlyRouteImport.update({
     id: '/integrations/ledgerly',
@@ -363,6 +375,7 @@ export interface FileRoutesByFullPath {
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/home': typeof AdminHomeRoute
   '/admin/login': typeof AdminLoginRoute
+  '/admin/orders': typeof AdminOrdersRoute
   '/admin/pages': typeof AdminPagesRoute
   '/admin/policies': typeof AdminPoliciesRoute
   '/admin/products': typeof AdminProductsRoute
@@ -378,6 +391,7 @@ export interface FileRoutesByFullPath {
   '/account/orders/$orderNumber': typeof AccountOrdersOrderNumberRoute
   '/account/reset/finish': typeof AccountResetFinishRoute
   '/admin/integrations/ledgerly': typeof AdminIntegrationsLedgerlyRoute
+  '/account/orders/': typeof AccountOrdersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -402,7 +416,6 @@ export interface FileRoutesByTo {
   '/account/addresses': typeof AccountAddressesRoute
   '/account/cart': typeof AccountCartRoute
   '/account/notifications': typeof AccountNotificationsRoute
-  '/account/orders': typeof AccountOrdersRouteWithChildren
   '/account/payments': typeof AccountPaymentsRoute
   '/account/profile': typeof AccountProfileRoute
   '/account/returns': typeof AccountReturnsRoute
@@ -414,6 +427,7 @@ export interface FileRoutesByTo {
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/home': typeof AdminHomeRoute
   '/admin/login': typeof AdminLoginRoute
+  '/admin/orders': typeof AdminOrdersRoute
   '/admin/pages': typeof AdminPagesRoute
   '/admin/policies': typeof AdminPoliciesRoute
   '/admin/products': typeof AdminProductsRoute
@@ -429,6 +443,7 @@ export interface FileRoutesByTo {
   '/account/orders/$orderNumber': typeof AccountOrdersOrderNumberRoute
   '/account/reset/finish': typeof AccountResetFinishRoute
   '/admin/integrations/ledgerly': typeof AdminIntegrationsLedgerlyRoute
+  '/account/orders': typeof AccountOrdersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -469,6 +484,7 @@ export interface FileRoutesById {
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/home': typeof AdminHomeRoute
   '/admin/login': typeof AdminLoginRoute
+  '/admin/orders': typeof AdminOrdersRoute
   '/admin/pages': typeof AdminPagesRoute
   '/admin/policies': typeof AdminPoliciesRoute
   '/admin/products': typeof AdminProductsRoute
@@ -484,6 +500,7 @@ export interface FileRoutesById {
   '/account/orders/$orderNumber': typeof AccountOrdersOrderNumberRoute
   '/account/reset/finish': typeof AccountResetFinishRoute
   '/admin/integrations/ledgerly': typeof AdminIntegrationsLedgerlyRoute
+  '/account/orders/': typeof AccountOrdersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -525,6 +542,7 @@ export interface FileRouteTypes {
     | '/admin/coupons'
     | '/admin/home'
     | '/admin/login'
+    | '/admin/orders'
     | '/admin/pages'
     | '/admin/policies'
     | '/admin/products'
@@ -540,6 +558,7 @@ export interface FileRouteTypes {
     | '/account/orders/$orderNumber'
     | '/account/reset/finish'
     | '/admin/integrations/ledgerly'
+    | '/account/orders/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -564,7 +583,6 @@ export interface FileRouteTypes {
     | '/account/addresses'
     | '/account/cart'
     | '/account/notifications'
-    | '/account/orders'
     | '/account/payments'
     | '/account/profile'
     | '/account/returns'
@@ -576,6 +594,7 @@ export interface FileRouteTypes {
     | '/admin/coupons'
     | '/admin/home'
     | '/admin/login'
+    | '/admin/orders'
     | '/admin/pages'
     | '/admin/policies'
     | '/admin/products'
@@ -591,6 +610,7 @@ export interface FileRouteTypes {
     | '/account/orders/$orderNumber'
     | '/account/reset/finish'
     | '/admin/integrations/ledgerly'
+    | '/account/orders'
   id:
     | '__root__'
     | '/'
@@ -630,6 +650,7 @@ export interface FileRouteTypes {
     | '/admin/coupons'
     | '/admin/home'
     | '/admin/login'
+    | '/admin/orders'
     | '/admin/pages'
     | '/admin/policies'
     | '/admin/products'
@@ -645,6 +666,7 @@ export interface FileRouteTypes {
     | '/account/orders/$orderNumber'
     | '/account/reset/finish'
     | '/admin/integrations/ledgerly'
+    | '/account/orders/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -906,6 +928,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPagesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/orders': {
+      id: '/admin/orders'
+      path: '/orders'
+      fullPath: '/admin/orders'
+      preLoaderRoute: typeof AdminOrdersRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/login': {
       id: '/admin/login'
       path: '/login'
@@ -1018,6 +1047,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountActivateRouteImport
       parentRoute: typeof AccountRoute
     }
+    '/account/orders/': {
+      id: '/account/orders/'
+      path: '/'
+      fullPath: '/account/orders/'
+      preLoaderRoute: typeof AccountOrdersIndexRouteImport
+      parentRoute: typeof AccountOrdersRoute
+    }
     '/admin/integrations/ledgerly': {
       id: '/admin/integrations/ledgerly'
       path: '/integrations/ledgerly'
@@ -1044,10 +1080,12 @@ declare module '@tanstack/react-router' {
 
 interface AccountOrdersRouteChildren {
   AccountOrdersOrderNumberRoute: typeof AccountOrdersOrderNumberRoute
+  AccountOrdersIndexRoute: typeof AccountOrdersIndexRoute
 }
 
 const AccountOrdersRouteChildren: AccountOrdersRouteChildren = {
   AccountOrdersOrderNumberRoute: AccountOrdersOrderNumberRoute,
+  AccountOrdersIndexRoute: AccountOrdersIndexRoute,
 }
 
 const AccountOrdersRouteWithChildren = AccountOrdersRoute._addFileChildren(
@@ -1094,6 +1132,7 @@ interface AdminRouteChildren {
   AdminCouponsRoute: typeof AdminCouponsRoute
   AdminHomeRoute: typeof AdminHomeRoute
   AdminLoginRoute: typeof AdminLoginRoute
+  AdminOrdersRoute: typeof AdminOrdersRoute
   AdminPagesRoute: typeof AdminPagesRoute
   AdminPoliciesRoute: typeof AdminPoliciesRoute
   AdminProductsRoute: typeof AdminProductsRoute
@@ -1111,6 +1150,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCouponsRoute: AdminCouponsRoute,
   AdminHomeRoute: AdminHomeRoute,
   AdminLoginRoute: AdminLoginRoute,
+  AdminOrdersRoute: AdminOrdersRoute,
   AdminPagesRoute: AdminPagesRoute,
   AdminPoliciesRoute: AdminPoliciesRoute,
   AdminProductsRoute: AdminProductsRoute,

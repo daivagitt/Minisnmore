@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Truck, Loader2, Search, Baby, Sparkles } from "lucide-react";
 import { useAccountData } from "@/lib/account";
 import { useOrderTrackingPoll } from "@/hooks/useOrderTrackingPoll";
@@ -22,16 +22,21 @@ function TrackPage() {
     "authenticated",
   );
 
+  const successfulOrders = useMemo(
+    () => orders?.filter((o) => o.payment_status === "paid") ?? orders,
+    [orders]
+  );
+
   useEffect(() => {
     if (orders === null && !loadingOrders) void refreshOrders();
   }, [orders, loadingOrders, refreshOrders]);
 
   useEffect(() => {
-    if (orders?.[0] && !activeOrderNumber) {
-      setActiveOrderNumber(orders[0].order_number);
-      setCode(orders[0].order_number);
+    if (successfulOrders?.[0] && !activeOrderNumber) {
+      setActiveOrderNumber(successfulOrders[0].order_number);
+      setCode(successfulOrders[0].order_number);
     }
-  }, [orders, activeOrderNumber]);
+  }, [successfulOrders, activeOrderNumber]);
 
   const handleTrack = () => {
     const next = code.trim();
@@ -99,14 +104,14 @@ function TrackPage() {
         )}
       </div>
 
-      {orders && orders.length > 0 && (
+      {successfulOrders && successfulOrders.length > 0 && (
         <div className="glass-strong rounded-[2rem] p-6 md:p-8">
           <div className="flex items-center justify-between gap-3 mb-3">
             <div className="text-xs uppercase tracking-wider text-muted-foreground">Recent orders</div>
             <div className="inline-flex items-center gap-2 text-xs text-primary"><Sparkles className="h-3.5 w-3.5" /> Quick lookup</div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {orders.slice(0, 6).map((o) => (
+            {successfulOrders.slice(0, 6).map((o) => (
               <button
                 key={o.id}
                 type="button"

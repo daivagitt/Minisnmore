@@ -29,6 +29,7 @@ const CreateOrderInput = z.object({
   items: z.array(ItemSchema).min(1).max(50),
   shipping_address: AddressSchema,
   shipping_mode: z.enum(["std", "exp"]).default("std"),
+  payment_method: z.enum(["online", "cod"]).optional().default("online"),
   coupon_code: z.string().max(40).optional().default(""),
   donation: z.number().min(0).max(100000).default(0),
   notes: z.string().max(500).optional().default(""),
@@ -220,6 +221,31 @@ export async function refundOrderReturn(returnNumber: string, adminNotes?: strin
   return api.post(
     `/api/v1/admin/order-returns/${encodeURIComponent(returnNumber)}/refund`,
     { admin_notes: adminNotes ?? "" },
+    { auth: true },
+  );
+}
+
+export type AdminCodOrderRow = {
+  id: number;
+  order_number: string;
+  total: number;
+  cod_fee: number;
+  status: string;
+  placed_at: string;
+  full_name?: string;
+  phone?: string;
+  city?: string;
+};
+
+export async function listCodPendingOrders(): Promise<{ orders: AdminCodOrderRow[] }> {
+  const res = await api.get<{ orders: AdminCodOrderRow[] }>("/api/v1/admin/orders/cod-pending", { auth: true });
+  return { orders: res.orders ?? [] };
+}
+
+export async function markCodCollected(orderNumber: string) {
+  return api.post(
+    `/api/v1/admin/orders/${encodeURIComponent(orderNumber)}/mark-cod-collected`,
+    undefined,
     { auth: true },
   );
 }

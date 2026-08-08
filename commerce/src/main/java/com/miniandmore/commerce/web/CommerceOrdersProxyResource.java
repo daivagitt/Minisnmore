@@ -19,6 +19,11 @@ public class CommerceOrdersProxyResource {
         return catalog.postPublic("/internal/v1/coupons/validate", body);
     }
 
+    @GetMapping("/coupons/active")
+    public ResponseEntity<String> activeCoupons() {
+        return catalog.getPublic("/internal/v1/coupons/active");
+    }
+
     @GetMapping("/account/profile")
     public ResponseEntity<String> profile() {
         return catalog.get("/internal/v1/account/profile");

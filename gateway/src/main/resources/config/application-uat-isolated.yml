@@ -15,6 +15,7 @@ spring:
           facebook:
             client-id: ${FACEBOOK_CLIENT_ID:uat-isolated-placeholder}
             client-secret: ${FACEBOOK_CLIENT_SECRET:uat-isolated-placeholder}
+            scope: email,public_profile
   cloud:
     gateway:
       server:

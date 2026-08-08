@@ -8,6 +8,7 @@ export const ORDER_TRACKING_POLL_MS = 60_000;
 export type TrackingOrder = OrderTrackingFields & {
   order_number?: string;
   payment_status?: string;
+  payment_method?: string;
   id?: number;
   created_at?: string;
   coupon_code?: string;

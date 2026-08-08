@@ -13,3 +13,15 @@ export async function validateCoupon(input: { data: unknown }) {
     parsed,
   );
 }
+
+export type ActiveCoupon = {
+  code: string;
+  discount_type: "percent" | "flat";
+  discount_value: number;
+  min_order: number;
+  max_discount: number | null;
+};
+
+export async function listActiveCoupons() {
+  return api.get<{ coupons: ActiveCoupon[] }>("/api/v1/coupons/active");
+}

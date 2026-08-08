@@ -31,9 +31,13 @@ export type CartItem = {
   unitPrice: number;
 };
 
+export type AppliedCoupon = { code: string; discount: number };
+
 type ShopState = {
   cart: CartItem[];
   wishlist: string[];
+  appliedCoupon: AppliedCoupon | null;
+  setAppliedCoupon: (coupon: AppliedCoupon | null) => void;
   addToCart: (p: Product, opts?: { size?: string; color?: string; qty?: number; variantSku?: string }) => void;
   removeFromCart: (id: string, size?: string, color?: string, variantSku?: string) => void;
   promptRemoveFromCart: (id: string, size?: string, color?: string, variantSku?: string) => void;
@@ -57,6 +61,10 @@ function cartStorageKey(userId: number | null) {
 
 function wishStorageKey(userId: number | null) {
   return userId != null ? `mnm_wish_u_${userId}` : "mnm_wish_guest";
+}
+
+function couponStorageKey(userId: number | null) {
+  return userId != null ? `mnm_coupon_u_${userId}` : "mnm_coupon_guest";
 }
 
 function readJson<T>(key: string, fallback: T): T {
@@ -87,10 +95,12 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   const userId = user?.id ?? null;
   const cKey = cartStorageKey(userId);
   const wKey = wishStorageKey(userId);
-  const scopeKey = `${cKey}|${wKey}`;
+  const couponKey = couponStorageKey(userId);
+  const scopeKey = `${cKey}|${wKey}|${couponKey}`;
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [quickView, setQuickView] = useState<Product | null>(null);
   const hydratedScope = useRef<string | null>(null);
@@ -102,6 +112,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     if (authLoading) return;
     setCart([]);
     setWishlist([]);
+    setAppliedCoupon(null);
     setCartOpen(false);
   }, [scopeKey, authLoading]);
 
@@ -120,19 +131,23 @@ export function ShopProvider({ children }: { children: ReactNode }) {
 
     let nextCart: CartItem[] = [];
     let nextWish: string[] = [];
+    let nextCoupon: AppliedCoupon | null = null;
     if (userId != null) {
       nextCart = readJson<CartItem[]>(cKey, []).map(normalizeCartItem);
       nextWish = readJson<string[]>(wKey, []).map(String);
+      nextCoupon = readJson<AppliedCoupon | null>(couponKey, null);
     } else {
       localStorage.setItem(cartStorageKey(null), "[]");
       localStorage.setItem(wishStorageKey(null), "[]");
+      localStorage.removeItem(couponStorageKey(null));
       localStorage.removeItem("mnm_cart");
       localStorage.removeItem("mnm_wish");
     }
 
     setCart(nextCart);
     setWishlist(nextWish);
-  }, [scopeKey, cKey, wKey, userId, authLoading]);
+    setAppliedCoupon(nextCoupon);
+  }, [scopeKey, cKey, wKey, couponKey, userId, authLoading]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -145,7 +160,9 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     if (userId == null) return;
     localStorage.setItem(cKey, JSON.stringify(cart));
     localStorage.setItem(wKey, JSON.stringify(wishlist));
-  }, [cart, wishlist, cKey, wKey, scopeKey, authLoading, userId]);
+    if (appliedCoupon) localStorage.setItem(couponKey, JSON.stringify(appliedCoupon));
+    else localStorage.removeItem(couponKey);
+  }, [cart, wishlist, appliedCoupon, cKey, wKey, couponKey, scopeKey, authLoading, userId]);
 
   const addToCart: ShopState["addToCart"] = (p, opts = {}) => {
     if (userId == null) {
@@ -219,7 +236,10 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       return next.length === w.length ? w : next;
     });
   }, []);
-  const clearCart = () => setCart([]);
+  const clearCart = () => {
+    setCart([]);
+    setAppliedCoupon(null);
+  };
 
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
   const cartTotal = cart.reduce((s, i) => s + roundInr(i.qty * i.unitPrice), 0);
@@ -229,6 +249,8 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       value={{
         cart,
         wishlist,
+        appliedCoupon,
+        setAppliedCoupon,
         addToCart,
         removeFromCart,
         promptRemoveFromCart,

@@ -185,6 +185,25 @@ export function lineUnitPrice(product: VariantProductLike, opts: { size?: string
   return product.price;
 }
 
+/**
+ * Card/list price for a product — matches the PDP default selection for VARIANTS
+ * (not the parent min-of-matrix price, which can be skewed by bad variant rows).
+ */
+export function storefrontListPricing(product: VariantProductLike): { price: number; compareAt?: number } {
+  if (isVariantsProduct(product) && (product.variants?.length ?? 0) > 0) {
+    const { variant } = defaultSellableSelection(product);
+    if (variant && variant.price > 0) {
+      const compareAt =
+        variant.compareAt != null && variant.compareAt > variant.price ? variant.compareAt : undefined;
+      return { price: variant.price, compareAt };
+    }
+  }
+  const price = Number(product.price) || 0;
+  const compareAt =
+    product.compareAt != null && product.compareAt > price ? product.compareAt : undefined;
+  return { price, compareAt };
+}
+
 export function defaultSellableSelection(product: VariantProductLike): { size: string; color: string; variant?: ProductVariant } {
   const sizes = sortSizesAsc(product.sizes);
   if (!isVariantsProduct(product)) {

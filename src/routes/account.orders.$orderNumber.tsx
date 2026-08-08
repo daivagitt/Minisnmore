@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { syncPaymentStatus, retryOrderPayment, verifyPayment } from "@/lib/orders.functions";
 import { openRazorpayCheckout } from "@/lib/razorpay";
 import { formatOrderDate } from "@/lib/dates";
@@ -10,14 +10,19 @@ import { OrderTrackingCard } from "@/components/OrderTrackingCard";
 import { TrackingRefreshHint } from "@/components/TrackingRefreshHint";
 
 export const Route = createFileRoute("/account/orders/$orderNumber")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    pay: search.pay === "1" || search.pay === 1 || search.pay === true,
+  }),
   head: ({ params }) => ({ meta: [{ title: `Order ${params.orderNumber} · Mini's n More` }] }),
   component: OrderDetail,
 });
 
 function OrderDetail() {
   const { orderNumber } = Route.useParams();
+  const { pay: autoPay } = Route.useSearch();
   const [syncing, setSyncing] = useState(false);
   const [paying, setPaying] = useState(false);
+  const autoPayStarted = useRef(false);
   const { order, loading, error, lastUpdated, polling, refresh } = useOrderTrackingPoll(
     orderNumber,
     "authenticated",
@@ -41,7 +46,7 @@ function OrderDetail() {
     }
   };
 
-  const payNow = async () => {
+  const payNow = useCallback(async () => {
     if (!order?.id) return;
     setPaying(true);
     try {
@@ -88,7 +93,14 @@ function OrderDetail() {
     } finally {
       setPaying(false);
     }
-  };
+  }, [order, refresh]);
+
+  useEffect(() => {
+    if (!autoPay || autoPayStarted.current || !order) return;
+    if (order.payment_status !== "pending" || order.payment_method === "cod") return;
+    autoPayStarted.current = true;
+    void payNow();
+  }, [autoPay, order, payNow]);
 
   if (error && !order) {
     return <div className="glass-strong rounded-[2rem] p-8 text-sm text-destructive">{error}</div>;
@@ -125,6 +137,28 @@ function OrderDetail() {
           </div>
         </div>
       </div>
+
+      {order.payment_status === "pending" && order.payment_method !== "cod" && (
+        <div className="glass-strong rounded-[2rem] p-5 md:p-6 border border-amber-500/30 bg-amber-500/10">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-medium text-amber-900">Payment pending</div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Complete payment of ₹{Number(order.total).toLocaleString("en-IN")} to confirm this order.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={payNow}
+              disabled={paying || syncing}
+              className="rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm inline-flex items-center gap-2 disabled:opacity-50"
+            >
+              {paying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+              {paying ? "Opening payment…" : "Pay now"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {order.payment_status === "paid" && (
         <div className="glass-strong rounded-[2rem] p-6 md:p-8">

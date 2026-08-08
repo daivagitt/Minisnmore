@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.mockito.ArgumentCaptor;
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
 import com.miniandmore.app.domain.*;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
@@ -358,6 +359,106 @@ class InternalAccountOrderResourceCoverageTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.totals.discount").value(100.0));
+    }
+
+    /**
+     * A raw percent discount on a non-round subtotal (10% of ₹999 = ₹99.90) must round to whole
+     * rupees before it's charged — otherwise the Razorpay amount silently drifts a few paise from
+     * the whole-rupee total shown on the storefront's checkout review screen.
+     */
+    @Test
+    void createOrder_fractionalDiscount_roundsToWholeRupeeBeforeCharging() throws Exception {
+        ReflectionTestUtils.setField(resource, "razorpayKeyId", "DEMO");
+        ReflectionTestUtils.setField(resource, "razorpayKeySecret", "");
+        Product product = new Product().id(1L).name("Dress").slug("dress").price(BigDecimal.valueOf(999)).stock(5).active(true);
+        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+        Coupon coupon = new Coupon()
+            .code("WELCOME10")
+            .active(true)
+            .discountType(com.miniandmore.app.domain.enumeration.DiscountType.PERCENT)
+            .discountValue(BigDecimal.TEN)
+            .minOrder(BigDecimal.ZERO);
+        when(couponRepository.findOneByCodeIgnoreCase("WELCOME10")).thenReturn(Optional.of(coupon));
+        CustomerOrder saved = new CustomerOrder().id(402L).orderNumber("MNM-ROUND").total(BigDecimal.valueOf(998));
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenReturn(saved);
+        when(orderItemRepository.saveAll(any())).thenReturn(List.of());
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "items":[{"product_id":"1","product_name":"Dress","qty":1,"price":999}],
+                          "shipping_address":{"full_name":"Jane","email":"j@example.com","phone":"9876543210","line1":"Line 1","city":"City","state":"State","pincode":"560001"},
+                          "donation":0,
+                          "coupon_code":"WELCOME10"
+                        }
+                        """
+                    )
+            )
+            .andExpect(status().isOk())
+            // Raw discount is ₹99.90; rounded to ₹100 so afterDiscount (₹899) + shipping (₹99) = ₹998 whole rupees.
+            .andExpect(jsonPath("$.data.totals.discount").value(100.0))
+            .andExpect(jsonPath("$.data.totals.total").value(998.0))
+            .andExpect(jsonPath("$.data.amount").value(99800));
+    }
+
+    /**
+     * Cash on Delivery must place a real, fulfillable order without touching Razorpay: the order
+     * is confirmed immediately (no online payment step to wait on), the ₹49 COD handling fee is
+     * added to the total, and the inventory hold never expires (no 30-minute TTL like online
+     * orders, since there's no "abandoned checkout" to reap).
+     */
+    @Test
+    void createOrder_cod_skipsGatewayAndChargesHandlingFee() throws Exception {
+        ReflectionTestUtils.setField(resource, "razorpayKeyId", "DEMO");
+        ReflectionTestUtils.setField(resource, "razorpayKeySecret", "");
+        Product product = new Product().id(1L).name("Dress").slug("dress").price(BigDecimal.valueOf(1000)).stock(5).active(true);
+        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+        CustomerOrder saved = new CustomerOrder().id(403L).orderNumber("MNM-COD").total(BigDecimal.valueOf(1148));
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenReturn(saved);
+        when(orderItemRepository.saveAll(any())).thenReturn(List.of());
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "items":[{"product_id":"1","product_name":"Dress","qty":1,"price":1000}],
+                          "shipping_address":{"full_name":"Jane","email":"j@example.com","phone":"9876543210","line1":"Line 1","city":"City","state":"State","pincode":"560001"},
+                          "donation":0,
+                          "payment_method":"cod"
+                        }
+                        """
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.cod").value(true))
+            .andExpect(jsonPath("$.data.paymentMethod").value("cod"))
+            // Subtotal ₹1000 + shipping ₹99 (below free-shipping threshold) + ₹49 COD fee = ₹1148.
+            .andExpect(jsonPath("$.data.totals.cod_fee").value(49.0))
+            .andExpect(jsonPath("$.data.totals.total").value(1148.0))
+            .andExpect(jsonPath("$.data.amount").value(114800))
+            .andExpect(jsonPath("$.data.razorpayOrderId").doesNotExist())
+            .andExpect(jsonPath("$.data.keyId").doesNotExist());
+
+        ArgumentCaptor<CustomerOrder> captor = ArgumentCaptor.forClass(CustomerOrder.class);
+        verify(customerOrderRepository).save(captor.capture());
+        CustomerOrder persisted = captor.getValue();
+        assertThat(persisted.getPaymentMethod()).isEqualTo("cod");
+        assertThat(persisted.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(persisted.getPaymentStatus()).isEqualTo(PaymentStatus.PENDING);
+        assertThat(persisted.getInventoryReservedUntil()).isNull();
     }
 
     private static String hmacSignature(String orderId, String paymentId, String secret) throws Exception {

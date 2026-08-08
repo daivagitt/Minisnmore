@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   LayoutDashboard, Image as ImgIcon, Tag, BookOpen, FileText, Package, Plug, LogOut, Loader2,
-  Folder, Home, EyeOff, Settings as SettingsIcon, ExternalLink, RotateCcw,
+  Folder, Home, EyeOff, Settings as SettingsIcon, ExternalLink, RotateCcw, Banknote,
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
@@ -24,6 +24,7 @@ const nav = [
   { to: "/admin/policies", label: "Policies", icon: FileText },
   { to: "/admin/integrations/ledgerly", label: "Ledgerly", icon: Plug },
   { to: "/admin/returns", label: "Order returns", icon: RotateCcw },
+  { to: "/admin/orders", label: "Cash on Delivery", icon: Banknote },
 ];
 
 function AdminLayout() {

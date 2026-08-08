@@ -3,7 +3,7 @@ import { agesFromSizes, sortSizesAsc } from "@/lib/product-ages";
 import { normalizeStorefrontColors, resolveStorefrontProductImages, hasPerColorGalleries } from "@/lib/product-colors";
 import { products as seedProducts, type Product, type Fabric } from "@/data/products";
 import { posts as seedPosts, type BlogPost } from "@/data/blog";
-import { parseVariantsJson } from "@/lib/product-variants";
+import { parseVariantsJson, storefrontListPricing } from "@/lib/product-variants";
 
 /**
  * Storefront data layer.
@@ -91,16 +91,18 @@ function mapProduct(row: DbProductRow): Product {
   const variants = parseVariantsJson(row.variants ?? row.variants_json);
   const itemStructure = (row.item_structure ?? (variants.length ? "VARIANTS" : "SIMPLE")).toUpperCase();
   const sizes = normalizeSizes(row.sizes);
-  return {
+  const parentPrice = Number(row.price) || 0;
+  const parentCompareAt =
+    row.compare_at_price && Number(row.compare_at_price) > parentPrice
+      ? Number(row.compare_at_price)
+      : undefined;
+  const mapped: Product = {
     id: row.id,
     slug: row.slug,
     name: row.name,
     tagline: (row.description ?? row.story ?? "").trim(),
-    price: Number(row.price) || 0,
-    compareAt:
-      row.compare_at_price && Number(row.compare_at_price) > Number(row.price)
-        ? Number(row.compare_at_price)
-        : undefined,
+    price: parentPrice,
+    compareAt: parentCompareAt,
     image: heroImage,
     gallery: gallery.length ? gallery : perPrint ? [] : heroImage ? [heroImage] : [],
     ages: agesFromSizes(sizes, { min: row.age_min_months, max: row.age_max_months }),
@@ -121,6 +123,11 @@ function mapProduct(row: DbProductRow): Product {
     isTrending: !!row.trending,
     description: row.description ?? row.story ?? "",
   };
+  // List/card price must match PDP default selection (parent price is min-of-matrix).
+  const listPricing = storefrontListPricing(mapped);
+  mapped.price = listPricing.price;
+  mapped.compareAt = listPricing.compareAt;
+  return mapped;
 }
 
 // ---------- Products cache ----------

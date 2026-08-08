@@ -1,5 +1,23 @@
 import { verifyPayment, syncPaymentStatus } from "@/lib/orders.functions";
 
+export type RazorpayPayMethod = "upi" | "card" | "netbanking" | "wallet";
+
+const ONLINE_METHODS: RazorpayPayMethod[] = ["upi", "card", "netbanking", "wallet"];
+
+/** Hide every Razorpay method except the one the customer picked at checkout. */
+export function razorpayDisplayConfig(selected: RazorpayPayMethod) {
+  return {
+    display: {
+      hide: [
+        ...ONLINE_METHODS.filter((m) => m !== selected).map((method) => ({ method })),
+        { method: "emi" },
+        { method: "paylater" },
+      ],
+      preferences: { show_default_blocks: true },
+    },
+  };
+}
+
 declare global {
   interface Window {
     Razorpay: any;
@@ -31,7 +49,8 @@ export type RazorpayCheckoutInit = {
 export async function openRazorpayCheckout(
   init: RazorpayCheckoutInit,
   opts: {
-    prefill: { name: string; email: string; contact: string };
+    payMethod?: RazorpayPayMethod;
+    prefill: { name: string; email: string; contact: string; vpa?: string };
     description?: string;
     onSuccess: (orderNumber: string) => void | Promise<void>;
     onCancelled?: () => void;
@@ -82,6 +101,9 @@ export async function openRazorpayCheckout(
     }
   };
 
+  const prefill = { ...opts.prefill };
+  if (!prefill.vpa?.trim()) delete prefill.vpa;
+
   const rzp = new window.Razorpay({
     key: init.keyId,
     amount: init.amount,
@@ -89,8 +111,9 @@ export async function openRazorpayCheckout(
     name: "Mini's n More",
     description: opts.description ?? `Order ${init.orderNumber}`,
     order_id: init.razorpayOrderId,
-    prefill: opts.prefill,
+    prefill,
     theme: { color: "#7c5cff" },
+    ...(opts.payMethod ? { config: razorpayDisplayConfig(opts.payMethod) } : {}),
     handler: async (resp: any) => {
       await handleSuccess(resp);
     },

@@ -29,6 +29,7 @@ const CreateOrderInput = z.object({
   items: z.array(ItemSchema).min(1).max(50),
   shipping_address: AddressSchema,
   shipping_mode: z.enum(["std", "exp"]).default("std"),
+  payment_method: z.enum(["online", "cod"]).optional().default("online"),
   coupon_code: z.string().max(40).optional().default(""),
   donation: z.number().min(0).max(100000).default(0),
   notes: z.string().max(500).optional().default(""),
@@ -60,6 +61,26 @@ export async function syncPaymentStatus(input: { data: z.infer<typeof SyncPaymen
   return api.post("/api/v1/orders/sync-payment", parsed, { auth: true });
 }
 
+const RetryPaymentInput = z.object({
+  orderId: z.coerce.number().int().positive(),
+});
+
+export type RetryPaymentInit = {
+  orderId: number;
+  orderNumber: string;
+  razorpayOrderId: string;
+  keyId: string;
+  amount: number;
+  currency: string;
+  demoMode: boolean;
+  gatewayMode: "demo" | "test" | "live" | "unknown";
+};
+
+export async function retryOrderPayment(input: { data: z.infer<typeof RetryPaymentInput> }): Promise<RetryPaymentInit> {
+  const parsed = RetryPaymentInput.parse(input.data);
+  return api.post("/api/v1/orders/retry-payment", parsed, { auth: true });
+}
+
 export async function listMyOrders(): Promise<{ orders: any[] }> {
   return api.get("/api/v1/orders", { auth: true });
 }
@@ -87,9 +108,22 @@ export async function getMyProfile(): Promise<{ profile: { full_name: string; ph
   return { profile: { full_name, phone } };
 }
 
-const ProfileUpdate = z.object({
-  full_name: z.string().trim().min(1, "Full name is required").max(120),
-  phone: z.string().trim().min(1, "Phone number is required").max(20),
+const FULL_NAME_PATTERN = /^\p{L}[\p{L} .'-]*$/u;
+const PHONE_PATTERN = /^(\+91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}$/;
+
+export const ProfileUpdate = z.object({
+  full_name: z
+    .string()
+    .trim()
+    .min(2, "Full name must be at least 2 characters")
+    .max(120, "Full name is too long")
+    .regex(FULL_NAME_PATTERN, "Full name may only contain letters, spaces, apostrophes, periods and hyphens"),
+  phone: z
+    .string()
+    .trim()
+    .min(1, "Phone number is required")
+    .max(20, "Phone number is too long")
+    .regex(PHONE_PATTERN, "Enter a valid 10-digit Indian mobile number"),
 });
 
 export async function updateMyProfile(input: { data: z.infer<typeof ProfileUpdate> }): Promise<{ ok: boolean }> {
@@ -187,6 +221,31 @@ export async function refundOrderReturn(returnNumber: string, adminNotes?: strin
   return api.post(
     `/api/v1/admin/order-returns/${encodeURIComponent(returnNumber)}/refund`,
     { admin_notes: adminNotes ?? "" },
+    { auth: true },
+  );
+}
+
+export type AdminCodOrderRow = {
+  id: number;
+  order_number: string;
+  total: number;
+  cod_fee: number;
+  status: string;
+  placed_at: string;
+  full_name?: string;
+  phone?: string;
+  city?: string;
+};
+
+export async function listCodPendingOrders(): Promise<{ orders: AdminCodOrderRow[] }> {
+  const res = await api.get<{ orders: AdminCodOrderRow[] }>("/api/v1/admin/orders/cod-pending", { auth: true });
+  return { orders: res.orders ?? [] };
+}
+
+export async function markCodCollected(orderNumber: string) {
+  return api.post(
+    `/api/v1/admin/orders/${encodeURIComponent(orderNumber)}/mark-cod-collected`,
+    undefined,
     { auth: true },
   );
 }

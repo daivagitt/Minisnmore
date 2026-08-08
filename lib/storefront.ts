@@ -3,7 +3,7 @@ import { agesFromSizes, sortSizesAsc } from "@/lib/product-ages";
 import { normalizeStorefrontColors, resolveStorefrontProductImages, hasPerColorGalleries } from "@/lib/product-colors";
 import { products as seedProducts, type Product, type Fabric } from "@/data/products";
 import { posts as seedPosts, type BlogPost } from "@/data/blog";
-import { parseVariantsJson } from "@/lib/product-variants";
+import { parseVariantsJson, storefrontListPricing } from "@/lib/product-variants";
 
 /**
  * Storefront data layer.
@@ -53,6 +53,7 @@ type DbProductRow = {
   item_structure?: string | null;
   variants_json?: string | null;
   variants?: unknown;
+  stock?: number | null;
 };
 
 type CategoryLookup = Map<string, { slug: string; name: string }>;
@@ -90,16 +91,18 @@ function mapProduct(row: DbProductRow): Product {
   const variants = parseVariantsJson(row.variants ?? row.variants_json);
   const itemStructure = (row.item_structure ?? (variants.length ? "VARIANTS" : "SIMPLE")).toUpperCase();
   const sizes = normalizeSizes(row.sizes);
-  return {
+  const parentPrice = Number(row.price) || 0;
+  const parentCompareAt =
+    row.compare_at_price && Number(row.compare_at_price) > parentPrice
+      ? Number(row.compare_at_price)
+      : undefined;
+  const mapped: Product = {
     id: row.id,
     slug: row.slug,
     name: row.name,
     tagline: (row.description ?? row.story ?? "").trim(),
-    price: Number(row.price) || 0,
-    compareAt:
-      row.compare_at_price && Number(row.compare_at_price) > Number(row.price)
-        ? Number(row.compare_at_price)
-        : undefined,
+    price: parentPrice,
+    compareAt: parentCompareAt,
     image: heroImage,
     gallery: gallery.length ? gallery : perPrint ? [] : heroImage ? [heroImage] : [],
     ages: agesFromSizes(sizes, { min: row.age_min_months, max: row.age_max_months }),
@@ -114,11 +117,17 @@ function mapProduct(row: DbProductRow): Product {
     sku: row.sku?.trim() || undefined,
     itemStructure,
     variants: variants.length ? variants : undefined,
+    stock: row.stock ?? null,
     isNew: !!row.new_arrival || badge.includes("new"),
     isBestseller: !!row.best_seller || badge.includes("best"),
     isTrending: !!row.trending,
     description: row.description ?? row.story ?? "",
   };
+  // List/card price must match PDP default selection (parent price is min-of-matrix).
+  const listPricing = storefrontListPricing(mapped);
+  mapped.price = listPricing.price;
+  mapped.compareAt = listPricing.compareAt;
+  return mapped;
 }
 
 // ---------- Products cache ----------
@@ -164,6 +173,7 @@ export async function loadProducts(): Promise<Product[]> {
             sku: row.sku,
             item_structure: row.item_structure,
             variants_json: row.variants_json,
+            stock: row.stock,
           });
         });
       const list = mapped.length > 0 ? mapped : seedProducts;

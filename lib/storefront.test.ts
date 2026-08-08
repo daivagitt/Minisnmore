@@ -178,6 +178,41 @@ describe("storefront cache", () => {
     expect(products[0].category).toBe("Newborn");
   });
 
+  it("aligns list price with default sellable variant, not parent min", async () => {
+    const storefront = await loadStorefront({
+      products: [
+        {
+          id: "p-shorts",
+          slug: "basic-shorts",
+          name: "BASIC SHORTS",
+          description: "Shorts",
+          story: null,
+          price: 1.64,
+          compare_at_price: 2,
+          images: ["/shorts.jpg"],
+          sizes: ["0-3m", "3-6m"],
+          colors: ["Snail Blue", "Bee Blue"],
+          age_min_months: 0,
+          age_max_months: 6,
+          badge: null,
+          featured: false,
+          best_seller: false,
+          new_arrival: false,
+          trending: false,
+          active: true,
+          item_structure: "VARIANTS",
+          variants_json: JSON.stringify([
+            { sku: "BASIC-SHORTS-03-SNAIL-BLUE", size: "0-3m", color: "Snail Blue", rate: 320, mrp: 400, stock: 5, active: true },
+            { sku: "BASIC-SHORTS-36-BEE-BLUE", size: "3-6m", color: "Bee Blue", rate: 1.64, mrp: 2, stock: 35, active: true },
+          ]),
+        },
+      ],
+    });
+    const products = await storefront.loadProducts();
+    expect(products[0].price).toBe(320);
+    expect(products[0].compareAt).toBe(400);
+  });
+
   it("does not treat newborn badge text as new arrival", async () => {
     const listProducts = [
       {

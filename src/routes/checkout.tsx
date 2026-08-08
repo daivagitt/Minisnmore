@@ -4,12 +4,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useShop } from "@/store/shop";
 import { useAuth } from "@/hooks/useAuth";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
-import { Check, ChevronLeft, Loader2, Smartphone, CreditCard, Building2, Wallet, Banknote, Shield, MapPin, Plus, Zap, Minus, X, ShoppingBag } from "lucide-react";
+import { Check, ChevronLeft, Loader2, Smartphone, CreditCard, Building2, Wallet, Banknote, Shield, MapPin, Plus, Zap, Minus, X, ShoppingBag, Tag } from "lucide-react";
 import { toast } from "sonner";
-import { createOrder, verifyPayment, syncPaymentStatus, getMyProfile, updateMyProfile } from "@/lib/orders.functions";
+import { createOrder, verifyPayment, getMyProfile, updateMyProfile } from "@/lib/orders.functions";
 import { validateCoupon } from "@/lib/coupons.functions";
 import { commerceFromSiteSettings } from "@/lib/commerce";
-import { orderTotals } from "@/lib/money";
+import { COD_FEE_INR, orderTotals } from "@/lib/money";
+import { CouponOffers } from "@/components/CouponOffers";
+import { openRazorpayCheckout } from "@/lib/razorpay";
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({ meta: [{ title: "Checkout · Mini's n More" }] }),
@@ -17,8 +19,6 @@ export const Route = createFileRoute("/checkout")({
 });
 
 const steps = ["Details", "Shipping", "Payment", "Review"];
-
-declare global { interface Window { Razorpay: any } }
 
 type SavedAddress = {
   id: string;
@@ -33,20 +33,20 @@ type SavedAddress = {
   is_default?: boolean;
 };
 
-function loadRazorpay(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (typeof window === "undefined") return resolve(false);
-    if (window.Razorpay) return resolve(true);
-    const s = document.createElement("script");
-    s.src = "https://checkout.razorpay.com/v1/checkout.js";
-    s.onload = () => resolve(true);
-    s.onerror = () => resolve(false);
-    document.body.appendChild(s);
-  });
+type PayMethod = "upi" | "card" | "netbanking" | "wallet" | "cod";
+
+function payMethodLabel(method: PayMethod) {
+  switch (method) {
+    case "upi": return "UPI";
+    case "card": return "Credit / Debit Card";
+    case "netbanking": return "Net Banking";
+    case "wallet": return "Wallets";
+    case "cod": return "Cash on Delivery";
+  }
 }
 
 function Checkout() {
-  const { cart, cartTotal, clearCart, updateQty, promptRemoveFromCart } = useShop();
+  const { cart, cartTotal, clearCart, updateQty, promptRemoveFromCart, appliedCoupon, setAppliedCoupon } = useShop();
   const { user, loading: authLoading } = useAuth();
   const settings = useSiteSettings();
   const nav = useNavigate();
@@ -66,15 +66,31 @@ function Checkout() {
   const [state, setStateName] = useState("");
   const [pinLoading, setPinLoading] = useState(false);
   const [donation, setDonation] = useState<number>(0);
-  const [coupon, setCoupon] = useState("");
-  const [couponOff, setCouponOff] = useState(0);
+  const [couponInput, setCouponInput] = useState(appliedCoupon?.code ?? "");
   const [shipMode, setShipMode] = useState<"std" | "exp">("std");
-  const [payMethod, setPayMethod] = useState<"upi" | "card" | "netbanking" | "wallet">("upi");
+  const [payMethod, setPayMethod] = useState<PayMethod>("upi");
   const [upiId, setUpiId] = useState("");
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [selectedAddrId, setSelectedAddrId] = useState<string>("");
   const [saveAddress, setSaveAddress] = useState(true);
   const [profileLoaded, setProfileLoaded] = useState(false);
+
+  useEffect(() => {
+    setCouponInput(appliedCoupon?.code ?? "");
+  }, [appliedCoupon?.code]);
+
+  useEffect(() => {
+    if (!appliedCoupon?.code) return;
+    let cancelled = false;
+    validateCoupon({ data: { code: appliedCoupon.code, subtotal: cartTotal } })
+      .then((res) => {
+        if (cancelled) return;
+        if (res.ok) setAppliedCoupon({ code: res.code!, discount: res.discount! });
+        else setAppliedCoupon(null);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [cartTotal, appliedCoupon?.code, setAppliedCoupon]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -112,7 +128,7 @@ function Checkout() {
         setSaveAddress(false);
       }
       const lastPay = localStorage.getItem("mnm_last_pay") as any;
-      if (lastPay && ["upi", "card", "netbanking", "wallet"].includes(lastPay)) setPayMethod(lastPay);
+      if (lastPay && ["upi", "card", "netbanking", "wallet", "cod"].includes(lastPay)) setPayMethod(lastPay);
       const lastShip = localStorage.getItem("mnm_last_ship") as any;
       if (lastShip === "std") setShipMode(lastShip);
     } catch {}
@@ -159,26 +175,34 @@ function Checkout() {
     } catch {}
   };
 
-  const applyCoupon = async () => {
-    const raw = coupon.trim().toUpperCase();
+  const applyCoupon = async (codeArg?: string) => {
+    const raw = (codeArg ?? couponInput).trim().toUpperCase();
     if (!raw) return;
+    setCouponInput(raw);
     try {
       const res = await validateCoupon({ data: { code: raw, subtotal: cartTotal } });
-      if (!res.ok) { setCouponOff(0); toast.error(res.error); return; }
-      setCoupon(res.code);
-      setCouponOff(res.discount);
+      if (!res.ok) {
+        setAppliedCoupon(null);
+        toast.error(res.error);
+        return;
+      }
+      setAppliedCoupon({ code: res.code!, discount: res.discount! });
       toast.success("Coupon applied");
     } catch {
-      setCouponOff(0);
+      setAppliedCoupon(null);
       toast.error("Could not validate coupon");
     }
   };
+
+  const couponOff = appliedCoupon?.discount ?? 0;
+  const coupon = appliedCoupon?.code ?? "";
 
   const commerce = commerceFromSiteSettings(settings);
   const totals = orderTotals({
     subtotal: cartTotal,
     discount: couponOff,
     donation,
+    codFee: payMethod === "cod" ? COD_FEE_INR : 0,
     shipMode,
     commerce,
   });
@@ -249,10 +273,23 @@ function Checkout() {
             full_name: fullName, email, phone, line1, line2, city, state, pincode: pin, baby_name: babyName,
           },
           shipping_mode: shipMode,
+          payment_method: payMethod === "cod" ? "cod" : "online",
           coupon_code: coupon ? coupon.toUpperCase() : "",
           donation,
         },
       });
+
+      // Cash on Delivery: no gateway involved — the order is confirmed and payment is
+      // collected at the doorstep, so there's nothing left to verify online.
+      if ((init as any).cod) {
+        clearCart();
+        setDone({ orderNumber: init.orderNumber });
+        toast.success("Order placed — pay on delivery ✨");
+        setTimeout(() => {
+          nav({ to: "/account/orders/$orderNumber", params: { orderNumber: init.orderNumber } });
+        }, 2500);
+        return;
+      }
 
       // Demo / Test mode: simulate Razorpay success without a real charge so a
       // dummy transaction can be recorded and the order placed end-to-end.
@@ -288,103 +325,40 @@ function Checkout() {
         throw new Error("Razorpay key format is invalid. Please check the configured Key ID and Secret.");
       }
 
-      const ok = await loadRazorpay();
-      if (!ok) throw new Error("Could not load Razorpay");
-
-      let paymentHandled = false;
-      let pollTimer: ReturnType<typeof setInterval> | null = null;
-
-      const finishSuccessfulPayment = async (orderNumber: string) => {
-        if (paymentHandled) return;
-        paymentHandled = true;
-        if (pollTimer) clearInterval(pollTimer);
-        clearCart();
-        setDone({ orderNumber });
-        toast.success("Payment successful ✨");
-        setTimeout(() => {
-          nav({ to: "/account/orders/$orderNumber", params: { orderNumber } });
-        }, 2500);
-      };
-
-      const handleRazorpaySuccess = async (resp: {
-        razorpay_order_id: string;
-        razorpay_payment_id: string;
-        razorpay_signature: string;
-      }) => {
-        if (paymentHandled) return;
-        try {
-          const v = await verifyPayment({
-            data: {
-              orderId: init.orderId,
-              razorpay_order_id: resp.razorpay_order_id,
-              razorpay_payment_id: resp.razorpay_payment_id,
-              razorpay_signature: resp.razorpay_signature,
-            },
-          });
-          await finishSuccessfulPayment(v.orderNumber);
-        } catch (e: any) {
-          toast.error(e?.message || "Payment verification failed. Please contact support if amount was debited.");
-        }
-      };
-
-      const pollPaymentStatus = async () => {
-        if (paymentHandled) return;
-        try {
-          const res = await syncPaymentStatus({ data: { orderId: init.orderId } });
-          if (res.paid) {
-            await finishSuccessfulPayment(res.orderNumber);
-          }
-        } catch {
-          // Razorpay may not have confirmed yet — keep polling until modal closes or payment succeeds.
-        }
-      };
-
-      const rzp = new window.Razorpay({
-        key: init.keyId,
-        amount: init.amount,
-        currency: init.currency,
-        name: "Mini's n More",
-        description: `Order ${init.orderNumber}`,
-        order_id: init.razorpayOrderId,
-        prefill: { name: fullName, email, contact: phone },
-        theme: { color: "#7c5cff" },
-        method: {
-          upi: payMethod === "upi",
-          card: payMethod === "card",
-          netbanking: payMethod === "netbanking",
-          wallet: payMethod === "wallet",
-          emi: false,
-          paylater: false,
+      await openRazorpayCheckout(
+        {
+          orderId: init.orderId,
+          orderNumber: init.orderNumber,
+          razorpayOrderId: init.razorpayOrderId,
+          keyId: init.keyId,
+          amount: init.amount,
+          currency: init.currency,
         },
-        config: {
-          display: {
-            preferences: { show_default_blocks: true },
+        {
+          payMethod: payMethod === "cod" ? undefined : payMethod,
+          prefill: {
+            name: fullName,
+            email,
+            contact: phone,
+            ...(upiId.trim() ? { vpa: upiId.trim() } : {}),
+          },
+          description: `Order ${init.orderNumber}`,
+          onSuccess: async (orderNumber) => {
+            clearCart();
+            setDone({ orderNumber });
+            toast.success("Payment successful ✨");
+            setTimeout(() => {
+              nav({ to: "/account/orders/$orderNumber", params: { orderNumber } });
+            }, 2500);
+          },
+          onCancelled: () => {
+            toast("Payment cancelled — your cart is saved, you can retry anytime.", { icon: "🛒" });
+          },
+          onFailed: (reason) => {
+            toast.error(`${reason}. Please try a different payment method.`);
           },
         },
-        handler: async (resp: any) => {
-          await handleRazorpaySuccess(resp);
-        },
-        modal: {
-          ondismiss: () => {
-            if (pollTimer) clearInterval(pollTimer);
-            if (!paymentHandled) {
-              toast("Payment cancelled — your cart is saved, you can retry anytime.", { icon: "🛒" });
-            }
-          },
-        },
-      });
-      rzp.on("payment.success", (resp: any) => {
-        void handleRazorpaySuccess(resp);
-      });
-      rzp.on("payment.failed", (r: any) => {
-        const reason = r?.error?.description || r?.error?.reason || "Payment failed";
-        toast.error(`${reason}. Please try a different payment method.`);
-      });
-      rzp.open();
-      void pollPaymentStatus();
-      pollTimer = setInterval(() => {
-        void pollPaymentStatus();
-      }, 3000);
+      );
     } catch (e: any) {
       toast.error(e?.message || "Could not start payment");
     } finally {
@@ -575,6 +549,8 @@ function Checkout() {
                       title="Net Banking" sub="HDFC · ICICI · SBI · Axis & 50+ more" />
                     <PayTile id="wallet" active={payMethod === "wallet"} onClick={() => setPayMethod("wallet")} icon={Wallet}
                       title="Wallets" sub="Paytm · Mobikwik · Freecharge" />
+                    <PayTile id="cod" active={payMethod === "cod"} onClick={() => setPayMethod("cod")} icon={Banknote}
+                      title="Cash on Delivery" sub={`Pay in cash · ₹${COD_FEE_INR} handling fee`} />
                   </div>
                 </div>
 
@@ -589,56 +565,60 @@ function Checkout() {
                   </div>
                 )}
                 {payMethod === "card" && (
-                  <div className="glass rounded-2xl p-4 grid sm:grid-cols-2 gap-3">
-                    <label className="block sm:col-span-2">
-                      <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">Card number</div>
-                      <input inputMode="numeric" placeholder="1234 5678 9012 3456" disabled
-                        className="w-full rounded-full bg-muted/40 border border-border/60 px-4 py-2.5 text-sm outline-none" />
-                    </label>
-                    <label className="block">
-                      <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">Expiry</div>
-                      <input placeholder="MM / YY" disabled
-                        className="w-full rounded-full bg-muted/40 border border-border/60 px-4 py-2.5 text-sm outline-none" />
-                    </label>
-                    <label className="block">
-                      <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">CVV</div>
-                      <input placeholder="•••" disabled
-                        className="w-full rounded-full bg-muted/40 border border-border/60 px-4 py-2.5 text-sm outline-none" />
-                    </label>
-                    <div className="sm:col-span-2 text-[11px] text-muted-foreground inline-flex items-center gap-1.5">
-                      <Shield className="h-3.5 w-3.5 text-primary" /> Card details are entered securely on the next screen — never stored on our servers.
+                  <div className="glass rounded-2xl p-4 text-sm text-muted-foreground">
+                    <div className="inline-flex items-center gap-2">
+                      <CreditCard className="h-4 w-4 text-primary shrink-0" />
+                      <span>You'll enter your card details securely on the Razorpay screen after you review your order.</span>
+                    </div>
+                    <div className="mt-2 text-[11px] inline-flex items-center gap-1.5">
+                      <Shield className="h-3.5 w-3.5 text-primary" /> Card details are never stored on our servers.
                     </div>
                   </div>
                 )}
                 {payMethod === "netbanking" && (
                   <div className="glass rounded-2xl p-4 text-sm text-muted-foreground inline-flex items-center gap-2">
-                    <Banknote className="h-4 w-4 text-primary" /> You'll choose your bank on the next screen.
+                    <Building2 className="h-4 w-4 text-primary" /> You'll choose your bank on the Razorpay screen after you review your order.
                   </div>
                 )}
                 {payMethod === "wallet" && (
                   <div className="glass rounded-2xl p-4 text-sm text-muted-foreground inline-flex items-center gap-2">
-                    <Wallet className="h-4 w-4 text-primary" /> Pick your wallet on the next screen.
+                    <Wallet className="h-4 w-4 text-primary" /> Pick your wallet on the Razorpay screen after you review your order.
+                  </div>
+                )}
+                {payMethod === "cod" && (
+                  <div className="glass rounded-2xl p-4 text-sm text-muted-foreground inline-flex items-center gap-2">
+                    <Banknote className="h-4 w-4 text-primary" /> Pay ₹{grand.toLocaleString("en-IN")} in cash (or UPI) when your order arrives. A ₹{COD_FEE_INR} handling fee applies.
                   </div>
                 )}
 
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">Promo code</div>
-                  <div className="flex gap-2">
-                    <input value={coupon} onChange={(e) => setCoupon(e.target.value.toUpperCase())} placeholder="LITTLEONE"
-                      className="glass flex-1 rounded-full px-4 py-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40" />
-                    <button onClick={applyCoupon} className="rounded-full bg-foreground text-background px-5 text-sm">Apply</button>
-                  </div>
-                  {couponOff > 0 && <div className="text-xs text-primary mt-1.5">✓ {coupon} applied · −₹{couponOff.toLocaleString("en-IN")}</div>}
-                </div>
-
                 <div className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5">
-                  <Shield className="h-3.5 w-3.5 text-primary" /> 256-bit SSL encrypted · Powered by Razorpay
+                  <Shield className="h-3.5 w-3.5 text-primary" />
+                  {payMethod === "cod"
+                    ? "No online payment required — pay when your order arrives."
+                    : "256-bit SSL encrypted · Powered by Razorpay"}
                 </div>
               </div>
             )}
             {step === 3 && (
               <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">Almost there. Please review your order, then pay securely.</p>
+                <p className="text-sm text-muted-foreground">
+                  {payMethod === "cod"
+                    ? "Almost there. Please review your order, then place it."
+                    : "Almost there. Please review your order, then pay securely."}
+                </p>
+                <div className="glass rounded-2xl p-4 flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <CreditCard className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                    <div className="text-sm min-w-0">
+                      <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Payment</div>
+                      <div className="font-medium">{payMethodLabel(payMethod)}</div>
+                      {payMethod === "cod" && (
+                        <div className="text-muted-foreground text-xs mt-0.5">Pay ₹{grand.toLocaleString("en-IN")} on delivery (₹{COD_FEE_INR} handling fee included)</div>
+                      )}
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => setStep(2)} className="text-xs text-primary story-link shrink-0">Edit</button>
+                </div>
                 <div className="glass rounded-2xl p-4 flex items-start justify-between gap-3">
                   <div className="flex items-start gap-2.5 min-w-0">
                     <MapPin className="h-4 w-4 text-primary mt-0.5 shrink-0" />
@@ -682,7 +662,11 @@ function Checkout() {
           ) : (
             <button onClick={place} disabled={cart.length === 0 || busy} className="rounded-full bg-primary text-primary-foreground px-6 py-3 font-medium hover:shadow-glow transition disabled:opacity-50 inline-flex items-center gap-2">
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-              {busy ? "Starting payment…" : `Pay ₹${grand.toLocaleString("en-IN")}`}
+              {busy
+                ? (payMethod === "cod" ? "Placing order…" : "Starting payment…")
+                : payMethod === "cod"
+                  ? "Place order"
+                  : `Pay ₹${grand.toLocaleString("en-IN")}`}
             </button>
           )}
         </div>
@@ -709,10 +693,40 @@ function Checkout() {
           ))}
           {cart.length === 0 && <div className="text-sm text-muted-foreground">Basket is empty.</div>}
         </div>
+        <div className="border-t border-border/60 mt-4 pt-4 space-y-3">
+          <div>
+            <label className="text-xs uppercase tracking-wider text-muted-foreground">Have a code?</label>
+            <div className="mt-2 flex gap-2">
+              <div className="flex-1 glass rounded-full flex items-center px-3">
+                <Tag className="h-3.5 w-3.5 text-muted-foreground" />
+                <input
+                  value={couponInput}
+                  onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                  placeholder="LITTLEONE"
+                  className="flex-1 bg-transparent px-2 py-2 text-sm outline-none uppercase"
+                />
+              </div>
+              <button onClick={() => applyCoupon()} className="rounded-full bg-foreground text-background px-4 text-sm">Apply</button>
+            </div>
+            {appliedCoupon && (
+              <div className="mt-2 text-xs text-primary flex items-center justify-between">
+                <span>{appliedCoupon.code} · −₹{appliedCoupon.discount.toLocaleString("en-IN")}</span>
+                <button
+                  onClick={() => { setAppliedCoupon(null); setCouponInput(""); }}
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  remove
+                </button>
+              </div>
+            )}
+            <CouponOffers subtotal={cartTotal} activeCode={appliedCoupon?.code} onApply={(c) => applyCoupon(c)} />
+          </div>
+        </div>
         <div className="border-t border-border/60 mt-4 pt-4 space-y-1.5 text-sm">
           <div className="flex justify-between"><span>Subtotal</span><span>₹{cartTotal.toLocaleString("en-IN")}</span></div>
           {couponOff > 0 && <div className="flex justify-between text-primary"><span>Discount ({coupon})</span><span>− ₹{couponOff.toLocaleString("en-IN")}</span></div>}
           <div className="flex justify-between text-muted-foreground"><span>Shipping</span><span>{shipping === 0 ? "Free" : `₹${shipping}`}</span></div>
+          {totals.codFee > 0 && <div className="flex justify-between text-muted-foreground"><span>COD handling fee</span><span>₹{totals.codFee.toLocaleString("en-IN")}</span></div>}
           <div className="flex justify-between text-muted-foreground"><span>GST ({commerce.gstRate}%)</span><span>₹{gst.toLocaleString("en-IN")}</span></div>
           {donation > 0 && <div className="flex justify-between text-primary"><span>Donation ♥</span><span>₹{donation.toLocaleString("en-IN")}</span></div>}
           <div className="flex justify-between font-display text-lg pt-2 border-t border-border/60 mt-2"><span>Total</span><span>₹{grand.toLocaleString("en-IN")}</span></div>

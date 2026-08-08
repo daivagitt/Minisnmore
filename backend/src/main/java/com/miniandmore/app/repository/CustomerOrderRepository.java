@@ -55,6 +55,12 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     Optional<CustomerOrder> findOneByOrderNumber(String orderNumber);
 
+    @Query(
+        "select customerOrder from CustomerOrder customerOrder where customerOrder.paymentMethod = 'cod' and " +
+        "customerOrder.paymentStatus = :paymentStatus order by customerOrder.id desc"
+    )
+    List<CustomerOrder> findCodOrdersByPaymentStatus(@Param("paymentStatus") PaymentStatus paymentStatus);
+
     boolean existsByUserLoginAndPaymentStatus(String userLogin, PaymentStatus paymentStatus);
 
     @Query(

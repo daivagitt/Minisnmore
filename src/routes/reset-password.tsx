@@ -8,6 +8,16 @@ import { resetPasswordErrorMessage } from "@/lib/auth-errors";
 
 const Search = z.object({ key: z.string().min(1).optional() });
 
+const MIN_PASSWORD_MSG = "Password must be at least 6 characters.";
+
+function setPasswordValidity(el: HTMLInputElement) {
+  if (el.validity.tooShort) {
+    el.setCustomValidity(MIN_PASSWORD_MSG);
+  } else {
+    el.setCustomValidity("");
+  }
+}
+
 export const Route = createFileRoute("/reset-password")({
   validateSearch: (search) => Search.parse(search),
   head: () => ({ meta: [{ title: "Reset password · Mini's n More" }] }),
@@ -44,7 +54,7 @@ function ResetPasswordPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password.length < 6) {
-      toast.error("Password must be at least 6 characters.");
+      toast.error(MIN_PASSWORD_MSG);
       return;
     }
     if (password !== confirm) {
@@ -80,6 +90,8 @@ function ResetPasswordPage() {
                 minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onInvalid={(e) => setPasswordValidity(e.currentTarget)}
+                onInput={(e) => e.currentTarget.setCustomValidity("")}
                 placeholder="New password (min 6)"
                 className="w-full rounded-2xl glass px-4 py-3 pr-11 text-sm outline-none focus:ring-2 focus:ring-primary/40"
               />
@@ -98,6 +110,8 @@ function ResetPasswordPage() {
               minLength={6}
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
+              onInvalid={(e) => setPasswordValidity(e.currentTarget)}
+              onInput={(e) => e.currentTarget.setCustomValidity("")}
               placeholder="Confirm new password"
               className="w-full rounded-2xl glass px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/40"
             />

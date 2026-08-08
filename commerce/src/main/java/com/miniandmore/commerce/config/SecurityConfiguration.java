@@ -22,8 +22,10 @@ public class SecurityConfiguration {
             .authorizeHttpRequests(authz ->
                 authz
                     .requestMatchers(HttpMethod.POST, "/api/v1/coupons/validate").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/coupons/active").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/orders/track/**").permitAll()
                     .requestMatchers("/api/v1/admin/order-returns/**").hasAuthority(AuthoritiesConstants.ADMIN)
+                    .requestMatchers("/api/v1/admin/orders/**").hasAuthority(AuthoritiesConstants.ADMIN)
                     .requestMatchers("/api/v1/**").authenticated()
                     .requestMatchers("/management/health", "/management/health/**", "/management/info")
                     .permitAll()

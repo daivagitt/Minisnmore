@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Plus, Minus, X, Tag, ShieldCheck, Truck } from "lucide-react";
 import { useShop } from "@/store/shop";
@@ -9,34 +9,52 @@ import { validateCoupon } from "@/lib/coupons.functions";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { commerceFromSiteSettings } from "@/lib/commerce";
 import { orderTotals } from "@/lib/money";
+import { CouponOffers } from "@/components/CouponOffers";
 export const Route = createFileRoute("/cart")({
   head: () => ({ meta: [{ title: "Your basket · Mini's n More" }] }),
   component: CartPage,
 });
 
 function CartPage() {
-  const { cart, updateQty, promptRemoveFromCart, cartTotal } = useShop();
+  const { cart, updateQty, promptRemoveFromCart, cartTotal, appliedCoupon, setAppliedCoupon } = useShop();
   const settings = useSiteSettings();
-  const [code, setCode] = useState("");
-  const [applied, setApplied] = useState<{ code: string; off: number } | null>(null);
+  const [code, setCode] = useState(appliedCoupon?.code ?? "");
 
-  const apply = async () => {
-    const normalized = code.trim().toUpperCase();
+  useEffect(() => {
+    setCode(appliedCoupon?.code ?? "");
+  }, [appliedCoupon?.code]);
+
+  useEffect(() => {
+    if (!appliedCoupon?.code) return;
+    let cancelled = false;
+    validateCoupon({ data: { code: appliedCoupon.code, subtotal: cartTotal } })
+      .then((res) => {
+        if (cancelled) return;
+        if (res.ok) setAppliedCoupon({ code: res.code!, discount: res.discount! });
+        else setAppliedCoupon(null);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [cartTotal, appliedCoupon?.code, setAppliedCoupon]);
+
+  const apply = async (codeArg?: string) => {
+    const normalized = (codeArg ?? code).trim().toUpperCase();
     if (!normalized) return;
+    setCode(normalized);
     try {
       const result = await validateCoupon({ data: { code: normalized, subtotal: cartTotal } });
       if (!result.ok) {
         toast.error(result.error);
         return;
       }
-      setApplied({ code: result.code, off: result.discount });
+      setAppliedCoupon({ code: result.code!, discount: result.discount! });
       toast.success("Coupon applied");
     } catch {
       toast.error("Could not validate coupon");
     }
   };
 
-  const discount = applied?.off ?? 0;
+  const discount = appliedCoupon?.discount ?? 0;
   const commerce = commerceFromSiteSettings(settings);
   const totals = orderTotals({ subtotal: cartTotal, discount, shipMode: "std", commerce });
   const shipping = totals.shipping;
@@ -102,12 +120,13 @@ function CartPage() {
               <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="LITTLEONE"
                 className="flex-1 bg-transparent px-2 py-2 text-sm outline-none uppercase" />
             </div>
-            <button onClick={apply} className="rounded-full bg-foreground text-background px-4 text-sm">Apply</button>
+            <button onClick={() => apply()} className="rounded-full bg-foreground text-background px-4 text-sm">Apply</button>
           </div>
-          {applied && <div className="mt-2 text-xs text-primary flex items-center justify-between">
-            <span>{applied.code} · −₹{applied.off}</span>
-            <button onClick={() => setApplied(null)} className="text-muted-foreground hover:text-destructive">remove</button>
+          {appliedCoupon && <div className="mt-2 text-xs text-primary flex items-center justify-between">
+            <span>{appliedCoupon.code} · −₹{appliedCoupon.discount.toLocaleString("en-IN")}</span>
+            <button onClick={() => { setAppliedCoupon(null); setCode(""); }} className="text-muted-foreground hover:text-destructive">remove</button>
           </div>}
+          <CouponOffers subtotal={cartTotal} activeCode={appliedCoupon?.code} onApply={(c) => apply(c)} />
         </div>
 
         <div className="border-t border-border/60 pt-4 space-y-2 text-sm">

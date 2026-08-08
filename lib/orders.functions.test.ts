@@ -291,13 +291,25 @@ describe("orders functions", () => {
     putMock.mockResolvedValueOnce({ ok: true });
 
     const res = await updateMyProfile({
-      data: { full_name: "  New Name  ", phone: "  987  " },
+      data: { full_name: "  New Name  ", phone: "  9876543210  " },
     });
     expect(res.ok).toBe(true);
     expect(putMock).toHaveBeenCalledWith(
       "/api/v1/account/profile",
-      { full_name: "New Name", phone: "987" },
+      { full_name: "New Name", phone: "9876543210" },
       { auth: true },
     );
+  });
+
+  it("rejects an invalid phone number when updating profile", async () => {
+    await expect(
+      updateMyProfile({ data: { full_name: "New Name", phone: "12345" } }),
+    ).rejects.toThrow();
+  });
+
+  it("rejects a full name containing digits", async () => {
+    await expect(
+      updateMyProfile({ data: { full_name: "New Name 2", phone: "9876543210" } }),
+    ).rejects.toThrow();
   });
 });

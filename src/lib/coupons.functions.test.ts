@@ -13,12 +13,13 @@ vi.mock("@tanstack/react-start", () => ({
 }));
 
 const postMock = vi.hoisted(() => vi.fn());
+const getMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api", () => ({
-  api: { post: postMock },
+  api: { post: postMock, get: getMock },
 }));
 
-import { validateCoupon } from "./coupons.functions";
+import { listActiveCoupons, validateCoupon } from "./coupons.functions";
 
 describe("coupon functions", () => {
   beforeEach(() => {
@@ -74,5 +75,15 @@ describe("coupon functions", () => {
       code: "SAVE",
       discount: 50,
     });
+  });
+
+  it("lists active coupons", async () => {
+    const coupons = [
+      { code: "WELCOME10", discount_type: "percent", discount_value: 10, min_order: 999, max_discount: 500 },
+    ];
+    getMock.mockResolvedValueOnce({ coupons });
+
+    await expect(listActiveCoupons()).resolves.toEqual({ coupons });
+    expect(getMock).toHaveBeenCalledWith("/api/v1/coupons/active");
   });
 });

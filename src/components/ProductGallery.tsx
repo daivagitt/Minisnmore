@@ -125,7 +125,7 @@ export function ProductGallery({ name, image, gallery = [], className }: Props) 
         className="order-1 lg:order-2 glass rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden relative min-w-0 w-full lg:flex-1"
       >
         <div
-          className="relative w-full overflow-hidden max-h-[85vh]"
+          className="relative w-full overflow-hidden max-h-[min(92vw,28rem)] sm:max-h-[min(80vw,32rem)] lg:max-h-[min(42vw,36rem)]"
           style={{ aspectRatio: heroAspect }}
         >
           <AnimatePresence mode="wait">
@@ -138,7 +138,7 @@ export function ProductGallery({ name, image, gallery = [], className }: Props) 
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               onLoad={(e) => rememberAspect(current, e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)}
-              className="absolute inset-0 h-full w-full object-cover object-center"
+              className="absolute inset-0 h-full w-full object-contain object-center"
             />
           </AnimatePresence>
 

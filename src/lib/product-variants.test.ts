@@ -10,6 +10,7 @@ import {
   parseVariantsJson,
   sellableColorsForSize,
   sizeHasSellableVariants,
+  storefrontListPricing,
   variantStockMessage,
 } from "./product-variants";
 import type { Product } from "@/data/products";
@@ -100,5 +101,20 @@ describe("product-variants", () => {
     });
     expect(sellableColorsForSize(ageProduct, "S")).toEqual(["Navy"]);
     expect(sellableColorsForSize(ageProduct, "L")).toEqual([]);
+  });
+
+  it("uses default sellable variant for list/card price instead of parent min", () => {
+    const skewed: Product = {
+      ...matrixProduct,
+      // Parent row is min-of-matrix (can be a bad/outlier variant rate).
+      price: 1.64,
+      compareAt: 2,
+      sizes: ["0-3m", "3-6m"],
+      variants: parseVariantsJson([
+        { sku: "SHORTS-03-BLUE", size: "0-3m", color: "Navy", rate: 320, mrp: 400, stock: 5, active: true },
+        { sku: "SHORTS-36-ODD", size: "3-6m", color: "Navy", rate: 1.64, mrp: 2, stock: 35, active: true },
+      ]),
+    };
+    expect(storefrontListPricing(skewed)).toEqual({ price: 320, compareAt: 400 });
   });
 });

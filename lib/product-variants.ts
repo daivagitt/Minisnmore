@@ -21,6 +21,8 @@ export type VariantProductLike = {
   price: number;
   compareAt?: number;
   sku?: string;
+  /** Stock for non-variant ("SIMPLE") products. Null/undefined means untracked — treated as always sellable. */
+  stock?: number | null;
 };
 
 export function isVariantsProduct(p: VariantProductLike | null | undefined): boolean {
@@ -147,6 +149,12 @@ export function isVariantSellable(variant: ProductVariant | undefined | null): b
   return !!variant && variant.active && variant.stock > 0 && !!variant.sku;
 }
 
+/** True for non-variant ("SIMPLE") products whose tracked stock (if any) isn't exhausted. */
+export function isSimpleProductSellable(product: VariantProductLike | null | undefined): boolean {
+  if (!product) return false;
+  return product.stock == null || product.stock > 0;
+}
+
 /** True if at least one active in-stock variant exists for this size. */
 export function sizeHasSellableVariants(product: VariantProductLike, size: string | null | undefined): boolean {
   if (!isVariantsProduct(product)) return true;
@@ -175,6 +183,25 @@ export function lineUnitPrice(product: VariantProductLike, opts: { size?: string
     return v?.price ?? product.price;
   }
   return product.price;
+}
+
+/**
+ * Card/list price for a product — matches the PDP default selection for VARIANTS
+ * (not the parent min-of-matrix price, which can be skewed by bad variant rows).
+ */
+export function storefrontListPricing(product: VariantProductLike): { price: number; compareAt?: number } {
+  if (isVariantsProduct(product) && (product.variants?.length ?? 0) > 0) {
+    const { variant } = defaultSellableSelection(product);
+    if (variant && variant.price > 0) {
+      const compareAt =
+        variant.compareAt != null && variant.compareAt > variant.price ? variant.compareAt : undefined;
+      return { price: variant.price, compareAt };
+    }
+  }
+  const price = Number(product.price) || 0;
+  const compareAt =
+    product.compareAt != null && product.compareAt > price ? product.compareAt : undefined;
+  return { price, compareAt };
 }
 
 export function defaultSellableSelection(product: VariantProductLike): { size: string; color: string; variant?: ProductVariant } {

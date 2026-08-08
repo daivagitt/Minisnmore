@@ -96,6 +96,16 @@ public class CustomerOrder implements Serializable {
     @Column(name = "coupon_code", length = 64)
     private String couponCode;
 
+    @NotNull
+    @Size(min = 1, max = 12)
+    @Column(name = "payment_method", length = 12, nullable = false)
+    private String paymentMethod;
+
+    @NotNull
+    @DecimalMin(value = "0")
+    @Column(name = "cod_fee", precision = 21, scale = 2, nullable = false)
+    private BigDecimal codFee;
+
     @Column(name = "shipping_address_json", columnDefinition = "text", nullable = false)
     private String shippingAddressJson;
 
@@ -339,6 +349,32 @@ public class CustomerOrder implements Serializable {
 
     public void setCouponCode(String couponCode) {
         this.couponCode = couponCode;
+    }
+
+    public String getPaymentMethod() {
+        return this.paymentMethod;
+    }
+
+    public CustomerOrder paymentMethod(String paymentMethod) {
+        this.setPaymentMethod(paymentMethod);
+        return this;
+    }
+
+    public void setPaymentMethod(String paymentMethod) {
+        this.paymentMethod = paymentMethod;
+    }
+
+    public BigDecimal getCodFee() {
+        return this.codFee;
+    }
+
+    public CustomerOrder codFee(BigDecimal codFee) {
+        this.setCodFee(codFee);
+        return this;
+    }
+
+    public void setCodFee(BigDecimal codFee) {
+        this.codFee = codFee;
     }
 
     public String getShippingAddressJson() {
@@ -628,6 +664,8 @@ public class CustomerOrder implements Serializable {
             ", donation=" + getDonation() +
             ", total=" + getTotal() +
             ", couponCode='" + getCouponCode() + "'" +
+            ", paymentMethod='" + getPaymentMethod() + "'" +
+            ", codFee=" + getCodFee() +
             "}";
     }
 }

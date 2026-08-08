@@ -51,12 +51,15 @@ public class InternalAccountOrderResource {
     private static final Logger LOG = LoggerFactory.getLogger(InternalAccountOrderResource.class);
     private static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
     private static final Duration INVENTORY_RESERVATION_TTL = Duration.ofMinutes(30);
+    /** Flat COD handling fee — matches the ₹49 figure quoted in the storefront's shipping policy. */
+    private static final BigDecimal COD_FEE = BigDecimal.valueOf(49);
     private static final Duration TRACKING_REFRESH_TTL = Duration.ofMinutes(5);
     private static final String FIELD_PHONE = "phone";
     private static final String FIELD_ERROR = "error";
     private static final String FIELD_ORDER_NUMBER = "orderNumber";
     private static final String FIELD_ORDER_NUMBER_SNAKE = "order_number";
     private static final String FIELD_DISCOUNT = "discount";
+    private static final String FIELD_DISCOUNT_VALUE = "discount_value";
     private static final String FIELD_TOTAL = "total";
 
     private final AccountOrderDataAccess dataAccess;
@@ -98,6 +101,34 @@ public class InternalAccountOrderResource {
         return ApiResponse.ok(data);
     }
 
+    /**
+     * Public listing of currently redeemable coupons, for an "available offers" widget on cart/checkout.
+     * No login required — mirrors the /coupons/validate endpoint's public visibility.
+     */
+    @GetMapping("/coupons/active")
+    public ApiResponse<Map<String, Object>> activeCoupons() {
+        Instant now = Instant.now();
+        List<Map<String, Object>> coupons = dataAccess
+            .couponRepository()
+            .findAllByOrderByIdDesc()
+            .stream()
+            .filter(c -> Boolean.TRUE.equals(c.getActive()))
+            .filter(c -> c.getExpiresAt() == null || c.getExpiresAt().isAfter(now))
+            .map(this::couponSummary)
+            .toList();
+        return ApiResponse.ok(Map.of("coupons", coupons));
+    }
+
+    private Map<String, Object> couponSummary(Coupon coupon) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("code", coupon.getCode());
+        data.put("discount_type", lower(coupon.getDiscountType()));
+        data.put(FIELD_DISCOUNT_VALUE, coupon.getDiscountValue());
+        data.put("min_order", coupon.getMinOrder());
+        data.put("max_discount", coupon.getMaxDiscount());
+        return data;
+    }
+
     @GetMapping("/account/profile")
     public ApiResponse<Map<String, String>> profile() {
         String login = requireLogin();
@@ -127,36 +158,44 @@ public class InternalAccountOrderResource {
     @Transactional
     public ApiResponse<Map<String, Object>> createOrder(@Valid @RequestBody CreateOrderRequest request) {
         String login = requireLogin();
+        boolean cod = "cod".equalsIgnoreCase(StringUtils.trimToEmpty(request.payment_method()));
         List<ReservedOrderItem> reserved;
         try {
             reserved = reserveInventory(request.items());
         } catch (ResponseStatusException ex) {
             throw ex;
         }
-        CommerceSettings commerce = commerceSettings();
         Totals totals = calculateTotals(
             reserved,
             blankToNull(request.coupon_code()),
             request.donation(),
-            request.shipping_mode()
+            request.shipping_mode(),
+            cod
         );
         String orderNumber = generateOrderNumber();
         CustomerOrder order = new CustomerOrder()
             .userLogin(login)
             .orderNumber(orderNumber)
-            .status(OrderStatus.PENDING)
+            // COD has no online payment step to wait on — the order is confirmed for fulfillment
+            // immediately; paymentStatus stays PENDING until cash/UPI is collected on delivery.
+            .status(cod ? OrderStatus.CONFIRMED : OrderStatus.PENDING)
             .paymentStatus(PaymentStatus.PENDING)
             .subtotal(totals.subtotal())
             .discount(totals.discount())
             .shipping(totals.shipping())
+            .codFee(totals.codFee())
+            .paymentMethod(cod ? "cod" : "online")
             .tax(totals.tax())
-            .donation(request.donation())
+            .donation(roundInr(request.donation()))
             .total(totals.total())
             .couponCode(blankToNull(request.coupon_code()))
             .shippingAddressJson(toJson(request.shipping_address()))
             .notes(blankToNull(request.notes()))
             .inventoryReserved(true)
-            .inventoryReservedUntil(Instant.now().plus(INVENTORY_RESERVATION_TTL))
+            // Online orders get a 30-minute hold that the reaper releases if payment never completes.
+            // COD orders commit the stock immediately with no expiry (inventoryReservedUntil left
+            // null, which the reaper's "<=  :now" comparison never matches).
+            .inventoryReservedUntil(cod ? null : Instant.now().plus(INVENTORY_RESERVATION_TTL))
             .placedAt(Instant.now());
         CustomerOrder saved = dataAccess.customerOrderRepository().save(order);
         List<OrderItem> orderItems = new ArrayList<>();
@@ -177,6 +216,28 @@ public class InternalAccountOrderResource {
         }
         dataAccess.orderItemRepository().saveAll(orderItems);
 
+        Map<String, Object> totalsMap = new LinkedHashMap<>();
+        totalsMap.put("subtotal", totals.subtotal());
+        totalsMap.put(FIELD_DISCOUNT, totals.discount());
+        totalsMap.put("shipping", totals.shipping());
+        totalsMap.put("cod_fee", totals.codFee());
+        totalsMap.put("tax", totals.tax());
+        totalsMap.put(FIELD_TOTAL, totals.total());
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("orderId", saved.getId());
+        data.put(FIELD_ORDER_NUMBER, saved.getOrderNumber());
+        data.put("paymentMethod", order.getPaymentMethod());
+        data.put("cod", cod);
+        data.put("amount", toPaise(totals.total()));
+        data.put("currency", "INR");
+        data.put("totals", totalsMap);
+
+        if (cod) {
+            // No gateway involved — the frontend treats this response as an immediate success.
+            return ApiResponse.ok(data);
+        }
+
         String razorpayOrderId;
         if (isDemoMode() || totals.total().compareTo(BigDecimal.ZERO) <= 0) {
             razorpayOrderId = "order_demo_" + orderNumber;
@@ -186,23 +247,10 @@ public class InternalAccountOrderResource {
         saved.setRazorpayOrderId(razorpayOrderId);
         dataAccess.customerOrderRepository().save(saved);
 
-        Map<String, Object> totalsMap = new LinkedHashMap<>();
-        totalsMap.put("subtotal", totals.subtotal());
-        totalsMap.put(FIELD_DISCOUNT, totals.discount());
-        totalsMap.put("shipping", totals.shipping());
-        totalsMap.put("tax", totals.tax());
-        totalsMap.put(FIELD_TOTAL, totals.total());
-
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("orderId", saved.getId());
-        data.put(FIELD_ORDER_NUMBER, saved.getOrderNumber());
         data.put("razorpayOrderId", razorpayOrderId);
         data.put("keyId", razorpayKeyId);
-        data.put("amount", toPaise(totals.total()));
-        data.put("currency", "INR");
         data.put("demoMode", isDemoMode());
         data.put("gatewayMode", gatewayMode());
-        data.put("totals", totalsMap);
         return ApiResponse.ok(data);
     }
 
@@ -446,6 +494,12 @@ public class InternalAccountOrderResource {
             discount = discount.min(coupon.getMaxDiscount());
         }
         discount = discount.max(BigDecimal.ZERO).min(subtotal);
+        // Round to whole rupees here so every downstream total (and the coupon preview shown at
+        // cart/checkout) matches the whole-rupee amounts the storefront displays — the frontend
+        // rounds each line to the nearest rupee for display, but a raw percent discount (e.g. 10%
+        // of ₹999 = ₹99.90) previously left the Razorpay-charged total a few paise off from what
+        // the customer reviewed on screen.
+        discount = roundInr(discount);
         return Optional.of(Map.of(FIELD_DISCOUNT, discount));
     }
 
@@ -453,7 +507,8 @@ public class InternalAccountOrderResource {
         List<ReservedOrderItem> items,
         String couponCode,
         BigDecimal donation,
-        String shippingMode
+        String shippingMode,
+        boolean cod
     ) {
         BigDecimal subtotal = items
             .stream()
@@ -462,17 +517,29 @@ public class InternalAccountOrderResource {
         BigDecimal discount = calculateCouponDiscount(couponCode, subtotal)
             .map(m -> (BigDecimal) m.get(FIELD_DISCOUNT))
             .orElse(BigDecimal.ZERO);
-        BigDecimal afterDiscount = subtotal.subtract(discount).max(BigDecimal.ZERO);
+        // Rounded to whole rupees to match the storefront's checkout review, which rounds every
+        // line (afterDiscount, GST, total) for display — see src/lib/money.ts#orderTotals. Without
+        // this, a fractional discount left the Razorpay-charged amount a few paise off from what
+        // the customer approved on screen.
+        BigDecimal afterDiscount = roundInr(subtotal.subtract(discount).max(BigDecimal.ZERO));
         CommerceSettings commerce = commerceSettings();
         BigDecimal shipping = calculateShipping(afterDiscount, shippingMode, commerce);
-        BigDecimal lineGst = calculateTax(afterDiscount, commerce);
-        BigDecimal shippingGst = shipping.compareTo(BigDecimal.ZERO) > 0 ? calculateTax(shipping, commerce) : BigDecimal.ZERO;
+        BigDecimal codFee = cod ? COD_FEE : BigDecimal.ZERO;
+        BigDecimal lineGst = roundInr(calculateTax(afterDiscount, commerce));
+        BigDecimal shippingGst = shipping.compareTo(BigDecimal.ZERO) > 0 ? roundInr(calculateTax(shipping, commerce)) : BigDecimal.ZERO;
         BigDecimal tax = lineGst.add(shippingGst);
+        BigDecimal roundedDonation = roundInr(donation == null ? BigDecimal.ZERO : donation);
         BigDecimal total = afterDiscount
             .add(shipping)
-            .add(donation == null ? BigDecimal.ZERO : donation)
+            .add(codFee)
+            .add(roundedDonation)
             .add(commerce.pricesIncludeGst() ? BigDecimal.ZERO : tax);
-        return new Totals(subtotal, discount, shipping, tax, total);
+        return new Totals(subtotal, discount, shipping, codFee, tax, total);
+    }
+
+    /** Whole rupees (INR) — mirrors src/lib/money.ts#roundInr so backend totals match the storefront's display rounding. */
+    private static BigDecimal roundInr(BigDecimal amount) {
+        return amount.setScale(0, RoundingMode.HALF_UP);
     }
 
     private CommerceSettings commerceSettings() {
@@ -833,6 +900,7 @@ public class InternalAccountOrderResource {
         data.put(FIELD_ORDER_NUMBER_SNAKE, order.getOrderNumber());
         data.put("status", lower(order.getStatus()));
         data.put("payment_status", lower(order.getPaymentStatus()));
+        data.put("payment_method", order.getPaymentMethod());
         data.put(FIELD_TOTAL, order.getTotal());
         data.put("created_at", orderCreatedAtIso(order));
         data.put("order_items", dataAccess.orderItemRepository().findAllByOrderId(order.getId()).stream().map(this::orderItem).toList());
@@ -845,6 +913,7 @@ public class InternalAccountOrderResource {
         data.put("subtotal", order.getSubtotal());
         data.put(FIELD_DISCOUNT, order.getDiscount());
         data.put("shipping", order.getShipping());
+        data.put("cod_fee", order.getCodFee());
         data.put("tax", order.getTax());
         data.put("donation", order.getDonation());
         data.put("coupon_code", order.getCouponCode());
@@ -1068,6 +1137,7 @@ public class InternalAccountOrderResource {
         @NotEmpty @Size(max = 50) List<@Valid OrderItemRequest> items,
         @NotNull @Valid AddressRequest shipping_address,
         @Size(max = 12) String shipping_mode,
+        @Pattern(regexp = "^(online|cod)?$") String payment_method,
         @Size(max = 64) String coupon_code,
         @NotNull @DecimalMin("0") BigDecimal donation,
         @Size(max = 500) String notes
@@ -1092,7 +1162,14 @@ public class InternalAccountOrderResource {
         BigDecimal freeShippingMin
     ) {}
 
-    private record Totals(BigDecimal subtotal, BigDecimal discount, BigDecimal shipping, BigDecimal tax, BigDecimal total) {}
+    private record Totals(
+        BigDecimal subtotal,
+        BigDecimal discount,
+        BigDecimal shipping,
+        BigDecimal codFee,
+        BigDecimal tax,
+        BigDecimal total
+    ) {}
 
     private record ReservedOrderItem(Product product, OrderItemRequest request, String variantSku, BigDecimal unitPrice) {}
 }

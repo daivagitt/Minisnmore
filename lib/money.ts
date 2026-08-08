@@ -50,16 +50,21 @@ export function shippingForOrder(
   return roundInr(commerce.shippingStandardInr);
 }
 
+/** Flat COD handling fee — matches backend InternalAccountOrderResource#COD_FEE and the ₹49 figure in the shipping policy. */
+export const COD_FEE_INR = 49;
+
 export function orderTotals({
   subtotal,
   discount = 0,
   donation = 0,
+  codFee = 0,
   shipMode = "std",
   commerce = DEFAULT_COMMERCE,
 }: {
   subtotal: number;
   discount?: number;
   donation?: number;
+  codFee?: number;
   shipMode?: ShipMode;
   commerce?: CommerceConfig;
 }) {
@@ -71,11 +76,13 @@ export function orderTotals({
   const grand =
     afterDiscount +
     shipping +
+    roundInr(codFee) +
     roundInr(donation) +
     (commerce.pricesIncludeGst ? 0 : gst);
   return {
     afterDiscount,
     shipping,
+    codFee: roundInr(codFee),
     gstIncluded: commerce.pricesIncludeGst ? gst : 0,
     gstAdded: commerce.pricesIncludeGst ? 0 : gst,
     gst,
