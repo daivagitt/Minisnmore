@@ -4,7 +4,7 @@ import { AnimatePresence, type MotionValue } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight, Leaf, Sparkles, Gift, Star, Truck, BadgePercent,
-  Heart, ShieldCheck, Quote, ChevronRight, PackageCheck, Flame, Tag, Play, ShoppingBag,
+  Heart, ShieldCheck, Quote, ChevronRight, Flame, Play, ShoppingBag,
   ChevronLeft, Download,
   Smile, Feather, Wind, Droplets, RefreshCw,
 } from "lucide-react";
@@ -458,8 +458,6 @@ const featuredTabs = [
   { key: "best", label: "Best sellers", icon: Star, hint: "Forever favourites" },
   { key: "trending", label: "Trending", icon: Flame, hint: "Loved this week" },
   { key: "new", label: "New", icon: Sparkles, hint: "Just arrived" },
-  { key: "back", label: "Back in stock", icon: PackageCheck, hint: "You asked, we restocked" },
-  { key: "first", label: "First-order 10%", icon: Tag, hint: "Use WELCOME10" },
 ] as const;
 
 function FeaturedTabs() {
@@ -486,18 +484,6 @@ function FeaturedTabs() {
           liveProducts,
           sectionProductSlugs(byKey.get("new_arrivals")?.payload as Record<string, unknown>),
           (ps) => ps.filter((p) => p.isNew),
-        );
-      case "back":
-        return resolveHomeSectionProducts(
-          liveProducts,
-          sectionProductSlugs(byKey.get("featured")?.payload as Record<string, unknown>),
-          (ps) => [...ps].reverse(),
-        );
-      case "first":
-        return resolveHomeSectionProducts(
-          liveProducts,
-          [],
-          (ps) => ps.filter((p) => !!p.compareAt),
         );
       default:
         return liveProducts.slice(0, HOME_SECTION_PRODUCT_LIMIT);
