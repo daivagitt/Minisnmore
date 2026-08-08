@@ -3,6 +3,7 @@ import {
   colorsForSize,
   defaultSellableSelection,
   findVariant,
+  isSimpleProductSellable,
   isVariantSellable,
   isVariantsProduct,
   lineUnitPrice,
@@ -59,6 +60,15 @@ describe("product-variants", () => {
     expect(lineUnitPrice(matrixProduct, { size: "M", color: "Navy" })).toBe(959.2);
     expect(isVariantSellable(findVariant(matrixProduct, { size: "M", color: "Navy" }))).toBe(true);
     expect(isVariantSellable(findVariant(matrixProduct, { size: "L", color: "Ivory" }))).toBe(false);
+  });
+
+  it("treats simple (non-variant) products as sellable only when stock isn't exhausted", () => {
+    const simple = { ...matrixProduct, itemStructure: "SIMPLE", variants: undefined };
+    expect(isSimpleProductSellable({ ...simple, stock: undefined })).toBe(true);
+    expect(isSimpleProductSellable({ ...simple, stock: null })).toBe(true);
+    expect(isSimpleProductSellable({ ...simple, stock: 5 })).toBe(true);
+    expect(isSimpleProductSellable({ ...simple, stock: 0 })).toBe(false);
+    expect(isSimpleProductSellable(null)).toBe(false);
   });
 
   it("flags sold-out sizes and surfaces stock copy for shoppers", () => {

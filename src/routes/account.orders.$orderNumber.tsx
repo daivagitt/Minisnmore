@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { syncPaymentStatus } from "@/lib/orders.functions";
+import { syncPaymentStatus, retryOrderPayment, verifyPayment } from "@/lib/orders.functions";
+import { openRazorpayCheckout } from "@/lib/razorpay";
 import { formatOrderDate } from "@/lib/dates";
 import { useOrderTrackingPoll } from "@/hooks/useOrderTrackingPoll";
-import { Loader2, ArrowLeft, MapPin, CreditCard, Package2, CheckCircle2, Clock, XCircle, Truck } from "lucide-react";
+import { Loader2, ArrowLeft, MapPin, CreditCard, Package2, CheckCircle2, Clock, XCircle, Truck, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { OrderTrackingCard } from "@/components/OrderTrackingCard";
 import { TrackingRefreshHint } from "@/components/TrackingRefreshHint";
@@ -16,6 +17,7 @@ export const Route = createFileRoute("/account/orders/$orderNumber")({
 function OrderDetail() {
   const { orderNumber } = Route.useParams();
   const [syncing, setSyncing] = useState(false);
+  const [paying, setPaying] = useState(false);
   const { order, loading, error, lastUpdated, polling, refresh } = useOrderTrackingPoll(
     orderNumber,
     "authenticated",
@@ -36,6 +38,55 @@ function OrderDetail() {
       toast.error(e?.message || "Could not check payment status");
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const payNow = async () => {
+    if (!order?.id) return;
+    setPaying(true);
+    try {
+      const init = await retryOrderPayment({ data: { orderId: order.id } });
+      const addr = order.shipping_address || {};
+
+      if (init.demoMode) {
+        const label = init.gatewayMode === "test" ? "TEST MODE" : "DEMO MODE";
+        const confirmed = window.confirm(
+          `🧪 ${label}\n\nAmount: ₹${(init.amount / 100).toLocaleString("en-IN")}\nOrder: ${init.orderNumber}\n\nClick OK to simulate a successful payment, Cancel to simulate cancellation.\n\nNote: Razorpay is using ${init.gatewayMode === "test" ? "test" : "demo"} keys — no real money will be charged.`,
+        );
+        if (!confirmed) {
+          toast("Payment cancelled.", { icon: "🛒" });
+          return;
+        }
+        await verifyPayment({
+          data: {
+            orderId: init.orderId,
+            razorpay_order_id: init.razorpayOrderId,
+            razorpay_payment_id: `pay_demo_${Date.now()}`,
+            razorpay_signature: "demo_signature",
+          },
+        });
+        toast.success(`Payment successful ✨ (${init.gatewayMode === "test" ? "test" : "demo"})`);
+        await refresh({ silent: true });
+        return;
+      }
+
+      if (init.gatewayMode === "unknown") {
+        throw new Error("Razorpay key format is invalid. Please check the configured Key ID and Secret.");
+      }
+
+      await openRazorpayCheckout(init, {
+        prefill: { name: addr.full_name ?? "", email: addr.email ?? "", contact: addr.phone ?? "" },
+        onSuccess: async () => {
+          toast.success("Payment successful ✨");
+          await refresh({ silent: true });
+        },
+        onCancelled: () => toast("Payment cancelled — you can retry anytime.", { icon: "🛒" }),
+        onFailed: (reason) => toast.error(`${reason}. Please try a different payment method.`),
+      });
+    } catch (e: any) {
+      toast.error(e?.message || "Could not start payment");
+    } finally {
+      setPaying(false);
     }
   };
 
@@ -116,15 +167,26 @@ function OrderDetail() {
               <div className="text-sm font-medium capitalize">{order.payment_status}</div>
               {order.razorpay_payment_id && <div className="text-xs text-muted-foreground break-all">ID: {order.razorpay_payment_id}</div>}
               {order.payment_status === "pending" && (
-                <button
-                  type="button"
-                  onClick={checkPaymentStatus}
-                  disabled={syncing}
-                  className="mt-3 rounded-full bg-primary text-primary-foreground px-4 py-2 text-xs inline-flex items-center gap-2 disabled:opacity-50"
-                >
-                  {syncing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  {syncing ? "Checking…" : "I paid — refresh status"}
-                </button>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={payNow}
+                    disabled={paying || syncing}
+                    className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-xs inline-flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {paying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wallet className="h-3.5 w-3.5" />}
+                    {paying ? "Opening payment…" : "Pay now"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={checkPaymentStatus}
+                    disabled={syncing || paying}
+                    className="rounded-full glass px-4 py-2 text-xs inline-flex items-center gap-2 disabled:opacity-50 hover:bg-white/60 transition"
+                  >
+                    {syncing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                    {syncing ? "Checking…" : "Already paid? Refresh status"}
+                  </button>
+                </div>
               )}
               {order.coupon_code && <div className="text-xs text-primary mt-1">Coupon: {order.coupon_code}</div>}
             </div>

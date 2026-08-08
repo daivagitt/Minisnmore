@@ -44,6 +44,11 @@ public class CommerceOrdersProxyResource {
         return catalog.post("/internal/v1/orders/sync-payment", body);
     }
 
+    @PostMapping("/orders/retry-payment")
+    public ResponseEntity<String> retryPayment(@RequestBody Object body) {
+        return catalog.post("/internal/v1/orders/retry-payment", body);
+    }
+
     @GetMapping("/orders")
     public ResponseEntity<String> listOrders() {
         return catalog.get("/internal/v1/orders");

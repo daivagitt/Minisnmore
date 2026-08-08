@@ -31,6 +31,49 @@ const matrixProduct: Product = {
   ]),
 };
 
+const simpleProduct: Product = {
+  id: "2",
+  slug: "cloud-swaddle",
+  name: "Cloud Swaddle",
+  tagline: "",
+  price: 499,
+  image: "/y.jpg",
+  gallery: ["/y.jpg"],
+  ages: ["0-3m"],
+  fabric: "Muslin",
+  colors: [{ name: "Cream", hex: "#f7e3d5" }],
+  sizes: ["One Size"],
+  rating: 5,
+  reviewCount: 0,
+  category: "Newborn",
+  description: "",
+  itemStructure: "SIMPLE",
+};
+
+describe("stockAvailabilityState — simple (non-variant) products", () => {
+  it("treats untracked stock (null/undefined) as always in stock", () => {
+    const state = stockAvailabilityState(simpleProduct, undefined, {});
+    expect(state.kind).toBe("in_stock");
+  });
+
+  it("flags zero stock as out of stock", () => {
+    const state = stockAvailabilityState({ ...simpleProduct, stock: 0 }, undefined, {});
+    expect(state.kind).toBe("out_of_stock");
+    expect(state.label).toBe("Out of stock");
+  });
+
+  it("flags low stock for small tracked quantities", () => {
+    const state = stockAvailabilityState({ ...simpleProduct, stock: 2 }, undefined, {});
+    expect(state.kind).toBe("low_stock");
+    expect(state.count).toBe(2);
+  });
+
+  it("shows in stock for healthy tracked quantities", () => {
+    const state = stockAvailabilityState({ ...simpleProduct, stock: 25 }, undefined, {});
+    expect(state.kind).toBe("in_stock");
+  });
+});
+
 describe("stockAvailabilityState", () => {
   it("prompts before size and colour are chosen", () => {
     const state = stockAvailabilityState(matrixProduct, undefined, { size: null, color: null });

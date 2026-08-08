@@ -21,6 +21,8 @@ export type VariantProductLike = {
   price: number;
   compareAt?: number;
   sku?: string;
+  /** Stock for non-variant ("SIMPLE") products. Null/undefined means untracked — treated as always sellable. */
+  stock?: number | null;
 };
 
 export function isVariantsProduct(p: VariantProductLike | null | undefined): boolean {
@@ -145,6 +147,12 @@ export function colorNameInList(colorName: string, names: string[]): boolean {
 
 export function isVariantSellable(variant: ProductVariant | undefined | null): boolean {
   return !!variant && variant.active && variant.stock > 0 && !!variant.sku;
+}
+
+/** True for non-variant ("SIMPLE") products whose tracked stock (if any) isn't exhausted. */
+export function isSimpleProductSellable(product: VariantProductLike | null | undefined): boolean {
+  if (!product) return false;
+  return product.stock == null || product.stock > 0;
 }
 
 /** True if at least one active in-stock variant exists for this size. */

@@ -24,6 +24,13 @@ export function stockAvailabilityState(
   opts: { size?: string | null; color?: string | null },
 ): StockAvailabilityState {
   if (!isVariantsProduct(product)) {
+    const stock = product.stock;
+    if (stock != null && stock <= 0) {
+      return { kind: "out_of_stock", label: "Out of stock" };
+    }
+    if (stock != null && stock <= LOW_STOCK_THRESHOLD) {
+      return { kind: "low_stock", label: `Only ${stock} left`, count: stock };
+    }
     return { kind: "in_stock", label: "In stock" };
   }
   if (!opts.size || !opts.color) {

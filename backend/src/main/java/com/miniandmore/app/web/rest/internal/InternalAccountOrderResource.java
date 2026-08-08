@@ -206,6 +206,37 @@ public class InternalAccountOrderResource {
         return ApiResponse.ok(data);
     }
 
+    /**
+     * Resume payment on an order that was created but never paid (e.g. the Razorpay
+     * checkout was closed or abandoned) — reopens the same Razorpay order rather than
+     * minting a fresh one, since Razorpay orders don't expire between attempts.
+     */
+    @PostMapping("/orders/retry-payment")
+    public ApiResponse<Map<String, Object>> retryPayment(@Valid @RequestBody RetryPaymentRequest request) {
+        String login = requireLogin();
+        CustomerOrder order = requireOwnedOrder(request.orderId(), login);
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This order is already paid");
+        }
+        if (order.getPaymentStatus() != PaymentStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This order can no longer be paid");
+        }
+        if (StringUtils.isBlank(order.getRazorpayOrderId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "No payment session found for this order");
+        }
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("orderId", order.getId());
+        data.put(FIELD_ORDER_NUMBER, order.getOrderNumber());
+        data.put("razorpayOrderId", order.getRazorpayOrderId());
+        data.put("keyId", razorpayKeyId);
+        data.put("amount", toPaise(order.getTotal()));
+        data.put("currency", "INR");
+        data.put("demoMode", isDemoMode());
+        data.put("gatewayMode", gatewayMode());
+        return ApiResponse.ok(data);
+    }
+
     @PostMapping("/orders/verify-payment")
     @Transactional
     public ApiResponse<Map<String, Object>> verifyPayment(@Valid @RequestBody VerifyPaymentRequest request) {
@@ -998,7 +1029,16 @@ public class InternalAccountOrderResource {
         @NotNull @DecimalMin("0") BigDecimal subtotal
     ) {}
 
-    public record ProfileUpdateRequest(@NotBlank @Size(max = 120) String full_name, @NotBlank @Size(max = 20) String phone) {}
+    public record ProfileUpdateRequest(
+        @NotBlank
+        @Size(min = 2, max = 120)
+        @Pattern(regexp = "^\\p{L}[\\p{L} .'-]*$", message = "Full name may only contain letters, spaces, apostrophes, periods and hyphens")
+        String full_name,
+        @NotBlank
+        @Size(max = 20)
+        @Pattern(regexp = "^(\\+91[\\s-]?)?[6-9]\\d{4}[\\s-]?\\d{5}$", message = "Enter a valid 10-digit Indian mobile number")
+        String phone
+    ) {}
 
     public record AddressRequest(
         @NotBlank @Size(max = 120) String full_name,
@@ -1041,6 +1081,8 @@ public class InternalAccountOrderResource {
     ) {}
 
     public record SyncPaymentRequest(@NotNull Long orderId) {}
+
+    public record RetryPaymentRequest(@NotNull Long orderId) {}
 
     private record CommerceSettings(
         BigDecimal gstRate,

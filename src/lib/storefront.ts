@@ -53,6 +53,7 @@ type DbProductRow = {
   item_structure?: string | null;
   variants_json?: string | null;
   variants?: unknown;
+  stock?: number | null;
 };
 
 type CategoryLookup = Map<string, { slug: string; name: string }>;
@@ -114,6 +115,7 @@ function mapProduct(row: DbProductRow): Product {
     sku: row.sku?.trim() || undefined,
     itemStructure,
     variants: variants.length ? variants : undefined,
+    stock: row.stock ?? null,
     isNew: !!row.new_arrival || badge.includes("new"),
     isBestseller: !!row.best_seller || badge.includes("best"),
     isTrending: !!row.trending,
@@ -164,6 +166,7 @@ export async function loadProducts(): Promise<Product[]> {
             sku: row.sku,
             item_structure: row.item_structure,
             variants_json: row.variants_json,
+            stock: row.stock,
           });
         });
       const list = mapped.length > 0 ? mapped : seedProducts;

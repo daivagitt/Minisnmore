@@ -21,6 +21,8 @@ export type Product = {
   sku?: string;
   itemStructure?: string;
   variants?: ProductVariant[];
+  /** Stock for non-variant ("SIMPLE") products. Null/undefined means untracked. */
+  stock?: number | null;
   isNew?: boolean;
   isBestseller?: boolean;
   isTrending?: boolean;

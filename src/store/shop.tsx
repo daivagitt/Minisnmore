@@ -15,6 +15,7 @@ import { roundInr } from "@/lib/money";
 import {
   defaultSellableSelection,
   findVariant,
+  isSimpleProductSellable,
   isVariantSellable,
   isVariantsProduct,
   lineUnitPrice,
@@ -157,6 +158,10 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     const variant = findVariant(p, { size, color, sku: opts.variantSku });
     if (isVariantsProduct(p) && !isVariantSellable(variant)) {
       toast.error("That size/color is out of stock");
+      return;
+    }
+    if (!isVariantsProduct(p) && !isSimpleProductSellable(p)) {
+      toast.error("This item is out of stock");
       return;
     }
     const variantSku = variant?.sku ?? opts.variantSku;

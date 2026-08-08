@@ -7,6 +7,7 @@ import {
   colorNameInList,
   defaultSellableSelection,
   findVariant,
+  isSimpleProductSellable,
   isVariantSellable,
   isVariantsProduct,
   sellableColorsForSize,
@@ -43,7 +44,7 @@ export function QuickView() {
     ? false
     : isVariantsProduct(quickView)
       ? isVariantSellable(selectedVariant)
-      : true;
+      : isSimpleProductSellable(quickView);
   const stockState = useMemo(
     () => (quickView ? stockAvailabilityState(quickView, selectedVariant, { size, color }) : null),
     [quickView, selectedVariant, size, color],
@@ -102,7 +103,7 @@ export function QuickView() {
                     <span className="text-sm line-through text-muted-foreground">&#8377;{displayCompareAt.toLocaleString("en-IN")}</span>
                   )}
                 </div>
-                {isVariantsProduct(quickView) && stockState && (
+                {stockState && (isVariantsProduct(quickView) || stockState.kind !== "in_stock") && (
                   <StockAvailability state={stockState} className="mt-3" />
                 )}
                 <div className="mt-5">

@@ -14,6 +14,7 @@ import {
   colorNameInList,
   defaultSellableSelection,
   findVariant,
+  isSimpleProductSellable,
   isVariantSellable,
   isVariantsProduct,
   sellableColorsForSize,
@@ -87,12 +88,17 @@ function ProductPage() {
     ? false
     : isVariantsProduct(product)
       ? isVariantSellable(selectedVariant)
-      : true;
+      : isSimpleProductSellable(product);
   const stockState = useMemo(
     () => (product ? stockAvailabilityState(product, selectedVariant, { size, color }) : null),
     [product, selectedVariant, size, color],
   );
   const stockIsSoldOut = stockState?.kind === "out_of_stock";
+  const soldOutMessage = !stockIsSoldOut
+    ? null
+    : isVariantsProduct(product)
+      ? (size && color ? "This size and colour is sold out. Choose another combination or check back later." : null)
+      : "This item is currently sold out. Check back soon.";
   const availableColors = useMemo(() => {
     if (!product) return [];
     return variantColorsForDisplay(product, size);
@@ -189,7 +195,7 @@ function ProductPage() {
                 </span>
               )}
             </div>
-            {isVariantsProduct(product) && stockState && (
+            {stockState && (isVariantsProduct(product) || stockState.kind !== "in_stock") && (
               <StockAvailability state={stockState} className="mt-1" />
             )}
           </div>
@@ -212,9 +218,9 @@ function ProductPage() {
                 colors={availableColors}
               />
             </div>
-            {isVariantsProduct(product) && size && color && stockIsSoldOut && (
+            {soldOutMessage && (
               <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2 leading-snug">
-                This size and colour is sold out. Choose another combination or check back later.
+                {soldOutMessage}
               </p>
             )}
           </div>
