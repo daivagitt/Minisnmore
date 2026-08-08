@@ -114,7 +114,7 @@ function Checkout() {
       const lastPay = localStorage.getItem("mnm_last_pay") as any;
       if (lastPay && ["upi", "card", "netbanking", "wallet"].includes(lastPay)) setPayMethod(lastPay);
       const lastShip = localStorage.getItem("mnm_last_ship") as any;
-      if (lastShip === "std" || lastShip === "exp") setShipMode(lastShip);
+      if (lastShip === "std") setShipMode(lastShip);
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
@@ -553,10 +553,6 @@ function Checkout() {
                     <label className="glass rounded-2xl p-4 flex items-center gap-3 cursor-pointer">
                       <input type="radio" name="ship" checked={shipMode === "std"} onChange={() => setShipMode("std")} className="accent-primary" />
                       <span className="text-sm">Standard · 4–6 days · {cartTotal >= commerce.freeShippingMinInr ? "Free" : `₹${commerce.shippingStandardInr.toLocaleString("en-IN")}`}{cartTotal < commerce.freeShippingMinInr && <span className="text-[11px] text-muted-foreground"> (Free above ₹{commerce.freeShippingMinInr.toLocaleString("en-IN")}/-)</span>}</span>
-                    </label>
-                    <label className="glass rounded-2xl p-4 flex items-center gap-3 cursor-pointer">
-                      <input type="radio" name="ship" checked={shipMode === "exp"} onChange={() => setShipMode("exp")} className="accent-primary" />
-                      <span className="text-sm">Express · 2–3 days · ₹{commerce.shippingExpressInr.toLocaleString("en-IN")}</span>
                     </label>
                   </div>
                 </div>
