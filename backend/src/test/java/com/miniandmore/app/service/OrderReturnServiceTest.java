@@ -264,7 +264,7 @@ class OrderReturnServiceTest {
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
         when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo_ORD-9001");
         when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
-        when(ledgerlyIntegrationClient.createCreditNote(eq(ORDER_NUMBER), eq("RET-1"), any())).thenReturn(Optional.of("cn-9001"));
+        when(ledgerlyIntegrationClient.cancelOrder(eq(ORDER_NUMBER), eq("RET-1"), any())).thenReturn(Optional.of("cn-9001"));
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -272,7 +272,7 @@ class OrderReturnServiceTest {
 
         assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REFUNDED);
         assertThat(result.getLedgerlyCreditNoteId()).isEqualTo("cn-9001");
-        verify(ledgerlyIntegrationClient).createCreditNote(eq(ORDER_NUMBER), eq("RET-1"), any());
+        verify(ledgerlyIntegrationClient).cancelOrder(eq(ORDER_NUMBER), eq("RET-1"), any());
     }
 
     @Test
@@ -287,6 +287,7 @@ class OrderReturnServiceTest {
 
         orderReturnService.processRefund("RET-1", null);
 
+        verify(ledgerlyIntegrationClient, never()).cancelOrder(any(), any(), any());
         verify(ledgerlyIntegrationClient, never()).createCreditNote(any(), any(), any());
     }
 
@@ -296,7 +297,7 @@ class OrderReturnServiceTest {
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(java.util.Optional.of(orderReturn));
         when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo_ORD-9001");
         when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
-        when(ledgerlyIntegrationClient.createCreditNote(any(), any(), any())).thenThrow(new RuntimeException("ledgerly down"));
+        when(ledgerlyIntegrationClient.cancelOrder(any(), any(), any())).thenThrow(new RuntimeException("ledgerly down"));
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
 

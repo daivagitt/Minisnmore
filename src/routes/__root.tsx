@@ -6,6 +6,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { CartDrawer } from "@/components/CartDrawer";
 import { QuickView } from "@/components/QuickView";
+import { CatalogSync } from "@/components/CatalogSync";
 // WhatsApp FAB removed per request — replaced by logo-led navigation only.
 import { Watermark } from "@/components/Watermark";
 import { ScrollProgress } from "@/components/ScrollProgress";
@@ -76,6 +77,7 @@ function RootComponent() {
   return (
     <AuthProvider>
     <ShopProvider>
+      <CatalogSync />
       <Watermark />
       <ScrollProgress />
       <div aria-hidden className="fixed inset-0 pointer-events-none z-0">

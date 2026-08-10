@@ -12,7 +12,7 @@ const UNIVERSAL_SIZES = new Set(["freesize", "onesize", "one size", "os", "free"
 
 const LETTER_SIZE_ORDER = ["xxs", "xs", "s", "m", "l", "xl", "xxl", "xxxl"];
 
-function normalizeSizeKey(size: string): string {
+export function normalizeSizeKey(size: string): string {
   return size.trim().toLowerCase().replace(/\s+/g, "");
 }
 

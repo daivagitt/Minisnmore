@@ -2,6 +2,8 @@ import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-r
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { oauthCallbackErrorMessage } from "@/lib/auth-errors";
+import { fullNameFieldError } from "@/lib/orders.functions";
+import { emailFieldError, passwordFieldError } from "@/lib/password-validation";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Eye, EyeOff } from "lucide-react";
@@ -24,8 +26,14 @@ export function LoginPage() {
   const search = useSearch({ from: "/login" });
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
   const [fullName, setFullName] = useState("");
+  const [fullNameError, setFullNameError] = useState<string | undefined>();
+  const [fullNameTouched, setFullNameTouched] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | undefined>();
+  const [passwordTouched, setPasswordTouched] = useState(false);
+  const [emailError, setEmailError] = useState<string | undefined>();
+  const [emailTouched, setEmailTouched] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [forgotBusy, setForgotBusy] = useState(false);
@@ -53,10 +61,29 @@ export function LoginPage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const nextEmailError = emailFieldError(email);
+    const nextPasswordError = passwordFieldError(password);
+    setEmailError(nextEmailError);
+    setPasswordError(nextPasswordError);
+    setEmailTouched(true);
+    setPasswordTouched(true);
+    if (mode === "signup") {
+      setFullNameTouched(true);
+      const nameError = fullNameFieldError(fullName);
+      setFullNameError(nameError);
+      if (nameError) {
+        toast.error(nameError, { id: "login-error" });
+        return;
+      }
+    }
+    if (nextEmailError || nextPasswordError) {
+      toast.error(nextEmailError ?? nextPasswordError, { id: "login-error" });
+      return;
+    }
     setBusy(true);
     const { error } = mode === "signin"
       ? await signIn(email, password)
-      : await signUp(email, password, fullName);
+      : await signUp(email, password, fullName.trim());
     setBusy(false);
     if (error) {
       toast.error(error, { id: "login-error" });
@@ -72,6 +99,13 @@ export function LoginPage() {
 
   const onForgotSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const nextEmailError = emailFieldError(email);
+    setEmailError(nextEmailError);
+    setEmailTouched(true);
+    if (nextEmailError) {
+      toast.error(nextEmailError, { id: "forgot-password-error" });
+      return;
+    }
     setForgotBusy(true);
     const { error } = await requestPasswordReset(email);
     setForgotBusy(false);
@@ -145,9 +179,27 @@ export function LoginPage() {
               If an account exists for {email}, a reset link is on its way.
             </div>
           ) : (
-            <form onSubmit={onForgotSubmit} className="mt-6 space-y-3">
-              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com"
-                className="w-full rounded-2xl glass px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+            <form onSubmit={onForgotSubmit} noValidate className="mt-6 space-y-3">
+              <div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (emailTouched) setEmailError(emailFieldError(e.target.value));
+                  }}
+                  onBlur={() => {
+                    setEmailTouched(true);
+                    setEmailError(emailFieldError(email));
+                  }}
+                  placeholder="you@email.com"
+                  aria-invalid={!!emailError && emailTouched}
+                  className={`w-full rounded-2xl glass px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/40 ${emailError && emailTouched ? "ring-2 ring-destructive/50" : ""}`}
+                />
+                {emailError && emailTouched ? (
+                  <p className="mt-1 text-xs text-destructive">{emailError}</p>
+                ) : null}
+              </div>
               <button disabled={forgotBusy} type="submit"
                 className="w-full rounded-full bg-primary text-primary-foreground py-3 font-medium hover:shadow-glow transition disabled:opacity-60">
                 {forgotBusy ? "Sending…" : "Send reset link"}
@@ -155,21 +207,76 @@ export function LoginPage() {
             </form>
           )
         ) : (
-          <form onSubmit={onSubmit} className="mt-6 space-y-3">
+          <form onSubmit={onSubmit} noValidate className="mt-6 space-y-3">
             {mode === "signup" && (
-              <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Full name"
-                className="w-full rounded-2xl glass px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+              <div>
+                <input
+                  required
+                  maxLength={120}
+                  value={fullName}
+                  onChange={(e) => {
+                    setFullName(e.target.value);
+                    if (fullNameTouched) setFullNameError(fullNameFieldError(e.target.value));
+                  }}
+                  onBlur={() => {
+                    setFullNameTouched(true);
+                    setFullNameError(fullNameFieldError(fullName));
+                  }}
+                  placeholder="Full name"
+                  aria-invalid={!!fullNameError && fullNameTouched}
+                  className={`w-full rounded-2xl glass px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/40 ${fullNameError && fullNameTouched ? "ring-2 ring-destructive/50" : ""}`}
+                />
+                {fullNameError && fullNameTouched ? (
+                  <p className="mt-1 text-xs text-destructive">{fullNameError}</p>
+                ) : null}
+              </div>
             )}
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com"
-              className="w-full rounded-2xl glass px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
-            <div className="relative">
-              <input type={showPassword ? "text" : "password"} required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password (min 6)"
-                className="w-full rounded-2xl glass px-4 py-3 pr-11 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
-              <button type="button" onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground">
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
+            <div>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (emailTouched) setEmailError(emailFieldError(e.target.value));
+                }}
+                onBlur={() => {
+                  setEmailTouched(true);
+                  setEmailError(emailFieldError(email));
+                }}
+                placeholder="you@email.com"
+                aria-invalid={!!emailError && emailTouched}
+                className={`w-full rounded-2xl glass px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/40 ${emailError && emailTouched ? "ring-2 ring-destructive/50" : ""}`}
+              />
+              {emailError && emailTouched ? (
+                <p className="mt-1 text-xs text-destructive">{emailError}</p>
+              ) : null}
+            </div>
+            <div>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (passwordTouched) setPasswordError(passwordFieldError(e.target.value));
+                  }}
+                  onBlur={() => {
+                    setPasswordTouched(true);
+                    setPasswordError(passwordFieldError(password));
+                  }}
+                  placeholder="Password (min 6)"
+                  aria-invalid={!!passwordError && passwordTouched}
+                  className={`w-full rounded-2xl glass px-4 py-3 pr-11 text-sm outline-none focus:ring-2 focus:ring-primary/40 ${passwordError && passwordTouched ? "ring-2 ring-destructive/50" : ""}`}
+                />
+                <button type="button" onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground">
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {passwordError && passwordTouched ? (
+                <p className="mt-1 text-xs text-destructive">{passwordError}</p>
+              ) : null}
             </div>
             {mode === "signin" && (
               <div className="text-right -mt-1">
@@ -213,7 +320,15 @@ export function LoginPage() {
               Back to sign in
             </button>
           ) : (
-            <button onClick={() => setMode(mode === "signin" ? "signup" : "signin")} className="story-link text-primary">
+            <button onClick={() => {
+              setMode(mode === "signin" ? "signup" : "signin");
+              setFullNameError(undefined);
+              setFullNameTouched(false);
+              setEmailError(undefined);
+              setEmailTouched(false);
+              setPasswordError(undefined);
+              setPasswordTouched(false);
+            }} className="story-link text-primary">
               {mode === "signin" ? "New here? Create an account" : "Have an account? Sign in"}
             </button>
           )}

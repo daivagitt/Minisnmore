@@ -11,6 +11,7 @@ export async function validateCoupon(input: { data: unknown }) {
   return api.post<{ ok: boolean; code?: string; discount?: number; error?: string }>(
     "/api/v1/coupons/validate",
     parsed,
+    { auth: true },
   );
 }
 
@@ -23,5 +24,5 @@ export type ActiveCoupon = {
 };
 
 export async function listActiveCoupons() {
-  return api.get<{ coupons: ActiveCoupon[] }>("/api/v1/coupons/active");
+  return api.get<{ coupons: ActiveCoupon[] }>("/api/v1/coupons/active", { auth: true });
 }

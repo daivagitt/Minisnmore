@@ -94,6 +94,7 @@ function AddressesPage() {
 
       {open && (
         <form onSubmit={save} className="glass rounded-2xl p-4 mt-6 grid sm:grid-cols-2 gap-3">
+          <p className="sm:col-span-2 text-xs text-muted-foreground"><span className="text-destructive font-semibold">*</span> indicates a required field</p>
           <Field label="Label (Home / Office)" value={draft.label} onChange={(v) => setDraft({ ...draft, label: v })} />
           <Field label="Full name" value={draft.full_name} onChange={(v) => setDraft({ ...draft, full_name: v })} required />
           <Field label="Phone" value={draft.phone} onChange={(v) => setDraft({ ...draft, phone: v })} required />
@@ -119,7 +120,16 @@ function blank(): Address {
 function Field({ label, value, onChange, required, className }: { label: string; value: string; onChange: (v: string) => void; required?: boolean; className?: string }) {
   return (
     <label className={`block ${className ?? ""}`}>
-      <span className="text-xs uppercase tracking-wider text-muted-foreground">{label}</span>
+      <span className="text-xs uppercase tracking-wider text-muted-foreground">
+        {label}
+        {required && (
+          <>
+            {" "}
+            <span className="text-destructive font-semibold" aria-hidden="true">*</span>
+            <span className="sr-only"> (required)</span>
+          </>
+        )}
+      </span>
       <input value={value} onChange={(e) => onChange(e.target.value)} required={required}
         className="mt-1 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm" />
     </label>

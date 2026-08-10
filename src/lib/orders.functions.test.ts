@@ -312,4 +312,13 @@ describe("orders functions", () => {
       updateMyProfile({ data: { full_name: "New Name 2", phone: "9876543210" } }),
     ).rejects.toThrow();
   });
+
+  it("validates full name for registration-style checks", async () => {
+    const { fullNameFieldError, FullNameSchema } = await import("./orders.functions");
+    expect(fullNameFieldError("")).toMatch(/at least 2 characters/i);
+    expect(fullNameFieldError("A")).toMatch(/at least 2 characters/i);
+    expect(fullNameFieldError("Ananya Sharma")).toBeUndefined();
+    expect(fullNameFieldError("Name123")).toMatch(/letters/i);
+    expect(FullNameSchema.parse("O'Brien")).toBe("O'Brien");
+  });
 });

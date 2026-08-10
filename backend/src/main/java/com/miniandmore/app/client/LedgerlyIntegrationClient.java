@@ -79,6 +79,34 @@ public class LedgerlyIntegrationClient {
         return Optional.ofNullable(id).filter(s -> !s.isBlank());
     }
 
+    /**
+     * Full paid-order cancel / return refund on Ledgerly: enriched credit note from invoice,
+     * accounting/GST side effects, apply to invoice, and accounting refund when paid.
+     */
+    public Optional<String> cancelOrder(String externalRef, String returnNumber) {
+        return cancelOrder(externalRef, returnNumber, null);
+    }
+
+    public Optional<String> cancelOrder(String externalRef, String returnNumber, String refundPaymentId) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        if (returnNumber != null && !returnNumber.isBlank()) {
+            body.put("returnNumber", returnNumber);
+        }
+        if (refundPaymentId != null && !refundPaymentId.isBlank()) {
+            body.put("refundPaymentId", refundPaymentId);
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, String> response = post(
+            "/v1/integrations/commerce/orders/" + externalRef + "/cancel",
+            body
+        );
+        if (response == null) {
+            return Optional.empty();
+        }
+        String id = response.get("ledgerlyCreditNoteId");
+        return Optional.ofNullable(id).filter(s -> !s.isBlank());
+    }
+
     public Map<String, Object> testConnection() {
         return get("/v1/platform/integration/status");
     }

@@ -20,6 +20,8 @@ import {
   isVariantsProduct,
   lineUnitPrice,
 } from "@/lib/product-variants";
+import { cartsEqual, sanitizeCartWithCatalog, type CartSyncResult } from "@/lib/cart-catalog";
+import { normalizeWishlistIds } from "@/lib/wishlist";
 import { toast } from "sonner";
 
 export type CartItem = {
@@ -44,6 +46,7 @@ type ShopState = {
   updateQty: (id: string, qty: number, size?: string, color?: string, variantSku?: string) => void;
   toggleWish: (id: string) => void;
   pruneWishlist: (validIds: Iterable<string>) => void;
+  syncCartWithCatalog: (products: Product[]) => CartSyncResult;
   clearCart: () => void;
   cartCount: number;
   cartTotal: number;
@@ -134,7 +137,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     let nextCoupon: AppliedCoupon | null = null;
     if (userId != null) {
       nextCart = readJson<CartItem[]>(cKey, []).map(normalizeCartItem);
-      nextWish = readJson<string[]>(wKey, []).map(String);
+      nextWish = normalizeWishlistIds(readJson<string[]>(wKey, []));
       nextCoupon = readJson<AppliedCoupon | null>(couponKey, null);
     } else {
       localStorage.setItem(cartStorageKey(null), "[]");
@@ -232,9 +235,17 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   const pruneWishlist = useCallback((validIds: Iterable<string>) => {
     const valid = new Set(Array.from(validIds, String));
     setWishlist((w) => {
-      const next = w.filter((id) => valid.has(id));
+      const next = normalizeWishlistIds(w).filter((id) => valid.has(id));
       return next.length === w.length ? w : next;
     });
+  }, []);
+  const syncCartWithCatalog = useCallback((products: Product[]): CartSyncResult => {
+    let result: CartSyncResult = { cart: [], removed: [], adjusted: [] };
+    setCart((current) => {
+      result = sanitizeCartWithCatalog(current, products);
+      return cartsEqual(current, result.cart) ? current : result.cart;
+    });
+    return result;
   }, []);
   const clearCart = () => {
     setCart([]);
@@ -257,6 +268,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
         updateQty,
         toggleWish,
         pruneWishlist,
+        syncCartWithCatalog,
         clearCart,
         cartCount,
         cartTotal,

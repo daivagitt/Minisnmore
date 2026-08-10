@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, backendOAuthUrl, getAuthToken, setAuthToken } from "@/lib/api";
 import { authErrorMessage } from "@/lib/auth-errors";
+import { fullNameFieldError } from "@/lib/orders.functions";
 
 export type AuthUser = {
   id: number;
@@ -166,6 +167,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, fullName?: string) => {
     const trimmed = email.trim().toLowerCase();
+    if (fullName !== undefined) {
+      const nameError = fullNameFieldError(fullName);
+      if (nameError) return { error: nameError };
+    }
     const parts = (fullName ?? "").trim().split(/\s+/).filter(Boolean);
     const firstName = parts[0] ?? "";
     const lastName = parts.slice(1).join(" ") || firstName;

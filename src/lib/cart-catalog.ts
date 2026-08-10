@@ -1,0 +1,111 @@
+import type { Product } from "@/data/products";
+import type { CartItem } from "@/store/shop";
+import { FIT_LIMITS } from "@/lib/product-fit";
+import {
+  findVariant,
+  isSimpleProductSellable,
+  isVariantSellable,
+  isVariantsProduct,
+  lineUnitPrice,
+} from "@/lib/product-variants";
+
+export type CartSyncResult = {
+  cart: CartItem[];
+  removed: string[];
+  adjusted: { name: string; qty: number }[];
+};
+
+function cartLineKey(item: CartItem): string {
+  return [item.product.id, item.variantSku ?? "", item.size, item.color].join("|");
+}
+
+function maxQtyForLine(product: Product, item: CartItem): number {
+  const variant = findVariant(product, { size: item.size, color: item.color, sku: item.variantSku });
+  if (isVariantsProduct(product) && variant) {
+    return Math.min(FIT_LIMITS.qtyMax, Math.max(0, variant.stock));
+  }
+  if (product.stock != null) {
+    return Math.min(FIT_LIMITS.qtyMax, Math.max(0, product.stock));
+  }
+  return FIT_LIMITS.qtyMax;
+}
+
+/** True when a cart line can still be purchased from the live (active) catalog. */
+export function isCartLineSellable(item: CartItem, live: Product | undefined): live is Product {
+  if (!live) return false;
+  const variant = findVariant(live, { size: item.size, color: item.color, sku: item.variantSku });
+  if (isVariantsProduct(live)) {
+    return isVariantSellable(variant);
+  }
+  return isSimpleProductSellable(live);
+}
+
+/** Drop inactive/unavailable lines and refresh prices + qty caps from the catalog. */
+export function sanitizeCartWithCatalog(cart: CartItem[], products: Product[]): CartSyncResult {
+  const byId = new Map(products.map((p) => [p.id, p]));
+  const removed: string[] = [];
+  const adjusted: { name: string; qty: number }[] = [];
+  const next: CartItem[] = [];
+
+  for (const item of cart) {
+    const live = byId.get(item.product.id);
+    if (!isCartLineSellable(item, live)) {
+      removed.push(item.product.name);
+      continue;
+    }
+
+    const variant = findVariant(live, { size: item.size, color: item.color, sku: item.variantSku });
+    const maxQty = maxQtyForLine(live, item);
+    if (maxQty <= 0) {
+      removed.push(item.product.name);
+      continue;
+    }
+
+    const qty = Math.min(item.qty, maxQty);
+    if (qty < item.qty) {
+      adjusted.push({ name: item.product.name, qty });
+    }
+
+    const unitPrice = lineUnitPrice(live, {
+      size: item.size,
+      color: item.color,
+      sku: item.variantSku ?? variant?.sku,
+    });
+
+    next.push({
+      ...item,
+      product: live,
+      qty,
+      unitPrice,
+      variantSku: variant?.sku ?? item.variantSku,
+    });
+  }
+
+  return { cart: next, removed, adjusted };
+}
+
+export function cartsEqual(a: CartItem[], b: CartItem[]): boolean {
+  if (a.length !== b.length) return false;
+  const mapB = new Map(b.map((item) => [cartLineKey(item), item]));
+  for (const item of a) {
+    const other = mapB.get(cartLineKey(item));
+    if (!other || other.qty !== item.qty || other.unitPrice !== item.unitPrice) return false;
+  }
+  return true;
+}
+
+export function formatCartSyncMessage(result: CartSyncResult): string {
+  const parts: string[] = [];
+  if (result.removed.length === 1) {
+    parts.push(`“${result.removed[0]}” was removed — no longer available`);
+  } else if (result.removed.length > 1) {
+    parts.push(`${result.removed.length} items were removed — no longer available`);
+  }
+  if (result.adjusted.length === 1) {
+    const { name, qty } = result.adjusted[0];
+    parts.push(`quantity for “${name}” updated to ${qty}`);
+  } else if (result.adjusted.length > 1) {
+    parts.push(`quantities updated for ${result.adjusted.length} items`);
+  }
+  return parts.join(". ");
+}

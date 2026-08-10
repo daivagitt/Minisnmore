@@ -17,15 +17,20 @@ describe("money", () => {
     expect(gstIncludedInPrice(1120, 12)).toBe(120);
   });
 
+  it("computes GST on subtotal only, not discount or shipping", () => {
+    expect(orderTotals({ subtotal: 1000, discount: 100, shipMode: "std", commerce: DEFAULT_COMMERCE }).gst).toBe(48);
+    expect(orderTotals({ subtotal: 1000, discount: 100, shipMode: "std", commerce: DEFAULT_COMMERCE }).shippingGst).toBe(0);
+  });
+
   it("computes GST included in price, not added on top", () => {
     expect(gstAmount(1050, DEFAULT_COMMERCE)).toBe(50);
     expect(orderTotals({ subtotal: 200, discount: 20, donation: 5 }).grand).toBe(284);
-    expect(orderTotals({ subtotal: 200, discount: 20, donation: 5 }).gstIncluded).toBe(14); // 9 on ₹180 + 5 on ₹99 shipping
+    expect(orderTotals({ subtotal: 200, discount: 20, donation: 5 }).gstIncluded).toBe(10); // 5% GST on ₹200 subtotal
   });
 
   it("adds GST on top when prices are exclusive", () => {
     const commerce = { ...DEFAULT_COMMERCE, pricesIncludeGst: false };
-    expect(orderTotals({ subtotal: 200, discount: 20, donation: 0, commerce }).grand).toBe(293); // 180 + 99 + 14 GST
+    expect(orderTotals({ subtotal: 200, discount: 20, donation: 0, commerce }).grand).toBe(289); // 180 + 99 + 10 GST on subtotal
   });
 
   it("applies standard shipping below free-shipping threshold", () => {

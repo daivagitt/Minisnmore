@@ -20,7 +20,18 @@ import {
   isVariantsProduct,
   lineUnitPrice,
 } from "@/lib/product-variants";
+import { RemoveFromCartDialog } from "@/components/RemoveFromCartDialog";
+import { cartsEqual, sanitizeCartWithCatalog, type CartSyncResult } from "@/lib/cart-catalog";
+import { normalizeWishlistIds } from "@/lib/wishlist";
 import { toast } from "sonner";
+
+type PendingRemove = {
+  id: string;
+  size?: string;
+  color?: string;
+  variantSku?: string;
+  productName: string;
+};
 
 export type CartItem = {
   product: Product;
@@ -44,6 +55,7 @@ type ShopState = {
   updateQty: (id: string, qty: number, size?: string, color?: string, variantSku?: string) => void;
   toggleWish: (id: string) => void;
   pruneWishlist: (validIds: Iterable<string>) => void;
+  syncCartWithCatalog: (products: Product[]) => CartSyncResult;
   clearCart: () => void;
   cartCount: number;
   cartTotal: number;
@@ -103,6 +115,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [quickView, setQuickView] = useState<Product | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<PendingRemove | null>(null);
   const hydratedScope = useRef<string | null>(null);
   const prevUserIdRef = useRef<number | null>(null);
   /** Skip one persist cycle after auth scope reload (setState is async; avoid leaking cart across keys). */
@@ -134,7 +147,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     let nextCoupon: AppliedCoupon | null = null;
     if (userId != null) {
       nextCart = readJson<CartItem[]>(cKey, []).map(normalizeCartItem);
-      nextWish = readJson<string[]>(wKey, []).map(String);
+      nextWish = normalizeWishlistIds(readJson<string[]>(wKey, []));
       nextCoupon = readJson<AppliedCoupon | null>(couponKey, null);
     } else {
       localStorage.setItem(cartStorageKey(null), "[]");
@@ -208,10 +221,14 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     setCart((c) => c.filter((x) => !matches(x, id, size, color, variantSku)));
   const promptRemoveFromCart = (id: string, size?: string, color?: string, variantSku?: string) => {
     const item = cart.find((x) => matches(x, id, size, color, variantSku));
-    if (item && window.confirm(`Move "${item.product.name}" to wishlist instead?`)) {
-      toggleWish(item.product.id);
-    }
-    removeFromCart(id, size, color, variantSku);
+    if (!item) return;
+    setPendingRemove({
+      id,
+      size,
+      color,
+      variantSku,
+      productName: item.product.name,
+    });
   };
   const updateQty = (id: string, qty: number, size?: string, color?: string, variantSku?: string) =>
     setCart((c) =>
@@ -229,12 +246,27 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     const key = String(id);
     setWishlist((w) => (w.includes(key) ? w.filter((x) => x !== key) : [...w, key]));
   };
+  const confirmRemoveFromCart = (moveToWishlist: boolean) => {
+    if (!pendingRemove) return;
+    const { id, size, color, variantSku } = pendingRemove;
+    setPendingRemove(null);
+    if (moveToWishlist) toggleWish(id);
+    removeFromCart(id, size, color, variantSku);
+  };
   const pruneWishlist = useCallback((validIds: Iterable<string>) => {
     const valid = new Set(Array.from(validIds, String));
     setWishlist((w) => {
-      const next = w.filter((id) => valid.has(id));
+      const next = normalizeWishlistIds(w).filter((id) => valid.has(id));
       return next.length === w.length ? w : next;
     });
+  }, []);
+  const syncCartWithCatalog = useCallback((products: Product[]): CartSyncResult => {
+    let result: CartSyncResult = { cart: [], removed: [], adjusted: [] };
+    setCart((current) => {
+      result = sanitizeCartWithCatalog(current, products);
+      return cartsEqual(current, result.cart) ? current : result.cart;
+    });
+    return result;
   }, []);
   const clearCart = () => {
     setCart([]);
@@ -257,6 +289,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
         updateQty,
         toggleWish,
         pruneWishlist,
+        syncCartWithCatalog,
         clearCart,
         cartCount,
         cartTotal,
@@ -267,6 +300,15 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+      <RemoveFromCartDialog
+        open={pendingRemove != null}
+        productName={pendingRemove?.productName ?? ""}
+        onOpenChange={(open) => {
+          if (!open && pendingRemove) confirmRemoveFromCart(false);
+        }}
+        onMoveToWishlist={() => confirmRemoveFromCart(true)}
+        onRemoveOnly={() => confirmRemoveFromCart(false)}
+      />
     </Ctx.Provider>
   );
 }

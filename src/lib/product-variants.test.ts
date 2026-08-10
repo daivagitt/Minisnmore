@@ -10,6 +10,7 @@ import {
   parseVariantsJson,
   sellableColorsForSize,
   sizeHasSellableVariants,
+  sizesForDisplay,
   storefrontListPricing,
   variantStockMessage,
 } from "./product-variants";
@@ -101,6 +102,34 @@ describe("product-variants", () => {
     });
     expect(sellableColorsForSize(ageProduct, "S")).toEqual(["Navy"]);
     expect(sellableColorsForSize(ageProduct, "L")).toEqual([]);
+  });
+
+  it("shows all four baby age bands even when catalog sizes are incomplete", () => {
+    const partial: Product = {
+      ...matrixProduct,
+      sizes: ["0-3 M", "6-12 M"],
+      itemStructure: "VARIANTS",
+      variants: parseVariantsJson([
+        { sku: "VEST-03-BLUE", size: "0-3 M", color: "Blue", rate: 400, stock: 2, active: true },
+        { sku: "VEST-612-BLUE", size: "6-12 M", color: "Blue", rate: 400, stock: 0, active: true },
+      ]),
+    };
+    expect(sizesForDisplay(partial)).toEqual(["0-3 M", "3-6 M", "6-12 M", "12-18 M"]);
+    expect(sizeHasSellableVariants(partial, "3-6 M")).toBe(false);
+    expect(sizeHasSellableVariants(partial, "0-3 M")).toBe(true);
+  });
+
+  it("matches variant rows when size labels differ only by spacing", () => {
+    const spaced: Product = {
+      ...matrixProduct,
+      sizes: ["0-3m"],
+      itemStructure: "VARIANTS",
+      variants: parseVariantsJson([
+        { sku: "VEST-03-BLUE", size: "0-3 M", color: "Blue", rate: 400, stock: 4, active: true },
+      ]),
+    };
+    expect(sizeHasSellableVariants(spaced, "0-3m")).toBe(true);
+    expect(findVariant(spaced, { size: "0-3m", color: "Blue" })?.sku).toBe("VEST-03-BLUE");
   });
 
   it("uses default sellable variant for list/card price instead of parent min", () => {

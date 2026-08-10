@@ -3,9 +3,12 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useShop } from "@/store/shop";
 import { useAuth } from "@/hooks/useAuth";
+import { useProducts } from "@/hooks/useProducts";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { Check, ChevronLeft, Loader2, Smartphone, CreditCard, Building2, Wallet, Banknote, Shield, MapPin, Plus, Zap, Minus, X, ShoppingBag, Tag } from "lucide-react";
 import { toast } from "sonner";
+import { ApiError } from "@/lib/api";
+import { formatCartSyncMessage } from "@/lib/cart-catalog";
 import { createOrder, verifyPayment, getMyProfile, updateMyProfile } from "@/lib/orders.functions";
 import { validateCoupon } from "@/lib/coupons.functions";
 import { commerceFromSiteSettings } from "@/lib/commerce";
@@ -46,7 +49,8 @@ function payMethodLabel(method: PayMethod) {
 }
 
 function Checkout() {
-  const { cart, cartTotal, clearCart, updateQty, promptRemoveFromCart, appliedCoupon, setAppliedCoupon } = useShop();
+  const { cart, cartTotal, clearCart, updateQty, promptRemoveFromCart, appliedCoupon, setAppliedCoupon, syncCartWithCatalog } = useShop();
+  const products = useProducts();
   const { user, loading: authLoading } = useAuth();
   const settings = useSiteSettings();
   const nav = useNavigate();
@@ -256,9 +260,19 @@ function Checkout() {
     if (!line1.trim() || pin.length !== 6 || !city.trim() || !state.trim()) { setStep(1); return toast.error("Please complete the address"); }
     setBusy(true);
     try {
+      const sync = syncCartWithCatalog(products);
+      if (sync.removed.length || sync.adjusted.length) {
+        const message = formatCartSyncMessage(sync);
+        if (message) toast.info(message);
+      }
+      if (sync.cart.length === 0) {
+        toast.error("Your basket is empty — unavailable items were removed.");
+        return;
+      }
+
       const init = await createOrder({
         data: {
-          items: cart.map((i) => ({
+          items: sync.cart.map((i) => ({
             product_id: i.product.id,
             product_slug: i.product.slug,
             product_name: i.product.name,
@@ -359,8 +373,13 @@ function Checkout() {
           },
         },
       );
-    } catch (e: any) {
-      toast.error(e?.message || "Could not start payment");
+    } catch (e: unknown) {
+      if (e instanceof ApiError && e.status === 409) {
+        syncCartWithCatalog(products);
+        toast.error(e.message || "Some items are no longer available — your basket was updated.");
+        return;
+      }
+      toast.error(e instanceof Error ? e.message : "Could not start payment");
     } finally {
       setBusy(false);
     }
@@ -469,6 +488,7 @@ function Checkout() {
             )}
             {step === 1 && (
               <div className="grid md:grid-cols-2 gap-4">
+                <p className="md:col-span-2 text-xs text-muted-foreground"><span className="text-destructive font-semibold">*</span> indicates a required field</p>
                 {savedAddresses.length > 0 && (
                   <div className="md:col-span-2">
                     <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
@@ -507,17 +527,33 @@ function Checkout() {
                 <Field label="Address line 1" required value={line1} onChange={(e) => setLine1(e.target.value)} placeholder="Flat 12, Tulip Apartments" />
                 <Field label="Address line 2" value={line2} onChange={(e) => setLine2(e.target.value)} placeholder="MG Road" />
                 <label className="block">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">Pincode * {pinLoading && <span className="text-primary normal-case">· looking up…</span>}</div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">
+                    Pincode
+                    {" "}
+                    <span className="text-destructive font-semibold" aria-hidden="true">*</span>
+                    <span className="sr-only"> (required)</span>
+                    {pinLoading && <span className="text-primary normal-case"> · looking up…</span>}
+                  </div>
                   <input required value={pin} onChange={(e) => onPinChange(e.target.value)} inputMode="numeric" placeholder="400001"
                     className="glass w-full rounded-full px-4 py-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40" />
                 </label>
                 <label className="block">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">City *</div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">
+                    City
+                    {" "}
+                    <span className="text-destructive font-semibold" aria-hidden="true">*</span>
+                    <span className="sr-only"> (required)</span>
+                  </div>
                   <input required value={city} onChange={(e) => setCity(e.target.value)} placeholder="Mumbai"
                     className="glass w-full rounded-full px-4 py-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40" />
                 </label>
                 <label className="block md:col-span-2">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">State *</div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">
+                    State
+                    {" "}
+                    <span className="text-destructive font-semibold" aria-hidden="true">*</span>
+                    <span className="sr-only"> (required)</span>
+                  </div>
                   <input required value={state} onChange={(e) => setStateName(e.target.value)} placeholder="Maharashtra"
                     className="glass w-full rounded-full px-4 py-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40" />
                 </label>
@@ -739,7 +775,16 @@ function Checkout() {
 function Field({ label, required, ...rest }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <label className="block">
-      <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">{label}{required && " *"}</div>
+      <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">
+        {label}
+        {required && (
+          <>
+            {" "}
+            <span className="text-destructive font-semibold" aria-hidden="true">*</span>
+            <span className="sr-only"> (required)</span>
+          </>
+        )}
+      </div>
       <input required={required} {...rest} className="glass w-full rounded-full px-4 py-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40" />
     </label>
   );

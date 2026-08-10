@@ -90,7 +90,8 @@ Auth: `Authorization: Bearer {token}`.
 | Customer sync | `POST /v1/integrations/commerce/customers/sync` |
 | Order sync (invoice) | `POST /v1/integrations/commerce/orders/sync` (+ optional `Idempotency-Key`) |
 | Tracking pull | `POST /v1/integrations/commerce/orders/{externalRef}/tracking/pull` |
-| Credit note | `POST /v1/integrations/commerce/orders/{externalRef}/credit-notes` |
+| Credit note (partial return) | `POST /v1/integrations/commerce/orders/{externalRef}/credit-notes` |
+| Paid order cancel / full refund | `POST /v1/integrations/commerce/orders/{externalRef}/cancel` |
 | Integration status | `GET /v1/platform/integration/status` |
 
 Matches Ledgerly handbook (gateway `/api` + `/v1/...`). **No live Zoho HTTP client** in catalog/store/commerce Java.
@@ -313,7 +314,8 @@ Suggested follow-up (one row each from UAT/prod DB):
 | Customer sync | `POST /v1/integrations/commerce/customers/sync` |
 | Order sync | `POST /v1/integrations/commerce/orders/sync` |
 | Tracking pull | `POST /v1/integrations/commerce/orders/{externalRef}/tracking/pull` |
-| Credit note | `POST /v1/integrations/commerce/orders/{externalRef}/credit-notes` |
+| Credit note (partial return) | `POST /v1/integrations/commerce/orders/{externalRef}/credit-notes` |
+| Paid order cancel / full refund | `POST /v1/integrations/commerce/orders/{externalRef}/cancel` |
 | Status | `GET /v1/platform/integration/status` |
 
 ---

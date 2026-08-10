@@ -85,6 +85,7 @@ class InternalAccountOrderResourceCoverageTest {
         ReflectionTestUtils.setField(resource, "razorpayKeyId", "rzp_test_livemode");
         ReflectionTestUtils.setField(resource, "razorpayKeySecret", LIVE_SECRET);
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("customer1", "n/a"));
+        when(customerOrderRepository.existsByUserLoginAndPaymentStatus("customer1", PaymentStatus.PAID)).thenReturn(false);
     }
 
     @Test
@@ -359,6 +360,93 @@ class InternalAccountOrderResourceCoverageTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.totals.discount").value(100.0));
+    }
+
+    @Test
+    void createOrder_welcome10Coupon_rejectsReturningCustomer() throws Exception {
+        when(customerOrderRepository.existsByUserLoginAndPaymentStatus("customer1", PaymentStatus.PAID)).thenReturn(true);
+        Product product = new Product().id(1L).name("Dress").slug("dress").price(BigDecimal.valueOf(1000)).stock(5).active(true);
+        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+        Coupon coupon = new Coupon()
+            .code("WELCOME10")
+            .active(true)
+            .discountType(com.miniandmore.app.domain.enumeration.DiscountType.PERCENT)
+            .discountValue(BigDecimal.TEN)
+            .minOrder(BigDecimal.ZERO);
+        when(couponRepository.findOneByCodeIgnoreCase("WELCOME10")).thenReturn(Optional.of(coupon));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "items":[{"product_id":"1","product_name":"Dress","qty":1,"price":1000}],
+                          "shipping_address":{"full_name":"Jane","email":"j@example.com","phone":"9876543210","line1":"Line 1","city":"City","state":"State","pincode":"560001"},
+                          "donation":0,
+                          "coupon_code":"WELCOME10"
+                        }
+                        """
+                    )
+            )
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void validateCoupon_welcome10_rejectsReturningCustomer() throws Exception {
+        when(customerOrderRepository.existsByUserLoginAndPaymentStatus("customer1", PaymentStatus.PAID)).thenReturn(true);
+        Coupon coupon = new Coupon()
+            .code("WELCOME10")
+            .active(true)
+            .discountType(com.miniandmore.app.domain.enumeration.DiscountType.PERCENT)
+            .discountValue(BigDecimal.TEN)
+            .minOrder(BigDecimal.ZERO);
+        when(couponRepository.findOneByCodeIgnoreCase("WELCOME10")).thenReturn(Optional.of(coupon));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/coupons/validate")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "code":"WELCOME10",
+                          "subtotal":1000
+                        }
+                        """
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(false))
+            .andExpect(jsonPath("$.data.error").value("WELCOME10 is only valid on your first order"));
+    }
+
+    @Test
+    void createOrder_inactiveProduct_rejectsCheckout() throws Exception {
+        Product product = new Product().id(1L).name("Dress").slug("dress").price(BigDecimal.valueOf(1000)).stock(5).active(false);
+        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "items":[{"product_id":"1","product_name":"Dress","qty":1,"price":1000}],
+                          "shipping_address":{"full_name":"Jane","email":"j@example.com","phone":"9876543210","line1":"Line 1","city":"City","state":"State","pincode":"560001"},
+                          "donation":0
+                        }
+                        """
+                    )
+            )
+            .andExpect(status().isConflict());
     }
 
     /**

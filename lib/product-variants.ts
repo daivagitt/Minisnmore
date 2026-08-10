@@ -1,4 +1,8 @@
-import { sortSizesAsc } from "@/lib/product-ages";
+import type { AgeRange } from "@/data/products";
+import { normalizeSizeKey, sizeToAgeBand, sortSizesAsc } from "@/lib/product-ages";
+
+const STANDARD_FOUR_AGE_BANDS: AgeRange[] = ["0-3m", "3-6m", "6-12m", "12-18m"];
+const UNIVERSAL_SIZE_KEYS = new Set(["common", "commonsize", "freesize", "onesize", "os", "free", "universal"]);
 
 export type ProductVariant = {
   id?: string;
@@ -93,8 +97,40 @@ export function parseVariantsJson(raw: unknown): ProductVariant[] {
     .filter((v): v is ProductVariant => v != null);
 }
 
-function key(value: string | undefined | null): string {
+function sizeKey(value: string | undefined | null): string {
+  return normalizeSizeKey(value ?? "");
+}
+
+function colorKey(value: string | undefined | null): string {
   return (value ?? "").trim().toLowerCase();
+}
+
+/** All size labels to render — merges catalog sizes, variant matrix, and standard baby bands. */
+export function sizesForDisplay(product: VariantProductLike): string[] {
+  const labelByKey = new Map<string, string>();
+  const remember = (label: string | undefined | null) => {
+    const trimmed = label?.trim();
+    if (!trimmed) return;
+    const k = sizeKey(trimmed);
+    if (!labelByKey.has(k)) labelByKey.set(k, trimmed);
+  };
+
+  for (const s of product.sizes ?? []) remember(s);
+  for (const v of product.variants ?? []) remember(v.size);
+
+  const labels = [...labelByKey.values()];
+  const hasAgeBand = labels.some((s) => sizeToAgeBand(s) != null);
+  const isUniversal = labels.some((s) => UNIVERSAL_SIZE_KEYS.has(sizeKey(s)));
+
+  if (isVariantsProduct(product) && hasAgeBand && !isUniversal) {
+    const usesSpacedM = labels.some((s) => /\d\s*-\s*\d+\s+m$/i.test(s.trim()));
+    for (const band of STANDARD_FOUR_AGE_BANDS) {
+      if (labelByKey.has(sizeKey(band))) continue;
+      remember(usesSpacedM ? band.replace(/m$/i, " M") : band);
+    }
+  }
+
+  return sortSizesAsc([...labelByKey.values()]);
 }
 
 export function findVariant(
@@ -107,18 +143,18 @@ export function findVariant(
     const bySku = variants.find((v) => v.sku.toLowerCase() === want);
     if (bySku) return bySku;
   }
-  return variants.find((v) => key(v.size) === key(opts.size) && key(v.color) === key(opts.color));
+  return variants.find((v) => sizeKey(v.size) === sizeKey(opts.size) && colorKey(v.color) === colorKey(opts.color));
 }
 
 export function colorsForSize(product: VariantProductLike, size: string | null | undefined): string[] {
   if (!isVariantsProduct(product)) {
     return product.colors.map((c) => c.name);
   }
-  const want = key(size);
+  const want = sizeKey(size);
   const names = new Set<string>();
   for (const v of product.variants ?? []) {
     if (!v.active) continue;
-    if (key(v.size) !== want) continue;
+    if (sizeKey(v.size) !== want) continue;
     if (v.color) names.add(v.color);
   }
   return Array.from(names);
@@ -129,11 +165,11 @@ export function sellableColorsForSize(product: VariantProductLike, size: string 
   if (!isVariantsProduct(product)) {
     return product.colors.map((c) => c.name);
   }
-  const want = key(size);
+  const want = sizeKey(size);
   const names = new Set<string>();
   for (const v of product.variants ?? []) {
     if (!isVariantSellable(v)) continue;
-    if (key(v.size) !== want) continue;
+    if (sizeKey(v.size) !== want) continue;
     if (v.color) names.add(v.color);
   }
   return Array.from(names);
@@ -141,8 +177,8 @@ export function sellableColorsForSize(product: VariantProductLike, size: string 
 
 /** Case-insensitive colour name match for variant matrix ↔ colours_json alignment. */
 export function colorNameInList(colorName: string, names: string[]): boolean {
-  const want = key(colorName);
-  return names.some((n) => key(n) === want);
+  const want = colorKey(colorName);
+  return names.some((n) => colorKey(n) === want);
 }
 
 export function isVariantSellable(variant: ProductVariant | undefined | null): boolean {
@@ -158,8 +194,8 @@ export function isSimpleProductSellable(product: VariantProductLike | null | und
 /** True if at least one active in-stock variant exists for this size. */
 export function sizeHasSellableVariants(product: VariantProductLike, size: string | null | undefined): boolean {
   if (!isVariantsProduct(product)) return true;
-  const want = key(size);
-  return (product.variants ?? []).some((v) => v.active && v.stock > 0 && key(v.size) === want);
+  const want = sizeKey(size);
+  return (product.variants ?? []).some((v) => v.active && v.stock > 0 && sizeKey(v.size) === want);
 }
 
 /** Human-readable stock message for the selected size × colour. */
@@ -205,7 +241,7 @@ export function storefrontListPricing(product: VariantProductLike): { price: num
 }
 
 export function defaultSellableSelection(product: VariantProductLike): { size: string; color: string; variant?: ProductVariant } {
-  const sizes = sortSizesAsc(product.sizes);
+  const sizes = sizesForDisplay(product);
   if (!isVariantsProduct(product)) {
     return {
       size: sizes[0] ?? "One Size",

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { Product } from "@/data/products";
 import { useProduct, useProducts } from "@/hooks/useProducts";
 import { useShop } from "@/store/shop";
@@ -19,10 +19,10 @@ import {
   isVariantsProduct,
   sellableColorsForSize,
   sizeHasSellableVariants,
+  sizesForDisplay,
 } from "@/lib/product-variants";
 import { StockAvailability, stockAvailabilityState } from "@/components/StockAvailability";
 import { VariantColorButtons, VariantSizeButtons, variantColorsForDisplay } from "@/components/VariantPickers";
-import { sortSizesAsc } from "@/lib/product-ages";
 
 export const Route = createFileRoute("/product/$slug")({
   head: ({ params }) => ({
@@ -63,7 +63,7 @@ function ProductPage() {
     setSize((prev) => {
       if (
         prev &&
-        product.sizes.includes(prev) &&
+        sizesForDisplay(product).some((s) => s === prev) &&
         (!isVariantsProduct(product) || sizeHasSellableVariants(product, prev))
       ) {
         return prev;
@@ -72,7 +72,7 @@ function ProductPage() {
     });
   }, [product]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!product || !size) return;
     const sellable = sellableColorsForSize(product, size);
     setColor((prev) => (prev && colorNameInList(prev, sellable) ? prev : sellable[0] ?? null));
@@ -111,7 +111,7 @@ function ProductPage() {
 
   const sizeFit = useMemo(() => {
     if (!product || !heightCm.trim()) return null;
-    const result = checkSizeFit({ heightCm, chestCm, sizes: sortSizesAsc(product.sizes) });
+    const result = checkSizeFit({ heightCm, chestCm, sizes: sizesForDisplay(product) });
     return result.ok ? { size: result.size } : { error: result.error };
   }, [heightCm, chestCm, product]);
 
@@ -171,7 +171,6 @@ function ProductPage() {
 
       <div className="grid lg:grid-cols-2 gap-x-6 lg:gap-x-8 gap-y-4 lg:gap-y-6 lg:items-start">
         <ProductGallery
-          key={color ?? "default"}
           name={product.name}
           image={colorGallery.image}
           gallery={colorGallery.gallery}

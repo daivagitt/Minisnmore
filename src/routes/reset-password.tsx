@@ -5,18 +5,9 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
 import { resetPasswordErrorMessage } from "@/lib/auth-errors";
+import { confirmPasswordFieldError, passwordFieldError } from "@/lib/password-validation";
 
 const Search = z.object({ key: z.string().min(1).optional() });
-
-const MIN_PASSWORD_MSG = "Password must be at least 6 characters.";
-
-function setPasswordValidity(el: HTMLInputElement) {
-  if (el.validity.tooShort) {
-    el.setCustomValidity(MIN_PASSWORD_MSG);
-  } else {
-    el.setCustomValidity("");
-  }
-}
 
 export const Route = createFileRoute("/reset-password")({
   validateSearch: (search) => Search.parse(search),
@@ -33,6 +24,9 @@ function ResetPasswordPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | undefined>();
+  const [confirmError, setConfirmError] = useState<string | undefined>();
+  const [touched, setTouched] = useState({ password: false, confirm: false });
 
   if (!search.key) {
     return (
@@ -51,16 +45,18 @@ function ResetPasswordPage() {
     );
   }
 
+  const validate = () => {
+    const nextPasswordError = passwordFieldError(password);
+    const nextConfirmError = confirmPasswordFieldError(password, confirm);
+    setPasswordError(nextPasswordError);
+    setConfirmError(nextConfirmError);
+    setTouched({ password: true, confirm: true });
+    return !nextPasswordError && !nextConfirmError;
+  };
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 6) {
-      toast.error(MIN_PASSWORD_MSG);
-      return;
-    }
-    if (password !== confirm) {
-      toast.error("Passwords do not match.");
-      return;
-    }
+    if (!validate()) return;
     setBusy(true);
     const { error } = await completePasswordReset(search.key!, password);
     setBusy(false);
@@ -82,39 +78,58 @@ function ResetPasswordPage() {
           {done ? "Redirecting you to sign in…" : "Enter a new password for your account."}
         </p>
         {!done && (
-          <form onSubmit={onSubmit} className="mt-6 space-y-3">
-            <div className="relative">
+          <form onSubmit={onSubmit} noValidate className="mt-6 space-y-3">
+            <div>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (touched.password) setPasswordError(passwordFieldError(e.target.value));
+                    if (touched.confirm) setConfirmError(confirmPasswordFieldError(e.target.value, confirm));
+                  }}
+                  onBlur={() => {
+                    setTouched((prev) => ({ ...prev, password: true }));
+                    setPasswordError(passwordFieldError(password));
+                  }}
+                  placeholder="New password (min 6)"
+                  aria-invalid={!!passwordError && touched.password}
+                  className={`w-full rounded-2xl glass px-4 py-3 pr-11 text-sm outline-none focus:ring-2 focus:ring-primary/40 ${passwordError && touched.password ? "ring-2 ring-destructive/50" : ""}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {passwordError && touched.password ? (
+                <p className="mt-1 text-xs text-destructive">{passwordError}</p>
+              ) : null}
+            </div>
+            <div>
               <input
                 type={showPassword ? "text" : "password"}
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onInvalid={(e) => setPasswordValidity(e.currentTarget)}
-                onInput={(e) => e.currentTarget.setCustomValidity("")}
-                placeholder="New password (min 6)"
-                className="w-full rounded-2xl glass px-4 py-3 pr-11 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                value={confirm}
+                onChange={(e) => {
+                  setConfirm(e.target.value);
+                  if (touched.confirm) setConfirmError(confirmPasswordFieldError(password, e.target.value));
+                }}
+                onBlur={() => {
+                  setTouched((prev) => ({ ...prev, confirm: true }));
+                  setConfirmError(confirmPasswordFieldError(password, confirm));
+                }}
+                placeholder="Confirm new password"
+                aria-invalid={!!confirmError && touched.confirm}
+                className={`w-full rounded-2xl glass px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/40 ${confirmError && touched.confirm ? "ring-2 ring-destructive/50" : ""}`}
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
-              >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
+              {confirmError && touched.confirm ? (
+                <p className="mt-1 text-xs text-destructive">{confirmError}</p>
+              ) : null}
             </div>
-            <input
-              type={showPassword ? "text" : "password"}
-              required
-              minLength={6}
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              onInvalid={(e) => setPasswordValidity(e.currentTarget)}
-              onInput={(e) => e.currentTarget.setCustomValidity("")}
-              placeholder="Confirm new password"
-              className="w-full rounded-2xl glass px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-            />
             <button disabled={busy} type="submit"
               className="w-full rounded-full bg-primary text-primary-foreground py-3 font-medium hover:shadow-glow transition disabled:opacity-60">
               {busy ? "Please wait…" : "Reset password"}

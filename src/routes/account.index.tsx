@@ -5,6 +5,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAccountData } from "@/lib/account";
 import { formatOrderDate } from "@/lib/dates";
 import { useShop } from "@/store/shop";
+import { useProducts } from "@/hooks/useProducts";
+import { wishlistCountForProducts } from "@/lib/wishlist";
 
 export const Route = createFileRoute("/account/")({
   head: () => ({ meta: [{ title: "Dashboard · Mini's n More" }] }),
@@ -14,6 +16,8 @@ export const Route = createFileRoute("/account/")({
 function Dashboard() {
   const { user } = useAuth();
   const { wishlist } = useShop();
+  const products = useProducts();
+  const wishlistCount = wishlistCountForProducts(wishlist, products.map((p) => p.id));
   const { orders, profile, loadingOrders, refreshOrders } = useAccountData();
 
   useEffect(() => {
@@ -35,7 +39,7 @@ function Dashboard() {
       <div className="grid sm:grid-cols-3 gap-4">
         <StatCard icon={Package} label="Orders" value={orders?.length ?? "—"} />
         <StatCard icon={CreditCard} label="Total spent" value={`₹${totalSpent.toLocaleString("en-IN")}`} />
-        <StatCard icon={Heart} label="Wishlist" value={wishlist.length} />
+        <StatCard icon={Heart} label="Wishlist" value={wishlistCount} />
       </div>
 
       <div className="glass-strong rounded-[2rem] p-6 md:p-8">

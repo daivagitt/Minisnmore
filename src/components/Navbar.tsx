@@ -4,6 +4,7 @@ import { Heart, ShoppingBag, Search, Menu, X, User, ArrowRight, Sparkles, Star, 
 import { useState, useEffect, useRef, useMemo, useId } from "react";
 import { useShop } from "@/store/shop";
 import { useProducts } from "@/hooks/useProducts";
+import { wishlistCountForProducts } from "@/lib/wishlist";
 import { usePageVisibility } from "@/hooks/usePageVisibility";
 import { useCategories, type Category } from "@/hooks/useCategories";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -33,6 +34,10 @@ export function Navbar() {
   const { isVisible } = usePageVisibility();
   const categories = useCategories();
   const products = useProducts();
+  const wishlistCount = useMemo(
+    () => wishlistCountForProducts(wishlist, products.map((p) => p.id)),
+    [wishlist, products],
+  );
   const settings = useSiteSettings();
   const { user } = useAuth();
   const profileTo = user ? "/account" : "/login";
@@ -201,8 +206,8 @@ export function Navbar() {
            <Link to={user ? "/wishlist" : "/login"} title="Wishlist" className="relative h-10 w-10 grid place-items-center rounded-full hover:bg-white/40 transition" aria-label="Wishlist">
              <span className="relative">
                <Heart className="h-5 w-5" strokeWidth={1.6} />
-               {wishlist.length > 0 && (
-                 <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-bold grid place-items-center">{wishlist.length}</span>
+               {wishlistCount > 0 && (
+                 <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-bold grid place-items-center">{wishlistCount}</span>
                )}
              </span>
            </Link>

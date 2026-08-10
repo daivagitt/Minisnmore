@@ -68,11 +68,12 @@ export function orderTotals({
   shipMode?: ShipMode;
   commerce?: CommerceConfig;
 }) {
+  const taxableSubtotal = Math.max(0, roundInr(subtotal));
   const afterDiscount = Math.max(0, roundInr(subtotal - discount));
   const shipping = shippingForOrder(afterDiscount, shipMode, commerce);
-  const lineGst = gstAmount(afterDiscount, commerce);
-  const shippingGst = shipping > 0 ? gstAmount(shipping, commerce) : 0;
-  const gst = lineGst + shippingGst;
+  const lineGst = gstAmount(taxableSubtotal, commerce);
+  const shippingGst = 0;
+  const gst = lineGst;
   const grand =
     afterDiscount +
     shipping +

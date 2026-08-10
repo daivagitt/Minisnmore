@@ -4,9 +4,9 @@ import {
   isVariantSellable,
   isVariantsProduct,
   sizeHasSellableVariants,
+  sizesForDisplay,
   type VariantProductLike,
 } from "@/lib/product-variants";
-import { sortSizesAsc } from "@/lib/product-ages";
 import { swatchImageForColor } from "@/lib/product-colors";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +37,7 @@ export function VariantSizeButtons({
   onSizeChange: (size: string) => void;
   gapClass?: string;
 }) {
-  const sizes = sortSizesAsc(product.sizes);
+  const sizes = sizesForDisplay(product);
   const isVariants = isVariantsProduct(product);
 
   return (

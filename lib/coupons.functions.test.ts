@@ -37,7 +37,7 @@ describe("coupon functions", () => {
     expect(postMock).toHaveBeenCalledWith("/api/v1/coupons/validate", {
       code: "WELCOME10",
       subtotal: 1500,
-    });
+    }, { auth: true });
   });
 
   it("rejects invalid coupon input", async () => {
@@ -84,6 +84,6 @@ describe("coupon functions", () => {
     getMock.mockResolvedValueOnce({ coupons });
 
     await expect(listActiveCoupons()).resolves.toEqual({ coupons });
-    expect(getMock).toHaveBeenCalledWith("/api/v1/coupons/active");
+    expect(getMock).toHaveBeenCalledWith("/api/v1/coupons/active", { auth: true });
   });
 });

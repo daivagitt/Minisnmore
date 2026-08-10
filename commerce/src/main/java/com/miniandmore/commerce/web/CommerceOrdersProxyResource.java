@@ -16,12 +16,12 @@ public class CommerceOrdersProxyResource {
 
     @PostMapping("/coupons/validate")
     public ResponseEntity<String> validateCoupon(@RequestBody Object body) {
-        return catalog.postPublic("/internal/v1/coupons/validate", body);
+        return catalog.post("/internal/v1/coupons/validate", body);
     }
 
     @GetMapping("/coupons/active")
     public ResponseEntity<String> activeCoupons() {
-        return catalog.getPublic("/internal/v1/coupons/active");
+        return catalog.get("/internal/v1/coupons/active");
     }
 
     @GetMapping("/account/profile")

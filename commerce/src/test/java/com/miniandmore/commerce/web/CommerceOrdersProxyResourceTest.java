@@ -36,14 +36,14 @@ class CommerceOrdersProxyResourceTest {
 
     @Test
     void validateCoupon_delegatesToCatalog() throws Exception {
-        when(catalog.postPublic(eq("/internal/v1/coupons/validate"), any())).thenReturn(ResponseEntity.ok("{}"));
+        when(catalog.post(eq("/internal/v1/coupons/validate"), any())).thenReturn(ResponseEntity.ok("{}"));
 
         mockMvc
             .perform(post("/api/v1/coupons/validate").contentType(MediaType.APPLICATION_JSON).content("{\"code\":\"X\"}"))
             .andExpect(status().isOk())
             .andExpect(content().string("{}"));
 
-        verify(catalog).postPublic(eq("/internal/v1/coupons/validate"), any());
+        verify(catalog).post(eq("/internal/v1/coupons/validate"), any());
     }
 
     @Test

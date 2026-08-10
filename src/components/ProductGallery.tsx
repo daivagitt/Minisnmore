@@ -1,7 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  contentAspect,
+  detectContentBoundsFromImage,
+  imageFitStyles,
+  type ImageContentBounds,
+} from "@/lib/product-image-bounds";
+
+/** Shared PDP gallery card — white outline box with soft shadow (reference PDP). */
+const galleryBox =
+  "glass shadow-soft border border-white/70 bg-white/90 backdrop-blur-sm";
+const galleryHeroRound = "rounded-[1.75rem] sm:rounded-[2rem] lg:rounded-[2.5rem]";
+const galleryThumbRailRound = "rounded-[1.25rem] sm:rounded-[1.5rem]";
+const galleryImageRound = "rounded-[1rem] sm:rounded-[1.25rem] lg:rounded-[1.5rem]";
+
+const DEFAULT_ASPECT = 1;
 
 function uniqueImages(...sources: (string | undefined)[]) {
   const seen = new Set<string>();
@@ -15,21 +30,96 @@ function uniqueImages(...sources: (string | undefined)[]) {
   return out;
 }
 
-function useImageAspects(sources: string[]) {
-  const aspectsRef = useRef<Map<string, number>>(new Map());
+function useImageContentBounds() {
+  const boundsRef = useRef<Map<string, ImageContentBounds>>(new Map());
+  const aspectRef = useRef<Map<string, number>>(new Map());
   const [, bump] = useState(0);
 
-  const rememberAspect = useCallback((src: string, naturalWidth: number, naturalHeight: number) => {
-    if (!naturalWidth || !naturalHeight) return;
-    const ratio = naturalWidth / naturalHeight;
-    if (aspectsRef.current.get(src) === ratio) return;
-    aspectsRef.current.set(src, ratio);
-    bump((n) => n + 1);
+  const rememberBounds = useCallback((src: string, img: HTMLImageElement) => {
+    const nw = img.naturalWidth;
+    const nh = img.naturalHeight;
+    if (!nw || !nh) return;
+
+    const naturalAspect = nw / nh;
+    if (!aspectRef.current.has(src)) {
+      aspectRef.current.set(src, naturalAspect);
+      bump((n) => n + 1);
+    }
+
+    // Defer pixel scan so layout can settle (avoids jank when variant pickers update).
+    requestAnimationFrame(() => {
+      try {
+        const bounds = detectContentBoundsFromImage(img);
+        const prev = boundsRef.current.get(src);
+        if (
+          prev &&
+          prev.x === bounds.x &&
+          prev.y === bounds.y &&
+          prev.width === bounds.width &&
+          prev.height === bounds.height
+        ) {
+          return;
+        }
+        boundsRef.current.set(src, bounds);
+        const contentAr = contentAspect(bounds);
+        const prevAr = aspectRef.current.get(src);
+        if (!prevAr || Math.abs(contentAr - prevAr) > 0.02) {
+          aspectRef.current.set(src, contentAr);
+          bump((n) => n + 1);
+        }
+      } catch {
+        boundsRef.current.set(src, {
+          x: 0,
+          y: 0,
+          width: nw,
+          height: nh,
+          naturalWidth: nw,
+          naturalHeight: nh,
+        });
+      }
+    });
   }, []);
 
-  const aspectFor = useCallback((src: string) => aspectsRef.current.get(src) ?? 1, []);
+  const boundsFor = useCallback((src: string) => boundsRef.current.get(src), []);
+  const aspectFor = useCallback(
+    (src: string) => aspectRef.current.get(src) ?? DEFAULT_ASPECT,
+    [],
+  );
 
-  return { aspectFor, rememberAspect };
+  return { boundsFor, aspectFor, rememberBounds };
+}
+
+type FittedImageProps = {
+  src: string;
+  alt: string;
+  bounds?: ImageContentBounds;
+  className?: string;
+  loading?: "lazy" | "eager";
+  onBounds: (src: string, img: HTMLImageElement) => void;
+};
+
+/** Zooms to the detected product region so the inner frame has no baked-in white/cream border. */
+function FittedGalleryImage({ src, alt, bounds, className, loading, onBounds }: FittedImageProps) {
+  if (!src) return null;
+
+  const fitStyle = bounds ? imageFitStyles(bounds) : undefined;
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      decoding="async"
+      loading={loading}
+      onLoad={(e) => onBounds(src, e.currentTarget)}
+      className={cn(
+        "absolute select-none",
+        bounds ? "max-w-none" : "inset-0 h-full w-full object-cover object-center",
+        className,
+      )}
+      style={fitStyle}
+      draggable={false}
+    />
+  );
 }
 
 type ThumbProps = {
@@ -37,30 +127,29 @@ type ThumbProps = {
   index: number;
   total: number;
   active: boolean;
-  aspect: number;
-  onAspect: (src: string, w: number, h: number) => void;
   onSelect: () => void;
 };
 
-function GalleryThumb({ src, index, total, active, aspect, onAspect, onSelect }: ThumbProps) {
+/** Square thumbs — fixed size avoids rail layout jumps when bounds load. */
+function GalleryThumb({ src, index, total, active, onSelect }: ThumbProps) {
   return (
     <button
       type="button"
       onClick={onSelect}
       aria-label={`View image ${index + 1} of ${total}`}
       aria-current={active ? "true" : undefined}
-      style={{ aspectRatio: aspect }}
       className={cn(
-        "glass rounded-xl overflow-hidden shrink-0 transition snap-start w-[3.75rem] sm:w-[4.25rem] lg:w-full",
-        active ? "ring-2 ring-primary ring-inset" : "opacity-75 hover:opacity-100",
+        "rounded-lg overflow-hidden shrink-0 snap-start relative w-[3.25rem] sm:w-[3.75rem] lg:w-full aspect-square bg-white/50",
+        active ? "ring-2 ring-primary ring-inset opacity-100" : "opacity-70 hover:opacity-100",
       )}
     >
       <img
         src={src}
         alt=""
-        className="block h-full w-full object-contain object-center"
+        decoding="async"
         loading="lazy"
-        onLoad={(e) => onAspect(src, e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)}
+        className="absolute inset-0 h-full w-full object-cover object-center select-none"
+        draggable={false}
       />
     </button>
   );
@@ -75,94 +164,119 @@ type Props = {
 
 export function ProductGallery({ name, image, gallery = [], className }: Props) {
   const images = useMemo(() => uniqueImages(image, ...gallery), [image, gallery]);
+  const imagesKey = useMemo(() => images.join("\0"), [images]);
   const [active, setActive] = useState(0);
-  const { aspectFor, rememberAspect } = useImageAspects(images);
+  const { boundsFor, aspectFor, rememberBounds } = useImageContentBounds();
 
   useEffect(() => {
     setActive(0);
-  }, [images]);
+  }, [imagesKey]);
 
   const safeActive = images.length ? Math.min(active, images.length - 1) : 0;
   const current = images[safeActive] ?? images[0] ?? "";
   const heroAspect = aspectFor(current);
+  const heroBounds = boundsFor(current);
 
   const go = (delta: number) => {
     if (images.length <= 1) return;
     setActive((i) => (i + delta + images.length) % images.length);
   };
 
+  const heroImageStyle: CSSProperties = {
+    aspectRatio: String(heroAspect),
+  };
+
   return (
     <div
       className={cn(
-        "flex flex-col lg:flex-row gap-2 sm:gap-3 w-full min-w-0 lg:items-start",
+        "flex flex-col lg:flex-row gap-3 sm:gap-4 w-full min-w-0 lg:items-start",
         className,
       )}
     >
       {images.length > 1 ? (
-        <div
-          className="order-2 lg:order-1 flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-y-auto -mx-1 px-1 lg:mx-0 lg:px-0 pb-0.5 lg:pb-0 shrink-0 lg:w-[4.5rem] xl:w-[5.25rem] lg:max-h-[min(92vw,36rem)] snap-x snap-mandatory lg:snap-none [scrollbar-width:thin]"
-          aria-label="Product image thumbnails"
-        >
-          {images.map((src, i) => (
-            <GalleryThumb
-              key={`${src}-${i}`}
-              src={src}
-              index={i}
-              total={images.length}
-              active={safeActive === i}
-              aspect={aspectFor(src)}
-              onAspect={rememberAspect}
-              onSelect={() => setActive(i)}
-            />
-          ))}
+        <div className="order-2 lg:order-1 shrink-0 lg:w-[5rem] xl:w-[5.5rem] lg:self-start">
+          <div
+            className={cn(
+              galleryBox,
+              galleryThumbRailRound,
+              "p-2 sm:p-2.5 flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-y-auto snap-x snap-mandatory lg:snap-none [scrollbar-width:thin] lg:max-h-[min(92vw,36rem)]",
+            )}
+            aria-label="Product image thumbnails"
+          >
+            {images.map((src, i) => (
+              <GalleryThumb
+                key={src}
+                src={src}
+                index={i}
+                total={images.length}
+                active={safeActive === i}
+                onSelect={() => setActive(i)}
+              />
+            ))}
+          </div>
         </div>
       ) : null}
 
       <motion.div
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-        className="order-1 lg:order-2 glass rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden relative min-w-0 w-full lg:flex-1"
+        initial={false}
+        className={cn(
+          galleryBox,
+          galleryHeroRound,
+          "order-1 lg:order-2 relative min-w-0 w-full lg:flex-1 p-4 sm:p-5",
+        )}
       >
         <div
-          className="relative w-full overflow-hidden max-h-[min(92vw,28rem)] sm:max-h-[min(80vw,32rem)] lg:max-h-[min(42vw,36rem)]"
-          style={{ aspectRatio: heroAspect }}
+          className={cn(
+            "relative w-full overflow-hidden transition-[aspect-ratio] duration-300 ease-out",
+            galleryImageRound,
+          )}
+          style={heroImageStyle}
         >
-          <AnimatePresence mode="wait">
-            <motion.img
+          {/* Aspect-ratio spacer — absolute children do not contribute to layout height */}
+          <div className="w-full" style={{ paddingBottom: `${(1 / heroAspect) * 100}%` }} aria-hidden />
+
+          <AnimatePresence mode="sync" initial={false}>
+            <motion.div
               key={current}
-              src={current}
-              alt={name}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onLoad={(e) => rememberAspect(current, e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)}
-              className="absolute inset-0 h-full w-full object-contain object-center"
-            />
+              transition={{ duration: 0.15 }}
+              className="absolute inset-0 overflow-hidden"
+            >
+              {current ? (
+                <FittedGalleryImage
+                  src={current}
+                  alt={name}
+                  bounds={heroBounds}
+                  loading="eager"
+                  onBounds={rememberBounds}
+                />
+              ) : null}
+            </motion.div>
           </AnimatePresence>
-
-          {images.length > 1 ? (
-            <>
-              <button
-                type="button"
-                onClick={() => go(-1)}
-                className="absolute left-1.5 sm:left-2 top-1/2 z-10 -translate-y-1/2 h-8 w-8 sm:h-9 sm:w-9 grid place-items-center rounded-full glass hover:bg-white/80 transition"
-                aria-label="Previous image"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => go(1)}
-                className="absolute right-1.5 sm:right-2 top-1/2 z-10 -translate-y-1/2 h-8 w-8 sm:h-9 sm:w-9 grid place-items-center rounded-full glass hover:bg-white/80 transition"
-                aria-label="Next image"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </>
-          ) : null}
         </div>
+
+        {images.length > 1 ? (
+          <>
+            <button
+              type="button"
+              onClick={() => go(-1)}
+              className="absolute left-2 sm:left-3 top-1/2 z-10 -translate-y-1/2 h-8 w-8 sm:h-9 sm:w-9 grid place-items-center rounded-full bg-white/80 backdrop-blur-sm hover:bg-white transition shadow-sm border border-white/70"
+              aria-label="Previous image"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => go(1)}
+              className="absolute right-2 sm:right-3 top-1/2 z-10 -translate-y-1/2 h-8 w-8 sm:h-9 sm:w-9 grid place-items-center rounded-full bg-white/80 backdrop-blur-sm hover:bg-white transition shadow-sm border border-white/70"
+              aria-label="Next image"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </>
+        ) : null}
       </motion.div>
     </div>
   );

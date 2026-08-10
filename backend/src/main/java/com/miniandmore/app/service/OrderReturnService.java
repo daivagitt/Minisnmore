@@ -179,7 +179,11 @@ public class OrderReturnService {
             if (StringUtils.isBlank(orderReturn.getLedgerlyCreditNoteId())) {
                 try {
                     ledgerlyIntegrationClient
-                        .createCreditNote(order.getOrderNumber(), orderReturn.getReturnNumber(), refundAmount)
+                        .cancelOrder(
+                            order.getOrderNumber(),
+                            orderReturn.getReturnNumber(),
+                            orderReturn.getRazorpayRefundId()
+                        )
                         .ifPresent(orderReturn::setLedgerlyCreditNoteId);
                 } catch (RuntimeException e) {
                     if (shouldStubDemoCreditNote(order, e)) {
@@ -190,9 +194,9 @@ public class OrderReturnService {
                             order.getOrderNumber()
                         );
                     } else {
-                        LOG.warn("Ledgerly credit note failed for return {}: {}", orderReturn.getReturnNumber(), e.getMessage());
+                        LOG.warn("Ledgerly order cancel failed for return {}: {}", orderReturn.getReturnNumber(), e.getMessage());
                         orderReturn.setAdminNotes(
-                            mergeNotes(orderReturn.getAdminNotes(), "Ledgerly credit note failed: " + StringUtils.left(e.getMessage(), 200))
+                            mergeNotes(orderReturn.getAdminNotes(), "Ledgerly order cancel failed: " + StringUtils.left(e.getMessage(), 200))
                         );
                     }
                 }

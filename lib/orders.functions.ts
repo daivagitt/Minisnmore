@@ -111,13 +111,21 @@ export async function getMyProfile(): Promise<{ profile: { full_name: string; ph
 const FULL_NAME_PATTERN = /^\p{L}[\p{L} .'-]*$/u;
 const PHONE_PATTERN = /^(\+91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}$/;
 
+export const FullNameSchema = z
+  .string()
+  .trim()
+  .min(2, "Full name must be at least 2 characters")
+  .max(120, "Full name is too long")
+  .regex(FULL_NAME_PATTERN, "Full name may only contain letters, spaces, apostrophes, periods and hyphens");
+
+export function fullNameFieldError(fullName: string): string | undefined {
+  const result = FullNameSchema.safeParse(fullName);
+  if (result.success) return undefined;
+  return result.error.issues[0]?.message;
+}
+
 export const ProfileUpdate = z.object({
-  full_name: z
-    .string()
-    .trim()
-    .min(2, "Full name must be at least 2 characters")
-    .max(120, "Full name is too long")
-    .regex(FULL_NAME_PATTERN, "Full name may only contain letters, spaces, apostrophes, periods and hyphens"),
+  full_name: FullNameSchema,
   phone: z
     .string()
     .trim()

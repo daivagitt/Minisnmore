@@ -127,6 +127,24 @@ describe("login route", () => {
     );
   });
 
+  it("rejects an invalid full name during sign up", async () => {
+    renderLogin();
+
+    await userEvent.click(screen.getByRole("button", { name: "New here? Create an account" }));
+    await userEvent.type(screen.getByPlaceholderText("Full name"), "A");
+    await userEvent.type(screen.getByPlaceholderText("you@email.com"), "new@example.com");
+    await userEvent.type(screen.getByPlaceholderText("Password (min 6)"), "secret1");
+    await userEvent.click(screen.getByRole("button", { name: /^Create account$/ }));
+
+    await waitFor(() =>
+      expect(toastMock.error).toHaveBeenCalledWith(
+        expect.stringMatching(/at least 2 characters/i),
+        { id: "login-error" },
+      ),
+    );
+    expect(authMock.signUp).not.toHaveBeenCalled();
+  });
+
   it("shows sign up errors and can switch back to sign in", async () => {
     authMock.signUp.mockResolvedValueOnce({ error: "Email taken" });
     renderLogin();

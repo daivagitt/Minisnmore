@@ -61,6 +61,7 @@ public class InternalAccountOrderResource {
     private static final String FIELD_DISCOUNT = "discount";
     private static final String FIELD_DISCOUNT_VALUE = "discount_value";
     private static final String FIELD_TOTAL = "total";
+    private static final String WELCOME10_COUPON = "WELCOME10";
 
     private final AccountOrderDataAccess dataAccess;
     private final ObjectMapper objectMapper;
@@ -90,14 +91,19 @@ public class InternalAccountOrderResource {
 
     @PostMapping("/coupons/validate")
     public ApiResponse<Map<String, Object>> validateCoupon(@Valid @RequestBody CouponValidationRequest request) {
-        Optional<Map<String, Object>> discount = calculateCouponDiscount(request.code(), request.subtotal());
+        Optional<String> login = SecurityUtils.getCurrentUserLogin();
+        Optional<Map<String, Object>> discount = calculateCouponDiscount(request.code(), request.subtotal(), login);
         if (discount.isEmpty()) {
             return ApiResponse.ok(Map.of("ok", false, FIELD_ERROR, "Invalid or expired coupon"));
+        }
+        Map<String, Object> result = discount.orElseThrow();
+        if (result.containsKey(FIELD_ERROR)) {
+            return ApiResponse.ok(Map.of("ok", false, FIELD_ERROR, result.get(FIELD_ERROR)));
         }
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("ok", true);
         data.put("code", request.code().trim().toUpperCase(Locale.ROOT));
-        data.put(FIELD_DISCOUNT, discount.orElseThrow().get(FIELD_DISCOUNT));
+        data.put(FIELD_DISCOUNT, result.get(FIELD_DISCOUNT));
         return ApiResponse.ok(data);
     }
 
@@ -108,12 +114,15 @@ public class InternalAccountOrderResource {
     @GetMapping("/coupons/active")
     public ApiResponse<Map<String, Object>> activeCoupons() {
         Instant now = Instant.now();
+        Optional<String> login = SecurityUtils.getCurrentUserLogin();
+        boolean welcome10Eligible = login.map(this::isFirstOrderEligible).orElse(true);
         List<Map<String, Object>> coupons = dataAccess
             .couponRepository()
             .findAllByOrderByIdDesc()
             .stream()
             .filter(c -> Boolean.TRUE.equals(c.getActive()))
             .filter(c -> c.getExpiresAt() == null || c.getExpiresAt().isAfter(now))
+            .filter(c -> welcome10Eligible || !isWelcome10Coupon(c.getCode()))
             .map(this::couponSummary)
             .toList();
         return ApiResponse.ok(Map.of("coupons", coupons));
@@ -166,6 +175,7 @@ public class InternalAccountOrderResource {
             throw ex;
         }
         Totals totals = calculateTotals(
+            login,
             reserved,
             blankToNull(request.coupon_code()),
             request.donation(),
@@ -464,9 +474,34 @@ public class InternalAccountOrderResource {
         ledgerlySyncService.syncOrder(order.getId());
     }
 
-    private Optional<Map<String, Object>> calculateCouponDiscount(String code, BigDecimal subtotal) {
+    private boolean isWelcome10Coupon(String code) {
+        return WELCOME10_COUPON.equalsIgnoreCase(StringUtils.trimToEmpty(code));
+    }
+
+    private boolean isFirstOrderEligible(String login) {
+        return !dataAccess.customerOrderRepository().existsByUserLoginAndPaymentStatus(login, PaymentStatus.PAID);
+    }
+
+    private Optional<String> welcome10EligibilityError(String code, Optional<String> userLogin) {
+        if (!isWelcome10Coupon(code)) {
+            return Optional.empty();
+        }
+        if (!SecurityUtils.isAuthenticated()) {
+            return Optional.of("Sign in to use WELCOME10 on your first order");
+        }
+        if (!isFirstOrderEligible(userLogin.orElseThrow())) {
+            return Optional.of("WELCOME10 is only valid on your first order");
+        }
+        return Optional.empty();
+    }
+
+    private Optional<Map<String, Object>> calculateCouponDiscount(String code, BigDecimal subtotal, Optional<String> userLogin) {
         if (StringUtils.isBlank(code)) {
             return Optional.empty();
+        }
+        Optional<String> welcome10Error = welcome10EligibilityError(code, userLogin);
+        if (welcome10Error.isPresent()) {
+            return Optional.of(Map.of(FIELD_ERROR, welcome10Error.orElseThrow()));
         }
         Optional<Coupon> couponOpt = dataAccess.couponRepository().findOneByCodeIgnoreCase(code.trim());
         if (couponOpt.isEmpty()) {
@@ -504,6 +539,7 @@ public class InternalAccountOrderResource {
     }
 
     private Totals calculateTotals(
+        String login,
         List<ReservedOrderItem> items,
         String couponCode,
         BigDecimal donation,
@@ -514,20 +550,22 @@ public class InternalAccountOrderResource {
             .stream()
             .map(item -> item.unitPrice().multiply(BigDecimal.valueOf(item.request().qty())))
             .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal discount = calculateCouponDiscount(couponCode, subtotal)
-            .map(m -> (BigDecimal) m.get(FIELD_DISCOUNT))
-            .orElse(BigDecimal.ZERO);
+        Optional<Map<String, Object>> couponResult = calculateCouponDiscount(couponCode, subtotal, Optional.ofNullable(login));
+        if (couponResult.map(m -> m.containsKey(FIELD_ERROR)).orElse(false)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, couponResult.orElseThrow().get(FIELD_ERROR).toString());
+        }
+        BigDecimal discount = couponResult.map(m -> (BigDecimal) m.get(FIELD_DISCOUNT)).orElse(BigDecimal.ZERO);
         // Rounded to whole rupees to match the storefront's checkout review, which rounds every
         // line (afterDiscount, GST, total) for display — see src/lib/money.ts#orderTotals. Without
         // this, a fractional discount left the Razorpay-charged amount a few paise off from what
         // the customer approved on screen.
+        BigDecimal taxableSubtotal = roundInr(subtotal.max(BigDecimal.ZERO));
         BigDecimal afterDiscount = roundInr(subtotal.subtract(discount).max(BigDecimal.ZERO));
         CommerceSettings commerce = commerceSettings();
         BigDecimal shipping = calculateShipping(afterDiscount, shippingMode, commerce);
         BigDecimal codFee = cod ? COD_FEE : BigDecimal.ZERO;
-        BigDecimal lineGst = roundInr(calculateTax(afterDiscount, commerce));
-        BigDecimal shippingGst = shipping.compareTo(BigDecimal.ZERO) > 0 ? roundInr(calculateTax(shipping, commerce)) : BigDecimal.ZERO;
-        BigDecimal tax = lineGst.add(shippingGst);
+        BigDecimal lineGst = roundInr(calculateTax(taxableSubtotal, commerce));
+        BigDecimal tax = lineGst;
         BigDecimal roundedDonation = roundInr(donation == null ? BigDecimal.ZERO : donation);
         BigDecimal total = afterDiscount
             .add(shipping)

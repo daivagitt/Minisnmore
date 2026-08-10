@@ -35,6 +35,23 @@ class LedgerlyIntegrationClientTest {
     }
 
     @Test
+    void cancelOrder_returnsIdWhenPresent() {
+        when(credentials.baseUrl()).thenReturn("http://ledgerly.test/api");
+        when(credentials.token()).thenReturn("lt_test");
+
+        server
+            .expect(requestTo("http://ledgerly.test/api/v1/integrations/commerce/orders/ORD-1/cancel"))
+            .andExpect(header("Authorization", "Bearer lt_test"))
+            .andExpect(content().json("{\"returnNumber\":\"RET-ORD-1\",\"refundPaymentId\":\"rfnd_1\"}"))
+            .andRespond(withSuccess("{\"ledgerlyCreditNoteId\":\"cn-42\",\"refunded\":true}", MediaType.APPLICATION_JSON));
+
+        Optional<String> id = client.cancelOrder("ORD-1", "RET-ORD-1", "rfnd_1");
+
+        assertThat(id).contains("cn-42");
+        server.verify();
+    }
+
+    @Test
     void createCreditNote_returnsIdWhenPresent() {
         when(credentials.baseUrl()).thenReturn("http://ledgerly.test/api");
         when(credentials.token()).thenReturn("lt_test");
