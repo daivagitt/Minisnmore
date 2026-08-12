@@ -56,6 +56,8 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     Optional<Product> findOneBySku(String sku);
 
+    Optional<Product> findOneByZohoItemId(String zohoItemId);
+
     Optional<Product> findOneByLedgerlyItemId(String ledgerlyItemId);
 
     @Query("select coalesce(max(product.sortOrder), 0) from Product product")
@@ -68,6 +70,13 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     long countByActiveTrue();
 
     List<Product> findAllByActiveTrue();
+
+    List<Product> findAllByZohoItemIdIsNotNull();
+
+    @Query(
+        "select product from Product product where product.active = true and (product.zohoItemId is not null or product.sku is not null)"
+    )
+    List<Product> findAllActiveEligibleForZohoInventoryPull();
 
     List<Product> findAllByLedgerlyItemIdIsNotNull();
 
@@ -83,6 +92,55 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     List<Product> findAllActiveEligibleForLedgerlyInventoryPull();
 
     long countByCategory_Id(Long categoryId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+        """
+        update Product p
+           set p.zohoItemId = :zohoItemId,
+               p.zohoSyncStatus = :status,
+               p.zohoLastSyncedAt = :syncedAt,
+               p.zohoSyncError = null
+         where p.id = :id
+        """
+    )
+    int updateZohoSyncSuccess(
+        @Param("id") Long id,
+        @Param("zohoItemId") String zohoItemId,
+        @Param("status") com.miniandmore.app.domain.enumeration.ZohoSyncStatus status,
+        @Param("syncedAt") java.time.Instant syncedAt
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+        """
+        update Product p
+           set p.zohoSyncStatus = :status,
+               p.zohoSyncError = :error
+         where p.id = :id
+        """
+    )
+    int updateZohoSyncFailure(
+        @Param("id") Long id,
+        @Param("status") com.miniandmore.app.domain.enumeration.ZohoSyncStatus status,
+        @Param("error") String error
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+        """
+        update Product p
+           set p.zohoLastSyncedAt = :syncedAt,
+               p.zohoSyncError = null,
+               p.zohoItemId = case when :clearItemId = true then null else p.zohoItemId end
+         where p.id = :id
+        """
+    )
+    int updateZohoDeactivateMeta(
+        @Param("id") Long id,
+        @Param("syncedAt") java.time.Instant syncedAt,
+        @Param("clearItemId") boolean clearItemId
+    );
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(

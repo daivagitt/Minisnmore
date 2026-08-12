@@ -8,8 +8,10 @@ import com.miniandmore.app.domain.enumeration.DiscountType;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
+import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import com.miniandmore.app.security.SecurityUtils;
 import com.miniandmore.app.service.LedgerlySyncService;
+import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.service.OrderTrackingStatusResolver;
 import com.miniandmore.app.service.ProductVariantSupport;
 import com.miniandmore.app.service.ProductVariantSupport.VariantRow;
@@ -66,6 +68,7 @@ public class InternalAccountOrderResource {
     private final AccountOrderDataAccess dataAccess;
     private final ObjectMapper objectMapper;
     private final LedgerlySyncService ledgerlySyncService;
+    private final ZohoSyncService zohoSyncService;
     private final ProductVariantSupport variantSupport;
 
     @Value("${razorpay.key-id:DEMO}")
@@ -81,11 +84,13 @@ public class InternalAccountOrderResource {
         AccountOrderDataAccess dataAccess,
         ObjectMapper objectMapper,
         LedgerlySyncService ledgerlySyncService,
+        ZohoSyncService zohoSyncService,
         ProductVariantSupport variantSupport
     ) {
         this.dataAccess = dataAccess;
         this.objectMapper = objectMapper;
         this.ledgerlySyncService = ledgerlySyncService;
+        this.zohoSyncService = zohoSyncService;
         this.variantSupport = variantSupport;
     }
 
@@ -182,6 +187,7 @@ public class InternalAccountOrderResource {
             request.shipping_mode(),
             cod
         );
+        AddressRequest shippingAddress = lockShippingEmailToLogin(request.shipping_address(), login);
         String orderNumber = generateOrderNumber();
         CustomerOrder order = new CustomerOrder()
             .userLogin(login)
@@ -199,7 +205,7 @@ public class InternalAccountOrderResource {
             .donation(roundInr(request.donation()))
             .total(totals.total())
             .couponCode(blankToNull(request.coupon_code()))
-            .shippingAddressJson(toJson(request.shipping_address()))
+            .shippingAddressJson(toJson(shippingAddress))
             .notes(blankToNull(request.notes()))
             .inventoryReserved(true)
             // Online orders get a 30-minute hold that the reaper releases if payment never completes.
@@ -380,7 +386,7 @@ public class InternalAccountOrderResource {
             .customerOrderRepository()
             .findOneByOrderNumber(orderNumber)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
-        order = refreshTrackingIfStale(order);
+        // Public track must not block on Ledgerly; scheduler/admin endpoints refresh stale tracking.
         return ApiResponse.ok(publicTrackingSummary(order));
     }
 
@@ -459,6 +465,20 @@ public class InternalAccountOrderResource {
             dataAccess.customerOrderRepository().save(order);
         }
         attemptLedgerlyOrderSync(order);
+        attemptZohoOrderSync(order);
+    }
+
+    private void attemptZohoOrderSync(CustomerOrder order) {
+        if (order.getPaymentStatus() != PaymentStatus.PAID) {
+            return;
+        }
+        ZohoSyncStatus syncStatus = order.getZohoSyncStatus();
+        if (syncStatus != null && syncStatus != ZohoSyncStatus.FAILED && syncStatus != ZohoSyncStatus.PENDING) {
+            return;
+        }
+        order.setZohoSyncStatus(ZohoSyncStatus.PENDING);
+        dataAccess.customerOrderRepository().save(order);
+        zohoSyncService.syncOrder(order.getId());
     }
 
     private void attemptLedgerlyOrderSync(CustomerOrder order) {
@@ -997,19 +1017,33 @@ public class InternalAccountOrderResource {
         if (order.getStatus() == OrderStatus.FULFILLED || order.getStatus() == OrderStatus.CANCELLED) {
             return order;
         }
-        if (StringUtils.isBlank(order.getLedgerlySalesOrderId())) {
-            return order;
+        boolean refreshed = false;
+        if (StringUtils.isNotBlank(order.getLedgerlySalesOrderId())) {
+            Instant lastLedgerlyPull = order.getLedgerlyTrackingLastPulledAt();
+            if (lastLedgerlyPull == null || lastLedgerlyPull.isBefore(Instant.now().minus(TRACKING_REFRESH_TTL))) {
+                try {
+                    ledgerlySyncService.pullOrderTracking(order.getId());
+                    refreshed = true;
+                } catch (Exception ex) {
+                    LOG.warn("Ledgerly tracking refresh failed for {}: {}", order.getOrderNumber(), ex.getMessage());
+                }
+            }
         }
-        Instant lastPulled = order.getLedgerlyTrackingLastPulledAt();
-        if (lastPulled != null && lastPulled.isAfter(Instant.now().minus(TRACKING_REFRESH_TTL))) {
-            return order;
+        if (StringUtils.isNotBlank(order.getZohoInvoiceId()) || StringUtils.isNotBlank(order.getZohoSalesOrderId())) {
+            Instant lastZohoPull = order.getZohoTrackingLastPulledAt();
+            if (lastZohoPull == null || lastZohoPull.isBefore(Instant.now().minus(TRACKING_REFRESH_TTL))) {
+                try {
+                    zohoSyncService.pullOrderTracking(order.getId());
+                    refreshed = true;
+                } catch (Exception ex) {
+                    LOG.warn("Zoho tracking refresh failed for {}: {}", order.getOrderNumber(), ex.getMessage());
+                }
+            }
         }
-        try {
-            ledgerlySyncService.pullOrderTracking(order.getId());
-        } catch (Exception ex) {
-            LOG.warn("Tracking refresh failed for {}: {}", order.getOrderNumber(), ex.getMessage());
+        if (refreshed) {
+            return dataAccess.customerOrderRepository().findById(order.getId()).orElse(order);
         }
-        return dataAccess.customerOrderRepository().findById(order.getId()).orElse(order);
+        return order;
     }
 
     private Map<String, Object> paymentSummary(CustomerOrder order) {
@@ -1047,6 +1081,20 @@ public class InternalAccountOrderResource {
         } catch (JsonProcessingException ex) {
             return Map.of();
         }
+    }
+
+    private static AddressRequest lockShippingEmailToLogin(AddressRequest address, String login) {
+        return new AddressRequest(
+            address.full_name(),
+            login,
+            address.phone(),
+            address.line1(),
+            address.line2(),
+            address.city(),
+            address.state(),
+            address.pincode(),
+            address.baby_name()
+        );
     }
 
     private String toJson(Object value) {

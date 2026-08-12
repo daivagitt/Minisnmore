@@ -51,6 +51,7 @@ public class InternalAdminStoreResource {
     private final PolicyMapper policyMapper;
     private final CouponMapper couponMapper;
     private final LedgerlySyncService ledgerlySyncService;
+    private final ZohoSyncService zohoSyncService;
 
     public InternalAdminStoreResource(
         CategoryRepository categoryRepository,
@@ -80,7 +81,8 @@ public class InternalAdminStoreResource {
         SiteSettingMapper siteSettingMapper,
         PolicyMapper policyMapper,
         CouponMapper couponMapper,
-        LedgerlySyncService ledgerlySyncService
+        LedgerlySyncService ledgerlySyncService,
+        ZohoSyncService zohoSyncService
     ) {
         this.categoryRepository = categoryRepository;
         this.productRepository = productRepository;
@@ -110,6 +112,7 @@ public class InternalAdminStoreResource {
         this.policyMapper = policyMapper;
         this.couponMapper = couponMapper;
         this.ledgerlySyncService = ledgerlySyncService;
+        this.zohoSyncService = zohoSyncService;
     }
 
     @GetMapping("/dashboard")
@@ -173,6 +176,7 @@ public class InternalAdminStoreResource {
     public ApiResponse<ProductDTO> createProduct(@Valid @RequestBody ProductDTO dto) {
         ProductDTO saved = productService.save(dto);
         scheduleLedgerlyProductSync(saved.getId());
+        scheduleZohoProductSync(saved.getId());
         return ApiResponse.ok(saved);
     }
 
@@ -182,6 +186,7 @@ public class InternalAdminStoreResource {
         dto.setId(id);
         ProductDTO saved = productService.update(dto);
         scheduleLedgerlyProductSync(saved.getId());
+        scheduleZohoProductSync(saved.getId());
         return ApiResponse.ok(saved);
     }
 
@@ -343,6 +348,17 @@ public class InternalAdminStoreResource {
             ledgerlySyncService.syncProductAsync(productId);
         } catch (RuntimeException e) {
             LOG.warn("Could not schedule Ledgerly product sync for product {}", productId, e);
+        }
+    }
+
+    private void scheduleZohoProductSync(Long productId) {
+        if (productId == null) {
+            return;
+        }
+        try {
+            zohoSyncService.syncProductAsync(productId);
+        } catch (RuntimeException e) {
+            LOG.warn("Could not schedule Zoho product sync for product {}", productId, e);
         }
     }
 }

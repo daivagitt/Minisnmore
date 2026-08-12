@@ -14,6 +14,7 @@ import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.repository.*;
 import com.miniandmore.app.service.LedgerlySyncService;
+import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -65,6 +66,9 @@ class InternalAdminOrderResourceTest {
     @MockitoBean
     private LedgerlySyncService ledgerlySyncService;
 
+    @MockitoBean
+    private ZohoSyncService zohoSyncService;
+
     private CustomerOrder codOrder() {
         return new CustomerOrder()
             .id(900L)
@@ -102,6 +106,7 @@ class InternalAdminOrderResourceTest {
             .andExpect(jsonPath("$.data.paymentStatus").value("paid"));
 
         verify(ledgerlySyncService).syncOrder(900L);
+        verify(zohoSyncService).syncOrder(900L);
     }
 
     @Test

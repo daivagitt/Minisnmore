@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Restore Zoho integration ALONGSIDE existing Ledgerly columns (post-cutover uat3 DBs).
+        Does not modify ledgerly_* columns or ledgerly_setting.
+    -->
+
+    <!--
+        Cutover 20260701130000 renamed zoho_* columns to ledgerly_* but left constraint/index names
+        unchanged on PostgreSQL. Rename them before adding new zoho_* columns/constraints.
+    -->
+    <changeSet id="20260812130000-0a" author="miniandmore" dbms="postgresql">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT COUNT(*) FROM pg_constraint WHERE conname = 'ux_product__zoho_item_id'
+            </sqlCheck>
+        </preConditions>
+        <sql>ALTER TABLE product RENAME CONSTRAINT ux_product__zoho_item_id TO ux_product__ledgerly_item_id;</sql>
+    </changeSet>
+
+    <changeSet id="20260812130000-0b" author="miniandmore" dbms="postgresql">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT COUNT(*) FROM pg_indexes WHERE indexname = 'idx_product__zoho_sync_status'
+            </sqlCheck>
+        </preConditions>
+        <sql>ALTER INDEX idx_product__zoho_sync_status RENAME TO idx_product__ledgerly_sync_status;</sql>
+    </changeSet>
+
+    <changeSet id="20260812130000-0c" author="miniandmore" dbms="postgresql">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT COUNT(*) FROM pg_constraint WHERE conname = 'ux_customer_order__zoho_sales_order_id'
+            </sqlCheck>
+        </preConditions>
+        <sql>
+            ALTER TABLE customer_order RENAME CONSTRAINT ux_customer_order__zoho_sales_order_id TO ux_customer_order__ledgerly_sales_order_id;
+        </sql>
+    </changeSet>
+
+    <changeSet id="20260812130000-0d" author="miniandmore" dbms="postgresql">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT COUNT(*) FROM pg_indexes WHERE indexname = 'idx_customer_order__zoho_sync_status'
+            </sqlCheck>
+        </preConditions>
+        <sql>ALTER INDEX idx_customer_order__zoho_sync_status RENAME TO idx_customer_order__ledgerly_sync_status;</sql>
+    </changeSet>
+
+    <changeSet id="20260812130000-0e" author="miniandmore" dbms="postgresql">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT COUNT(*) FROM pg_indexes WHERE indexname = 'idx_customer_order__zoho_tracking_last_pulled_at'
+            </sqlCheck>
+        </preConditions>
+        <sql>
+            ALTER INDEX idx_customer_order__zoho_tracking_last_pulled_at RENAME TO idx_customer_order__ledgerly_tracking_last_pulled_at;
+        </sql>
+    </changeSet>
+
+    <changeSet id="20260812130000-0f" author="miniandmore" dbms="postgresql">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT COUNT(*) FROM pg_constraint WHERE conname = 'ux_category__zoho_category_id'
+            </sqlCheck>
+        </preConditions>
+        <sql>ALTER TABLE category RENAME CONSTRAINT ux_category__zoho_category_id TO ux_category__ledgerly_category_id;</sql>
+    </changeSet>
+
+    <changeSet id="20260812130000-1" author="miniandmore">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="zoho_setting"/>
+            </not>
+        </preConditions>
+        <createTable tableName="zoho_setting">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="org_id" type="varchar(120)"/>
+            <column name="client_id" type="varchar(220)"/>
+            <column name="client_secret" type="varchar(500)"/>
+            <column name="refresh_token" type="varchar(800)"/>
+            <column name="data_center" type="varchar(40)"/>
+            <column name="connected" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="pull_products_auto_create_category" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="20260812130000-2" author="miniandmore">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="product" columnName="zoho_item_id"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="product">
+            <column name="zoho_item_id" type="varchar(120)"/>
+            <column name="zoho_sync_status" type="varchar(255)"/>
+            <column name="zoho_last_synced_at" type="timestamp"/>
+            <column name="zoho_sync_error" type="varchar(1000)"/>
+        </addColumn>
+        <addUniqueConstraint tableName="product" columnNames="zoho_item_id" constraintName="ux_product__zoho_item_id"/>
+        <createIndex tableName="product" indexName="idx_product__zoho_sync_status">
+            <column name="zoho_sync_status"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="20260812130000-3" author="miniandmore">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="customer_order" columnName="zoho_sales_order_id"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="customer_order">
+            <column name="zoho_sales_order_id" type="varchar(120)"/>
+            <column name="zoho_invoice_id" type="varchar(120)"/>
+            <column name="zoho_sync_status" type="varchar(255)"/>
+            <column name="zoho_last_synced_at" type="timestamp"/>
+            <column name="zoho_sync_error" type="varchar(1000)"/>
+            <column name="zoho_order_status" type="varchar(40)"/>
+            <column name="zoho_tracking_last_pulled_at" type="timestamp"/>
+        </addColumn>
+        <addUniqueConstraint
+            tableName="customer_order"
+            columnNames="zoho_sales_order_id"
+            constraintName="ux_customer_order__zoho_sales_order_id"
+        />
+        <createIndex tableName="customer_order" indexName="idx_customer_order__zoho_sync_status">
+            <column name="zoho_sync_status"/>
+        </createIndex>
+        <createIndex tableName="customer_order" indexName="idx_customer_order__zoho_tracking_last_pulled_at">
+            <column name="zoho_tracking_last_pulled_at"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="20260812130000-4" author="miniandmore">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="order_return" columnName="zoho_credit_note_id"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="order_return">
+            <column name="zoho_credit_note_id" type="varchar(120)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20260812130000-5" author="miniandmore">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="category" columnName="zoho_category_id"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="category">
+            <column name="zoho_category_id" type="varchar(120)"/>
+        </addColumn>
+        <addUniqueConstraint
+            tableName="category"
+            columnNames="zoho_category_id"
+            constraintName="ux_category__zoho_category_id"
+        />
+    </changeSet>
+
+</databaseChangeLog>

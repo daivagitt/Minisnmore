@@ -123,6 +123,13 @@ spring:
               metadata:
                 response-timeout: 120000
                 connect-timeout: 5000
+            - id: miniandmore-zoho-api
+              uri: lb://miniandmore-store
+              predicates:
+                - Path=/api/v1/admin/zoho/**,/api/v1/admin/zoho-settings
+              metadata:
+                response-timeout: 600000
+                connect-timeout: 5000
             - id: miniandmore-commerce-api
               uri: lb://miniandmore-commerce
               predicates:

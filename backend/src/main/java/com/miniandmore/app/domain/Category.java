@@ -52,6 +52,10 @@ public class Category implements Serializable {
     @Column(name = "ledgerly_category_id", length = 120, unique = true)
     private String ledgerlyCategoryId;
 
+    @Size(max = 120)
+    @Column(name = "zoho_category_id", length = 120, unique = true)
+    private String zohoCategoryId;
+
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
     public Long getId() {
@@ -156,6 +160,19 @@ public class Category implements Serializable {
 
     public void setLedgerlyCategoryId(String ledgerlyCategoryId) {
         this.ledgerlyCategoryId = ledgerlyCategoryId;
+    }
+
+    public String getZohoCategoryId() {
+        return this.zohoCategoryId;
+    }
+
+    public Category zohoCategoryId(String zohoCategoryId) {
+        this.setZohoCategoryId(zohoCategoryId);
+        return this;
+    }
+
+    public void setZohoCategoryId(String zohoCategoryId) {
+        this.zohoCategoryId = zohoCategoryId;
     }
 
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here

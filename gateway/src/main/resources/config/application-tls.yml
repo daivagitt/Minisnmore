@@ -10,7 +10,7 @@
 server:
   ssl:
     key-store: classpath:config/tls/keystore.p12
-    key-store-password: password
+    key-store-password: ${SERVER_SSL_KEYSTORE_PASSWORD:${JHIPSTER_KEYSTORE_PASSWORD:password}}
     key-store-type: PKCS12
     key-alias: selfsigned
     ciphers:

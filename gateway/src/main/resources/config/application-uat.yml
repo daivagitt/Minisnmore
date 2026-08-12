@@ -9,6 +9,13 @@ spring:
               uri: http://127.0.0.1:8081
               predicates:
                 - Path=/api/v1/admin/ledgerly/**
+            - id: miniandmore-zoho-api
+              uri: http://127.0.0.1:8081
+              predicates:
+                - Path=/api/v1/admin/zoho/**,/api/v1/admin/zoho-settings
+              metadata:
+                response-timeout: 600000
+                connect-timeout: 5000
             - id: miniandmore-commerce-api
               uri: http://127.0.0.1:8082
               predicates:

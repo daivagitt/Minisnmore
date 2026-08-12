@@ -5,7 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
+import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import com.miniandmore.app.service.LedgerlySyncService;
+import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import com.miniandmore.app.web.rest.v1.ApiResponse;
 import java.util.LinkedHashMap;
@@ -28,15 +30,18 @@ public class InternalAdminOrderResource {
 
     private final AccountOrderDataAccess dataAccess;
     private final LedgerlySyncService ledgerlySyncService;
+    private final ZohoSyncService zohoSyncService;
     private final ObjectMapper objectMapper;
 
     public InternalAdminOrderResource(
         AccountOrderDataAccess dataAccess,
         LedgerlySyncService ledgerlySyncService,
+        ZohoSyncService zohoSyncService,
         ObjectMapper objectMapper
     ) {
         this.dataAccess = dataAccess;
         this.ledgerlySyncService = ledgerlySyncService;
+        this.zohoSyncService = zohoSyncService;
         this.objectMapper = objectMapper;
     }
 
@@ -65,12 +70,11 @@ public class InternalAdminOrderResource {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Already marked as collected");
         }
         order.setPaymentStatus(PaymentStatus.PAID);
-        // Mirrors InternalAccountOrderResource#attemptLedgerlyOrderSync — Ledgerly only syncs PAID
-        // orders, so COD orders (payment pending until the doorstep handover) skip it at creation
-        // and only sync here, once collection is confirmed.
         order.setLedgerlySyncStatus(LedgerlySyncStatus.PENDING);
+        order.setZohoSyncStatus(ZohoSyncStatus.PENDING);
         CustomerOrder saved = dataAccess.customerOrderRepository().save(order);
         ledgerlySyncService.syncOrder(saved.getId());
+        zohoSyncService.syncOrder(saved.getId());
         return ApiResponse.ok(Map.of("ok", true, "orderNumber", saved.getOrderNumber(), "paymentStatus", "paid"));
     }
 

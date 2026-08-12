@@ -36,6 +36,7 @@ import { Route as AccountIndexRouteImport } from './routes/account.index'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
 import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
+import { Route as AdminZohoRouteImport } from './routes/admin.zoho'
 import { Route as AdminSubscribeRouteImport } from './routes/admin.subscribe'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminReturnsRouteImport } from './routes/admin.returns'
@@ -198,6 +199,11 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
   path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminZohoRoute = AdminZohoRouteImport.update({
+  id: '/zoho',
+  path: '/zoho',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminSubscribeRoute = AdminSubscribeRouteImport.update({
   id: '/subscribe',
@@ -382,6 +388,7 @@ export interface FileRoutesByFullPath {
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/subscribe': typeof AdminSubscribeRoute
+  '/admin/zoho': typeof AdminZohoRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/product/$slug': typeof ProductSlugRoute
@@ -434,6 +441,7 @@ export interface FileRoutesByTo {
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/subscribe': typeof AdminSubscribeRoute
+  '/admin/zoho': typeof AdminZohoRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/product/$slug': typeof ProductSlugRoute
@@ -491,6 +499,7 @@ export interface FileRoutesById {
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/subscribe': typeof AdminSubscribeRoute
+  '/admin/zoho': typeof AdminZohoRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/product/$slug': typeof ProductSlugRoute
@@ -549,6 +558,7 @@ export interface FileRouteTypes {
     | '/admin/returns'
     | '/admin/settings'
     | '/admin/subscribe'
+    | '/admin/zoho'
     | '/auth/callback'
     | '/blog/$slug'
     | '/product/$slug'
@@ -601,6 +611,7 @@ export interface FileRouteTypes {
     | '/admin/returns'
     | '/admin/settings'
     | '/admin/subscribe'
+    | '/admin/zoho'
     | '/auth/callback'
     | '/blog/$slug'
     | '/product/$slug'
@@ -657,6 +668,7 @@ export interface FileRouteTypes {
     | '/admin/returns'
     | '/admin/settings'
     | '/admin/subscribe'
+    | '/admin/zoho'
     | '/auth/callback'
     | '/blog/$slug'
     | '/product/$slug'
@@ -885,6 +897,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/auth/callback'
       preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/zoho': {
+      id: '/admin/zoho'
+      path: '/zoho'
+      fullPath: '/admin/zoho'
+      preLoaderRoute: typeof AdminZohoRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/subscribe': {
       id: '/admin/subscribe'
@@ -1139,6 +1158,7 @@ interface AdminRouteChildren {
   AdminReturnsRoute: typeof AdminReturnsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSubscribeRoute: typeof AdminSubscribeRoute
+  AdminZohoRoute: typeof AdminZohoRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminIntegrationsLedgerlyRoute: typeof AdminIntegrationsLedgerlyRoute
 }
@@ -1157,6 +1177,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminReturnsRoute: AdminReturnsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminSubscribeRoute: AdminSubscribeRoute,
+  AdminZohoRoute: AdminZohoRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminIntegrationsLedgerlyRoute: AdminIntegrationsLedgerlyRoute,
 }

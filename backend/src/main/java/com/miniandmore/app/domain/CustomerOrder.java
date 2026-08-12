@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
+import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serial;
@@ -124,6 +125,32 @@ public class CustomerOrder implements Serializable {
 
     @Column(name = "placed_at")
     private Instant placedAt;
+
+    @Size(max = 120)
+    @Column(name = "zoho_sales_order_id", length = 120, unique = true)
+    private String zohoSalesOrderId;
+
+    @Size(max = 120)
+    @Column(name = "zoho_invoice_id", length = 120)
+    private String zohoInvoiceId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "zoho_sync_status")
+    private ZohoSyncStatus zohoSyncStatus;
+
+    @Column(name = "zoho_last_synced_at")
+    private Instant zohoLastSyncedAt;
+
+    @Size(max = 1000)
+    @Column(name = "zoho_sync_error", length = 1000)
+    private String zohoSyncError;
+
+    @Size(max = 40)
+    @Column(name = "zoho_order_status", length = 40)
+    private String zohoOrderStatus;
+
+    @Column(name = "zoho_tracking_last_pulled_at")
+    private Instant zohoTrackingLastPulledAt;
 
     @Size(max = 120)
     @Column(name = "ledgerly_sales_order_id", length = 120, unique = true)
@@ -453,6 +480,97 @@ public class CustomerOrder implements Serializable {
 
     public void setPlacedAt(Instant placedAt) {
         this.placedAt = placedAt;
+    }
+
+    public String getZohoSalesOrderId() {
+        return this.zohoSalesOrderId;
+    }
+
+    public CustomerOrder zohoSalesOrderId(String zohoSalesOrderId) {
+        this.setZohoSalesOrderId(zohoSalesOrderId);
+        return this;
+    }
+
+    public void setZohoSalesOrderId(String zohoSalesOrderId) {
+        this.zohoSalesOrderId = zohoSalesOrderId;
+    }
+
+    public String getZohoInvoiceId() {
+        return this.zohoInvoiceId;
+    }
+
+    public CustomerOrder zohoInvoiceId(String zohoInvoiceId) {
+        this.setZohoInvoiceId(zohoInvoiceId);
+        return this;
+    }
+
+    public void setZohoInvoiceId(String zohoInvoiceId) {
+        this.zohoInvoiceId = zohoInvoiceId;
+    }
+
+    public ZohoSyncStatus getZohoSyncStatus() {
+        return this.zohoSyncStatus;
+    }
+
+    public CustomerOrder zohoSyncStatus(ZohoSyncStatus zohoSyncStatus) {
+        this.setZohoSyncStatus(zohoSyncStatus);
+        return this;
+    }
+
+    public void setZohoSyncStatus(ZohoSyncStatus zohoSyncStatus) {
+        this.zohoSyncStatus = zohoSyncStatus;
+    }
+
+    public Instant getZohoLastSyncedAt() {
+        return this.zohoLastSyncedAt;
+    }
+
+    public CustomerOrder zohoLastSyncedAt(Instant zohoLastSyncedAt) {
+        this.setZohoLastSyncedAt(zohoLastSyncedAt);
+        return this;
+    }
+
+    public void setZohoLastSyncedAt(Instant zohoLastSyncedAt) {
+        this.zohoLastSyncedAt = zohoLastSyncedAt;
+    }
+
+    public String getZohoSyncError() {
+        return this.zohoSyncError;
+    }
+
+    public CustomerOrder zohoSyncError(String zohoSyncError) {
+        this.setZohoSyncError(zohoSyncError);
+        return this;
+    }
+
+    public void setZohoSyncError(String zohoSyncError) {
+        this.zohoSyncError = zohoSyncError;
+    }
+
+    public String getZohoOrderStatus() {
+        return this.zohoOrderStatus;
+    }
+
+    public CustomerOrder zohoOrderStatus(String zohoOrderStatus) {
+        this.setZohoOrderStatus(zohoOrderStatus);
+        return this;
+    }
+
+    public void setZohoOrderStatus(String zohoOrderStatus) {
+        this.zohoOrderStatus = zohoOrderStatus;
+    }
+
+    public Instant getZohoTrackingLastPulledAt() {
+        return this.zohoTrackingLastPulledAt;
+    }
+
+    public CustomerOrder zohoTrackingLastPulledAt(Instant zohoTrackingLastPulledAt) {
+        this.setZohoTrackingLastPulledAt(zohoTrackingLastPulledAt);
+        return this;
+    }
+
+    public void setZohoTrackingLastPulledAt(Instant zohoTrackingLastPulledAt) {
+        this.zohoTrackingLastPulledAt = zohoTrackingLastPulledAt;
     }
 
     public String getLedgerlySalesOrderId() {

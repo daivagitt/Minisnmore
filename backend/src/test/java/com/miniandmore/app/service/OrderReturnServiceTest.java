@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
+import com.miniandmore.app.client.ZohoBooksIntegrationClient;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.OrderReturn;
@@ -57,6 +58,9 @@ class OrderReturnServiceTest {
 
     @Mock
     private LedgerlyIntegrationClient ledgerlyIntegrationClient;
+
+    @Mock
+    private ZohoBooksIntegrationClient zohoBooksIntegrationClient;
 
     @Spy
     private ProductVariantSupport variantSupport = new ProductVariantSupport(new com.fasterxml.jackson.databind.ObjectMapper());
@@ -307,6 +311,25 @@ class OrderReturnServiceTest {
     }
 
     @Test
+    void processRefund_ledgerlyEmptyResponse_demoOrder_stubsCreditNoteId() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+        CustomerOrder order = orderReturn.getOrder();
+        order.setRazorpayPaymentId("pay_demo_scenario_123");
+        order.setRazorpayOrderId("order_demo_ORD-9001");
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(razorpayRefundService.isDemoMode()).thenReturn(true);
+        when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo_ORD-9001");
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
+        when(ledgerlyIntegrationClient.cancelOrder(any(), any(), any())).thenReturn(Optional.empty());
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderReturn result = orderReturnService.processRefund("RET-1", null);
+
+        assertThat(result.getLedgerlyCreditNoteId()).isEqualTo("cn_demo_" + ORDER_NUMBER);
+    }
+
+    @Test
     void processRefund_existingRefundId_skipsRazorpay() {
         OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.FAILED);
         orderReturn.setRazorpayRefundId("rfnd_existing");
@@ -480,6 +503,75 @@ class OrderReturnServiceTest {
         orderReturnService.processRefund("RET-1", "done");
 
         verify(productRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void restoreInventory_variantProduct_incrementsVariantStock() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+        String variantsJson =
+            "[{\"sku\":\"TEE-S-RED\",\"size\":\"S\",\"color\":\"Red\",\"rate\":500,\"stock\":1,\"active\":true}]";
+        OrderItem item = new OrderItem().productId("2").qty(1).variantSku("TEE-S-RED").itemSize("S").color("Red");
+        Product product = new Product().id(2L).stock(1).itemStructure("VARIANTS").variantsJson(variantsJson);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo");
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
+        when(productRepository.findOneForInventoryUpdate(2L)).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        orderReturnService.processRefund("RET-1", null);
+
+        verify(productRepository).save(product);
+    }
+
+    @Test
+    void resolveDeliveryAnchor_trackingNumberWithShipmentDate() {
+        CustomerOrder order = eligibleOrder()
+            .shipmentDate(LocalDate.now().minusDays(1).toString())
+            .status(OrderStatus.CONFIRMED)
+            .trackingNumber("AWB-123");
+
+        Instant anchor = orderReturnService.resolveDeliveryAnchor(order);
+
+        assertThat(anchor).isNotNull();
+    }
+
+    @Test
+    void resolveDeliveryAnchor_fulfilledUsesLedgerlyLastSyncedAt() {
+        CustomerOrder order = eligibleOrder()
+            .shipmentDate(null)
+            .status(OrderStatus.FULFILLED)
+            .ledgerlyLastSyncedAt(Instant.parse("2026-01-10T00:00:00Z"));
+
+        Instant anchor = orderReturnService.resolveDeliveryAnchor(order);
+
+        assertThat(anchor).isEqualTo(Instant.parse("2026-01-10T00:00:00Z"));
+    }
+
+    @Test
+    void processRefund_ledgerlyFailure_recordsAdminNote() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_live_1");
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
+        when(ledgerlyIntegrationClient.cancelOrder(any(), any(), any())).thenThrow(new RuntimeException("ledgerly 500"));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderReturn result = orderReturnService.processRefund("RET-1", "done");
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REFUNDED);
+        assertThat(result.getAdminNotes()).contains("Ledgerly order cancel failed");
+    }
+
+    @Test
+    void approve_returnNotFound_throwsNotFound() {
+        when(orderReturnRepository.findOneByReturnNumber("MISSING")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderReturnService.approve("MISSING", null))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("not found");
     }
 
     private CustomerOrder eligibleOrder() {

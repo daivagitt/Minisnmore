@@ -1,5 +1,7 @@
 package com.miniandmore.app.config;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -17,6 +19,8 @@ public class ApplicationProperties {
 
     private final Inventory inventory = new Inventory();
 
+    private final Zoho zoho = new Zoho();
+
     private final Ledgerly ledgerly = new Ledgerly();
 
     private String internalApiKey = "";
@@ -33,6 +37,10 @@ public class ApplicationProperties {
 
     public Inventory getInventory() {
         return inventory;
+    }
+
+    public Zoho getZoho() {
+        return zoho;
     }
 
     public Ledgerly getLedgerly() {
@@ -165,6 +173,208 @@ public class ApplicationProperties {
         public static class ReservationRelease {
 
             private Long fixedDelayMs = 300_000L;
+
+            public Long getFixedDelayMs() {
+                return fixedDelayMs;
+            }
+
+            public void setFixedDelayMs(Long fixedDelayMs) {
+                this.fixedDelayMs = fixedDelayMs;
+            }
+        }
+    }
+
+    public static class Zoho {
+
+        private final OrderRetry orderRetry = new OrderRetry();
+
+        private final OrderTracking orderTracking = new OrderTracking();
+
+        private final OAuth oauth = new OAuth();
+
+        private boolean syncProductImages = true;
+
+        private boolean syncProductStock = true;
+
+        private String defaultLocationId;
+
+        private String defaultLocationName = "Head Office";
+
+        private String inventoryAccountId;
+
+        private boolean pullProductsAutoCreateCategory = false;
+
+        private boolean autoSyncEnabled = false;
+
+        public boolean isSyncProductImages() {
+            return syncProductImages;
+        }
+
+        public void setSyncProductImages(boolean syncProductImages) {
+            this.syncProductImages = syncProductImages;
+        }
+
+        public boolean isSyncProductStock() {
+            return syncProductStock;
+        }
+
+        public void setSyncProductStock(boolean syncProductStock) {
+            this.syncProductStock = syncProductStock;
+        }
+
+        public String getDefaultLocationId() {
+            return defaultLocationId;
+        }
+
+        public void setDefaultLocationId(String defaultLocationId) {
+            this.defaultLocationId = defaultLocationId;
+        }
+
+        public String getDefaultLocationName() {
+            return defaultLocationName;
+        }
+
+        public void setDefaultLocationName(String defaultLocationName) {
+            this.defaultLocationName = defaultLocationName;
+        }
+
+        public String getInventoryAccountId() {
+            return inventoryAccountId;
+        }
+
+        public void setInventoryAccountId(String inventoryAccountId) {
+            this.inventoryAccountId = inventoryAccountId;
+        }
+
+        public boolean isPullProductsAutoCreateCategory() {
+            return pullProductsAutoCreateCategory;
+        }
+
+        public void setPullProductsAutoCreateCategory(boolean pullProductsAutoCreateCategory) {
+            this.pullProductsAutoCreateCategory = pullProductsAutoCreateCategory;
+        }
+
+        public boolean isAutoSyncEnabled() {
+            return autoSyncEnabled;
+        }
+
+        public void setAutoSyncEnabled(boolean autoSyncEnabled) {
+            this.autoSyncEnabled = autoSyncEnabled;
+        }
+
+        public OrderRetry getOrderRetry() {
+            return orderRetry;
+        }
+
+        public OrderTracking getOrderTracking() {
+            return orderTracking;
+        }
+
+        public OAuth getOauth() {
+            return oauth;
+        }
+
+        public static class OAuth {
+
+            private String homepageUrl = "http://localhost:5173";
+
+            private List<String> redirectUris = new ArrayList<>(
+                List.of("http://localhost:5173", "http://localhost:5173/admin/zoho")
+            );
+
+            private List<String> javascriptDomains = new ArrayList<>(List.of("http://localhost:5173", "http://127.0.0.1:5173"));
+
+            private String scopes = "ZohoBooks.fullaccess.all";
+
+            private String clientId;
+
+            private String clientSecret;
+
+            private String orgId;
+
+            private String defaultDataCenter = "in";
+
+            public String getHomepageUrl() {
+                return homepageUrl;
+            }
+
+            public void setHomepageUrl(String homepageUrl) {
+                this.homepageUrl = homepageUrl;
+            }
+
+            public List<String> getRedirectUris() {
+                return redirectUris;
+            }
+
+            public void setRedirectUris(List<String> redirectUris) {
+                this.redirectUris = redirectUris;
+            }
+
+            public List<String> getJavascriptDomains() {
+                return javascriptDomains;
+            }
+
+            public void setJavascriptDomains(List<String> javascriptDomains) {
+                this.javascriptDomains = javascriptDomains;
+            }
+
+            public String getScopes() {
+                return scopes;
+            }
+
+            public void setScopes(String scopes) {
+                this.scopes = scopes;
+            }
+
+            public String getClientId() {
+                return clientId;
+            }
+
+            public void setClientId(String clientId) {
+                this.clientId = clientId;
+            }
+
+            public String getClientSecret() {
+                return clientSecret;
+            }
+
+            public void setClientSecret(String clientSecret) {
+                this.clientSecret = clientSecret;
+            }
+
+            public String getOrgId() {
+                return orgId;
+            }
+
+            public void setOrgId(String orgId) {
+                this.orgId = orgId;
+            }
+
+            public String getDefaultDataCenter() {
+                return defaultDataCenter;
+            }
+
+            public void setDefaultDataCenter(String defaultDataCenter) {
+                this.defaultDataCenter = defaultDataCenter;
+            }
+        }
+
+        public static class OrderRetry {
+
+            private Long fixedDelayMs = 600_000L;
+
+            public Long getFixedDelayMs() {
+                return fixedDelayMs;
+            }
+
+            public void setFixedDelayMs(Long fixedDelayMs) {
+                this.fixedDelayMs = fixedDelayMs;
+            }
+        }
+
+        public static class OrderTracking {
+
+            private Long fixedDelayMs = 900_000L;
 
             public Long getFixedDelayMs() {
                 return fixedDelayMs;

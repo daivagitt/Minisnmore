@@ -1,6 +1,7 @@
 package com.miniandmore.app.domain;
 
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
+import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serial;
@@ -135,6 +136,21 @@ public class Product implements Serializable {
     @DecimalMin(value = "0")
     @Column(name = "tax_pct", precision = 5, scale = 2)
     private BigDecimal taxPct;
+
+    @Size(max = 120)
+    @Column(name = "zoho_item_id", length = 120, unique = true)
+    private String zohoItemId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "zoho_sync_status")
+    private ZohoSyncStatus zohoSyncStatus;
+
+    @Column(name = "zoho_last_synced_at")
+    private Instant zohoLastSyncedAt;
+
+    @Size(max = 1000)
+    @Column(name = "zoho_sync_error", length = 1000)
+    private String zohoSyncError;
 
     @Size(max = 120)
     @Column(name = "ledgerly_item_id", length = 120, unique = true)
@@ -531,6 +547,58 @@ public class Product implements Serializable {
 
     public void setActive(Boolean active) {
         this.active = active;
+    }
+
+    public String getZohoItemId() {
+        return this.zohoItemId;
+    }
+
+    public Product zohoItemId(String zohoItemId) {
+        this.setZohoItemId(zohoItemId);
+        return this;
+    }
+
+    public void setZohoItemId(String zohoItemId) {
+        this.zohoItemId = zohoItemId;
+    }
+
+    public ZohoSyncStatus getZohoSyncStatus() {
+        return this.zohoSyncStatus;
+    }
+
+    public Product zohoSyncStatus(ZohoSyncStatus zohoSyncStatus) {
+        this.setZohoSyncStatus(zohoSyncStatus);
+        return this;
+    }
+
+    public void setZohoSyncStatus(ZohoSyncStatus zohoSyncStatus) {
+        this.zohoSyncStatus = zohoSyncStatus;
+    }
+
+    public Instant getZohoLastSyncedAt() {
+        return this.zohoLastSyncedAt;
+    }
+
+    public Product zohoLastSyncedAt(Instant zohoLastSyncedAt) {
+        this.setZohoLastSyncedAt(zohoLastSyncedAt);
+        return this;
+    }
+
+    public void setZohoLastSyncedAt(Instant zohoLastSyncedAt) {
+        this.zohoLastSyncedAt = zohoLastSyncedAt;
+    }
+
+    public String getZohoSyncError() {
+        return this.zohoSyncError;
+    }
+
+    public Product zohoSyncError(String zohoSyncError) {
+        this.setZohoSyncError(zohoSyncError);
+        return this;
+    }
+
+    public void setZohoSyncError(String zohoSyncError) {
+        this.zohoSyncError = zohoSyncError;
     }
 
     public String getLedgerlyItemId() {

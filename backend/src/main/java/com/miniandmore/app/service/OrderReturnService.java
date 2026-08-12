@@ -1,6 +1,7 @@
 package com.miniandmore.app.service;
 
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
+import com.miniandmore.app.client.ZohoBooksIntegrationClient;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.OrderReturn;
@@ -55,6 +56,7 @@ public class OrderReturnService {
     private final ProductRepository productRepository;
     private final RazorpayRefundService razorpayRefundService;
     private final LedgerlyIntegrationClient ledgerlyIntegrationClient;
+    private final ZohoBooksIntegrationClient zohoBooksIntegrationClient;
     private final ProductVariantSupport variantSupport;
 
     public OrderReturnService(
@@ -64,6 +66,7 @@ public class OrderReturnService {
         ProductRepository productRepository,
         RazorpayRefundService razorpayRefundService,
         LedgerlyIntegrationClient ledgerlyIntegrationClient,
+        ZohoBooksIntegrationClient zohoBooksIntegrationClient,
         ProductVariantSupport variantSupport
     ) {
         this.orderReturnRepository = orderReturnRepository;
@@ -72,6 +75,7 @@ public class OrderReturnService {
         this.productRepository = productRepository;
         this.razorpayRefundService = razorpayRefundService;
         this.ledgerlyIntegrationClient = ledgerlyIntegrationClient;
+        this.zohoBooksIntegrationClient = zohoBooksIntegrationClient;
         this.variantSupport = variantSupport;
     }
 
@@ -178,13 +182,21 @@ public class OrderReturnService {
             }
             if (StringUtils.isBlank(orderReturn.getLedgerlyCreditNoteId())) {
                 try {
-                    ledgerlyIntegrationClient
-                        .cancelOrder(
-                            order.getOrderNumber(),
+                    Optional<String> creditNoteId = ledgerlyIntegrationClient.cancelOrder(
+                        order.getOrderNumber(),
+                        orderReturn.getReturnNumber(),
+                        orderReturn.getRazorpayRefundId()
+                    );
+                    if (creditNoteId.isPresent()) {
+                        orderReturn.setLedgerlyCreditNoteId(creditNoteId.orElseThrow());
+                    } else if (shouldStubDemoCreditNote(order, null)) {
+                        orderReturn.setLedgerlyCreditNoteId("cn_demo_" + order.getOrderNumber());
+                        LOG.info(
+                            "Ledgerly credit note stubbed for demo return {} (order {}, no Ledgerly credit note id)",
                             orderReturn.getReturnNumber(),
-                            orderReturn.getRazorpayRefundId()
-                        )
-                        .ifPresent(orderReturn::setLedgerlyCreditNoteId);
+                            order.getOrderNumber()
+                        );
+                    }
                 } catch (RuntimeException e) {
                     if (shouldStubDemoCreditNote(order, e)) {
                         orderReturn.setLedgerlyCreditNoteId("cn_demo_" + order.getOrderNumber());
@@ -197,6 +209,38 @@ public class OrderReturnService {
                         LOG.warn("Ledgerly order cancel failed for return {}: {}", orderReturn.getReturnNumber(), e.getMessage());
                         orderReturn.setAdminNotes(
                             mergeNotes(orderReturn.getAdminNotes(), "Ledgerly order cancel failed: " + StringUtils.left(e.getMessage(), 200))
+                        );
+                    }
+                }
+            }
+            if (StringUtils.isBlank(orderReturn.getZohoCreditNoteId())) {
+                try {
+                    Optional<String> zohoCreditNoteId = zohoBooksIntegrationClient.createCreditNote(
+                        order.getId(),
+                        orderReturn.getReturnNumber()
+                    );
+                    if (zohoCreditNoteId.isPresent()) {
+                        orderReturn.setZohoCreditNoteId(zohoCreditNoteId.orElseThrow());
+                    } else if (shouldStubDemoCreditNote(order, null)) {
+                        orderReturn.setZohoCreditNoteId("cn_zoho_demo_" + order.getOrderNumber());
+                        LOG.info(
+                            "Zoho credit note stubbed for demo return {} (order {}, no Zoho credit note id)",
+                            orderReturn.getReturnNumber(),
+                            order.getOrderNumber()
+                        );
+                    }
+                } catch (RuntimeException e) {
+                    if (shouldStubDemoCreditNote(order, e)) {
+                        orderReturn.setZohoCreditNoteId("cn_zoho_demo_" + order.getOrderNumber());
+                        LOG.info(
+                            "Zoho credit note stubbed for demo return {} (order {})",
+                            orderReturn.getReturnNumber(),
+                            order.getOrderNumber()
+                        );
+                    } else {
+                        LOG.warn("Zoho credit note failed for return {}: {}", orderReturn.getReturnNumber(), e.getMessage());
+                        orderReturn.setAdminNotes(
+                            mergeNotes(orderReturn.getAdminNotes(), "Zoho credit note failed: " + StringUtils.left(e.getMessage(), 200))
                         );
                     }
                 }
@@ -385,16 +429,20 @@ public class OrderReturnService {
         return merged.length() <= 2000 ? merged : merged.substring(0, 2000);
     }
 
-    /** UAT/demo: when Ledgerly has no invoice (e.g. demo checkout), still complete return flow for scenario tests. */
+    /** UAT/demo: when Ledgerly has no invoice or cancel fails, still complete return flow for scenario tests. */
     private boolean shouldStubDemoCreditNote(CustomerOrder order, RuntimeException error) {
-        if (!razorpayRefundService.isDemoMode()) {
+        if (!isDemoPaymentOrder(order)) {
             return false;
         }
+        if (error != null) {
+            return true;
+        }
+        return razorpayRefundService.isDemoMode();
+    }
+
+    private static boolean isDemoPaymentOrder(CustomerOrder order) {
         String paymentId = StringUtils.trimToEmpty(order.getRazorpayPaymentId());
-        if (!paymentId.startsWith("pay_demo")) {
-            return false;
-        }
-        String message = StringUtils.defaultString(error.getMessage());
-        return message.contains("Invoice not found") || message.contains("invoice not found");
+        String razorpayOrderId = StringUtils.trimToEmpty(order.getRazorpayOrderId());
+        return paymentId.startsWith("pay_demo") || razorpayOrderId.startsWith("order_demo");
     }
 }

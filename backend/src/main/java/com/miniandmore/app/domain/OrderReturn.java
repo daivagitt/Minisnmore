@@ -56,6 +56,10 @@ public class OrderReturn implements Serializable {
     @Column(name = "ledgerly_credit_note_id", length = 120)
     private String ledgerlyCreditNoteId;
 
+    @Size(max = 120)
+    @Column(name = "zoho_credit_note_id", length = 120)
+    private String zohoCreditNoteId;
+
     @NotNull
     @Column(name = "requested_at", nullable = false)
     private Instant requestedAt;
@@ -144,6 +148,14 @@ public class OrderReturn implements Serializable {
 
     public void setLedgerlyCreditNoteId(String ledgerlyCreditNoteId) {
         this.ledgerlyCreditNoteId = ledgerlyCreditNoteId;
+    }
+
+    public String getZohoCreditNoteId() {
+        return zohoCreditNoteId;
+    }
+
+    public void setZohoCreditNoteId(String zohoCreditNoteId) {
+        this.zohoCreditNoteId = zohoCreditNoteId;
     }
 
     public Instant getRequestedAt() {

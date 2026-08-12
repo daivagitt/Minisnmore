@@ -20,7 +20,7 @@ spring:
     gateway:
       server:
         webflux:
-          routes:
+            routes:
             - id: miniandmore-ledgerly-webhooks
               uri: http://127.0.0.1:9184
               predicates:
@@ -29,6 +29,13 @@ spring:
               uri: http://127.0.0.1:9181
               predicates:
                 - Path=/api/v1/admin/ledgerly/**
+            - id: miniandmore-zoho-api
+              uri: http://127.0.0.1:9181
+              predicates:
+                - Path=/api/v1/admin/zoho/**,/api/v1/admin/zoho-settings
+              metadata:
+                response-timeout: 600000
+                connect-timeout: 5000
             - id: miniandmore-commerce-api
               uri: http://127.0.0.1:9182
               predicates:

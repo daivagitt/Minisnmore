@@ -1,6 +1,7 @@
 package com.miniandmore.app.service.dto;
 
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
+import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -91,6 +92,16 @@ public class ProductDTO implements Serializable {
 
     @Size(max = 20)
     private String units;
+
+    @Size(max = 120)
+    private String zohoItemId;
+
+    private ZohoSyncStatus zohoSyncStatus;
+
+    private Instant zohoLastSyncedAt;
+
+    @Size(max = 1000)
+    private String zohoSyncError;
 
     @Size(max = 120)
     private String ledgerlyItemId;
@@ -318,6 +329,38 @@ public class ProductDTO implements Serializable {
 
     public void setUnits(String units) {
         this.units = units;
+    }
+
+    public String getZohoItemId() {
+        return zohoItemId;
+    }
+
+    public void setZohoItemId(String zohoItemId) {
+        this.zohoItemId = zohoItemId;
+    }
+
+    public ZohoSyncStatus getZohoSyncStatus() {
+        return zohoSyncStatus;
+    }
+
+    public void setZohoSyncStatus(ZohoSyncStatus zohoSyncStatus) {
+        this.zohoSyncStatus = zohoSyncStatus;
+    }
+
+    public Instant getZohoLastSyncedAt() {
+        return zohoLastSyncedAt;
+    }
+
+    public void setZohoLastSyncedAt(Instant zohoLastSyncedAt) {
+        this.zohoLastSyncedAt = zohoLastSyncedAt;
+    }
+
+    public String getZohoSyncError() {
+        return zohoSyncError;
+    }
+
+    public void setZohoSyncError(String zohoSyncError) {
+        this.zohoSyncError = zohoSyncError;
     }
 
     public String getLedgerlyItemId() {

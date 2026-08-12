@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
 import com.miniandmore.app.repository.*;
 import com.miniandmore.app.service.LedgerlySyncService;
+import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.service.ProductVariantSupport;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import com.miniandmore.app.web.rest.internal.InternalAccountOrderResource.VerifyPaymentRequest;
@@ -50,6 +51,9 @@ class InternalAccountOrderResourceReflectionTest {
     @Mock
     private LedgerlySyncService ledgerlySyncService;
 
+    @Mock
+    private ZohoSyncService zohoSyncService;
+
     private InternalAccountOrderResource resource;
 
     @BeforeEach
@@ -67,6 +71,7 @@ class InternalAccountOrderResourceReflectionTest {
             dataAccess,
             new ObjectMapper(),
             ledgerlySyncService,
+            zohoSyncService,
             new ProductVariantSupport(new ObjectMapper())
         );
         ReflectionTestUtils.setField(resource, "razorpayKeyId", "rzp_live_abc");
@@ -124,6 +129,13 @@ class InternalAccountOrderResourceReflectionTest {
         assertThatThrownBy(() ->
             ReflectionTestUtils.invokeMethod(resource, "createRazorpayOrder", "MNM-LIVE", java.math.BigDecimal.valueOf(100), "customer1")
         ).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+    }
+
+    @Test
+    void computeRazorpaySignature_matchesVerifyPath() throws Exception {
+        String signature = (String) ReflectionTestUtils.invokeMethod(resource, "computeRazorpaySignature", "order_2", "pay_2");
+        VerifyPaymentRequest request = new VerifyPaymentRequest(2L, "order_2", "pay_2", signature);
+        assertThat((Boolean) ReflectionTestUtils.invokeMethod(resource, "validRazorpaySignature", request)).isTrue();
     }
 
     private static String hmac(String orderId, String paymentId) throws Exception {

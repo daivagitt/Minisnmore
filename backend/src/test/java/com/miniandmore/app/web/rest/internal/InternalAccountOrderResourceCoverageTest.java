@@ -2,12 +2,16 @@ package com.miniandmore.app.web.rest.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -15,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.mockito.ArgumentCaptor;
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
 import com.miniandmore.app.domain.*;
+import com.miniandmore.app.domain.enumeration.DiscountType;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.repository.*;
@@ -40,6 +45,8 @@ import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -80,10 +87,14 @@ class InternalAccountOrderResourceCoverageTest {
     @MockitoBean
     private LedgerlySyncService ledgerlySyncService;
 
+    @MockitoBean
+    private com.miniandmore.app.service.ZohoSyncService zohoSyncService;
+
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(resource, "razorpayKeyId", "rzp_test_livemode");
         ReflectionTestUtils.setField(resource, "razorpayKeySecret", LIVE_SECRET);
+        ReflectionTestUtils.setField(resource, "razorpayPaymentDemo", false);
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("customer1", "n/a"));
         when(customerOrderRepository.existsByUserLoginAndPaymentStatus("customer1", PaymentStatus.PAID)).thenReturn(false);
     }
@@ -226,7 +237,7 @@ class InternalAccountOrderResourceCoverageTest {
     }
 
     @Test
-    void trackOrder_ledgerlyRefreshFailure_returnsOrderAnyway() throws Exception {
+    void trackOrder_doesNotRefreshLedgerlyTracking() throws Exception {
         CustomerOrder order = new CustomerOrder()
             .id(6L)
             .orderNumber("MNM-LDR")
@@ -234,9 +245,9 @@ class InternalAccountOrderResourceCoverageTest {
             .ledgerlySalesOrderId("SO-1")
             .ledgerlyTrackingLastPulledAt(Instant.now().minusSeconds(7200));
         when(customerOrderRepository.findOneByOrderNumber("MNM-LDR")).thenReturn(Optional.of(order));
-        doThrow(new RuntimeException("ledgerly down")).when(ledgerlySyncService).pullOrderTracking(6L);
 
         mockMvc.perform(get("/internal/v1/orders/track/MNM-LDR")).andExpect(status().isOk());
+        verify(ledgerlySyncService, never()).pullOrderTracking(anyLong());
     }
 
     @Test
@@ -290,6 +301,45 @@ class InternalAccountOrderResourceCoverageTest {
             .andExpect(jsonPath("$.data.demoMode").value(true));
 
         assertThat(product.getStock()).isEqualTo(7);
+    }
+
+    @Test
+    void createOrder_mismatchedShippingEmail_overridesWithAccountLogin() throws Exception {
+        ReflectionTestUtils.setField(resource, "razorpayKeyId", "DEMO");
+        ReflectionTestUtils.setField(resource, "razorpayKeySecret", "");
+        Product product = new Product().id(1L).name("Dress").slug("dress").price(BigDecimal.valueOf(100)).stock(10).active(true);
+        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+        ArgumentCaptor<CustomerOrder> orderCaptor = ArgumentCaptor.forClass(CustomerOrder.class);
+        when(customerOrderRepository.save(orderCaptor.capture())).thenAnswer(inv -> {
+            CustomerOrder order = inv.getArgument(0);
+            order.setId(201L);
+            order.setOrderNumber("MNM-EMAIL");
+            return order;
+        });
+        when(orderItemRepository.saveAll(any())).thenReturn(List.of());
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "items":[{"product_id":"1","product_name":"Dress","qty":1,"price":100}],
+                          "shipping_address":{"full_name":"Jane","email":"other@example.com","phone":"9876543210","line1":"Line 1","city":"City","state":"State","pincode":"560001"},
+                          "donation":0
+                        }
+                        """
+                    )
+            )
+            .andExpect(status().isOk());
+
+        String shippingJson = orderCaptor.getValue().getShippingAddressJson();
+        assertThat(shippingJson).contains("customer1");
+        assertThat(shippingJson).doesNotContain("other@example.com");
     }
 
     @Test
@@ -626,6 +676,485 @@ class InternalAccountOrderResourceCoverageTest {
             )
             .andExpect(status().isConflict())
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(org.hamcrest.Matchers.containsString("1 item available")));
+    }
+
+    @Test
+    void activeCoupons_listsEligibleOffers() throws Exception {
+        Coupon coupon = new Coupon()
+            .code("SAVE5")
+            .discountType(DiscountType.PERCENT)
+            .discountValue(BigDecimal.valueOf(5))
+            .minOrder(BigDecimal.ZERO)
+            .active(true);
+        when(couponRepository.findAllByOrderByIdDesc()).thenReturn(List.of(coupon));
+
+        mockMvc
+            .perform(get("/internal/v1/coupons/active"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.coupons[0].code").value("SAVE5"));
+    }
+
+    @Test
+    void profile_getAndUpdate() throws Exception {
+        CustomerProfile profile = new CustomerProfile().userLogin("customer1").fullName("Jane").phone("9876543210");
+        when(customerProfileRepository.findOneByUserLogin("customer1")).thenReturn(Optional.of(profile));
+        when(customerProfileRepository.save(any(CustomerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc
+            .perform(get("/internal/v1/account/profile").with(user("customer1")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.full_name").value("Jane"))
+            .andExpect(jsonPath("$.data.phone").value("9876543210"));
+
+        mockMvc
+            .perform(
+                put("/internal/v1/account/profile")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"full_name\":\"Janet\",\"phone\":\"9000000000\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(true));
+
+        verify(ledgerlySyncService).syncCustomerProfileAsync("customer1");
+    }
+
+    @Test
+    void ordersAndPayments_listSummaries() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(42L)
+            .userLogin("customer1")
+            .orderNumber("MNM-42")
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .paymentMethod("online")
+            .total(BigDecimal.valueOf(500))
+            .placedAt(Instant.now());
+        when(customerOrderRepository.findAllByUserLoginOrderByIdDesc("customer1")).thenReturn(List.of(order));
+        when(orderItemRepository.findAllByOrderId(42L)).thenReturn(List.of());
+
+        mockMvc
+            .perform(get("/internal/v1/orders").with(user("customer1")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.orders[0].order_number").value("MNM-42"));
+
+        mockMvc
+            .perform(get("/internal/v1/payments").with(user("customer1")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.payments[0].order_number").value("MNM-42"));
+    }
+
+    @Test
+    void orderDetail_returnsOwnedOrder() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(55L)
+            .userLogin("customer1")
+            .orderNumber("MNM-55")
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .paymentMethod("online")
+            .subtotal(BigDecimal.valueOf(400))
+            .discount(BigDecimal.ZERO)
+            .shipping(BigDecimal.ZERO)
+            .codFee(BigDecimal.ZERO)
+            .tax(BigDecimal.ZERO)
+            .donation(BigDecimal.ZERO)
+            .total(BigDecimal.valueOf(400))
+            .placedAt(Instant.now());
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-55", "customer1")).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(55L)).thenReturn(List.of());
+
+        mockMvc
+            .perform(get("/internal/v1/orders/MNM-55").with(user("customer1")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.order_number").value("MNM-55"))
+            .andExpect(jsonPath("$.data.order.subtotal").value(400));
+    }
+
+    @Test
+    void retryPayment_reopensPendingSession() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(77L)
+            .userLogin("customer1")
+            .orderNumber("MNM-77")
+            .paymentStatus(PaymentStatus.PENDING)
+            .razorpayOrderId("order_rzp_77")
+            .total(BigDecimal.valueOf(299));
+        when(customerOrderRepository.findById(77L)).thenReturn(Optional.of(order));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders/retry-payment")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"orderId\":77}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.razorpayOrderId").value("order_rzp_77"))
+            .andExpect(jsonPath("$.data.amount").value(29900));
+    }
+
+    @Test
+    void retryPayment_alreadyPaid_returnsConflict() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(78L)
+            .userLogin("customer1")
+            .paymentStatus(PaymentStatus.PAID)
+            .razorpayOrderId("order_rzp_78");
+        when(customerOrderRepository.findById(78L)).thenReturn(Optional.of(order));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders/retry-payment")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"orderId\":78}")
+            )
+            .andExpect(status().isConflict());
+    }
+
+    @Test
+    void releaseExpiredInventoryReservations_releasesStock() {
+        CustomerOrder expired = new CustomerOrder()
+            .id(90L)
+            .userLogin("customer1")
+            .paymentStatus(PaymentStatus.PENDING)
+            .inventoryReserved(true);
+        when(customerOrderRepository.findExpiredInventoryReservations(eq(PaymentStatus.PENDING), any(Instant.class), any(PageRequest.class)))
+            .thenReturn(new PageImpl<>(List.of(expired)));
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        resource.releaseExpiredInventoryReservations();
+
+        assertThat(expired.getInventoryReserved()).isFalse();
+        verify(customerOrderRepository).save(expired);
+    }
+
+    @Test
+    void syncPayment_liveOrderNoCapturedPayment_returnsNotPaid() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(56L)
+            .userLogin("customer1")
+            .orderNumber("MNM-SYNC-LIVE")
+            .paymentStatus(PaymentStatus.PENDING)
+            .razorpayOrderId("order_no_payments_yet")
+            .total(BigDecimal.valueOf(500));
+        when(customerOrderRepository.findById(56L)).thenReturn(Optional.of(order));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders/sync-payment")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"orderId\":56}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.paid").value(false));
+    }
+
+    @Test
+    void syncPayment_demoMode_returnsNotPaidWithoutRazorpayLookup() throws Exception {
+        ReflectionTestUtils.setField(resource, "razorpayPaymentDemo", true);
+        CustomerOrder order = new CustomerOrder()
+            .id(57L)
+            .userLogin("customer1")
+            .orderNumber("MNM-SYNC-DEMO")
+            .paymentStatus(PaymentStatus.PENDING)
+            .razorpayOrderId("order_demo_xyz")
+            .total(BigDecimal.TEN);
+        when(customerOrderRepository.findById(57L)).thenReturn(Optional.of(order));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders/sync-payment")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"orderId\":57}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.paid").value(false));
+    }
+
+    @Test
+    void validateCoupon_validPercentCoupon_returnsDiscount() throws Exception {
+        Coupon coupon = new Coupon()
+            .code("SAVE10")
+            .active(true)
+            .discountType(DiscountType.PERCENT)
+            .discountValue(BigDecimal.TEN)
+            .minOrder(BigDecimal.ZERO);
+        when(couponRepository.findOneByCodeIgnoreCase("SAVE10")).thenReturn(Optional.of(coupon));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/coupons/validate")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"code\":\"SAVE10\",\"subtotal\":1000}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(true))
+            .andExpect(jsonPath("$.data.discount").value(100.0));
+    }
+
+    @Test
+    void activeCoupons_hidesWelcome10ForReturningCustomer() throws Exception {
+        when(customerOrderRepository.existsByUserLoginAndPaymentStatus("customer1", PaymentStatus.PAID)).thenReturn(true);
+        Coupon welcome = new Coupon()
+            .code("WELCOME10")
+            .active(true)
+            .discountType(DiscountType.PERCENT)
+            .discountValue(BigDecimal.TEN)
+            .minOrder(BigDecimal.ZERO);
+        Coupon save5 = new Coupon()
+            .code("SAVE5")
+            .active(true)
+            .discountType(DiscountType.PERCENT)
+            .discountValue(BigDecimal.valueOf(5))
+            .minOrder(BigDecimal.ZERO);
+        when(couponRepository.findAllByOrderByIdDesc()).thenReturn(List.of(welcome, save5));
+
+        mockMvc
+            .perform(get("/internal/v1/coupons/active").with(user("customer1")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.coupons.length()").value(1))
+            .andExpect(jsonPath("$.data.coupons[0].code").value("SAVE5"));
+    }
+
+    @Test
+    void orderDetail_refreshesStaleLedgerlyTracking() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(60L)
+            .userLogin("customer1")
+            .orderNumber("MNM-STALE")
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .paymentMethod("online")
+            .ledgerlySalesOrderId("SO-STALE")
+            .ledgerlyTrackingLastPulledAt(Instant.now().minusSeconds(7200))
+            .total(BigDecimal.TEN)
+            .placedAt(Instant.now());
+        CustomerOrder refreshed = new CustomerOrder()
+            .id(60L)
+            .userLogin("customer1")
+            .orderNumber("MNM-STALE")
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .paymentMethod("online")
+            .ledgerlySalesOrderId("SO-STALE")
+            .trackingNumber("AWB-NEW")
+            .total(BigDecimal.TEN)
+            .placedAt(Instant.now());
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-STALE", "customer1")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.findById(60L)).thenReturn(Optional.of(refreshed));
+        when(orderItemRepository.findAllByOrderId(60L)).thenReturn(List.of());
+
+        mockMvc
+            .perform(get("/internal/v1/orders/MNM-STALE").with(user("customer1")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.tracking_number").value("AWB-NEW"));
+
+        verify(ledgerlySyncService).pullOrderTracking(60L);
+    }
+
+    @Test
+    void createOrder_expressShipping_chargesExpressRate() throws Exception {
+        ReflectionTestUtils.setField(resource, "razorpayKeyId", "DEMO");
+        ReflectionTestUtils.setField(resource, "razorpayKeySecret", "");
+        Product product = new Product().id(1L).name("Dress").slug("dress").price(BigDecimal.valueOf(1000)).stock(5).active(true);
+        SiteSetting settings = new SiteSetting()
+            .shippingStandardInr(99)
+            .shippingExpressInr(199)
+            .freeShippingMinInr(5000)
+            .pricesIncludeGst(true);
+        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.of(settings));
+        CustomerOrder saved = new CustomerOrder().id(410L).orderNumber("MNM-EXP").total(BigDecimal.valueOf(1199));
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenReturn(saved);
+        when(orderItemRepository.saveAll(any())).thenReturn(List.of());
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "items":[{"product_id":"1","product_name":"Dress","qty":1,"price":1000}],
+                          "shipping_address":{"full_name":"Jane","email":"j@example.com","phone":"9876543210","line1":"Line 1","city":"City","state":"State","pincode":"560001"},
+                          "donation":0,
+                          "shipping_mode":"exp"
+                        }
+                        """
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.totals.shipping").value(199.0));
+    }
+
+    @Test
+    void createOrder_freeShippingAboveThreshold() throws Exception {
+        ReflectionTestUtils.setField(resource, "razorpayKeyId", "DEMO");
+        ReflectionTestUtils.setField(resource, "razorpayKeySecret", "");
+        Product product = new Product().id(1L).name("Dress").slug("dress").price(BigDecimal.valueOf(3000)).stock(5).active(true);
+        SiteSetting settings = new SiteSetting()
+            .shippingStandardInr(99)
+            .shippingExpressInr(199)
+            .freeShippingMinInr(2500)
+            .pricesIncludeGst(true);
+        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.of(settings));
+        CustomerOrder saved = new CustomerOrder().id(411L).orderNumber("MNM-FREE").total(BigDecimal.valueOf(3000));
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenReturn(saved);
+        when(orderItemRepository.saveAll(any())).thenReturn(List.of());
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "items":[{"product_id":"1","product_name":"Dress","qty":1,"price":3000}],
+                          "shipping_address":{"full_name":"Jane","email":"j@example.com","phone":"9876543210","line1":"Line 1","city":"City","state":"State","pincode":"560001"},
+                          "donation":0
+                        }
+                        """
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.totals.shipping").value(0.0));
+    }
+
+    @Test
+    void createOrder_variantProduct_reservesVariantStock() throws Exception {
+        ReflectionTestUtils.setField(resource, "razorpayKeyId", "DEMO");
+        ReflectionTestUtils.setField(resource, "razorpayKeySecret", "");
+        String variantsJson =
+            "[{\"sku\":\"TEE-S-RED\",\"size\":\"S\",\"color\":\"Red\",\"rate\":500,\"stock\":3,\"active\":true}]";
+        Product product = new Product()
+            .id(2L)
+            .name("Tee")
+            .slug("tee")
+            .price(BigDecimal.valueOf(500))
+            .stock(3)
+            .active(true)
+            .itemStructure("VARIANTS")
+            .variantsJson(variantsJson);
+        when(productRepository.findOneForInventoryUpdate(2L)).thenReturn(Optional.of(product));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+        CustomerOrder saved = new CustomerOrder().id(412L).orderNumber("MNM-VAR").total(BigDecimal.valueOf(599));
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenReturn(saved);
+        when(orderItemRepository.saveAll(any())).thenReturn(List.of());
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "items":[{"product_id":"2","product_name":"Tee","qty":1,"price":500,"size":"S","color":"Red","sku":"TEE-S-RED"}],
+                          "shipping_address":{"full_name":"Jane","email":"j@example.com","phone":"9876543210","line1":"Line 1","city":"City","state":"State","pincode":"560001"},
+                          "donation":0
+                        }
+                        """
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.orderId").value(412));
+    }
+
+    @Test
+    void retryPayment_nonPendingStatus_returnsConflict() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(79L)
+            .userLogin("customer1")
+            .paymentStatus(PaymentStatus.FAILED)
+            .razorpayOrderId("order_rzp_79");
+        when(customerOrderRepository.findById(79L)).thenReturn(Optional.of(order));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders/retry-payment")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"orderId\":79}")
+            )
+            .andExpect(status().isConflict());
+    }
+
+    @Test
+    void orderDetail_notFound_returns404() throws Exception {
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-MISSING", "customer1")).thenReturn(Optional.empty());
+
+        mockMvc
+            .perform(get("/internal/v1/orders/MNM-MISSING").with(user("customer1")))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void orderDetail_wrongOwner_returns404() throws Exception {
+        CustomerOrder order = new CustomerOrder().id(99L).userLogin("other").orderNumber("MNM-OTHER");
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-OTHER", "customer1")).thenReturn(Optional.empty());
+
+        mockMvc
+            .perform(get("/internal/v1/orders/MNM-OTHER").with(user("customer1")))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void validateCoupon_invalidCoupon_returnsError() throws Exception {
+        when(couponRepository.findOneByCodeIgnoreCase("NOPE")).thenReturn(Optional.empty());
+
+        mockMvc
+            .perform(
+                post("/internal/v1/coupons/validate")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"code\":\"NOPE\",\"subtotal\":100}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(false));
+    }
+
+    @Test
+    void createOrder_demoMode_usesDemoRazorpayOrderId() throws Exception {
+        ReflectionTestUtils.setField(resource, "razorpayPaymentDemo", true);
+        Product product = new Product().id(1L).name("Dress").slug("dress").price(BigDecimal.TEN).stock(5).active(true);
+        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> {
+            CustomerOrder order = inv.getArgument(0);
+            if (order.getId() == null) {
+                order.setId(101L);
+            }
+            return order;
+        });
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "items":[{"product_id":"1","product_name":"Dress","qty":1,"price":10}],
+                          "shipping_address":{"full_name":"Jane","email":"j@example.com","phone":"9876543210","line1":"Line 1","city":"City","state":"State","pincode":"560001"},
+                          "donation":0
+                        }
+                        """
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.demoMode").value(true))
+            .andExpect(jsonPath("$.data.razorpayOrderId").value(org.hamcrest.Matchers.startsWith("order_demo_")));
     }
 
     @TestConfiguration

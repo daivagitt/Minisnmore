@@ -23,6 +23,7 @@ const nav = [
   { to: "/admin/blog", label: "Blogs", icon: BookOpen },
   { to: "/admin/policies", label: "Policies", icon: FileText },
   { to: "/admin/integrations/ledgerly", label: "Ledgerly", icon: Plug },
+  { to: "/admin/zoho", label: "Zoho settings", icon: Plug },
   { to: "/admin/returns", label: "Order returns", icon: RotateCcw },
   { to: "/admin/orders", label: "Cash on Delivery", icon: Banknote },
 ];

@@ -3,6 +3,7 @@ package com.miniandmore.app.repository;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
+import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import java.time.Instant;
 import java.util.List;
@@ -32,6 +33,26 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
         "select customerOrder from CustomerOrder customerOrder where customerOrder.userLogin = :login and customerOrder.orderNumber = :orderNumber"
     )
     Optional<CustomerOrder> findOneByOrderNumberAndUserLogin(@Param("orderNumber") String orderNumber, @Param("login") String login);
+
+    @Query(
+        value = "select customerOrder from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
+        "(customerOrder.zohoSyncStatus in :statuses or customerOrder.zohoSyncStatus is null) order by customerOrder.id asc",
+        countQuery = "select count(customerOrder) from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
+        "(customerOrder.zohoSyncStatus in :statuses or customerOrder.zohoSyncStatus is null)"
+    )
+    Page<CustomerOrder> findPaidOrdersForZohoRetry(
+        @Param("paymentStatus") PaymentStatus paymentStatus,
+        @Param("statuses") List<ZohoSyncStatus> statuses,
+        Pageable pageable
+    );
+
+    @Query(
+        value = "select customerOrder from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
+        "customerOrder.zohoSalesOrderId is null order by customerOrder.id asc",
+        countQuery = "select count(customerOrder) from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
+        "customerOrder.zohoSalesOrderId is null"
+    )
+    Page<CustomerOrder> findPaidOrdersMissingZohoSalesOrder(@Param("paymentStatus") PaymentStatus paymentStatus, Pageable pageable);
 
     @Query(
         value = "select customerOrder from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
@@ -73,6 +94,18 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     Page<CustomerOrder> findExpiredInventoryReservations(
         @Param("paymentStatus") PaymentStatus paymentStatus,
         @Param("now") Instant now,
+        Pageable pageable
+    );
+
+    @Query(
+        value = "select customerOrder from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
+        "customerOrder.zohoSalesOrderId is not null and customerOrder.status in :statuses order by customerOrder.id asc",
+        countQuery = "select count(customerOrder) from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
+        "customerOrder.zohoSalesOrderId is not null and customerOrder.status in :statuses"
+    )
+    Page<CustomerOrder> findOrdersForZohoTrackingPull(
+        @Param("paymentStatus") PaymentStatus paymentStatus,
+        @Param("statuses") List<OrderStatus> statuses,
         Pageable pageable
     );
 
