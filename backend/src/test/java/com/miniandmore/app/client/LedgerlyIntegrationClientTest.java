@@ -1,8 +1,10 @@
 package com.miniandmore.app.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.miniandmore.app.service.LedgerlyCredentialsProvider;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -143,6 +146,151 @@ class LedgerlyIntegrationClientTest {
         Map<String, Object> response = client.syncCustomerPayload(Map.of("email", "buyer@example.com", "name", "Buyer"));
 
         assertThat(response).containsEntry("ledgerlyContactId", "contact-1");
+        server.verify();
+    }
+
+    @Test
+    void syncProduct_postsProductId() {
+        when(credentials.baseUrl()).thenReturn("http://ledgerly.test/api");
+        when(credentials.token()).thenReturn("lt_test");
+
+        server
+            .expect(requestTo("http://ledgerly.test/api/v1/integrations/commerce/products/sync"))
+            .andExpect(content().json("{\"productId\":42}"))
+            .andRespond(withSuccess("{\"ledgerlyItemId\":\"item-42\"}", MediaType.APPLICATION_JSON));
+
+        client.syncProduct(42L);
+        server.verify();
+    }
+
+    @Test
+    void syncProductAsync_postsAsyncFlag() {
+        when(credentials.baseUrl()).thenReturn("http://ledgerly.test/api");
+        when(credentials.token()).thenReturn("lt_test");
+
+        server
+            .expect(requestTo("http://ledgerly.test/api/v1/integrations/commerce/products/sync"))
+            .andExpect(content().json("{\"productId\":43,\"async\":true}"))
+            .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        client.syncProductAsync(43L);
+        server.verify();
+    }
+
+    @Test
+    void syncOrder_postsOrderId() {
+        when(credentials.baseUrl()).thenReturn("http://ledgerly.test/api");
+        when(credentials.token()).thenReturn("lt_test");
+
+        server
+            .expect(requestTo("http://ledgerly.test/api/v1/integrations/commerce/orders/sync"))
+            .andExpect(content().json("{\"orderId\":7}"))
+            .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        client.syncOrder(7L);
+        server.verify();
+    }
+
+    @Test
+    void deactivateProduct_postsInactivePayload() {
+        when(credentials.baseUrl()).thenReturn("http://ledgerly.test/api");
+        when(credentials.token()).thenReturn("lt_test");
+
+        server
+            .expect(requestTo("http://ledgerly.test/api/v1/integrations/commerce/products/sync"))
+            .andExpect(content().json("{\"productId\":8,\"active\":false}"))
+            .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        client.deactivateProduct(8L);
+        server.verify();
+    }
+
+    @Test
+    void pullProducts_postsEmptyBody() {
+        when(credentials.baseUrl()).thenReturn("http://ledgerly.test/api");
+        when(credentials.token()).thenReturn("lt_test");
+
+        server
+            .expect(requestTo("http://ledgerly.test/api/v1/integrations/commerce/products/pull"))
+            .andRespond(withSuccess("{\"products\":[]}", MediaType.APPLICATION_JSON));
+
+        Map<String, Object> response = client.pullProducts();
+
+        assertThat(response).containsKey("products");
+        server.verify();
+    }
+
+    @Test
+    void pullInventory_postsEmptyBody() {
+        when(credentials.baseUrl()).thenReturn("http://ledgerly.test/api");
+        when(credentials.token()).thenReturn("lt_test");
+
+        server
+            .expect(requestTo("http://ledgerly.test/api/v1/integrations/commerce/inventory/pull"))
+            .andRespond(withSuccess("{\"inventory\":[]}", MediaType.APPLICATION_JSON));
+
+        Map<String, Object> response = client.pullInventory();
+
+        assertThat(response).containsKey("inventory");
+        server.verify();
+    }
+
+    @Test
+    void syncProductPayload_failureRethrowsAfterLogging() {
+        when(credentials.baseUrl()).thenReturn("http://ledgerly.test/api");
+        when(credentials.token()).thenReturn("lt_test");
+
+        server
+            .expect(requestTo("http://ledgerly.test/api/v1/integrations/commerce/products/sync"))
+            .andRespond(withStatus(HttpStatus.BAD_REQUEST).body("{\"error\":\"bad\"}").contentType(MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.syncProductPayload(Map.of("sku", "BAD")))
+            .isInstanceOf(org.springframework.web.client.RestClientResponseException.class);
+        server.verify();
+    }
+
+    @Test
+    void cancelOrder_withoutReturnNumber_postsEmptyBody() {
+        when(credentials.baseUrl()).thenReturn("http://ledgerly.test/api");
+        when(credentials.token()).thenReturn("lt_test");
+
+        server
+            .expect(requestTo("http://ledgerly.test/api/v1/integrations/commerce/orders/ORD-2/cancel"))
+            .andExpect(content().json("{}"))
+            .andRespond(withSuccess("{\"ledgerlyCreditNoteId\":\"cn-2\"}", MediaType.APPLICATION_JSON));
+
+        Optional<String> id = client.cancelOrder("ORD-2", null, null);
+
+        assertThat(id).contains("cn-2");
+        server.verify();
+    }
+
+    @Test
+    void createCreditNote_nullResponse_returnsEmpty() {
+        when(credentials.baseUrl()).thenReturn("http://ledgerly.test/api");
+        when(credentials.token()).thenReturn("lt_test");
+
+        server
+            .expect(requestTo("http://ledgerly.test/api/v1/integrations/commerce/orders/ORD-1/credit-notes"))
+            .andRespond(withSuccess("null", MediaType.APPLICATION_JSON));
+
+        assertThat(client.createCreditNote("ORD-1", "RET-1")).isEmpty();
+        server.verify();
+    }
+
+    @Test
+    void syncOrderPayload_withoutIdempotencyKey_omitsHeader() {
+        when(credentials.baseUrl()).thenReturn("http://ledgerly.test/api");
+        when(credentials.token()).thenReturn("lt_test");
+
+        server
+            .expect(requestTo("http://ledgerly.test/api/v1/integrations/commerce/orders/sync"))
+            .andExpect(headerDoesNotExist("Idempotency-Key"))
+            .andRespond(withSuccess("{\"ledgerlyInvoiceId\":\"inv-2\"}", MediaType.APPLICATION_JSON));
+
+        Map<String, Object> response = client.syncOrderPayload(Map.of("externalRef", "ORD-2"), " ");
+
+        assertThat(response).containsEntry("ledgerlyInvoiceId", "inv-2");
         server.verify();
     }
 

@@ -9,6 +9,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { ProductGallery } from "@/components/ProductGallery";
 import { checkSizeFit, clampQuantity } from "@/lib/product-fit";
 import { galleryForSelectedColor } from "@/lib/product-gallery";
+import { resolveStorefrontColorLabel } from "@/lib/expected-prints";
 import { lookupPincode, normalizePincode } from "@/lib/pincode";
 import {
   colorNameInList,
@@ -206,9 +207,15 @@ function ProductPage() {
                 <button type="button" onClick={() => setSizeChart(true)} className="text-[11px] text-primary underline-offset-2 hover:underline">Size chart</button>
               </div>
               <VariantSizeButtons product={product} size={size} onSizeChange={setSize} />
+              {isVariantsProduct(product) &&
+              sizesForDisplay(product).some((s) => !sizeHasSellableVariants(product, s)) ? (
+                <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">
+                  All sizes are listed; sold-out sizes are struck through.
+                </p>
+              ) : null}
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Print · {color}</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Print · {resolveStorefrontColorLabel(product.colors, color, product.sku)}</div>
               <VariantColorButtons
                 product={product}
                 size={size}

@@ -63,6 +63,55 @@ function colorKey(name: string): string {
   return name.trim().toLowerCase();
 }
 
+/** Internal import-matrix slot labels like "Print-1" / "Print 2" — not customer-facing names. */
+export function isGenericPrintSlotName(name: string): boolean {
+  return /^print[-\s]?\d+$/i.test(name.trim());
+}
+
+/** Zero-based index for a generic print slot, or null when the name is not a slot label. */
+export function genericPrintSlotIndex(name: string): number | null {
+  const match = name.trim().match(/^print[-\s]?(\d+)$/i);
+  if (!match) return null;
+  const slot = Number(match[1]);
+  return Number.isFinite(slot) && slot > 0 ? slot - 1 : null;
+}
+
+function galleryKeysOverlapEntries(
+  entries: ProductColorEntry[],
+  galleryMap: Map<string, string[]>,
+): boolean {
+  const keys = new Set(Array.from(galleryMap.keys()).map((k) => colorKey(k)));
+  return entries.some((e) => keys.has(colorKey(e.name)));
+}
+
+/**
+ * When colours use generic slots but colorImagesJson has real print names, rename by stable order
+ * (parity with backend {@code ProductColorImagesSupport.realignColorNamesToGalleryKeys}).
+ */
+export function realignColorEntriesToGalleryKeys(
+  entries: ProductColorEntry[],
+  galleryMap: Map<string, string[]>,
+): ProductColorEntry[] {
+  if (!entries.length || !galleryMap.size) return entries;
+  const galleryKeys = Array.from(galleryMap.keys());
+  if (entries.length !== galleryKeys.length) return entries;
+  if (galleryKeysOverlapEntries(entries, galleryMap)) return entries;
+
+  return entries.map((entry, i) => {
+    const newName = galleryKeys[i]!;
+    const urls = galleryMapLookup(galleryMap, newName);
+    const swatchUrl = entry.swatchUrl?.trim();
+    const existingUrls = colorImageUrls(entry);
+    const fromMap = swatchUrl ? urls.filter((url) => url !== swatchUrl) : urls;
+    const imageUrls = fromMap.length ? fromMap : (existingUrls.length ? existingUrls : urls);
+    return {
+      ...entry,
+      name: newName,
+      imageUrls: imageUrls.length ? imageUrls : undefined,
+    };
+  });
+}
+
 function uniqueUrls(urls: (string | null | undefined)[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -403,7 +452,7 @@ export function mergeColorImagesIntoColors(
     }));
   }
 
-  return entries.map((entry) => {
+  const withGalleries = entries.map((entry) => {
     const urls = galleryMapLookup(galleryMap, entry.name);
     if (!urls.length) return entry;
     const swatchUrl = entry.swatchUrl?.trim();
@@ -412,22 +461,8 @@ export function mergeColorImagesIntoColors(
       ...entry,
       imageUrls: galleryOnly.length ? galleryOnly : urls,
     };
-  }).map((entry, i, merged) => {
-    if (colorImageUrls(entry).length > 0) return entry;
-    const galleryKeys = Array.from(galleryMap.keys());
-    if (galleryKeys.length !== merged.length) return entry;
-    const anyMatched = merged.some((e) => colorImageUrls(e).length > 0);
-    if (anyMatched) return entry;
-    const key = galleryKeys[i];
-    const urls = galleryMap.get(key) ?? [];
-    const swatchUrl = entry.swatchUrl?.trim();
-    const galleryOnly = swatchUrl ? urls.filter((url) => url !== swatchUrl) : urls;
-    return {
-      ...entry,
-      name: key,
-      imageUrls: galleryOnly.length ? galleryOnly : urls,
-    };
   });
+  return realignColorEntriesToGalleryKeys(withGalleries, galleryMap);
 }
 
 /** True when colours carry per-print media (lifestyle gallery and/or print swatch). */

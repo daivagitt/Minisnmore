@@ -139,11 +139,10 @@ public class InternalStorefrontResource {
 
     @GetMapping("/pincode/{pincode}")
     public ApiResponse<PincodeLookupDTO> pincode(@PathVariable String pincode) {
-        return ApiResponse.ok(
-            pincodeLookupService
-                .lookup(pincode)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pincode not found"))
-        );
+        if (pincode == null || !pincode.matches("^[1-9]\\d{5}$")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid pincode format");
+        }
+        return ApiResponse.ok(pincodeLookupService.lookup(pincode).orElse(null));
     }
 
     @GetMapping("/policies/{slug}")

@@ -119,6 +119,35 @@ describe("product-variants", () => {
     expect(sizeHasSellableVariants(partial, "0-3 M")).toBe(true);
   });
 
+  it("infers VARIANTS from variant matrix when itemStructure missing", () => {
+    const inferred: Product = {
+      ...matrixProduct,
+      itemStructure: undefined,
+      variants: parseVariantsJson([
+        { sku: "VEST-03-BLUE", size: "0-3 M", color: "Blue", rate: 400, stock: 4, active: true },
+      ]),
+    };
+    expect(isVariantsProduct(inferred)).toBe(true);
+  });
+
+  it("keeps SIMPLE products simple even when stray variant rows exist", () => {
+    const simpleWithRows: Product = {
+      ...matrixProduct,
+      itemStructure: "SIMPLE",
+      variants: parseVariantsJson([
+        { sku: "VEST-03-BLUE", size: "0-3 M", color: "Blue", rate: 400, stock: 4, active: true },
+      ]),
+    };
+    expect(isVariantsProduct(simpleWithRows)).toBe(false);
+    expect(sizeHasSellableVariants(simpleWithRows, "S")).toBe(true);
+  });
+
+  it("treats simple products with zero stock as unsellable for every size", () => {
+    const simple = { ...matrixProduct, itemStructure: "SIMPLE", variants: undefined, stock: 0 };
+    expect(sizeHasSellableVariants(simple, "S")).toBe(false);
+    expect(sizeHasSellableVariants(simple, "M")).toBe(false);
+  });
+
   it("matches variant rows when size labels differ only by spacing", () => {
     const spaced: Product = {
       ...matrixProduct,

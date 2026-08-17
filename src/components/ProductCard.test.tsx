@@ -29,6 +29,16 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
+vi.mock("@/lib/account.functions", () => ({
+  listMyWishlist: vi.fn(async () => ({ product_ids: [] })),
+  syncMyWishlist: vi.fn(async (ids: string[]) => ({ product_ids: ids })),
+  replaceMyWishlist: vi.fn(async (ids: string[]) => ({ product_ids: ids })),
+  addMyWishlistItem: vi.fn(async () => ({ ok: true })),
+  removeMyWishlistItem: vi.fn(async () => ({ ok: true })),
+  listMyCart: vi.fn(async () => ({ items: [], coupon: null })),
+  replaceMyCart: vi.fn(async (items: unknown[], coupon: unknown) => ({ items, coupon })),
+}));
+
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to, params, ...props }: any) => (
     <a href={params?.slug ? `/product/${params.slug}` : to} {...props}>
@@ -99,7 +109,9 @@ describe("ProductCard", () => {
       </Providers>,
     );
 
-    expect(screen.getByRole("img", { name: "Petal Romper" })).toHaveAttribute("src", "/romper.jpg");
+    await waitFor(() =>
+      expect(screen.getByRole("img", { name: "Petal Romper" })).toHaveAttribute("src", "/romper.jpg"),
+    );
     expect(screen.getByText("New")).toBeInTheDocument();
     expect(screen.getByText("Bestseller")).toBeInTheDocument();
     expect(screen.getByText("₹1,299")).toBeInTheDocument();

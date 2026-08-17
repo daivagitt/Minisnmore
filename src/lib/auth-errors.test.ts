@@ -24,6 +24,12 @@ describe("authErrorMessage", () => {
     const error = new ApiError("Unauthorized", 401, { detail: "User not activated" });
     expect(authErrorMessage(error)).toMatch(/not activated yet/i);
   });
+
+  it("maps invalid credentials without activation hint", () => {
+    const error = new ApiError("Unauthorized", 401, { detail: "Invalid credentials" });
+    expect(authErrorMessage(error)).toMatch(/invalid email or password/i);
+    expect(authErrorMessage(error)).not.toMatch(/activation/i);
+  });
 });
 
 describe("oauthCallbackErrorMessage", () => {

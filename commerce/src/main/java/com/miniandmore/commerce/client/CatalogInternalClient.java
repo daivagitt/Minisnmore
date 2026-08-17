@@ -46,6 +46,10 @@ public class CatalogInternalClient {
         return exchange(HttpMethod.PUT, internalPath, body, true);
     }
 
+    public ResponseEntity<String> delete(String internalPath) {
+        return exchange(HttpMethod.DELETE, internalPath, null, true);
+    }
+
     public ResponseEntity<String> exchange(HttpMethod method, String internalPath, Object body, boolean forwardAuth) {
         RestClient.RequestBodySpec spec = restClient.method(method).uri(toUri(internalPath)).contentType(MediaType.APPLICATION_JSON);
         if (forwardAuth) {

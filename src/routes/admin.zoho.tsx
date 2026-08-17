@@ -37,14 +37,14 @@ import {
 } from "@/lib/backend-data";
 import { showApiError, showValidationErrors } from "@/lib/ui-errors";
 
-const ZohoSchema = z.object({
+const ZohoCredentialsSchema = z.object({
   org_id: z
     .string()
     .trim()
     .regex(/^\d{6,15}$/, "Org ID must be 6–15 digits"),
   client_id: z.string().trim().min(10, "Client ID looks too short").max(200),
-  client_secret: z.string().trim().min(10, "Client Secret looks too short").max(500),
-  refresh_token: z.string().trim().min(20, "Refresh token looks too short").max(500),
+  client_secret: z.string().trim().max(500),
+  refresh_token: z.string().trim().max(500),
   data_center: z.enum(["in", "com", "eu", "com.au"]),
 });
 
@@ -57,6 +57,8 @@ type ZohoSettings = {
   refresh_token: string | null;
   data_center: string | null;
   connected: boolean;
+  hasClientSecret?: boolean;
+  hasRefreshToken?: boolean;
 };
 
 type SyncAction = "products" | "productsPull" | "inventory" | "orders" | "tracking";
@@ -76,8 +78,6 @@ function ZohoPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [connecting, setConnecting] = useState(false);
-
-  const serverMode = integration?.serverConfigured === true;
 
   const reloadStatus = useCallback(async () => {
     const status = await getZohoIntegrationStatus();
@@ -105,7 +105,18 @@ function ZohoPage() {
           getZohoOAuthSetup(),
         ]);
         setIntegration(status);
-        if (data) setS(data as ZohoSettings);
+        if (data) {
+          setS({
+            org_id: data.org_id ?? "",
+            client_id: data.client_id ?? "",
+            client_secret: "",
+            refresh_token: "",
+            data_center: data.data_center ?? "in",
+            connected: data.connected,
+            hasClientSecret: data.hasClientSecret,
+            hasRefreshToken: data.hasRefreshToken,
+          });
+        }
         setOauthSetup(setup);
       } catch (error) {
         showApiError(error, "Could not load Zoho settings");
@@ -115,7 +126,7 @@ function ZohoPage() {
   }, []);
 
   const save = async () => {
-    const parsed = ZohoSchema.safeParse({
+    const parsed = ZohoCredentialsSchema.safeParse({
       org_id: s.org_id ?? "",
       client_id: s.client_id ?? "",
       client_secret: s.client_secret ?? "",
@@ -126,12 +137,42 @@ function ZohoPage() {
       showValidationErrors(parsed.error.issues.map((issue) => issue.message));
       return;
     }
+    if (!s.hasClientSecret && !(parsed.data.client_secret ?? "").trim()) {
+      showValidationErrors(["Client secret is required on first setup."]);
+      return;
+    }
+    const hasRefreshToken =
+      !!(parsed.data.refresh_token ?? "").trim() || !!s.hasRefreshToken;
     setSaving(true);
     try {
-      await saveZohoSettings({ ...parsed.data, connected: true });
-      toast.success("Zoho credentials saved");
-      setS((p) => ({ ...p, ...parsed.data, connected: true }));
-      setIntegration((p) => (p ? { ...p, connected: true } : p));
+      await saveZohoSettings(
+        {
+          ...parsed.data,
+          client_secret: (parsed.data.client_secret ?? "").trim() || null,
+          refresh_token: (parsed.data.refresh_token ?? "").trim() || null,
+          connected: hasRefreshToken,
+        },
+        { hasClientSecret: s.hasClientSecret },
+      );
+      toast.success(
+        hasRefreshToken
+          ? "Zoho credentials saved"
+          : "Zoho app credentials saved — click Connect to Zoho Books to finish",
+      );
+      setS((p) => ({
+        ...p,
+        org_id: parsed.data.org_id,
+        client_id: parsed.data.client_id,
+        client_secret: "",
+        refresh_token: "",
+        data_center: parsed.data.data_center,
+        connected: hasRefreshToken,
+        hasClientSecret: p.hasClientSecret || !!(parsed.data.client_secret ?? "").trim(),
+        hasRefreshToken: hasRefreshToken,
+      }));
+      if (hasRefreshToken) {
+        setIntegration((p) => (p ? { ...p, connected: true } : p));
+      }
     } catch (error) {
       showApiError(error, "Could not save Zoho settings");
     } finally {
@@ -140,8 +181,44 @@ function ZohoPage() {
   };
 
   const connectZoho = async () => {
+    const parsed = ZohoCredentialsSchema.safeParse({
+      org_id: s.org_id ?? "",
+      client_id: s.client_id ?? "",
+      client_secret: s.client_secret ?? "",
+      refresh_token: "",
+      data_center: s.data_center ?? "in",
+    });
+    if (!parsed.success) {
+      showValidationErrors(parsed.error.issues.map((issue) => issue.message));
+      return;
+    }
+    if (!s.hasClientSecret && !(parsed.data.client_secret ?? "").trim()) {
+      showValidationErrors(["Save client ID and secret first, then connect."]);
+      return;
+    }
     setConnecting(true);
     try {
+      if (
+        (parsed.data.client_secret ?? "").trim() ||
+        !(s.org_id === parsed.data.org_id && s.client_id === parsed.data.client_id)
+      ) {
+        await saveZohoSettings(
+          {
+            ...parsed.data,
+            client_secret: (parsed.data.client_secret ?? "").trim() || null,
+            refresh_token: null,
+            connected: false,
+          },
+          { hasClientSecret: s.hasClientSecret },
+        );
+        setS((p) => ({
+          ...p,
+          org_id: parsed.data.org_id,
+          client_id: parsed.data.client_id,
+          client_secret: "",
+          hasClientSecret: p.hasClientSecret || !!(parsed.data.client_secret ?? "").trim(),
+        }));
+      }
       const { url } = await getZohoConnectUrl();
       window.location.href = url;
     } catch (error) {
@@ -173,17 +250,13 @@ function ZohoPage() {
 
   if (loading) return <div className="text-sm text-muted-foreground">Loading…</div>;
 
-  const connected = serverMode ? !!integration?.connected : s.connected;
+  const connected = !!integration?.connected;
 
   return (
     <AdminPage
       eyebrow="Integration"
       title="Zoho Books"
-      description={
-        serverMode
-          ? "Connect once, then sync products and orders from this page. Paid checkout orders sync automatically."
-          : "Connect Zoho Books, then use the sync actions below."
-      }
+      description="Save your Zoho API app credentials below, then connect once to obtain a refresh token. Paid checkout orders sync automatically after connect."
     >
       <div className="space-y-4 max-w-2xl">
         <div className="glass-strong rounded-3xl p-5 space-y-4">
@@ -193,33 +266,27 @@ function ZohoPage() {
             {connected ? <Plug className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
             {connected
               ? "Zoho Books is connected."
-              : serverMode
-                ? "Not connected — click Connect to Zoho Books below."
-                : "Not connected — save credentials below."}
+              : s.hasRefreshToken
+                ? "Credentials saved — test connection or reconnect if sync fails."
+                : s.hasClientSecret
+                  ? "App credentials saved — click Connect to Zoho Books to finish."
+                  : "Enter credentials below, save, then connect to Zoho Books."}
           </div>
 
-          {serverMode ? (
-            <SimpleConnectPanel
-              integration={integration}
-              connecting={connecting}
-              testing={testing}
-              onConnect={connectZoho}
-              onTest={testConnection}
-            />
-          ) : (
-            <ManualConnectPanel
-              s={s}
-              setS={setS}
-              oauthSetup={oauthSetup}
-              saving={saving}
-              testing={testing}
-              onSave={save}
-              onTest={testConnection}
-            />
-          )}
+          <ZohoConnectPanel
+            integration={integration}
+            s={s}
+            setS={setS}
+            oauthSetup={oauthSetup}
+            saving={saving}
+            testing={testing}
+            connecting={connecting}
+            onSave={save}
+            onConnect={connectZoho}
+            onTest={testConnection}
+          />
 
-          {serverMode ? (
-            <label className="flex items-start gap-2 text-xs text-muted-foreground rounded-2xl border border-border/60 bg-background/40 p-3">
+          <label className="flex items-start gap-2 text-xs text-muted-foreground rounded-2xl border border-border/60 bg-background/40 p-3">
               <input
                 type="checkbox"
                 className="mt-0.5"
@@ -244,7 +311,6 @@ function ZohoPage() {
                 If off, only existing category matches are assigned.
               </span>
             </label>
-          ) : null}
         </div>
 
         <ZohoSyncPanel connected={connected} />
@@ -261,19 +327,22 @@ function ZohoSyncPanel({ connected }: { connected: boolean }) {
 
   const run = async (action: SyncAction, label: string, fn: () => Promise<ZohoSyncSummary>) => {
     setBusy(action);
+    const toastId = toast.loading(`${label}…`);
     try {
       const summary = await fn();
       setLastResult({ label, summary });
+      toast.dismiss(toastId);
       if (summary.failed > 0) {
         toast.warning(formatZohoSyncSummary(summary, label));
-      } else if ((summary.notices?.length ?? 0) > 0) {
-        toast.info(formatZohoSyncSummary(summary, label));
       } else if (summary.success > 0) {
         toast.success(formatZohoSyncSummary(summary, label));
+      } else if ((summary.notices?.length ?? 0) > 0) {
+        toast.info(formatZohoSyncSummary(summary, label));
       } else {
-        toast.info(`${label}: nothing to process`);
+        toast.info(`${label} completed — nothing to process`);
       }
     } catch (error) {
+      toast.dismiss(toastId);
       showApiError(error, `${label} failed`);
     } finally {
       setBusy(null);
@@ -452,71 +521,36 @@ function ZohoSyncPanel({ connected }: { connected: boolean }) {
   );
 }
 
-function SimpleConnectPanel({
+function ZohoConnectPanel({
   integration,
-  connecting,
-  testing,
-  onConnect,
-  onTest,
-}: {
-  integration: ZohoIntegrationStatus | null;
-  connecting: boolean;
-  testing: boolean;
-  onConnect: () => void;
-  onTest: () => void;
-}) {
-  return (
-    <div className="space-y-4 text-sm">
-      {integration?.organizationId ? (
-        <p className="text-xs text-muted-foreground">
-          Organisation ID: <span className="text-foreground">{integration.organizationId}</span> · Data
-          centre: <span className="text-foreground">{integration.dataCenter}</span>
-        </p>
-      ) : null}
-      <p className="text-xs text-muted-foreground">
-        Sign in with Zoho once. Each product needs a SKU and category (Admin → Products) before catalogue sync.
-      </p>
-      <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
-          onClick={onConnect}
-          disabled={connecting || testing}
-          className="rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm"
-        >
-          {connecting ? "Redirecting…" : integration?.connected ? "Reconnect Zoho Books" : "Connect to Zoho Books"}
-        </button>
-        <button
-          type="button"
-          onClick={onTest}
-          disabled={testing || connecting}
-          className="rounded-full border border-border px-5 py-2.5 text-sm"
-        >
-          {testing ? "Testing…" : "Test connection"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ManualConnectPanel({
   s,
   setS,
   oauthSetup,
   saving,
   testing,
+  connecting,
   onSave,
+  onConnect,
   onTest,
 }: {
+  integration: ZohoIntegrationStatus | null;
   s: ZohoSettings;
   setS: Dispatch<SetStateAction<ZohoSettings>>;
   oauthSetup: ZohoOAuthSetup | null;
   saving: boolean;
   testing: boolean;
+  connecting: boolean;
   onSave: () => void;
+  onConnect: () => void;
   onTest: () => void;
 }) {
   return (
     <>
+      {integration?.serverConfigured ? (
+        <p className="text-xs text-muted-foreground">
+          Server env defaults are available; values saved here override env for this store.
+        </p>
+      ) : null}
       <a
         href={oauthSetup?.apiConsoleUrl ?? "https://api-console.zoho.in/"}
         target="_blank"
@@ -525,12 +559,19 @@ function ManualConnectPanel({
       >
         Open Zoho API Console <ExternalLink className="h-3 w-3" />
       </a>
+      <p className="text-xs text-muted-foreground">
+        Create a <span className="text-foreground">Server-based</span> app. Redirect URI must include{" "}
+        <span className="font-mono text-[11px]">
+          {oauthSetup?.primaryRedirectUri ?? "https://uat.minisnmore.com/admin/zoho"}
+        </span>
+        .
+      </p>
       <Field label="Organisation ID">
         <input
           className={inputCls()}
           value={s.org_id ?? ""}
           onChange={(e) => setS({ ...s, org_id: e.target.value })}
-          placeholder="e.g. 60073093410"
+          placeholder="e.g. 60082852067"
         />
       </Field>
       <Field label="Client ID">
@@ -540,20 +581,36 @@ function ManualConnectPanel({
           onChange={(e) => setS({ ...s, client_id: e.target.value })}
         />
       </Field>
-      <Field label="Client Secret">
+      <Field
+        label="Client Secret"
+        hint={
+          s.hasClientSecret
+            ? "Leave blank to keep the saved secret. Enter a new value to replace it."
+            : "Required on first setup."
+        }
+      >
         <input
           className={inputCls()}
           value={s.client_secret ?? ""}
           onChange={(e) => setS({ ...s, client_secret: e.target.value })}
           type="password"
+          placeholder={s.hasClientSecret ? "Saved — leave blank or paste to replace" : ""}
         />
       </Field>
-      <Field label="Refresh token">
+      <Field
+        label="Refresh token (optional)"
+        hint={
+          s.hasRefreshToken
+            ? "Stored server-side. Paste only to replace, or use Connect to Zoho Books."
+            : "Optional — use Connect to Zoho Books instead of pasting manually."
+        }
+      >
         <input
           className={inputCls()}
           value={s.refresh_token ?? ""}
           onChange={(e) => setS({ ...s, refresh_token: e.target.value })}
           type="password"
+          placeholder={s.hasRefreshToken ? "Saved — leave blank or paste to replace" : ""}
         />
       </Field>
       <Field label="Data centre">
@@ -571,15 +628,23 @@ function ManualConnectPanel({
       <div className="flex flex-wrap gap-3">
         <button
           onClick={onSave}
-          disabled={saving}
+          disabled={saving || connecting}
           className="rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm flex items-center gap-2"
         >
-          <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save"}
+          <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save credentials"}
+        </button>
+        <button
+          type="button"
+          onClick={onConnect}
+          disabled={connecting || saving || testing}
+          className="rounded-full border border-border px-5 py-2.5 text-sm"
+        >
+          {connecting ? "Redirecting…" : integration?.connected ? "Reconnect Zoho Books" : "Connect to Zoho Books"}
         </button>
         <button
           type="button"
           onClick={onTest}
-          disabled={testing || saving}
+          disabled={testing || saving || connecting}
           className="rounded-full border border-border px-5 py-2.5 text-sm"
         >
           {testing ? "Testing…" : "Test connection"}

@@ -33,10 +33,44 @@ uat_gateway_sanitize_env() {
   fi
   export GATEWAY_RESPONSE_TIMEOUT="${GATEWAY_RESPONSE_TIMEOUT:-600s}"
 
-  # Gmail and most SMTP providers require From to match the authenticated mailbox.
+  uat_gateway_resolve_mail_provider
+
+  # Gmail, Zoho, and most SMTP providers require From to match the authenticated mailbox.
   if [ -z "${JHIPSTER_MAIL_FROM:-}" ] && [ -n "${SPRING_MAIL_USERNAME:-}" ]; then
     export JHIPSTER_MAIL_FROM="${SPRING_MAIL_USERNAME}"
   fi
+}
+
+# Select active SMTP provider without removing alternate credentials from uat.env.
+# SPRING_MAIL_PROVIDER: gmail (default) | zoho
+# Gmail uses SPRING_MAIL_* directly; Zoho uses ZOHO_MAIL_* (copied to SPRING_MAIL_* at runtime).
+uat_gateway_resolve_mail_provider() {
+  local _provider
+  _provider="$(printf '%s' "${SPRING_MAIL_PROVIDER:-gmail}" | tr '[:upper:]' '[:lower:]')"
+
+  case "$_provider" in
+    zoho)
+      if [ -z "${ZOHO_MAIL_HOST:-}" ] || [ -z "${ZOHO_MAIL_USERNAME:-}" ] || [ -z "${ZOHO_MAIL_PASSWORD:-}" ]; then
+        echo "ERROR: SPRING_MAIL_PROVIDER=zoho but ZOHO_MAIL_HOST/USERNAME/PASSWORD not set." >&2
+        return 1
+      fi
+      export SPRING_MAIL_HOST="${ZOHO_MAIL_HOST}"
+      export SPRING_MAIL_PORT="${ZOHO_MAIL_PORT:-587}"
+      export SPRING_MAIL_USERNAME="${ZOHO_MAIL_USERNAME}"
+      export SPRING_MAIL_PASSWORD="${ZOHO_MAIL_PASSWORD}"
+      if [ -n "${ZOHO_MAIL_FROM:-}" ]; then
+        export JHIPSTER_MAIL_FROM="${ZOHO_MAIL_FROM}"
+      elif [ -n "${ZOHO_MAIL_USERNAME:-}" ]; then
+        export JHIPSTER_MAIL_FROM="${ZOHO_MAIL_USERNAME}"
+      fi
+      ;;
+    gmail)
+      ;;
+    *)
+      echo "ERROR: SPRING_MAIL_PROVIDER must be gmail or zoho (got: ${_provider})." >&2
+      return 1
+      ;;
+  esac
 }
 
 uat_gateway_verify_env() {

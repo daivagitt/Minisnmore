@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.miniandmore.gateway.domain.Authority;
 import com.miniandmore.gateway.domain.User;
 import com.miniandmore.gateway.repository.AuthorityRepository;
+import com.miniandmore.gateway.repository.UserAuthoritiesLoader;
 import com.miniandmore.gateway.repository.UserRepository;
 import com.miniandmore.gateway.security.AuthoritiesConstants;
 import com.miniandmore.gateway.service.dto.AdminUserDTO;
@@ -51,14 +52,18 @@ class UserServiceTest {
     @Mock
     private AuthorityRepository authorityRepository;
 
+    @Mock
+    private UserAuthoritiesLoader userAuthoritiesLoader;
+
     private UserService userService;
 
     private User user;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, passwordEncoder, authorityRepository);
+        userService = new UserService(userRepository, authorityRepository, userAuthoritiesLoader, passwordEncoder);
         user = sampleUser();
+        lenient().when(userAuthoritiesLoader.withAuthorities(any(User.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
         lenient().when(passwordEncoder.encode(anyString())).thenReturn("encoded");
         lenient()
             .when(userRepository.save(any(User.class)))
@@ -69,10 +74,10 @@ class UserServiceTest {
                 }
                 return Mono.just(saved);
             });
+        when(userRepository.deleteUserAuthorities(anyLong())).thenReturn(Mono.empty());
         lenient().when(userRepository.saveUserAuthority(ArgumentMatchers.nullable(Long.class), anyString())).thenReturn(Mono.empty());
         lenient().when(userRepository.delete(any(User.class))).thenReturn(Mono.empty());
         lenient().when(userRepository.findOneByEmailIgnoreCase(anyString())).thenReturn(Mono.empty());
-        lenient().when(userRepository.delete(any(User.class))).thenReturn(Mono.empty());
         Authority defaultAuthority = new Authority();
         defaultAuthority.setName(AuthoritiesConstants.USER);
         lenient().when(authorityRepository.findById(anyString())).thenReturn(Mono.just(defaultAuthority));
@@ -89,6 +94,19 @@ class UserServiceTest {
         StepVerifier.create(userService.activateRegistration("key").contextWrite(securityContext()))
             .assertNext(activated -> assertThat(activated.isActivated()).isTrue())
             .verifyComplete();
+    }
+
+    @Test
+    void activateRegistration_isIdempotentWhenAlreadyActivated() {
+        user.setActivated(true);
+        user.setActivationKey("key");
+        when(userRepository.findOneByActivationKey("key")).thenReturn(Mono.just(user));
+
+        StepVerifier.create(userService.activateRegistration("key").contextWrite(securityContext()))
+            .assertNext(activated -> assertThat(activated.isActivated()).isTrue())
+            .verifyComplete();
+
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
@@ -163,9 +181,13 @@ class UserServiceTest {
         authority.setName(AuthoritiesConstants.USER);
         org.mockito.Mockito.doReturn(Mono.just(inactive)).when(userRepository).findOneByLogin("newuser");
         org.mockito.Mockito.doReturn(Mono.empty()).when(userRepository).delete(inactive);
+        org.mockito.Mockito.doReturn(Mono.empty()).when(userRepository).deleteUserAuthorities(inactive.getId());
         org.mockito.Mockito.doReturn(Mono.empty()).when(userRepository).findOneByEmailIgnoreCase("new@localhost");
         org.mockito.Mockito.doReturn(Mono.just(authority)).when(authorityRepository).findById(AuthoritiesConstants.USER);
-        org.mockito.Mockito.doReturn(Mono.just(new User())).when(userRepository).save(org.mockito.Mockito.any(User.class));
+        User registered = sampleUser();
+        registered.setLogin("newuser");
+        registered.setEmail("new@localhost");
+        org.mockito.Mockito.doReturn(Mono.just(registered)).when(userRepository).save(org.mockito.Mockito.any(User.class));
 
         StepVerifier.create(userService.registerUser(dto, "password").contextWrite(securityContext()))
             .expectNextCount(1)
@@ -190,7 +212,11 @@ class UserServiceTest {
         Authority authority = new Authority();
         authority.setName(AuthoritiesConstants.USER);
         org.mockito.Mockito.doReturn(Mono.just(authority)).when(authorityRepository).findById(AuthoritiesConstants.USER);
-        org.mockito.Mockito.doReturn(Mono.just(new User())).when(userRepository).save(org.mockito.Mockito.any(User.class));
+        org.mockito.Mockito.doReturn(Mono.empty()).when(userRepository).deleteUserAuthorities(anyLong());
+        User saved = sampleUser();
+        saved.setLogin("newuser");
+        saved.setEmail("new@localhost");
+        org.mockito.Mockito.doReturn(Mono.just(saved)).when(userRepository).save(org.mockito.Mockito.any(User.class));
 
         StepVerifier.create(userService.createUser(dto).contextWrite(securityContext())).expectNextCount(1).verifyComplete();
     }
@@ -257,7 +283,7 @@ class UserServiceTest {
 
     @Test
     void getAllManagedUsers_mapsToDto() {
-        when(userRepository.findAllWithAuthorities(PageRequest.of(0, 20))).thenReturn(Flux.just(user));
+        when(userRepository.findAllByIdNotNull(PageRequest.of(0, 20))).thenReturn(Flux.just(user));
 
         StepVerifier.create(userService.getAllManagedUsers(PageRequest.of(0, 20)))
             .assertNext(dto -> assertThat(dto.getLogin()).isEqualTo("user"))
@@ -266,7 +292,7 @@ class UserServiceTest {
 
     @Test
     void getAllPublicUsers_mapsToDto() {
-        when(userRepository.findAllByIdNotNullAndActivatedIsTrue(PageRequest.of(0, 20))).thenReturn(Flux.just(user));
+        when(userRepository.findAllByActivatedIsTrue(PageRequest.of(0, 20))).thenReturn(Flux.just(user));
 
         StepVerifier.create(userService.getAllPublicUsers(PageRequest.of(0, 20))).expectNextCount(1).verifyComplete();
     }
@@ -280,46 +306,41 @@ class UserServiceTest {
 
     @Test
     void getUserWithAuthoritiesByLogin_delegatesToRepository() {
-        when(userRepository.findOneWithAuthoritiesByLogin("user")).thenReturn(Mono.just(user));
+        when(userRepository.findOneByLogin("user")).thenReturn(Mono.just(user));
 
         StepVerifier.create(userService.getUserWithAuthoritiesByLogin("user")).expectNext(user).verifyComplete();
     }
 
     @Test
     void getUserWithAuthorities_usesSecurityContext() {
-        when(userRepository.findOneWithAuthoritiesByLogin("user")).thenReturn(Mono.just(user));
+        when(userRepository.findOneByLogin("user")).thenReturn(Mono.just(user));
 
         StepVerifier.create(userService.getUserWithAuthorities().contextWrite(securityContext())).expectNext(user).verifyComplete();
     }
 
     @Test
-    void removeNotActivatedUsersReactively_deletesStaleUsers() {
+    void removeNotActivatedUsers_deletesStaleUsers() {
         User stale = sampleUser();
         stale.setActivated(false);
-        when(userRepository.findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(any(LocalDateTime.class))).thenReturn(
+        when(userRepository.findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(any(Instant.class))).thenReturn(
             Flux.just(stale)
         );
-        StepVerifier.create(userService.removeNotActivatedUsersReactively()).expectNext(stale).verifyComplete();
+        when(userRepository.delete(stale)).thenReturn(Mono.empty());
+
+        userService.removeNotActivatedUsers();
+
+        verify(userRepository).delete(stale);
     }
 
     @Test
     void removeNotActivatedUsers_blocksUntilComplete() {
         when(
-            userRepository.findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(any(LocalDateTime.class))
+            userRepository.findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(any(Instant.class))
         ).thenReturn(Flux.empty());
 
         userService.removeNotActivatedUsers();
 
-        verify(userRepository).findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(any(LocalDateTime.class));
-    }
-
-    @Test
-    void getAuthorities_returnsNames() {
-        Authority authority = new Authority();
-        authority.setName(AuthoritiesConstants.ADMIN);
-        when(authorityRepository.findAll()).thenReturn(Flux.just(authority));
-
-        StepVerifier.create(userService.getAuthorities()).expectNext(AuthoritiesConstants.ADMIN).verifyComplete();
+        verify(userRepository).findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(any(Instant.class));
     }
 
     @Test

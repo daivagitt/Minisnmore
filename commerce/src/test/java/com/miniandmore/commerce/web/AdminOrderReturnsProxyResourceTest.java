@@ -63,4 +63,17 @@ class AdminOrderReturnsProxyResourceTest {
             )
             .andExpect(status().isOk());
     }
+
+    @Test
+    void refund_delegatesToCatalog() throws Exception {
+        when(catalog.post(eq("/internal/v1/admin/order-returns/R2/refund"), any())).thenReturn(ResponseEntity.ok("{}"));
+
+        mockMvc
+            .perform(
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/admin/order-returns/R2/refund")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content("{}")
+            )
+            .andExpect(status().isOk());
+    }
 }

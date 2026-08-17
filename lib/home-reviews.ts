@@ -52,6 +52,28 @@ export function homeReviewDraftsFromPayload(payload: Record<string, unknown> | u
   return raw.map(draftFromRaw);
 }
 
+export function reviewToHomeReviewDraft(review: Review): HomeReviewDraft {
+  return {
+    title: review.title,
+    body: review.body,
+    author: review.author,
+    date: review.date.trim() === "Recent" ? "" : review.date,
+    rating: review.rating,
+    photo: review.photo,
+  };
+}
+
+/** Default mom-review cards — same content shown on the homepage before CMS overrides. */
+export function defaultHomeReviewDrafts(): HomeReviewDraft[] {
+  return defaultReviews.map(reviewToHomeReviewDraft);
+}
+
+/** Admin editor: show saved reviews, or pre-fill with defaults so they can be edited and saved. */
+export function homeReviewDraftsForEditor(payload: Record<string, unknown> | undefined): HomeReviewDraft[] {
+  const fromPayload = homeReviewDraftsFromPayload(payload);
+  return fromPayload.length > 0 ? fromPayload : defaultHomeReviewDrafts();
+}
+
 export function getHomeReviewValidationErrors(draft: HomeReviewDraft, index?: number): string[] {
   const prefix = index != null ? `Review ${index + 1}: ` : "";
   const errors: string[] = [];

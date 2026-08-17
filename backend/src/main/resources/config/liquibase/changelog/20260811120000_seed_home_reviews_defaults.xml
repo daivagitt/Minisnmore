@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+  <!-- Pre-fill mom reviews home section so Admin → Home can edit the default carousel cards. -->
+  <changeSet id="20260811120000-1" author="minisandmore">
+    <sql dbms="postgresql">
+      UPDATE home_section
+      SET payload_json = '{"reviews":[
+        {"title":"Softest muslin we own","body":"The swaddle set feels feather-light and washes beautifully. My daughter sleeps so much better wrapped in it.","rating":5,"author":"Priya S., Bengaluru","date":"Mar 2025","photo":""},
+        {"title":"Perfect naming-day gift","body":"Ordered the gift service for my niece''s ceremony — the wrapping was stunning and the note card felt truly personal.","rating":5,"author":"Ananya M., Hyderabad","date":"Feb 2025","photo":""},
+        {"title":"Gentle on newborn skin","body":"Zero irritation on day one. The organic cotton romper is now our go-to for every outing.","rating":5,"author":"Meera K., Chennai","date":"Jan 2025","photo":""},
+        {"title":"Heirloom quality","body":"Stitching and fabric feel premium. We''re saving pieces for baby number two — they still look new after many washes.","rating":5,"author":"Divya R., Pune","date":"Dec 2024","photo":""},
+        {"title":"Beautiful colours, true to photos","body":"The blush terracotta set matched the website exactly. Fast delivery and lovely packaging too.","rating":5,"author":"Kavya N., Mumbai","date":"Nov 2024","photo":""}
+      ]}'
+      WHERE section_key = 'reviews'
+        AND (
+          payload_json IS NULL
+          OR trim(payload_json) = ''
+          OR payload_json = '{}'
+          OR payload_json = '{"reviews":[]}'
+        );
+    </sql>
+  </changeSet>
+</databaseChangeLog>

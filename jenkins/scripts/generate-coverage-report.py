@@ -159,6 +159,68 @@ def parse_jacoco_xml(path: Path) -> tuple[dict, list[dict]]:
     return total, rows
 
 
+def merge_jacoco_xmls(paths: list[Path]) -> tuple[dict, list[dict]]:
+    """Merge multiple JaCoCo report roots into one combined total + class rows."""
+    line_missed = line_covered = 0
+    stmt_missed = stmt_covered = 0
+    branch_missed = branch_covered = 0
+    merged_rows: dict[str, dict] = {}
+
+    for path in paths:
+        if not path.is_file():
+            continue
+        root = ET.parse(path).getroot()
+        lm, lc = counter_totals(root, "LINE")
+        sm, sc = counter_totals(root, "INSTRUCTION")
+        bm, bc = counter_totals(root, "BRANCH")
+        line_missed += lm
+        line_covered += lc
+        stmt_missed += sm
+        stmt_covered += sc
+        branch_missed += bm
+        branch_covered += bc
+
+        _, rows = parse_jacoco_xml(path)
+        for row in rows:
+            key = row["module"]
+            if key not in merged_rows:
+                merged_rows[key] = {"module": key, "covered": 0, "total": 0}
+            merged_rows[key]["covered"] += row["covered"]
+            merged_rows[key]["total"] += row["total"]
+
+    total = {
+        "lines": {
+            "covered": line_covered,
+            "total": line_missed + line_covered,
+            "pct": ratio_pct(line_missed, line_covered),
+        },
+        "statements": {
+            "covered": stmt_covered,
+            "total": stmt_missed + stmt_covered,
+            "pct": ratio_pct(stmt_missed, stmt_covered),
+        },
+        "branches": {
+            "covered": branch_covered,
+            "total": branch_missed + branch_covered,
+            "pct": ratio_pct(branch_missed, branch_covered),
+        },
+    }
+
+    rows: list[dict] = []
+    for key, row in merged_rows.items():
+        missed = row["total"] - row["covered"]
+        rows.append(
+            {
+                "module": key,
+                "lines_pct": ratio_pct(missed, row["covered"]),
+                "covered": row["covered"],
+                "total": row["total"],
+            }
+        )
+    rows.sort(key=lambda row: (-row["lines_pct"], row["module"]))
+    return total, rows
+
+
 def module_rows_html(rows: list[dict], *, limit: int = 40) -> str:
     if not rows:
         return '<tr><td colspan="4" class="muted">No module-level coverage data found.</td></tr>'
@@ -237,7 +299,7 @@ def build_body(
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--kind", choices=["frontend", "backend"], required=True)
-    parser.add_argument("--input", required=True)
+    parser.add_argument("--input", required=True, help="Primary input file, or comma-separated JaCoCo XML paths for backend merge")
     parser.add_argument("--output", required=True)
     parser.add_argument("--detail-href", required=True, help="Relative link to raw HTML coverage browser")
     parser.add_argument("--line-gate", type=float, default=95.0)
@@ -249,7 +311,11 @@ def main() -> None:
         total, rows = parse_vitest_summary(input_path)
         title = "Frontend Code Coverage Report"
     else:
-        total, rows = parse_jacoco_xml(input_path)
+        jacoco_paths = [Path(p.strip()) for p in args.input.split(",") if p.strip()]
+        if len(jacoco_paths) > 1:
+            total, rows = merge_jacoco_xmls(jacoco_paths)
+        else:
+            total, rows = parse_jacoco_xml(jacoco_paths[0])
         title = "Backend Code Coverage Report"
 
     body = build_body(

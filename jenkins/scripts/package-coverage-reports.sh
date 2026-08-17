@@ -19,6 +19,8 @@ if [ -f coverage/frontend/coverage-summary.json ]; then
     --kind frontend \
     --input coverage/frontend/coverage-summary.json \
     --detail-href ../coverage/index.html \
+    --line-gate 94 \
+    --branch-gate 80 \
     --output "$package_dir/frontend/coverage-summary/index.html"
 fi
 
@@ -58,11 +60,13 @@ done < <(
 
 if [ "${#module_args[@]}" -gt 0 ]; then
   mkdir -p "$package_dir/backend/coverage-summary"
-  primary_xml="$(echo "${module_args[0]}" | cut -d'|' -f1)"
+  jacoco_csv="$(printf '%s\n' "${module_args[@]}" | cut -d'|' -f1 | paste -sd,)"
   python3 jenkins/scripts/generate-coverage-report.py \
     --kind backend \
-    --input "$primary_xml" \
+    --input "$jacoco_csv" \
     --detail-href ../coverage/index.html \
+    --line-gate 94 \
+    --branch-gate 70 \
     --output "$package_dir/backend/coverage-summary/index.html"
 
   python3 jenkins/scripts/generate-backend-coverage-index.py \

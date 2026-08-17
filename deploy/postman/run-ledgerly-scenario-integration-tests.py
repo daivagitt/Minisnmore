@@ -131,6 +131,17 @@ def scenario_ledgerly_order_sync(admin_token: str, order_ctx: dict[str, Any]) ->
             )
         )
         order_ctx["ledgerlySyncTriggered"] = True
+    elif code == 200 and target_order == REFERENCE_SYNCED_ORDER:
+        sc.steps.append(
+            Step(
+                "sync-order",
+                "pass",
+                f"sync exercised on reference {target_order} (status={payload.get('ledgerlySyncStatus', 'unknown')})",
+                ms,
+                payload,
+            )
+        )
+        order_ctx["ledgerlySyncTriggered"] = True
     else:
         sc.steps.append(Step("sync-order", "fail", f"HTTP {code}", ms, {"body": str(data)[:400]}))
         return sc

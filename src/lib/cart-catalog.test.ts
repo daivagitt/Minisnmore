@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Product } from "@/data/products";
 import type { CartItem } from "@/store/shop";
-import { sanitizeCartWithCatalog } from "./cart-catalog";
+import { sanitizeCartWithCatalog, cartLineImage, cartLineColorLabel } from "./cart-catalog";
 
 const base: Product = {
   id: "p1",
@@ -83,5 +83,25 @@ describe("cart-catalog", () => {
     const result = sanitizeCartWithCatalog([line({ product: soldOut })], [soldOut]);
     expect(result.removed).toEqual(["Sold out"]);
     expect(result.cart).toHaveLength(0);
+  });
+
+  it("resolves per-print images for cart lines", () => {
+    const swaddle: Product = {
+      ...base,
+      id: "swaddle",
+      name: "Baby Swaddle",
+      image: "https://cdn.example.com/print1.jpg",
+      gallery: [],
+      colors: [
+        { name: "BROWN SWADDLE", hex: "#d9bfa6", imageUrls: ["https://cdn.example.com/print1.jpg"] },
+        { name: "GREEN SWADDLE", hex: "#d9bfa6", imageUrls: ["https://cdn.example.com/print2.jpg"] },
+      ],
+    };
+    const print1 = line({ product: swaddle, color: "Print-1" });
+    const print2 = line({ product: swaddle, color: "Print-2" });
+    expect(cartLineImage(print1)).toBe("https://cdn.example.com/print1.jpg");
+    expect(cartLineImage(print2)).toBe("https://cdn.example.com/print2.jpg");
+    expect(cartLineColorLabel(print1)).toBe("BROWN SWADDLE");
+    expect(cartLineColorLabel(print2)).toBe("GREEN SWADDLE");
   });
 });

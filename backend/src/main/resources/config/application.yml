@@ -250,6 +250,14 @@ application:
     default-location-id: ${ZOHO_DEFAULT_LOCATION_ID:}
     default-location-name: ${ZOHO_DEFAULT_LOCATION_NAME:Head Office}
     inventory-account-id: ${ZOHO_INVENTORY_ACCOUNT_ID:}
+    inventory-adjustment-account-id: ${ZOHO_INVENTORY_ADJUSTMENT_ACCOUNT_ID:}
+    product-fields:
+      fabric-type-label: ${ZOHO_FIELD_FABRIC_TYPE:Fabric Type}
+      sizes-label: ${ZOHO_FIELD_SIZES:sizes}
+      age-min-label: ${ZOHO_FIELD_AGE_MIN:age}
+      age-max-label: ${ZOHO_FIELD_AGE_MAX:Age Max (months)}
+      category-label: ${ZOHO_FIELD_CATEGORY:category}
+      mrp-api-name: ${ZOHO_FIELD_MRP_API_NAME:label_rate}
     order-retry:
       fixed-delay-ms: ${ZOHO_ORDER_RETRY_FIXED_DELAY_MS:600000}
     order-tracking:
@@ -282,6 +290,12 @@ application:
   inventory:
     reservation-release:
       fixed-delay-ms: ${INVENTORY_RESERVATION_RELEASE_FIXED_DELAY_MS:300000}
+  xpressbees:
+    base-url: ${XPRESSBEES_BASE_URL:https://shipment.xpressbees.com}
+    email: ${XPRESSBEES_EMAIL:}
+    password: ${XPRESSBEES_PASSWORD:}
+    origin-pincode: ${XPRESSBEES_ORIGIN_PINCODE:560074}
+    payment-type: ${XPRESSBEES_PAYMENT_TYPE:prepaid}
 
 razorpay:
   key-id: ${RAZORPAY_KEY_ID:}

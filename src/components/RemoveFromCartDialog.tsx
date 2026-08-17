@@ -30,7 +30,7 @@ export function RemoveFromCartDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Remove from cart?</AlertDialogTitle>
           <AlertDialogDescription>
-            Move &ldquo;{productName}&rdquo; to your wishlist instead, or remove it from your cart.
+            Move &ldquo;{productName}&rdquo; to your wishlist instead, or remove it from cart.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

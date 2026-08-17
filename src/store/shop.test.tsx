@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ShopProvider, useShop } from "./shop";
 import type { Product } from "@/data/products";
+import { addMyWishlistItem, replaceMyCart, replaceMyWishlist, removeMyWishlistItem } from "@/lib/account.functions";
 
 const authState = vi.hoisted(() => ({
   user: null as { id: number } | null,
@@ -26,6 +27,16 @@ vi.mock("@/hooks/useAuth", () => ({
 
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
+}));
+
+vi.mock("@/lib/account.functions", () => ({
+  listMyWishlist: vi.fn(async () => ({ product_ids: [] })),
+  syncMyWishlist: vi.fn(async (ids: string[]) => ({ product_ids: ids })),
+  replaceMyWishlist: vi.fn(async (ids: string[]) => ({ product_ids: ids })),
+  addMyWishlistItem: vi.fn(async () => ({ ok: true })),
+  removeMyWishlistItem: vi.fn(async () => ({ ok: true })),
+  listMyCart: vi.fn(async () => ({ items: [], coupon: null })),
+  replaceMyCart: vi.fn(async (items: unknown[], coupon: unknown) => ({ items, coupon })),
 }));
 
 const product: Product = {
@@ -131,8 +142,12 @@ describe("ShopProvider", () => {
     await userEvent.click(screen.getByRole("button", { name: "wish" }));
     expect(screen.getByTestId("wishlist")).toHaveTextContent("p1");
     expect(localStorage.getItem("mnm_wish_u_1")).toContain("p1");
+    await waitFor(() => expect(addMyWishlistItem).toHaveBeenCalledWith("p1"));
+    await waitFor(() => expect(replaceMyWishlist).toHaveBeenCalled());
+    await waitFor(() => expect(replaceMyCart).toHaveBeenCalled());
     await userEvent.click(screen.getByRole("button", { name: "wish" }));
     expect(screen.getByTestId("wishlist")).toHaveTextContent("");
+    await waitFor(() => expect(removeMyWishlistItem).toHaveBeenCalledWith("p1"));
 
     await userEvent.click(screen.getByRole("button", { name: "remove" }));
     expect(screen.getByTestId("count")).toHaveTextContent("0");

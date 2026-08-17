@@ -100,4 +100,16 @@ class CatalogInternalClientTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         mockServer.verify();
     }
+
+    @Test
+    void exchange_emptyBody_returnsNullBody() {
+        mockServer
+            .expect(org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo("http://127.0.0.1:8084/internal/v1/empty"))
+            .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withNoContent());
+
+        var response = client.exchange(HttpMethod.GET, "/internal/v1/empty", null, false);
+        assertThat(response.getBody()).isNull();
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        mockServer.verify();
+    }
 }

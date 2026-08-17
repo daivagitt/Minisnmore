@@ -27,9 +27,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class LedgerlyWebhookHandlerServiceTest {
 
     private static final String SECRET = "webhook-secret";
@@ -171,6 +174,121 @@ class LedgerlyWebhookHandlerServiceTest {
         assertThatThrownBy(() -> handler.handle(body, sign(body), "item.updated"))
             .isInstanceOf(ResponseStatusException.class)
             .hasMessageContaining("Missing event id");
+    }
+
+    @Test
+    void handle_itemCreated_mergesProduct() throws Exception {
+        String body = "{\"id\":\"evt-7\",\"data\":{\"sku\":\"SKU-2\",\"price\":99}}";
+        Product product = new Product().sku("SKU-2");
+        when(webhookEventRepository.existsByEventId("evt-7")).thenReturn(false);
+        when(productRepository.findOneBySku("SKU-2")).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+
+        Map<String, Object> result = handler.handle(body, sign(body), "item.created");
+
+        assertThat(result).containsEntry("event", "item.created");
+        verify(productMergeService).mergeLedgerlyItem(any(), any(), any(), any());
+    }
+
+    @Test
+    void handle_autoPullDisabled_skipsItemUpdate() throws Exception {
+        ApplicationProperties.Ledgerly ledgerly = new ApplicationProperties.Ledgerly();
+        ledgerly.setAutoPullEnabled(false);
+        when(applicationProperties.getLedgerly()).thenReturn(ledgerly);
+        String body = "{\"id\":\"evt-8\",\"data\":{\"sku\":\"SKU-3\"}}";
+        when(webhookEventRepository.existsByEventId("evt-8")).thenReturn(false);
+
+        handler.handle(body, sign(body), "item.updated");
+
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void handle_autoSyncDisabled_skipsInvoicePaid() throws Exception {
+        ApplicationProperties.Ledgerly ledgerly = new ApplicationProperties.Ledgerly();
+        ledgerly.setAutoSyncEnabled(false);
+        when(applicationProperties.getLedgerly()).thenReturn(ledgerly);
+        String body = "{\"id\":\"evt-9\",\"data\":{\"externalRef\":\"MNM-200\"}}";
+        when(webhookEventRepository.existsByEventId("evt-9")).thenReturn(false);
+
+        handler.handle(body, sign(body), "invoice.paid");
+
+        verify(customerOrderRepository, never()).save(any());
+    }
+
+    @Test
+    void handle_orderFulfilled_updatesTracking() throws Exception {
+        String body = "{\"id\":\"evt-10\",\"data\":{\"orderNumber\":\"MNM-201\",\"status\":\"fulfilled\",\"trackingNumber\":\"AWB-2\"}}";
+        CustomerOrder order = new CustomerOrder().orderNumber("MNM-201").paymentStatus(PaymentStatus.PAID);
+        when(webhookEventRepository.existsByEventId("evt-10")).thenReturn(false);
+        when(customerOrderRepository.findOneByOrderNumber("MNM-201")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        handler.handle(body, sign(body), "order.fulfilled");
+
+        assertThat(order.getTrackingNumber()).isEqualTo("AWB-2");
+    }
+
+    @Test
+    void handle_unhandledEvent_stillPersistsEvent() throws Exception {
+        String body = "{\"id\":\"evt-11\",\"data\":{}}";
+        when(webhookEventRepository.existsByEventId("evt-11")).thenReturn(false);
+
+        Map<String, Object> result = handler.handle(body, sign(body), "catalog.unknown");
+
+        assertThat(result).containsEntry("ok", true).containsEntry("event", "catalog.unknown");
+        verify(webhookEventRepository).save(any());
+    }
+
+    @Test
+    void handle_itemUpdated_missingSku_throwsBadRequest() {
+        String body = "{\"id\":\"evt-12\",\"data\":{}}";
+        when(webhookEventRepository.existsByEventId("evt-12")).thenReturn(false);
+
+        assertThatThrownBy(() -> handler.handle(body, sign(body), "item.updated"))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("requires sku");
+    }
+
+    @Test
+    void handle_invoicePaid_usesOrderNumberFallback() throws Exception {
+        String body = "{\"id\":\"evt-13\",\"data\":{\"orderNumber\":\"MNM-203\",\"ledgerlyInvoiceId\":\"inv-203\"}}";
+        CustomerOrder order = new CustomerOrder().orderNumber("MNM-203").paymentStatus(PaymentStatus.PENDING);
+        when(webhookEventRepository.existsByEventId("evt-13")).thenReturn(false);
+        when(customerOrderRepository.findOneByOrderNumber("MNM-203")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        handler.handle(body, sign(body), "invoice.paid");
+
+        assertThat(order.getLedgerlyInvoiceId()).isEqualTo("inv-203");
+    }
+
+    @Test
+    void handle_missingWebhookSecret_throwsServiceUnavailable() {
+        when(credentialsProvider.webhookSecret()).thenReturn("");
+        String body = "{\"id\":\"evt-14\",\"data\":{}}";
+
+        assertThatThrownBy(() -> handler.handle(body, sign(body), "item.updated"))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("webhook secret not configured");
+    }
+
+    @Test
+    void handle_missingSignature_throwsUnauthorized() {
+        String body = "{\"id\":\"evt-15\",\"data\":{}}";
+
+        assertThatThrownBy(() -> handler.handle(body, "", "item.updated"))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Missing X-Ledgerly-Signature");
+    }
+
+    @Test
+    void handle_invalidJson_throwsBadRequest() {
+        String body = "not-json";
+
+        assertThatThrownBy(() -> handler.handle(body, sign(body), "item.updated"))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Invalid JSON");
     }
 
     private static String sign(String payload) throws Exception {

@@ -3,9 +3,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { syncPaymentStatus, retryOrderPayment, verifyPayment } from "@/lib/orders.functions";
 import { openRazorpayCheckout } from "@/lib/razorpay";
 import { formatOrderDate } from "@/lib/dates";
+import { formatOrderStatusSummary, formatPaymentStatusLabel } from "@/lib/order-status";
 import { useOrderTrackingPoll } from "@/hooks/useOrderTrackingPoll";
+import { shouldPollOrderTracking } from "@/lib/order-tracking";
 import { Loader2, ArrowLeft, MapPin, CreditCard, Package2, CheckCircle2, Clock, XCircle, Truck, Wallet } from "lucide-react";
 import { toast } from "sonner";
+import { LazyImage } from "@/components/LazyImage";
+import { CopyButton } from "@/components/CopyButton";
 import { OrderTrackingCard } from "@/components/OrderTrackingCard";
 import { TrackingRefreshHint } from "@/components/TrackingRefreshHint";
 
@@ -114,6 +118,7 @@ function OrderDetail() {
   }
 
   const addr = order.shipping_address || {};
+  const itemCount = (order.order_items ?? []).reduce((sum, it) => sum + Number(it.qty ?? 0), 0);
   const StatusIcon = order.payment_status === "paid" ? CheckCircle2 : order.payment_status === "failed" ? XCircle : Clock;
 
   return (
@@ -124,19 +129,48 @@ function OrderDetail() {
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
             <div className="text-xs uppercase tracking-[0.28em] text-primary">Order</div>
-            <h1 className="font-display text-3xl mt-1">{order.order_number}</h1>
+            <div className="flex items-center gap-2 mt-1">
+              <h1 className="font-display text-3xl">{order.order_number}</h1>
+              <CopyButton
+                value={order.order_number}
+                label="Copy order ID"
+                title="Copy"
+                successMessage="Order ID copied"
+                className="h-7 w-7 shrink-0"
+                iconClassName="h-3 w-3"
+              />
+            </div>
             <div className="text-xs text-muted-foreground mt-1">
               Placed {formatOrderDate(order.created_at, { day: "numeric", month: "long", year: "numeric" })}
+              {shouldPollOrderTracking(order) && (
+                <>
+                  {" · "}
+                  <Link
+                    to="/track"
+                    search={{ order: order.order_number }}
+                    className="text-primary hover:underline"
+                  >
+                    Open tracking page
+                  </Link>
+                </>
+              )}
             </div>
           </div>
           <div className="inline-flex items-center gap-2 glass rounded-full px-4 py-2 text-sm">
             <StatusIcon className="h-4 w-4 text-primary" />
-            <span className="capitalize">{order.payment_status}</span>
-            <span className="text-muted-foreground">·</span>
-            <span className="capitalize">{order.status}</span>
+            <span>{formatOrderStatusSummary(order)}</span>
           </div>
         </div>
       </div>
+
+      {order.payment_status === "pending" && order.payment_method === "cod" && (
+        <div className="glass-strong rounded-[2rem] p-5 md:p-6 border border-primary/20 bg-primary/5">
+          <div className="text-sm font-medium">Pay on delivery</div>
+          <p className="text-sm text-muted-foreground mt-1">
+            Your order is confirmed and being prepared. Pay ₹{Number(order.total).toLocaleString("en-IN")} in cash or UPI when it arrives.
+          </p>
+        </div>
+      )}
 
       {order.payment_status === "pending" && order.payment_method !== "cod" && (
         <div className="glass-strong rounded-[2rem] p-5 md:p-6 border border-amber-500/30 bg-amber-500/10">
@@ -172,11 +206,15 @@ function OrderDetail() {
 
       <div className="grid lg:grid-cols-[1fr_320px] gap-4">
         <div className="glass-strong rounded-[2rem] p-6 md:p-8">
-          <h2 className="font-display text-xl mb-4 flex items-center gap-2"><Package2 className="h-5 w-5 text-primary" /> Items</h2>
+          <h2 className="font-display text-xl mb-4 flex items-center gap-2">
+            <Package2 className="h-5 w-5 text-primary" />
+            Items
+            <span className="text-muted-foreground font-normal text-base">({itemCount})</span>
+          </h2>
           <div className="space-y-3">
             {order.order_items?.map((it: any) => (
               <div key={it.id} className="glass rounded-2xl p-3 flex gap-3 items-center">
-                {it.product_image && <img src={it.product_image} className="h-16 w-16 rounded-xl object-cover" alt="" />}
+                {it.product_image && <LazyImage src={it.product_image} className="h-16 w-16 rounded-xl object-cover" alt="" priority="auto" />}
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{it.product_name}</div>
                   <div className="text-xs text-muted-foreground">
@@ -198,9 +236,12 @@ function OrderDetail() {
             </div>
             <div className="glass rounded-2xl p-4">
               <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground mb-2"><CreditCard className="h-4 w-4 text-primary" /> Payment</div>
-              <div className="text-sm font-medium capitalize">{order.payment_status}</div>
+              <div className="text-sm font-medium">{formatPaymentStatusLabel(order.payment_status, order.payment_method)}</div>
+              {order.payment_method === "cod" && order.payment_status === "pending" && (
+                <div className="text-xs text-muted-foreground mt-1">Cash or UPI at doorstep</div>
+              )}
               {order.razorpay_payment_id && <div className="text-xs text-muted-foreground break-all">ID: {order.razorpay_payment_id}</div>}
-              {order.payment_status === "pending" && (
+              {order.payment_status === "pending" && order.payment_method !== "cod" && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -232,6 +273,9 @@ function OrderDetail() {
           <Row label="Subtotal" value={`₹${Number(order.subtotal).toLocaleString("en-IN")}`} />
           {Number(order.discount) > 0 && <Row label="Discount" value={`− ₹${Number(order.discount).toLocaleString("en-IN")}`} accent />}
           <Row label="Shipping" value={Number(order.shipping) === 0 ? "Free" : `₹${Number(order.shipping).toLocaleString("en-IN")}`} muted />
+          {Number(order.cod_fee) > 0 && (
+            <Row label="COD handling fee" value={`₹${Number(order.cod_fee).toLocaleString("en-IN")}`} muted />
+          )}
           <Row label="GST" value={`₹${Number(order.tax).toLocaleString("en-IN")}`} muted />
           {Number(order.donation) > 0 && <Row label="Donation ♥" value={`₹${Number(order.donation).toLocaleString("en-IN")}`} accent />}
           <div className="border-t border-border/60 mt-2 pt-2 flex justify-between font-display text-lg">

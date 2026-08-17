@@ -62,7 +62,7 @@ public class LedgerlyCategoryResolver {
             return "item";
         }
         String normalized = NON_SLUG.matcher(value.toLowerCase(Locale.ROOT).trim()).replaceAll("-");
-        normalized = normalized.replaceAll("^-+|-+$", "");
+        normalized = normalized.replaceAll("^-+", "").replaceAll("-+$", "");
         return normalized.isBlank() ? "item" : normalized;
     }
 }

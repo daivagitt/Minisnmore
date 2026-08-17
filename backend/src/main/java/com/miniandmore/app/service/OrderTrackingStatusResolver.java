@@ -17,11 +17,16 @@ public final class OrderTrackingStatusResolver {
         if (order.getPaymentStatus() != PaymentStatus.PAID) {
             return "pending";
         }
-        if (order.getStatus() == OrderStatus.FULFILLED || LedgerlyOrderStatus.isDelivered(ledgerlyStatus)) {
+        if (
+            order.getStatus() == OrderStatus.FULFILLED ||
+            LedgerlyOrderStatus.isDelivered(ledgerlyStatus) ||
+            ZohoOrderStatus.isDelivered(order.getZohoOrderStatus())
+        ) {
             return "delivered";
         }
         if (
             LedgerlyOrderStatus.isShipped(ledgerlyStatus) ||
+            ZohoOrderStatus.isShipped(order.getZohoOrderStatus()) ||
             StringUtils.isNotBlank(order.getTrackingNumber()) ||
             StringUtils.isNotBlank(order.getShipmentDate())
         ) {

@@ -81,6 +81,10 @@ class OAuth2UserTokenServiceTest {
             .thenReturn(Mono.just(new Authority().name(AuthoritiesConstants.USER)));
         org.mockito.Mockito.lenient().when(userRepository.findOneWithAuthoritiesByEmailIgnoreCaseForOAuth(anyString())).thenReturn(Mono.empty());
         org.mockito.Mockito.lenient().when(userRepository.findOneWithAuthoritiesByLoginForOAuth(anyString())).thenReturn(Mono.empty());
+        org.mockito.Mockito.lenient().when(userRepository.findOneByLogin(anyString())).thenReturn(Mono.empty());
+        org.mockito.Mockito.lenient().when(userRepository.findOneByEmailIgnoreCase(anyString())).thenReturn(Mono.empty());
+        org.mockito.Mockito.lenient().when(userRepository.deleteUserAuthorities(anyLong())).thenReturn(Mono.empty());
+        org.mockito.Mockito.lenient().when(userRepository.delete(any(User.class))).thenReturn(Mono.empty());
         org.mockito.Mockito.lenient().when(userRepository.deleteInactiveByLogin(anyString())).thenReturn(Mono.empty());
         org.mockito.Mockito.lenient().when(userRepository.deleteInactiveByEmail(anyString())).thenReturn(Mono.empty());
         org.mockito.Mockito.lenient()

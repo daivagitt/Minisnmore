@@ -156,4 +156,138 @@ class ProductColorImagesSupportTest {
 
         assertThat(support.parseMap(json)).isEqualTo(map);
     }
+
+    @Test
+    void syncProductColorImages_nullProductIsNoOp() {
+        support.syncProductColorImages(null);
+    }
+
+    @Test
+    void ensureProductImagesFromColorGalleries_skipsWhenImagesJsonPopulated() {
+        Product product = new Product()
+            .colorsJson("[{\"name\":\"Navy\",\"imageUrls\":[\"https://cdn.example.com/navy.jpg\"]}]")
+            .imagesJson("[\"https://cdn.example.com/existing.jpg\"]");
+
+        support.ensureProductImagesFromColorGalleries(product);
+
+        assertThat(product.getImagesJson()).contains("existing.jpg").doesNotContain("navy.jpg");
+    }
+
+    @Test
+    void ensureProductImagesFromColorGalleries_nullProductIsNoOp() {
+        support.ensureProductImagesFromColorGalleries(null);
+    }
+
+    @Test
+    void collectSwatchAndGalleryUrls_deduplicateAndSkipBlanks() {
+        String colorsJson =
+            "[{\"name\":\"A\",\"swatchUrl\":\"https://cdn.example.com/s.jpg\"}," +
+            "{\"name\":\"B\",\"swatchUrl\":\"  \"}," +
+            "{\"name\":\"C\",\"imageUrls\":[\"https://cdn.example.com/g1.jpg\",\"https://cdn.example.com/g1.jpg\"]}]";
+
+        assertThat(support.collectSwatchUrlsFromColorsJson(colorsJson)).containsExactly("https://cdn.example.com/s.jpg");
+        assertThat(support.collectGalleryUrlsFromColorsJson(colorsJson)).containsExactly("https://cdn.example.com/g1.jpg");
+    }
+
+    @Test
+    void normalizeColorsJson_dedupesPlainStringEntries() {
+        String normalized = support.normalizeColorsJson("[\"Navy\",\"navy\",\"Blush\"]");
+
+        assertThat(normalized).isEqualTo("[\"Navy\",\"Blush\"]");
+    }
+
+    @Test
+    void coerceMap_handlesMapStringAndInvalidObject() {
+        Map<String, List<String>> fromMap = support.coerceMap(Map.of("Navy", List.of("https://cdn.example.com/n.jpg")));
+        assertThat(fromMap).containsEntry("Navy", List.of("https://cdn.example.com/n.jpg"));
+
+        assertThat(support.coerceMap("{\"Blush\":[\"https://cdn.example.com/b.jpg\"]}")).containsKey("Blush");
+        assertThat(support.coerceMap(42)).isEmpty();
+        assertThat(support.coerceMap(null)).isEmpty();
+    }
+
+    @Test
+    void parseMap_returnsEmptyForInvalidJson() {
+        assertThat(support.parseMap("not-json")).isEmpty();
+        assertThat(support.parseMap(null)).isEmpty();
+    }
+
+    @Test
+    void realignColorNamesToGalleryKeys_buildsFromEmptyColors() {
+        Map<String, List<String>> gallery = Map.of("BROWN", List.of("https://cdn.example.com/brown.jpg"));
+        String realigned = support.realignColorNamesToGalleryKeys("[]", gallery);
+
+        assertThat(realigned).contains("BROWN").contains("brown.jpg");
+    }
+
+    @Test
+    void realignColorNamesToGalleryKeys_usesApplyWhenSizesMismatch() {
+        String colorsJson = "[\"Print 1\",\"Print 2\",\"Print 3\"]";
+        Map<String, List<String>> gallery = Map.of(
+            "A",
+            List.of("https://cdn.example.com/a.jpg"),
+            "B",
+            List.of("https://cdn.example.com/b.jpg")
+        );
+
+        String realigned = support.realignColorNamesToGalleryKeys(colorsJson, gallery);
+
+        assertThat(realigned).contains("Print 1").contains("Print 2").contains("Print 3");
+        assertThat(support.galleryMapFromColorsJson(realigned)).isEmpty();
+    }
+
+    @Test
+    void buildPositionalColorRename_returnsEmptyWhenSizesDiffer() {
+        assertThat(support.buildPositionalColorRename("[\"A\"]", "[\"A\",\"B\"]")).isEmpty();
+    }
+
+    @Test
+    void mergeRichColorMetadata_returnsRichWhenMatrixEmpty() {
+        String rich = "[{\"name\":\"BEE\",\"swatchUrl\":\"https://cdn.example.com/bee.jpg\"}]";
+
+        assertThat(support.mergeRichColorMetadata("[]", rich)).contains("bee.jpg");
+    }
+
+    @Test
+    void applyGalleryMapToColorsJson_buildsFromEmptyColorsJson() {
+        Map<String, List<String>> gallery = Map.of("Navy", List.of("https://cdn.example.com/navy.jpg"));
+
+        String merged = support.applyGalleryMapToColorsJson("[]", gallery);
+
+        assertThat(merged).contains("Navy").contains("navy.jpg");
+    }
+
+    @Test
+    void syncProductColorImages_clearsColorImagesWhenNoGallery() {
+        Product product = new Product().colorsJson("[\"Plain\"]");
+
+        support.syncProductColorImages(product);
+
+        assertThat(product.getColorImagesJson()).isNull();
+    }
+
+    @Test
+    void galleryUrls_capAtMaxPerColor() {
+        List<String> urls = new java.util.ArrayList<>();
+        for (int i = 0; i < ProductColorImagesSupport.MAX_IMAGES_PER_COLOR + 3; i++) {
+            urls.add("https://cdn.example.com/img-" + i + ".jpg");
+        }
+        String colorsJson =
+            "[{\"name\":\"Busy\",\"imageUrls\":" + new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(urls) + "}]";
+
+        Map<String, List<String>> map = support.galleryMapFromColorsJson(colorsJson);
+
+        assertThat(map.get("Busy")).hasSize(ProductColorImagesSupport.MAX_IMAGES_PER_COLOR);
+    }
+
+    @Test
+    void ensureProductImagesFromColorGalleries_treatsWhitespaceOnlyArrayAsEmpty() {
+        Product product = new Product()
+            .colorsJson("[{\"name\":\"Navy\",\"imageUrls\":[\"https://cdn.example.com/navy.jpg\"]}]")
+            .imagesJson("[\"   \"]");
+
+        support.ensureProductImagesFromColorGalleries(product);
+
+        assertThat(product.getImagesJson()).contains("navy.jpg");
+    }
 }

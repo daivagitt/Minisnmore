@@ -8,6 +8,8 @@ const authMock = vi.hoisted(() => ({
   signIn: vi.fn(),
   signUp: vi.fn(),
   signInWithOAuth: vi.fn(),
+  requestPasswordReset: vi.fn(),
+  resendActivationEmail: vi.fn(),
   user: null as null | { id: string },
   loading: false,
 }));
@@ -291,6 +293,53 @@ describe("login route", () => {
       to: "/login",
       search: { redirect: "/account" },
       replace: true,
-    });
+    }    );
+  });
+
+  it("forgotPassword_flow_sendsResetAndShowsConfirmation", async () => {
+    authMock.requestPasswordReset.mockResolvedValueOnce({ error: null });
+    renderLogin();
+
+    await userEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+    expect(screen.getByRole("heading", { name: "Reset password" })).toBeTruthy();
+
+    await userEvent.type(screen.getByPlaceholderText("you@email.com"), "parent@example.com");
+    await userEvent.click(screen.getByRole("button", { name: "Send reset link" }));
+
+    await waitFor(() =>
+      expect(authMock.requestPasswordReset).toHaveBeenCalledWith("parent@example.com")
+    );
+    expect(screen.getByText(/reset link is on its way/i)).toBeTruthy();
+  });
+
+  it("forgotPassword_invalidEmail_showsValidationError", async () => {
+    renderLogin();
+    await userEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+    await userEvent.type(screen.getByPlaceholderText("you@email.com"), "not-an-email");
+    await userEvent.click(screen.getByRole("button", { name: "Send reset link" }));
+
+    await waitFor(() =>
+      expect(toastMock.error).toHaveBeenCalledWith(expect.stringMatching(/email/i), { id: "forgot-password-error" })
+    );
+    expect(authMock.requestPasswordReset).not.toHaveBeenCalled();
+  });
+
+  it("togglesPasswordVisibility", async () => {
+    renderLogin();
+    const password = screen.getByPlaceholderText("Password (min 6)") as HTMLInputElement;
+    expect(password.type).toBe("password");
+
+    await userEvent.click(screen.getByRole("button", { name: "Show password" }));
+    expect(password.type).toBe("text");
+
+    await userEvent.click(screen.getByRole("button", { name: "Hide password" }));
+    expect(password.type).toBe("password");
+  });
+
+  it("backToSignIn_fromForgotMode", async () => {
+    renderLogin();
+    await userEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+    await userEvent.click(screen.getByRole("button", { name: "Back to sign in" }));
+    expect(screen.getByRole("heading", { name: "Sign in" })).toBeTruthy();
   });
 });

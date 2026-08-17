@@ -63,6 +63,21 @@ describe("resolveStorefrontProductImages", () => {
     expect(merged.map((e) => e.name)).toEqual(["BROWN SWADDLE", "GREEN SWADDLE", "WHITE SWADDLE"]);
     expect(merged[0]?.imageUrls).toEqual(["https://cdn.example.com/brown.jpg"]);
   });
+
+  it("realigns generic print slots even when colours already have gallery URLs", () => {
+    const merged = mergeColorImagesIntoColors(
+      [
+        { name: "Print-1", imageUrls: ["https://cdn.example.com/brown.jpg"] },
+        { name: "Print-2", imageUrls: ["https://cdn.example.com/green.jpg"] },
+      ],
+      {
+        "BROWN SWADDLE": ["https://cdn.example.com/brown.jpg"],
+        "GREEN SWADDLE": ["https://cdn.example.com/green.jpg"],
+      },
+    );
+
+    expect(merged.map((e) => e.name)).toEqual(["BROWN SWADDLE", "GREEN SWADDLE"]);
+  });
 });
 
 describe("buildColorImagesJson", () => {

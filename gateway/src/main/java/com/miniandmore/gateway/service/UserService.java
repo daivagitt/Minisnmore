@@ -82,6 +82,9 @@ public class UserService {
             .findOneByActivationKey(key)
             .flatMap(user -> {
                 user.setIsPersisted();
+                if (user.isActivated()) {
+                    return Mono.just(user);
+                }
                 user.setActivated(true);
                 user.setActivationKey(null);
                 return saveUser(user);

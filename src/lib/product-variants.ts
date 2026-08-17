@@ -30,7 +30,10 @@ export type VariantProductLike = {
 };
 
 export function isVariantsProduct(p: VariantProductLike | null | undefined): boolean {
-  return (p?.itemStructure ?? "").toUpperCase() === "VARIANTS";
+  const structure = (p?.itemStructure ?? "").toUpperCase();
+  if (structure === "VARIANTS") return true;
+  if (structure === "SIMPLE") return false;
+  return (p?.variants?.length ?? 0) > 0;
 }
 
 export function hasSellableVariants(p: VariantProductLike | null | undefined): boolean {
@@ -193,7 +196,7 @@ export function isSimpleProductSellable(product: VariantProductLike | null | und
 
 /** True if at least one active in-stock variant exists for this size. */
 export function sizeHasSellableVariants(product: VariantProductLike, size: string | null | undefined): boolean {
-  if (!isVariantsProduct(product)) return true;
+  if (!isVariantsProduct(product)) return isSimpleProductSellable(product);
   const want = sizeKey(size);
   return (product.variants ?? []).some((v) => v.active && v.stock > 0 && sizeKey(v.size) === want);
 }

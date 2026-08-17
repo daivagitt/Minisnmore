@@ -4,7 +4,7 @@ import { ImageUploadField } from "@/components/admin/ImageUploadField";
 import { HOME_SECTION_CARD_LIMIT } from "@/lib/home-section-limit";
 import {
   emptyHomeReview,
-  homeReviewDraftsFromPayload,
+  homeReviewDraftsForEditor,
   type HomeReviewDraft,
 } from "@/lib/home-reviews";
 
@@ -14,7 +14,7 @@ type Props = {
 };
 
 export function HomeReviewsEditor({ payload, onChange }: Props) {
-  const reviews = homeReviewDraftsFromPayload(payload);
+  const reviews = homeReviewDraftsForEditor(payload);
 
   const update = (index: number, patch: Partial<HomeReviewDraft>) => {
     const next = reviews.map((row, i) => (i === index ? { ...row, ...patch } : row));
@@ -34,10 +34,10 @@ export function HomeReviewsEditor({ payload, onChange }: Props) {
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <div className="text-sm font-medium">
-            Customer reviews ({reviews.length}/{HOME_SECTION_CARD_LIMIT})
+            Mom reviews ({reviews.length}/{HOME_SECTION_CARD_LIMIT})
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Add up to five review cards, or leave empty to show built-in sample reviews.
+            Edit the scrolling review cards on the homepage. Defaults are pre-filled — save to persist changes.
           </p>
         </div>
         <button
@@ -52,7 +52,7 @@ export function HomeReviewsEditor({ payload, onChange }: Props) {
 
       {reviews.length === 0 && (
         <div className="glass rounded-2xl p-4 text-xs text-muted-foreground">
-          No custom reviews yet. Add one above, or save with none to keep the default carousel.
+          No reviews yet. Add one above to show it in the homepage carousel.
         </div>
       )}
 

@@ -1,3 +1,4 @@
+import { CopyButton } from "@/components/CopyButton";
 import {
   TRACKING_STAGES,
   type OrderTrackingFields,
@@ -29,8 +30,15 @@ export function OrderTrackingCard({ order, showHeader = true }: Props) {
       {showHeader && (
         <>
           {order.order_number && (
-            <div className="text-xs uppercase tracking-wider text-muted-foreground">
-              Order {order.order_number}
+            <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
+              <span>Order {order.order_number}</span>
+              <CopyButton
+                value={order.order_number}
+                label="Copy order ID"
+                successMessage="Order ID copied"
+                className="h-7 w-7"
+                iconClassName="h-3 w-3"
+              />
             </div>
           )}
           <div className="font-display text-2xl mt-1 capitalize">{trackingStatusLabel(order)}</div>
@@ -45,8 +53,17 @@ export function OrderTrackingCard({ order, showHeader = true }: Props) {
             </div>
           )}
           {order.tracking_number && (
-            <div>
-              <span className="text-muted-foreground">Tracking number:</span> {order.tracking_number}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span>
+                <span className="text-muted-foreground">Tracking number:</span> {order.tracking_number}
+              </span>
+              <CopyButton
+                value={order.tracking_number}
+                label="Copy tracking number"
+                successMessage="Tracking number copied"
+                variant="text"
+                className="text-[11px]"
+              />
             </div>
           )}
           {order.shipment_date && (

@@ -100,4 +100,23 @@ class ProductDescriptionCodecTest {
     void parseDelimitedOrJson_acceptsJsonArray() {
         assertThat(codec.parseDelimitedOrJson("[\"Red\",\"Blue\"]")).containsExactly("Red", "Blue");
     }
+
+    @Test
+    void decode_extractsSizesFromSizePrefixLine() {
+        ProductDescriptionCodec.Decoded decoded = codec.decode("Size: S, M, L");
+
+        assertThat(decoded.sizes()).containsExactly("S", "M", "L");
+    }
+
+    @Test
+    void decode_extractsColorsFromColorPrefixLine() {
+        ProductDescriptionCodec.Decoded decoded = codec.decode("Color: Navy, Ivory");
+
+        assertThat(decoded.colors()).containsExactly("Navy", "Ivory");
+    }
+
+    @Test
+    void parseDelimitedOrJson_splitsSemicolonSeparatedValues() {
+        assertThat(codec.parseDelimitedOrJson("0-3 M; 3-6 M; 6-12 M")).containsExactly("0-3 M", "3-6 M", "6-12 M");
+    }
 }

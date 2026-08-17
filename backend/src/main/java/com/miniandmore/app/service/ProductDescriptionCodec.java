@@ -21,7 +21,7 @@ import org.springframework.stereotype.Component;
 public class ProductDescriptionCodec {
 
     private static final Pattern LINE_PREFIX = Pattern.compile(
-        "^(Category|Fabric|Sizes|Colors|Age|Story|Badge|CompareAt):\\s*(.*)$",
+        "^(Category|Fabric|Sizes?|Colors?|Age|Story|Badge|CompareAt):\\s*(.*)$",
         Pattern.CASE_INSENSITIVE
     );
     private static final Pattern AGE_RANGE = Pattern.compile("(\\d+)\\s*-\\s*(\\d+)\\s*months?", Pattern.CASE_INSENSITIVE);
@@ -102,8 +102,8 @@ public class ProductDescriptionCodec {
             body = null;
         }
 
-        List<String> sizes = splitList(meta.get("sizes"));
-        List<String> colors = splitList(meta.get("colors"));
+        List<String> sizes = splitList(firstNonBlank(meta.get("sizes"), meta.get("size")));
+        List<String> colors = splitList(firstNonBlank(meta.get("colors"), meta.get("color")));
         Integer ageMin = null;
         Integer ageMax = null;
         String ageRaw = meta.get("age");
@@ -218,12 +218,21 @@ public class ProductDescriptionCodec {
             return List.of();
         }
         List<String> parts = new ArrayList<>();
-        for (String part : value.split(",")) {
+        for (String part : value.split("[,;|\\n]+")) {
             String trimmed = part.trim();
             if (!trimmed.isEmpty()) {
                 parts.add(trimmed);
             }
         }
         return parts;
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 }

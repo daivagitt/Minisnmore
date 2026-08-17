@@ -81,5 +81,12 @@ describe("pincode helpers", () => {
       ok: false,
       error: "Couldn't check delivery just now. Please try again.",
     });
+
+    const { ApiError } = await import("@/lib/api");
+    const notFound = vi.fn().mockRejectedValue(new ApiError("missing", 404));
+    await expect(lookupPincode("560001", notFound)).resolves.toMatchObject({
+      ok: false,
+      error: "Delivery isn't available for this pincode yet. Try another pincode or contact us on WhatsApp.",
+    });
   });
 });

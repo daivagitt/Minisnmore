@@ -42,7 +42,7 @@ import {
 import {
   normalizeHomeReviewDrafts,
   validateHomeReviewDrafts,
-  homeReviewDraftsFromPayload,
+  homeReviewDraftsForEditor,
   type HomeReviewDraft,
 } from "@/lib/home-reviews";
 
@@ -177,7 +177,7 @@ function HomePage() {
       };
     }
     if (s.key === "reviews") {
-      const drafts = homeReviewDraftsFromPayload(s.payload);
+      const drafts = homeReviewDraftsForEditor(s.payload);
       const errors = validateHomeReviewDrafts(drafts);
       if (errors.length) {
         showValidationErrors(errors);

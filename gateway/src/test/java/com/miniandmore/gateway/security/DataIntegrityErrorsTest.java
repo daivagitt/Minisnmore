@@ -19,4 +19,29 @@ class DataIntegrityErrorsTest {
         var error = new RuntimeException("duplicate key value violates unique constraint \"ux_user_email\"");
         assertThat(DataIntegrityErrors.isDuplicateUserEmail(error)).isTrue();
     }
+
+    @Test
+    void isDuplicateUserLogin_detectsConstraintName() {
+        var error = new RuntimeException("duplicate key value violates unique constraint \"ux_user_login\"");
+        assertThat(DataIntegrityErrors.isDuplicateUserLogin(error)).isTrue();
+    }
+
+    @Test
+    void isDuplicateUserIdentity_matchesAnyUserConstraint() {
+        var error = new RuntimeException("duplicate key value violates unique constraint \"jhi_user_pkey\"");
+        assertThat(DataIntegrityErrors.isDuplicateUserIdentity(error)).isTrue();
+    }
+
+    @Test
+    void isDuplicateKey_ignoresBlankMessagesInCauseChain() {
+        var blank = new RuntimeException("   ");
+        var duplicate = new RuntimeException("duplicate key value violates unique constraint", blank);
+        assertThat(DataIntegrityErrors.isDuplicateKey(duplicate)).isTrue();
+    }
+
+    @Test
+    void isDuplicateKey_requiresMatchingConstraintWhenProvided() {
+        var error = new RuntimeException("duplicate key value violates unique constraint \"other\"");
+        assertThat(DataIntegrityErrors.isDuplicateKey(error, "ux_user_email")).isFalse();
+    }
 }

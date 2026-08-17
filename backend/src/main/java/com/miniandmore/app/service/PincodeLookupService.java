@@ -2,6 +2,7 @@ package com.miniandmore.app.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.miniandmore.app.client.XpressBeesClient;
 import com.miniandmore.app.service.dto.PincodeLookupDTO;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -30,9 +31,11 @@ public class PincodeLookupService {
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
+    private final XpressBeesClient xpressBeesClient;
 
-    public PincodeLookupService(ObjectMapper objectMapper) {
+    public PincodeLookupService(ObjectMapper objectMapper, XpressBeesClient xpressBeesClient) {
         this.objectMapper = objectMapper;
+        this.xpressBeesClient = xpressBeesClient;
         this.httpClient = HttpClient
             .newBuilder()
             .connectTimeout(REQUEST_TIMEOUT)
@@ -44,8 +47,21 @@ public class PincodeLookupService {
         if (pincode == null || !pincode.matches("^[1-9]\\d{5}$")) {
             return Optional.empty();
         }
+        if (xpressBeesClient.isConfigured()) {
+            Optional<PincodeLookupDTO> serviceable = lookupXpressBees(pincode);
+            if (serviceable.isPresent()) {
+                return serviceable;
+            }
+            return Optional.empty();
+        }
         // India Post has broader coverage for Indian pincodes; Zippopotam is the fallback.
         return lookupIndiaPost(pincode).or(() -> lookupZippopotam(pincode));
+    }
+
+    private Optional<PincodeLookupDTO> lookupXpressBees(String pincode) {
+        return xpressBeesClient
+            .checkServiceability(pincode)
+            .map(result -> new PincodeLookupDTO(result.city(), result.state(), result.eta()));
     }
 
     private Optional<PincodeLookupDTO> lookupZippopotam(String pincode) {

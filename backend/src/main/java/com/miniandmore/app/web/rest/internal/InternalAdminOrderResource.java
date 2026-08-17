@@ -7,6 +7,7 @@ import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import com.miniandmore.app.service.LedgerlySyncService;
+import com.miniandmore.app.service.OrderEventService;
 import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import com.miniandmore.app.web.rest.v1.ApiResponse;
@@ -22,6 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 /**
  * Admin-only actions for Cash on Delivery orders, which have no online payment step and so need a
  * manual "collected" confirmation once the courier hands over the cash/UPI payment at the doorstep.
+ * Zoho Books receives the sales order when the COD order is placed; marking collected records the cash payment.
  */
 @RestController
 @RequestMapping("/internal/v1/admin/orders")
@@ -32,17 +34,20 @@ public class InternalAdminOrderResource {
     private final LedgerlySyncService ledgerlySyncService;
     private final ZohoSyncService zohoSyncService;
     private final ObjectMapper objectMapper;
+    private final OrderEventService orderEventService;
 
     public InternalAdminOrderResource(
         AccountOrderDataAccess dataAccess,
         LedgerlySyncService ledgerlySyncService,
         ZohoSyncService zohoSyncService,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        OrderEventService orderEventService
     ) {
         this.dataAccess = dataAccess;
         this.ledgerlySyncService = ledgerlySyncService;
         this.zohoSyncService = zohoSyncService;
         this.objectMapper = objectMapper;
+        this.orderEventService = orderEventService;
     }
 
     @GetMapping("/cod-pending")
@@ -73,6 +78,7 @@ public class InternalAdminOrderResource {
         order.setLedgerlySyncStatus(LedgerlySyncStatus.PENDING);
         order.setZohoSyncStatus(ZohoSyncStatus.PENDING);
         CustomerOrder saved = dataAccess.customerOrderRepository().save(order);
+        orderEventService.onOrderPaid(saved);
         ledgerlySyncService.syncOrder(saved.getId());
         zohoSyncService.syncOrder(saved.getId());
         return ApiResponse.ok(Map.of("ok", true, "orderNumber", saved.getOrderNumber(), "paymentStatus", "paid"));

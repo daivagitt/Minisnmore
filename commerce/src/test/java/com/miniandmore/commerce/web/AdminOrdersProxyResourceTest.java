@@ -1,0 +1,55 @@
+package com.miniandmore.commerce.web;
+
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.miniandmore.commerce.client.CatalogInternalClient;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+@ExtendWith(MockitoExtension.class)
+class AdminOrdersProxyResourceTest {
+
+    @Mock
+    private CatalogInternalClient catalog;
+
+    private MockMvc mockMvc;
+
+    @BeforeEach
+    void setUp() {
+        mockMvc = MockMvcBuilders.standaloneSetup(new AdminOrdersProxyResource(catalog)).build();
+    }
+
+    @Test
+    void codPending_delegatesToCatalog() throws Exception {
+        when(catalog.get("/internal/v1/admin/orders/cod-pending")).thenReturn(ResponseEntity.ok("[]"));
+
+        mockMvc.perform(get("/api/v1/admin/orders/cod-pending")).andExpect(status().isOk()).andExpect(content().string("[]"));
+
+        verify(catalog).get("/internal/v1/admin/orders/cod-pending");
+    }
+
+    @Test
+    void markCodCollected_delegatesToCatalog() throws Exception {
+        when(catalog.post(eq("/internal/v1/admin/orders/MNM-42/mark-cod-collected"), eq(null)))
+            .thenReturn(ResponseEntity.ok("{\"ok\":true}"));
+
+        mockMvc
+            .perform(post("/api/v1/admin/orders/MNM-42/mark-cod-collected"))
+            .andExpect(status().isOk())
+            .andExpect(content().string("{\"ok\":true}"));
+
+        verify(catalog).post(eq("/internal/v1/admin/orders/MNM-42/mark-cod-collected"), eq(null));
+    }
+}

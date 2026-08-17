@@ -1,4 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { LazyImage } from "@/components/LazyImage";
+import { cartLineColorLabel, cartLineImage } from "@/lib/cart-catalog";
 import { useShop } from "@/store/shop";
 import { ShoppingBag, Plus, Minus, X, ArrowRight } from "lucide-react";
 
@@ -25,10 +27,10 @@ function CartPage() {
           <div className="space-y-3">
             {cart.map((it) => (
               <div key={it.product.id + it.size + it.color} className="glass rounded-2xl p-3 flex items-center gap-3">
-                <img src={it.product.image} alt="" className="h-16 w-16 rounded-xl object-cover" />
+                <LazyImage src={cartLineImage(it)} alt="" className="h-16 w-16 rounded-xl object-cover" priority="auto" />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{it.product.name}</div>
-                  <div className="text-xs text-muted-foreground">{[it.size, it.color].filter(Boolean).join(" · ")}</div>
+                  <div className="text-xs text-muted-foreground">{[it.size, cartLineColorLabel(it)].filter(Boolean).join(" · ")}</div>
                   <div className="mt-2 inline-flex items-center gap-2 glass rounded-full px-1 py-0.5">
                     <button onClick={() => updateQty(it.product.id, it.qty - 1, it.size, it.color)} className="h-7 w-7 grid place-items-center rounded-full hover:bg-muted"><Minus className="h-3 w-3" /></button>
                     <span className="text-sm w-5 text-center">{it.qty}</span>

@@ -46,7 +46,7 @@ function AdminOrdersPage() {
     <AdminPage
       eyebrow="Fulfilment"
       title="Cash on Delivery"
-      description="COD orders awaiting doorstep collection. Mark an order collected once the courier has handed over payment — this confirms the payment and syncs the invoice to Ledgerly."
+      description="COD orders awaiting doorstep collection. Orders sync to Zoho Books when placed. Mark collected once payment is received — this records the cash payment in Zoho and Ledgerly."
     >
       {loading ? (
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

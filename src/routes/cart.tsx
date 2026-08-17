@@ -3,12 +3,14 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Plus, Minus, X, Tag, ShieldCheck, Truck } from "lucide-react";
 import { useShop } from "@/store/shop";
+import { cartLineColorLabel, cartLineImage } from "@/lib/cart-catalog";
 import { FIT_LIMITS } from "@/lib/product-fit";
 import { toast } from "sonner";
 import { validateCoupon } from "@/lib/coupons.functions";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { commerceFromSiteSettings } from "@/lib/commerce";
 import { orderTotals } from "@/lib/money";
+import { LazyImage } from "@/components/LazyImage";
 import { CouponOffers } from "@/components/CouponOffers";
 export const Route = createFileRoute("/cart")({
   head: () => ({ meta: [{ title: "Your basket · Mini's n More" }] }),
@@ -84,7 +86,7 @@ function CartPage() {
           <motion.div key={item.product.id + item.size + item.color}
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}
             className="glass rounded-2xl p-4 flex gap-4">
-            <img src={item.product.image} alt={item.product.name} className="h-24 w-24 rounded-xl object-cover" loading="lazy" />
+            <LazyImage src={cartLineImage(item)} alt={item.product.name} className="h-24 w-24 rounded-xl object-cover" priority="auto" />
             <div className="flex-1 min-w-0">
               <div className="flex justify-between gap-2">
                 <Link to="/product/$slug" params={{ slug: item.product.slug }} className="font-medium hover:text-primary">{item.product.name}</Link>
@@ -92,7 +94,7 @@ function CartPage() {
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <div className="text-xs text-muted-foreground mt-1">{item.size} · {item.color}</div>
+              <div className="text-xs text-muted-foreground mt-1">{item.size} · {cartLineColorLabel(item)}</div>
               <div className="flex items-center justify-between mt-3">
                 <div className="glass rounded-full flex items-center">
                   <button onClick={() => updateQty(item.product.id, item.qty - 1, item.size, item.color)} className="h-8 w-8 grid place-items-center" aria-label="Decrease"><Minus className="h-3.5 w-3.5" /></button>

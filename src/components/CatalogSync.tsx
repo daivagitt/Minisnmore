@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { loadProducts } from "@/lib/storefront";
 import { useProducts } from "@/hooks/useProducts";
 import { formatCartSyncMessage } from "@/lib/cart-catalog";
 import { useShop } from "@/store/shop";
@@ -9,6 +10,10 @@ export function CatalogSync() {
   const products = useProducts();
   const { wishlist, pruneWishlist, syncCartWithCatalog } = useShop();
   const lastCartMessage = useRef("");
+
+  useEffect(() => {
+    void loadProducts();
+  }, []);
 
   useEffect(() => {
     if (products.length === 0) return;

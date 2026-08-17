@@ -42,21 +42,44 @@ public class ZohoOAuthService {
         return StringUtils.isNotBlank(serverOAuth.getClientId()) && StringUtils.isNotBlank(serverOAuth.getClientSecret());
     }
 
+  /** UI-saved credentials in {@code zoho_setting} override server env when present. */
     public String effectiveClientId() {
-        return isServerConfigured() ? serverOAuth.getClientId() : settingRepository.findActiveOrLatest().map(ZohoSetting::getClientId).orElse(null);
+        String stored = settingRepository
+            .findActiveOrLatest()
+            .map(ZohoSetting::getClientId)
+            .filter(StringUtils::isNotBlank)
+            .orElse(null);
+        if (stored != null) {
+            return stored;
+        }
+        return isServerConfigured() ? serverOAuth.getClientId() : null;
     }
 
     public String effectiveClientSecret() {
-        return isServerConfigured()
-            ? serverOAuth.getClientSecret()
-            : settingRepository.findActiveOrLatest().map(ZohoSetting::getClientSecret).orElse(null);
+        String stored = settingRepository
+            .findActiveOrLatest()
+            .map(ZohoSetting::getClientSecret)
+            .filter(StringUtils::isNotBlank)
+            .orElse(null);
+        if (stored != null) {
+            return stored;
+        }
+        return isServerConfigured() ? serverOAuth.getClientSecret() : null;
     }
 
     public String effectiveOrgId() {
+        String stored = settingRepository
+            .findActiveOrLatest()
+            .map(ZohoSetting::getOrgId)
+            .filter(StringUtils::isNotBlank)
+            .orElse(null);
+        if (stored != null) {
+            return stored;
+        }
         if (StringUtils.isNotBlank(serverOAuth.getOrgId())) {
             return serverOAuth.getOrgId();
         }
-        return settingRepository.findActiveOrLatest().map(ZohoSetting::getOrgId).orElse(null);
+        return null;
     }
 
     public String effectiveDataCenter() {

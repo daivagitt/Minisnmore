@@ -13,7 +13,7 @@ class ProductMapperNullAndPartialTest {
 
     @Test
     void productMapper_nullInputs_returnNull() {
-        ProductMapper mapper = new ProductMapperImpl();
+        ProductMapper mapper = MapperTestSupport.productMapper();
         assertThat(mapper.toDto((Product) null)).isNull();
         assertThat(mapper.toEntity((ProductDTO) null)).isNull();
         assertThat(mapper.toDto(java.util.List.of())).isEmpty();
@@ -21,7 +21,7 @@ class ProductMapperNullAndPartialTest {
 
     @Test
     void productMapper_partialUpdateCategoryWhenEntityHasNoCategory() {
-        ProductMapper mapper = new ProductMapperImpl();
+        ProductMapper mapper = MapperTestSupport.productMapper();
         Product entity = new Product().slug("p").name("P").price(BigDecimal.TEN).currency("INR").active(true);
         CategoryDTO categoryDto = new CategoryDTO();
         categoryDto.setId(3L);
@@ -38,7 +38,7 @@ class ProductMapperNullAndPartialTest {
 
     @Test
     void productMapper_partialUpdateCategoryWhenEntityAlreadyHasCategory() {
-        ProductMapper mapper = new ProductMapperImpl();
+        ProductMapper mapper = MapperTestSupport.productMapper();
         Category existing = new Category().id(1L).name("Old").slug("old");
         Product entity = new Product()
             .slug("p")
@@ -59,7 +59,7 @@ class ProductMapperNullAndPartialTest {
 
     @Test
     void productMapper_partialUpdateEveryScalarField() {
-        ProductMapper mapper = new ProductMapperImpl();
+        ProductMapper mapper = MapperTestSupport.productMapper();
         Product entity = new Product().slug("p").name("P").price(BigDecimal.ONE).currency("INR").active(true);
         ProductDTO patch = new ProductDTO();
         patch.setId(99L);
@@ -96,7 +96,7 @@ class ProductMapperNullAndPartialTest {
 
     @Test
     void productMapper_toDtoCategoryName_nullCategory() {
-        ProductMapper mapper = new ProductMapperImpl();
+        ProductMapper mapper = MapperTestSupport.productMapper();
         assertThat(mapper.toDtoCategoryName(null)).isNull();
     }
 }

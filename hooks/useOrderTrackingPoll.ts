@@ -16,6 +16,7 @@ export type TrackingOrder = OrderTrackingFields & {
   subtotal?: number;
   discount?: number;
   shipping?: number;
+  cod_fee?: number;
   tax?: number;
   donation?: number;
   total?: number;

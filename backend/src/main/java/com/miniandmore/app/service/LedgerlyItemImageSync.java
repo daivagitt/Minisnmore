@@ -11,10 +11,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -71,6 +73,14 @@ public class LedgerlyItemImageSync {
                 String publicUrl = s3StorageService.uploadObject("products", filename, downloaded.body(), downloaded.contentType());
                 setPrimaryImage(product, publicUrl);
                 return;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                LOG.warn(
+                    "Ledgerly image import interrupted for product {} ({}): {}",
+                    product.getId(),
+                    product.getSku(),
+                    e.getMessage()
+                );
             } catch (Exception e) {
                 LOG.warn(
                     "Ledgerly image import failed for product {} ({}): {}",
@@ -124,6 +134,15 @@ public class LedgerlyItemImageSync {
                 DownloadedImage downloaded = download(trimmed);
                 String filename = filenameForColor(product, colorName, index, downloaded.contentType());
                 return s3StorageService.uploadObject("products", filename, downloaded.body(), downloaded.contentType());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                LOG.warn(
+                    "Ledgerly colour image import interrupted for product {} ({}) colour {}: {}",
+                    product.getId(),
+                    product.getSku(),
+                    colorName,
+                    e.getMessage()
+                );
             } catch (Exception e) {
                 LOG.warn(
                     "Ledgerly colour image import failed for product {} ({}) colour {}: {}",
@@ -253,5 +272,26 @@ public class LedgerlyItemImageSync {
         return filename.replaceAll("[^A-Za-z0-9._-]", "-");
     }
 
-    private record DownloadedImage(byte[] body, String contentType) {}
+    private record DownloadedImage(byte[] body, String contentType) {
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) {
+                return true;
+            }
+            if (!(other instanceof DownloadedImage that)) {
+                return false;
+            }
+            return Arrays.equals(body, that.body) && Objects.equals(contentType, that.contentType);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(Arrays.hashCode(body), contentType);
+        }
+
+        @Override
+        public String toString() {
+            return "DownloadedImage[body=" + Arrays.toString(body) + ", contentType=" + contentType + "]";
+        }
+    }
 }

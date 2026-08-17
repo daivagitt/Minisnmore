@@ -3,10 +3,12 @@ package com.miniandmore.app.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.miniandmore.app.client.XpressBeesClient;
 import com.miniandmore.app.service.dto.PincodeLookupDTO;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 class PincodeLookupServiceTest {
 
@@ -15,7 +17,9 @@ class PincodeLookupServiceTest {
     @BeforeEach
     void setUp() {
         ObjectMapper objectMapper = new ObjectMapper();
-        pincodeLookupService = new PincodeLookupService(objectMapper);
+        XpressBeesClient xpressBeesClient = Mockito.mock(XpressBeesClient.class);
+        Mockito.when(xpressBeesClient.isConfigured()).thenReturn(false);
+        pincodeLookupService = new PincodeLookupService(objectMapper, xpressBeesClient);
     }
 
     @Test

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Loader2, Search, Sparkles, ShieldCheck, Gift } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import babyNewborn from "@/assets/cat-newborn.webp";
 import babyInfant from "@/assets/cat-infant.webp";
 import babyToddler from "@/assets/cat-toddler.webp";
@@ -13,13 +13,19 @@ import { TrackingRefreshHint } from "@/components/TrackingRefreshHint";
 import { StorefrontPageHeader } from "@/components/StorefrontPageHeader";
 
 export const Route = createFileRoute("/track")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    order: typeof search.order === "string" ? search.order.trim() : "",
+  }),
   head: () => ({ meta: [{ title: "Track Order · Mini's n More" }] }),
   component: Track,
 });
 
 function Track() {
-  const [code, setCode] = useState("");
-  const [activeOrderNumber, setActiveOrderNumber] = useState<string | null>(null);
+  const { order: orderFromUrl } = Route.useSearch();
+  const [code, setCode] = useState(orderFromUrl);
+  const [activeOrderNumber, setActiveOrderNumber] = useState<string | null>(
+    orderFromUrl ? orderFromUrl.toUpperCase() : null,
+  );
   const settings = useSiteSettings();
   const { order: trackedOrder, loading, error, lastUpdated, polling } = useOrderTrackingPoll(
     activeOrderNumber,
@@ -34,6 +40,12 @@ function Track() {
     }
     setActiveOrderNumber(next.toUpperCase());
   };
+
+  useEffect(() => {
+    if (!orderFromUrl) return;
+    setCode(orderFromUrl);
+    setActiveOrderNumber(orderFromUrl.toUpperCase());
+  }, [orderFromUrl]);
 
   return (
     <div className="px-4 md:px-6 max-w-7xl mx-auto grid lg:grid-cols-[1fr_280px] gap-6 lg:gap-10">

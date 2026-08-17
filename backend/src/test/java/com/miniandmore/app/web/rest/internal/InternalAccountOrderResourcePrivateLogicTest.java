@@ -15,6 +15,7 @@ import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.repository.*;
 import com.miniandmore.app.service.LedgerlySyncService;
+import com.miniandmore.app.service.OrderEventService;
 import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.service.ProductVariantSupport;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
@@ -65,6 +66,9 @@ class InternalAccountOrderResourcePrivateLogicTest {
     @Mock
     private ZohoSyncService zohoSyncService;
 
+    @Mock
+    private OrderEventService orderEventService;
+
     private InternalAccountOrderResource resource;
 
     @BeforeEach
@@ -83,7 +87,8 @@ class InternalAccountOrderResourcePrivateLogicTest {
             new ObjectMapper(),
             ledgerlySyncService,
             zohoSyncService,
-            new ProductVariantSupport(new ObjectMapper())
+            new ProductVariantSupport(new ObjectMapper()),
+            orderEventService
         );
         ReflectionTestUtils.setField(resource, "razorpayKeyId", "rzp_test");
         ReflectionTestUtils.setField(resource, "razorpayKeySecret", "secret");
@@ -198,14 +203,6 @@ class InternalAccountOrderResourcePrivateLogicTest {
         assertThat(parsed).isNotNull();
         assertThat((Object) ReflectionTestUtils.invokeMethod(resource, "readJson", (Object) null)).isEqualTo(Map.of());
         assertThat((String) ReflectionTestUtils.invokeMethod(resource, "toJson", Map.of("ok", true))).contains("ok");
-    }
-
-    @Test
-    void stampDemoDeliveryAnchor_setsShipmentDate() {
-        ReflectionTestUtils.setField(resource, "razorpayPaymentDemo", true);
-        CustomerOrder order = new CustomerOrder().orderNumber("MNM-DEMO");
-        ReflectionTestUtils.invokeMethod(resource, "stampDemoDeliveryAnchor", order);
-        assertThat(order.getShipmentDate()).isNotBlank();
     }
 
     @Test
@@ -550,7 +547,6 @@ class InternalAccountOrderResourcePrivateLogicTest {
             .orderNumber("MNM-22")
             .status(OrderStatus.CONFIRMED)
             .ledgerlySalesOrderId("SO-22");
-        when(customerOrderRepository.findById(22L)).thenReturn(Optional.of(order));
         org.mockito.Mockito.doThrow(new RuntimeException("pull down")).when(ledgerlySyncService).pullOrderTracking(22L);
 
         CustomerOrder result = (CustomerOrder) ReflectionTestUtils.invokeMethod(resource, "refreshTrackingIfStale", order);

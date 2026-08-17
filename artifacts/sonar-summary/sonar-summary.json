@@ -1,0 +1,471 @@
+{
+  "generatedAt": "2026-08-11T05:32:48.598275+00:00",
+  "frontend": {
+    "key": "frontend",
+    "label": "Frontend",
+    "missing": false,
+    "coverage": "89.8",
+    "line_coverage": "94.6",
+    "branch_coverage": "83.9",
+    "bugs": "0",
+    "vulnerabilities": "0",
+    "code_smells": "23",
+    "duplication": "3.8",
+    "ncloc": "1917",
+    "reliability": "1.0",
+    "security": "1.0",
+    "maintainability": "1.0",
+    "gate": "OK",
+    "gate_conditions": [
+      {
+        "status": "OK",
+        "metricKey": "coverage",
+        "comparator": "LT",
+        "errorThreshold": "80",
+        "actualValue": "89.8"
+      },
+      {
+        "status": "OK",
+        "metricKey": "bugs",
+        "comparator": "GT",
+        "errorThreshold": "50",
+        "actualValue": "0"
+      },
+      {
+        "status": "OK",
+        "metricKey": "line_coverage",
+        "comparator": "LT",
+        "errorThreshold": "94",
+        "actualValue": "94.6"
+      }
+    ],
+    "issues": [
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6594",
+        "file": "src/lib/api.ts",
+        "line": 347,
+        "message": "Use the \"RegExp.exec()\" method instead."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "typescript:S3776",
+        "file": "src/lib/api.ts",
+        "line": 370,
+        "message": "Refactor this function to reduce its Cognitive Complexity from 20 to the 15 allowed."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "typescript:S3776",
+        "file": "src/routes/admin.login.tsx",
+        "line": 14,
+        "message": "Refactor this function to reduce its Cognitive Complexity from 17 to the 15 allowed."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "typescript:S3776",
+        "file": "src/routes/login.tsx",
+        "line": 22,
+        "message": "Refactor this function to reduce its Cognitive Complexity from 54 to the 15 allowed."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6606",
+        "file": "src/routes/login.tsx",
+        "line": 47,
+        "message": "Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6606",
+        "file": "src/routes/login.tsx",
+        "line": 97,
+        "message": "Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S1874",
+        "file": "src/routes/login.tsx",
+        "line": 100,
+        "message": "'FormEvent' is deprecated."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "typescript:S3358",
+        "file": "src/routes/login.tsx",
+        "line": 166,
+        "message": "Extract this nested ternary operation into an independent statement."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "typescript:S3358",
+        "file": "src/routes/login.tsx",
+        "line": 177,
+        "message": "Extract this nested ternary operation into an independent statement."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6759",
+        "file": "src/hooks/useAuth.tsx",
+        "line": 63,
+        "message": "Mark the props of the component as read-only."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "typescript:S3358",
+        "file": "src/hooks/useAuth.tsx",
+        "line": 123,
+        "message": "Extract this nested ternary operation into an independent statement."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "typescript:S6481",
+        "file": "src/hooks/useAuth.tsx",
+        "line": 259,
+        "message": "The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "typescript:S3358",
+        "file": "src/lib/api.ts",
+        "line": 28,
+        "message": "Extract this nested ternary operation into an independent statement."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "typescript:S4624",
+        "file": "src/lib/api.ts",
+        "line": 28,
+        "message": "Refactor this code to not use nested template literals."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6594",
+        "file": "src/lib/api.ts",
+        "line": 217,
+        "message": "Use the \"RegExp.exec()\" method instead."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6594",
+        "file": "src/lib/api.ts",
+        "line": 220,
+        "message": "Use the \"RegExp.exec()\" method instead."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6594",
+        "file": "src/lib/api.ts",
+        "line": 223,
+        "message": "Use the \"RegExp.exec()\" method instead."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S1874",
+        "file": "src/routes/admin.login.tsx",
+        "line": 31,
+        "message": "'FormEvent' is deprecated."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "typescript:S3358",
+        "file": "src/routes/admin.login.tsx",
+        "line": 132,
+        "message": "Extract this nested ternary operation into an independent statement."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S1874",
+        "file": "src/routes/login.tsx",
+        "line": 62,
+        "message": "'FormEvent' is deprecated."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "typescript:S3358",
+        "file": "src/routes/login.tsx",
+        "line": 290,
+        "message": "Extract this nested ternary operation into an independent statement."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6759",
+        "file": "src/store/shop.tsx",
+        "line": 105,
+        "message": "Mark the props of the component as read-only."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "typescript:S6481",
+        "file": "src/store/shop.tsx",
+        "line": 281,
+        "message": "The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook."
+      }
+    ]
+  },
+  "backend": {
+    "key": "mnm-backend",
+    "label": "Backend",
+    "missing": false,
+    "coverage": "87.7",
+    "line_coverage": "94.4",
+    "branch_coverage": "69.9",
+    "bugs": "0",
+    "vulnerabilities": "0",
+    "code_smells": "158",
+    "duplication": "8.3",
+    "ncloc": "26555",
+    "reliability": "1.0",
+    "security": "1.0",
+    "maintainability": "1.0",
+    "gate": "OK",
+    "gate_conditions": [
+      {
+        "status": "OK",
+        "metricKey": "coverage",
+        "comparator": "LT",
+        "errorThreshold": "80",
+        "actualValue": "87.7"
+      },
+      {
+        "status": "OK",
+        "metricKey": "bugs",
+        "comparator": "GT",
+        "errorThreshold": "50",
+        "actualValue": "0"
+      },
+      {
+        "status": "OK",
+        "metricKey": "line_coverage",
+        "comparator": "LT",
+        "errorThreshold": "94",
+        "actualValue": "94.4"
+      }
+    ],
+    "issues": [
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "java:S1854",
+        "file": "backend/src/test/java/com/miniandmore/app/web/rest/internal/InternalAccountOrderResourceCoverageTest.java",
+        "line": 1062,
+        "message": "Remove this useless assignment to local variable \"order\"."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S1827",
+        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
+        "line": 17,
+        "message": "Remove this deprecated \"width\" attribute."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S5257",
+        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
+        "line": 17,
+        "message": "Replace this layout table with a CSS layout."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S1827",
+        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
+        "line": 17,
+        "message": "Remove this deprecated \"cellspacing\" attribute."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S6819",
+        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
+        "line": 17,
+        "message": "Use <img> instead of the presentation role to ensure accessibility across all devices."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S1827",
+        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
+        "line": 17,
+        "message": "Remove this deprecated \"cellpadding\" attribute."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S1827",
+        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
+        "line": 19,
+        "message": "Remove this deprecated \"align\" attribute."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S1827",
+        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
+        "line": 20,
+        "message": "Remove this deprecated \"cellspacing\" attribute."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S6819",
+        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
+        "line": 20,
+        "message": "Use <img> instead of the presentation role to ensure accessibility across all devices."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S1827",
+        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
+        "line": 20,
+        "message": "Remove this deprecated \"cellpadding\" attribute."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S5257",
+        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
+        "line": 20,
+        "message": "Replace this layout table with a CSS layout."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S1827",
+        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
+        "line": 20,
+        "message": "Remove this deprecated \"width\" attribute."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S1827",
+        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
+        "line": 47,
+        "message": "Remove this deprecated \"align\" attribute."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S1827",
+        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
+        "line": 17,
+        "message": "Remove this deprecated \"cellpadding\" attribute."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S1827",
+        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
+        "line": 17,
+        "message": "Remove this deprecated \"cellspacing\" attribute."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S5257",
+        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
+        "line": 17,
+        "message": "Replace this layout table with a CSS layout."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S1827",
+        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
+        "line": 17,
+        "message": "Remove this deprecated \"width\" attribute."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S6819",
+        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
+        "line": 17,
+        "message": "Use <img> instead of the presentation role to ensure accessibility across all devices."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S1827",
+        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
+        "line": 19,
+        "message": "Remove this deprecated \"align\" attribute."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S1827",
+        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
+        "line": 20,
+        "message": "Remove this deprecated \"cellspacing\" attribute."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S1827",
+        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
+        "line": 20,
+        "message": "Remove this deprecated \"cellpadding\" attribute."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S5257",
+        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
+        "line": 20,
+        "message": "Replace this layout table with a CSS layout."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S6819",
+        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
+        "line": 20,
+        "message": "Use <img> instead of the presentation role to ensure accessibility across all devices."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S1827",
+        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
+        "line": 20,
+        "message": "Remove this deprecated \"width\" attribute."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "Web:S1827",
+        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
+        "line": 47,
+        "message": "Remove this deprecated \"align\" attribute."
+      }
+    ]
+  }
+}

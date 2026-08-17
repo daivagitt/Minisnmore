@@ -43,6 +43,18 @@ public class ZohoSyncScheduler {
                     LOG.debug("Scheduled Zoho order retry failed for {}: {}", order.getId(), e.getMessage());
                 }
             });
+        customerOrderRepository
+            .findConfirmedCodOrdersForZohoRetry(
+                List.of(ZohoSyncStatus.FAILED, ZohoSyncStatus.PENDING),
+                PageRequest.of(0, ORDER_RETRY_BATCH)
+            )
+            .forEach(order -> {
+                try {
+                    zohoSyncService.syncOrder(order.getId());
+                } catch (Exception e) {
+                    LOG.debug("Scheduled Zoho COD order retry failed for {}: {}", order.getId(), e.getMessage());
+                }
+            });
     }
 
     @Scheduled(fixedDelayString = "${application.zoho.order-tracking.fixed-delay-ms:900000}")

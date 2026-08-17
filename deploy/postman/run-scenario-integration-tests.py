@@ -25,11 +25,12 @@ OUT_JSON = OUT_DIR / "scenario-integration-report.json"
 OUT_HTML = OUT_DIR / "index.html"
 
 BASE = os.environ.get("API_TEST_BASE_URL", "https://uat.minisnmore.com").rstrip("/")
-CUSTOMER_USER = os.environ.get("SCENARIO_CUSTOMER_USER", "saikedar2003@gmail.com")
+CUSTOMER_USER = os.environ.get("SCENARIO_CUSTOMER_USER", "irfanpatan9948@gmail.com")
+SCENARIO_PRODUCT_SLUG_DEFAULT = "basic-shorts"
 CUSTOMER_PASS = os.environ.get("SCENARIO_CUSTOMER_PASS", "Zero@1234")
 ADMIN_USER = os.environ.get("SCENARIO_ADMIN_USER", "admin@uat.minisnmore.com")
 ADMIN_PASS = os.environ.get("SCENARIO_ADMIN_PASS", "admin6")
-COUPON_CODE = os.environ.get("SCENARIO_COUPON_CODE", "WELCOM10")
+COUPON_CODE = os.environ.get("SCENARIO_COUPON_CODE", "WELCOME10")
 PRODUCT_ID = os.environ.get("SCENARIO_PRODUCT_ID", "26523")
 PRODUCT_NAME = os.environ.get("SCENARIO_PRODUCT_NAME", "Baby Swaddle")
 PRODUCT_PRICE = float(os.environ.get("SCENARIO_PRODUCT_PRICE", "349"))
@@ -209,10 +210,10 @@ def zoho_sales_order_total(so_id: str) -> float | None:
 def resolve_scenario_checkout_line() -> dict[str, Any] | None:
     """Pick a sellable VARIANTS line on UAT (slug env or known fallbacks)."""
     slug_candidates: list[str] = []
-    env_slug = os.environ.get("SCENARIO_PRODUCT_SLUG", "").strip()
+    env_slug = os.environ.get("SCENARIO_PRODUCT_SLUG", SCENARIO_PRODUCT_SLUG_DEFAULT).strip()
     if env_slug:
         slug_candidates.append(env_slug)
-    for slug in ("front-open-vest-sleveless", "baby-swaddle"):
+    for slug in (SCENARIO_PRODUCT_SLUG_DEFAULT, "front-open-vest-sleveless", "baby-swaddle"):
         if slug not in slug_candidates:
             slug_candidates.append(slug)
     env_id = os.environ.get("SCENARIO_PRODUCT_ID", "").strip()
@@ -286,7 +287,7 @@ def scenario_coupon_checkout(customer_token: str) -> tuple[Scenario, dict[str, A
     if checkout_line is None:
         sc = Scenario(
             "coupon-checkout",
-            "Coupon checkout (WELCOM10)",
+            "Coupon checkout (WELCOME10)",
             "Validate coupon and create checkout order with correct totals.",
         )
         sc.steps.append(
@@ -322,8 +323,8 @@ def scenario_coupon_checkout(customer_token: str) -> tuple[Scenario, dict[str, A
         code, data, ms = api(
             "POST",
             "/api/v1/coupons/validate",
+            customer_token,
             body={"code": COUPON_CODE, "subtotal": subtotal},
-            public=True,
         )
         payload = unwrap(data) if isinstance(data, dict) else {}
         discount = float(payload.get("discount") or 0) if payload.get("ok") else 0

@@ -142,14 +142,14 @@ class UserServiceIT {
         User dbUser = userRepository.save(user).block();
         dbUser.setCreatedDate(now.minus(4, ChronoUnit.DAYS));
         userRepository.save(dbUser).block();
-        LocalDateTime threeDaysAgo = LocalDateTime.ofInstant(now.minus(3, ChronoUnit.DAYS), ZoneOffset.UTC);
+        Instant cutoff = now.minus(3, ChronoUnit.DAYS);
         List<User> users = userRepository
-            .findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(threeDaysAgo)
+            .findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(cutoff)
             .collectList()
             .block();
         assertThat(users).isNotEmpty();
         userService.removeNotActivatedUsers();
-        users = userRepository.findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(threeDaysAgo).collectList().block();
+        users = userRepository.findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(cutoff).collectList().block();
         assertThat(users).isEmpty();
     }
 
@@ -160,9 +160,9 @@ class UserServiceIT {
         User dbUser = userRepository.save(user).block();
         dbUser.setCreatedDate(now.minus(4, ChronoUnit.DAYS));
         userRepository.save(dbUser).block();
-        LocalDateTime threeDaysAgo = LocalDateTime.ofInstant(now.minus(3, ChronoUnit.DAYS), ZoneOffset.UTC);
+        Instant cutoff = now.minus(3, ChronoUnit.DAYS);
         List<User> users = userRepository
-            .findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(threeDaysAgo)
+            .findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(cutoff)
             .collectList()
             .block();
         assertThat(users).isEmpty();

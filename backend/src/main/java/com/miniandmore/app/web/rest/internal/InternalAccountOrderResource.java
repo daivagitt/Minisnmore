@@ -11,6 +11,7 @@ import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import com.miniandmore.app.security.SecurityUtils;
 import com.miniandmore.app.service.LedgerlySyncService;
+import com.miniandmore.app.service.OrderEventService;
 import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.service.OrderTrackingStatusResolver;
 import com.miniandmore.app.service.ProductVariantSupport;
@@ -70,6 +71,7 @@ public class InternalAccountOrderResource {
     private final LedgerlySyncService ledgerlySyncService;
     private final ZohoSyncService zohoSyncService;
     private final ProductVariantSupport variantSupport;
+    private final OrderEventService orderEventService;
 
     @Value("${razorpay.key-id:DEMO}")
     private String razorpayKeyId;
@@ -85,13 +87,15 @@ public class InternalAccountOrderResource {
         ObjectMapper objectMapper,
         LedgerlySyncService ledgerlySyncService,
         ZohoSyncService zohoSyncService,
-        ProductVariantSupport variantSupport
+        ProductVariantSupport variantSupport,
+        OrderEventService orderEventService
     ) {
         this.dataAccess = dataAccess;
         this.objectMapper = objectMapper;
         this.ledgerlySyncService = ledgerlySyncService;
         this.zohoSyncService = zohoSyncService;
         this.variantSupport = variantSupport;
+        this.orderEventService = orderEventService;
     }
 
     @PostMapping("/coupons/validate")
@@ -153,6 +157,16 @@ public class InternalAccountOrderResource {
         return ApiResponse.ok(data);
     }
 
+    @GetMapping("/account/notifications")
+    public ApiResponse<Map<String, Object>> notifications() {
+        String login = requireLogin();
+        List<CustomerOrder> orders = dataAccess.customerOrderRepository().findAllByUserLoginOrderByIdDesc(login);
+        for (CustomerOrder order : orders) {
+            orderEventService.syncLifecycleEvents(order);
+        }
+        return ApiResponse.ok(Map.of("events", orderEventService.listForUser(login)));
+    }
+
     @PutMapping("/account/profile")
     @Transactional
     public ApiResponse<Map<String, Boolean>> updateProfile(@Valid @RequestBody ProfileUpdateRequest request) {
@@ -166,6 +180,30 @@ public class InternalAccountOrderResource {
         dataAccess.customerProfileRepository().save(profile);
         ledgerlySyncService.syncCustomerProfileAsync(login);
         return ApiResponse.ok(Map.of("ok", true));
+    }
+
+    /** Keep account profile in sync with checkout contact details used on the order. */
+    private void syncProfileFromShippingAddress(String login, AddressRequest shippingAddress) {
+        if (shippingAddress == null) {
+            return;
+        }
+        String fullName = StringUtils.trimToNull(shippingAddress.full_name());
+        String phone = StringUtils.trimToNull(shippingAddress.phone());
+        if (fullName == null && phone == null) {
+            return;
+        }
+        CustomerProfile profile = dataAccess
+            .customerProfileRepository()
+            .findOneByUserLogin(login)
+            .orElseGet(() -> new CustomerProfile().userLogin(login));
+        if (fullName != null) {
+            profile.setFullName(fullName);
+        }
+        if (phone != null) {
+            profile.setPhone(phone);
+        }
+        dataAccess.customerProfileRepository().save(profile);
+        ledgerlySyncService.syncCustomerProfileAsync(login);
     }
 
     @PostMapping("/orders")
@@ -231,6 +269,8 @@ public class InternalAccountOrderResource {
             orderItems.add(item);
         }
         dataAccess.orderItemRepository().saveAll(orderItems);
+        orderEventService.onOrderCreated(saved);
+        syncProfileFromShippingAddress(login, shippingAddress);
 
         Map<String, Object> totalsMap = new LinkedHashMap<>();
         totalsMap.put("subtotal", totals.subtotal());
@@ -251,6 +291,7 @@ public class InternalAccountOrderResource {
 
         if (cod) {
             // No gateway involved — the frontend treats this response as an immediate success.
+            attemptZohoOrderSync(saved);
             return ApiResponse.ok(data);
         }
 
@@ -455,8 +496,8 @@ public class InternalAccountOrderResource {
                 .razorpaySignature(razorpaySignature)
                 .inventoryReserved(false)
                 .inventoryReleasedAt(null);
-            stampDemoDeliveryAnchor(order);
             dataAccess.customerOrderRepository().save(order);
+            orderEventService.onOrderPaid(order);
         } else {
             order
                 .razorpayOrderId(razorpayOrderId)
@@ -469,7 +510,7 @@ public class InternalAccountOrderResource {
     }
 
     private void attemptZohoOrderSync(CustomerOrder order) {
-        if (order.getPaymentStatus() != PaymentStatus.PAID) {
+        if (!isEligibleForZohoOrderSync(order)) {
             return;
         }
         ZohoSyncStatus syncStatus = order.getZohoSyncStatus();
@@ -479,6 +520,13 @@ public class InternalAccountOrderResource {
         order.setZohoSyncStatus(ZohoSyncStatus.PENDING);
         dataAccess.customerOrderRepository().save(order);
         zohoSyncService.syncOrder(order.getId());
+    }
+
+    private static boolean isEligibleForZohoOrderSync(CustomerOrder order) {
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            return true;
+        }
+        return ZohoSyncService.isCodOrder(order) && order.getStatus() == OrderStatus.CONFIRMED;
     }
 
     private void attemptLedgerlyOrderSync(CustomerOrder order) {
@@ -1109,14 +1157,6 @@ public class InternalAccountOrderResource {
         return razorpayPaymentDemo
             || "DEMO".equalsIgnoreCase(StringUtils.trimToEmpty(razorpayKeyId))
             || StringUtils.isBlank(StringUtils.trimToEmpty(razorpayKeySecret));
-    }
-
-    /** Demo/UAT: mark paid orders as delivered so return + Ledgerly credit-note scenarios can run. */
-    private void stampDemoDeliveryAnchor(CustomerOrder order) {
-        if (!isDemoMode() || StringUtils.isNotBlank(order.getShipmentDate())) {
-            return;
-        }
-        order.setShipmentDate(LocalDate.now(INDIA).toString());
     }
 
     private String gatewayMode() {

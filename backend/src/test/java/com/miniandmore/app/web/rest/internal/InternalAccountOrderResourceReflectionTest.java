@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
 import com.miniandmore.app.repository.*;
 import com.miniandmore.app.service.LedgerlySyncService;
+import com.miniandmore.app.service.OrderEventService;
 import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.service.ProductVariantSupport;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
@@ -54,6 +55,9 @@ class InternalAccountOrderResourceReflectionTest {
     @Mock
     private ZohoSyncService zohoSyncService;
 
+    @Mock
+    private OrderEventService orderEventService;
+
     private InternalAccountOrderResource resource;
 
     @BeforeEach
@@ -72,7 +76,8 @@ class InternalAccountOrderResourceReflectionTest {
             new ObjectMapper(),
             ledgerlySyncService,
             zohoSyncService,
-            new ProductVariantSupport(new ObjectMapper())
+            new ProductVariantSupport(new ObjectMapper()),
+            orderEventService
         );
         ReflectionTestUtils.setField(resource, "razorpayKeyId", "rzp_live_abc");
         ReflectionTestUtils.setField(resource, "razorpayKeySecret", SECRET);

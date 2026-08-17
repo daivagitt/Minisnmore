@@ -39,7 +39,7 @@ export function VariantsMatrixEditor({
 
   const commit = (nextRows: VariantEditorRow[]) => {
     const variants_json = serializeVariantRows(nextRows);
-    const agg = aggregateFromVariantRows(nextRows);
+    const agg = aggregateFromVariantRows(nextRows, sizes);
     onChange({
       variants_json,
       sizes: agg.sizes,
@@ -126,6 +126,7 @@ export function VariantsMatrixEditor({
               <th className="p-2 font-medium">Cost (₹)</th>
               <th className="p-2 font-medium">Stock</th>
               <th className="p-2 font-medium">Active</th>
+              <th className="p-2 font-medium">Zoho item</th>
               <th className="p-2 w-10" />
             </tr>
           </thead>
@@ -235,6 +236,9 @@ export function VariantsMatrixEditor({
                     aria-label="Active"
                   />
                 </td>
+                <td className="p-1.5 font-mono text-[10px] text-muted-foreground max-w-[120px] truncate" title={r.zohoItemId ?? undefined}>
+                  {r.zohoItemId?.trim() ? r.zohoItemId.trim() : "—"}
+                </td>
                 <td className="p-1.5">
                   <button
                     type="button"
@@ -250,6 +254,10 @@ export function VariantsMatrixEditor({
           </tbody>
         </table>
       </div>
+      <p className="mt-2 text-[11px] text-muted-foreground leading-relaxed">
+        Zoho Books does not use a single parent item for variant products — each variant SKU syncs as its own Zoho item.
+        The <span className="font-medium">Zoho item</span> column shows the linked id after sync or pull (read-only).
+      </p>
       <div className="mt-2 flex flex-wrap gap-2">
         <button
           type="button"

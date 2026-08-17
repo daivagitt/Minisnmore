@@ -21,6 +21,10 @@ import {
   serializeProductColors,
   type ProductColorEntry,
 } from "@/lib/product-colors";
+import {
+  applyExpectedPrintNamesToColors,
+  applyExpectedPrintNamesToVariantsJson,
+} from "@/lib/expected-prints";
 
 type Id = string | number;
 type JsonRecord = Record<string, unknown>;
@@ -468,6 +472,9 @@ export type ProductRow = {
   ledgerly_sync_status?: string | null;
   ledgerly_sync_error?: string | null;
   ledgerly_item_id?: string | null;
+  zoho_sync_status?: string | null;
+  zoho_sync_error?: string | null;
+  zoho_item_id?: string | null;
   fabric_type: string | null;
   description: string | null;
   story: string | null;
@@ -532,6 +539,9 @@ type ProductDto = {
   ledgerlySyncStatus?: string | null;
   ledgerlySyncError?: string | null;
   ledgerlyItemId?: string | null;
+  zohoSyncStatus?: string | null;
+  zohoSyncError?: string | null;
+  zohoItemId?: string | null;
 };
 
 export const fromProductDto = (dto: ProductDto): ProductRow => ({
@@ -554,14 +564,17 @@ export const fromProductDto = (dto: ProductDto): ProductRow => ({
   age_max_months: dto.ageMaxMonths ?? null,
   sizes: parseJson<string[]>(dto.sizesJson, []),
   colors: normalizeColorEntries(
-    mergeColorImagesIntoColors(
-      parseProductColors(parseJson(dto.colorsJson, [])),
-      dto.colorImagesJson,
+    applyExpectedPrintNamesToColors(
+      mergeColorImagesIntoColors(
+        parseProductColors(parseJson(dto.colorsJson, [])),
+        dto.colorImagesJson,
+      ),
+      dto.sku,
     ),
   ),
   color_images_json: dto.colorImagesJson ?? null,
   item_structure: dto.itemStructure ?? null,
-  variants_json: dto.variantsJson ?? null,
+  variants_json: applyExpectedPrintNamesToVariantsJson(dto.variantsJson, dto.sku),
   images: parseJson<string[]>(dto.imagesJson, []),
   badge: dto.badge ?? null,
   hsn: dto.hsn ?? null,
@@ -577,6 +590,9 @@ export const fromProductDto = (dto: ProductDto): ProductRow => ({
   ledgerly_sync_status: dto.ledgerlySyncStatus ?? null,
   ledgerly_sync_error: dto.ledgerlySyncError ?? null,
   ledgerly_item_id: dto.ledgerlyItemId ?? null,
+  zoho_sync_status: dto.zohoSyncStatus ?? null,
+  zoho_sync_error: dto.zohoSyncError ?? null,
+  zoho_item_id: dto.zohoItemId ?? null,
 });
 
 const toProductDto = (row: ProductRow): ProductDto => ({
@@ -1427,3 +1443,212 @@ export function formatLedgerlySyncFailures(summary: LedgerlySyncSummary): string
   const notices = (summary.notices ?? []).map((f) => `Note — ${label(f)}: ${f.message ?? ""}`);
   return [...failures, ...skipped, ...notices];
 }
+
+export type ZohoSettingsRow = {
+  org_id: string | null;
+  client_id: string | null;
+  client_secret: string | null;
+  refresh_token: string | null;
+  data_center: string | null;
+  connected: boolean;
+  hasClientSecret?: boolean;
+  hasRefreshToken?: boolean;
+};
+
+const zohoMap = {
+  org_id: "orgId",
+  client_id: "clientId",
+  client_secret: "clientSecret",
+  refresh_token: "refreshToken",
+  data_center: "dataCenter",
+};
+
+export function getZohoSettingsValidationErrors(
+  row: ZohoSettingsRow,
+  options?: { hasClientSecret?: boolean; requireRefreshToken?: boolean },
+): string[] {
+  const errors: string[] = [];
+  if (!(row.org_id ?? "").trim()) errors.push("Zoho organisation ID is required.");
+  if (!(row.client_id ?? "").trim()) errors.push("Zoho client ID is required.");
+  if (!options?.hasClientSecret && !(row.client_secret ?? "").trim()) {
+    errors.push("Zoho client secret is required.");
+  }
+  if (options?.requireRefreshToken && !(row.refresh_token ?? "").trim()) {
+    errors.push("Zoho refresh token is required.");
+  }
+  return errors;
+}
+
+function assertValidZohoSettings(
+  row: ZohoSettingsRow,
+  options?: { hasClientSecret?: boolean; requireRefreshToken?: boolean },
+) {
+  const errors = getZohoSettingsValidationErrors(row, options);
+  if (errors.length) throw new Error(errors.join("\n"));
+}
+
+export type ZohoOAuthSetup = {
+  clientType: string;
+  apiConsoleUrl: string;
+  homepageUrl: string;
+  redirectUris: string[];
+  javascriptDomains: string[];
+  scopes: string;
+  primaryRedirectUri: string;
+  authorizationUrlTemplate: string;
+  dataCenter: string;
+};
+
+export const getZohoOAuthSetup = () =>
+  api.get<ZohoOAuthSetup>("/api/v1/admin/zoho/oauth-setup", { auth: true });
+
+export type ZohoIntegrationStatus = {
+  serverConfigured: boolean;
+  connected: boolean;
+  dataCenter: string;
+  organizationId: string | null;
+  pullProductsAutoCreateCategory: boolean;
+};
+
+export const getZohoIntegrationStatus = () =>
+  api.get<ZohoIntegrationStatus>("/api/v1/admin/zoho/integration-status", { auth: true });
+
+export const setZohoPullProductsAutoCreateCategory = (enabled: boolean) =>
+  api.put<ZohoIntegrationStatus>(
+    "/api/v1/admin/zoho/pull-products-auto-create-category",
+    { enabled },
+    { auth: true },
+  );
+
+export const getZohoConnectUrl = () =>
+  api.get<{ url: string }>("/api/v1/admin/zoho/connect-url", { auth: true });
+
+export const completeZohoOAuth = (code: string) =>
+  api.post<ZohoIntegrationStatus>(
+    "/api/v1/admin/zoho/oauth/complete",
+    { code },
+    { auth: true },
+  );
+
+export type ZohoConnectionStatus = {
+  connected: boolean;
+  message: string;
+  organizationName: string | null;
+};
+
+export const testZohoConnection = () =>
+  api.get<ZohoConnectionStatus>("/api/v1/admin/zoho/test", { auth: true });
+
+export type ZohoSyncFailure = {
+  productId: number;
+  productName: string;
+  message: string;
+};
+
+export type ZohoSyncSummary = {
+  success: number;
+  failed: number;
+  failures?: ZohoSyncFailure[];
+  notices?: ZohoSyncFailure[];
+};
+
+export const syncAllZohoProducts = () =>
+  api.post<ZohoSyncSummary>("/api/v1/admin/zoho/sync-products", undefined, { auth: true });
+
+export type ZohoProductSyncResult = {
+  id: number;
+  zohoItemId?: string | null;
+  zohoSyncStatus?: string | null;
+  zohoSyncError?: string | null;
+  zohoLastSyncedAt?: string | null;
+  variantsJson?: string | null;
+  itemStructure?: string | null;
+};
+
+export const syncZohoProduct = (productId: number) =>
+  api.post<ZohoProductSyncResult>(`/api/v1/admin/zoho/sync-products/${productId}`, undefined, {
+    auth: true,
+  });
+
+export const pullZohoInventory = () =>
+  api.post<ZohoSyncSummary>("/api/v1/admin/zoho/pull-inventory", undefined, { auth: true });
+
+export const pullZohoProducts = () =>
+  api.post<ZohoSyncSummary>("/api/v1/admin/zoho/pull-products", undefined, { auth: true });
+
+export const retryZohoOrders = () =>
+  api.post<ZohoSyncSummary>("/api/v1/admin/zoho/retry-orders", undefined, { auth: true });
+
+export const syncZohoOrders = retryZohoOrders;
+
+export type ZohoOrderSyncResult = {
+  id: number;
+  orderNumber?: string | null;
+  zohoSalesOrderId?: string | null;
+  zohoInvoiceId?: string | null;
+  zohoSyncStatus?: string | null;
+  zohoSyncError?: string | null;
+  zohoLastSyncedAt?: string | null;
+};
+
+export const syncZohoOrderByNumber = (orderNumber: string) =>
+  api.post<ZohoOrderSyncResult>(
+    `/api/v1/admin/zoho/sync-orders/by-number/${encodeURIComponent(orderNumber.trim())}`,
+    undefined,
+    { auth: true },
+  );
+
+export const pullZohoOrderTracking = () =>
+  api.post<ZohoSyncSummary>("/api/v1/admin/zoho/pull-order-tracking", undefined, { auth: true });
+
+export function formatZohoSyncSummary(summary: ZohoSyncSummary, label: string) {
+  const noticeCount = (summary.notices ?? []).length;
+  if (summary.failed === 0) {
+    if (summary.success > 0) {
+      return noticeCount > 0
+        ? `${label} completed: ${summary.success} succeeded, ${noticeCount} notes`
+        : `${label} completed: ${summary.success} succeeded`;
+    }
+    if (noticeCount > 0) {
+      return `${label}: ${noticeCount} notes`;
+    }
+  }
+  return `${label}: ${summary.success} succeeded, ${summary.failed} failed`;
+}
+
+export function formatZohoSyncFailures(summary: ZohoSyncSummary): string[] {
+  const failures = (summary.failures ?? []).map((f) => `${f.productName}: ${f.message}`);
+  const notices = (summary.notices ?? []).map((f) => `Note — ${f.productName}: ${f.message}`);
+  return [...failures, ...notices];
+}
+
+export const getZohoSettings = async (): Promise<ZohoSettingsRow | null> => {
+  const dto = await api.get<Record<string, unknown> | null>("/api/v1/admin/zoho-settings", {
+    auth: true,
+  });
+  if (!dto) return null;
+  return {
+    ...(fromCamelMap<Omit<ZohoSettingsRow, "connected" | "hasClientSecret" | "hasRefreshToken">>(
+      dto,
+      zohoMap,
+    ) as Omit<ZohoSettingsRow, "connected" | "hasClientSecret" | "hasRefreshToken">),
+    connected: !!dto.connected,
+    hasClientSecret: !!dto.hasClientSecret,
+    hasRefreshToken: !!dto.hasRefreshToken,
+  };
+};
+
+export const saveZohoSettings = (
+  row: ZohoSettingsRow,
+  options?: { hasClientSecret?: boolean; requireRefreshToken?: boolean },
+) => {
+  assertValidZohoSettings(row, options);
+  const payload: Record<string, unknown> = { ...toCamelMap(row, zohoMap), connected: row.connected };
+  if (!row.client_secret?.trim()) {
+    delete payload.clientSecret;
+  }
+  if (!row.refresh_token?.trim()) {
+    delete payload.refreshToken;
+  }
+  return api.put<Record<string, unknown>>("/api/v1/admin/zoho-settings", payload, { auth: true });
+};

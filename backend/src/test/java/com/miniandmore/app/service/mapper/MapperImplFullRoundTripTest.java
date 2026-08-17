@@ -20,7 +20,7 @@ class MapperImplFullRoundTripTest {
 
     @Test
     void productMapper_nullCategoryAndFullFields() {
-        ProductMapper mapper = new ProductMapperImpl();
+        ProductMapper mapper = MapperTestSupport.productMapper();
         Product entity = fullProduct(null);
         assertThat(mapper.toDto(entity).getCategory()).isNull();
         Product roundTrip = mapper.toEntity(mapper.toDto(entity));

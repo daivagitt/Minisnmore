@@ -367,4 +367,107 @@ class LedgerlyProductMergeServiceTest {
         assertThat(colorImages).containsEntry("Print 1", List.of("https://cdn.example.com/g1.jpg"));
         assertThat(colorImages.get("Print 1")).doesNotContain("https://cdn.example.com/swatch.jpg");
     }
+
+    @Test
+    void mergeLedgerlyItem_appliesUnitAndColorImages() {
+        Product product = new Product().sku("SKU-COL").price(BigDecimal.ZERO).stock(0);
+        Map<String, List<String>> colorImages = Map.of("Red", List.of("https://cdn.example.com/red.jpg"));
+        Map<String, Object> item = Map.of(
+            "price",
+            100,
+            "stock",
+            2,
+            "unit",
+            "pair",
+            "colorImagesJson",
+            colorImages
+        );
+        when(itemImageSync.importColorImages(any(), any())).thenReturn(colorImages);
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+
+        assertThat(product.getUnits()).isEqualTo("pair");
+        verify(itemImageSync).importColorImages(eq(product), eq(colorImages));
+    }
+
+    @Test
+    void buildPushPayload_usesColorGalleryWhenNoPrimaryImage() {
+        when(itemImageSync.firstImageUrl(any())).thenReturn(null);
+        Product product = new Product()
+            .sku("MNM-GALLERY2")
+            .name("Gallery")
+            .price(BigDecimal.valueOf(300))
+            .stock(2)
+            .active(true)
+            .colorsJson(
+                "[{\"name\":\"Blue\",\"imageUrls\":[\"https://cdn.example.com/blue.jpg\"],\"swatchUrl\":\"https://cdn.example.com/blue-swatch.jpg\"}]"
+            );
+
+        Map<String, Object> payload = mergeService.buildPushPayload(product, "Baby");
+
+        assertThat(payload.get("imageUrl")).isEqualTo("https://cdn.example.com/blue.jpg");
+    }
+
+    @Test
+    void mergeLedgerlyItem_mrpOnly_setsStoreUatPrice() {
+        Product product = new Product().sku("SKU-MRP").price(BigDecimal.ZERO).stock(0);
+        Map<String, Object> item = Map.of("mrp", 1000, "stock", 1);
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+
+        assertThat(product.getCompareAtPrice()).isEqualByComparingTo("1000");
+        assertThat(product.getPrice()).isEqualByComparingTo("800.00");
+    }
+
+    @Test
+    void storeSellingPrice_and_storeUatPrice_helpers() {
+        Product withPrice = new Product().price(BigDecimal.valueOf(400)).compareAtPrice(BigDecimal.valueOf(500));
+        assertThat(mergeService.storeSellingPrice(withPrice)).isEqualByComparingTo("400");
+        assertThat(mergeService.storeUatPrice(BigDecimal.valueOf(500))).isEqualByComparingTo("400.00");
+        assertThat(mergeService.storeUatPrice(null)).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void mergeLedgerlyItem_categoryFromDescription_triggersNotice() {
+        Product product = new Product().sku("SKU-CAT").price(BigDecimal.ZERO).stock(0);
+        Category category = new Category().name("Essentials").slug("essentials");
+        Map<String, Object> item = Map.of("price", 100, "stock", 1, "description", "Category: Essentials\n\nBody");
+
+        mergeService.mergeLedgerlyItem(
+            product,
+            item,
+            name -> Optional.of(category),
+            (sku, message) -> assertThat(message).contains("Essentials")
+        );
+
+        assertThat(product.getCategory()).isEqualTo(category);
+    }
+
+    @Test
+    void mergeLedgerlyItem_readsUnitsAliasField() {
+        Product product = new Product().sku("SKU-UNIT").price(BigDecimal.ZERO).stock(0);
+        Map<String, Object> item = Map.of("price", 100, "stock", 1, "units", "pack");
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+
+        assertThat(product.getUnits()).isEqualTo("pack");
+    }
+
+    @Test
+    void buildPushPayload_includesSizesAndColorsAsDelimitedStrings() {
+        when(itemImageSync.firstImageUrl(any())).thenReturn(null);
+        Product product = new Product()
+            .sku("MNM-FIELDS")
+            .name("Fields")
+            .price(BigDecimal.valueOf(100))
+            .stock(1)
+            .active(true)
+            .sizesJson("[\"S\",\"M\"]")
+            .colorsJson("[\"Red\",\"Blue\"]");
+
+        Map<String, Object> payload = mergeService.buildPushPayload(product, "Baby");
+
+        assertThat(payload.get("sizes")).isEqualTo("S, M");
+        assertThat(payload.get("colors")).isEqualTo("Red, Blue");
+    }
 }

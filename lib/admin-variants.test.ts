@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  aggregateFromVariantRows,
   buildVariantMatrixFromSizesColors,
   regenerateVariantSkus,
   suggestParentSku,
   suggestVariantSku,
+  summarizeZohoVariantLinkage,
   variantAmountBlur,
   variantAmountInput,
 } from "./admin-variants";
@@ -54,5 +56,32 @@ describe("admin-variants SKU helpers", () => {
     expect(variantAmountBlur("799.")).toBe(799);
     expect(variantAmountInput("0.0")).toBe(0);
     expect(variantAmountBlur("999")).toBe(999);
+  });
+
+  it("aggregateFromVariantRows keeps catalog sizes without variant rows", () => {
+    const agg = aggregateFromVariantRows(
+      [
+        {
+          sku: "VEST-03-BLUE",
+          size: "0-3 M",
+          color: "Blue",
+          rate: 400,
+          mrp: 500,
+          cost: "",
+          stock: 2,
+          active: true,
+        },
+      ],
+      ["0-3 M", "3-6 M", "6-12 M", "12-18 M"],
+    );
+    expect(agg.sizes).toEqual(["0-3 M", "3-6 M", "6-12 M", "12-18 M"]);
+  });
+
+  it("summarizeZohoVariantLinkage counts linked variant rows", () => {
+    const json = JSON.stringify([
+      { sku: "A-S", size: "S", color: "Red", rate: 100, stock: 1, active: true, zohoItemId: "z1" },
+      { sku: "A-M", size: "M", color: "Red", rate: 100, stock: 1, active: true },
+    ]);
+    expect(summarizeZohoVariantLinkage(json).label).toBe("1/2 variant item(s) in Zoho");
   });
 });

@@ -4,6 +4,7 @@ import { Loader2, Package, CreditCard, Heart, ArrowRight, Truck } from "lucide-r
 import { useAuth } from "@/hooks/useAuth";
 import { useAccountData } from "@/lib/account";
 import { formatOrderDate } from "@/lib/dates";
+import { formatOrderStatusSummary } from "@/lib/order-status";
 import { useShop } from "@/store/shop";
 import { useProducts } from "@/hooks/useProducts";
 import { wishlistCountForProducts } from "@/lib/wishlist";
@@ -64,7 +65,7 @@ function Dashboard() {
               </div>
               <div className="text-right">
                 <div className="font-medium">₹{Number(o.total).toLocaleString("en-IN")}</div>
-                <div className="text-[11px] uppercase tracking-wider text-primary">{o.payment_status} · {o.status}</div>
+                <div className="text-[11px] tracking-wide text-primary">{formatOrderStatusSummary(o)}</div>
               </div>
             </Link>
           ))}

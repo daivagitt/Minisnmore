@@ -15,6 +15,7 @@ import {
 import { StockAvailability, stockAvailabilityState } from "@/components/StockAvailability";
 import { VariantColorButtons, VariantSizeButtons, variantColorsForDisplay } from "@/components/VariantPickers";
 import { galleryForSelectedColor } from "@/lib/product-gallery";
+import { resolveStorefrontColorLabel } from "@/lib/expected-prints";
 
 export function QuickView() {
   const { quickView, setQuickView, addToCart } = useShop();
@@ -116,7 +117,7 @@ export function QuickView() {
                   />
                 </div>
                 <div className="mt-4">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Print · {color}</div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Print · {resolveStorefrontColorLabel(quickView.colors, color, quickView.sku)}</div>
                   <VariantColorButtons
                     product={quickView}
                     size={size}

@@ -1,5 +1,7 @@
 import type { Product } from "@/data/products";
 import type { CartItem } from "@/store/shop";
+import { galleryForSelectedColor } from "@/lib/product-gallery";
+import { resolveStorefrontColorLabel } from "@/lib/expected-prints";
 import { FIT_LIMITS } from "@/lib/product-fit";
 import {
   findVariant,
@@ -17,6 +19,33 @@ export type CartSyncResult = {
 
 function cartLineKey(item: CartItem): string {
   return [item.product.id, item.variantSku ?? "", item.size, item.color].join("|");
+}
+
+/** Customer-facing print/colour label for a cart line. */
+export function cartLineColorLabel(item: CartItem): string {
+  const variant = findVariant(item.product, {
+    size: item.size,
+    color: item.color,
+    sku: item.variantSku,
+  });
+  if (variant?.color && !/^print[-\s]?\d+$/i.test(variant.color.trim())) {
+    return variant.color;
+  }
+  return resolveStorefrontColorLabel(item.product.colors, item.color, item.product.sku);
+}
+
+/** Thumbnail for a cart line — uses the selected print/color gallery, not the parent product hero. */
+export function cartLineImage(item: CartItem): string {
+  const color = cartLineColorLabel(item);
+  const { image } = galleryForSelectedColor(item.product, color);
+  return image || item.product.image;
+}
+
+function cartLineColorForLookup(item: CartItem, product: Product): string {
+  const label = cartLineColorLabel({ ...item, product });
+  if (findVariant(product, { size: item.size, color: label, sku: item.variantSku })) return label;
+  if (findVariant(product, { size: item.size, color: item.color, sku: item.variantSku })) return item.color;
+  return label;
 }
 
 function maxQtyForLine(product: Product, item: CartItem): number {
@@ -54,7 +83,8 @@ export function sanitizeCartWithCatalog(cart: CartItem[], products: Product[]): 
       continue;
     }
 
-    const variant = findVariant(live, { size: item.size, color: item.color, sku: item.variantSku });
+    const lookupColor = cartLineColorForLookup(item, live);
+    const variant = findVariant(live, { size: item.size, color: lookupColor, sku: item.variantSku });
     const maxQty = maxQtyForLine(live, item);
     if (maxQty <= 0) {
       removed.push(item.product.name);
@@ -78,6 +108,7 @@ export function sanitizeCartWithCatalog(cart: CartItem[], products: Product[]): 
       qty,
       unitPrice,
       variantSku: variant?.sku ?? item.variantSku,
+      color: lookupColor,
     });
   }
 

@@ -26,7 +26,7 @@ export function authErrorMessage(error: unknown): string {
       if (/not activated/i.test(detail) || /not activated/i.test(combined)) {
         return "Your account is not activated yet. Open the activation link from your email, or resend it below.";
       }
-      return "Invalid email or password. New accounts must open the activation link from email before signing in.";
+      return "Invalid email or password. Use Forgot password if you need to reset it.";
     }
 
     if (

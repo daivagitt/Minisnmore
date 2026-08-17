@@ -25,8 +25,8 @@ public class ZohoSettingsResource {
                 Map<String, Object> dto = new LinkedHashMap<>();
                 dto.put("orgId", s.getOrgId());
                 dto.put("clientId", s.getClientId());
-                dto.put("clientSecret", s.getClientSecret());
-                dto.put("refreshToken", s.getRefreshToken());
+                dto.put("hasClientSecret", s.getClientSecret() != null && !s.getClientSecret().isBlank());
+                dto.put("hasRefreshToken", s.getRefreshToken() != null && !s.getRefreshToken().isBlank());
                 dto.put("dataCenter", s.getDataCenter());
                 dto.put("connected", s.getConnected());
                 return ResponseEntity.ok(dto);
@@ -59,6 +59,8 @@ public class ZohoSettingsResource {
         }
         if (body.get("connected") != null) {
             setting.setConnected(Boolean.parseBoolean(body.get("connected").toString()));
+        } else if (setting.getRefreshToken() != null && !setting.getRefreshToken().isBlank()) {
+            setting.setConnected(true);
         }
         settingRepository.save(setting);
         return Map.of("ok", true);

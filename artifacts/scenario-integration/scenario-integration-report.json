@@ -1,22 +1,22 @@
 {
-  "baseUrl": "http://127.0.0.1:9180",
-  "startedAt": "2026-07-25T03:37:15.233283+00:00",
-  "finishedAt": "2026-07-25T03:37:16.084868+00:00",
+  "baseUrl": "https://uat.minisnmore.com",
+  "startedAt": "2026-08-10T10:59:38.202513+00:00",
+  "finishedAt": "2026-08-10T10:59:44.808755+00:00",
   "paymentDemo": true,
   "refundDemo": true,
   "credentials": {
-    "customer": "saikedar2003@gmail.com",
+    "customer": "irfanpatan9948@gmail.com",
     "admin": "admin@uat.minisnmore.com"
   },
   "orderContext": {
-    "orderId": 37458,
-    "orderNumber": "MNM-4199AB561E28",
-    "total": 198.97,
+    "orderId": 40351,
+    "orderNumber": "MNM-13EBD4C7A001",
+    "total": 8.0,
     "demoMode": true,
     "gatewayMode": "demo",
     "paid": true,
     "ledgerlySyncTriggered": true,
-    "zohoSalesOrderId": "MNM-4199AB561E28"
+    "zohoSalesOrderId": "MNM-13EBD4C7A001"
   },
   "scenarios": [
     {
@@ -44,51 +44,51 @@
     {
       "id": "coupon-checkout",
       "title": "Coupon checkout (WELCOM10)",
-      "description": "Validate coupon on Front Open Vest Sleveless and create checkout order.",
+      "description": "Validate coupon on BASIC SHORTS and create checkout order.",
       "status": "pass",
       "steps": [
         {
           "name": "resolve-product",
           "status": "pass",
-          "note": "front-open-vest-sleveless id=36623 \u20b9272",
+          "note": "basic-shorts id=39351 \u20b98",
           "ms": 0,
           "detail": {
-            "product_id": "36623",
-            "product_slug": "front-open-vest-sleveless",
-            "product_name": "Front Open Vest Sleveless",
-            "qty": 2,
+            "product_id": "39351",
+            "product_slug": "basic-shorts",
+            "product_name": "BASIC SHORTS",
+            "qty": 1,
             "size": "0-3 M",
-            "color": "Print 1",
-            "sku": "FRONT-OPEN-VEST-SLEVELESS-03-P1",
-            "price": 272.0
+            "color": "Happy Bee",
+            "sku": "BASIC-SHORTS-03-HAPPY-BEE",
+            "price": 8.0
           }
         },
         {
           "name": "validate-coupon",
           "status": "pass",
-          "note": "discount \u20b9348 on subtotal \u20b9544 (qty=2)",
-          "ms": 27,
+          "note": "discount \u20b91 on subtotal \u20b98 (qty=1)",
+          "ms": 82,
           "detail": {
-            "discount": 348.0,
-            "subtotal": 544.0,
-            "qty": 2
+            "discount": 1.0,
+            "subtotal": 8.0,
+            "qty": 1
           }
         },
         {
           "name": "create-order",
           "status": "pass",
-          "note": "order MNM-4199AB561E28 total \u20b9199 (demoMode=True)",
-          "ms": 45,
+          "note": "order MNM-13EBD4C7A001 total \u20b98 (demoMode=True)",
+          "ms": 102,
           "detail": {
-            "orderId": 37458,
-            "orderNumber": "MNM-4199AB561E28",
-            "razorpayOrderId": "order_demo_MNM-4199AB561E28",
-            "total": 198.97,
+            "orderId": 40351,
+            "orderNumber": "MNM-13EBD4C7A001",
+            "razorpayOrderId": "order_demo_MNM-13EBD4C7A001",
+            "total": 8.0,
             "demoMode": true,
             "gatewayMode": "demo",
             "paid": true,
             "ledgerlySyncTriggered": true,
-            "zohoSalesOrderId": "MNM-4199AB561E28"
+            "zohoSalesOrderId": "MNM-13EBD4C7A001"
           }
         }
       ]
@@ -102,8 +102,8 @@
         {
           "name": "verify-payment",
           "status": "pass",
-          "note": "PAID MNM-4199AB561E28",
-          "ms": 71,
+          "note": "PAID MNM-13EBD4C7A001",
+          "ms": 4191,
           "detail": {
             "zohoSynced": null
           }
@@ -119,13 +119,13 @@
         {
           "name": "sync-order",
           "status": "pass",
-          "note": "Ledgerly sync for MNM-4199AB561E28 (Zoho admin API not on MS stack)",
-          "ms": 73,
+          "note": "Ledgerly sync for MNM-13EBD4C7A001 (Zoho admin API not on MS stack)",
+          "ms": 207,
           "detail": {
-            "orderNumber": "MNM-4199AB561E28",
-            "ledgerlySyncStatus": "FAILED",
-            "ledgerlySyncError": "502 Bad Gateway: \"error code: 502<EOL>\"",
-            "ok": false
+            "orderNumber": "MNM-13EBD4C7A001",
+            "ledgerlySyncStatus": "SYNCED",
+            "ledgerlySyncError": "",
+            "ok": true
           }
         }
       ]
@@ -139,10 +139,10 @@
         {
           "name": "zoho-so-total",
           "status": "pass",
-          "note": "Checkout total \u20b9198.97 (Books SO check skipped \u2014 use Ledgerly on MS UAT)",
+          "note": "Checkout total \u20b98.00 (Books SO check skipped \u2014 use Ledgerly on MS UAT)",
           "ms": 0,
           "detail": {
-            "expected": 198.97
+            "expected": 8.0
           }
         }
       ]
@@ -171,14 +171,14 @@
           "name": "public-track-api",
           "status": "pass",
           "note": "public track (shipped)",
-          "ms": 23,
+          "ms": 132,
           "detail": {
-            "order_number": "MNM-4199AB561E28",
+            "order_number": "MNM-13EBD4C7A001",
             "status": "confirmed",
             "tracking_status": "shipped",
             "tracking_number": "",
             "tracking_carrier": "",
-            "shipment_date": "2026-07-25"
+            "shipment_date": "2026-08-10"
           }
         }
       ]
@@ -193,21 +193,21 @@
           "name": "return-eligibility",
           "status": "pass",
           "note": "eligible",
-          "ms": 27,
+          "ms": 43,
           "detail": {}
         },
         {
           "name": "request-return",
           "status": "pass",
-          "note": "RET-MNM-4199AB561E28-750D9A",
-          "ms": 33,
+          "note": "RET-MNM-13EBD4C7A001-4ED8F0",
+          "ms": 60,
           "detail": {}
         },
         {
           "name": "approve",
           "status": "pass",
           "note": "approved",
-          "ms": 29,
+          "ms": 50,
           "detail": {
             "refund_amount": null
           }
@@ -216,7 +216,7 @@
           "name": "mark-received",
           "status": "pass",
           "note": "received",
-          "ms": 28,
+          "ms": 43,
           "detail": {
             "refund_amount": null
           }
@@ -225,9 +225,9 @@
           "name": "refund",
           "status": "pass",
           "note": "refunded",
-          "ms": 125,
+          "ms": 1255,
           "detail": {
-            "refund_amount": 198.97
+            "refund_amount": 8.0
           }
         }
       ]
@@ -242,7 +242,7 @@
           "name": "shipped-order-track",
           "status": "pass",
           "note": "MNM-2606-A4A0B \u2192 delivered",
-          "ms": 30,
+          "ms": 33,
           "detail": {
             "order_number": "MNM-2606-A4A0B",
             "status": "fulfilled",
@@ -256,7 +256,7 @@
           "name": "returned-order-track",
           "status": "pass",
           "note": "MNM-2606-86EA3 shipment_date=2026-06-06",
-          "ms": 69,
+          "ms": 28,
           "detail": {
             "order_number": "MNM-2606-86EA3",
             "status": "confirmed",

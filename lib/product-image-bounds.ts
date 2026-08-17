@@ -4,7 +4,8 @@ import { PRODUCT_IMAGE_SURFACE } from "@/lib/product-gallery";
 /** Catalogue backdrop (#F6F6F6) and common near-white JPEG padding. */
 const SURFACE_RGB = { r: 246, g: 246, b: 246 };
 const BG_DISTANCE_SQ = 40 * 40;
-const CONTENT_PAD_FRACTION = 0.012;
+/** Keep crop tight — padding reintroduces the white gaps we strip. */
+const CONTENT_PAD_FRACTION = 0;
 const SAMPLE_MAX_PX = 256;
 
 export type ImageContentBounds = {
@@ -18,11 +19,15 @@ export type ImageContentBounds = {
 
 export function isProductImageBackground(r: number, g: number, b: number, a: number): boolean {
   if (a < 128) return true;
+  // Pure / cool catalogue whites (#F6F6F6 and JPEG padding)
   if (r >= 228 && g >= 228 && b >= 228) return true;
   const dr = r - SURFACE_RGB.r;
   const dg = g - SURFACE_RGB.g;
   const db = b - SURFACE_RGB.b;
-  return dr * dr + dg * dg + db * db <= BG_DISTANCE_SQ;
+  if (dr * dr + dg * dg + db * db <= BG_DISTANCE_SQ) return true;
+  // Warm cream / beige studio backdrops (common in product photography)
+  if (r >= 200 && g >= 190 && b >= 170 && r >= g && g >= b - 8) return true;
+  return false;
 }
 
 function fullBounds(naturalWidth: number, naturalHeight: number): ImageContentBounds {
@@ -93,7 +98,7 @@ export function contentAspect(bounds: ImageContentBounds): number {
   return bounds.width / bounds.height;
 }
 
-/** True when bounds cover the full file — use object-contain instead of zoom fit. */
+/** True when bounds cover the full file — use object-cover fill instead of zoom fit. */
 export function isFullImageBounds(bounds: ImageContentBounds): boolean {
   if (!bounds.naturalWidth || !bounds.naturalHeight) return true;
   const coverW = bounds.width / bounds.naturalWidth;

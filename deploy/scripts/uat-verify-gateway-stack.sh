@@ -116,8 +116,8 @@ else
       -H "Authorization: Bearer ${TOKEN}" "http://127.0.0.1:${GATEWAY_PORT}${url}" || echo ERR)
     if [ "$code" = "200" ]; then
       pass "${method} ${url} → 200"
-      if [ "$url" = "/api/v1/admin/zoho/sync-products" ] && ! grep -q 'Background sync' /tmp/zoho-verify-body.txt 2>/dev/null; then
-        fail "sync-products 200 but missing Background sync notice — deploy integration JAR"
+      if [ "$url" = "/api/v1/admin/zoho/sync-products" ] && ! grep -qE '"success"|"failed"' /tmp/zoho-verify-body.txt 2>/dev/null; then
+        fail "sync-products 200 but missing sync summary — deploy catalog JAR"
       fi
     elif [ "$code" = "502" ] && [ "$url" = "/api/v1/admin/zoho/integration-status" ]; then
       fail "${url} → 502 (Zoho quota/API — not 504 timeout)"

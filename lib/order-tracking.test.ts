@@ -3,6 +3,8 @@ import {
   isTerminalTrackingState,
   resolveTrackingStage,
   shouldPollOrderTracking,
+  trackingActivityDate,
+  trackingActivityTitle,
 } from "@/lib/order-tracking";
 
 describe("order-tracking helpers", () => {
@@ -22,6 +24,29 @@ describe("order-tracking helpers", () => {
 
   it("prefers tracking_status for stage resolution", () => {
     expect(resolveTrackingStage({ status: "confirmed", tracking_status: "shipped" })).toBe(2);
+  });
+
+  it("builds activity titles from tracking_status", () => {
+    expect(trackingActivityTitle({ tracking_status: "shipped" })).toBe("On the way");
+    expect(trackingActivityTitle({ tracking_status: "delivered" })).toBe("Delivered");
+    expect(trackingActivityTitle({ status: "cancelled" })).toBe("Order cancelled");
+  });
+
+  it("prefers shipment date for in-transit activity", () => {
+    expect(
+      trackingActivityDate({
+        tracking_status: "shipped",
+        shipment_date: "2026-08-10",
+        created_at: "2026-08-01T10:00:00Z",
+      }),
+    ).toEqual({ prefix: "Shipped", value: "2026-08-10" });
+
+    expect(
+      trackingActivityDate({
+        tracking_status: "processing",
+        created_at: "2026-08-01T10:00:00Z",
+      }),
+    ).toEqual({ prefix: "Ordered", value: "2026-08-01T10:00:00Z" });
   });
 });
 

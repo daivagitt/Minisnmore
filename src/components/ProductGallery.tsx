@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { LazyImage } from "@/components/LazyImage";
 import { cn } from "@/lib/utils";
 import {
   contentAspect,
@@ -94,22 +95,22 @@ type FittedImageProps = {
   alt: string;
   bounds?: ImageContentBounds;
   className?: string;
-  loading?: "lazy" | "eager";
+  priority?: "high" | "auto" | "low";
   onBounds: (src: string, img: HTMLImageElement) => void;
 };
 
 /** Zooms to the detected product region so the inner frame has no baked-in white/cream border. */
-function FittedGalleryImage({ src, alt, bounds, className, loading, onBounds }: FittedImageProps) {
+function FittedGalleryImage({ src, alt, bounds, className, priority, onBounds }: FittedImageProps) {
   if (!src) return null;
 
   const fitStyle = bounds ? imageFitStyles(bounds) : undefined;
 
   return (
-    <img
+    <LazyImage
       src={src}
       alt={alt}
       decoding="async"
-      loading={loading}
+      priority={priority ?? "auto"}
       onLoad={(e) => onBounds(src, e.currentTarget)}
       className={cn(
         "absolute select-none",
@@ -130,7 +131,7 @@ type ThumbProps = {
   onSelect: () => void;
 };
 
-/** Square thumbs — fixed size avoids rail layout jumps when bounds load. */
+/** Each thumb is its own rounded card — not grouped in a single rail container. */
 function GalleryThumb({ src, index, total, active, onSelect }: ThumbProps) {
   return (
     <button
@@ -139,16 +140,21 @@ function GalleryThumb({ src, index, total, active, onSelect }: ThumbProps) {
       aria-label={`View image ${index + 1} of ${total}`}
       aria-current={active ? "true" : undefined}
       className={cn(
-        "rounded-lg overflow-hidden shrink-0 snap-start relative w-[3.25rem] sm:w-[3.75rem] lg:w-full aspect-square bg-white/50",
-        active ? "ring-2 ring-primary ring-inset opacity-100" : "opacity-70 hover:opacity-100",
+        galleryBox,
+        galleryThumbRailRound,
+        "p-1.5 sm:p-2 overflow-hidden shrink-0 snap-start relative w-[3.25rem] sm:w-[3.75rem] lg:w-full aspect-square",
+        active ? "ring-2 ring-primary ring-offset-1 opacity-100" : "opacity-70 hover:opacity-100",
       )}
     >
-      <img
+      <LazyImage
         src={src}
         alt=""
         decoding="async"
-        loading="lazy"
-        className="absolute inset-0 h-full w-full object-cover object-center select-none"
+        priority="auto"
+        className={cn(
+          "absolute inset-0 h-full w-full object-cover object-center select-none",
+          galleryImageRound,
+        )}
         draggable={false}
       />
     </button>
@@ -166,15 +172,27 @@ export function ProductGallery({ name, image, gallery = [], className }: Props) 
   const images = useMemo(() => uniqueImages(image, ...gallery), [image, gallery]);
   const imagesKey = useMemo(() => images.join("\0"), [images]);
   const [active, setActive] = useState(0);
-  const { boundsFor, aspectFor, rememberBounds } = useImageContentBounds();
+  const { boundsFor, rememberBounds } = useImageContentBounds();
 
   useEffect(() => {
     setActive(0);
   }, [imagesKey]);
 
+  const frameSrc = images[0] ?? "";
+
+  useEffect(() => {
+    if (!frameSrc || boundsFor(frameSrc)) return;
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => rememberBounds(frameSrc, img);
+    img.src = frameSrc;
+  }, [frameSrc, boundsFor, rememberBounds]);
+
   const safeActive = images.length ? Math.min(active, images.length - 1) : 0;
   const current = images[safeActive] ?? images[0] ?? "";
-  const heroAspect = aspectFor(current);
+  const frameBounds = boundsFor(frameSrc);
+  /** Lock frame size to the first gallery image so slides do not resize the hero box. */
+  const heroAspect = frameBounds ? contentAspect(frameBounds) : DEFAULT_ASPECT;
   const heroBounds = boundsFor(current);
 
   const go = (delta: number) => {
@@ -194,26 +212,20 @@ export function ProductGallery({ name, image, gallery = [], className }: Props) 
       )}
     >
       {images.length > 1 ? (
-        <div className="order-2 lg:order-1 shrink-0 lg:w-[5rem] xl:w-[5.5rem] lg:self-start">
-          <div
-            className={cn(
-              galleryBox,
-              galleryThumbRailRound,
-              "p-2 sm:p-2.5 flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-y-auto snap-x snap-mandatory lg:snap-none [scrollbar-width:thin] lg:max-h-[min(92vw,36rem)]",
-            )}
-            aria-label="Product image thumbnails"
-          >
-            {images.map((src, i) => (
-              <GalleryThumb
-                key={src}
-                src={src}
-                index={i}
-                total={images.length}
-                active={safeActive === i}
-                onSelect={() => setActive(i)}
-              />
-            ))}
-          </div>
+        <div
+          className="order-2 lg:order-1 shrink-0 lg:w-[5rem] xl:w-[5.5rem] lg:self-start flex flex-row lg:flex-col gap-2 sm:gap-2.5 overflow-x-auto lg:overflow-y-auto snap-x snap-mandatory lg:snap-none [scrollbar-width:thin] lg:max-h-[min(92vw,36rem)]"
+          aria-label="Product image thumbnails"
+        >
+          {images.map((src, i) => (
+            <GalleryThumb
+              key={src}
+              src={src}
+              index={i}
+              total={images.length}
+              active={safeActive === i}
+              onSelect={() => setActive(i)}
+            />
+          ))}
         </div>
       ) : null}
 
@@ -222,12 +234,12 @@ export function ProductGallery({ name, image, gallery = [], className }: Props) 
         className={cn(
           galleryBox,
           galleryHeroRound,
-          "order-1 lg:order-2 relative min-w-0 w-full lg:flex-1 p-4 sm:p-5",
+          "order-1 lg:order-2 relative min-w-0 w-full lg:flex-1 p-2.5 sm:p-3",
         )}
       >
         <div
           className={cn(
-            "relative w-full overflow-hidden transition-[aspect-ratio] duration-300 ease-out",
+            "group relative w-full overflow-hidden",
             galleryImageRound,
           )}
           style={heroImageStyle}
@@ -249,34 +261,34 @@ export function ProductGallery({ name, image, gallery = [], className }: Props) 
                   src={current}
                   alt={name}
                   bounds={heroBounds}
-                  loading="eager"
+                  priority="high"
                   onBounds={rememberBounds}
                 />
               ) : null}
             </motion.div>
           </AnimatePresence>
-        </div>
 
-        {images.length > 1 ? (
-          <>
-            <button
-              type="button"
-              onClick={() => go(-1)}
-              className="absolute left-2 sm:left-3 top-1/2 z-10 -translate-y-1/2 h-8 w-8 sm:h-9 sm:w-9 grid place-items-center rounded-full bg-white/80 backdrop-blur-sm hover:bg-white transition shadow-sm border border-white/70"
-              aria-label="Previous image"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => go(1)}
-              className="absolute right-2 sm:right-3 top-1/2 z-10 -translate-y-1/2 h-8 w-8 sm:h-9 sm:w-9 grid place-items-center rounded-full bg-white/80 backdrop-blur-sm hover:bg-white transition shadow-sm border border-white/70"
-              aria-label="Next image"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </>
-        ) : null}
+          {images.length > 1 ? (
+            <>
+              <button
+                type="button"
+                onClick={() => go(-1)}
+                className="absolute left-2 sm:left-3 top-1/2 z-10 -translate-y-1/2 h-8 w-8 sm:h-9 sm:w-9 grid place-items-center rounded-full bg-white/80 backdrop-blur-sm hover:bg-white shadow-sm border border-white/70 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto"
+                aria-label="Previous image"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => go(1)}
+                className="absolute right-2 sm:right-3 top-1/2 z-10 -translate-y-1/2 h-8 w-8 sm:h-9 sm:w-9 grid place-items-center rounded-full bg-white/80 backdrop-blur-sm hover:bg-white shadow-sm border border-white/70 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto"
+                aria-label="Next image"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </>
+          ) : null}
+        </div>
       </motion.div>
     </div>
   );

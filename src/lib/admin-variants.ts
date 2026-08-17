@@ -1,3 +1,4 @@
+import { sortSizesAsc } from "@/lib/product-ages";
 import { parseVariantsJson } from "@/lib/product-variants";
 
 export type VariantEditorRow = {
@@ -12,7 +13,36 @@ export type VariantEditorRow = {
   cost: number | string | "";
   stock: number | string | "";
   active: boolean;
+  /** Zoho Books item_id for this variant SKU (read-only in admin; set by sync/pull). */
+  zohoItemId?: string;
 };
+
+export type ZohoVariantLinkageSummary = {
+  activeRows: number;
+  linkedRows: number;
+  /** Human label for parent product sync strip, e.g. "8/10 variant items in Zoho". */
+  label: string;
+};
+
+/** Count variant rows with a cached Zoho item id (VARIANTS parents have no single parent Zoho item). */
+export function summarizeZohoVariantLinkage(variantsJson: string | null | undefined): ZohoVariantLinkageSummary {
+  const rows = rowsFromVariantsJson(variantsJson);
+  const activeRows = rows.filter((r) => r.active && r.sku.trim()).length;
+  const linkedRows = rows.filter((r) => r.active && r.sku.trim() && r.zohoItemId?.trim()).length;
+  const label =
+    activeRows === 0
+      ? "no active variant SKUs"
+      : linkedRows === 0
+        ? `${activeRows} variant SKU(s) — not linked in Zoho yet`
+        : linkedRows === activeRows
+          ? `${linkedRows} variant item(s) in Zoho`
+          : `${linkedRows}/${activeRows} variant item(s) in Zoho`;
+  return { activeRows, linkedRows, label };
+}
+
+export function isVariantsItemStructure(itemStructure: string | null | undefined): boolean {
+  return (itemStructure ?? "").trim().toUpperCase() === "VARIANTS";
+}
 
 function variantAmount(value: number | string | ""): number {
   if (value === "" || value == null) return NaN;
@@ -141,6 +171,7 @@ export function rowsFromVariantsJson(raw: string | null | undefined): VariantEdi
             mrp = rateRaw;
             rate = Math.round(rateRaw * 0.8 * 100) / 100;
           }
+          const zohoRaw = r.zohoItemId ?? r.zoho_item_id;
           return {
             id: r.id != null ? String(r.id) : undefined,
             sku: String(r.sku ?? "").trim(),
@@ -151,6 +182,7 @@ export function rowsFromVariantsJson(raw: string | null | undefined): VariantEdi
             cost: r.cost != null && r.cost !== "" ? Number(r.cost) : "",
             stock: r.stock != null && r.stock !== "" ? Number(r.stock) : 0,
             active: r.active === false || r.active === "false" || r.active === 0 ? false : true,
+            zohoItemId: zohoRaw != null && String(zohoRaw).trim() ? String(zohoRaw).trim() : undefined,
           };
         });
       }
@@ -190,26 +222,34 @@ export function serializeVariantRows(rows: VariantEditorRow[]): string {
       if (r.id) out.id = r.id;
       if (r.size.trim()) out.size = r.size.trim();
       if (r.color.trim()) out.color = r.color.trim();
+      if (r.zohoItemId?.trim()) out.zohoItemId = r.zohoItemId.trim();
       return out;
     });
   return JSON.stringify(payload);
 }
 
-export function aggregateFromVariantRows(rows: VariantEditorRow[]): {
+export function aggregateFromVariantRows(
+  rows: VariantEditorRow[],
+  catalogSizes: string[] = [],
+): {
   sizes: string[];
   colors: string[];
   compare_at_price: number | null;
   price: number | null;
   stock: number;
 } {
-  const sizes: string[] = [];
+  const sizeSet = new Set<string>();
+  for (const size of catalogSizes) {
+    const trimmed = size.trim();
+    if (trimmed) sizeSet.add(trimmed);
+  }
   const colors: string[] = [];
   let minSelling: number | null = null;
   let minMrp: number | null = null;
   let stock = 0;
   for (const r of rows) {
     // Sizes/colors include inactive rows so the storefront can render them disabled instead of hiding them.
-    if (r.size.trim() && !sizes.includes(r.size.trim())) sizes.push(r.size.trim());
+    if (r.size.trim()) sizeSet.add(r.size.trim());
     if (r.color.trim() && !colors.includes(r.color.trim())) colors.push(r.color.trim());
     if (!r.active) continue;
     const selling = variantAmount(r.rate);
@@ -223,7 +263,7 @@ export function aggregateFromVariantRows(rows: VariantEditorRow[]): {
     stock += Math.max(0, Math.floor(Number(r.stock) || 0));
   }
   return {
-    sizes,
+    sizes: sortSizesAsc([...sizeSet]),
     colors,
     compare_at_price: minMrp ?? (minSelling != null ? Math.round((minSelling / 0.8) * 100) / 100 : null),
     price: minSelling,

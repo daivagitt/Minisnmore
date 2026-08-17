@@ -14,6 +14,7 @@ import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.repository.*;
 import com.miniandmore.app.service.LedgerlySyncService;
+import com.miniandmore.app.service.OrderEventService;
 import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.service.ProductVariantSupport;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
@@ -69,6 +70,9 @@ class InternalAccountOrderResourceRazorpayTest {
     @Mock
     private ZohoSyncService zohoSyncService;
 
+    @Mock
+    private OrderEventService orderEventService;
+
     private InternalAccountOrderResource resource;
     private ObjectMapper objectMapper;
 
@@ -89,7 +93,8 @@ class InternalAccountOrderResourceRazorpayTest {
             objectMapper,
             ledgerlySyncService,
             zohoSyncService,
-            new ProductVariantSupport(objectMapper)
+            new ProductVariantSupport(objectMapper),
+            orderEventService
         );
         ReflectionTestUtils.setField(resource, "razorpayKeyId", "rzp_test_key");
         ReflectionTestUtils.setField(resource, "razorpayKeySecret", SECRET);

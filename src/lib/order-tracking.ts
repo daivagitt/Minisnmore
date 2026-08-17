@@ -57,3 +57,38 @@ export function shouldPollOrderTracking(
 export function trackingStageIcon(key: string): LucideIcon {
   return TRACKING_STAGES.find((s) => s.key === key)?.icon ?? Package;
 }
+
+function normalizedTrackingKey(order: OrderTrackingFields): string {
+  const tracking = (order.tracking_status ?? order.status ?? "pending").toLowerCase();
+  if (tracking === "fulfilled") return "delivered";
+  return tracking;
+}
+
+/** Customer-facing headline for order activity feeds (notifications, etc.). */
+export function trackingActivityTitle(order: OrderTrackingFields): string {
+  const key = normalizedTrackingKey(order);
+  if (key === "cancelled" || key === "canceled") return "Order cancelled";
+  const stage = TRACKING_STAGES.find((s) => s.key === key);
+  if (stage) return stage.label;
+  if (key === "confirmed") return "Order confirmed";
+  return "Order update";
+}
+
+export function trackingActivityIcon(order: OrderTrackingFields): LucideIcon {
+  const key = normalizedTrackingKey(order);
+  if (key === "cancelled" || key === "canceled") return Package;
+  return trackingStageIcon(key);
+}
+
+/** Best available date string for activity UI — shipment date when in transit, else order placed. */
+export function trackingActivityDate(order: OrderTrackingFields & { created_at?: string }): {
+  prefix: "Ordered" | "Shipped";
+  value: string;
+} {
+  const key = normalizedTrackingKey(order);
+  const shipped = key === "shipped" || key === "delivered";
+  if (shipped && order.shipment_date) {
+    return { prefix: "Shipped", value: order.shipment_date };
+  }
+  return { prefix: "Ordered", value: order.created_at ?? "" };
+}

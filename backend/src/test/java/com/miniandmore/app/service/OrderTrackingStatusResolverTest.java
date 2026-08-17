@@ -71,4 +71,18 @@ class OrderTrackingStatusResolverTest {
 
         assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("shipped");
     }
+
+    @Test
+    void resolve_shippedWhenZohoReportsShipped() {
+        CustomerOrder order = paidOrder().zohoOrderStatus("shipped");
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("shipped");
+    }
+
+    @Test
+    void resolve_processingWhenZohoOrderClosedButNotShipped() {
+        CustomerOrder order = paidOrder().zohoOrderStatus("closed");
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("processing");
+    }
 }

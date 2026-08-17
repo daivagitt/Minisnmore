@@ -567,7 +567,7 @@ describe("api client", () => {
     );
 
     await expect(api.post("/api/v1/admin/products", {})).rejects.toThrow(
-      "Price: must be greater than 0\nQty: must be less than or equal to 10\nName: must match \"^[a-z]+$\"",
+      "Selling price (₹): must be greater than 0\nQty: must be less than or equal to 10\nName: must match \"^[a-z]+$\"",
     );
   });
 });

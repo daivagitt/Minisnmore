@@ -14,6 +14,7 @@ import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.repository.*;
 import com.miniandmore.app.service.LedgerlySyncService;
+import com.miniandmore.app.service.OrderEventService;
 import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import java.math.BigDecimal;
@@ -68,6 +69,9 @@ class InternalAdminOrderResourceTest {
 
     @MockitoBean
     private ZohoSyncService zohoSyncService;
+
+    @MockitoBean
+    private OrderEventService orderEventService;
 
     private CustomerOrder codOrder() {
         return new CustomerOrder()

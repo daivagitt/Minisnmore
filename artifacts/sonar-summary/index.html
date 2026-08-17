@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SonarQube summary · Daiva Technologies</title>
+    <style>
+      :root {
+        --brand: #1e3a8a;
+        --brand-light: #3b82f6;
+        --brand-accent: #0ea5e9;
+        --surface: #ffffff;
+        --surface-muted: #f8fafc;
+        --border: #e2e8f0;
+        --text: #0f172a;
+        --text-muted: #64748b;
+        --pass: #15803d;
+        --fail: #b91c1c;
+        --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+        --radius: 14px;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        line-height: 1.55;
+        color: var(--text);
+        background: linear-gradient(180deg, #eff6ff 0%, #f8fafc 220px, #f1f5f9 100%);
+        min-height: 100vh;
+      }
+      .page { max-width: 1100px; margin: 0 auto; padding: 28px 20px 48px; }
+      .brand-bar {
+        background: linear-gradient(135deg, var(--brand) 0%, var(--brand-light) 55%, var(--brand-accent) 100%);
+        color: #fff;
+        border-radius: calc(var(--radius) + 4px);
+        padding: 28px 30px;
+        box-shadow: var(--shadow);
+      }
+      .brand-top {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 18px;
+        margin-bottom: 16px;
+      }
+      .brand-logo {
+        display: block;
+        height: 48px;
+        width: auto;
+        max-width: min(100%, 260px);
+      }
+      .brand-bar .eyebrow {
+        margin: 0 0 6px;
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        opacity: 0.9;
+        font-weight: 700;
+      }
+      .brand-bar h1 { margin: 0 0 8px; font-size: 1.85rem; font-weight: 700; }
+      .brand-bar p { margin: 0; opacity: 0.95; }
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 18px;
+      }
+      .meta-chip {
+        background: rgba(255, 255, 255, 0.16);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 0.9rem;
+      }
+      .content { margin-top: 24px; }
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 22px 24px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        margin-bottom: 18px;
+      }
+      .panel h2 { margin: 0 0 12px; font-size: 1.2rem; }
+      .status {
+        display: inline-block;
+        padding: 5px 12px;
+        border-radius: 999px;
+        color: #fff;
+        font-weight: 700;
+        font-size: 0.85rem;
+        letter-spacing: 0.04em;
+      }
+      .status.pass { background: var(--pass); }
+      .status.fail { background: var(--fail); }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+      th, td {
+        border-bottom: 1px solid var(--border);
+        padding: 10px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th { background: var(--surface-muted); font-size: 0.92rem; }
+      tr:last-child td { border-bottom: none; }
+      code {
+        background: #eef2ff;
+        color: #312e81;
+        padding: 2px 7px;
+        border-radius: 6px;
+        font-size: 0.92em;
+      }
+      a { color: var(--brand-light); text-decoration: none; font-weight: 600; }
+      a:hover { text-decoration: underline; }
+      .links { display: grid; gap: 12px; }
+      .link-card {
+        display: block;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 16px 18px;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+      .link-card:hover {
+        border-color: #93c5fd;
+        box-shadow: var(--shadow);
+        text-decoration: none;
+      }
+      .link-card strong { display: block; font-size: 1.05rem; color: var(--text); margin-bottom: 4px; }
+      .link-card span { color: var(--text-muted); font-weight: 400; font-size: 0.95rem; }
+      .muted { color: var(--text-muted); }
+      .stats { display: flex; flex-wrap: wrap; gap: 14px; margin: 14px 0 0; }
+      .stat {
+        background: var(--surface-muted);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 16px;
+        min-width: 120px;
+      }
+      .stat strong { display: block; font-size: 1.35rem; }
+      .stat span { color: var(--text-muted); font-size: 0.88rem; }
+      footer {
+        margin-top: 28px;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+      }
+      footer strong { color: var(--brand); }
+    
+      .metrics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin: 16px 0 24px; }
+      .metric { background: var(--surface-muted); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+      .metric-label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+      .metric-value { font-size: 1.15rem; font-weight: 700; }
+      table.compact { font-size: 0.92rem; }
+      table.compact code { font-size: 0.85rem; word-break: break-all; }
+      table.issues td:nth-child(4) { max-width: 420px; }
+      .project-detail { scroll-margin-top: 24px; }
+      .notice { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 14px 16px; margin-bottom: 18px; }
+      .status.pass { background: var(--pass); }
+      .status.fail { background: var(--fail); }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="brand-bar">
+        <div class="brand-top">
+          <img class="brand-logo" src="../daiva-logo.svg" alt="Daiva Technologies logo" width="240" height="48" decoding="async" />
+        </div>
+        <h1>SonarQube summary</h1>
+        <p>Frontend + Backend — no login required</p>
+        <div class="meta">
+          <span class="meta-chip">Mini&#x27;s n More</span>
+          <span class="meta-chip">Build <code style="background:transparent;color:inherit;padding:0;">local</code></span>
+        </div>
+      </header>
+      <main class="content">
+        
+      <section class="panel">
+        <div class="notice">
+          <strong>Self-contained report.</strong> All SonarQube metrics and issues are shown on this page —
+          no separate Sonar login is required. Data refreshed at 2026-08-11 05:32 UTC.
+        </div>
+        <h2>SonarQube — Frontend &amp; Backend</h2>
+        <p class="muted">Backend project <code>mnm-backend</code> combines gateway, catalog, store, and commerce.
+        Frontend uses Vitest-scoped coverage.</p>
+        <table><thead><tr><th>Project</th><th>Gate</th><th>Coverage</th><th>Lines</th><th>Branches</th><th>Bugs</th><th>Vulns</th><th>LoC</th></tr></thead><tbody><tr><td><a href="#frontend">Frontend</a></td><td><span class="status pass">OK</span></td><td>89.8%</td><td>94.6%</td><td>83.9%</td><td>0</td><td>0</td><td>1917</td></tr><tr><td><a href="#mnm-backend">Backend</a></td><td><span class="status pass">OK</span></td><td>87.7%</td><td>94.4%</td><td>69.9%</td><td>0</td><td>0</td><td>26555</td></tr></tbody></table>
+      </section>
+      
+      <section class="panel project-detail" id="frontend">
+        <h2>Frontend — full results</h2>
+        <p>Quality gate: <span class="status pass">OK</span>
+        &nbsp;·&nbsp; Project key: <code>frontend</code></p>
+        <div class="metrics-grid"><div class="metric"><span class="metric-label">Coverage</span><span class="metric-value">89.8%</span></div><div class="metric"><span class="metric-label">Line coverage</span><span class="metric-value">94.6%</span></div><div class="metric"><span class="metric-label">Branch coverage</span><span class="metric-value">83.9%</span></div><div class="metric"><span class="metric-label">Bugs</span><span class="metric-value">0</span></div><div class="metric"><span class="metric-label">Vulnerabilities</span><span class="metric-value">0</span></div><div class="metric"><span class="metric-label">Code smells</span><span class="metric-value">23</span></div><div class="metric"><span class="metric-label">Duplication</span><span class="metric-value">3.8%</span></div><div class="metric"><span class="metric-label">Lines of code</span><span class="metric-value">1917</span></div><div class="metric"><span class="metric-label">Reliability</span><span class="metric-value">1.0</span></div><div class="metric"><span class="metric-label">Security</span><span class="metric-value">1.0</span></div><div class="metric"><span class="metric-label">Maintainability</span><span class="metric-value">1.0</span></div></div>
+        <h3>Quality gate conditions</h3>
+        <table class="compact"><thead><tr><th>Condition</th><th>Status</th><th>Actual</th><th>Threshold</th></tr></thead>
+        <tbody><tr><td>coverage</td><td><span class="status pass">OK</span></td><td>89.8</td><td>80</td></tr><tr><td>bugs</td><td><span class="status pass">OK</span></td><td>0</td><td>50</td></tr><tr><td>line_coverage</td><td><span class="status pass">OK</span></td><td>94.6</td><td>94</td></tr></tbody></table>
+        <h3>Open issues (23 shown)</h3>
+        <table class="compact issues"><thead><tr><th>Type</th><th>Severity</th><th>Location</th><th>Message</th></tr></thead>
+        <tbody><tr><td>CODE_SMELL</td><td>MINOR</td><td><code>src/lib/api.ts:347</code></td><td>Use the &quot;RegExp.exec()&quot; method instead.</td></tr><tr><td>CODE_SMELL</td><td>CRITICAL</td><td><code>src/lib/api.ts:370</code></td><td>Refactor this function to reduce its Cognitive Complexity from 20 to the 15 allowed.</td></tr><tr><td>CODE_SMELL</td><td>CRITICAL</td><td><code>src/routes/admin.login.tsx:14</code></td><td>Refactor this function to reduce its Cognitive Complexity from 17 to the 15 allowed.</td></tr><tr><td>CODE_SMELL</td><td>CRITICAL</td><td><code>src/routes/login.tsx:22</code></td><td>Refactor this function to reduce its Cognitive Complexity from 54 to the 15 allowed.</td></tr><tr><td>CODE_SMELL</td><td>MINOR</td><td><code>src/routes/login.tsx:47</code></td><td>Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.</td></tr><tr><td>CODE_SMELL</td><td>MINOR</td><td><code>src/routes/login.tsx:97</code></td><td>Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.</td></tr><tr><td>CODE_SMELL</td><td>MINOR</td><td><code>src/routes/login.tsx:100</code></td><td>&#x27;FormEvent&#x27; is deprecated.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>src/routes/login.tsx:166</code></td><td>Extract this nested ternary operation into an independent statement.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>src/routes/login.tsx:177</code></td><td>Extract this nested ternary operation into an independent statement.</td></tr><tr><td>CODE_SMELL</td><td>MINOR</td><td><code>src/hooks/useAuth.tsx:63</code></td><td>Mark the props of the component as read-only.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>src/hooks/useAuth.tsx:123</code></td><td>Extract this nested ternary operation into an independent statement.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>src/hooks/useAuth.tsx:259</code></td><td>The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>src/lib/api.ts:28</code></td><td>Extract this nested ternary operation into an independent statement.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>src/lib/api.ts:28</code></td><td>Refactor this code to not use nested template literals.</td></tr><tr><td>CODE_SMELL</td><td>MINOR</td><td><code>src/lib/api.ts:217</code></td><td>Use the &quot;RegExp.exec()&quot; method instead.</td></tr><tr><td>CODE_SMELL</td><td>MINOR</td><td><code>src/lib/api.ts:220</code></td><td>Use the &quot;RegExp.exec()&quot; method instead.</td></tr><tr><td>CODE_SMELL</td><td>MINOR</td><td><code>src/lib/api.ts:223</code></td><td>Use the &quot;RegExp.exec()&quot; method instead.</td></tr><tr><td>CODE_SMELL</td><td>MINOR</td><td><code>src/routes/admin.login.tsx:31</code></td><td>&#x27;FormEvent&#x27; is deprecated.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>src/routes/admin.login.tsx:132</code></td><td>Extract this nested ternary operation into an independent statement.</td></tr><tr><td>CODE_SMELL</td><td>MINOR</td><td><code>src/routes/login.tsx:62</code></td><td>&#x27;FormEvent&#x27; is deprecated.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>src/routes/login.tsx:290</code></td><td>Extract this nested ternary operation into an independent statement.</td></tr><tr><td>CODE_SMELL</td><td>MINOR</td><td><code>src/store/shop.tsx:105</code></td><td>Mark the props of the component as read-only.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>src/store/shop.tsx:281</code></td><td>The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook.</td></tr></tbody></table>
+      </section>
+    
+      <section class="panel project-detail" id="mnm-backend">
+        <h2>Backend — full results</h2>
+        <p>Quality gate: <span class="status pass">OK</span>
+        &nbsp;·&nbsp; Project key: <code>mnm-backend</code></p>
+        <div class="metrics-grid"><div class="metric"><span class="metric-label">Coverage</span><span class="metric-value">87.7%</span></div><div class="metric"><span class="metric-label">Line coverage</span><span class="metric-value">94.4%</span></div><div class="metric"><span class="metric-label">Branch coverage</span><span class="metric-value">69.9%</span></div><div class="metric"><span class="metric-label">Bugs</span><span class="metric-value">0</span></div><div class="metric"><span class="metric-label">Vulnerabilities</span><span class="metric-value">0</span></div><div class="metric"><span class="metric-label">Code smells</span><span class="metric-value">158</span></div><div class="metric"><span class="metric-label">Duplication</span><span class="metric-value">8.3%</span></div><div class="metric"><span class="metric-label">Lines of code</span><span class="metric-value">26555</span></div><div class="metric"><span class="metric-label">Reliability</span><span class="metric-value">1.0</span></div><div class="metric"><span class="metric-label">Security</span><span class="metric-value">1.0</span></div><div class="metric"><span class="metric-label">Maintainability</span><span class="metric-value">1.0</span></div></div>
+        <h3>Quality gate conditions</h3>
+        <table class="compact"><thead><tr><th>Condition</th><th>Status</th><th>Actual</th><th>Threshold</th></tr></thead>
+        <tbody><tr><td>coverage</td><td><span class="status pass">OK</span></td><td>87.7</td><td>80</td></tr><tr><td>bugs</td><td><span class="status pass">OK</span></td><td>0</td><td>50</td></tr><tr><td>line_coverage</td><td><span class="status pass">OK</span></td><td>94.4</td><td>94</td></tr></tbody></table>
+        <h3>Open issues (25 shown)</h3>
+        <table class="compact issues"><thead><tr><th>Type</th><th>Severity</th><th>Location</th><th>Message</th></tr></thead>
+        <tbody><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>backend/src/test/java/com/miniandmore/app/web/rest/internal/InternalAccountOrderResourceCoverageTest.java:1062</code></td><td>Remove this useless assignment to local variable &quot;order&quot;.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/activationEmail.html:17</code></td><td>Remove this deprecated &quot;width&quot; attribute.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/activationEmail.html:17</code></td><td>Replace this layout table with a CSS layout.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/activationEmail.html:17</code></td><td>Remove this deprecated &quot;cellspacing&quot; attribute.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/activationEmail.html:17</code></td><td>Use &lt;img&gt; instead of the presentation role to ensure accessibility across all devices.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/activationEmail.html:17</code></td><td>Remove this deprecated &quot;cellpadding&quot; attribute.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/activationEmail.html:19</code></td><td>Remove this deprecated &quot;align&quot; attribute.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/activationEmail.html:20</code></td><td>Remove this deprecated &quot;cellspacing&quot; attribute.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/activationEmail.html:20</code></td><td>Use &lt;img&gt; instead of the presentation role to ensure accessibility across all devices.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/activationEmail.html:20</code></td><td>Remove this deprecated &quot;cellpadding&quot; attribute.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/activationEmail.html:20</code></td><td>Replace this layout table with a CSS layout.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/activationEmail.html:20</code></td><td>Remove this deprecated &quot;width&quot; attribute.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/activationEmail.html:47</code></td><td>Remove this deprecated &quot;align&quot; attribute.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/creationEmail.html:17</code></td><td>Remove this deprecated &quot;cellpadding&quot; attribute.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/creationEmail.html:17</code></td><td>Remove this deprecated &quot;cellspacing&quot; attribute.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/creationEmail.html:17</code></td><td>Replace this layout table with a CSS layout.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/creationEmail.html:17</code></td><td>Remove this deprecated &quot;width&quot; attribute.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/creationEmail.html:17</code></td><td>Use &lt;img&gt; instead of the presentation role to ensure accessibility across all devices.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/creationEmail.html:19</code></td><td>Remove this deprecated &quot;align&quot; attribute.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/creationEmail.html:20</code></td><td>Remove this deprecated &quot;cellspacing&quot; attribute.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/creationEmail.html:20</code></td><td>Remove this deprecated &quot;cellpadding&quot; attribute.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/creationEmail.html:20</code></td><td>Replace this layout table with a CSS layout.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/creationEmail.html:20</code></td><td>Use &lt;img&gt; instead of the presentation role to ensure accessibility across all devices.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/creationEmail.html:20</code></td><td>Remove this deprecated &quot;width&quot; attribute.</td></tr><tr><td>CODE_SMELL</td><td>MAJOR</td><td><code>gateway/src/main/resources/templates/mail/creationEmail.html:47</code></td><td>Remove this deprecated &quot;align&quot; attribute.</td></tr></tbody></table>
+      </section>
+    
+      <section class="panel">
+        <h2>Related reports</h2>
+        <div class="links">
+          <a class="link-card" href="../frontend/coverage-summary/index.html"><strong>Frontend coverage</strong><span>Vitest line and branch coverage</span></a>
+          <a class="link-card" href="../backend/coverage-summary/index.html"><strong>Backend coverage</strong><span>JaCoCo combined across all services</span></a>
+          <a class="link-card" href="../index.html"><strong>Reports home</strong><span>Unified dashboard</span></a>
+        </div>
+      </section>
+    
+      </main>
+      <footer>Generated by Jenkins · <strong>Daiva Technologies</strong></footer>
+    </div>
+  </body>
+</html>

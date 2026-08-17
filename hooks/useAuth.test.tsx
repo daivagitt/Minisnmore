@@ -40,6 +40,7 @@ function Harness() {
       <button onClick={() => auth.signInWithOAuth("google", "/account")}>oauth</button>
       <button onClick={() => auth.completeOAuthSignIn("oauth-token")}>complete oauth</button>
       <button onClick={() => auth.refreshSession()}>refresh</button>
+      <button onClick={() => auth.requestPasswordReset("reset@example.com")}>reset password</button>
     </div>
   );
 }
@@ -131,6 +132,19 @@ describe("useAuth", () => {
     expect(window.sessionStorage.getItem("mnm_oauth_redirect")).toBe("/account");
     expect(window.location.href).toBe("https://api.test/oauth2/authorization/google");
     Object.defineProperty(window, "location", { configurable: true, value: prev });
+  });
+
+  it("requests password reset through account API", async () => {
+    apiMock.post.mockResolvedValueOnce(null);
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
+
+    await userEvent.click(screen.getByRole("button", { name: "reset password" }));
+    expect(apiMock.post).toHaveBeenCalledWith(
+      "/api/account/reset-password/init",
+      JSON.stringify("reset@example.com"),
+      expect.objectContaining({ unwrap: false }),
+    );
   });
 
   it("throws when useAuth is called outside AuthProvider", () => {

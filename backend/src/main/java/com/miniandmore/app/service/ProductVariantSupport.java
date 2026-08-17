@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
 /**
@@ -296,18 +297,7 @@ public class ProductVariantSupport {
             if (!Objects.equals(row.color(), nextColor)) {
                 rows.set(
                     i,
-                    new VariantRow(
-                        row.id(),
-                        row.sku(),
-                        row.size(),
-                        nextColor,
-                        row.rate(),
-                        row.mrp(),
-                        row.cost(),
-                        row.stock(),
-                        row.active(),
-                        row.swatchUrl()
-                    )
+                    row.withColor(nextColor)
                 );
                 changed = true;
             }
@@ -341,18 +331,7 @@ public class ProductVariantSupport {
         List<VariantRow> updated = replaceRowAt(
             rows,
             targetIndex,
-            new VariantRow(
-                row.id(),
-                row.sku(),
-                row.size(),
-                row.color(),
-                row.rate(),
-                row.mrp(),
-                row.cost(),
-                row.stock() - qty,
-                row.active(),
-                row.swatchUrl()
-            )
+            row.withStock(row.stock() - qty)
         );
         product.setVariantsJson(serialize(updated));
         product.setStock(aggregates(updated).stockSum());
@@ -379,18 +358,7 @@ public class ProductVariantSupport {
         List<VariantRow> updated = replaceRowAt(
             rows,
             targetIndex,
-            new VariantRow(
-                row.id(),
-                row.sku(),
-                row.size(),
-                row.color(),
-                row.rate(),
-                row.mrp(),
-                row.cost(),
-                row.stock() + qty,
-                row.active(),
-                row.swatchUrl()
-            )
+            row.withStock(row.stock() + qty)
         );
         product.setVariantsJson(serialize(updated));
         product.setStock(aggregates(updated).stockSum());
@@ -408,25 +376,96 @@ public class ProductVariantSupport {
         }
         VariantRow row = match.orElseThrow();
         int targetIndex = rows.indexOf(row);
-        List<VariantRow> updated = replaceRowAt(
-            rows,
-            targetIndex,
-            new VariantRow(
-                row.id(),
-                row.sku(),
-                row.size(),
-                row.color(),
-                row.rate(),
-                row.mrp(),
-                row.cost(),
-                Math.max(0, stock),
-                row.active(),
-                row.swatchUrl()
-            )
-        );
+        List<VariantRow> updated = replaceRowAt(rows, targetIndex, row.withStock(Math.max(0, stock)));
         product.setVariantsJson(serialize(updated));
         product.setStock(aggregates(updated).stockSum());
         return true;
+    }
+
+    public Optional<String> zohoItemIdForSku(Product product, String variantSku) {
+        if (!isVariants(product)) {
+            return Optional.empty();
+        }
+        return findBySku(parseProduct(product), variantSku).map(VariantRow::zohoItemId).filter(id -> id != null && !id.isBlank());
+    }
+
+    public boolean setVariantZohoItemId(Product product, String variantSku, String zohoItemId) {
+        if (!isVariants(product) || StringUtils.isBlank(variantSku) || StringUtils.isBlank(zohoItemId)) {
+            return false;
+        }
+        List<VariantRow> rows = new ArrayList<>(parseProduct(product));
+        Optional<VariantRow> match = findBySku(rows, variantSku);
+        if (match.isEmpty()) {
+            return false;
+        }
+        VariantRow row = match.orElseThrow();
+        int targetIndex = rows.indexOf(row);
+        List<VariantRow> updated = replaceRowAt(rows, targetIndex, row.withZohoItemId(zohoItemId.trim()));
+        product.setVariantsJson(serialize(updated));
+        return true;
+    }
+
+    /**
+     * Merge one Zoho Books item (matched by variant SKU) into the parent matrix.
+     * @return false when the SKU is not on the matrix
+     */
+    public boolean mergePulledVariantFromZoho(
+        Product product,
+        String variantSku,
+        BigDecimal sellingRate,
+        BigDecimal mrp,
+        Integer stock,
+        String zohoItemId
+    ) {
+        if (!isVariants(product) || StringUtils.isBlank(variantSku)) {
+            return false;
+        }
+        List<VariantRow> rows = new ArrayList<>(parseProduct(product));
+        Optional<VariantRow> match = findBySku(rows, variantSku);
+        if (match.isEmpty()) {
+            return false;
+        }
+        VariantRow row = match.orElseThrow();
+        int targetIndex = rows.indexOf(row);
+        BigDecimal nextRate = row.rate();
+        if (sellingRate != null && sellingRate.compareTo(BigDecimal.ZERO) > 0) {
+            nextRate = sellingRate;
+        }
+        BigDecimal nextMrp = row.mrp();
+        if (mrp != null && mrp.compareTo(BigDecimal.ZERO) > 0) {
+            nextMrp = mrp;
+        }
+        int nextStock = stock != null ? Math.max(0, stock) : row.stock();
+        String nextZohoId = StringUtils.isNotBlank(zohoItemId) ? zohoItemId.trim() : row.zohoItemId();
+        List<VariantRow> updated = replaceRowAt(
+            rows,
+            targetIndex,
+            row.withPricing(nextRate, nextMrp).withStock(nextStock).withZohoItemId(nextZohoId)
+        );
+        product.setVariantsJson(serialize(updated));
+        Aggregates agg = aggregates(updated);
+        if (agg.minSelling() != null) {
+            product.setPrice(agg.minSelling());
+        }
+        if (agg.minMrp() != null) {
+            product.setCompareAtPrice(agg.minMrp());
+        }
+        product.setStock(agg.stockSum());
+        return true;
+    }
+
+    /** Whether any variant row on this parent still appears in the pulled Zoho SKU set. */
+    public boolean anyVariantSkuInSet(Product product, Set<String> pulledSkus) {
+        if (!isVariants(product) || pulledSkus == null || pulledSkus.isEmpty()) {
+            return false;
+        }
+        for (VariantRow row : parseProduct(product)) {
+            String sku = normalize(row.sku());
+            if (sku != null && pulledSkus.contains(sku)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static List<VariantRow> replaceRowAt(List<VariantRow> rows, int index, VariantRow replacement) {
@@ -478,8 +517,25 @@ public class ProductVariantSupport {
         BigDecimal cost,
         int stock,
         boolean active,
-        String swatchUrl
+        String swatchUrl,
+        String zohoItemId
     ) {
+        VariantRow withColor(String nextColor) {
+            return new VariantRow(id, sku, size, nextColor, rate, mrp, cost, stock, active, swatchUrl, zohoItemId);
+        }
+
+        VariantRow withStock(int nextStock) {
+            return new VariantRow(id, sku, size, color, rate, mrp, cost, nextStock, active, swatchUrl, zohoItemId);
+        }
+
+        VariantRow withPricing(BigDecimal nextRate, BigDecimal nextMrp) {
+            return new VariantRow(id, sku, size, color, nextRate, nextMrp, cost, stock, active, swatchUrl, zohoItemId);
+        }
+
+        VariantRow withZohoItemId(String nextZohoItemId) {
+            return new VariantRow(id, sku, size, color, rate, mrp, cost, stock, active, swatchUrl, nextZohoItemId);
+        }
+
         static VariantRow fromMap(Map<String, Object> map) {
             BigDecimal rateRaw = toBigDecimal(map.get("rate"));
             BigDecimal mrpRaw = map.containsKey("mrp") ? toBigDecimal(map.get("mrp")) : null;
@@ -508,7 +564,8 @@ public class ProductVariantSupport {
                 toBigDecimal(map.get("cost")),
                 toInt(map.get("stock")),
                 toBoolean(map.get("active"), true),
-                swatchUrlValue(map)
+                swatchUrlValue(map),
+                zohoItemIdValue(map)
             );
         }
 
@@ -536,7 +593,18 @@ public class ProductVariantSupport {
             if (swatchUrl != null && !swatchUrl.isBlank()) {
                 map.put("swatchUrl", swatchUrl.trim());
             }
+            if (zohoItemId != null && !zohoItemId.isBlank()) {
+                map.put("zohoItemId", zohoItemId.trim());
+            }
             return map;
+        }
+
+        private static String zohoItemIdValue(Map<String, Object> map) {
+            String camel = stringValue(map.get("zohoItemId"));
+            if (camel != null) {
+                return camel;
+            }
+            return stringValue(map.get("zoho_item_id"));
         }
 
         private static String swatchUrlValue(Map<String, Object> map) {

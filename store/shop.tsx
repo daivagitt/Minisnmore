@@ -20,9 +20,26 @@ import {
   isVariantsProduct,
   lineUnitPrice,
 } from "@/lib/product-variants";
+import { RemoveFromCartDialog } from "@/components/RemoveFromCartDialog";
 import { cartsEqual, sanitizeCartWithCatalog, type CartSyncResult } from "@/lib/cart-catalog";
 import { normalizeWishlistIds } from "@/lib/wishlist";
+import {
+  addMyWishlistItem,
+  listMyCart,
+  listMyWishlist,
+  removeMyWishlistItem,
+  replaceMyCart,
+  replaceMyWishlist,
+} from "@/lib/account.functions";
 import { toast } from "sonner";
+
+type PendingRemove = {
+  id: string;
+  size?: string;
+  color?: string;
+  variantSku?: string;
+  productName: string;
+};
 
 export type CartItem = {
   product: Product;
@@ -80,6 +97,25 @@ function readJson<T>(key: string, fallback: T): T {
   }
 }
 
+function isCartItem(raw: unknown): raw is CartItem {
+  if (!raw || typeof raw !== "object") return false;
+  const row = raw as Partial<CartItem>;
+  return !!row.product && typeof row.product === "object" && typeof row.product.id === "string" && typeof row.qty === "number";
+}
+
+function coerceCart(raw: unknown): CartItem[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(isCartItem).map(normalizeCartItem);
+}
+
+function coerceCoupon(raw: unknown): AppliedCoupon | null {
+  if (!raw || typeof raw !== "object") return null;
+  const row = raw as Partial<AppliedCoupon>;
+  if (typeof row.code !== "string" || !row.code.trim()) return null;
+  const discount = typeof row.discount === "number" && Number.isFinite(row.discount) ? row.discount : 0;
+  return { code: row.code, discount };
+}
+
 function normalizeCartItem(raw: CartItem): CartItem {
   const unitPrice =
     typeof raw.unitPrice === "number" && Number.isFinite(raw.unitPrice)
@@ -106,10 +142,12 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [quickView, setQuickView] = useState<Product | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<PendingRemove | null>(null);
   const hydratedScope = useRef<string | null>(null);
   const prevUserIdRef = useRef<number | null>(null);
   /** Skip one persist cycle after auth scope reload (setState is async; avoid leaking cart across keys). */
   const skipPersistRef = useRef(false);
+  const wishlistSyncRef = useRef(0);
 
   useLayoutEffect(() => {
     if (authLoading) return;
@@ -136,9 +174,52 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     let nextWish: string[] = [];
     let nextCoupon: AppliedCoupon | null = null;
     if (userId != null) {
-      nextCart = readJson<CartItem[]>(cKey, []).map(normalizeCartItem);
+      nextCart = coerceCart(readJson<unknown>(cKey, []));
       nextWish = normalizeWishlistIds(readJson<string[]>(wKey, []));
-      nextCoupon = readJson<AppliedCoupon | null>(couponKey, null);
+      nextCoupon = coerceCoupon(readJson<PersistedCoupon>(couponKey, null));
+
+      const wishSyncId = ++wishlistSyncRef.current;
+      void (async () => {
+        const localWish = nextWish;
+        const localCart = nextCart;
+        const localCoupon = nextCoupon;
+        try {
+          const [wishRes, cartRes] = await Promise.all([listMyWishlist(), listMyCart()]);
+          if (wishlistSyncRef.current !== wishSyncId) return;
+
+          let serverWish = normalizeWishlistIds(wishRes.product_ids);
+          if (serverWish.length === 0 && localWish.length > 0) {
+            serverWish = normalizeWishlistIds((await replaceMyWishlist(localWish)).product_ids);
+          }
+          if (wishlistSyncRef.current !== wishSyncId) return;
+          setWishlist((current) => {
+            const next = current.join("\0") === localWish.join("\0") ? serverWish : current;
+            localStorage.setItem(wKey, JSON.stringify(next));
+            return next;
+          });
+
+          const serverCart = coerceCart(cartRes.items);
+          const serverCoupon = coerceCoupon(cartRes.coupon);
+          const adoptServer = !(serverCart.length === 0 && localCart.length > 0);
+          if (!adoptServer) {
+            await replaceMyCart(localCart, localCoupon);
+          }
+          if (wishlistSyncRef.current !== wishSyncId) return;
+          setCart((current) => {
+            const next = cartsEqual(current, localCart) ? (adoptServer ? serverCart : localCart) : current;
+            localStorage.setItem(cKey, JSON.stringify(next));
+            return next;
+          });
+          setAppliedCoupon((current) => {
+            const next = current === localCoupon ? (adoptServer ? serverCoupon : localCoupon) : current;
+            if (next) localStorage.setItem(couponKey, JSON.stringify(next));
+            else localStorage.removeItem(couponKey);
+            return next;
+          });
+        } catch {
+          // Keep the local cache when the account API is unavailable.
+        }
+      })();
     } else {
       localStorage.setItem(cartStorageKey(null), "[]");
       localStorage.setItem(wishStorageKey(null), "[]");
@@ -165,6 +246,8 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(wKey, JSON.stringify(wishlist));
     if (appliedCoupon) localStorage.setItem(couponKey, JSON.stringify(appliedCoupon));
     else localStorage.removeItem(couponKey);
+    void replaceMyCart(cart, appliedCoupon).catch(() => {});
+    void replaceMyWishlist(wishlist).catch(() => {});
   }, [cart, wishlist, appliedCoupon, cKey, wKey, couponKey, scopeKey, authLoading, userId]);
 
   const addToCart: ShopState["addToCart"] = (p, opts = {}) => {
@@ -211,10 +294,14 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     setCart((c) => c.filter((x) => !matches(x, id, size, color, variantSku)));
   const promptRemoveFromCart = (id: string, size?: string, color?: string, variantSku?: string) => {
     const item = cart.find((x) => matches(x, id, size, color, variantSku));
-    if (item && window.confirm(`Move "${item.product.name}" to wishlist instead?`)) {
-      toggleWish(item.product.id);
-    }
-    removeFromCart(id, size, color, variantSku);
+    if (!item) return;
+    setPendingRemove({
+      id,
+      size,
+      color,
+      variantSku,
+      productName: item.product.name,
+    });
   };
   const updateQty = (id: string, qty: number, size?: string, color?: string, variantSku?: string) =>
     setCart((c) =>
@@ -230,7 +317,20 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       return;
     }
     const key = String(id);
-    setWishlist((w) => (w.includes(key) ? w.filter((x) => x !== key) : [...w, key]));
+    const adding = !wishlist.includes(key);
+    setWishlist((w) => (adding ? [...w, key] : w.filter((x) => x !== key)));
+    const action = adding ? addMyWishlistItem(key) : removeMyWishlistItem(key);
+    void action.catch(() => {
+      setWishlist((w) => (adding ? w.filter((x) => x !== key) : [...w, key]));
+      toast.error("Could not update your wishlist. Please try again.");
+    });
+  };
+  const confirmRemoveFromCart = (moveToWishlist: boolean) => {
+    if (!pendingRemove) return;
+    const { id, size, color, variantSku } = pendingRemove;
+    setPendingRemove(null);
+    if (moveToWishlist) toggleWish(id);
+    removeFromCart(id, size, color, variantSku);
   };
   const pruneWishlist = useCallback((validIds: Iterable<string>) => {
     const valid = new Set(Array.from(validIds, String));
@@ -279,6 +379,15 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+      <RemoveFromCartDialog
+        open={pendingRemove != null}
+        productName={pendingRemove?.productName ?? ""}
+        onOpenChange={(open) => {
+          if (!open && pendingRemove) confirmRemoveFromCart(false);
+        }}
+        onMoveToWishlist={() => confirmRemoveFromCart(true)}
+        onRemoveOnly={() => confirmRemoveFromCart(false)}
+      />
     </Ctx.Provider>
   );
 }

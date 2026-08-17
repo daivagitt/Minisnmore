@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.miniandmore.app.client.XpressBeesClient;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -18,10 +19,13 @@ class PincodeLookupServiceHttpTest {
 
     private PincodeLookupService service;
     private HttpClient httpClient;
+    private XpressBeesClient xpressBeesClient;
 
     @BeforeEach
     void setUp() {
-        service = new PincodeLookupService(new ObjectMapper());
+        xpressBeesClient = mock(XpressBeesClient.class);
+        when(xpressBeesClient.isConfigured()).thenReturn(false);
+        service = new PincodeLookupService(new ObjectMapper(), xpressBeesClient);
         httpClient = mock(HttpClient.class);
         ReflectionTestUtils.setField(service, "httpClient", httpClient);
     }
@@ -90,5 +94,25 @@ class PincodeLookupServiceHttpTest {
         when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(miss, miss);
 
         assertThat(service.lookup("560001")).isEmpty();
+    }
+
+    @Test
+    void lookup_xpressBeesConfigured_usesServiceability() {
+        when(xpressBeesClient.isConfigured()).thenReturn(true);
+        when(xpressBeesClient.checkServiceability("560001")).thenReturn(
+            Optional.of(new XpressBeesClient.ServiceabilityResult("Bangalore", "Karnataka", "2 days", 2, "560001"))
+        );
+
+        Optional<?> result = service.lookup("560001");
+
+        assertThat(result).isPresent();
+    }
+
+    @Test
+    void lookup_xpressBeesConfigured_notServiceable_returnsEmpty() {
+        when(xpressBeesClient.isConfigured()).thenReturn(true);
+        when(xpressBeesClient.checkServiceability("522235")).thenReturn(Optional.empty());
+
+        assertThat(service.lookup("522235")).isEmpty();
     }
 }

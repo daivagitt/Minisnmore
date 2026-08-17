@@ -11,7 +11,7 @@ import reactor.core.publisher.Mono;
 @Repository
 public interface UserRepository extends R2dbcRepository<User, Long> {
 
-    @Query("SELECT * FROM jhi_user WHERE activated = false AND activation_key = :activationKey")
+    @Query("SELECT * FROM jhi_user WHERE activation_key = :activationKey")
     Mono<User> findOneByActivationKey(String activationKey);
 
     Flux<User> findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(java.time.Instant dateTime);

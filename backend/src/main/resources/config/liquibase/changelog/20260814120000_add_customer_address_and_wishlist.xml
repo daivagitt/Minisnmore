@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260814120000-1" author="miniandmore">
+        <createTable tableName="customer_address">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="user_login" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="label" type="varchar(40)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="full_name" type="varchar(120)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="phone" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="line1" type="varchar(200)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="line2" type="varchar(200)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="city" type="varchar(80)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="state" type="varchar(80)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="pincode" type="varchar(6)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_default" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex indexName="idx_customer_address_user_login" tableName="customer_address">
+            <column name="user_login"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="20260814120000-2" author="miniandmore">
+        <createTable tableName="wishlist_item">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="user_login" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="product_id" type="varchar(120)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint
+            tableName="wishlist_item"
+            columnNames="user_login, product_id"
+            constraintName="ux_wishlist_item__user_login_product_id"/>
+        <createIndex indexName="idx_wishlist_item_user_login" tableName="wishlist_item">
+            <column name="user_login"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

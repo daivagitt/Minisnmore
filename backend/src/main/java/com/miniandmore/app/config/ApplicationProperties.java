@@ -23,6 +23,8 @@ public class ApplicationProperties {
 
     private final Ledgerly ledgerly = new Ledgerly();
 
+    private final XpressBees xpressbees = new XpressBees();
+
     private String internalApiKey = "";
 
     // jhipster-needle-application-properties-property
@@ -45,6 +47,10 @@ public class ApplicationProperties {
 
     public Ledgerly getLedgerly() {
         return ledgerly;
+    }
+
+    public XpressBees getXpressbees() {
+        return xpressbees;
     }
 
     public String getInternalApiKey() {
@@ -202,9 +208,13 @@ public class ApplicationProperties {
 
         private String inventoryAccountId;
 
+        private String inventoryAdjustmentAccountId;
+
         private boolean pullProductsAutoCreateCategory = false;
 
         private boolean autoSyncEnabled = false;
+
+        private final ProductFields productFields = new ProductFields();
 
         public boolean isSyncProductImages() {
             return syncProductImages;
@@ -246,6 +256,14 @@ public class ApplicationProperties {
             this.inventoryAccountId = inventoryAccountId;
         }
 
+        public String getInventoryAdjustmentAccountId() {
+            return inventoryAdjustmentAccountId;
+        }
+
+        public void setInventoryAdjustmentAccountId(String inventoryAdjustmentAccountId) {
+            this.inventoryAdjustmentAccountId = inventoryAdjustmentAccountId;
+        }
+
         public boolean isPullProductsAutoCreateCategory() {
             return pullProductsAutoCreateCategory;
         }
@@ -272,6 +290,94 @@ public class ApplicationProperties {
 
         public OAuth getOauth() {
             return oauth;
+        }
+
+        public ProductFields getProductFields() {
+            return productFields;
+        }
+
+        public static class ProductFields {
+
+            private String fabricTypeLabel = "Fabric Type";
+
+            private String sizesLabel = "sizes";
+
+            private String ageMinLabel = "age";
+
+            private String ageMaxLabel = "Age Max (months)";
+
+            private String categoryLabel = "category";
+
+            /** Zoho India Books stores MRP on {@code label_rate}. */
+            private String mrpApiName = "label_rate";
+
+            public String getFabricTypeLabel() {
+                return fabricTypeLabel;
+            }
+
+            public void setFabricTypeLabel(String fabricTypeLabel) {
+                this.fabricTypeLabel = fabricTypeLabel;
+            }
+
+            public String getSizesLabel() {
+                return sizesLabel;
+            }
+
+            public void setSizesLabel(String sizesLabel) {
+                this.sizesLabel = sizesLabel;
+            }
+
+            public String getAgeMinLabel() {
+                return ageMinLabel;
+            }
+
+            public void setAgeMinLabel(String ageMinLabel) {
+                this.ageMinLabel = ageMinLabel;
+            }
+
+            public String getAgeMaxLabel() {
+                return ageMaxLabel;
+            }
+
+            public void setAgeMaxLabel(String ageMaxLabel) {
+                this.ageMaxLabel = ageMaxLabel;
+            }
+
+            public String getCategoryLabel() {
+                return categoryLabel;
+            }
+
+            public void setCategoryLabel(String categoryLabel) {
+                this.categoryLabel = categoryLabel;
+            }
+
+            public String getMrpApiName() {
+                return mrpApiName;
+            }
+
+            public void setMrpApiName(String mrpApiName) {
+                this.mrpApiName = mrpApiName;
+            }
+
+            public List<String> fabricTypeLabels() {
+                return List.of(fabricTypeLabel);
+            }
+
+            public List<String> sizesLabels() {
+                return List.of(sizesLabel, "Sizes");
+            }
+
+            public List<String> ageMinLabels() {
+                return List.of(ageMinLabel, "Age Min (months)");
+            }
+
+            public List<String> ageMaxLabels() {
+                return List.of(ageMaxLabel, "age(max)", "Age Max");
+            }
+
+            public List<String> categoryLabels() {
+                return List.of(categoryLabel, "Category");
+            }
         }
 
         public static class OAuth {
@@ -383,6 +489,59 @@ public class ApplicationProperties {
             public void setFixedDelayMs(Long fixedDelayMs) {
                 this.fixedDelayMs = fixedDelayMs;
             }
+        }
+    }
+
+    public static class XpressBees {
+
+        private String baseUrl = "https://shipment.xpressbees.com";
+
+        private String email;
+
+        private String password;
+
+        private String originPincode;
+
+        private String paymentType = "prepaid";
+
+        public String getBaseUrl() {
+            return baseUrl;
+        }
+
+        public void setBaseUrl(String baseUrl) {
+            this.baseUrl = baseUrl;
+        }
+
+        public String getEmail() {
+            return email;
+        }
+
+        public void setEmail(String email) {
+            this.email = email;
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
+        }
+
+        public String getOriginPincode() {
+            return originPincode;
+        }
+
+        public void setOriginPincode(String originPincode) {
+            this.originPincode = originPincode;
+        }
+
+        public String getPaymentType() {
+            return paymentType;
+        }
+
+        public void setPaymentType(String paymentType) {
+            this.paymentType = paymentType;
         }
     }
 

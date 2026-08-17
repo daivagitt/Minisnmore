@@ -7,35 +7,32 @@ import {
   sizesForDisplay,
   type VariantProductLike,
 } from "@/lib/product-variants";
+import { LazyImage } from "@/components/LazyImage";
 import { swatchImageForColor } from "@/lib/product-colors";
 import { cn } from "@/lib/utils";
 
-/** Out-of-stock sizes: strikethrough + diagonal cross (not blurred). */
+/** Out-of-stock sizes: strikethrough only (not blurred). */
 const UNAVAILABLE_SIZE_CLASS =
-  "opacity-60 cursor-not-allowed pointer-events-none relative line-through decoration-foreground/55 decoration-2";
+  "opacity-60 cursor-not-allowed pointer-events-none line-through decoration-foreground/55 decoration-2";
 
-/** Out-of-stock colour swatches: diagonal cross only (not blurred). */
-const UNAVAILABLE_COLOR_CLASS = "opacity-60 cursor-not-allowed pointer-events-none relative";
+/** Out-of-stock colour swatches: muted only (not blurred). */
+const UNAVAILABLE_COLOR_CLASS = "opacity-60 cursor-not-allowed pointer-events-none";
 
-function OutOfStockCross() {
-  return (
-    <span className="pointer-events-none absolute inset-0 z-10 overflow-hidden rounded-[inherit]" aria-hidden>
-      <span className="absolute left-1/2 top-[-12%] h-[124%] w-[1.5px] -translate-x-1/2 rotate-45 bg-foreground/70" />
-      <span className="absolute left-1/2 top-[-12%] h-[124%] w-[1.5px] -translate-x-1/2 -rotate-45 bg-foreground/70" />
-    </span>
-  );
-}
+const SIZE_PILL_CLASS = "rounded-full px-3 py-1.5 text-xs transition-all duration-300 ease-out";
 
 export function VariantSizeButtons({
   product,
   size,
   onSizeChange,
   gapClass = "gap-1.5",
+  readOnly = false,
 }: {
   product: VariantProductLike;
-  size: string | null;
-  onSizeChange: (size: string) => void;
+  size?: string | null;
+  onSizeChange?: (size: string) => void;
   gapClass?: string;
+  /** Admin preview — show all sizes with sold-out strikethrough, no selection. */
+  readOnly?: boolean;
 }) {
   const sizes = sizesForDisplay(product);
   const isVariants = isVariantsProduct(product);
@@ -44,22 +41,30 @@ export function VariantSizeButtons({
     <div className={cn("flex flex-wrap", gapClass)}>
       {sizes.map((s) => {
         const unavailable = isVariants && !sizeHasSellableVariants(product, s);
-        const selected = !unavailable && size === s;
+        const selected = !readOnly && !unavailable && size === s;
+        const className = cn(
+          SIZE_PILL_CLASS,
+          selected ? "bg-primary text-primary-foreground" : "glass",
+          !readOnly && !selected && "hover:bg-white/60",
+          unavailable && UNAVAILABLE_SIZE_CLASS,
+        );
+        if (readOnly) {
+          return (
+            <span key={s} className={className} title={unavailable ? `${s} — sold out` : s}>
+              {s}
+            </span>
+          );
+        }
         return (
           <button
             key={s}
             type="button"
             disabled={unavailable}
-            onClick={() => onSizeChange(s)}
-            className={cn(
-              "rounded-full px-3 py-1.5 text-xs transition-all duration-300 ease-out",
-              selected ? "bg-primary text-primary-foreground" : "glass hover:bg-white/60",
-              unavailable && UNAVAILABLE_SIZE_CLASS,
-            )}
+            onClick={() => onSizeChange?.(s)}
+            className={className}
             title={unavailable ? `${s} — sold out` : s}
           >
             {s}
-            {unavailable ? <OutOfStockCross /> : null}
           </button>
         );
       })}
@@ -111,9 +116,8 @@ export function VariantColorButtons({
             title={unavailable ? `${c.name} — out of stock in this size` : c.name}
           >
             {swatchImage ? (
-              <img src={swatchImage} alt={c.name} className="h-full w-full object-cover" loading="lazy" />
+              <LazyImage src={swatchImage} alt={c.name} className="h-full w-full object-cover" priority="auto" />
             ) : null}
-            {unavailable ? <OutOfStockCross /> : null}
           </button>
         );
       })}
@@ -121,7 +125,7 @@ export function VariantColorButtons({
   );
 }
 
-/** All active colours for the size (including out-of-stock for crossed-out display). */
+/** All active colours for the size (including out-of-stock for muted display). */
 export function variantColorsForDisplay(product: VariantProductLike, size: string | null): VariantProductLike["colors"] {
   if (!isVariantsProduct(product)) return product.colors;
   const names = colorsForSize(product, size);

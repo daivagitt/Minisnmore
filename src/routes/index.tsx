@@ -8,10 +8,11 @@ import {
   ChevronLeft, Download,
   Smile, Feather, Wind, Droplets, RefreshCw,
 } from "lucide-react";
-import { products, reviews } from "@/data/products";
+import { resolveHomeReviews } from "@/lib/home-reviews";
 import { useProducts, useProductsLoaded } from "@/hooks/useProducts";
 import { ProductGridSkeleton } from "@/components/ProductGridSkeleton";
 import { WatchShopSkeleton } from "@/components/WatchShopSkeleton";
+import { LazyImage } from "@/components/LazyImage";
 import { ProductCard } from "@/components/ProductCard";
 import { SectionDivider } from "@/components/SectionDivider";
 import { FloatingDecor } from "@/components/FloatingDecor";
@@ -199,6 +200,15 @@ function Home() {
       ),
     [liveProducts, byKey],
   );
+  const momReviews = useMemo(
+    () =>
+      resolveHomeReviews(
+        byKey.get("reviews")?.payload && typeof byKey.get("reviews")?.payload === "object"
+          ? (byKey.get("reviews")?.payload as Record<string, unknown>)
+          : undefined,
+      ),
+    [byKey],
+  );
 
   return (
     <div className="space-y-12 md:space-y-16">
@@ -248,7 +258,7 @@ function Home() {
               transition={{ duration: 0.6, delay: i * 0.08 }} className="group">
               <Link to={c.to} search={c.search} className="block glass rounded-3xl p-2.5 md:p-3 hover-lift">
                 <div className="relative aspect-square overflow-hidden rounded-2xl bg-secondary/40">
-                  <img src={c.img} alt={c.label} loading="lazy" className="img-zoom h-full w-full object-cover" />
+                  <LazyImage src={c.img} alt={c.label} priority="auto" className="img-zoom h-full w-full object-cover" />
                   <div className="absolute inset-x-3 bottom-3 glass-strong rounded-2xl p-3 md:p-4 flex items-center justify-between">
                     <div>
                       <div className="font-display text-base md:text-lg">{c.label}</div>
@@ -289,7 +299,7 @@ function Home() {
           </div>
           <Link to="/shop" className="story-link text-sm hidden md:inline">See all new</Link>
         </div>
-        {productsLoaded ? (
+        {productsLoaded || liveProducts.length > 0 ? (
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
             {(newArrivals.length ? newArrivals : liveProducts.slice(0, HOME_SECTION_PRODUCT_LIMIT))
               .slice(0, HOME_SECTION_PRODUCT_LIMIT)
@@ -315,7 +325,7 @@ function Home() {
           </div>
           <Link to="/trending" className="story-link text-sm hidden md:inline">Shop trending</Link>
         </div>
-        {productsLoaded ? (
+        {productsLoaded || liveProducts.length > 0 ? (
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
             {trending
               .slice(0, HOME_SECTION_PRODUCT_LIMIT)
@@ -341,7 +351,7 @@ function Home() {
           </div>
           <Link to="/gift" className="story-link text-sm hidden md:inline">Build a gift</Link>
         </div>
-        {productsLoaded ? (
+        {productsLoaded || liveProducts.length > 0 ? (
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
             {gifts
               .slice(0, HOME_SECTION_PRODUCT_LIMIT)
@@ -373,7 +383,7 @@ function Home() {
           <motion.div initial={{ opacity: 0, scale: 0.96 }} whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true, margin: "-80px" }} transition={{ duration: 1, ease: [0.2, 0.8, 0.2, 1] }}
             className="rounded-[2rem] overflow-hidden relative aspect-4/5 md:aspect-auto md:min-h-[560px] group">
-            <img src={lifestyle} alt="Mother and baby" className="img-zoom absolute inset-0 h-full w-full object-cover" loading="lazy" />
+            <LazyImage src={lifestyle} alt="Mother and baby" className="img-zoom absolute inset-0 h-full w-full object-cover" priority="auto" />
             <FloatingDecor count={6} variant="petals" className="opacity-80" />
             <div className="absolute bottom-4 left-4 right-4 glass-strong rounded-2xl p-4">
               <div className="text-[10px] uppercase tracking-[0.28em] text-primary">A note from the founders</div>
@@ -424,7 +434,7 @@ function Home() {
           <motion.div className="flex gap-4 w-max"
             initial={{ x: 0 }} animate={{ x: "-50%" }}
             transition={{ duration: 50, repeat: Infinity, ease: "linear" }}>
-            {[...reviews, ...reviews, ...reviews, ...reviews].map((r, i) => (
+            {[...momReviews, ...momReviews, ...momReviews, ...momReviews].map((r, i) => (
               <div key={i} className="glass-strong rounded-3xl p-5 w-[300px] md:w-[360px] shrink-0">
                 <Quote className="h-5 w-5 text-primary/60" />
                 <div className="flex gap-0.5 mt-2">
@@ -435,7 +445,7 @@ function Home() {
                 <div className="font-display text-lg mt-2">{r.title}</div>
                 <p className="text-sm text-foreground/75 mt-1.5 leading-relaxed line-clamp-4">{r.body}</p>
                 <div className="mt-3 flex items-center gap-2">
-                  <img src={r.photo} alt="" className="h-8 w-8 rounded-full object-cover" />
+                  <LazyImage src={r.photo} alt="" className="h-8 w-8 rounded-full object-cover" priority="auto" />
                   <div className="text-xs">
                     <div className="font-medium">{r.author}</div>
                     <div className="text-muted-foreground">{r.date}</div>
@@ -512,7 +522,7 @@ function FeaturedTabs() {
           );
         })}
       </div>
-      {productsLoaded ? (
+      {productsLoaded || list.length > 0 ? (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
           {list.slice(0, HOME_SECTION_PRODUCT_LIMIT).map((p, i) => (
             <ProductCard key={p.id} product={p} index={i} />
@@ -597,19 +607,18 @@ function FabricStorySection({
 
 function WatchAndShop() {
   const live = useProducts();
-  const productsLoaded = useProductsLoaded();
   const { byKey, loaded: homeLoaded } = useHomeSections();
   const reels = useMemo(() => {
-    if (!productsLoaded || !homeLoaded) return [];
+    if (!homeLoaded) return [];
     const payload = byKey.get("watch_shop")?.payload;
     const fromCms = parseWatchReels(
       payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {},
     );
     const reelSource = fromCms.length > 0 ? fromCms : watchReels;
     return resolveWatchShopReels(reelSource, live);
-  }, [live, byKey, productsLoaded, homeLoaded]);
+  }, [live, byKey, homeLoaded]);
 
-  if (!productsLoaded || !homeLoaded) {
+  if (!homeLoaded) {
     return (
       <section id="watch-shop" className="px-4 md:px-6 scroll-mt-28">
         <div className="flex items-end justify-between mb-5">
@@ -733,13 +742,13 @@ function HeroCarousel({
         className="absolute inset-0"
       >
         {slides.map((s, i) => (
-          <img
+          <LazyImage
             key={s.id}
             src={s.image}
             alt={i === index ? s.title : ""}
             aria-hidden={i !== index}
             fetchPriority={i === 0 ? "high" : i === 1 ? "low" : "auto"}
-            loading={i <= 1 ? "eager" : "lazy"}
+            priority={i <= 1 ? "high" : "auto"}
             decoding="async"
             className={`absolute inset-0 h-full w-full object-cover object-[center_20%] md:object-[right_20%] transition-opacity duration-500 ease-out ${
               i === index ? "opacity-100" : "opacity-0"

@@ -3,22 +3,17 @@ import { getCachedProducts, loadProducts, subscribeProducts } from "@/lib/storef
 import { products as seedProducts, type Product } from "@/data/products";
 
 export function useProducts(): Product[] {
-  const [list, setList] = useState<Product[]>(() => getCachedProducts() ?? []);
+  const [list, setList] = useState<Product[]>(() => getCachedProducts() ?? seedProducts);
   useEffect(() => {
     let alive = true;
-    const cached = getCachedProducts();
-    if (!cached) {
-      loadProducts()
-        .then((p) => {
-          if (alive) setList(p);
-        })
-        .catch(() => {});
-    } else {
-      setList(cached);
-    }
     const unsub = subscribeProducts((p) => {
       if (alive) setList(p);
     });
+    void loadProducts()
+      .then((p) => {
+        if (alive) setList(p);
+      })
+      .catch(() => {});
     return () => {
       alive = false;
       unsub();
@@ -27,6 +22,7 @@ export function useProducts(): Product[] {
   return list;
 }
 
+/** True once live catalog data is available (seed data still renders immediately). */
 export function useProductsLoaded(): boolean {
   const [loaded, setLoaded] = useState(() => getCachedProducts() !== null);
   useEffect(() => {
@@ -35,7 +31,8 @@ export function useProductsLoaded(): boolean {
       setLoaded(true);
       return;
     }
-    loadProducts()
+    void loadProducts()
+      .catch(() => {})
       .finally(() => {
         if (alive) setLoaded(true);
       });

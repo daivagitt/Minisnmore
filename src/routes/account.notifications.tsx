@@ -1,9 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Bell, Package, CreditCard, Heart, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Bell, CreditCard, Home, Loader2, Package, Truck, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccountData } from "@/lib/account";
 import { formatOrderDate } from "@/lib/dates";
+import { listMyNotifications, type NotificationEvent } from "@/lib/orders.functions";
+import {
+  trackingActivityDate,
+  trackingActivityIcon,
+  trackingActivityTitle,
+  type OrderTrackingFields,
+} from "@/lib/order-tracking";
+import { formatPaymentStatusLabel } from "@/lib/order-status";
 
 export const Route = createFileRoute("/account/notifications")({
   head: () => ({ meta: [{ title: "Notifications · Mini's n More" }] }),
@@ -12,11 +20,94 @@ export const Route = createFileRoute("/account/notifications")({
 
 type Pref = { orders: boolean; promos: boolean; restocks: boolean };
 
+type ActivityItem = {
+  key: string;
+  icon: LucideIcon;
+  title: string;
+  body: string;
+  datePrefix: string;
+  dateValue: string;
+};
+
+function iconForEventType(eventType: string): LucideIcon {
+  switch (eventType) {
+    case "payment_received":
+    case "refunded":
+      return CreditCard;
+    case "shipped":
+      return Truck;
+    case "delivered":
+      return Home;
+    default:
+      return Package;
+  }
+}
+
+function datePrefixForEventType(eventType: string): string {
+  switch (eventType) {
+    case "order_placed":
+      return "Ordered";
+    case "payment_received":
+      return "Paid";
+    case "shipped":
+      return "Shipped";
+    case "delivered":
+      return "Delivered";
+    case "refunded":
+      return "Refunded";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      return "Updated";
+  }
+}
+
+function eventToActivity(event: NotificationEvent): ActivityItem {
+  return {
+    key: `${event.id}-${event.event_type}`,
+    icon: iconForEventType(event.event_type),
+    title: event.title,
+    body: event.body,
+    datePrefix: datePrefixForEventType(event.event_type),
+    dateValue: event.created_at,
+  };
+}
+
+function buildOrderActivityFallback(orders: OrderTrackingFields[]): ActivityItem[] {
+  return orders.map((order) => {
+    const paymentLabel = formatPaymentStatusLabel(
+      (order as { payment_status?: string }).payment_status,
+      (order as { payment_method?: string }).payment_method,
+    );
+    const total = Number((order as { total?: number }).total ?? 0);
+    const orderNumber = (order as { order_number?: string }).order_number ?? "";
+    const parts = [orderNumber];
+    if (total > 0) parts.push(`₹${total.toLocaleString("en-IN")}`);
+    if (paymentLabel) parts.push(paymentLabel);
+    if (order.tracking_number) parts.push(`Tracking ${order.tracking_number}`);
+
+    const { prefix, value } = trackingActivityDate(
+      order as OrderTrackingFields & { created_at?: string },
+    );
+
+    return {
+      key: orderNumber || String((order as { id?: number }).id ?? ""),
+      icon: trackingActivityIcon(order),
+      title: trackingActivityTitle(order),
+      body: parts.join(" · "),
+      datePrefix: prefix,
+      dateValue: value,
+    };
+  });
+}
+
 function NotificationsPage() {
   const { user } = useAuth();
-  const { orders, loadingOrders } = useAccountData();
+  const { orders, loadingOrders, refreshOrders } = useAccountData();
   const key = `mnm_notif_prefs_${user?.id ?? "guest"}`;
   const [prefs, setPrefs] = useState<Pref>({ orders: true, promos: true, restocks: false });
+  const [events, setEvents] = useState<NotificationEvent[] | null>(null);
+  const [loadingEvents, setLoadingEvents] = useState(false);
 
   useEffect(() => {
     try {
@@ -25,18 +116,46 @@ function NotificationsPage() {
     } catch {}
   }, [key]);
 
+  useEffect(() => {
+    if (orders === null && !loadingOrders) void refreshOrders();
+  }, [orders, loadingOrders, refreshOrders]);
+
+  useEffect(() => {
+    if (!prefs.orders) {
+      setEvents([]);
+      return;
+    }
+    let alive = true;
+    setLoadingEvents(true);
+    void listMyNotifications()
+      .then((res) => {
+        if (alive) setEvents(res.events ?? []);
+      })
+      .catch(() => {
+        if (alive) setEvents(null);
+      })
+      .finally(() => {
+        if (alive) setLoadingEvents(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [prefs.orders, orders?.length]);
+
   const toggle = (k: keyof Pref) => {
     const next = { ...prefs, [k]: !prefs[k] };
     setPrefs(next);
     try { localStorage.setItem(key, JSON.stringify(next)); } catch {}
   };
 
-  const items = (orders ?? []).flatMap((o: any) => {
-    const list: { icon: any; title: string; body: string; at: string }[] = [];
-    if (o.payment_status === "paid") list.push({ icon: CreditCard, title: "Payment received", body: `Order ${o.order_number} · ₹${Number(o.total).toLocaleString("en-IN")}`, at: o.created_at });
-    list.push({ icon: Package, title: o.status === "delivered" ? "Order delivered" : "Order update", body: `${o.order_number} · ${o.status}`, at: o.created_at });
-    return list;
-  });
+  const items = useMemo(() => {
+    if (!prefs.orders) return [];
+    if (events && events.length > 0) return events.map(eventToActivity);
+    if (events === null && orders) return buildOrderActivityFallback(orders);
+    return [];
+  }, [events, orders, prefs.orders]);
+
+  const showLoading = loadingOrders || loadingEvents;
 
   return (
     <div className="space-y-4">
@@ -52,20 +171,27 @@ function NotificationsPage() {
 
       <div className="glass-strong rounded-[2rem] p-6 md:p-8">
         <h2 className="font-display text-xl mb-4">Recent activity</h2>
-        {loadingOrders && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
-        {orders && items.length === 0 && <div className="text-sm text-muted-foreground">Nothing yet — your updates will appear here.</div>}
+        {showLoading && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+        {!showLoading && !prefs.orders && (
+          <div className="text-sm text-muted-foreground">Order updates are turned off.</div>
+        )}
+        {!showLoading && prefs.orders && items.length === 0 && (
+          <div className="text-sm text-muted-foreground">Nothing yet — your updates will appear here.</div>
+        )}
         <div className="space-y-2">
-          {items.map((n, i) => {
+          {items.map((n) => {
             const Icon = n.icon;
             return (
-              <div key={i} className="glass rounded-2xl p-3 flex items-start gap-3">
+              <div key={n.key} className="glass rounded-2xl p-3 flex items-start gap-3">
                 <div className="h-9 w-9 rounded-full bg-primary/10 text-primary grid place-items-center flex-shrink-0"><Icon className="h-4 w-4" /></div>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium">{n.title}</div>
                   <div className="text-xs text-muted-foreground">{n.body}</div>
                 </div>
-                <div className="text-[11px] text-muted-foreground whitespace-nowrap">
-                  {formatOrderDate(n.at, { day: "numeric", month: "short" })}
+                <div className="text-[11px] text-muted-foreground whitespace-nowrap text-right">
+                  <span className="text-muted-foreground/70">{n.datePrefix}</span>
+                  <br />
+                  {formatOrderDate(n.dateValue, { day: "numeric", month: "short" })}
                 </div>
               </div>
             );

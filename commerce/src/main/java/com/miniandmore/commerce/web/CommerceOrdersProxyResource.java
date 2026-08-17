@@ -1,6 +1,7 @@
 package com.miniandmore.commerce.web;
 
 import com.miniandmore.commerce.client.CatalogInternalClient;
+import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,6 +33,76 @@ public class CommerceOrdersProxyResource {
     @PutMapping("/account/profile")
     public ResponseEntity<String> updateProfile(@RequestBody Object body) {
         return catalog.put("/internal/v1/account/profile", body);
+    }
+
+    @GetMapping("/account/addresses")
+    public ResponseEntity<String> listAddresses() {
+        return catalog.get("/internal/v1/account/addresses");
+    }
+
+    @PostMapping("/account/addresses")
+    public ResponseEntity<String> createAddress(@RequestBody Object body) {
+        return catalog.post("/internal/v1/account/addresses", body);
+    }
+
+    @PutMapping("/account/addresses/{id}")
+    public ResponseEntity<String> updateAddress(@PathVariable Long id, @RequestBody Object body) {
+        return catalog.put("/internal/v1/account/addresses/" + id, body);
+    }
+
+    @DeleteMapping("/account/addresses/{id}")
+    public ResponseEntity<String> deleteAddress(@PathVariable Long id) {
+        return catalog.delete("/internal/v1/account/addresses/" + id);
+    }
+
+    @PutMapping("/account/addresses/{id}/default")
+    public ResponseEntity<String> setDefaultAddress(@PathVariable Long id) {
+        return catalog.put("/internal/v1/account/addresses/" + id + "/default", Map.of());
+    }
+
+    @PostMapping("/account/addresses/sync")
+    public ResponseEntity<String> syncAddresses(@RequestBody Object body) {
+        return catalog.post("/internal/v1/account/addresses/sync", body);
+    }
+
+    @GetMapping("/account/wishlist")
+    public ResponseEntity<String> listWishlist() {
+        return catalog.get("/internal/v1/account/wishlist");
+    }
+
+    @GetMapping("/account/notifications")
+    public ResponseEntity<String> listNotifications() {
+        return catalog.get("/internal/v1/account/notifications");
+    }
+
+    @PostMapping("/account/wishlist/items")
+    public ResponseEntity<String> addWishlistItem(@RequestBody Object body) {
+        return catalog.post("/internal/v1/account/wishlist/items", body);
+    }
+
+    @DeleteMapping("/account/wishlist/items/{productId}")
+    public ResponseEntity<String> removeWishlistItem(@PathVariable String productId) {
+        return catalog.delete(CatalogInternalClient.encodedPath("/internal/v1/account/wishlist/items/{productId}", productId));
+    }
+
+    @PostMapping("/account/wishlist/sync")
+    public ResponseEntity<String> syncWishlist(@RequestBody Object body) {
+        return catalog.post("/internal/v1/account/wishlist/sync", body);
+    }
+
+    @PutMapping("/account/wishlist")
+    public ResponseEntity<String> replaceWishlist(@RequestBody Object body) {
+        return catalog.put("/internal/v1/account/wishlist", body);
+    }
+
+    @GetMapping("/account/cart")
+    public ResponseEntity<String> getCart() {
+        return catalog.get("/internal/v1/account/cart");
+    }
+
+    @PutMapping("/account/cart")
+    public ResponseEntity<String> replaceCart(@RequestBody Object body) {
+        return catalog.put("/internal/v1/account/cart", body);
     }
 
     @PostMapping("/orders")

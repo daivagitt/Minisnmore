@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -24,12 +25,15 @@ import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.repository.*;
 import com.miniandmore.app.service.LedgerlySyncService;
+import com.miniandmore.app.service.OrderEventService;
+import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -89,6 +93,9 @@ class InternalAccountOrderResourceCoverageTest {
 
     @MockitoBean
     private com.miniandmore.app.service.ZohoSyncService zohoSyncService;
+
+    @MockitoBean
+    private OrderEventService orderEventService;
 
     @BeforeEach
     void setUp() {
@@ -561,7 +568,11 @@ class InternalAccountOrderResourceCoverageTest {
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
         when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
         CustomerOrder saved = new CustomerOrder().id(403L).orderNumber("MNM-COD").total(BigDecimal.valueOf(1148));
-        when(customerOrderRepository.save(any(CustomerOrder.class))).thenReturn(saved);
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> {
+            CustomerOrder order = inv.getArgument(0);
+            order.setId(403L);
+            return order;
+        });
         when(orderItemRepository.saveAll(any())).thenReturn(List.of());
 
         mockMvc
@@ -591,12 +602,61 @@ class InternalAccountOrderResourceCoverageTest {
             .andExpect(jsonPath("$.data.keyId").doesNotExist());
 
         ArgumentCaptor<CustomerOrder> captor = ArgumentCaptor.forClass(CustomerOrder.class);
-        verify(customerOrderRepository).save(captor.capture());
-        CustomerOrder persisted = captor.getValue();
+        verify(customerOrderRepository, times(2)).save(captor.capture());
+        CustomerOrder persisted = captor.getAllValues().get(0);
         assertThat(persisted.getPaymentMethod()).isEqualTo("cod");
         assertThat(persisted.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(persisted.getPaymentStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(persisted.getInventoryReservedUntil()).isNull();
+
+        ArgumentCaptor<CustomerProfile> profileCaptor = ArgumentCaptor.forClass(CustomerProfile.class);
+        verify(customerProfileRepository).save(profileCaptor.capture());
+        CustomerProfile syncedProfile = profileCaptor.getValue();
+        assertThat(syncedProfile.getUserLogin()).isEqualTo("customer1");
+        assertThat(syncedProfile.getFullName()).isEqualTo("Jane");
+        assertThat(syncedProfile.getPhone()).isEqualTo("9876543210");
+        verify(ledgerlySyncService).syncCustomerProfileAsync("customer1");
+        verify(zohoSyncService).syncOrder(403L);
+    }
+
+    @Test
+    void createOrder_syncsProfileFromShippingAddress() throws Exception {
+        ReflectionTestUtils.setField(resource, "razorpayKeyId", "DEMO");
+        ReflectionTestUtils.setField(resource, "razorpayKeySecret", "");
+        Product product = new Product().id(1L).name("Dress").slug("dress").price(BigDecimal.valueOf(500)).stock(5).active(true);
+        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+        when(customerProfileRepository.findOneByUserLogin("customer1")).thenReturn(Optional.empty());
+        when(customerProfileRepository.save(any(CustomerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+        CustomerOrder saved = new CustomerOrder().id(404L).orderNumber("MNM-PROFILE").total(BigDecimal.valueOf(599));
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenReturn(saved);
+        when(orderItemRepository.saveAll(any())).thenReturn(List.of());
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "items":[{"product_id":"1","product_name":"Dress","qty":1,"price":500}],
+                          "shipping_address":{"full_name":"stagefirst","email":"minisuatregression@yopmail.com","phone":"9876543210","line1":"Line 1","city":"City","state":"State","pincode":"560001"},
+                          "donation":0,
+                          "payment_method":"cod"
+                        }
+                        """
+                    )
+            )
+            .andExpect(status().isOk());
+
+        ArgumentCaptor<CustomerProfile> profileCaptor = ArgumentCaptor.forClass(CustomerProfile.class);
+        verify(customerProfileRepository).save(profileCaptor.capture());
+        CustomerProfile syncedProfile = profileCaptor.getValue();
+        assertThat(syncedProfile.getFullName()).isEqualTo("stagefirst");
+        assertThat(syncedProfile.getPhone()).isEqualTo("9876543210");
+        verify(ledgerlySyncService).syncCustomerProfileAsync("customer1");
     }
 
     private static String hmacSignature(String orderId, String paymentId, String secret) throws Exception {
@@ -717,6 +777,46 @@ class InternalAccountOrderResourceCoverageTest {
             .andExpect(jsonPath("$.data.ok").value(true));
 
         verify(ledgerlySyncService).syncCustomerProfileAsync("customer1");
+    }
+
+    @Test
+    void notifications_syncsOrdersAndReturnsEvents() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(501L)
+            .userLogin("customer1")
+            .orderNumber("MNM-NOTIF1")
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .total(BigDecimal.valueOf(299))
+            .placedAt(Instant.parse("2026-08-14T10:00:00Z"));
+        when(customerOrderRepository.findAllByUserLoginOrderByIdDesc("customer1")).thenReturn(List.of(order));
+        when(orderEventService.listForUser("customer1"))
+            .thenReturn(
+                List.of(
+                    Map.of(
+                        "id",
+                        1L,
+                        "event_type",
+                        "order_placed",
+                        "title",
+                        "Order placed",
+                        "body",
+                        "MNM-NOTIF1 · ₹299",
+                        "order_number",
+                        "MNM-NOTIF1",
+                        "created_at",
+                        "2026-08-14T10:00:00Z"
+                    )
+                )
+            );
+
+        mockMvc
+            .perform(get("/internal/v1/account/notifications").with(user("customer1")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.events[0].event_type").value("order_placed"))
+            .andExpect(jsonPath("$.data.events[0].title").value("Order placed"));
+
+        verify(orderEventService).syncLifecycleEvents(order);
     }
 
     @Test

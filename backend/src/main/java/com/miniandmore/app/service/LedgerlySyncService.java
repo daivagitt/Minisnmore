@@ -8,6 +8,8 @@ import com.miniandmore.app.domain.LedgerlySetting;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.Product;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
+import com.miniandmore.app.domain.enumeration.OrderStatus;
+import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.CustomerProfileRepository;
 import com.miniandmore.app.repository.LedgerlySettingRepository;
@@ -25,6 +27,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.ResourceAccessException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.web.client.RestClientResponseException;
 
 @Service
@@ -417,7 +421,12 @@ public class LedgerlySyncService {
 
     public Map<String, Object> pullAllTracking() {
         LedgerlySyncSummary.Builder builder = LedgerlySyncSummary.builder();
-        for (CustomerOrder order : customerOrderRepository.findAll()) {
+        Page<CustomerOrder> page = customerOrderRepository.findOrdersForLedgerlyTrackingPull(
+            PaymentStatus.PAID,
+            List.of(OrderStatus.PENDING, OrderStatus.CONFIRMED),
+            PageRequest.of(0, 3)
+        );
+        for (CustomerOrder order : page.getContent()) {
             try {
                 pullOrderTracking(order.getId());
                 builder.success();
@@ -425,6 +434,7 @@ public class LedgerlySyncService {
                 builder.orderFailure(order.getOrderNumber(), e.getMessage());
             }
         }
+        builder.notice("batch", "Pulled tracking for " + page.getNumberOfElements() + " open paid orders (max 3)");
         return builder.build().toMap();
     }
 

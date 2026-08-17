@@ -20,7 +20,7 @@ export const Route = createFileRoute("/login")({
 });
 
 export function LoginPage() {
-  const { signIn, signUp, signInWithOAuth, requestPasswordReset, user, loading } = useAuth();
+  const { signIn, signUp, signInWithOAuth, requestPasswordReset, resendActivationEmail, user, loading } = useAuth();
   const defaultAfterLogin = "/account";
   const nav = useNavigate();
   const search = useSearch({ from: "/login" });
@@ -41,6 +41,8 @@ export function LoginPage() {
   const [googleBusy, setGoogleBusy] = useState(false);
   const [appleBusy, setAppleBusy] = useState(false);
   const [facebookBusy, setFacebookBusy] = useState(false);
+  const [signInError, setSignInError] = useState<string | null>(null);
+  const [resendBusy, setResendBusy] = useState(false);
   const oauthErrorShown = useRef(false);
 
   useEffect(() => {
@@ -81,11 +83,13 @@ export function LoginPage() {
       return;
     }
     setBusy(true);
+    setSignInError(null);
     const { error } = mode === "signin"
       ? await signIn(email, password)
       : await signUp(email, password, fullName.trim());
     setBusy(false);
     if (error) {
+      if (mode === "signin") setSignInError(error);
       toast.error(error, { id: "login-error" });
       return;
     }
@@ -114,6 +118,24 @@ export function LoginPage() {
       return;
     }
     setForgotSent(true);
+  };
+
+  const onResendActivation = async () => {
+    const nextEmailError = emailFieldError(email);
+    setEmailError(nextEmailError);
+    setEmailTouched(true);
+    if (nextEmailError) {
+      toast.error(nextEmailError, { id: "resend-activation-error" });
+      return;
+    }
+    setResendBusy(true);
+    const { error } = await resendActivationEmail(email);
+    setResendBusy(false);
+    if (error) {
+      toast.error(error, { id: "resend-activation-error" });
+      return;
+    }
+    toast.success("If your account is not active yet, a new activation link is on its way.");
   };
 
   const startOAuth = async (provider: "google" | "apple" | "facebook", label: string) => {
@@ -279,10 +301,22 @@ export function LoginPage() {
               ) : null}
             </div>
             {mode === "signin" && (
-              <div className="text-right -mt-1">
-                <button type="button" onClick={() => { setMode("forgot"); setForgotSent(false); }} className="text-xs story-link text-primary">
+              <div className="text-right -mt-1 space-y-1">
+                <button type="button" onClick={() => { setMode("forgot"); setForgotSent(false); setSignInError(null); }} className="text-xs story-link text-primary">
                   Forgot password?
                 </button>
+                {signInError && /not activated/i.test(signInError) ? (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={onResendActivation}
+                      disabled={resendBusy}
+                      className="text-xs story-link text-primary disabled:opacity-60"
+                    >
+                      {resendBusy ? "Sending activation email…" : "Resend activation email"}
+                    </button>
+                  </div>
+                ) : null}
               </div>
             )}
             <button disabled={busy} type="submit"
@@ -322,6 +356,7 @@ export function LoginPage() {
           ) : (
             <button onClick={() => {
               setMode(mode === "signin" ? "signup" : "signin");
+              setSignInError(null);
               setFullNameError(undefined);
               setFullNameTouched(false);
               setEmailError(undefined);

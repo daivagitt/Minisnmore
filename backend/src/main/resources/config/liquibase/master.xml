@@ -65,4 +65,8 @@
     <include file="config/liquibase/changelog/20260808070000_add_customer_order_payment_method.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260811120000_seed_home_reviews_defaults.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260812130000_restore_zoho_alongside_ledgerly.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260814120000_add_customer_address_and_wishlist.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260814150000_add_order_event.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260814150100_seed_mock_notification_test_product.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260817120000_add_customer_cart.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>

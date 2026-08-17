@@ -120,6 +120,50 @@ SECTIONS: list[tuple[str, str, list[tuple[str, str, str]]]] = [
     ),
 ]
 
+EXTERNAL_SECTIONS: list[tuple[str, str, list[tuple[str, str, str]]]] = [
+    (
+        "Architecture",
+        "Live architecture documentation — https://architecturediagrams.aaushmon.com/",
+        [
+            (
+                "https://architecturediagrams.aaushmon.com/",
+                "https://architecturediagrams.aaushmon.com/",
+                "Architecture & Technical Documentation — system, frontend, backend, database, API, and CI/CD diagrams",
+            ),
+            (
+                "https://architecturediagrams.aaushmon.com/",
+                "Architecture documentation hub",
+                "Six interactive diagrams with step-by-step explanations and SVG/PNG downloads",
+            ),
+            (
+                "https://architecturediagrams.aaushmon.com/architecture/system-architecture",
+                "System architecture",
+                "Nginx, gateway, store/commerce proxies, catalog core, Postgres, Ledgerly, Razorpay",
+            ),
+            (
+                "https://architecturediagrams.aaushmon.com/architecture/frontend-architecture",
+                "Frontend architecture",
+                "Route groups, components, state management, and typed data layer",
+            ),
+            (
+                "https://architecturediagrams.aaushmon.com/architecture/backend-architecture",
+                "Backend architecture",
+                "Gateway, store, commerce, and catalog core service boundaries",
+            ),
+            (
+                "https://architecturediagrams.aaushmon.com/architecture/database-er-diagram",
+                "Database ER diagram",
+                "miniandmore and gateway Postgres schemas",
+            ),
+            (
+                "https://architecturediagrams.aaushmon.com/architecture/api-schema",
+                "API resource map",
+                "REST surface grouped by owning microservice",
+            ),
+        ],
+    ),
+]
+
 SONAR_PROJECTS: list[tuple[str, str, str]] = [
     ("frontend", "Frontend", "React storefront — Vitest coverage"),
     ("miniandmore", "Catalog (backend)", "JHipster catalog core service"),
@@ -206,6 +250,9 @@ def main() -> None:
 
     parts: list[str] = []
     any_section = False
+    for title, blurb, links in EXTERNAL_SECTIONS:
+        any_section = True
+        parts.append(section_html(title, blurb, links))
     for title, blurb, links in SECTIONS:
         present = existing_links(links, out_dir)
         if present:
@@ -234,6 +281,8 @@ def main() -> None:
       }
     """
     toc_links = []
+    for title, _, links in EXTERNAL_SECTIONS:
+        toc_links.append(f'<a href="#{esc(section_id(title))}">{esc(title)}</a>')
     for title, _, links in SECTIONS:
         if existing_links(links, out_dir):
             toc_links.append(f'<a href="#{esc(section_id(title))}">{esc(title)}</a>')

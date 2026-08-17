@@ -43,14 +43,14 @@ public class DomainUserDetailsService implements ReactiveUserDetailsService {
 
         if (looksLikeEmail(login)) {
             return userRepository
-                .findOneWithAuthoritiesByEmailIgnoreCase(login)
+                .findOneByEmailIgnoreCase(login)
                 .switchIfEmpty(Mono.error(new UsernameNotFoundException("User with email " + login + " was not found in the database")))
                 .flatMap(user -> withPasswordHash(user, login));
         }
 
         String lowercaseLogin = login.toLowerCase(Locale.ENGLISH);
         return userRepository
-            .findOneWithAuthoritiesByLogin(lowercaseLogin)
+            .findOneByLogin(lowercaseLogin)
             .switchIfEmpty(Mono.error(new UsernameNotFoundException("User " + lowercaseLogin + " was not found in the database")))
             .flatMap(user -> withPasswordHash(user, lowercaseLogin));
     }

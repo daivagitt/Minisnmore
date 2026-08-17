@@ -5,12 +5,13 @@ import { AgeRangeField } from "@/components/admin/AgeRangeField";
 import { CommaListField } from "@/components/admin/CommaListField";
 import { NumberField } from "@/components/admin/NumberField";
 import { VariantsMatrixEditor, validateVariantRows } from "@/components/admin/VariantsMatrixEditor";
-import { suggestParentSku } from "@/lib/admin-variants";
+import { suggestParentSku, summarizeZohoVariantLinkage, isVariantsItemStructure } from "@/lib/admin-variants";
 import { parseAgeRangeField } from "@/lib/comma-list-field";
 import { ImageSpecHint } from "@/components/admin/ImageSpecHint";
 import { ADMIN_IMAGE_SPECS } from "@/lib/admin-image-specs";
 import { BulkImport } from "@/components/admin/BulkImport";
 import { ColorImagesEditor } from "@/components/admin/ColorImagesEditor";
+import { AdminSizeAvailabilityPreview } from "@/components/admin/AdminSizeAvailabilityPreview";
 import { toast } from "sonner";
 import {
   Plus,
@@ -47,6 +48,7 @@ import {
   saveProduct,
   slugifyProductSlug,
   syncLedgerlyProduct,
+  syncZohoProduct,
   uploadAdminImage,
   type ProductRow,
 } from "@/lib/backend-data";
@@ -104,6 +106,7 @@ function ProductsPage() {
   const [filter, setFilter] = useState("");
   const [editing, setEditing] = useState<number | null>(null);
   const [ledgerlySyncing, setLedgerlySyncing] = useState<Set<number>>(() => new Set());
+  const [zohoSyncing, setZohoSyncing] = useState<Set<number>>(() => new Set());
   const [imageUploading, setImageUploading] = useState<number | null>(null);
   const [skuWiseImporting, setSkuWiseImporting] = useState(false);
 
@@ -215,6 +218,45 @@ function ProductsPage() {
       showApiError(error, "Ledgerly sync failed");
     } finally {
       setLedgerlySyncing((prev) => {
+        const next = new Set(prev);
+        next.delete(i);
+        return next;
+      });
+    }
+  };
+
+  const syncToZoho = async (i: number, p: Product) => {
+    if (!p.id) {
+      toast.error("Save the product first, then sync to Zoho.");
+      return;
+    }
+    if (!p.sku?.trim()) {
+      toast.error("SKU is required before syncing to Zoho.");
+      return;
+    }
+    setZohoSyncing((prev) => new Set(prev).add(i));
+    try {
+      const result = await syncZohoProduct(Number(p.id));
+      update(i, {
+        zoho_sync_status: result.zohoSyncStatus ?? null,
+        zoho_item_id: result.zohoItemId ?? null,
+        zoho_sync_error: result.zohoSyncError ?? null,
+        variants_json: result.variantsJson ?? p.variants_json,
+        item_structure: result.itemStructure ?? p.item_structure,
+      });
+      toast.success(
+        isVariantsItemStructure(p.item_structure)
+          ? `Synced to Zoho — ${summarizeZohoVariantLinkage(result.variantsJson ?? p.variants_json).label}`
+          : "Product synced to Zoho",
+      );
+    } catch (error) {
+      update(i, {
+        zoho_sync_status: "FAILED",
+        zoho_sync_error: getUserErrorMessage(error, "Zoho sync failed"),
+      });
+      showApiError(error, "Zoho sync failed");
+    } finally {
+      setZohoSyncing((prev) => {
         const next = new Set(prev);
         next.delete(i);
         return next;
@@ -641,6 +683,7 @@ function ProductsPage() {
                             placeholder="Navy, Ivory, Blush"
                           />
                         </div>
+                        <AdminSizeAvailabilityPreview product={p} />
                         <ColorImagesEditor
                           colors={p.colors ?? []}
                           onPatchColor={(colorIndex, patch) => patchProductColor(i, colorIndex, patch)}
@@ -668,6 +711,7 @@ function ProductsPage() {
                           onChange={(sizes) => update(i, { sizes })}
                           placeholder="0-3m, 3-6m, 6-12m"
                         />
+                        <AdminSizeAvailabilityPreview product={p} />
                         <CommaListField
                           label="Colors (optional, comma-separated)"
                           value={colorNames(p.colors)}
@@ -825,6 +869,27 @@ function ProductsPage() {
                       </div>
                     )}
 
+                    {(p.zoho_sync_status || p.zoho_sync_error) && (
+                      <div className="text-xs rounded-xl bg-white/40 px-3 py-2 space-y-1">
+                        {p.zoho_sync_status && (
+                          <p>
+                            Zoho: <span className="font-medium">{p.zoho_sync_status}</span>
+                            {isVariantsItemStructure(p.item_structure)
+                              ? ` · ${summarizeZohoVariantLinkage(p.variants_json).label}`
+                              : p.zoho_item_id
+                                ? ` · item ${p.zoho_item_id}`
+                                : ""}
+                          </p>
+                        )}
+                        {p.zoho_sync_error && <p className="text-destructive">{p.zoho_sync_error}</p>}
+                        {isVariantsItemStructure(p.item_structure) && (
+                          <p className="text-muted-foreground">
+                            Variant products use per-SKU Zoho items — see the matrix &quot;Zoho item&quot; column.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex flex-wrap gap-2 pt-2">
                       <button
                         onClick={() => save(p)}
@@ -846,6 +911,26 @@ function ProductsPage() {
                             <CloudUpload className="h-4 w-4" />
                           )}
                           {ledgerlySyncing.has(i) ? "Syncing…" : "Sync to Ledgerly"}
+                        </button>
+                      )}
+                      {p.id && (
+                        <button
+                          type="button"
+                          disabled={zohoSyncing.has(i)}
+                          onClick={() => void syncToZoho(i, p)}
+                          className="rounded-full glass px-4 py-2 text-sm flex items-center gap-2 disabled:opacity-50"
+                          title={
+                            isVariantsItemStructure(p.item_structure)
+                              ? "Push each variant SKU to Zoho Books as separate items"
+                              : "Push this product to Zoho Books (requires SKU)"
+                          }
+                        >
+                          {zohoSyncing.has(i) ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <CloudUpload className="h-4 w-4" />
+                          )}
+                          {zohoSyncing.has(i) ? "Syncing…" : "Sync to Zoho"}
                         </button>
                       )}
                       <button

@@ -11,6 +11,7 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useAuth } from "@/hooks/useAuth";
 import { buildShopSearch } from "@/lib/shop-filters";
 import { filterProductsByQuery } from "@/lib/product-search";
+import { LazyImage } from "@/components/LazyImage";
 import defaultLogo from "@/assets/logo-horizontal-optimized.webp";
 import type { FileRoutesByTo } from '@/routeTree.gen';
 
@@ -324,7 +325,7 @@ export function Navbar() {
                             onMouseEnter={() => setActiveIndex(index)}
                             className={`flex items-center gap-3 p-2 rounded-2xl transition ${index === activeIndex ? "bg-white/50" : "hover:bg-white/40"}`}
                           >
-                            <img src={p.image} alt="" className="h-12 w-12 rounded-xl object-cover" />
+                            <LazyImage src={p.image} alt="" className="h-12 w-12 rounded-xl object-cover" priority="low" />
                             <div className="flex-1 min-w-0">
                               <div className="text-sm font-medium truncate">{p.name}</div>
                               <div className="text-xs text-muted-foreground truncate">
@@ -435,7 +436,7 @@ function MegaMenu({ categories, products, onClose }: { categories: Category[]; p
                         className="group flex items-center gap-3 rounded-2xl p-2 hover:bg-primary/10 transition"
                       >
                         {c.image_url ? (
-                          <img src={c.image_url} alt="" className="h-11 w-11 rounded-xl object-cover shrink-0" loading="lazy" />
+                          <LazyImage src={c.image_url} alt="" className="h-11 w-11 rounded-xl object-cover shrink-0" priority="auto" />
                         ) : (
                           <div className="h-11 w-11 rounded-xl bg-primary/10 shrink-0" />
                         )}
@@ -473,7 +474,7 @@ function MegaMenu({ categories, products, onClose }: { categories: Category[]; p
                 onClick={onClose}
                 className="group flex items-center gap-3 rounded-2xl p-2 hover:bg-primary/10 transition"
               >
-                <img src={p.image} alt={p.name} className="h-14 w-14 rounded-xl object-cover shrink-0" loading="lazy" />
+                <LazyImage src={p.image} alt={p.name} className="h-14 w-14 rounded-xl object-cover shrink-0" priority="auto" />
                 <div className="min-w-0 flex-1">
                   <div className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{p.category}</div>
                   <div className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition">{p.name}</div>

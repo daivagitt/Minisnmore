@@ -23,6 +23,16 @@ vi.mock("@/hooks/useAuth", () => ({
   }),
 }));
 
+vi.mock("@/lib/account.functions", () => ({
+  listMyWishlist: vi.fn(async () => ({ product_ids: [] })),
+  syncMyWishlist: vi.fn(async (ids: string[]) => ({ product_ids: ids })),
+  replaceMyWishlist: vi.fn(async (ids: string[]) => ({ product_ids: ids })),
+  addMyWishlistItem: vi.fn(async () => ({ ok: true })),
+  removeMyWishlistItem: vi.fn(async () => ({ ok: true })),
+  listMyCart: vi.fn(async () => ({ items: [], coupon: null })),
+  replaceMyCart: vi.fn(async (items: unknown[], coupon: unknown) => ({ items, coupon })),
+}));
+
 const product: Product = {
   id: "p1",
   slug: "romper",

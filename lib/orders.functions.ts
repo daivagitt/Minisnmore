@@ -101,6 +101,20 @@ export async function listMyPayments(): Promise<{ payments: any[] }> {
   return api.get("/api/v1/payments", { auth: true });
 }
 
+export type NotificationEvent = {
+  id: number;
+  event_type: string;
+  title: string;
+  body: string;
+  order_number: string;
+  created_at: string;
+};
+
+export async function listMyNotifications(): Promise<{ events: NotificationEvent[] }> {
+  const res = await api.get<{ events: NotificationEvent[] }>("/api/v1/account/notifications", { auth: true });
+  return { events: res?.events ?? [] };
+}
+
 export async function getMyProfile(): Promise<{ profile: { full_name: string; phone: string } }> {
   const profile = await api.get("/api/v1/account/profile", { auth: true });
   const full_name = (profile as any)?.full_name ?? "";

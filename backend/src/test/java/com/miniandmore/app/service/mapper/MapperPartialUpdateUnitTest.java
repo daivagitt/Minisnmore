@@ -167,7 +167,7 @@ class MapperPartialUpdateUnitTest {
 
     @Test
     void productMapper_partialUpdateAndListMapping() {
-        ProductMapper mapper = new ProductMapperImpl();
+        ProductMapper mapper = MapperTestSupport.productMapper();
         Product entity = getProductSample1().price(BigDecimal.TEN);
         var dto = mapper.toDto(entity);
         var copy = mapper.toEntity(dto);

@@ -8,11 +8,27 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { Check, ChevronLeft, Loader2, Smartphone, CreditCard, Building2, Wallet, Banknote, Shield, MapPin, Plus, Zap, Minus, X, ShoppingBag, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
-import { formatCartSyncMessage } from "@/lib/cart-catalog";
-import { createOrder, verifyPayment, getMyProfile, updateMyProfile } from "@/lib/orders.functions";
+import { cartLineColorLabel, cartLineImage, formatCartSyncMessage } from "@/lib/cart-catalog";
+import { createOrder, verifyPayment, getMyProfile, updateMyProfile, ProfileUpdate, fullNameFieldError } from "@/lib/orders.functions";
+import {
+  clearLegacyLocalAddresses,
+  createMyAddress,
+  listMyAddresses,
+  normalizeAddressDraft,
+  normalizeAddressPhone,
+  readLegacyLocalAddresses,
+  syncMyAddresses,
+  validateCheckoutAddress,
+  type CheckoutAddressFieldErrors,
+  type CheckoutAddressFieldName,
+  type SavedAddress,
+} from "@/lib/account.functions";
 import { validateCoupon } from "@/lib/coupons.functions";
 import { commerceFromSiteSettings } from "@/lib/commerce";
 import { COD_FEE_INR, orderTotals } from "@/lib/money";
+import { lookupPincode, normalizePincode } from "@/lib/pincode";
+import { LazyImage } from "@/components/LazyImage";
+import { CopyButton } from "@/components/CopyButton";
 import { CouponOffers } from "@/components/CouponOffers";
 import { openRazorpayCheckout } from "@/lib/razorpay";
 
@@ -23,19 +39,6 @@ export const Route = createFileRoute("/checkout")({
 
 const steps = ["Details", "Shipping", "Payment", "Review"];
 
-type SavedAddress = {
-  id: string;
-  label?: string;
-  full_name: string;
-  phone: string;
-  line1: string;
-  line2?: string;
-  city: string;
-  state: string;
-  pincode: string;
-  is_default?: boolean;
-};
-
 type PayMethod = "upi" | "card" | "netbanking" | "wallet" | "cod";
 
 function payMethodLabel(method: PayMethod) {
@@ -45,6 +48,28 @@ function payMethodLabel(method: PayMethod) {
     case "netbanking": return "Net Banking";
     case "wallet": return "Wallets";
     case "cod": return "Cash on Delivery";
+  }
+}
+
+/** Keep digits only; drop a leading 91 country code when a 12-digit paste is used; cap at 10. */
+function normalizePhoneInput(value: string): string {
+  return normalizeAddressPhone(value);
+}
+
+function phoneFieldError(phone: string): string | undefined {
+  const result = ProfileUpdate.safeParse({ full_name: "A A", phone });
+  if (result.success) return undefined;
+  return result.error.issues.find((issue) => issue.path[0] === "phone")?.message;
+}
+
+async function persistCheckoutProfile(fullName: string, phone: string) {
+  const name = fullName.trim();
+  const normalizedPhone = normalizePhoneInput(phone);
+  if (!name || phoneFieldError(normalizedPhone)) return;
+  try {
+    await updateMyProfile({ data: { full_name: name, phone: normalizedPhone } });
+  } catch {
+    // createOrder also syncs profile server-side as a fallback.
   }
 }
 
@@ -60,7 +85,7 @@ function Checkout() {
 
   // form state
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
+  const accountEmail = user?.email ?? user?.login ?? "";
   const [phone, setPhone] = useState("");
   const [babyName, setBabyName] = useState("");
   const [line1, setLine1] = useState("");
@@ -69,6 +94,8 @@ function Checkout() {
   const [city, setCity] = useState("");
   const [state, setStateName] = useState("");
   const [pinLoading, setPinLoading] = useState(false);
+  const [pinDeliverable, setPinDeliverable] = useState<boolean | null>(null);
+  const [pinError, setPinError] = useState<string | null>(null);
   const [donation, setDonation] = useState<number>(0);
   const [couponInput, setCouponInput] = useState(appliedCoupon?.code ?? "");
   const [shipMode, setShipMode] = useState<"std" | "exp">("std");
@@ -78,6 +105,42 @@ function Checkout() {
   const [selectedAddrId, setSelectedAddrId] = useState<string>("");
   const [saveAddress, setSaveAddress] = useState(true);
   const [profileLoaded, setProfileLoaded] = useState(false);
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const [addressErrors, setAddressErrors] = useState<CheckoutAddressFieldErrors>({});
+  const [addressTouched, setAddressTouched] = useState<Partial<Record<CheckoutAddressFieldName, boolean>>>({});
+
+  const checkoutAddress = () => ({ line1, line2, city, state, pincode: pin });
+
+  const addressFieldError = (name: CheckoutAddressFieldName) =>
+    addressTouched[name] ? addressErrors[name] : undefined;
+
+  const revalidateAddressFields = (
+    draft: ReturnType<typeof checkoutAddress>,
+    fields: CheckoutAddressFieldName[],
+  ) => {
+    const fieldErrors = validateCheckoutAddress(draft);
+    setAddressErrors((prev) => {
+      const next = { ...prev };
+      for (const field of fields) next[field] = fieldErrors[field];
+      return next;
+    });
+  };
+
+  const touchAddressField = (name: CheckoutAddressFieldName) => {
+    const draft = checkoutAddress();
+    setAddressTouched((prev) => ({ ...prev, [name]: true }));
+    revalidateAddressFields(draft, [name]);
+  };
+
+  const updateAddressField = <K extends CheckoutAddressFieldName>(name: K, value: string) => {
+    const next = { ...checkoutAddress(), [name]: value };
+    if (name === "line1") setLine1(value);
+    if (name === "line2") setLine2(value);
+    if (name === "city") setCity(value);
+    if (name === "state") setStateName(value);
+    if (name === "pincode") setPin(value);
+    if (addressTouched[name]) revalidateAddressFields(next, [name]);
+  };
 
   useEffect(() => {
     setCouponInput(appliedCoupon?.code ?? "");
@@ -102,81 +165,163 @@ function Checkout() {
     }
   }, [user, authLoading, nav]);
 
-  useEffect(() => {
-    if (user?.email && !email) setEmail(user.email);
-  }, [user, email]);
-
   // Auto-populate profile (name, phone) from server
   useEffect(() => {
     if (!user || profileLoaded) return;
     getMyProfile()
       .then((r) => {
         if (r.profile?.full_name && !fullName) setFullName(r.profile.full_name);
-        if (r.profile?.phone && !phone) setPhone(r.profile.phone);
+        if (r.profile?.phone && !phone) setPhone(normalizePhoneInput(r.profile.phone));
       })
       .catch(() => {})
       .finally(() => setProfileLoaded(true));
   }, [user, profileLoaded, fullName, phone]);
 
-  // Load saved addresses + last preferences from localStorage
+  // Load saved addresses from account + last checkout preferences from localStorage
   useEffect(() => {
     if (!user) return;
-    try {
-      const raw = localStorage.getItem(`mnm_addresses_${user.id}`);
-      const list: SavedAddress[] = raw ? JSON.parse(raw) : [];
-      setSavedAddresses(list);
-      const def = list.find((a) => a.is_default) ?? list[0];
-      if (def) {
-        setSelectedAddrId(def.id);
-        applyAddress(def);
-        setSaveAddress(false);
+    let cancelled = false;
+    const storageKey = `mnm_addresses_${user.id}`;
+
+    void (async () => {
+      try {
+        let { addresses } = await listMyAddresses();
+        if (addresses.length === 0) {
+          const legacy = readLegacyLocalAddresses(storageKey);
+          if (legacy.length > 0) {
+            const synced = await syncMyAddresses(
+              legacy.map((a) => ({
+                label: a.label ?? "Home",
+                full_name: a.full_name,
+                phone: a.phone,
+                line1: a.line1,
+                line2: a.line2 ?? "",
+                city: a.city,
+                state: a.state,
+                pincode: a.pincode,
+                is_default: a.is_default,
+              })),
+            );
+            addresses = synced.addresses;
+            clearLegacyLocalAddresses(storageKey);
+          }
+        }
+        if (cancelled) return;
+        setSavedAddresses(addresses);
+        const def = addresses.find((a) => a.is_default) ?? addresses[0];
+        if (def) {
+          setSelectedAddrId(String(def.id));
+          applyAddress(def);
+          setSaveAddress(false);
+        }
+      } catch {
+        if (!cancelled) setSavedAddresses([]);
       }
-      const lastPay = localStorage.getItem("mnm_last_pay") as any;
-      if (lastPay && ["upi", "card", "netbanking", "wallet", "cod"].includes(lastPay)) setPayMethod(lastPay);
-      const lastShip = localStorage.getItem("mnm_last_ship") as any;
-      if (lastShip === "std") setShipMode(lastShip);
+    })();
+
+    try {
+      const lastPay = localStorage.getItem("mnm_last_pay") as PayMethod | null;
+      // COD is a per-order choice — never restore it from a previous checkout.
+      if (lastPay === "cod") {
+        try { localStorage.removeItem("mnm_last_pay"); } catch {}
+      } else if (lastPay && ["upi", "card", "netbanking", "wallet"].includes(lastPay)) {
+        setPayMethod(lastPay);
+      }
+      const lastShip = localStorage.getItem("mnm_last_ship") as "std" | "exp" | null;
+      if (lastShip === "std" || lastShip === "exp") setShipMode(lastShip);
     } catch {}
+
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  const checkPinDelivery = async (pinValue: string, opts?: { toastOnError?: boolean }) => {
+    const clean = normalizePincode(pinValue);
+    if (clean.length !== 6) {
+      setPinDeliverable(null);
+      setPinError(null);
+      return;
+    }
+    setPinLoading(true);
+    setPinError(null);
+    try {
+      const result = await lookupPincode(clean);
+      if (result.ok) {
+        setCity(result.lookup.city);
+        setStateName(result.lookup.state);
+        setPinDeliverable(true);
+        setPinError(null);
+        setAddressErrors((prev) => ({ ...prev, city: undefined, state: undefined, pincode: undefined }));
+      } else {
+        setCity("");
+        setStateName("");
+        setPinDeliverable(false);
+        setPinError(result.error);
+        if (opts?.toastOnError !== false) toast.error(result.error);
+      }
+    } catch {
+      setPinDeliverable(false);
+      const message = "Couldn't check pincode";
+      setPinError(message);
+      if (opts?.toastOnError !== false) toast.error(message);
+    } finally {
+      setPinLoading(false);
+    }
+  };
+
   const applyAddress = (a: SavedAddress) => {
-    if (a.full_name) setFullName(a.full_name);
-    if (a.phone) setPhone(a.phone);
+    if (a.phone) setPhone(normalizePhoneInput(a.phone));
     setLine1(a.line1 || "");
     setLine2(a.line2 || "");
     setPin(a.pincode || "");
     setCity(a.city || "");
     setStateName(a.state || "");
+    if (normalizePincode(a.pincode || "").length === 6) {
+      void checkPinDelivery(a.pincode || "", { toastOnError: false });
+    } else {
+      setPinDeliverable(null);
+      setPinError(null);
+    }
   };
 
   const onPickSaved = (id: string) => {
     setSelectedAddrId(id);
+    setAddressErrors({});
+    setAddressTouched({});
     if (id === "__new") {
       setLine1(""); setLine2(""); setPin(""); setCity(""); setStateName("");
+      setPinDeliverable(null);
+      setPinError(null);
       setSaveAddress(true);
       return;
     }
-    const a = savedAddresses.find((x) => x.id === id);
+    const a = savedAddresses.find((x) => String(x.id) === id);
     if (a) { applyAddress(a); setSaveAddress(false); }
   };
 
-  const persistAddressIfNeeded = () => {
+  const persistAddressIfNeeded = async () => {
     if (!user || !saveAddress) return;
+    const dup = savedAddresses.find((a) => a.line1 === line1 && a.pincode === pin && a.city === city);
+    if (dup) return;
     try {
-      const key = `mnm_addresses_${user.id}`;
-      const raw = localStorage.getItem(key);
-      const list: SavedAddress[] = raw ? JSON.parse(raw) : [];
-      const dup = list.find((a) => a.line1 === line1 && a.pincode === pin && a.city === city);
-      if (dup) return;
-      const next: SavedAddress = {
-        id: crypto.randomUUID(),
-        label: "Home",
-        full_name: fullName, phone, line1, line2, city, state, pincode: pin,
-        is_default: list.length === 0,
-      };
-      localStorage.setItem(key, JSON.stringify([...list, next]));
-      setSavedAddresses([...list, next]);
-    } catch {}
+      const { address } = await createMyAddress(
+        normalizeAddressDraft({
+          label: "Home",
+          full_name: fullName.trim(),
+          phone: normalizePhoneInput(phone),
+          line1,
+          line2,
+          city,
+          state,
+          pincode: pin,
+          is_default: savedAddresses.length === 0,
+        }),
+      );
+      setSavedAddresses((list) => [...list, address]);
+      setSelectedAddrId(String(address.id));
+    } catch {
+      // Non-blocking — checkout can still complete with the typed address.
+    }
   };
 
   const applyCoupon = async (codeArg?: string) => {
@@ -206,7 +351,7 @@ function Checkout() {
     subtotal: cartTotal,
     discount: couponOff,
     donation,
-    codFee: payMethod === "cod" ? COD_FEE_INR : 0,
+    codFee: step >= 2 && payMethod === "cod" ? COD_FEE_INR : 0,
     shipMode,
     commerce,
   });
@@ -215,37 +360,60 @@ function Checkout() {
   const grand = totals.grand;
 
   const onPinChange = async (v: string) => {
-    const clean = v.replace(/\D/g, "").slice(0, 6);
+    const clean = normalizePincode(v);
     setPin(clean);
+    if (addressTouched.pincode) revalidateAddressFields({ ...checkoutAddress(), pincode: clean }, ["pincode"]);
     if (clean.length === 6) {
-      setPinLoading(true);
-      try {
-        const r = await fetch(`https://api.postalpincode.in/pincode/${clean}`);
-        const d = await r.json();
-        const po = d?.[0]?.PostOffice?.[0];
-        if (po) { setCity(po.District ?? ""); setStateName(po.State ?? ""); }
-        else toast.error("Pincode not found");
-      } catch { toast.error("Couldn't fetch pincode"); }
-      finally { setPinLoading(false); }
+      await checkPinDelivery(clean);
+    } else {
+      setPinDeliverable(null);
+      setPinError(null);
     }
+  };
+
+  const shippingFieldErrors = validateCheckoutAddress(checkoutAddress());
+  const shippingHasErrors = Object.values(shippingFieldErrors).some(Boolean);
+  const pinNotDeliverable = pin.length === 6 && pinDeliverable !== true;
+  const shippingContinueDisabled = step === 1 && (pinLoading || shippingHasErrors || pinNotDeliverable);
+
+  const validateDetailsStep = () => {
+    const nameError = fullNameFieldError(fullName);
+    if (nameError) return nameError;
+    if (!fullName.trim()) return "Add your full name in your profile before checkout";
+    if (!/^\S+@\S+\.\S+$/.test(accountEmail)) return "Your account email is missing or invalid";
+    return phoneFieldError(phone);
+  };
+
+  const validateShippingStep = () => {
+    const fieldErrors = validateCheckoutAddress(checkoutAddress());
+    const firstFieldError = (["line1", "pincode", "city", "state", "line2"] as CheckoutAddressFieldName[])
+      .map((field) => fieldErrors[field])
+      .find(Boolean);
+    if (firstFieldError) return firstFieldError;
+    if (pinNotDeliverable) return pinError ?? "Delivery isn't available for this pincode yet.";
+    return undefined;
   };
 
   const next = () => {
     if (step === 0) {
-      if (!fullName.trim()) return toast.error("Please enter your full name");
-      if (!/^\S+@\S+\.\S+$/.test(email)) return toast.error("Please enter a valid email");
-      const digits = phone.replace(/\D/g, "");
-      if (digits.length < 10) return toast.error("Please enter a valid phone number");
-      // Persist phone/name onto profile (best-effort, non-blocking)
-      updateMyProfile({ data: { full_name: fullName.trim(), phone: phone.trim() } }).catch(() => {});
+      setPhoneTouched(true);
+      const detailsError = validateDetailsStep();
+      if (detailsError) return toast.error(detailsError);
+      void persistCheckoutProfile(fullName, phone);
     }
     if (step === 1) {
-      if (!line1.trim() || pin.length !== 6 || !city.trim() || !state.trim())
-        return toast.error("Please complete the address");
+      const allTouched = Object.fromEntries(
+        (["line1", "line2", "pincode", "city", "state"] as CheckoutAddressFieldName[]).map((field) => [field, true]),
+      ) as Record<CheckoutAddressFieldName, boolean>;
+      setAddressTouched((prev) => ({ ...prev, ...allTouched }));
+      const fieldErrors = validateCheckoutAddress(checkoutAddress());
+      setAddressErrors(fieldErrors);
+      const shippingError = validateShippingStep();
+      if (shippingError) return toast.error(shippingError);
       persistAddressIfNeeded();
       try { localStorage.setItem("mnm_last_ship", shipMode); } catch {}
     }
-    if (step === 2) {
+    if (step === 2 && payMethod !== "cod") {
       try { localStorage.setItem("mnm_last_pay", payMethod); } catch {}
     }
     setStep((s) => Math.min(s + 1, steps.length - 1));
@@ -254,12 +422,13 @@ function Checkout() {
 
   const place = async () => {
     if (cart.length === 0) return;
-    if (!fullName.trim()) { setStep(0); return toast.error("Please enter your full name"); }
-    if (!/^\S+@\S+\.\S+$/.test(email)) { setStep(0); return toast.error("Please enter a valid email"); }
-    if (phone.replace(/\D/g, "").length < 10) { setStep(0); return toast.error("Please enter a valid phone number"); }
-    if (!line1.trim() || pin.length !== 6 || !city.trim() || !state.trim()) { setStep(1); return toast.error("Please complete the address"); }
+    const detailsError = validateDetailsStep();
+    if (detailsError) { setStep(0); return toast.error(detailsError); }
+    const shippingError = validateShippingStep();
+    if (shippingError) { setStep(1); return toast.error(shippingError); }
     setBusy(true);
     try {
+      await persistCheckoutProfile(fullName, phone);
       const sync = syncCartWithCatalog(products);
       if (sync.removed.length || sync.adjusted.length) {
         const message = formatCartSyncMessage(sync);
@@ -276,15 +445,15 @@ function Checkout() {
             product_id: i.product.id,
             product_slug: i.product.slug,
             product_name: i.product.name,
-            product_image: i.product.image,
+            product_image: cartLineImage(i),
             size: i.size,
-            color: i.color,
+            color: cartLineColorLabel(i),
             sku: i.variantSku ?? "",
             qty: i.qty,
             price: i.unitPrice,
           })),
           shipping_address: {
-            full_name: fullName, email, phone, line1, line2, city, state, pincode: pin, baby_name: babyName,
+            full_name: fullName, email: accountEmail, phone, line1, line2, city, state, pincode: pin, baby_name: babyName,
           },
           shipping_mode: shipMode,
           payment_method: payMethod === "cod" ? "cod" : "online",
@@ -352,7 +521,7 @@ function Checkout() {
           payMethod: payMethod === "cod" ? undefined : payMethod,
           prefill: {
             name: fullName,
-            email,
+            email: accountEmail,
             contact: phone,
             ...(upiId.trim() ? { vpa: upiId.trim() } : {}),
           },
@@ -400,7 +569,18 @@ function Checkout() {
           <div className="text-[10px] uppercase tracking-[0.32em] text-primary mt-5">Thank you</div>
           <h1 className="font-display text-3xl md:text-4xl mt-2">Your order is on its way ✨</h1>
           <p className="text-muted-foreground mt-3 text-sm md:text-base">
-            Order <span className="font-medium text-foreground">{done.orderNumber}</span> has been placed successfully. We'll hand-wrap it with care and send a tracking update on WhatsApp & email shortly.
+            Order{" "}
+            <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+              {done.orderNumber}
+              <CopyButton
+                value={done.orderNumber}
+                label="Copy order ID"
+                successMessage="Order ID copied"
+                className="h-7 w-7"
+                iconClassName="h-3 w-3"
+              />
+            </span>
+            {" "}has been placed successfully. We'll hand-wrap it with care and send a tracking update on WhatsApp & email shortly.
           </p>
           <div className="grid grid-cols-3 gap-2 mt-6 text-[11px]">
             <div className="glass rounded-2xl p-3"><div className="text-primary font-medium">Confirmed</div><div className="text-muted-foreground mt-0.5">Right now</div></div>
@@ -471,7 +651,10 @@ function Checkout() {
                       type="button"
                       onClick={() => {
                         const def = savedAddresses.find((a) => a.is_default) ?? savedAddresses[0];
-                        if (def) { onPickSaved(def.id); }
+                        if (def) {
+                          onPickSaved(String(def.id));
+                          void persistCheckoutProfile(fullName, def.phone);
+                        }
                         setStep(3);
                       }}
                       className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-xs font-medium"
@@ -480,9 +663,35 @@ function Checkout() {
                     </button>
                   </div>
                 )}
-                <Field label="Full name" required value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ananya Sharma" />
-                <Field label="Email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ananya@email.com" />
-                <Field label="Phone" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 99999 99999" />
+                <Field
+                  label="Full name"
+                  required
+                  readOnly
+                  disabled
+                  value={fullName}
+                  placeholder="Ananya Sharma"
+                />
+                <Field label="Email" type="email" required readOnly disabled value={accountEmail} placeholder="ananya@email.com" />
+                <Field
+                  label="Phone"
+                  required
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  maxLength={10}
+                  value={phone}
+                  onChange={(e) => setPhone(normalizePhoneInput(e.target.value))}
+                  onBlur={() => setPhoneTouched(true)}
+                  error={phoneTouched ? phoneFieldError(phone) : undefined}
+                  placeholder="9999999999"
+                />
+                {!fullName.trim() ? (
+                  <p className="md:col-span-2 text-xs text-muted-foreground">
+                    Add your name in{" "}
+                    <Link to="/account/profile" className="text-primary story-link">your profile</Link>
+                    {" "}before placing an order.
+                  </p>
+                ) : null}
                 <Field label="Baby's name (optional)" value={babyName} onChange={(e) => setBabyName(e.target.value)} placeholder="Aarav" />
               </div>
             )}
@@ -496,12 +705,13 @@ function Checkout() {
                     </div>
                     <div className="grid sm:grid-cols-2 gap-2.5">
                       {savedAddresses.map((a) => {
-                        const active = selectedAddrId === a.id;
+                        const addrId = String(a.id);
+                        const active = selectedAddrId === addrId;
                         return (
                           <button
                             type="button"
-                            key={a.id}
-                            onClick={() => onPickSaved(a.id)}
+                            key={addrId}
+                            onClick={() => onPickSaved(addrId)}
                             className={`text-left rounded-2xl p-3.5 border transition ${active ? "bg-primary/10 border-primary ring-2 ring-primary/30" : "glass border-transparent hover:bg-white/60"}`}
                           >
                             <div className="flex items-center justify-between">
@@ -524,39 +734,58 @@ function Checkout() {
                     </div>
                   </div>
                 )}
-                <Field label="Address line 1" required value={line1} onChange={(e) => setLine1(e.target.value)} placeholder="Flat 12, Tulip Apartments" />
-                <Field label="Address line 2" value={line2} onChange={(e) => setLine2(e.target.value)} placeholder="MG Road" />
-                <label className="block">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">
-                    Pincode
-                    {" "}
-                    <span className="text-destructive font-semibold" aria-hidden="true">*</span>
-                    <span className="sr-only"> (required)</span>
-                    {pinLoading && <span className="text-primary normal-case"> · looking up…</span>}
-                  </div>
-                  <input required value={pin} onChange={(e) => onPinChange(e.target.value)} inputMode="numeric" placeholder="400001"
-                    className="glass w-full rounded-full px-4 py-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40" />
-                </label>
-                <label className="block">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">
-                    City
-                    {" "}
-                    <span className="text-destructive font-semibold" aria-hidden="true">*</span>
-                    <span className="sr-only"> (required)</span>
-                  </div>
-                  <input required value={city} onChange={(e) => setCity(e.target.value)} placeholder="Mumbai"
-                    className="glass w-full rounded-full px-4 py-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40" />
-                </label>
-                <label className="block md:col-span-2">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">
-                    State
-                    {" "}
-                    <span className="text-destructive font-semibold" aria-hidden="true">*</span>
-                    <span className="sr-only"> (required)</span>
-                  </div>
-                  <input required value={state} onChange={(e) => setStateName(e.target.value)} placeholder="Maharashtra"
-                    className="glass w-full rounded-full px-4 py-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40" />
-                </label>
+                <Field
+                  label="Address line 1"
+                  required
+                  value={line1}
+                  onChange={(e) => updateAddressField("line1", e.target.value)}
+                  onBlur={() => touchAddressField("line1")}
+                  error={addressFieldError("line1")}
+                  maxLength={200}
+                  placeholder="Flat 12, Tulip Apartments"
+                />
+                <Field
+                  label="Address line 2"
+                  value={line2}
+                  onChange={(e) => updateAddressField("line2", e.target.value)}
+                  onBlur={() => touchAddressField("line2")}
+                  error={addressFieldError("line2")}
+                  maxLength={200}
+                  placeholder="MG Road"
+                />
+                <Field
+                  label="Pincode"
+                  required
+                  value={pin}
+                  onChange={(e) => void onPinChange(e.target.value)}
+                  onBlur={() => touchAddressField("pincode")}
+                  error={addressFieldError("pincode") ?? (addressTouched.pincode ? pinError ?? undefined : undefined)}
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="400001"
+                  hint={pinLoading ? "looking up…" : undefined}
+                />
+                <Field
+                  label="City"
+                  required
+                  value={city}
+                  onChange={(e) => updateAddressField("city", e.target.value)}
+                  onBlur={() => touchAddressField("city")}
+                  error={addressFieldError("city")}
+                  maxLength={80}
+                  placeholder="Mumbai"
+                />
+                <Field
+                  label="State"
+                  required
+                  value={state}
+                  onChange={(e) => updateAddressField("state", e.target.value)}
+                  onBlur={() => touchAddressField("state")}
+                  error={addressFieldError("state")}
+                  maxLength={80}
+                  className="md:col-span-2"
+                  placeholder="Maharashtra"
+                />
                 <div className="md:col-span-2">
                   <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Delivery</div>
                   <div className="grid md:grid-cols-2 gap-3">
@@ -665,14 +894,14 @@ function Checkout() {
                       <div className="text-muted-foreground mt-0.5">Phone: {phone}</div>
                     </div>
                   </div>
-                  <button type="button" onClick={() => setStep(0)} className="text-xs text-primary story-link shrink-0">Edit</button>
+                  <button type="button" onClick={() => setStep(1)} className="text-xs text-primary story-link shrink-0">Edit</button>
                 </div>
                 {cart.map((i) => (
                   <div key={i.product.id + i.size + i.color} className="glass rounded-2xl p-3 flex gap-3 items-center">
-                    <img src={i.product.image} alt="" className="h-14 w-14 rounded-xl object-cover" />
+                    <LazyImage src={cartLineImage(i)} alt="" className="h-14 w-14 rounded-xl object-cover" priority="auto" />
                     <div className="flex-1 text-sm min-w-0">
                       <div className="font-medium truncate">{i.product.name}</div>
-                      <div className="text-xs text-muted-foreground">{i.size} · {i.color}</div>
+                      <div className="text-xs text-muted-foreground">{i.size} · {cartLineColorLabel(i)}</div>
                       <div className="mt-1.5 inline-flex items-center gap-1 glass rounded-full px-1 py-0.5">
                         <button onClick={() => updateQty(i.product.id, i.qty - 1, i.size, i.color)} className="h-6 w-6 grid place-items-center rounded-full hover:bg-white/60"><Minus className="h-3 w-3" /></button>
                         <span className="text-xs w-5 text-center">{i.qty}</span>
@@ -694,7 +923,13 @@ function Checkout() {
 
         <div className="mt-8 flex justify-end">
           {step < steps.length - 1 ? (
-            <button onClick={next} className="rounded-full bg-primary text-primary-foreground px-6 py-3 font-medium hover:shadow-glow transition">Continue</button>
+            <button
+              onClick={next}
+              disabled={shippingContinueDisabled}
+              className="rounded-full bg-primary text-primary-foreground px-6 py-3 font-medium hover:shadow-glow transition disabled:opacity-50 disabled:pointer-events-none"
+            >
+              Continue
+            </button>
           ) : (
             <button onClick={place} disabled={cart.length === 0 || busy} className="rounded-full bg-primary text-primary-foreground px-6 py-3 font-medium hover:shadow-glow transition disabled:opacity-50 inline-flex items-center gap-2">
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -713,10 +948,10 @@ function Checkout() {
         <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
           {cart.map((i) => (
             <div key={i.product.id + i.size + i.color} className="flex gap-3 text-sm">
-              <img src={i.product.image} className="h-12 w-12 rounded-lg object-cover" alt="" />
+              <LazyImage src={cartLineImage(i)} className="h-12 w-12 rounded-lg object-cover" alt="" priority="auto" />
               <div className="flex-1 min-w-0">
                 <div className="font-medium leading-tight truncate">{i.product.name}</div>
-                <div className="text-[11px] text-muted-foreground">{i.size} · {i.color}</div>
+                <div className="text-[11px] text-muted-foreground">{i.size} · {cartLineColorLabel(i)}</div>
                 <div className="mt-1 inline-flex items-center gap-1">
                   <button onClick={() => updateQty(i.product.id, i.qty - 1, i.size, i.color)} className="h-5 w-5 grid place-items-center rounded-full glass hover:bg-white/60"><Minus className="h-2.5 w-2.5" /></button>
                   <span className="text-[11px] w-5 text-center">{i.qty}</span>
@@ -772,9 +1007,21 @@ function Checkout() {
   );
 }
 
-function Field({ label, required, ...rest }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+function Field({
+  label,
+  required,
+  error,
+  hint,
+  className,
+  ...rest
+}: {
+  label: string;
+  error?: string;
+  hint?: string;
+  className?: string;
+} & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
-    <label className="block">
+    <label className={`block ${className ?? ""}`}>
       <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">
         {label}
         {required && (
@@ -784,8 +1031,14 @@ function Field({ label, required, ...rest }: { label: string } & React.InputHTML
             <span className="sr-only"> (required)</span>
           </>
         )}
+        {hint ? <span className="text-primary normal-case"> · {hint}</span> : null}
       </div>
-      <input required={required} {...rest} className="glass w-full rounded-full px-4 py-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40" />
+      <input
+        aria-invalid={!!error}
+        {...rest}
+        className={`glass w-full rounded-full px-4 py-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-70 disabled:cursor-not-allowed ${error ? "ring-2 ring-destructive/40 border border-destructive/50" : ""}`}
+      />
+      {error ? <p className="mt-1.5 text-[11px] text-destructive">{error}</p> : null}
     </label>
   );
 }

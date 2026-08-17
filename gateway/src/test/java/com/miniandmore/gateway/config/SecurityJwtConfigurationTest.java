@@ -9,6 +9,7 @@ import com.miniandmore.gateway.management.SecurityMetersService;
 import com.miniandmore.gateway.security.jwt.JwtAuthenticationTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.test.util.ReflectionTestUtils;
 import reactor.test.StepVerifier;
 
@@ -58,5 +59,19 @@ class SecurityJwtConfigurationTest {
 
         StepVerifier.create(configuration.jwtDecoder(metersService).decode(token)).expectError().verify();
         verify(metersService).trackTokenInvalidSignature();
+    }
+
+    @Test
+    void jwtDecoder_unknownErrorMessage_logsWithoutTracking() {
+        StepVerifier
+            .create(configuration.jwtDecoder(metersService).decode("not-a-jwt"))
+            .expectError()
+            .verify();
+    }
+
+    @Test
+    void jwtDecoder_syncExceptionWithNullMessage_doesNotTrack() {
+        ReactiveJwtDecoder decoder = configuration.jwtDecoder(metersService);
+        assertThatThrownBy(() -> decoder.decode(null).block()).isInstanceOf(Exception.class);
     }
 }

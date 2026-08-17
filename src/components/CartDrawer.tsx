@@ -1,6 +1,8 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Plus, Minus, ShoppingBag } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { LazyImage } from "@/components/LazyImage";
+import { cartLineColorLabel, cartLineImage } from "@/lib/cart-catalog";
 import { FIT_LIMITS } from "@/lib/product-fit";
 import { useShop } from "@/store/shop";
 
@@ -36,7 +38,7 @@ export function CartDrawer() {
                 )}
                 {cart.map((item) => (
                   <div key={item.product.id + item.size + item.color} className="glass rounded-2xl p-3 flex gap-3">
-                    <img src={item.product.image} alt={item.product.name} className="h-20 w-20 rounded-xl object-cover" loading="lazy" />
+                    <LazyImage src={cartLineImage(item)} alt={item.product.name} className="h-20 w-20 rounded-xl object-cover" priority="auto" />
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between gap-2">
                         <div className="font-medium text-sm leading-tight">{item.product.name}</div>
@@ -44,7 +46,7 @@ export function CartDrawer() {
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
-                      <div className="text-xs text-muted-foreground mt-1">{item.size} &middot; {item.color}</div>
+                      <div className="text-xs text-muted-foreground mt-1">{item.size} &middot; {cartLineColorLabel(item)}</div>
                       <div className="flex items-center justify-between mt-2">
                         <div className="glass rounded-full flex items-center">
                           <button onClick={() => updateQty(item.product.id, item.qty - 1, item.size, item.color)} className="h-7 w-7 grid place-items-center"><Minus className="h-3 w-3" /></button>

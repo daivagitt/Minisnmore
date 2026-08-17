@@ -57,6 +57,7 @@ class CommerceOrdersProxyResourceTest {
     void ordersAndPayments_delegate() throws Exception {
         when(catalog.get("/internal/v1/orders")).thenReturn(ResponseEntity.ok("[]"));
         when(catalog.get("/internal/v1/payments")).thenReturn(ResponseEntity.ok("[]"));
+        when(catalog.get("/internal/v1/account/notifications")).thenReturn(ResponseEntity.ok("{\"events\":[]}"));
         when(catalog.getPublic("/internal/v1/orders/track/ORD-1")).thenReturn(ResponseEntity.ok("{}"));
         when(catalog.get("/internal/v1/orders/ORD-1")).thenReturn(ResponseEntity.ok("{}"));
         when(catalog.post(eq("/internal/v1/orders"), any())).thenReturn(ResponseEntity.ok("{}"));
@@ -66,6 +67,7 @@ class CommerceOrdersProxyResourceTest {
 
         mockMvc.perform(get("/api/v1/orders")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/payments")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/account/notifications")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/orders/track/ORD-1")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/orders/ORD-1")).andExpect(status().isOk());
         mockMvc.perform(post("/api/v1/orders").contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isOk());
@@ -80,6 +82,40 @@ class CommerceOrdersProxyResourceTest {
                 org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/account/profile")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{}")
+            )
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void activeCoupons_and_retryPayment_delegate() throws Exception {
+        when(catalog.get("/internal/v1/coupons/active")).thenReturn(ResponseEntity.ok("[]"));
+        when(catalog.post(eq("/internal/v1/orders/retry-payment"), any())).thenReturn(ResponseEntity.ok("{}"));
+
+        mockMvc.perform(get("/api/v1/coupons/active")).andExpect(status().isOk());
+        mockMvc
+            .perform(post("/api/v1/orders/retry-payment").contentType(MediaType.APPLICATION_JSON).content("{\"orderId\":1}"))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void accountCartAndWishlistReplace_delegate() throws Exception {
+        when(catalog.get("/internal/v1/account/cart")).thenReturn(ResponseEntity.ok("{\"items\":[]}"));
+        when(catalog.put(eq("/internal/v1/account/cart"), any())).thenReturn(ResponseEntity.ok("{}"));
+        when(catalog.put(eq("/internal/v1/account/wishlist"), any())).thenReturn(ResponseEntity.ok("{}"));
+
+        mockMvc.perform(get("/api/v1/account/cart")).andExpect(status().isOk());
+        mockMvc
+            .perform(
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/account/cart")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"items\":[]}")
+            )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/account/wishlist")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"product_ids\":[]}")
             )
             .andExpect(status().isOk());
     }

@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Link } from "@tanstack/react-router";
 import { Heart, Eye, Star } from "lucide-react";
 import type { Product } from "@/data/products";
+import { LazyImage } from "@/components/LazyImage";
 import { useShop } from "@/store/shop";
 
 export function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
@@ -12,12 +13,12 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
     <motion.div
       initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-50px" }}
-      transition={{ duration: 0.6, delay: index * 0.06, ease: [0.2, 0.8, 0.2, 1] }}
+      transition={{ duration: 0.5, delay: Math.min(index * 0.04, 0.2), ease: [0.2, 0.8, 0.2, 1] }}
       className="group hover-lift h-full">
       <div className="glass rounded-3xl p-2.5 md:p-3 relative overflow-hidden flex flex-col h-full">
         <Link to="/product/$slug" params={{ slug: product.slug }} className="block">
           <div className="relative aspect-square overflow-hidden rounded-2xl bg-secondary/40">
-            <img src={product.image} alt={product.name} loading="lazy"
+            <LazyImage src={product.image} alt={product.name} priority={index < 6 ? "high" : "auto"}
               className="img-zoom h-full w-full object-cover" />
             <div className="absolute top-3 left-3 flex flex-col gap-1.5">
               {product.isNew && <span className="glass-strong text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full">New</span>}
@@ -52,16 +53,9 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
               <Star className="h-3 w-3 fill-primary text-primary" /> {product.rating}
             </div>
           </div>
-          <div className="mt-auto pt-2.5 flex items-center justify-between">
-            <div className="flex items-baseline gap-2">
-              <span className="font-medium">&#8377;{product.price.toLocaleString("en-IN")}</span>
-              {product.compareAt && <span className="text-xs line-through text-muted-foreground">&#8377;{product.compareAt.toLocaleString("en-IN")}</span>}
-            </div>
-            <div className="flex gap-1">
-              {product.colors.slice(0, 3).map((c) => (
-                <span key={c.name} className="h-3.5 w-3.5 rounded-full border border-white/70" style={{ background: c.hex }} />
-              ))}
-            </div>
+          <div className="mt-auto pt-2.5 flex items-baseline gap-2">
+            <span className="font-medium">&#8377;{product.price.toLocaleString("en-IN")}</span>
+            {product.compareAt && <span className="text-xs line-through text-muted-foreground">&#8377;{product.compareAt.toLocaleString("en-IN")}</span>}
           </div>
         </div>
       </div>

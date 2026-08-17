@@ -36,5 +36,9 @@ class TechnicalStructureTest {
         .ignoreDependency(alwaysTrue(), belongToAnyOf(
             com.miniandmore.app.config.Constants.class,
             com.miniandmore.app.config.ApplicationProperties.class
-        ));
+        ))
+        .ignoreDependency(
+            belongToAnyOf(com.miniandmore.app.client.LedgerlyIntegrationClient.class),
+            belongToAnyOf(com.miniandmore.app.service.LedgerlyCredentialsProvider.class)
+        );
 }

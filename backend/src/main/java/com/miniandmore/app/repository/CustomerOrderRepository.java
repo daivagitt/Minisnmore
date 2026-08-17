@@ -82,6 +82,21 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     )
     List<CustomerOrder> findCodOrdersByPaymentStatus(@Param("paymentStatus") PaymentStatus paymentStatus);
 
+    @Query(
+        value = "select customerOrder from CustomerOrder customerOrder where customerOrder.paymentMethod = 'cod' and " +
+        "customerOrder.status = com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED and " +
+        "(customerOrder.zohoSyncStatus in :statuses or customerOrder.zohoSyncStatus is null) and " +
+        "customerOrder.zohoSalesOrderId is null order by customerOrder.id asc",
+        countQuery = "select count(customerOrder) from CustomerOrder customerOrder where customerOrder.paymentMethod = 'cod' and " +
+        "customerOrder.status = com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED and " +
+        "(customerOrder.zohoSyncStatus in :statuses or customerOrder.zohoSyncStatus is null) and " +
+        "customerOrder.zohoSalesOrderId is null"
+    )
+    Page<CustomerOrder> findConfirmedCodOrdersForZohoRetry(
+        @Param("statuses") List<ZohoSyncStatus> statuses,
+        Pageable pageable
+    );
+
     boolean existsByUserLoginAndPaymentStatus(String userLogin, PaymentStatus paymentStatus);
 
     @Query(

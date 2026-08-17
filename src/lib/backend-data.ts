@@ -1451,6 +1451,8 @@ export type ZohoSettingsRow = {
   refresh_token: string | null;
   data_center: string | null;
   connected: boolean;
+  hasClientSecret?: boolean;
+  hasRefreshToken?: boolean;
 };
 
 const zohoMap = {
@@ -1461,17 +1463,27 @@ const zohoMap = {
   data_center: "dataCenter",
 };
 
-export function getZohoSettingsValidationErrors(row: ZohoSettingsRow): string[] {
+export function getZohoSettingsValidationErrors(
+  row: ZohoSettingsRow,
+  options?: { hasClientSecret?: boolean; requireRefreshToken?: boolean },
+): string[] {
   const errors: string[] = [];
   if (!(row.org_id ?? "").trim()) errors.push("Zoho organisation ID is required.");
   if (!(row.client_id ?? "").trim()) errors.push("Zoho client ID is required.");
-  if (!(row.client_secret ?? "").trim()) errors.push("Zoho client secret is required.");
-  if (!(row.refresh_token ?? "").trim()) errors.push("Zoho refresh token is required.");
+  if (!options?.hasClientSecret && !(row.client_secret ?? "").trim()) {
+    errors.push("Zoho client secret is required.");
+  }
+  if (options?.requireRefreshToken && !(row.refresh_token ?? "").trim()) {
+    errors.push("Zoho refresh token is required.");
+  }
   return errors;
 }
 
-function assertValidZohoSettings(row: ZohoSettingsRow) {
-  const errors = getZohoSettingsValidationErrors(row);
+function assertValidZohoSettings(
+  row: ZohoSettingsRow,
+  options?: { hasClientSecret?: boolean; requireRefreshToken?: boolean },
+) {
+  const errors = getZohoSettingsValidationErrors(row, options);
   if (errors.length) throw new Error(errors.join("\n"));
 }
 
@@ -1547,7 +1559,10 @@ export type ZohoProductSyncResult = {
   id: number;
   zohoItemId?: string | null;
   zohoSyncStatus?: string | null;
+  zohoSyncError?: string | null;
   zohoLastSyncedAt?: string | null;
+  variantsJson?: string | null;
+  itemStructure?: string | null;
 };
 
 export const syncZohoProduct = (productId: number) =>
@@ -1589,9 +1604,14 @@ export const pullZohoOrderTracking = () =>
 export function formatZohoSyncSummary(summary: ZohoSyncSummary, label: string) {
   const noticeCount = (summary.notices ?? []).length;
   if (summary.failed === 0) {
-    return noticeCount > 0
-      ? `${label}: ${summary.success} succeeded, ${noticeCount} notes`
-      : `${label}: ${summary.success} succeeded`;
+    if (summary.success > 0) {
+      return noticeCount > 0
+        ? `${label} completed: ${summary.success} succeeded, ${noticeCount} notes`
+        : `${label} completed: ${summary.success} succeeded`;
+    }
+    if (noticeCount > 0) {
+      return `${label}: ${noticeCount} notes`;
+    }
   }
   return `${label}: ${summary.success} succeeded, ${summary.failed} failed`;
 }
@@ -1608,19 +1628,27 @@ export const getZohoSettings = async (): Promise<ZohoSettingsRow | null> => {
   });
   if (!dto) return null;
   return {
-    ...(fromCamelMap<Omit<ZohoSettingsRow, "connected">>(dto, zohoMap) as Omit<
-      ZohoSettingsRow,
-      "connected"
-    >),
+    ...(fromCamelMap<Omit<ZohoSettingsRow, "connected" | "hasClientSecret" | "hasRefreshToken">>(
+      dto,
+      zohoMap,
+    ) as Omit<ZohoSettingsRow, "connected" | "hasClientSecret" | "hasRefreshToken">),
     connected: !!dto.connected,
+    hasClientSecret: !!dto.hasClientSecret,
+    hasRefreshToken: !!dto.hasRefreshToken,
   };
 };
 
-export const saveZohoSettings = (row: ZohoSettingsRow) => {
-  assertValidZohoSettings(row);
-  return api.put<Record<string, unknown>>(
-    "/api/v1/admin/zoho-settings",
-    { ...toCamelMap(row, zohoMap), connected: row.connected },
-    { auth: true },
-  );
+export const saveZohoSettings = (
+  row: ZohoSettingsRow,
+  options?: { hasClientSecret?: boolean; requireRefreshToken?: boolean },
+) => {
+  assertValidZohoSettings(row, options);
+  const payload: Record<string, unknown> = { ...toCamelMap(row, zohoMap), connected: row.connected };
+  if (!row.client_secret?.trim()) {
+    delete payload.clientSecret;
+  }
+  if (!row.refresh_token?.trim()) {
+    delete payload.refreshToken;
+  }
+  return api.put<Record<string, unknown>>("/api/v1/admin/zoho-settings", payload, { auth: true });
 };

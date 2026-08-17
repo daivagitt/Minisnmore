@@ -182,7 +182,10 @@ public class ZohoAdminResource {
                 result.put("id", id);
                 result.put("zohoItemId", product.getZohoItemId());
                 result.put("zohoSyncStatus", product.getZohoSyncStatus());
+                result.put("zohoSyncError", product.getZohoSyncError());
                 result.put("zohoLastSyncedAt", product.getZohoLastSyncedAt());
+                result.put("variantsJson", product.getVariantsJson());
+                result.put("itemStructure", product.getItemStructure());
                 return result;
             })
             .orElse(Map.of("id", id, "error", "not found"));

@@ -16,7 +16,7 @@ class EntityFullFieldsMapperTest {
 
     @Test
     void productMapper_roundTripsAllFields() {
-        ProductMapper mapper = new ProductMapperImpl();
+        ProductMapper mapper = MapperTestSupport.productMapper();
         Category category = new Category().id(9L).name("Dresses").slug("dresses");
         Product product = new Product()
             .id(1L)

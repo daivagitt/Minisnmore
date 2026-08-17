@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   emptyHomeReview,
+  defaultHomeReviewDrafts,
   getHomeReviewValidationErrors,
+  homeReviewDraftsForEditor,
   homeReviewDraftsFromPayload,
   isBlankHomeReview,
   normalizeHomeReviewDrafts,
@@ -40,6 +42,13 @@ describe("home-reviews", () => {
     });
     expect(drafts).toHaveLength(1);
     expect(drafts[0]?.title).toBe("Draft");
+  });
+
+  it("pre-fills admin editor with default mom reviews when payload is empty", () => {
+    expect(defaultHomeReviewDrafts().length).toBe(5);
+    expect(homeReviewDraftsForEditor({})).toHaveLength(5);
+    expect(homeReviewDraftsForEditor({ reviews: [] })).toHaveLength(5);
+    expect(homeReviewDraftsForEditor({ reviews: [{ title: "Saved", body: "Already in CMS", author: "Mom", rating: 5, date: "", photo: "" }] })).toHaveLength(1);
   });
 
   it("validates required review fields", () => {

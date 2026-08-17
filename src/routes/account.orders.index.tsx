@@ -2,7 +2,15 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Package, ChevronRight } from "lucide-react";
 import { useAccountData } from "@/lib/account";
+import { LazyImage } from "@/components/LazyImage";
+import { CopyButton } from "@/components/CopyButton";
 import { formatOrderDate } from "@/lib/dates";
+import {
+  formatOrderStatusSummary,
+  PAYMENT_STATUS_TONE_CLASS,
+  paymentStatusTone,
+} from "@/lib/order-status";
+import { shouldPollOrderTracking } from "@/lib/order-tracking";
 
 export const Route = createFileRoute("/account/orders/")({
   head: () => ({ meta: [{ title: "Your orders · Mini's n More" }] }),
@@ -64,51 +72,82 @@ function OrdersPage() {
 
       <div className="space-y-3">
         {filteredOrders?.map((o) => (
-          <Link
+          <div
             key={o.id}
-            to="/account/orders/$orderNumber"
-            params={{ orderNumber: o.order_number }}
-            search={needsOnlinePayment(o) ? { pay: "1" } : {}}
             className="glass rounded-2xl p-4 flex items-center justify-between gap-4 hover:bg-white/60 transition group"
           >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="flex -space-x-2">
+            <Link
+              to="/account/orders/$orderNumber"
+              params={{ orderNumber: o.order_number }}
+              search={needsOnlinePayment(o) ? { pay: "1" } : {}}
+              className="flex items-center gap-3 min-w-0 flex-1"
+            >
+              <div className="flex -space-x-2 shrink-0">
                 {(o.order_items ?? []).slice(0, 3).map((it: any, i: number) => (
                   it.product_image ? (
-                    <img key={i} src={it.product_image} alt="" className="h-10 w-10 rounded-xl object-cover ring-2 ring-background" />
+                    <LazyImage key={i} src={it.product_image} alt="" className="h-10 w-10 rounded-xl object-cover ring-2 ring-background" priority="auto" />
                   ) : (
                     <div key={i} className="h-10 w-10 rounded-xl bg-muted ring-2 ring-background" />
                   )
                 ))}
               </div>
               <div className="min-w-0">
-                <div className="font-medium truncate">{o.order_number}</div>
+                <div className="font-medium flex items-center gap-1.5 min-w-0">
+                  <span className="truncate">{o.order_number}</span>
+                  <CopyButton
+                    value={o.order_number}
+                    label="Copy order ID"
+                    title="Copy"
+                    successMessage="Order ID copied"
+                    className="h-7 w-7 shrink-0"
+                    iconClassName="h-3 w-3"
+                  />
+                </div>
                 <div className="text-xs text-muted-foreground">
                   {formatOrderDate(o.created_at)}
                   {" · "}{o.order_items?.length || 0} item(s)
                   {needsOnlinePayment(o) && <span className="text-primary"> · Tap to complete payment</span>}
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <div className="font-medium">₹{Number(o.total).toLocaleString("en-IN")}</div>
-                <StatusPill status={o.payment_status} />
+            </Link>
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <div className="font-medium">₹{Number(o.total).toLocaleString("en-IN")}</div>
+                  <StatusPill order={o} />
+                  {shouldPollOrderTracking(o) && (
+                    <Link
+                      to="/track"
+                      search={{ order: o.order_number }}
+                      className="text-[10px] text-primary hover:underline mt-1 inline-block"
+                    >
+                      Track order
+                    </Link>
+                  )}
+                </div>
+                <Link
+                  to="/account/orders/$orderNumber"
+                  params={{ orderNumber: o.order_number }}
+                  search={needsOnlinePayment(o) ? { pay: "1" } : {}}
+                  className="text-muted-foreground group-hover:translate-x-0.5 transition"
+                  aria-label={`View order ${o.order_number}`}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
               </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition" />
             </div>
-          </Link>
+          </div>
         ))}
       </div>
     </div>
   );
 }
 
-function StatusPill({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    paid: "bg-primary/15 text-primary",
-    pending: "bg-amber-500/15 text-amber-700",
-    failed: "bg-destructive/15 text-destructive",
-  };
-  return <span className={`text-[10px] uppercase tracking-wider rounded-full px-2 py-0.5 ${map[status] ?? "bg-muted text-muted-foreground"}`}>{status}</span>;
+function StatusPill({ order }: { order: { payment_status?: string; payment_method?: string; status?: string } }) {
+  const tone = paymentStatusTone(order.payment_status);
+  return (
+    <span className={`text-[10px] tracking-wide rounded-full px-2 py-0.5 ${PAYMENT_STATUS_TONE_CLASS[tone]}`}>
+      {formatOrderStatusSummary(order)}
+    </span>
+  );
 }

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!-- Simple in-stock product for notification / checkout smoke tests (UAT). -->
+  <changeSet id="20260814150100-1" author="miniandmore">
+    <sql dbms="postgresql">
+      INSERT INTO product (
+        id, slug, name, sku, price, currency, stock, sort_order,
+        featured, trending, new_arrival, best_seller, active,
+        item_structure, units, tax_pct, hsn
+      )
+      SELECT
+        999901,
+        'mock-notif-test-tee',
+        'Notification Test Tee',
+        'MOCK-NOTIF-001',
+        299.00,
+        'INR',
+        100,
+        1,
+        false,
+        false,
+        true,
+        false,
+        true,
+        'SIMPLE',
+        'ea',
+        5,
+        ''
+      WHERE NOT EXISTS (SELECT 1 FROM product WHERE slug = 'mock-notif-test-tee');
+    </sql>
+  </changeSet>
+</databaseChangeLog>
