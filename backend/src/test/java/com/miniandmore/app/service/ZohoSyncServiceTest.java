@@ -1034,6 +1034,57 @@ class ZohoSyncServiceTest {
     }
 
     @Test
+    void syncProduct_variants_longSkuStockAdjustment_keepsReferenceNumberUnder50Chars() {
+        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository
+            );
+        ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
+        zoho.setSyncProductStock(true);
+        zoho.setInventoryAccountId("inv-acct-1");
+        zoho.setInventoryAdjustmentAccountId("adj-acct-1");
+        when(applicationProperties.getZoho()).thenReturn(zoho);
+
+        Product product = new Product()
+            .id(39351L)
+            .sku("BASIC-SHORTS")
+            .name("Basic Shorts")
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                """
+                [{"sku":"BASIC-SHORTS-1824-SNAIL-BLUE","size":"18-24 M","color":"Snail Blue","rate":100,"mrp":349,"stock":24,"active":true,"zohoItemId":"zoho-long"}]
+                """
+            )
+            .active(true);
+        when(productRepository.findOneWithEagerRelationships(39351L)).thenReturn(Optional.of(product));
+        when(booksClient.updateItem(eq("zoho-long"), any())).thenReturn(Map.of("item", Map.of("item_id", "zoho-long")));
+        when(booksClient.getItem("zoho-long")).thenReturn(
+            Map.of("item", Map.of("item_id", "zoho-long", "item_type", "inventory", "stock_on_hand", 0, "rate", 100))
+        );
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.syncProduct(39351L);
+
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(booksClient).createInventoryAdjustment(payloadCaptor.capture());
+        String referenceNumber = (String) payloadCaptor.getValue().get("reference_number");
+        assertThat(referenceNumber).isNotNull();
+        assertThat(referenceNumber.length()).isLessThanOrEqualTo(50);
+    }
+
+    @Test
     void syncProduct_variants_staleZohoItemId_recreatesRowInsteadOfFailing() {
         ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
         service =

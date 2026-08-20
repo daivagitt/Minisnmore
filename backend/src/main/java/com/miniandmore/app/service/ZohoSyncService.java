@@ -721,10 +721,26 @@ public class ZohoSyncService {
         payload.put("reason", "Store catalog sync");
         payload.put("adjustment_type", "quantity");
         payload.put("adjustment_account_id", adjustmentAccountId);
-        payload.put("reference_number", referencePrefix + "-" + System.currentTimeMillis());
+        payload.put("reference_number", truncatedReferenceNumber(referencePrefix));
         resolveLocationId().ifPresent(locationId -> payload.put("location_id", locationId));
         payload.put("line_items", List.of(line));
         return payload;
+    }
+
+    /**
+     * Zoho rejects {@code reference_number} over 50 characters. Long variant SKUs (e.g.
+     * {@code STORE-VAR-<productId>-<sku>}) can blow past that once the millisecond suffix is
+     * appended, so trim the prefix rather than the timestamp — the timestamp is what keeps
+     * concurrent adjustments unique.
+     */
+    private static String truncatedReferenceNumber(String referencePrefix) {
+        String suffix = "-" + System.currentTimeMillis();
+        int maxPrefixLen = 50 - suffix.length();
+        String safePrefix = StringUtils.defaultString(referencePrefix);
+        if (safePrefix.length() > maxPrefixLen) {
+            safePrefix = safePrefix.substring(0, Math.max(0, maxPrefixLen));
+        }
+        return safePrefix + suffix;
     }
 
     private static boolean isInventoryItem(Map<String, Object> item) {
