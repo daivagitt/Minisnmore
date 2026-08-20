@@ -12,6 +12,7 @@ import { commerceFromSiteSettings } from "@/lib/commerce";
 import { orderTotals } from "@/lib/money";
 import { LazyImage } from "@/components/LazyImage";
 import { CouponOffers } from "@/components/CouponOffers";
+import { EmptyCartState } from "@/components/EmptyCartState";
 export const Route = createFileRoute("/cart")({
   head: () => ({ meta: [{ title: "Your basket · Mini's n More" }] }),
   component: CartPage,
@@ -66,10 +67,8 @@ function CartPage() {
   if (cart.length === 0) {
     return (
       <div className="px-4 md:px-6 max-w-2xl mx-auto">
-        <div className="glass-strong rounded-[2rem] p-12 text-center">
-          <h1 className="font-display text-4xl">Your basket is gentle and empty</h1>
-          <p className="text-muted-foreground mt-3">Tiny treasures await.</p>
-          <Link to="/shop" className="mt-6 inline-block rounded-full bg-primary text-primary-foreground px-6 py-3">Begin discovering</Link>
+        <div className="glass-strong rounded-[2rem]">
+          <EmptyCartState />
         </div>
       </div>
     );

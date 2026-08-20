@@ -213,6 +213,39 @@ describe("storefront cache", () => {
     expect(products[0].compareAt).toBe(400);
   });
 
+  it("keeps catalog sizes on the product row without adding synthetic age bands", async () => {
+    const storefront = await loadStorefront({
+      products: [
+        {
+          id: "p-partial",
+          slug: "partial-vest",
+          name: "Partial Vest",
+          description: "Vest",
+          story: null,
+          price: 400,
+          compare_at_price: null,
+          images: ["/vest.jpg"],
+          sizes: ["0-3 M", "6-12 M"],
+          colors: ["Blue"],
+          age_min_months: 0,
+          age_max_months: 12,
+          badge: null,
+          featured: false,
+          best_seller: false,
+          new_arrival: false,
+          trending: false,
+          active: true,
+          item_structure: "VARIANTS",
+          variants_json: JSON.stringify([
+            { sku: "VEST-03-BLUE", size: "0-3 M", color: "Blue", rate: 400, mrp: 500, stock: 2, active: true },
+          ]),
+        },
+      ],
+    });
+    const products = await storefront.loadProducts();
+    expect(products[0].sizes).toEqual(["0-3 M", "6-12 M"]);
+  });
+
   it("does not treat newborn badge text as new arrival", async () => {
     const listProducts = [
       {

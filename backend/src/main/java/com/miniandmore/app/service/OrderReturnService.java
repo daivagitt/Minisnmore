@@ -58,6 +58,8 @@ public class OrderReturnService {
     private final LedgerlyIntegrationClient ledgerlyIntegrationClient;
     private final ZohoBooksIntegrationClient zohoBooksIntegrationClient;
     private final ProductVariantSupport variantSupport;
+    private final OrderMailService orderMailService;
+    private final OrderSmsService orderSmsService;
 
     public OrderReturnService(
         OrderReturnRepository orderReturnRepository,
@@ -67,7 +69,9 @@ public class OrderReturnService {
         RazorpayRefundService razorpayRefundService,
         LedgerlyIntegrationClient ledgerlyIntegrationClient,
         ZohoBooksIntegrationClient zohoBooksIntegrationClient,
-        ProductVariantSupport variantSupport
+        ProductVariantSupport variantSupport,
+        OrderMailService orderMailService,
+        OrderSmsService orderSmsService
     ) {
         this.orderReturnRepository = orderReturnRepository;
         this.customerOrderRepository = customerOrderRepository;
@@ -77,6 +81,8 @@ public class OrderReturnService {
         this.ledgerlyIntegrationClient = ledgerlyIntegrationClient;
         this.zohoBooksIntegrationClient = zohoBooksIntegrationClient;
         this.variantSupport = variantSupport;
+        this.orderMailService = orderMailService;
+        this.orderSmsService = orderSmsService;
     }
 
     public List<OrderReturn> listForUser(String login) {
@@ -109,7 +115,9 @@ public class OrderReturnService {
         orderReturn.setRequestedAt(Instant.now());
         orderReturn.setOrder(order);
         orderReturn.setUserLogin(userLogin);
-        return orderReturnRepository.save(orderReturn);
+        OrderReturn saved = orderReturnRepository.save(orderReturn);
+        queueReturnEmail(order, saved);
+        return saved;
     }
 
     public OrderReturn cancelByCustomer(String userLogin, String returnNumber) {
@@ -119,7 +127,9 @@ public class OrderReturnService {
         }
         orderReturn.setStatus(OrderReturnStatus.CANCELLED);
         orderReturn.setResolvedAt(Instant.now());
-        return orderReturnRepository.save(orderReturn);
+        OrderReturn saved = orderReturnRepository.save(orderReturn);
+        queueReturnEmail(saved.getOrder(), saved);
+        return saved;
     }
 
     public OrderReturn approve(String returnNumber, String adminNotes) {
@@ -129,7 +139,9 @@ public class OrderReturnService {
         }
         orderReturn.setStatus(OrderReturnStatus.APPROVED);
         orderReturn.setAdminNotes(trimNotes(adminNotes));
-        return orderReturnRepository.save(orderReturn);
+        OrderReturn saved = orderReturnRepository.save(orderReturn);
+        queueReturnEmail(saved.getOrder(), saved);
+        return saved;
     }
 
     public OrderReturn reject(String returnNumber, String rejectionReason, String adminNotes) {
@@ -145,7 +157,9 @@ public class OrderReturnService {
         orderReturn.setRejectionReason(reason.length() <= 1000 ? reason : reason.substring(0, 1000));
         orderReturn.setAdminNotes(trimNotes(adminNotes));
         orderReturn.setResolvedAt(Instant.now());
-        return orderReturnRepository.save(orderReturn);
+        OrderReturn saved = orderReturnRepository.save(orderReturn);
+        queueReturnEmail(saved.getOrder(), saved);
+        return saved;
     }
 
     public OrderReturn markReceived(String returnNumber, String adminNotes) {
@@ -155,7 +169,9 @@ public class OrderReturnService {
         }
         orderReturn.setStatus(OrderReturnStatus.RECEIVED);
         orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
-        return orderReturnRepository.save(orderReturn);
+        OrderReturn saved = orderReturnRepository.save(orderReturn);
+        queueReturnEmail(saved.getOrder(), saved);
+        return saved;
     }
 
     public OrderReturn processRefund(String returnNumber, String adminNotes) {
@@ -248,7 +264,9 @@ public class OrderReturnService {
             orderReturn.setStatus(OrderReturnStatus.REFUNDED);
             orderReturn.setResolvedAt(Instant.now());
             orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
-            return orderReturnRepository.save(orderReturn);
+            OrderReturn saved = orderReturnRepository.save(orderReturn);
+            queueReturnEmail(order, saved);
+            return saved;
         } catch (RuntimeException e) {
             if (existingRefundId == null) {
                 orderReturn.setStatus(OrderReturnStatus.FAILED);
@@ -333,6 +351,20 @@ public class OrderReturnService {
             return order.getLedgerlyTrackingLastPulledAt();
         }
         return null;
+    }
+
+    private void queueReturnEmail(CustomerOrder order, OrderReturn orderReturn) {
+        if (order == null || orderReturn == null) {
+            return;
+        }
+        AfterCommit.run(() -> {
+            try {
+                orderMailService.sendReturnUpdate(order, orderReturn);
+                orderSmsService.sendReturnUpdate(order, orderReturn);
+            } catch (RuntimeException ex) {
+                LOG.warn("Return email/SMS failed for {}", orderReturn.getReturnNumber(), ex);
+            }
+        });
     }
 
     private void restoreInventory(CustomerOrder order) {

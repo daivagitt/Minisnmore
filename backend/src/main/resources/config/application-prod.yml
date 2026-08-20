@@ -58,6 +58,19 @@ spring:
       idle-timeout: 600000
   liquibase:
     contexts: prod
+  mail:
+    host: ${SPRING_MAIL_HOST:}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    protocol: smtp
+    properties:
+      mail:
+        smtp:
+          auth: ${SPRING_MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${SPRING_MAIL_SMTP_STARTTLS_ENABLE:true}
+            required: ${SPRING_MAIL_SMTP_STARTTLS_REQUIRED:true}
   thymeleaf:
     cache: true
 
@@ -72,6 +85,9 @@ server:
     min-response-size: 1024
 
 jhipster:
+  mail:
+    base-url: ${JHIPSTER_MAIL_BASE_URL:https://minisnmore.com}
+    from: ${JHIPSTER_MAIL_FROM:${SPRING_MAIL_USERNAME:}}
   http:
     cache:
       timeToLiveInDays: 1461

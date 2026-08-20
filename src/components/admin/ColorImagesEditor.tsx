@@ -260,7 +260,9 @@ export function ColorImagesEditor({
       <Field label="Colour gallery (main product photos)">
         <ImageSpecHint spec={ADMIN_IMAGE_SPECS.productGallery} className="mb-2" />
         <p className="text-xs text-muted-foreground mb-3">
-          When a shopper selects a colour on the product page, the main gallery switches to these photos. Up to {MAX_COLOR_IMAGES} images per colour.
+          When a shopper selects a colour, these photos are used if that colour has only one size.
+          Same colour / different sizes use the photo stored on each variant row (Zoho item image only).
+          Up to {MAX_COLOR_IMAGES} images per colour.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           {normalizedColors.map((entry, index) => {

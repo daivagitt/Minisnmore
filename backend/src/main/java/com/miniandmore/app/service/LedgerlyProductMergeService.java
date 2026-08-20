@@ -6,6 +6,7 @@ import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -124,12 +125,54 @@ public class LedgerlyProductMergeService {
                 ? ProductVariantSupport.STRUCTURE_VARIANTS
                 : ProductVariantSupport.STRUCTURE_SIMPLE;
         }
+        Map<String, ProductVariantSupport.VariantRow> previousBySku = variantsBySku(product);
         if (!variantSupport.applyMatrixToProduct(product, itemStructure, variantsJson)) {
             // Keep previously merged parent fields; do not wipe matrix on bad payload.
             if (product.getItemStructure() == null || product.getItemStructure().isBlank()) {
                 product.setItemStructure(itemStructure);
             }
+            return;
         }
+        // Ledgerly's payload never carries Zoho-imported photos, and applyMatrixToProduct rebuilds
+        // variantsJson from that payload alone — so every SKU starts photo-less again here. Carry
+        // each SKU's previous photo(s) forward when its size/colour identity is unchanged (a routine
+        // stock/price webhook); drop them when the SKU is new or was reassigned to a different
+        // size/colour, since the old photo no longer describes it.
+        for (ProductVariantSupport.VariantRow newRow : variantSupport.parseProduct(product)) {
+            if (newRow.sku() == null) {
+                continue;
+            }
+            ProductVariantSupport.VariantRow oldRow = previousBySku.get(newRow.sku());
+            if (oldRow == null) {
+                continue;
+            }
+            boolean samePairing =
+                java.util.Objects.equals(ProductVariantSupport.normalize(oldRow.size()), ProductVariantSupport.normalize(newRow.size())) &&
+                java.util.Objects.equals(ProductVariantSupport.normalize(oldRow.color()), ProductVariantSupport.normalize(newRow.color()));
+            if (!samePairing) {
+                continue;
+            }
+            List<String> photos = new java.util.ArrayList<>();
+            if (oldRow.imageUrl() != null) {
+                photos.add(oldRow.imageUrl());
+            }
+            if (oldRow.imageUrls() != null) {
+                photos.addAll(oldRow.imageUrls());
+            }
+            if (!photos.isEmpty()) {
+                variantSupport.setVariantImages(product, newRow.sku(), photos);
+            }
+        }
+    }
+
+    private Map<String, ProductVariantSupport.VariantRow> variantsBySku(Product product) {
+        Map<String, ProductVariantSupport.VariantRow> out = new LinkedHashMap<>();
+        for (ProductVariantSupport.VariantRow row : variantSupport.parseProduct(product)) {
+            if (row.sku() != null) {
+                out.put(row.sku(), row);
+            }
+        }
+        return out;
     }
 
     private BigDecimal firstPrice(Map<String, Object> item) {

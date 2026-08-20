@@ -24,6 +24,8 @@ public class SecurityConfiguration {
                     .permitAll()
                     .requestMatchers("/api/v1/admin/**")
                     .hasAuthority(ADMIN)
+                    .requestMatchers("/v3/api-docs", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
+                    .permitAll()
                     .requestMatchers("/management/health", "/management/health/**", "/management/info")
                     .permitAll()
                     .requestMatchers("/management/**")

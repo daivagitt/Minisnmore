@@ -52,7 +52,7 @@ pm2 start java --name mini-uat-ms-catalog-core --update-env -- \
   -Djava.security.egd=file:/dev/./urandom \
   -Dserver.port="${CATALOG_PORT}" \
   -jar "$CATALOG_JAR" \
-  --spring.profiles.active=prod \
+  --spring.profiles.active=prod,api-docs \
   --spring.cloud.consul.enabled=false \
   --spring.cloud.consul.config.enabled=false \
   --spring.liquibase.enabled=false \

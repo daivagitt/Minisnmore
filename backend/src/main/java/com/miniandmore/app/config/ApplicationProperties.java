@@ -25,6 +25,8 @@ public class ApplicationProperties {
 
     private final XpressBees xpressbees = new XpressBees();
 
+    private final FastSms fastsms = new FastSms();
+
     private String internalApiKey = "";
 
     // jhipster-needle-application-properties-property
@@ -51,6 +53,10 @@ public class ApplicationProperties {
 
     public XpressBees getXpressbees() {
         return xpressbees;
+    }
+
+    public FastSms getFastsms() {
+        return fastsms;
     }
 
     public String getInternalApiKey() {
@@ -542,6 +548,163 @@ public class ApplicationProperties {
 
         public void setPaymentType(String paymentType) {
             this.paymentType = paymentType;
+        }
+    }
+
+    /**
+     * FastSMS India (RITS SMS API v1.0) transactional SMS gateway.
+     * Signature: MD5(MD5(accessToken + MD5(requestFor + "sms@rits-v1.0" + expire)) + accessTokenKey).
+     */
+    public static class FastSms {
+
+        private boolean enabled = false;
+
+        private String baseUrl = "https://s.fastsmsindia.com/api/sms/v1.0";
+
+        private String accessToken = "";
+
+        private String accessTokenKey = "";
+
+        /** DLT-registered sender header / sender ID (guide: MININM). */
+        private String smsHeader = "MININM";
+
+        /** promotional | transactional | international */
+        private String route = "transactional";
+
+        /** DLT principal entity id (guide fixed value). */
+        private String entityId = "1701178669941271239";
+
+        /** Optional default DLT template id; prefer per-event template ids under templates. */
+        private String templateId = "";
+
+        /** Signature / request expiry window in seconds from now (guide: +1 hour). */
+        private long expireSeconds = 3600L;
+
+        private final Templates templates = new Templates();
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getBaseUrl() {
+            return baseUrl;
+        }
+
+        public void setBaseUrl(String baseUrl) {
+            this.baseUrl = baseUrl;
+        }
+
+        public String getAccessToken() {
+            return accessToken;
+        }
+
+        public void setAccessToken(String accessToken) {
+            this.accessToken = accessToken;
+        }
+
+        public String getAccessTokenKey() {
+            return accessTokenKey;
+        }
+
+        public void setAccessTokenKey(String accessTokenKey) {
+            this.accessTokenKey = accessTokenKey;
+        }
+
+        public String getSmsHeader() {
+            return smsHeader;
+        }
+
+        public void setSmsHeader(String smsHeader) {
+            this.smsHeader = smsHeader;
+        }
+
+        public String getRoute() {
+            return route;
+        }
+
+        public void setRoute(String route) {
+            this.route = route;
+        }
+
+        public String getEntityId() {
+            return entityId;
+        }
+
+        public void setEntityId(String entityId) {
+            this.entityId = entityId;
+        }
+
+        public String getTemplateId() {
+            return templateId;
+        }
+
+        public void setTemplateId(String templateId) {
+            this.templateId = templateId;
+        }
+
+        public long getExpireSeconds() {
+            return expireSeconds;
+        }
+
+        public void setExpireSeconds(long expireSeconds) {
+            this.expireSeconds = expireSeconds;
+        }
+
+        public Templates getTemplates() {
+            return templates;
+        }
+
+        /**
+         * DLT-registered message bodies from SMS_API_Integration_Guide.md.pdf §4.
+         * Only placeholder values may change; wording/punctuation must match exactly.
+         */
+        public static class Templates {
+
+            private String orderConfirmed =
+                "Dear {name}, your order {orderId} from Minis n More has been confirmed. Order amount: Rs.{amount}. Thank you for shopping with us.";
+
+            private String orderConfirmedTemplateId = "1777178696636494530";
+
+            private String orderCancelled =
+                "Dear {name}, your Minis n More order {orderId} has been cancelled successfully as requested. If payment was made online, the applicable refund will be processed as per our refund policy.";
+
+            private String orderCancelledTemplateId = "1777178696692470339";
+
+            public String getOrderConfirmed() {
+                return orderConfirmed;
+            }
+
+            public void setOrderConfirmed(String orderConfirmed) {
+                this.orderConfirmed = orderConfirmed;
+            }
+
+            public String getOrderConfirmedTemplateId() {
+                return orderConfirmedTemplateId;
+            }
+
+            public void setOrderConfirmedTemplateId(String orderConfirmedTemplateId) {
+                this.orderConfirmedTemplateId = orderConfirmedTemplateId;
+            }
+
+            public String getOrderCancelled() {
+                return orderCancelled;
+            }
+
+            public void setOrderCancelled(String orderCancelled) {
+                this.orderCancelled = orderCancelled;
+            }
+
+            public String getOrderCancelledTemplateId() {
+                return orderCancelledTemplateId;
+            }
+
+            public void setOrderCancelledTemplateId(String orderCancelledTemplateId) {
+                this.orderCancelledTemplateId = orderCancelledTemplateId;
+            }
         }
     }
 

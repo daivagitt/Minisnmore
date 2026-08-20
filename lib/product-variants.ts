@@ -15,6 +15,9 @@ export type ProductVariant = {
   compareAt?: number;
   stock: number;
   active: boolean;
+  /** Lifestyle photo for this size×colour SKU (Zoho item image). */
+  imageUrl?: string;
+  imageUrls?: string[];
 };
 
 export type VariantProductLike = {
@@ -30,7 +33,10 @@ export type VariantProductLike = {
 };
 
 export function isVariantsProduct(p: VariantProductLike | null | undefined): boolean {
-  return (p?.itemStructure ?? "").toUpperCase() === "VARIANTS";
+  const structure = (p?.itemStructure ?? "").toUpperCase();
+  if (structure === "VARIANTS") return true;
+  if (structure === "SIMPLE") return false;
+  return (p?.variants?.length ?? 0) > 0;
 }
 
 export function hasSellableVariants(p: VariantProductLike | null | undefined): boolean {
@@ -83,6 +89,17 @@ export function parseVariantsJson(raw: unknown): ProductVariant[] {
                 : 0;
         compareAt = hasExplicitMrp ? mrpRaw : hasSelling ? Math.round(rate / 0.8 * 100) / 100 : undefined;
       }
+      const imageUrl =
+        r.imageUrl != null && String(r.imageUrl).trim()
+          ? String(r.imageUrl).trim()
+          : r.image_url != null && String(r.image_url).trim()
+            ? String(r.image_url).trim()
+            : undefined;
+      const imageUrls = Array.isArray(r.imageUrls)
+        ? r.imageUrls.map((u) => String(u).trim()).filter(Boolean)
+        : Array.isArray(r.image_urls)
+          ? r.image_urls.map((u) => String(u).trim()).filter(Boolean)
+          : undefined;
       return {
         id: r.id != null ? String(r.id) : undefined,
         sku,
@@ -92,6 +109,8 @@ export function parseVariantsJson(raw: unknown): ProductVariant[] {
         compareAt,
         stock: Math.max(0, Math.floor(Number(r.stock) || 0)),
         active: r.active === false || r.active === "false" || r.active === 0 ? false : true,
+        imageUrl,
+        imageUrls,
       };
     })
     .filter((v): v is ProductVariant => v != null);
@@ -130,6 +149,23 @@ export function sizesForDisplay(product: VariantProductLike): string[] {
     }
   }
 
+  return sortSizesAsc([...labelByKey.values()]);
+}
+
+/** Sizes on the catalog / variant matrix only — no standard-band padding for the size picker. */
+export function catalogSizesForProduct(product: VariantProductLike): string[] {
+  const labelByKey = new Map<string, string>();
+  const remember = (label: string | undefined | null) => {
+    const trimmed = label?.trim();
+    if (!trimmed) return;
+    const k = sizeKey(trimmed);
+    if (!labelByKey.has(k)) labelByKey.set(k, trimmed);
+  };
+
+  for (const s of product.sizes ?? []) remember(s);
+  for (const v of product.variants ?? []) remember(v.size);
+
+  if (labelByKey.size === 0) remember("One Size");
   return sortSizesAsc([...labelByKey.values()]);
 }
 
@@ -193,7 +229,7 @@ export function isSimpleProductSellable(product: VariantProductLike | null | und
 
 /** True if at least one active in-stock variant exists for this size. */
 export function sizeHasSellableVariants(product: VariantProductLike, size: string | null | undefined): boolean {
-  if (!isVariantsProduct(product)) return true;
+  if (!isVariantsProduct(product)) return isSimpleProductSellable(product);
   const want = sizeKey(size);
   return (product.variants ?? []).some((v) => v.active && v.stock > 0 && sizeKey(v.size) === want);
 }

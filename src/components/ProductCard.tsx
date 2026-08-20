@@ -1,3 +1,4 @@
+import type { MouseEvent } from "react";
 import { motion } from "framer-motion";
 import { Link } from "@tanstack/react-router";
 import { Heart, Eye, Star } from "lucide-react";
@@ -8,6 +9,11 @@ import { useShop } from "@/store/shop";
 export function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
   const { toggleWish, wishlist, setQuickView } = useShop();
   const wished = wishlist.includes(product.id);
+
+  const handleWishlistClick = (e: MouseEvent) => {
+    e.preventDefault();
+    toggleWish(product.id, product.name);
+  };
 
   return (
     <motion.div
@@ -28,7 +34,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
         </Link>
 
         <div className="absolute top-5 right-5 flex flex-col items-end gap-2 transition-all duration-500">
-          <button onClick={(e) => { e.preventDefault(); toggleWish(product.id); }}
+          <button onClick={handleWishlistClick}
             aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
             aria-pressed={wished}
             className={`glass-strong inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] hover:scale-105 active:scale-95 transition ${wished ? "text-primary bg-primary/15" : ""}`}>

@@ -98,6 +98,15 @@ class PincodeLookupServiceTest {
     }
 
     @Test
+    void adjustEtaWithBuffer_addsThreeDays() {
+        assertThat(PincodeLookupService.adjustEtaWithBuffer("2–3 days")).isEqualTo("5–6 days");
+        assertThat(PincodeLookupService.adjustEtaWithBuffer("4–6 days")).isEqualTo("7–9 days");
+        assertThat(PincodeLookupService.adjustEtaWithBuffer("2 days")).isEqualTo("5 days");
+        assertThat(PincodeLookupService.adjustEtaWithBuffer("1 day")).isEqualTo("4 days");
+        assertThat(PincodeLookupService.adjustEtaWithBuffer("Same day")).isEqualTo("3 days");
+    }
+
+    @Test
     void parseZippopotamResponse_emptyPlaces_returnsEmpty() {
         assertThat(pincodeLookupService.parseZippopotamResponse("{\"places\":[]}", "560001")).isEmpty();
     }

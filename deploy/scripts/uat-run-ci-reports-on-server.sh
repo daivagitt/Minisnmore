@@ -22,7 +22,9 @@ RUN_SONAR="${RUN_SONAR:-true}"
 PUBLISH_REPORTS="${PUBLISH_REPORTS:-true}"
 CONTINUE_ON_TEST_FAIL="${CONTINUE_ON_TEST_FAIL:-true}"
 API_TEST_BASE_URL="${API_TEST_BASE_URL:-http://127.0.0.1:9180}"
+API_CATALOG_BASE_URL="${API_CATALOG_BASE_URL:-http://127.0.0.1:9184}"
 API_INTEGRATION_BASE_URL="${API_INTEGRATION_BASE_URL:-https://uat.minisnmore.com}"
+OPENAPI_SNAPSHOT_FALLBACK="${OPENAPI_SNAPSHOT_FALLBACK:-false}"
 
 PKG="${PKG:-artifacts/reports-site}"
 REMOTE="${REMOTE_REPORTS_DIR:-/var/www/uat1/mini_reports}"
@@ -107,26 +109,32 @@ if [ "$RUN_JAVADOC" = "true" ]; then
 fi
 
 if [ "$RUN_OPENAPI" = "true" ]; then
-  echo "=== 7. OpenAPI spec from gateway ==="
+  echo "=== 7. OpenAPI spec from catalog core (public /api/v1 contract) ==="
   mkdir -p "$PKG/backend/swagger"
   OPENAPI_SNAPSHOT="$REPO_ROOT/deploy/postman/openapi.snapshot.json"
   openapi_fetched=false
   for openapi_url in \
+    "${API_CATALOG_BASE_URL}/v3/api-docs/catalog" \
+    "${API_CATALOG_BASE_URL}/v3/api-docs" \
+    "${API_INTEGRATION_BASE_URL}/v3/api-docs/catalog" \
     "${API_INTEGRATION_BASE_URL}/v3/api-docs" \
     "${API_INTEGRATION_BASE_URL}/api/v3/api-docs" \
-    "${API_TEST_BASE_URL}/v3/api-docs" \
     "${API_TEST_BASE_URL}/api/v3/api-docs"; do
     if curl -fsSL "$openapi_url" -o "$PKG/backend/swagger/openapi.json"; then
-      echo "  fetched OpenAPI from $openapi_url"
-      openapi_fetched=true
-      break
+      if python3 -c "import json; json.load(open('$PKG/backend/swagger/openapi.json'))" 2>/dev/null; then
+        echo "  fetched OpenAPI from $openapi_url"
+        openapi_fetched=true
+        cp -f "$PKG/backend/swagger/openapi.json" "$OPENAPI_SNAPSHOT"
+        break
+      fi
     fi
   done
-  if [ "$openapi_fetched" = false ] && [ -f "$OPENAPI_SNAPSHOT" ]; then
+  if [ "$openapi_fetched" = false ] && [ -f "$OPENAPI_SNAPSHOT" ] && [ "$OPENAPI_SNAPSHOT_FALLBACK" = "true" ]; then
     cp -f "$OPENAPI_SNAPSHOT" "$PKG/backend/swagger/openapi.json"
-    echo "  using OpenAPI snapshot from deploy/postman/openapi.snapshot.json"
+    echo "  using OpenAPI snapshot from deploy/postman/openapi.snapshot.json (OPENAPI_SNAPSHOT_FALLBACK=true)"
   elif [ "$openapi_fetched" = false ]; then
-    echo "WARNING: could not fetch OpenAPI and no snapshot found" >&2
+    echo "ERROR: could not fetch OpenAPI (set OPENAPI_SNAPSHOT_FALLBACK=true to allow stale snapshot)" >&2
+    exit 1
   fi
 fi
 

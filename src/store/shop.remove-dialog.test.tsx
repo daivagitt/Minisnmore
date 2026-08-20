@@ -89,7 +89,9 @@ function Harness() {
       <span data-testid="count">{shop.cartCount}</span>
       <span data-testid="wishlist">{shop.wishlist.join(",")}</span>
       <button type="button" onClick={() => shop.addToCart(product)}>add</button>
+      <button type="button" onClick={() => shop.toggleWish("p1")}>wish</button>
       <button type="button" onClick={() => shop.promptRemoveFromCart("p1")}>prompt-remove</button>
+      <button type="button" onClick={() => shop.updateQty("p1", 0)}>decrement-remove</button>
       <button type="button" onClick={() => shop.syncCartWithCatalog([product])}>sync-catalog</button>
     </div>
   );
@@ -120,7 +122,23 @@ describe("ShopProvider remove dialog", () => {
     expect(screen.getByTestId("wishlist")).toHaveTextContent("p1");
   });
 
-  it("remove dialog close removes item without wishlist", async () => {
+  it("remove dialog close keeps item in cart", async () => {
+    render(
+      <ShopProvider>
+        <Harness />
+      </ShopProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+    await userEvent.click(screen.getByRole("button", { name: "add" }));
+    await userEvent.click(screen.getByRole("button", { name: "prompt-remove" }));
+    await userEvent.click(screen.getByRole("button", { name: "close-dialog" }));
+
+    expect(screen.getByTestId("count")).toHaveTextContent("1");
+    expect(screen.getByTestId("wishlist")).toHaveTextContent("");
+  });
+
+  it("remove dialog remove-only removes item without wishlist", async () => {
     render(
       <ShopProvider>
         <Harness />
@@ -134,6 +152,40 @@ describe("ShopProvider remove dialog", () => {
 
     expect(screen.getByTestId("count")).toHaveTextContent("0");
     expect(screen.getByTestId("wishlist")).toHaveTextContent("");
+  });
+
+  it("move to wishlist keeps item when already wishlisted", async () => {
+    render(
+      <ShopProvider>
+        <Harness />
+      </ShopProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+    await userEvent.click(screen.getByRole("button", { name: "wish" }));
+    expect(screen.getByTestId("wishlist")).toHaveTextContent("p1");
+
+    await userEvent.click(screen.getByRole("button", { name: "add" }));
+    await userEvent.click(screen.getByRole("button", { name: "decrement-remove" }));
+    await userEvent.click(screen.getByRole("button", { name: "move-wish" }));
+
+    expect(screen.getByTestId("count")).toHaveTextContent("0");
+    expect(screen.getByTestId("wishlist")).toHaveTextContent("p1");
+  });
+
+  it("updateQty to zero opens remove dialog instead of removing immediately", async () => {
+    render(
+      <ShopProvider>
+        <Harness />
+      </ShopProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+    await userEvent.click(screen.getByRole("button", { name: "add" }));
+    await userEvent.click(screen.getByRole("button", { name: "decrement-remove" }));
+
+    expect(screen.getByTestId("remove-dialog")).toBeTruthy();
+    expect(screen.getByTestId("count")).toHaveTextContent("1");
   });
 
   it("syncCartWithCatalog keeps matching products", async () => {

@@ -1,4 +1,4 @@
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { Field, inputCls } from "@/components/admin/AdminPage";
 import {
   aggregateFromVariantRows,
@@ -12,8 +12,25 @@ import {
   variantAmountInput,
   type VariantEditorRow,
 } from "@/lib/admin-variants";
+import { normalizeProductImageUrl } from "@/lib/backend-data";
 
 export { validateVariantRows } from "@/lib/admin-variants";
+
+function rowPhotos(row: VariantEditorRow): string[] {
+  return collectRowPhotos(row);
+}
+
+function collectRowPhotos(row: VariantEditorRow): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const url of [row.imageUrl, ...(row.imageUrls ?? [])]) {
+    const trimmed = url?.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  return out;
+}
 
 export function VariantsMatrixEditor({
   parentSku,
@@ -125,13 +142,16 @@ export function VariantsMatrixEditor({
               <th className="p-2 font-medium">MRP (₹)</th>
               <th className="p-2 font-medium">Cost (₹)</th>
               <th className="p-2 font-medium">Stock</th>
+              <th className="p-2 font-medium">Photo</th>
               <th className="p-2 font-medium">Active</th>
               <th className="p-2 font-medium">Zoho item</th>
               <th className="p-2 w-10" />
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, index) => (
+            {rows.map((r, index) => {
+              const photos = rowPhotos(r);
+              return (
               <tr key={r.id ?? `row-${index}`} className="border-t border-border/40">
                 <td className="p-1.5">
                   <input
@@ -228,6 +248,31 @@ export function VariantsMatrixEditor({
                     )}
                   </div>
                 </td>
+                <td className="p-1.5">
+                  {photos.length ? (
+                    <div className="flex items-center gap-1">
+                      {photos.slice(0, 3).map((url) => (
+                        <img
+                          key={url}
+                          src={normalizeProductImageUrl(url) ?? url}
+                          alt=""
+                          className="h-10 w-10 rounded-md object-cover border border-border/60"
+                        />
+                      ))}
+                      <button
+                        type="button"
+                        className="h-7 w-7 grid place-items-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => patchRow(index, { imageUrl: undefined, imageUrls: undefined })}
+                        aria-label={`Remove photos from ${r.sku || "variant"}`}
+                        title="Remove photos from this SKU"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground">—</span>
+                  )}
+                </td>
                 <td className="p-1.5 text-center">
                   <input
                     type="checkbox"
@@ -250,13 +295,16 @@ export function VariantsMatrixEditor({
                   </button>
                 </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </div>
       <p className="mt-2 text-[11px] text-muted-foreground leading-relaxed">
         Zoho Books does not use a single parent item for variant products — each variant SKU syncs as its own Zoho item.
         The <span className="font-medium">Zoho item</span> column shows the linked id after sync or pull (read-only).
+        Photo is stored on this Mini product, not read from the Zoho Books item-image screen.
+        Pull from Zoho always clears these thumbnails. Use the colour gallery above for real photos.
       </p>
       <div className="mt-2 flex flex-wrap gap-2">
         <button

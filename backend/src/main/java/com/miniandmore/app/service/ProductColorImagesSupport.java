@@ -57,6 +57,165 @@ public class ProductColorImagesSupport {
         }
     }
 
+    /** Add a lifestyle/gallery URL for one print/colour without dropping other colours. */
+    public void appendGalleryUrl(Product product, String colorName, String url) {
+        if (product == null) {
+            return;
+        }
+        String color = colorName == null ? "" : colorName.trim();
+        String image = url == null ? "" : url.trim();
+        if (color.isEmpty() || image.isEmpty()) {
+            return;
+        }
+        List<ColorEntry> entries = parseColorEntries(product.getColorsJson());
+        boolean found = false;
+        List<ColorEntry> next = new ArrayList<>();
+        for (ColorEntry entry : entries) {
+            if (entry.name().trim().equalsIgnoreCase(color)) {
+                found = true;
+                List<String> urls = new ArrayList<>(entry.galleryUrls());
+                if (!urls.contains(image)) {
+                    urls.add(image);
+                }
+                if (urls.size() > MAX_IMAGES_PER_COLOR) {
+                    urls = new ArrayList<>(urls.subList(0, MAX_IMAGES_PER_COLOR));
+                }
+                next.add(new ColorEntry(entry.name(), entry.swatchUrl(), uniqueUrls(urls)));
+            } else {
+                next.add(entry);
+            }
+        }
+        if (!found) {
+            next.add(new ColorEntry(color, null, List.of(image)));
+        }
+        product.setColorsJson(writeColorEntries(next));
+        syncProductColorImages(product);
+    }
+
+    /**
+     * Seed a colour gallery only when it has no photos yet. Same-colour / different-size Zoho SKUs
+     * must not dump every size's photo into one mixed colour gallery.
+     */
+    public void seedGalleryUrlIfEmpty(Product product, String colorName, String url) {
+        if (product == null) {
+            return;
+        }
+        String color = colorName == null ? "" : colorName.trim();
+        String image = url == null ? "" : url.trim();
+        if (color.isEmpty() || image.isEmpty()) {
+            return;
+        }
+        for (ColorEntry entry : parseColorEntries(product.getColorsJson())) {
+            if (entry.name().trim().equalsIgnoreCase(color) && !entry.galleryUrls().isEmpty()) {
+                return;
+            }
+        }
+        appendGalleryUrl(product, color, image);
+    }
+
+    /**
+     * Replace one colour's gallery. Empty list clears that colour so same-colour size SKUs
+     * are not mixed into one map (sync must not restore the old mixed {@code color_images_json}).
+     */
+    public void replaceColorGallery(Product product, String colorName, List<String> urls) {
+        if (product == null) {
+            return;
+        }
+        String color = colorName == null ? "" : colorName.trim();
+        if (color.isEmpty()) {
+            return;
+        }
+        List<String> nextUrls = uniqueUrls(urls == null ? List.of() : urls);
+        List<ColorEntry> entries = parseColorEntries(product.getColorsJson());
+        boolean found = false;
+        List<ColorEntry> next = new ArrayList<>();
+        for (ColorEntry entry : entries) {
+            if (entry.name().trim().equalsIgnoreCase(color)) {
+                found = true;
+                next.add(new ColorEntry(entry.name(), entry.swatchUrl(), nextUrls));
+            } else {
+                next.add(entry);
+            }
+        }
+        if (!found && !nextUrls.isEmpty()) {
+            next.add(new ColorEntry(color, null, nextUrls));
+        }
+        product.setColorsJson(writeColorEntries(next));
+        Map<String, List<String>> gallery = parseMap(product.getColorImagesJson());
+        String staleKey = null;
+        for (String key : gallery.keySet()) {
+            if (key != null && key.trim().equalsIgnoreCase(color)) {
+                staleKey = key;
+                break;
+            }
+        }
+        if (staleKey != null) {
+            gallery.remove(staleKey);
+        }
+        if (!nextUrls.isEmpty()) {
+            gallery.put(color, nextUrls);
+        }
+        product.setColorImagesJson(gallery.isEmpty() ? null : serializeMap(gallery));
+        syncProductColorImages(product);
+    }
+
+    /** Combined colour gallery from {@code colors_json} and {@code color_images_json}. */
+    public List<String> galleryUrlsForColor(Product product, String colorName) {
+        if (product == null || colorName == null || colorName.isBlank()) {
+            return List.of();
+        }
+        String want = colorName.trim();
+        LinkedHashSet<String> urls = new LinkedHashSet<>();
+        for (ColorEntry entry : parseColorEntries(product.getColorsJson())) {
+            if (entry.name() != null && want.equalsIgnoreCase(entry.name().trim())) {
+                urls.addAll(uniqueUrls(entry.galleryUrls()));
+            }
+        }
+        Map<String, List<String>> fromMap = parseMap(product.getColorImagesJson());
+        for (Map.Entry<String, List<String>> entry : fromMap.entrySet()) {
+            if (entry.getKey() != null && want.equalsIgnoreCase(entry.getKey().trim())) {
+                urls.addAll(uniqueUrls(entry.getValue()));
+            }
+        }
+        return new ArrayList<>(urls);
+    }
+
+    /** Drop SKU photos that were wrongly appended onto the parent {@code images_json} gallery. */
+    public void stripUrlsFromImagesJson(Product product, java.util.Collection<String> urlsToRemove) {
+        if (product == null || urlsToRemove == null || urlsToRemove.isEmpty()) {
+            return;
+        }
+        Set<String> remove = new LinkedHashSet<>();
+        for (String url : urlsToRemove) {
+            if (url != null && !url.isBlank()) {
+                remove.add(url.trim());
+            }
+        }
+        if (remove.isEmpty() || isImagesJsonEmpty(product.getImagesJson())) {
+            return;
+        }
+        List<String> kept = new ArrayList<>();
+        try {
+            JsonNode root = objectMapper.readTree(product.getImagesJson());
+            if (root == null || !root.isArray()) {
+                return;
+            }
+            for (JsonNode node : root) {
+                if (node == null || !node.isTextual()) {
+                    continue;
+                }
+                String url = node.asText().trim();
+                if (url.isEmpty() || remove.contains(url)) {
+                    continue;
+                }
+                kept.add(url);
+            }
+        } catch (Exception ignored) {
+            return;
+        }
+        product.setImagesJson(kept.isEmpty() ? null : serializeStringList(kept));
+    }
+
     /** When {@code images_json} is empty, copy unique per-colour gallery URLs for shop cards / Ledgerly hero. */
     public void ensureProductImagesFromColorGalleries(Product product) {
         if (product == null || !isImagesJsonEmpty(product.getImagesJson())) {
@@ -105,7 +264,7 @@ public class ProductColorImagesSupport {
         return out;
     }
 
-    private boolean isImagesJsonEmpty(String imagesJson) {
+    public boolean isImagesJsonEmpty(String imagesJson) {
         if (imagesJson == null || imagesJson.isBlank()) {
             return true;
         }

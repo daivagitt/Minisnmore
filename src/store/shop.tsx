@@ -22,12 +22,10 @@ import {
 } from "@/lib/product-variants";
 import { RemoveFromCartDialog } from "@/components/RemoveFromCartDialog";
 import { cartsEqual, sanitizeCartWithCatalog, type CartSyncResult } from "@/lib/cart-catalog";
-import { normalizeWishlistIds } from "@/lib/wishlist";
+import { normalizeWishlistIds, wishlistAlreadyExistsMessage } from "@/lib/wishlist";
 import {
-  addMyWishlistItem,
   listMyCart,
   listMyWishlist,
-  removeMyWishlistItem,
   replaceMyCart,
   replaceMyWishlist,
 } from "@/lib/account.functions";
@@ -61,7 +59,7 @@ type ShopState = {
   removeFromCart: (id: string, size?: string, color?: string, variantSku?: string) => void;
   promptRemoveFromCart: (id: string, size?: string, color?: string, variantSku?: string) => void;
   updateQty: (id: string, qty: number, size?: string, color?: string, variantSku?: string) => void;
-  toggleWish: (id: string) => void;
+  toggleWish: (id: string, productName?: string) => void;
   pruneWishlist: (validIds: Iterable<string>) => void;
   syncCartWithCatalog: (products: Product[]) => CartSyncResult;
   clearCart: () => void;
@@ -148,6 +146,9 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   /** Skip one persist cycle after auth scope reload (setState is async; avoid leaking cart across keys). */
   const skipPersistRef = useRef(false);
   const wishlistSyncRef = useRef(0);
+  const lastSyncedWishlistRef = useRef<string[]>([]);
+  const wishlistPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wishlistPersistSeqRef = useRef(0);
 
   useLayoutEffect(() => {
     if (authLoading) return;
@@ -195,6 +196,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
           setWishlist((current) => {
             const next = current.join("\0") === localWish.join("\0") ? serverWish : current;
             localStorage.setItem(wKey, JSON.stringify(next));
+            lastSyncedWishlistRef.current = next;
             return next;
           });
 
@@ -247,7 +249,28 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     if (appliedCoupon) localStorage.setItem(couponKey, JSON.stringify(appliedCoupon));
     else localStorage.removeItem(couponKey);
     void replaceMyCart(cart, appliedCoupon).catch(() => {});
-    void replaceMyWishlist(wishlist).catch(() => {});
+
+    if (wishlistPersistTimerRef.current) clearTimeout(wishlistPersistTimerRef.current);
+    const wishlistToSync = wishlist;
+    const persistSeq = ++wishlistPersistSeqRef.current;
+    wishlistPersistTimerRef.current = setTimeout(() => {
+      void replaceMyWishlist(wishlistToSync)
+        .then(() => {
+          if (wishlistPersistSeqRef.current !== persistSeq) return;
+          lastSyncedWishlistRef.current = wishlistToSync;
+        })
+        .catch(() => {
+          if (wishlistPersistSeqRef.current !== persistSeq) return;
+          const rollback = lastSyncedWishlistRef.current;
+          setWishlist(rollback);
+          localStorage.setItem(wKey, JSON.stringify(rollback));
+          toast.error("Could not update your wishlist. Please try again.");
+        });
+    }, 300);
+
+    return () => {
+      if (wishlistPersistTimerRef.current) clearTimeout(wishlistPersistTimerRef.current);
+    };
   }, [cart, wishlist, appliedCoupon, cKey, wKey, couponKey, scopeKey, authLoading, userId]);
 
   const addToCart: ShopState["addToCart"] = (p, opts = {}) => {
@@ -303,33 +326,62 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       productName: item.product.name,
     });
   };
-  const updateQty = (id: string, qty: number, size?: string, color?: string, variantSku?: string) =>
+  const updateQty = (id: string, qty: number, size?: string, color?: string, variantSku?: string) => {
+    const item = cart.find((x) => matches(x, id, size, color, variantSku));
+    if (!item) return;
+    const n = Math.max(0, Math.min(FIT_LIMITS.qtyMax, qty));
+    if (n === 0) {
+      promptRemoveFromCart(id, size, color, variantSku);
+      return;
+    }
     setCart((c) =>
-      c.flatMap((x) => {
-        if (!matches(x, id, size, color, variantSku)) return [x];
-        const n = Math.max(0, Math.min(FIT_LIMITS.qtyMax, qty));
-        return n === 0 ? [] : [{ ...x, qty: n }];
-      }),
+      c.map((x) => (matches(x, id, size, color, variantSku) ? { ...x, qty: n } : x)),
     );
-  const toggleWish = (id: string) => {
+  };
+  const warnWishlistDuplicate = (productName?: string) => {
+    toast.warning(wishlistAlreadyExistsMessage(productName));
+  };
+  const addToWishlist = (id: string, productName?: string) => {
     if (userId == null) {
       requireSignedIn();
       return;
     }
     const key = String(id);
-    const adding = !wishlist.includes(key);
-    setWishlist((w) => (adding ? [...w, key] : w.filter((x) => x !== key)));
-    const action = adding ? addMyWishlistItem(key) : removeMyWishlistItem(key);
-    void action.catch(() => {
-      setWishlist((w) => (adding ? w.filter((x) => x !== key) : [...w, key]));
-      toast.error("Could not update your wishlist. Please try again.");
+    if (wishlist.includes(key)) {
+      warnWishlistDuplicate(productName);
+      return;
+    }
+    setWishlist((w) => {
+      if (w.includes(key)) {
+        warnWishlistDuplicate(productName);
+        return w;
+      }
+      return [...w, key];
+    });
+  };
+  const toggleWish = (id: string, productName?: string) => {
+    if (userId == null) {
+      requireSignedIn();
+      return;
+    }
+    const key = String(id);
+    if (wishlist.includes(key)) {
+      setWishlist((w) => w.filter((x) => x !== key));
+      return;
+    }
+    setWishlist((w) => {
+      if (w.includes(key)) {
+        warnWishlistDuplicate(productName);
+        return w;
+      }
+      return [...w, key];
     });
   };
   const confirmRemoveFromCart = (moveToWishlist: boolean) => {
     if (!pendingRemove) return;
-    const { id, size, color, variantSku } = pendingRemove;
+    const { id, size, color, variantSku, productName } = pendingRemove;
     setPendingRemove(null);
-    if (moveToWishlist) toggleWish(id);
+    if (moveToWishlist) addToWishlist(id, productName);
     removeFromCart(id, size, color, variantSku);
   };
   const pruneWishlist = useCallback((validIds: Iterable<string>) => {
@@ -382,8 +434,9 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       <RemoveFromCartDialog
         open={pendingRemove != null}
         productName={pendingRemove?.productName ?? ""}
+        alreadyInWishlist={pendingRemove != null && wishlist.includes(String(pendingRemove.id))}
         onOpenChange={(open) => {
-          if (!open && pendingRemove) confirmRemoveFromCart(false);
+          if (!open) setPendingRemove(null);
         }}
         onMoveToWishlist={() => confirmRemoveFromCart(true)}
         onRemoveOnly={() => confirmRemoveFromCart(false)}

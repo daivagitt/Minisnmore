@@ -15,7 +15,7 @@ Browser → Nginx → Gateway (:8080) → [Store :8081 | Commerce :8082] → Bac
 | `/internal/v1/**` | backend | Business logic, meant to be reached only via store/commerce; **not proxied by any committed Nginx config or gateway route** — not internet-reachable through anything in this repo |
 | `/api/v1/admin/ledgerly/**` | backend directly | Sole exception living under `/api/v1` on backend itself, routed straight through by store |
 
-There is no single current OpenAPI spec covering the full proxied surface (springdoc only runs on `gateway` and `backend`; store/commerce re-expose backend's endpoints opaquely without re-declaring them). `openapi-all.zip` at the repo root is Zoho Books' *own* API spec, not this app's. `artifacts/api-docs/openapi.json` / `deploy/postman/openapi.snapshot.json` are **stale pre-microservices-split snapshots** (still show `/api/v1/admin/zoho/*`). Treat this document plus [FRONTEND_API_CONTRACT.md](./FRONTEND_API_CONTRACT.md) as the current source of truth.
+There is no single current OpenAPI spec covering the full proxied surface unless **catalog-core** runs with the `api-docs` profile (`/v3/api-docs` on `:9184`, proxied by UAT nginx). springdoc scans `backend` controllers under `/internal/v1/**` and `/api/v1/**`, remapping internal paths to the public `/api/v1/**` contract. Store/commerce proxies are 1:1 with that surface. Gateway auth (`/api/authenticate`, `/api/account`, …) is documented separately when the gateway runs with `api-docs`. Regenerate snapshots with `deploy/scripts/export-openapi.sh`. `openapi-all.zip` at the repo root is Zoho Books' *own* API spec, not this app's. Treat this document plus [FRONTEND_API_CONTRACT.md](./FRONTEND_API_CONTRACT.md) as the semantic source of truth for payloads and behaviour.
 
 ## Auth scheme
 
@@ -27,7 +27,7 @@ Backend's `ApiResponse<T>` (`backend/.../web/rest/v1/ApiResponse.java`):
 ```json
 { "success": true, "data": {}, "meta": { "requestId": "...", "timestamp": "..." } }
 ```
-Note: catalog/CMS DTOs (`ProductDTO`, `CategoryDTO`, etc.) use **camelCase**, but the hand-built order/account/return endpoints (`InternalAccountOrderResource`, `InternalOrderReturnResource`) use **snake_case** JSON keys (`full_name`, `order_number`, `product_id`) — an intentional inconsistency documented in [FRONTEND_API_CONTRACT.md](./FRONTEND_API_CONTRACT.md).
+Note: catalog/CMS DTOs (`ProductDTO`, `CategoryDTO`, etc.) use **camelCase**, but the hand-built order/account/return endpoints (`InternalAccountOrderResource`, `InternalOrderReturnResource`) use **snake_case** JSON keys (`full_name`, `order_number`, `product_id`) — an intentional inconsistency documented in [FRONTEND_API_CONTRACT.md](./FRONTEND_API_CONTRACT.md). Field-level order/return schemas: [order-return-json-contract.md](./order-return-json-contract.md).
 
 ---
 

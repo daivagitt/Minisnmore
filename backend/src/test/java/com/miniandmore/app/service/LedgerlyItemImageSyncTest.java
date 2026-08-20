@@ -61,27 +61,32 @@ class LedgerlyItemImageSyncTest {
     }
 
     @Test
-    void importItemImage_repeatedPull_replacesPrimaryInsteadOfAppending() throws Exception {
+    void importItemImage_replacesPrimaryKeepsAdditionalImages() throws Exception {
+        applicationProperties.getLedgerly().setSyncProductImages(false);
+        Product product = new Product()
+            .sku("SKU-1")
+            .imagesJson("[\"https://cdn.example.com/front.jpg\",\"https://cdn.example.com/rear.jpg\"]");
+
+        itemImageSync.importItemImage(product, "https://cdn.example.com/new-front.jpg");
+
+        assertThat(new ObjectMapper().readValue(product.getImagesJson(), String[].class))
+            .containsExactly(
+                "https://cdn.example.com/new-front.jpg",
+                "https://cdn.example.com/front.jpg",
+                "https://cdn.example.com/rear.jpg"
+            );
+    }
+
+    @Test
+    void importItemImage_repeatedPull_doesNotAppendDuplicatePrimary() throws Exception {
         applicationProperties.getLedgerly().setSyncProductImages(false);
         Product product = new Product().sku("SKU-1").imagesJson("[\"https://external.example.com/old.jpg\"]");
 
         itemImageSync.importItemImage(product, "https://external.example.com/new.jpg");
-
-        assertThat(new ObjectMapper().readValue(product.getImagesJson(), String[].class))
-            .containsExactly("https://external.example.com/new.jpg");
-    }
-
-    @Test
-    void importItemImage_repeatedPull_collapsesBloatedGalleryToSingleImage() throws Exception {
-        applicationProperties.getLedgerly().setSyncProductImages(false);
-        Product product = new Product().sku("SKU-1").imagesJson(
-            "[\"https://external.example.com/old1.jpg\",\"https://external.example.com/old2.jpg\",\"https://external.example.com/old3.jpg\"]"
-        );
-
         itemImageSync.importItemImage(product, "https://external.example.com/new.jpg");
 
         assertThat(new ObjectMapper().readValue(product.getImagesJson(), String[].class))
-            .containsExactly("https://external.example.com/new.jpg");
+            .containsExactly("https://external.example.com/new.jpg", "https://external.example.com/old.jpg");
     }
 
     @Test

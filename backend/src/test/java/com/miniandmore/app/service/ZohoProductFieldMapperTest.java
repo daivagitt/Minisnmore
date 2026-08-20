@@ -174,6 +174,28 @@ class ZohoProductFieldMapperTest {
         assertThat(product.getSizesJson()).contains("S").contains("M");
     }
 
+    @Test
+    void applyPulledItem_readsAgeFabricFromZohoLabelsWhenFieldCatalogMissing() {
+        when(booksClient.listItemFields()).thenReturn(List.of());
+        Product product = new Product();
+        mapper.applyPulledItem(
+            product,
+            Map.of(
+                "custom_fields",
+                List.of(
+                    Map.of("label", "Fabric Type", "value", "Muslin"),
+                    Map.of("label", "age", "value", "0"),
+                    Map.of("label", "age(max)", "value", "12")
+                )
+            ),
+            false
+        );
+
+        assertThat(product.getFabricType()).isEqualTo("Muslin");
+        assertThat(product.getAgeMinMonths()).isEqualTo(0);
+        assertThat(product.getAgeMaxMonths()).isEqualTo(12);
+    }
+
     private static List<Map<String, Object>> sampleFields() {
         return List.of(
             field("4063993000000072027", "MRP", "mrp", "amount", false, false),

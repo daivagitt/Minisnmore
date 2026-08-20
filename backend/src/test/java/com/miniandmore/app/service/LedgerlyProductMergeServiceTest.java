@@ -348,6 +348,60 @@ class LedgerlyProductMergeServiceTest {
     }
 
     @Test
+    void mergeLedgerlyItem_unchangedVariantIdentities_keepsZohoImportedPhotos() {
+        Product product = new Product()
+            .sku("KEDAR")
+            .price(BigDecimal.ZERO)
+            .stock(0)
+            .active(true)
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                "[{\"sku\":\"KED-PINK-03\",\"size\":\"0-3\",\"color\":\"Pink\",\"rate\":100,\"stock\":2,\"active\":true," +
+                "\"imageUrl\":\"https://cdn.example.com/zoho/pink-03.jpg\"}]"
+            );
+        // A routine stock/price webhook resends the same matrix — Ledgerly does not own photos.
+        Map<String, Object> item = Map.of(
+            "stock",
+            9,
+            "itemStructure",
+            "VARIANTS",
+            "variantsJson",
+            "[{\"sku\":\"KED-PINK-03\",\"size\":\"0-3\",\"color\":\"Pink\",\"rate\":110,\"stock\":9,\"active\":true}]"
+        );
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+
+        assertThat(product.getVariantsJson()).contains("https://cdn.example.com/zoho/pink-03.jpg");
+    }
+
+    @Test
+    void mergeLedgerlyItem_variantIdentityChanged_clearsStalePhotos() {
+        Product product = new Product()
+            .sku("KEDAR")
+            .price(BigDecimal.ZERO)
+            .stock(0)
+            .active(true)
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                "[{\"sku\":\"KED-PINK-03\",\"size\":\"0-3\",\"color\":\"Pink\",\"rate\":100,\"stock\":2,\"active\":true," +
+                "\"imageUrl\":\"https://cdn.example.com/zoho/pink-03.jpg\"}]"
+            );
+        // Colour on this SKU was corrected in Ledgerly — the old photo no longer belongs to it.
+        Map<String, Object> item = Map.of(
+            "stock",
+            2,
+            "itemStructure",
+            "VARIANTS",
+            "variantsJson",
+            "[{\"sku\":\"KED-PINK-03\",\"size\":\"0-3\",\"color\":\"Blue\",\"rate\":100,\"stock\":2,\"active\":true}]"
+        );
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+
+        assertThat(product.getVariantsJson()).doesNotContain("https://cdn.example.com/zoho/pink-03.jpg");
+    }
+
+    @Test
     void buildPushPayload_includesColorGalleryMap() {
         when(itemImageSync.firstImageUrl(any())).thenReturn(null);
         Product product = new Product()

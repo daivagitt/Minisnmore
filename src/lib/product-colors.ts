@@ -275,7 +275,7 @@ export function galleryUrlsForStorefrontColor(color: StorefrontColor | undefined
   return [];
 }
 
-/** Keep only lifestyle URLs whose filename matches this print name (when possible). */
+/** Keep lifestyle URLs whose filename matches this print; also keep generic rear/front files. */
 export function filterGalleryUrlsForPrint(
   colorName: string,
   urls: string[],
@@ -300,8 +300,17 @@ export function filterGalleryUrlsForPrint(
     return false;
   });
 
-  if (printSpecific.length) return printSpecific;
+  if (printSpecific.length) {
+    const viewExtras = urls.filter((url) => !printSpecific.includes(url) && isBareViewAngleUrl(url));
+    return viewExtras.length ? [...printSpecific, ...viewExtras] : printSpecific;
+  }
   return opts?.strict ? [] : urls;
+}
+
+function isBareViewAngleUrl(url: string): boolean {
+  const path = url.split("?")[0] ?? url;
+  const filename = (path.split("/").pop() ?? "").toLowerCase();
+  return /^(front|rear|back|detail|close-?up)(\.[a-z0-9]+)?$/i.test(filename);
 }
 
 /** True when any URL in the set matches at least one print name on the product. */

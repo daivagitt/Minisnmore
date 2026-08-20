@@ -103,9 +103,10 @@ class PincodeLookupServiceHttpTest {
             Optional.of(new XpressBeesClient.ServiceabilityResult("Bangalore", "Karnataka", "2 days", 2, "560001"))
         );
 
-        Optional<?> result = service.lookup("560001");
+        Optional<com.miniandmore.app.service.dto.PincodeLookupDTO> result = service.lookup("560001");
 
         assertThat(result).isPresent();
+        assertThat(result.orElseThrow().eta()).isEqualTo("5 days");
     }
 
     @Test

@@ -57,6 +57,27 @@ class ProductVariantSupportTest {
     }
 
     @Test
+    void applyMatrix_keepsFrontAndRearGalleryUrlsForMatchingPrints() {
+        Product product = new Product()
+            .sku("HORIZON")
+            .price(BigDecimal.ZERO)
+            .stock(0)
+            .colorsJson(
+                """
+                [{"name":"Navy","imageUrls":["https://cdn.example.com/navy-front.jpg","https://cdn.example.com/navy-rear.jpg"]}]
+                """
+            );
+        String json =
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":3,"active":true}]
+            """;
+
+        support.applyMatrixToProduct(product, "VARIANTS", json);
+
+        assertThat(product.getColorsJson()).contains("navy-front.jpg").contains("navy-rear.jpg");
+    }
+
+    @Test
     void decrementAndResolveSellable() {
         Product product = new Product().sku("HORIZON").price(BigDecimal.ZERO).stock(0);
         String json =
@@ -121,6 +142,22 @@ class ProductVariantSupportTest {
         List<VariantRow> rows = support.parseProduct(product);
         assertThat(rows).hasSize(1);
         assertThat(rows.get(0).swatchUrl()).isEqualTo(swatch);
+    }
+
+    @Test
+    void clearAllVariantImages_dropsSkuPhotosAndKeepsSwatch() {
+        Product product = new Product().sku("KED").price(BigDecimal.ZERO).stock(0);
+        support.applyMatrixToProduct(
+            product,
+            "VARIANTS",
+            """
+            [{"sku":"KED-BLU-0-3","size":"0-3","color":"blue","rate":380,"stock":89,"active":true,"imageUrl":"https://cdn.example.com/shot.jpg","swatchUrl":"https://cdn.example.com/chip.jpg"}]
+            """
+        );
+        support.clearAllVariantImages(product);
+        assertThat(product.getVariantsJson()).doesNotContain("shot.jpg");
+        assertThat(product.getVariantsJson()).doesNotContain("imageUrl");
+        assertThat(support.parseProduct(product).get(0).swatchUrl()).isEqualTo("https://cdn.example.com/chip.jpg");
     }
 
     @Test
@@ -339,7 +376,9 @@ class ProductVariantSupportTest {
             7,
             true,
             "https://cdn.example.com/swatch.jpg",
-            "zoho-99"
+            "zoho-99",
+            "https://cdn.example.com/sku.jpg",
+            List.of()
         );
 
         Map<String, Object> map = row.toMap();
@@ -352,7 +391,8 @@ class ProductVariantSupportTest {
             .containsEntry("stock", 7)
             .containsEntry("active", true)
             .containsEntry("swatchUrl", "https://cdn.example.com/swatch.jpg")
-            .containsEntry("zohoItemId", "zoho-99");
+            .containsEntry("zohoItemId", "zoho-99")
+            .containsEntry("imageUrl", "https://cdn.example.com/sku.jpg");
         assertThat(map.get("rate")).isEqualTo(new BigDecimal("80.00"));
         assertThat(map.get("mrp")).isEqualTo(new BigDecimal("100"));
     }
@@ -406,6 +446,28 @@ class ProductVariantSupportTest {
 
         assertThat(support.applyMatrixToProduct(product, null, null)).isTrue();
         assertThat(product.getItemStructure()).isEqualTo("SIMPLE");
+        assertThat(product.getVariantsJson()).isNull();
+    }
+
+    @Test
+    void applyMatrix_keepsGalleriesFromColorImagesJson() {
+        Product product = new Product()
+            .sku("HORIZON")
+            .price(BigDecimal.ZERO)
+            .stock(0)
+            .colorImagesJson(
+                """
+                {"Navy":["https://cdn.example.com/navy-front.jpg","https://cdn.example.com/navy-rear.jpg"]}
+                """
+            );
+        String json =
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":3,"active":true}]
+            """;
+
+        support.applyMatrixToProduct(product, "VARIANTS", json);
+
+        assertThat(product.getColorsJson()).contains("navy-front.jpg").contains("navy-rear.jpg");
     }
 
     @Test
@@ -418,6 +480,46 @@ class ProductVariantSupportTest {
 
         assertThat(support.updateVariantStockBySku(product, "HORIZON-S-NAVY", 9)).isTrue();
         assertThat(support.parseProduct(product).get(0).stock()).isEqualTo(9);
+    }
+
+    @Test
+    void upsertPulledVariantFromZoho_appendsMissingSkuOntoParent() {
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":799.20,"stock":1,"active":true}]
+            """
+        );
+
+        assertThat(
+            support.upsertPulledVariantFromZoho(
+                product,
+                "HORIZON-M-NAVY",
+                "M",
+                "Navy",
+                BigDecimal.valueOf(959.20),
+                BigDecimal.valueOf(1199),
+                4,
+                "zoho-m",
+                true
+            )
+        ).isTrue();
+        assertThat(support.parseProduct(product)).hasSize(2);
+        assertThat(support.findBySku(support.parseProduct(product), "HORIZON-M-NAVY")).isPresent();
+        assertThat(product.getStock()).isEqualTo(5);
+        assertThat(product.getItemStructure()).isEqualTo("VARIANTS");
+        assertThat(
+            support.upsertPulledVariantFromZoho(
+                product,
+                "MISSING-SKU",
+                "L",
+                "Navy",
+                BigDecimal.ONE,
+                BigDecimal.TEN,
+                1,
+                "zoho-x",
+                false
+            )
+        ).isFalse();
     }
 
     @Test
@@ -447,7 +549,7 @@ class ProductVariantSupportTest {
 
     @Test
     void variantSellingPrice_prefersRateOverMrp() {
-        VariantRow row = new VariantRow("id", "SKU", "M", "Blue", new BigDecimal("80"), new BigDecimal("100"), null, 1, true, null, null);
+        VariantRow row = new VariantRow("id", "SKU", "M", "Blue", new BigDecimal("80"), new BigDecimal("100"), null, 1, true, null, null, null, List.of());
         assertThat(support.variantSellingPrice(row)).isEqualByComparingTo("80");
     }
 

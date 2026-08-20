@@ -187,7 +187,7 @@ export async function listMyAddresses(): Promise<{ addresses: SavedAddress[] }> 
 }
 
 export async function createMyAddress(input: AddressInput): Promise<{ address: SavedAddress }> {
-  const parsed = AddressInput.parse(input);
+  const parsed = AddressFormInput.parse(input);
   const res = await api.post<unknown>("/api/v1/account/addresses", parsed, { auth: true });
   const address = pickAddress(res);
   if (!address) throw new Error("Could not save address");
@@ -195,7 +195,7 @@ export async function createMyAddress(input: AddressInput): Promise<{ address: S
 }
 
 export async function updateMyAddress(id: number, input: AddressInput): Promise<{ address: SavedAddress }> {
-  const parsed = AddressInput.parse(input);
+  const parsed = AddressFormInput.parse(input);
   const res = await api.put<unknown>(`/api/v1/account/addresses/${id}`, parsed, { auth: true });
   const address = pickAddress(res);
   if (!address) throw new Error("Could not update address");
@@ -214,7 +214,7 @@ export async function setMyDefaultAddress(id: number): Promise<{ address: SavedA
 }
 
 export async function syncMyAddresses(addresses: AddressInput[]): Promise<{ addresses: SavedAddress[] }> {
-  const parsed = addresses.map((row) => AddressInput.parse(row));
+  const parsed = addresses.map((row) => AddressFormInput.parse(row));
   const res = await api.post<{ addresses?: unknown[] }>(
     "/api/v1/account/addresses/sync",
     { addresses: parsed },

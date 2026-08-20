@@ -60,8 +60,7 @@ bash "${SCRIPT_DIR}/verify-spring-boot-fat-jar.sh" "$GATEWAY_JAR" "gateway-uat.j
 mkdir -p "${REPO_ROOT}/gateway/target"
 ln -sf "../../deploy/gateway-uat.jar" "${REPO_ROOT}/gateway/target/gateway-0.0.1-SNAPSHOT.jar"
 
-echo "=== Start gateway (prod,uat-isolated only — NO api-docs) ==="
-# JAR may be built with api-docs baked in — disable explicitly for faster boot on UAT.
+echo "=== Start gateway (prod,uat-isolated,api-docs) ==="
 unset SPRING_PROFILES_ACTIVE SPRING_PROFILES_INCLUDE
 
 pm2 flush mini-uat-ms-gateway 2>/dev/null || true
@@ -74,13 +73,11 @@ pm2 start java --name mini-uat-ms-gateway --cwd "${REPO_ROOT}" --update-env -- \
   -Djava.security.egd=file:/dev/./urandom \
   -Dserver.port="${GATEWAY_PORT}" \
   -jar "$GATEWAY_JAR" \
-  --spring.profiles.active=prod,uat-isolated \
+  --spring.profiles.active=prod,uat-isolated,api-docs \
   --spring.cloud.consul.enabled=false \
   --spring.cloud.consul.config.enabled=false \
   --spring.liquibase.enabled=false \
   --spring.main.allow-circular-references=true \
-  --springdoc.api-docs.enabled=false \
-  --springdoc.swagger-ui.enabled=false \
   --spring.cloud.gateway.server.webflux.httpclient.response-timeout="${GATEWAY_RESPONSE_TIMEOUT}" \
   --jhipster.logging.use-json-format=false \
   --jhipster.logging.logstash.enabled=false

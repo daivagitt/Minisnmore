@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  catalogSizesForProduct,
   colorsForSize,
   defaultSellableSelection,
   findVariant,
@@ -15,6 +16,24 @@ import {
   variantStockMessage,
 } from "./product-variants";
 import type { Product } from "@/data/products";
+
+describe("parseVariantsJson", () => {
+  it("keeps per-SKU imageUrl", () => {
+    expect(
+      parseVariantsJson([
+        {
+          sku: "KEDAR-03-PINK",
+          size: "0-3M",
+          color: "Pink",
+          rate: 100,
+          stock: 1,
+          active: true,
+          imageUrl: "https://cdn.example.com/pink-03.jpg",
+        },
+      ])[0].imageUrl,
+    ).toBe("https://cdn.example.com/pink-03.jpg");
+  });
+});
 
 const matrixProduct: Product = {
   id: "1",
@@ -117,6 +136,50 @@ describe("product-variants", () => {
     expect(sizesForDisplay(partial)).toEqual(["0-3 M", "3-6 M", "6-12 M", "12-18 M"]);
     expect(sizeHasSellableVariants(partial, "3-6 M")).toBe(false);
     expect(sizeHasSellableVariants(partial, "0-3 M")).toBe(true);
+  });
+
+  it("lists only catalog/variant sizes without standard-band padding", () => {
+    const vest: Product = {
+      ...matrixProduct,
+      sizes: ["0-3 M", "3-6 M", "6-12 M"],
+      itemStructure: "VARIANTS",
+      variants: parseVariantsJson([
+        { sku: "VEST-03-P1", size: "0-3 M", color: "Print 1", rate: 400, stock: 2, active: true },
+        { sku: "VEST-36-P1", size: "3-6 M", color: "Print 1", rate: 400, stock: 2, active: true },
+        { sku: "VEST-612-P1", size: "6-12 M", color: "Print 1", rate: 400, stock: 2, active: true },
+      ]),
+    };
+    expect(catalogSizesForProduct(vest)).toEqual(["0-3 M", "3-6 M", "6-12 M"]);
+    expect(sizesForDisplay(vest)).toEqual(["0-3 M", "3-6 M", "6-12 M", "12-18 M"]);
+  });
+
+  it("infers VARIANTS from variant matrix when itemStructure missing", () => {
+    const inferred: Product = {
+      ...matrixProduct,
+      itemStructure: undefined,
+      variants: parseVariantsJson([
+        { sku: "VEST-03-BLUE", size: "0-3 M", color: "Blue", rate: 400, stock: 4, active: true },
+      ]),
+    };
+    expect(isVariantsProduct(inferred)).toBe(true);
+  });
+
+  it("keeps SIMPLE products simple even when stray variant rows exist", () => {
+    const simpleWithRows: Product = {
+      ...matrixProduct,
+      itemStructure: "SIMPLE",
+      variants: parseVariantsJson([
+        { sku: "VEST-03-BLUE", size: "0-3 M", color: "Blue", rate: 400, stock: 4, active: true },
+      ]),
+    };
+    expect(isVariantsProduct(simpleWithRows)).toBe(false);
+    expect(sizeHasSellableVariants(simpleWithRows, "S")).toBe(true);
+  });
+
+  it("treats simple products with zero stock as unsellable for every size", () => {
+    const simple = { ...matrixProduct, itemStructure: "SIMPLE", variants: undefined, stock: 0 };
+    expect(sizeHasSellableVariants(simple, "S")).toBe(false);
+    expect(sizeHasSellableVariants(simple, "M")).toBe(false);
   });
 
   it("matches variant rows when size labels differ only by spacing", () => {

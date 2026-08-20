@@ -258,6 +258,37 @@ class ProductColorImagesSupportTest {
     }
 
     @Test
+    void appendGalleryUrl_keepsBothPrintGalleries() {
+        Product product = new Product();
+        support.appendGalleryUrl(product, "Pink", "https://cdn.example.com/pink.jpg");
+        support.appendGalleryUrl(product, "Blue", "https://cdn.example.com/blue.jpg");
+
+        assertThat(product.getColorImagesJson()).contains("Pink").contains("pink.jpg").contains("Blue").contains("blue.jpg");
+        assertThat(product.getColorsJson()).contains("Pink").contains("Blue");
+    }
+
+    @Test
+    void seedGalleryUrlIfEmpty_doesNotMixSameColourSizes() {
+        Product product = new Product();
+        support.seedGalleryUrlIfEmpty(product, "Pink", "https://cdn.example.com/pink-03.jpg");
+        support.seedGalleryUrlIfEmpty(product, "Pink", "https://cdn.example.com/pink-36.jpg");
+
+        assertThat(product.getColorImagesJson()).contains("pink-03.jpg");
+        assertThat(product.getColorImagesJson()).doesNotContain("pink-36.jpg");
+    }
+
+    @Test
+    void replaceColorGallery_unmixesSameColourSizePhotos() {
+        Product product = new Product();
+        support.appendGalleryUrl(product, "Pink", "https://cdn.example.com/pink-03.jpg");
+        support.appendGalleryUrl(product, "Pink", "https://cdn.example.com/pink-36.jpg");
+        support.replaceColorGallery(product, "Pink", List.of("https://cdn.example.com/pink-03.jpg"));
+
+        assertThat(product.getColorImagesJson()).contains("pink-03.jpg");
+        assertThat(product.getColorImagesJson()).doesNotContain("pink-36.jpg");
+    }
+
+    @Test
     void syncProductColorImages_clearsColorImagesWhenNoGallery() {
         Product product = new Product().colorsJson("[\"Plain\"]");
 

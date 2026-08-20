@@ -106,6 +106,44 @@ export function validateAddressForm(draft: AddressDraftInput): AddressFieldError
   return errors;
 }
 
+export const CheckoutAddressFields = AddressFormInput.pick({
+  line1: true,
+  line2: true,
+  city: true,
+  state: true,
+  pincode: true,
+});
+
+export type CheckoutAddressFieldName = keyof z.infer<typeof CheckoutAddressFields>;
+export type CheckoutAddressFieldErrors = Partial<Record<CheckoutAddressFieldName, string>>;
+
+export function normalizeCheckoutAddress(
+  draft: Pick<AddressDraftInput, "line1" | "line2" | "city" | "state" | "pincode">,
+) {
+  return {
+    line1: draft.line1.trim(),
+    line2: draft.line2?.trim() ?? "",
+    city: draft.city.trim(),
+    state: draft.state.trim(),
+    pincode: normalizePincode(draft.pincode),
+  };
+}
+
+export function validateCheckoutAddress(
+  draft: Pick<AddressDraftInput, "line1" | "line2" | "city" | "state" | "pincode">,
+): CheckoutAddressFieldErrors {
+  const result = CheckoutAddressFields.safeParse(normalizeCheckoutAddress(draft));
+  if (result.success) return {};
+  const errors: CheckoutAddressFieldErrors = {};
+  for (const issue of result.error.issues) {
+    const key = issue.path[0];
+    if (typeof key === "string" && !errors[key as CheckoutAddressFieldName]) {
+      errors[key as CheckoutAddressFieldName] = issue.message;
+    }
+  }
+  return errors;
+}
+
 function mapAddress(raw: unknown): SavedAddress | null {
   if (!raw || typeof raw !== "object") return null;
   const row = raw as Record<string, unknown>;
@@ -149,7 +187,7 @@ export async function listMyAddresses(): Promise<{ addresses: SavedAddress[] }> 
 }
 
 export async function createMyAddress(input: AddressInput): Promise<{ address: SavedAddress }> {
-  const parsed = AddressInput.parse(input);
+  const parsed = AddressFormInput.parse(input);
   const res = await api.post<unknown>("/api/v1/account/addresses", parsed, { auth: true });
   const address = pickAddress(res);
   if (!address) throw new Error("Could not save address");
@@ -157,7 +195,7 @@ export async function createMyAddress(input: AddressInput): Promise<{ address: S
 }
 
 export async function updateMyAddress(id: number, input: AddressInput): Promise<{ address: SavedAddress }> {
-  const parsed = AddressInput.parse(input);
+  const parsed = AddressFormInput.parse(input);
   const res = await api.put<unknown>(`/api/v1/account/addresses/${id}`, parsed, { auth: true });
   const address = pickAddress(res);
   if (!address) throw new Error("Could not update address");
@@ -176,7 +214,7 @@ export async function setMyDefaultAddress(id: number): Promise<{ address: SavedA
 }
 
 export async function syncMyAddresses(addresses: AddressInput[]): Promise<{ addresses: SavedAddress[] }> {
-  const parsed = addresses.map((row) => AddressInput.parse(row));
+  const parsed = addresses.map((row) => AddressFormInput.parse(row));
   const res = await api.post<{ addresses?: unknown[] }>(
     "/api/v1/account/addresses/sync",
     { addresses: parsed },

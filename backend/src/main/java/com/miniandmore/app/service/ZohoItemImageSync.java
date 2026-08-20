@@ -13,8 +13,11 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.security.MessageDigest;
 import java.time.Duration;
+import com.miniandmore.app.service.ProductVariantSupport.VariantRow;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -40,18 +43,24 @@ public class ZohoItemImageSync {
     private final ApplicationProperties applicationProperties;
     private final ZohoBooksClient booksClient;
     private final S3StorageService s3StorageService;
+    private final ProductVariantSupport variantSupport;
+    private final ProductColorImagesSupport colorImagesSupport;
     private final HttpClient downloadClient;
+    private final Map<String, String> importedHashUrls = new LinkedHashMap<>();
 
     public ZohoItemImageSync(
         ObjectMapper objectMapper,
         ApplicationProperties applicationProperties,
         ZohoBooksClient booksClient,
-        S3StorageService s3StorageService
+        S3StorageService s3StorageService,
+        ProductVariantSupport variantSupport
     ) {
         this.objectMapper = objectMapper;
         this.applicationProperties = applicationProperties;
         this.booksClient = booksClient;
         this.s3StorageService = s3StorageService;
+        this.variantSupport = variantSupport;
+        this.colorImagesSupport = new ProductColorImagesSupport(objectMapper);
         this.downloadClient = HttpClient.newBuilder().connectTimeout(DOWNLOAD_TIMEOUT).followRedirects(HttpClient.Redirect.NORMAL).build();
     }
 
@@ -63,10 +72,63 @@ public class ZohoItemImageSync {
         if (!isEnabled() || StringUtils.isBlank(zohoItemId) || product == null) {
             return;
         }
-        List<String> imageUrls = parseImageUrls(product.getImagesJson());
-        if (imageUrls.isEmpty()) {
+        uploadFirstWorkingImage(zohoItemId, product, parseImageUrls(product.getImagesJson()));
+    }
+
+    /**
+     * Push this variant SKU's photo to its Zoho item (not the parent mixed gallery).
+     */
+    public void syncVariantImage(String zohoItemId, Product product, String variantSku) {
+        if (!isEnabled() || StringUtils.isBlank(zohoItemId) || product == null) {
+            return;
+        }
+        uploadFirstWorkingImage(zohoItemId, product, resolveVariantImageUrls(product, variantSku));
+    }
+
+    List<String> resolveVariantImageUrls(Product product, String variantSku) {
+        List<String> urls = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        if (StringUtils.isBlank(variantSku)) {
+            return urls;
+        }
+        Optional<ProductVariantSupport.VariantRow> row = variantSupport.findBySku(
+            variantSupport.parseProduct(product),
+            variantSku
+        );
+        if (row.isEmpty()) {
+            return urls;
+        }
+        ProductVariantSupport.VariantRow variant = row.orElseThrow();
+        addResolvedUrl(urls, seen, variant.imageUrl());
+        addResolvedUrls(urls, seen, variant.imageUrls());
+        return urls;
+    }
+
+    private void addResolvedUrl(List<String> urls, Set<String> seen, String raw) {
+        String resolved = resolvePublicUrl(raw);
+        if (StringUtils.isNotBlank(resolved) && seen.add(resolved)) {
+            urls.add(resolved);
+        }
+    }
+
+    private void addResolvedUrls(List<String> urls, Set<String> seen, List<String> candidates) {
+        if (candidates == null) {
+            return;
+        }
+        for (String candidate : candidates) {
+            addResolvedUrl(urls, seen, candidate);
+        }
+    }
+
+    private void uploadFirstWorkingImage(String zohoItemId, Product product, List<String> imageUrls) {
+        if (imageUrls == null || imageUrls.isEmpty()) {
+            try {
+                booksClient.deleteItemImage(zohoItemId);
+            } catch (RuntimeException e) {
+                LOG.debug("Zoho item image delete skipped for {}: {}", zohoItemId, e.getMessage());
+            }
             LOG.debug(
-                "No public image URL for product {} ({}); check images_json and S3_PUBLIC_BASE_URL",
+                "No public image URL for product {} ({}); check images_json, variant imageUrl, and S3_PUBLIC_BASE_URL",
                 product.getId(),
                 product.getName()
             );
@@ -100,84 +162,464 @@ public class ZohoItemImageSync {
     }
 
     public void importZohoItemImage(Product product, String zohoItemId, Map<String, Object> item) {
-        if (!isEnabled() || StringUtils.isBlank(zohoItemId)) {
+        List<String> imported = storeImportedImages(product, zohoItemId, item);
+        for (int i = imported.size() - 1; i >= 0; i--) {
+            setPrimaryImage(product, imported.get(i));
+        }
+    }
+
+    /**
+     * Pull this Zoho SKU's photos onto that variant row. Same-colour sizes keep their own fronts;
+     * shared extras (rear) stay on the colour gallery.
+     */
+    public void importZohoVariantColorImage(Product product, String color, String zohoItemId, Map<String, Object> item) {
+        importZohoVariantColorImage(product, color, zohoItemId, item, true);
+    }
+
+    /**
+     * @param shareEmptySizes when false, only store this SKU's Zoho photos. Call
+     *     {@link #applySameColorPhotoSharing} after every size of the product has been imported
+     *     so empty sizes are filled from a single donor set (not from a partial pull).
+     */
+    public void importZohoVariantColorImage(
+        Product product,
+        String color,
+        String zohoItemId,
+        Map<String, Object> item,
+        boolean shareEmptySizes
+    ) {
+        String sku = textOf(item, "sku");
+        List<String> importedUrls = StringUtils.isNotBlank(zohoItemId) ? storeImportedImages(product, zohoItemId, item) : List.of();
+        if (StringUtils.isNotBlank(sku) && !importedUrls.isEmpty()) {
+            variantSupport.setVariantImages(product, sku, importedUrls);
+        } else if (StringUtils.isNotBlank(sku)) {
+            variantSupport.clearVariantImages(product, sku);
+        }
+        reconcileSameColourSizePhotos(product, color, sku, importedUrls, shareEmptySizes);
+        if (importedUrls.isEmpty() && StringUtils.isBlank(textOf(item, "image_document_id")) && StringUtils.isNotBlank(textOf(item, "image_url"))) {
+            LOG.debug("Zoho variant {} exposed only HTTP image_url without native image metadata; sibling fallback may apply", sku);
+        }
+    }
+
+    /**
+     * Same colour / different size: keep distinct fronts; empty sizes may reuse one donor set.
+     */
+    private void reconcileSameColourSizePhotos(
+        Product product,
+        String color,
+        String sku,
+        List<String> importedUrls,
+        boolean shareEmptySizes
+    ) {
+        String colorKey = StringUtils.defaultIfBlank(StringUtils.trimToNull(color), StringUtils.trimToNull(sku));
+        List<VariantRow> rows = variantSupport.parseProduct(product);
+        Map<String, String> colorLabel = new LinkedHashMap<>();
+        Map<String, LinkedHashSet<String>> sizesByColor = new LinkedHashMap<>();
+        Map<String, List<VariantRow>> rowsByColor = new LinkedHashMap<>();
+        for (VariantRow row : rows) {
+            String rowColor = StringUtils.trimToNull(row.color());
+            if (rowColor == null) {
+                continue;
+            }
+            String key = rowColor.toLowerCase(Locale.ROOT);
+            colorLabel.putIfAbsent(key, rowColor);
+            String sizeKey = StringUtils.defaultIfBlank(StringUtils.trimToNull(row.size()), StringUtils.trimToNull(row.sku()));
+            if (sizeKey != null) {
+                sizesByColor.computeIfAbsent(key, ignored -> new LinkedHashSet<>()).add(sizeKey.toLowerCase(Locale.ROOT));
+            }
+            rowsByColor.computeIfAbsent(key, ignored -> new ArrayList<>()).add(row);
+        }
+        if (StringUtils.isNotBlank(colorKey)) {
+            String key = colorKey.toLowerCase(Locale.ROOT);
+            colorLabel.putIfAbsent(key, colorKey);
+            String importedSize = textOfSkuOrSize(rows, sku);
+            sizesByColor
+                .computeIfAbsent(key, ignored -> new LinkedHashSet<>())
+                .add(importedSize != null ? importedSize : key);
+            rowsByColor.computeIfAbsent(key, ignored -> new ArrayList<>());
+        }
+
+        LinkedHashSet<String> sizeSpecificFronts = new LinkedHashSet<>();
+        for (Map.Entry<String, String> labelEntry : colorLabel.entrySet()) {
+            String key = labelEntry.getKey();
+            String label = labelEntry.getValue();
+            int sizeCount = sizesByColor.getOrDefault(key, new LinkedHashSet<>()).size();
+            List<VariantRow> colorRows = rowsByColor.getOrDefault(key, List.of());
+            List<String> importedForColor =
+                colorKey != null && key.equals(colorKey.toLowerCase(Locale.ROOT)) ? nonBlank(importedUrls) : List.of();
+            if (sizeCount < 2) {
+                List<String> urls = orderedPhotos(colorRows);
+                if (urls.isEmpty()) {
+                    urls = importedForColor;
+                }
+                if (!urls.isEmpty()) {
+                    colorImagesSupport.seedGalleryUrlIfEmpty(product, label, urls.get(0));
+                }
+                continue;
+            }
+            List<VariantRow> withPhotos = colorRows.stream().filter(row -> !orderedPhotos(row).isEmpty()).toList();
+            if (withPhotos.size() < 2) {
+                List<String> urls = orderedPhotos(colorRows);
+                if (urls.isEmpty()) {
+                    urls = importedForColor;
+                }
+                if (!urls.isEmpty()) {
+                    colorImagesSupport.seedGalleryUrlIfEmpty(product, label, urls.get(0));
+                }
+                continue;
+            }
+            LinkedHashSet<String> primaries = new LinkedHashSet<>();
+            for (VariantRow row : withPhotos) {
+                if (StringUtils.isNotBlank(row.imageUrl())) {
+                    primaries.add(row.imageUrl().trim());
+                }
+            }
+            boolean sharedFronts = primaries.size() <= 1;
+            if (sharedFronts) {
+                LinkedHashSet<String> shared = new LinkedHashSet<>(orderedPhotos(colorRows));
+                colorImagesSupport.replaceColorGallery(product, label, new ArrayList<>(shared));
+                continue;
+            }
+            LinkedHashSet<String> sharedExtras = new LinkedHashSet<>();
+            Map<String, Integer> extraCounts = new LinkedHashMap<>();
+            for (VariantRow row : withPhotos) {
+                for (String extra : row.imageUrls() == null ? List.<String>of() : row.imageUrls()) {
+                    if (StringUtils.isBlank(extra) || primaries.contains(extra.trim())) {
+                        continue;
+                    }
+                    String trimmed = extra.trim();
+                    extraCounts.put(trimmed, extraCounts.getOrDefault(trimmed, 0) + 1);
+                }
+            }
+            for (Map.Entry<String, Integer> extra : extraCounts.entrySet()) {
+                if (extra.getValue() > 1) {
+                    sharedExtras.add(extra.getKey());
+                }
+            }
+            colorImagesSupport.replaceColorGallery(product, label, new ArrayList<>(sharedExtras));
+            if (sharedExtras.isEmpty() && !primaries.isEmpty()) {
+                // No image is shared across every size of this colour (each size has its own distinct
+                // front) — the colour swatch/thumbnail still needs a representative photo of the print,
+                // so seed it with the first size's front rather than leaving the swatch blank.
+                colorImagesSupport.seedGalleryUrlIfEmpty(product, label, primaries.iterator().next());
+            }
+            for (VariantRow row : colorRows) {
+                if (StringUtils.isBlank(row.sku())) {
+                    continue;
+                }
+                LinkedHashSet<String> next = new LinkedHashSet<>();
+                if (StringUtils.isNotBlank(row.imageUrl())) {
+                    next.add(row.imageUrl().trim());
+                }
+                for (String extra : row.imageUrls() == null ? List.<String>of() : row.imageUrls()) {
+                    if (StringUtils.isBlank(extra)) {
+                        continue;
+                    }
+                    String trimmed = extra.trim();
+                    boolean otherSizeFront = primaries.contains(trimmed) &&
+                        (row.imageUrl() == null || !trimmed.equals(row.imageUrl().trim()));
+                    if (otherSizeFront) {
+                        continue;
+                    }
+                    next.add(trimmed);
+                }
+                if (!next.isEmpty()) {
+                    variantSupport.setVariantImages(product, row.sku(), new ArrayList<>(next));
+                }
+            }
+            sizeSpecificFronts.addAll(primaries);
+        }
+        if (shareEmptySizes) {
+            applySameColorPhotoSharing(product);
+        }
+        if (!sizeSpecificFronts.isEmpty()) {
+            colorImagesSupport.stripUrlsFromImagesJson(product, sizeSpecificFronts);
+        }
+        colorImagesSupport.ensureProductImagesFromColorGalleries(product);
+        String importedUrl = importedUrls == null || importedUrls.isEmpty() ? null : importedUrls.get(0);
+        if (variantSupport.isVariants(product) && StringUtils.isNotBlank(importedUrl)) {
+            if (colorImagesSupport.isImagesJsonEmpty(product.getImagesJson())) {
+                setPrimaryImage(product, firstNonBlank(rows.stream().map(VariantRow::imageUrl).toList(), importedUrl));
+            }
+        } else if (StringUtils.isBlank(colorKey) && !variantSupport.isVariants(product)) {
+            setPrimaryImage(product, importedUrl);
+        }
+    }
+
+    /**
+     * Same-colour empty sizes may <em>display</em> a sibling photo in admin/PDP. Do not write
+     * those URLs onto the empty SKU — that made unsynced / un-uploaded rows look like they had
+     * photos and then pushed them into Zoho Books.
+     */
+    public void applySameColorPhotoSharing(Product product) {
+        if (product == null) {
             return;
         }
-        String httpUrl = resolveHttpImageUrl(item);
-        if (StringUtils.isNotBlank(httpUrl)) {
-            importHttpImage(product, httpUrl);
-            return;
+        List<VariantRow> rows = variantSupport.parseProduct(product);
+        Map<String, List<VariantRow>> rowsByColor = new LinkedHashMap<>();
+        for (VariantRow row : rows) {
+            String color = StringUtils.trimToNull(row.color());
+            if (color == null || StringUtils.isBlank(row.sku())) {
+                continue;
+            }
+            rowsByColor.computeIfAbsent(color.toLowerCase(Locale.ROOT), ignored -> new ArrayList<>()).add(row);
+        }
+        for (List<VariantRow> colorRows : rowsByColor.values()) {
+            List<String> donorPhotos = List.of();
+            for (VariantRow row : colorRows) {
+                List<String> photos = orderedPhotos(row);
+                if (!photos.isEmpty()) {
+                    donorPhotos = photos;
+                    break;
+                }
+            }
+            if (donorPhotos.isEmpty()) {
+                continue;
+            }
+            for (VariantRow row : colorRows) {
+                if (orderedPhotos(row).isEmpty()) {
+                    variantSupport.setVariantImages(product, row.sku(), donorPhotos);
+                }
+            }
+        }
+    }
+
+    private static List<String> orderedPhotos(List<VariantRow> rows) {
+        LinkedHashSet<String> urls = new LinkedHashSet<>();
+        for (VariantRow row : rows) {
+            urls.addAll(orderedPhotos(row));
+        }
+        return new ArrayList<>(urls);
+    }
+
+    private static List<String> orderedPhotos(VariantRow row) {
+        LinkedHashSet<String> urls = new LinkedHashSet<>();
+        if (row == null) {
+            return List.of();
+        }
+        if (StringUtils.isNotBlank(row.imageUrl())) {
+            urls.add(row.imageUrl().trim());
+        }
+        if (row.imageUrls() != null) {
+            for (String extra : row.imageUrls()) {
+                if (StringUtils.isNotBlank(extra)) {
+                    urls.add(extra.trim());
+                }
+            }
+        }
+        return new ArrayList<>(urls);
+    }
+
+    private static List<String> nonBlank(List<String> urls) {
+        if (urls == null || urls.isEmpty()) {
+            return List.of();
+        }
+        List<String> out = new ArrayList<>();
+        for (String url : urls) {
+            if (StringUtils.isNotBlank(url)) {
+                out.add(url.trim());
+            }
+        }
+        return out;
+    }
+
+    private static String textOfSkuOrSize(List<VariantRow> rows, String sku) {
+        if (StringUtils.isBlank(sku)) {
+            return null;
+        }
+        for (VariantRow row : rows) {
+            if (sku.equalsIgnoreCase(StringUtils.trimToNull(row.sku()))) {
+                String size = StringUtils.trimToNull(row.size());
+                return size != null ? size.toLowerCase(Locale.ROOT) : sku.trim().toLowerCase(Locale.ROOT);
+            }
+        }
+        return sku.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static String firstNonBlank(List<String> urls, String fallback) {
+        for (String url : urls) {
+            if (StringUtils.isNotBlank(url)) {
+                return url.trim();
+            }
+        }
+        return fallback;
+    }
+
+    private List<String> storeImportedImages(Product product, String zohoItemId, Map<String, Object> item) {
+        if (!isEnabled() || StringUtils.isBlank(zohoItemId) || product == null) {
+            return List.of();
+        }
+        LinkedHashSet<String> urls = new LinkedHashSet<>();
+        List<String> itemHttpUrls = collectItemHttpImageUrls(item);
+        for (String httpUrl : itemHttpUrls) {
+            String imported = importHttpImageUrl(product, httpUrl);
+            if (StringUtils.isNotBlank(imported)) {
+                urls.add(imported.trim());
+            }
         }
         long maxBytes = applicationProperties.getStorage().getS3().getMaxUploadBytes();
-        Optional<BinaryDownload> downloaded = downloadZohoDocument(item, maxBytes);
-        if (downloaded.isEmpty()) {
-            downloaded = booksClient.downloadItemImage(zohoItemId, maxBytes);
+        int index = 0;
+        for (String documentId : primaryDocumentIds(item)) {
+            Optional<BinaryDownload> downloaded = booksClient.downloadDocument(documentId, maxBytes);
+            if (downloaded.isEmpty() || !isImageDownload(downloaded.orElseThrow())) {
+                continue;
+            }
+            String stored = storeBinary(product, zohoItemId, item, downloaded.orElseThrow(), documentId + "-" + index);
+            if (StringUtils.isNotBlank(stored)) {
+                urls.add(stored.trim());
+            }
+            index++;
         }
-        if (downloaded.isEmpty()) {
+        if (urls.isEmpty() && itemDeclaresImage(item)) {
+            Optional<BinaryDownload> downloaded = booksClient.downloadItemImage(zohoItemId, maxBytes);
+            if (downloaded.isPresent() && isImageDownload(downloaded.orElseThrow())) {
+                String stored = storeBinary(product, zohoItemId, item, downloaded.orElseThrow(), "item");
+                if (StringUtils.isNotBlank(stored)) {
+                    urls.add(stored.trim());
+                }
+            }
+        }
+        if (urls.isEmpty()) {
             LOG.debug("No Zoho image bytes for item {} (sku={})", zohoItemId, textOf(item, "sku"));
-            return;
         }
+        return new ArrayList<>(urls);
+    }
+
+    private String storeBinary(
+        Product product,
+        String zohoItemId,
+        Map<String, Object> item,
+        BinaryDownload image,
+        String suffix
+    ) {
         try {
-            BinaryDownload image = downloaded.orElseThrow();
-            String filename = filenameForZohoImport(item, zohoItemId, image.contentType());
-            String publicUrl = s3StorageService.uploadObject("products", filename, image.bytes(), image.contentType());
-            setPrimaryImage(product, publicUrl);
+            String publicUrl = storeHashedImage(image.bytes(), image.contentType());
+            if (publicUrl != null && !publicUrl.isBlank()) {
+                return publicUrl.trim();
+            }
         } catch (RuntimeException e) {
             LOG.warn("Could not import Zoho image for item {}: {}", zohoItemId, e.getMessage());
         }
+        return null;
     }
 
-    private void importHttpImage(Product product, String sourceUrl) {
+    private String importHttpImageUrl(Product product, String sourceUrl) {
         String trimmed = sourceUrl.trim();
         if (isOnStoreCdn(trimmed)) {
-            setPrimaryImage(product, trimmed);
-            return;
+            return trimmed;
         }
         try {
             DownloadedImage downloaded = downloadImage(trimmed);
-            String filename = filenameFor(product, downloaded.contentType());
-            String publicUrl = s3StorageService.uploadObject("products", filename, downloaded.bytes(), downloaded.contentType());
-            setPrimaryImage(product, publicUrl);
+            String publicUrl = storeHashedImage(downloaded.bytes(), downloaded.contentType());
+            if (publicUrl != null && !publicUrl.isBlank()) {
+                return publicUrl.trim();
+            }
+            return trimmed;
         } catch (RuntimeException e) {
             LOG.warn("Zoho HTTP image import failed for product {} ({}): {}", product.getId(), product.getSku(), e.getMessage());
-            setPrimaryImage(product, trimmed);
+            return null;
         }
     }
 
-    private Optional<BinaryDownload> downloadZohoDocument(Map<String, Object> item, long maxBytes) {
-        if (item == null || item.isEmpty()) {
-            return Optional.empty();
+    private String storeHashedImage(byte[] bytes, String contentType) {
+        if (bytes == null || bytes.length == 0) {
+            return null;
         }
-        Set<String> documentIds = new LinkedHashSet<>();
-        addIfPresent(documentIds, textOf(item, "image_document_id"));
-        addIfPresent(documentIds, textOf(item, "image_id"));
-        addIfPresent(documentIds, textOf(item, "document_id"));
-        for (String documentId : documentIds) {
-            Optional<BinaryDownload> downloaded = booksClient.downloadDocument(documentId, maxBytes);
-            if (downloaded.isPresent()) {
-                return downloaded;
+        String digest = sha256Prefix(bytes);
+        String cached = importedHashUrls.get(digest);
+        if (cached != null) {
+            return cached;
+        }
+        String filename = "zoho-" + digest + "." + extensionForContentType(contentType);
+        String publicUrl = s3StorageService.uploadObject("products", filename, bytes, contentType);
+        if (publicUrl == null || publicUrl.isBlank()) {
+            return null;
+        }
+        String trimmed = publicUrl.trim();
+        importedHashUrls.put(digest, trimmed);
+        return trimmed;
+    }
+
+    private static String sha256Prefix(byte[] bytes) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(bytes);
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte value : digest) {
+                hex.append(String.format("%02x", value));
+            }
+            return hex.substring(0, 16);
+        } catch (Exception e) {
+            return Integer.toHexString(java.util.Arrays.hashCode(bytes));
+        }
+    }
+
+    private static String extensionForContentType(String contentType) {
+        String type = StringUtils.defaultString(contentType);
+        if (type.contains("png")) {
+            return "png";
+        }
+        if (type.contains("webp")) {
+            return "webp";
+        }
+        if (type.contains("gif")) {
+            return "gif";
+        }
+        return "jpg";
+    }
+
+    private static List<String> collectItemHttpImageUrls(Map<String, Object> item) {
+        LinkedHashSet<String> urls = new LinkedHashSet<>();
+        if (item == null) {
+            return List.of();
+        }
+        for (String field : List.of("image_uri", "image_url", "item_image_url")) {
+            String value = textOf(item, field);
+            if (StringUtils.isNotBlank(value) && value.startsWith("http")) {
+                urls.add(value.trim());
             }
         }
-        return Optional.empty();
+        return new ArrayList<>(urls);
+    }
+
+    private static List<String> primaryDocumentIds(Map<String, Object> item) {
+        LinkedHashSet<String> documentIds = new LinkedHashSet<>();
+        addIfPresent(documentIds, textOf(item, "image_document_id"));
+        return new ArrayList<>(documentIds);
+    }
+
+    /**
+     * True when Zoho Books has a real item image ({@code image_document_id} / {@code image_name}).
+     * HTTP {@code image_url} alone is not enough — leftover CDN links from an older push must not
+     * be treated as a live Zoho photo on re-pull.
+     */
+    public boolean hasNativeZohoItemImage(Map<String, Object> item) {
+        return itemDeclaresImage(item);
+    }
+
+    private static boolean itemDeclaresImage(Map<String, Object> item) {
+        if (item == null || item.isEmpty()) {
+            return false;
+        }
+        String documentId = textOf(item, "image_document_id");
+        if (StringUtils.isNotBlank(documentId) && !"0".equals(documentId) && !"null".equalsIgnoreCase(documentId)) {
+            return true;
+        }
+        String imageName = textOf(item, "image_name");
+        return StringUtils.isNotBlank(imageName) && !"null".equalsIgnoreCase(imageName);
+    }
+
+    private static boolean isImageDownload(BinaryDownload download) {
+        if (download == null || download.bytes() == null || download.bytes().length == 0) {
+            return false;
+        }
+        String type = StringUtils.defaultString(download.contentType()).toLowerCase(Locale.ROOT);
+        return type.startsWith("image/") || type.startsWith("application/octet-stream");
     }
 
     private static void addIfPresent(Set<String> ids, String value) {
         if (StringUtils.isNotBlank(value)) {
             ids.add(value.trim());
         }
-    }
-
-    private static String resolveHttpImageUrl(Map<String, Object> item) {
-        if (item == null) {
-            return null;
-        }
-        for (String field : List.of("image_uri", "image_url", "item_image_url")) {
-            String value = textOf(item, field);
-            if (StringUtils.isNotBlank(value) && value.startsWith("http")) {
-                return value.trim();
-            }
-        }
-        return null;
     }
 
     private static String textOf(Map<String, Object> item, String field) {
@@ -297,38 +739,37 @@ public class ZohoItemImageSync {
         return "image/jpeg";
     }
 
-    private static String filenameForZohoImport(Map<String, Object> item, String zohoItemId, String contentType) {
-        String sku = textOf(item, "sku");
-        String base = StringUtils.isNotBlank(sku) ? "zoho-" + sku : "zoho-" + zohoItemId;
-        String safeBase = base.replaceAll("[^A-Za-z0-9._-]", "-");
-        if (contentType != null && contentType.contains("png")) {
-            return safeBase + ".png";
-        }
-        if (contentType != null && contentType.contains("webp")) {
-            return safeBase + ".webp";
-        }
-        if (contentType != null && contentType.contains("gif")) {
-            return safeBase + ".gif";
-        }
-        return safeBase + ".jpg";
-    }
-
-    private String filenameFor(Product product, String contentType) {
-        String sku = product.getSku() != null && !product.getSku().isBlank() ? product.getSku() : "item";
-        String ext = switch (StringUtils.defaultString(contentType)) {
-            case "image/png" -> "png";
-            case "image/webp" -> "webp";
-            case "image/gif" -> "gif";
-            default -> "jpg";
-        };
-        return sku.replaceAll("[^A-Za-z0-9._-]", "-") + "-zoho." + ext;
-    }
-
     private void setPrimaryImage(Product product, String url) {
+        if (StringUtils.isBlank(url)) {
+            return;
+        }
+        List<String> images = parseStoredImageUrls(product.getImagesJson());
+        images.removeIf(url::equals);
+        images.add(0, url.trim());
         try {
-            product.setImagesJson(objectMapper.writeValueAsString(List.of(url)));
+            product.setImagesJson(objectMapper.writeValueAsString(images));
         } catch (Exception e) {
             LOG.warn("Failed to serialize images_json for product {}: {}", product.getId(), e.getMessage());
+        }
+    }
+
+    private List<String> parseStoredImageUrls(String imagesJson) {
+        if (StringUtils.isBlank(imagesJson)) {
+            return new ArrayList<>();
+        }
+        try {
+            List<String> raw = objectMapper.readValue(imagesJson, new TypeReference<List<String>>() {});
+            List<String> urls = new ArrayList<>();
+            Set<String> seen = new LinkedHashSet<>();
+            for (String value : raw) {
+                if (StringUtils.isBlank(value) || !seen.add(value.trim())) {
+                    continue;
+                }
+                urls.add(value.trim());
+            }
+            return urls;
+        } catch (Exception e) {
+            return new ArrayList<>();
         }
     }
 

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { LazyImage } from "@/components/LazyImage";
 import { cn } from "@/lib/utils";
+import { sortGalleryByLeadingOrientation, PRODUCT_GALLERY_HERO_FRAME, PRODUCT_GALLERY_HERO_MAX_H } from "@/lib/product-gallery";
 import {
   contentAspect,
   detectContentBoundsFromImage,
@@ -94,16 +95,25 @@ type FittedImageProps = {
   src: string;
   alt: string;
   bounds?: ImageContentBounds;
+  frameAspect: number;
   className?: string;
   priority?: "high" | "auto" | "low";
   onBounds: (src: string, img: HTMLImageElement) => void;
 };
 
 /** Zooms to the detected product region so the inner frame has no baked-in white/cream border. */
-function FittedGalleryImage({ src, alt, bounds, className, priority, onBounds }: FittedImageProps) {
+function FittedGalleryImage({
+  src,
+  alt,
+  bounds,
+  frameAspect,
+  className,
+  priority,
+  onBounds,
+}: FittedImageProps) {
   if (!src) return null;
 
-  const fitStyle = bounds ? imageFitStyles(bounds) : undefined;
+  const fitStyle = bounds ? imageFitStyles(bounds, frameAspect) : undefined;
 
   return (
     <LazyImage
@@ -169,39 +179,71 @@ type Props = {
 };
 
 export function ProductGallery({ name, image, gallery = [], className }: Props) {
-  const images = useMemo(() => uniqueImages(image, ...gallery), [image, gallery]);
-  const imagesKey = useMemo(() => images.join("\0"), [images]);
+  const rawImages = useMemo(() => uniqueImages(image, ...gallery), [image, gallery]);
+  const rawImagesKey = useMemo(() => rawImages.join("\0"), [rawImages]);
+  const naturalAspectRef = useRef<Map<string, number>>(new Map());
+  const [orientationSorted, setOrientationSorted] = useState(false);
   const [active, setActive] = useState(0);
-  const { boundsFor, rememberBounds } = useImageContentBounds();
+  const { boundsFor, aspectFor, rememberBounds } = useImageContentBounds();
+
+  useEffect(() => {
+    naturalAspectRef.current = new Map();
+    setOrientationSorted(false);
+    if (!rawImages.length) {
+      setOrientationSorted(true);
+      return;
+    }
+
+    let cancelled = false;
+    let loaded = 0;
+    const total = rawImages.length;
+
+    const markLoaded = () => {
+      loaded += 1;
+      if (!cancelled && loaded >= total) setOrientationSorted(true);
+    };
+
+    for (const src of rawImages) {
+      const img = new Image();
+      img.decoding = "async";
+      img.onload = () => {
+        const nw = img.naturalWidth;
+        const nh = img.naturalHeight;
+        if (nw && nh) {
+          naturalAspectRef.current.set(src, nw / nh);
+          rememberBounds(src, img);
+        }
+        markLoaded();
+      };
+      img.onerror = () => markLoaded();
+      img.src = src;
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rawImagesKey, rememberBounds]);
+
+  const images = useMemo(() => {
+    if (!orientationSorted || rawImages.length <= 1) return rawImages;
+    return sortGalleryByLeadingOrientation(rawImages, (src) => naturalAspectRef.current.get(src));
+  }, [rawImages, orientationSorted]);
+
+  const imagesKey = useMemo(() => images.join("\0"), [images]);
 
   useEffect(() => {
     setActive(0);
   }, [imagesKey]);
 
-  const frameSrc = images[0] ?? "";
-
-  useEffect(() => {
-    if (!frameSrc || boundsFor(frameSrc)) return;
-    const img = new Image();
-    img.decoding = "async";
-    img.onload = () => rememberBounds(frameSrc, img);
-    img.src = frameSrc;
-  }, [frameSrc, boundsFor, rememberBounds]);
-
   const safeActive = images.length ? Math.min(active, images.length - 1) : 0;
   const current = images[safeActive] ?? images[0] ?? "";
-  const frameBounds = boundsFor(frameSrc);
-  /** Lock frame size to the first gallery image so slides do not resize the hero box. */
-  const heroAspect = frameBounds ? contentAspect(frameBounds) : DEFAULT_ASPECT;
   const heroBounds = boundsFor(current);
+  /** Frame follows the active slide so each image fills the box without letterboxing. */
+  const heroAspect = heroBounds ? contentAspect(heroBounds) : aspectFor(current);
 
   const go = (delta: number) => {
     if (images.length <= 1) return;
     setActive((i) => (i + delta + images.length) % images.length);
-  };
-
-  const heroImageStyle: CSSProperties = {
-    aspectRatio: String(heroAspect),
   };
 
   return (
@@ -229,23 +271,30 @@ export function ProductGallery({ name, image, gallery = [], className }: Props) 
         </div>
       ) : null}
 
-      <motion.div
-        initial={false}
-        className={cn(
-          galleryBox,
-          galleryHeroRound,
-          "order-1 lg:order-2 relative min-w-0 w-full lg:flex-1 p-2.5 sm:p-3",
-        )}
-      >
+      <div className="order-1 lg:order-2 flex-1 min-w-0 flex justify-center lg:justify-start">
+        <motion.div
+          initial={false}
+          className={cn(
+            galleryBox,
+            galleryHeroRound,
+            "relative w-fit max-w-full p-2.5 sm:p-3",
+          )}
+        >
         <div
           className={cn(
-            "group relative w-full overflow-hidden",
+            "group relative overflow-hidden",
+            PRODUCT_GALLERY_HERO_MAX_H,
+            PRODUCT_GALLERY_HERO_FRAME,
             galleryImageRound,
           )}
-          style={heroImageStyle}
+          style={{ ["--hero-ar" as string]: String(heroAspect) }}
         >
-          {/* Aspect-ratio spacer — absolute children do not contribute to layout height */}
-          <div className="w-full" style={{ paddingBottom: `${(1 / heroAspect) * 100}%` }} aria-hidden />
+          {/* In-flow spacer — absolute children alone collapse the frame to zero height. */}
+          <div
+            className="w-full"
+            style={{ paddingBottom: `${(1 / heroAspect) * 100}%` }}
+            aria-hidden
+          />
 
           <AnimatePresence mode="sync" initial={false}>
             <motion.div
@@ -261,6 +310,7 @@ export function ProductGallery({ name, image, gallery = [], className }: Props) 
                   src={current}
                   alt={name}
                   bounds={heroBounds}
+                  frameAspect={heroAspect}
                   priority="high"
                   onBounds={rememberBounds}
                 />
@@ -289,7 +339,8 @@ export function ProductGallery({ name, image, gallery = [], className }: Props) 
             </>
           ) : null}
         </div>
-      </motion.div>
+        </motion.div>
+      </div>
     </div>
   );
 }

@@ -1,3 +1,6 @@
+import type { AgeRange } from "@/data/products";
+import { sizeToAgeBand } from "@/lib/product-ages";
+
 export const FIT_LIMITS = {
   heightMin: 30,
   heightMax: 120,
@@ -88,6 +91,28 @@ export function validateVirtualFitFile(file: File | null | undefined): FileValid
 
 export function normalizeSizeLabel(size: string): string {
   return size.trim().toLowerCase();
+}
+
+export type SizeGuideRow = { size: string; weight: string; height: string };
+
+const SIZE_GUIDE_BY_BAND: Record<AgeRange, { weight: string; height: string }> = {
+  "0-3m": { weight: "2.5–5 kg", height: "45–58 cm" },
+  "3-6m": { weight: "5–7 kg", height: "58–67 cm" },
+  "6-12m": { weight: "7–9 kg", height: "67–74 cm" },
+  "12-18m": { weight: "9–11 kg", height: "74–82 cm" },
+  "18-24m": { weight: "11–13 kg", height: "82–90 cm" },
+};
+
+/** Weight/height guide rows for the sizes this product actually carries. */
+export function sizeGuideRowsForProduct(sizes: string[]): SizeGuideRow[] {
+  return sizes.map((size) => {
+    const band = sizeToAgeBand(size);
+    if (band) {
+      const guide = SIZE_GUIDE_BY_BAND[band];
+      return { size, weight: guide.weight, height: guide.height };
+    }
+    return { size, weight: "—", height: "—" };
+  });
 }
 
 /** Match a canonical band (e.g. 0-3m) to the product's size string (e.g. 0-3M). */

@@ -15,6 +15,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,13 +32,22 @@ public class OrderEventService {
     public static final String TYPE_CANCELLED = "cancelled";
     public static final String TYPE_REFUNDED = "refunded";
 
+    private static final Logger LOG = LoggerFactory.getLogger(OrderEventService.class);
     private static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
     private static final int MAX_EVENTS = 100;
 
     private final OrderEventRepository orderEventRepository;
+    private final OrderMailService orderMailService;
+    private final OrderSmsService orderSmsService;
 
-    public OrderEventService(OrderEventRepository orderEventRepository) {
+    public OrderEventService(
+        OrderEventRepository orderEventRepository,
+        OrderMailService orderMailService,
+        OrderSmsService orderSmsService
+    ) {
         this.orderEventRepository = orderEventRepository;
+        this.orderMailService = orderMailService;
+        this.orderSmsService = orderSmsService;
     }
 
     public void onOrderCreated(CustomerOrder order) {
@@ -155,6 +166,44 @@ public class OrderEventService {
             .body(body)
             .createdAt(createdAt != null ? createdAt : Instant.now());
         orderEventRepository.save(event);
+        queueLifecycleEmail(order, eventType);
+    }
+
+    private void queueLifecycleEmail(CustomerOrder order, String eventType) {
+        AfterCommit.run(() -> {
+            try {
+                switch (eventType) {
+                    case TYPE_ORDER_PLACED:
+                        if (isCod(order)) {
+                            orderMailService.sendOrderConfirmation(order);
+                            orderSmsService.sendOrderConfirmation(order);
+                        }
+                        break;
+                    case TYPE_PAYMENT_RECEIVED:
+                        if (!isCod(order)) {
+                            orderMailService.sendOrderConfirmation(order);
+                            orderSmsService.sendOrderConfirmation(order);
+                        }
+                        break;
+                    case TYPE_SHIPPED:
+                        orderMailService.sendOutForDelivery(order);
+                        orderSmsService.sendOutForDelivery(order);
+                        break;
+                    case TYPE_CANCELLED:
+                        orderMailService.sendOrderCancelled(order);
+                        orderSmsService.sendOrderCancelled(order);
+                        break;
+                    default:
+                        break;
+                }
+            } catch (RuntimeException ex) {
+                LOG.warn("Order email/SMS failed for {} on {}", eventType, order.getOrderNumber(), ex);
+            }
+        });
+    }
+
+    private static boolean isCod(CustomerOrder order) {
+        return "cod".equalsIgnoreCase(StringUtils.trimToEmpty(order.getPaymentMethod()));
     }
 
     private String titleFor(String eventType) {

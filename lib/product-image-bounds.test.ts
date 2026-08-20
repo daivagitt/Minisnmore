@@ -55,6 +55,22 @@ describe("product-image-bounds", () => {
     expect(styles.top).toBe("-25%");
   });
 
+  it("preserves aspect ratio when frame aspect differs from content", () => {
+    const bounds = {
+      x: 0,
+      y: 0,
+      width: 800,
+      height: 400,
+      naturalWidth: 800,
+      naturalHeight: 400,
+    };
+    const styles = imageFitStyles(bounds, 0.75);
+    expect(styles.width).toBe("100%");
+    expect(styles.height).toBe("37.5%");
+    expect(styles.left).toBe("0%");
+    expect(styles.top).toBe("31.25%");
+  });
+
   it("detects full-frame bounds", () => {
     const bounds = {
       x: 0,

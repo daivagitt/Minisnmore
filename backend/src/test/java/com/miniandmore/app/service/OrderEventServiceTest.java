@@ -27,11 +27,17 @@ class OrderEventServiceTest {
     @Mock
     private OrderEventRepository orderEventRepository;
 
+    @Mock
+    private OrderMailService orderMailService;
+
+    @Mock
+    private OrderSmsService orderSmsService;
+
     private OrderEventService service;
 
     @BeforeEach
     void setUp() {
-        service = new OrderEventService(orderEventRepository);
+        service = new OrderEventService(orderEventRepository, orderMailService, orderSmsService);
     }
 
     @Test
@@ -47,10 +53,21 @@ class OrderEventServiceTest {
         assertThat(event.getEventType()).isEqualTo(OrderEventService.TYPE_ORDER_PLACED);
         assertThat(event.getTitle()).isEqualTo("Order placed");
         assertThat(event.getCreatedAt()).isEqualTo(order.getPlacedAt());
+        verify(orderMailService, never()).sendOrderConfirmation(any());
     }
 
     @Test
-    void onOrderPaid_recordsPaymentAndShippedWhenDemoShipmentStamped() {
+    void onOrderCreated_cod_sendsConfirmation() {
+        CustomerOrder order = baseOrder().paymentMethod("cod").status(OrderStatus.CONFIRMED).paymentStatus(PaymentStatus.PENDING);
+        when(orderEventRepository.existsByOrderIdAndEventType(42L, OrderEventService.TYPE_ORDER_PLACED)).thenReturn(false);
+
+        service.onOrderCreated(order);
+
+        verify(orderMailService).sendOrderConfirmation(order);
+    }
+
+    @Test
+    void onOrderPaid_online_sendsConfirmationAndOutForDeliveryWhenShipped() {
         CustomerOrder order = baseOrder()
             .status(OrderStatus.CONFIRMED)
             .paymentStatus(PaymentStatus.PAID)
@@ -63,6 +80,40 @@ class OrderEventServiceTest {
         verify(orderEventRepository, org.mockito.Mockito.atLeast(2)).save(captor.capture());
         List<String> types = captor.getAllValues().stream().map(OrderEvent::getEventType).toList();
         assertThat(types).contains(OrderEventService.TYPE_PAYMENT_RECEIVED, OrderEventService.TYPE_SHIPPED);
+        verify(orderMailService, org.mockito.Mockito.atLeastOnce()).sendOrderConfirmation(order);
+        verify(orderMailService).sendOutForDelivery(order);
+    }
+
+    @Test
+    void syncLifecycleEvents_cancelled_sendsCancelEmail() {
+        CustomerOrder order = baseOrder().status(OrderStatus.CANCELLED).paymentStatus(PaymentStatus.PAID);
+        when(orderEventRepository.existsByOrderIdAndEventType(any(), any())).thenReturn(false);
+
+        service.syncLifecycleEvents(order);
+
+        verify(orderMailService).sendOrderCancelled(order);
+    }
+
+    @Test
+    void onOrderPaid_cod_skipsPaidConfirmation() {
+        CustomerOrder order = baseOrder().paymentMethod("cod").status(OrderStatus.CONFIRMED).paymentStatus(PaymentStatus.PAID);
+        when(orderEventRepository.existsByOrderIdAndEventType(42L, OrderEventService.TYPE_ORDER_PLACED)).thenReturn(true);
+        when(orderEventRepository.existsByOrderIdAndEventType(42L, OrderEventService.TYPE_PAYMENT_RECEIVED)).thenReturn(false);
+
+        service.onOrderPaid(order);
+
+        verify(orderMailService, never()).sendOrderConfirmation(any());
+    }
+
+    @Test
+    void queueLifecycleEmail_swallowsMailFailures() {
+        CustomerOrder order = baseOrder().paymentMethod("cod");
+        when(orderEventRepository.existsByOrderIdAndEventType(42L, OrderEventService.TYPE_ORDER_PLACED)).thenReturn(false);
+        org.mockito.Mockito.doThrow(new RuntimeException("smtp down")).when(orderMailService).sendOrderConfirmation(order);
+
+        service.onOrderCreated(order);
+
+        verify(orderEventRepository).save(any());
     }
 
     @Test
@@ -74,6 +125,7 @@ class OrderEventServiceTest {
         service.syncLifecycleEvents(order);
 
         verify(orderEventRepository, never()).save(any());
+        verify(orderMailService, never()).sendOrderConfirmation(any());
     }
 
     private CustomerOrder baseOrder() {
@@ -81,6 +133,7 @@ class OrderEventServiceTest {
             .id(42L)
             .userLogin("buyer@example.com")
             .orderNumber("MNM-TEST-001")
+            .paymentMethod("online")
             .total(BigDecimal.valueOf(299))
             .placedAt(Instant.parse("2026-08-14T10:00:00Z"));
     }

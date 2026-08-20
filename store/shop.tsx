@@ -303,14 +303,18 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       productName: item.product.name,
     });
   };
-  const updateQty = (id: string, qty: number, size?: string, color?: string, variantSku?: string) =>
+  const updateQty = (id: string, qty: number, size?: string, color?: string, variantSku?: string) => {
+    const item = cart.find((x) => matches(x, id, size, color, variantSku));
+    if (!item) return;
+    const n = Math.max(0, Math.min(FIT_LIMITS.qtyMax, qty));
+    if (n === 0) {
+      promptRemoveFromCart(id, size, color, variantSku);
+      return;
+    }
     setCart((c) =>
-      c.flatMap((x) => {
-        if (!matches(x, id, size, color, variantSku)) return [x];
-        const n = Math.max(0, Math.min(FIT_LIMITS.qtyMax, qty));
-        return n === 0 ? [] : [{ ...x, qty: n }];
-      }),
+      c.map((x) => (matches(x, id, size, color, variantSku) ? { ...x, qty: n } : x)),
     );
+  };
   const toggleWish = (id: string) => {
     if (userId == null) {
       requireSignedIn();
@@ -383,7 +387,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
         open={pendingRemove != null}
         productName={pendingRemove?.productName ?? ""}
         onOpenChange={(open) => {
-          if (!open && pendingRemove) confirmRemoveFromCart(false);
+          if (!open) setPendingRemove(null);
         }}
         onMoveToWishlist={() => confirmRemoveFromCart(true)}
         onRemoveOnly={() => confirmRemoveFromCart(false)}

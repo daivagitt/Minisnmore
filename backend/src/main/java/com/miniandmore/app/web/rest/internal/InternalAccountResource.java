@@ -223,10 +223,16 @@ public class InternalAccountResource {
                 incoming.add(normalized);
             }
         }
-        wishlistItemRepository.deleteByUserLogin(login);
-        wishlistItemRepository.flush();
+        Set<String> existing = new LinkedHashSet<>(wishlistIds(login));
+        for (String productId : existing) {
+            if (!incoming.contains(productId)) {
+                wishlistItemRepository.deleteByUserLoginAndProductId(login, productId);
+            }
+        }
         for (String productId : incoming) {
-            wishlistItemRepository.save(new WishlistItem().userLogin(login).productId(productId));
+            if (!existing.contains(productId) && !wishlistItemRepository.existsByUserLoginAndProductId(login, productId)) {
+                wishlistItemRepository.save(new WishlistItem().userLogin(login).productId(productId));
+            }
         }
         return ApiResponse.ok(Map.of("product_ids", List.copyOf(incoming)));
     }

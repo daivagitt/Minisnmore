@@ -114,6 +114,7 @@ public class ZohoProductFieldMapper {
             .flatMap(def -> readCustomValue(valuesByApiName, def))
             .flatMap(this::parseInteger)
             .ifPresent(product::setAgeMaxMonths);
+        applyMissingCatalogFromItemLabels(product, item);
         Optional<String> categoryNotice = fields
             .category()
             .flatMap(def -> readCustomValue(valuesByApiName, def))
@@ -302,6 +303,15 @@ public class ZohoProductFieldMapper {
             if (StringUtils.isNotBlank(fieldId)) {
                 values.put(fieldId, value.trim());
             }
+            String label = firstNonBlank(
+                stringValue(entry.get("label")),
+                stringValue(entry.get("field_name_formatted")),
+                stringValue(entry.get("field_name"))
+            );
+            if (StringUtils.isNotBlank(label)) {
+                values.put(label.trim(), value.trim());
+                values.put(label.trim().toLowerCase(Locale.ROOT), value.trim());
+            }
         }
         return values;
     }
@@ -312,7 +322,75 @@ public class ZohoProductFieldMapper {
             return Optional.of(byApi);
         }
         String byId = valuesByApiName.get(field.fieldId());
-        return StringUtils.isNotBlank(byId) ? Optional.of(byId) : Optional.empty();
+        if (StringUtils.isNotBlank(byId)) {
+            return Optional.of(byId);
+        }
+        if (StringUtils.isNotBlank(field.label())) {
+            String byLabel = valuesByApiName.get(field.label());
+            if (StringUtils.isNotBlank(byLabel)) {
+                return Optional.of(byLabel);
+            }
+            String byLabelLower = valuesByApiName.get(field.label().trim().toLowerCase(Locale.ROOT));
+            if (StringUtils.isNotBlank(byLabelLower)) {
+                return Optional.of(byLabelLower);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** When Zoho item-field metadata is missing, still read age/fabric/sizes from the item payload labels. */
+    private void applyMissingCatalogFromItemLabels(Product product, Map<String, Object> item) {
+        Object raw = item.get("custom_fields");
+        if (!(raw instanceof List<?> entries)) {
+            return;
+        }
+        String fabric = null;
+        String sizes = null;
+        Integer ageMin = null;
+        Integer ageMax = null;
+        for (Object entryObj : entries) {
+            if (!(entryObj instanceof Map<?, ?> entry)) {
+                continue;
+            }
+            String value = stringValue(entry.get("value"));
+            if (StringUtils.isBlank(value)) {
+                continue;
+            }
+            String label = firstNonBlank(
+                stringValue(entry.get("label")),
+                stringValue(entry.get("field_name_formatted")),
+                stringValue(entry.get("field_name")),
+                stringValue(entry.get("api_name"))
+            );
+            if (StringUtils.isBlank(label)) {
+                continue;
+            }
+            String token = label.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "");
+            if (token.contains("agemax") || (token.contains("age") && token.contains("max"))) {
+                ageMax = parseInteger(value).orElse(ageMax);
+            } else if (token.equals("age") || token.contains("agemin") || token.equals("ageminmonths")) {
+                ageMin = parseInteger(value).orElse(ageMin);
+            } else if (token.contains("fabric")) {
+                fabric = value.trim();
+            } else if (token.equals("sizes") || token.equals("size")) {
+                sizes = value.trim();
+            }
+        }
+        if (StringUtils.isBlank(product.getFabricType()) && StringUtils.isNotBlank(fabric)) {
+            product.setFabricType(fabric);
+        }
+        if (product.getAgeMinMonths() == null && ageMin != null) {
+            product.setAgeMinMonths(ageMin);
+        }
+        if (product.getAgeMaxMonths() == null && ageMax != null) {
+            product.setAgeMaxMonths(ageMax);
+        }
+        if (StringUtils.isBlank(product.getSizesJson()) && StringUtils.isNotBlank(sizes)) {
+            List<String> parsed = descriptionCodec.parseDelimitedOrJson(sizes);
+            if (!parsed.isEmpty()) {
+                product.setSizesJson(descriptionCodec.toJsonList(parsed));
+            }
+        }
     }
 
     private Optional<Integer> parseInteger(String raw) {

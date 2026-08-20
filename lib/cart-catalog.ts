@@ -37,7 +37,7 @@ export function cartLineColorLabel(item: CartItem): string {
 /** Thumbnail for a cart line — uses the selected print/color gallery, not the parent product hero. */
 export function cartLineImage(item: CartItem): string {
   const color = cartLineColorLabel(item);
-  const { image } = galleryForSelectedColor(item.product, color);
+  const { image } = galleryForSelectedColor(item.product, color, item.size, item.variantSku);
   return image || item.product.image;
 }
 

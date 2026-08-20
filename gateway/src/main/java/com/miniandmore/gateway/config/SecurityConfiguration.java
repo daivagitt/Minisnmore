@@ -69,6 +69,7 @@ public class SecurityConfiguration {
                     .pathMatchers("/oauth2/**").permitAll()
                     .pathMatchers("/login/oauth2/**").permitAll()
                     // Actuator / health
+                    .pathMatchers("/v3/api-docs", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
                     .pathMatchers("/management/health", "/management/health/**", "/management/info").permitAll()
                     .pathMatchers("/management/prometheus").permitAll()
                     .pathMatchers("/management/**").hasAuthority(AuthoritiesConstants.ADMIN)

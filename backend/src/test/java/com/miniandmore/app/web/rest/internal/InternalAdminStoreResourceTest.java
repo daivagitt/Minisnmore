@@ -366,6 +366,21 @@ class InternalAdminStoreResourceTest {
     }
 
     @Test
+    void clearVariantPhotos_returnsUpdatedProduct() throws Exception {
+        when(productRepository.existsById(2L)).thenReturn(true);
+        ProductDTO dto = productDto(2L, "Shorts");
+        dto.setVariantsJson("[]");
+        when(productService.clearVariantPhotos(2L)).thenReturn(dto);
+
+        mockMvc
+            .perform(post("/internal/v1/admin/products/2/clear-variant-photos"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(2));
+
+        verify(productService).clearVariantPhotos(2L);
+    }
+
+    @Test
     void createBlogPost_returnsSavedDto() throws Exception {
         BlogPostDTO dto = blogPostDto(14L, "Hello");
         when(blogPostService.save(any(BlogPostDTO.class))).thenReturn(dto);

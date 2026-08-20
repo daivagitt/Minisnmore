@@ -8,6 +8,7 @@ import {
   recommendSizeByChest,
   recommendSizeByHeight,
   resolveRecommendedSize,
+  sizeGuideRowsForProduct,
   validateBirthDate,
   validateChestCm,
   validateHeightCm,
@@ -99,5 +100,16 @@ describe("product fit validators", () => {
     expect(
       validateVirtualFitFile(new File([new Uint8Array(6 * 1024 * 1024)], "big.jpg", { type: "image/jpeg" })).ok,
     ).toBe(false);
+  });
+
+  it("builds size guide rows only for product sizes", () => {
+    expect(sizeGuideRowsForProduct(["0-3 M", "3-6 M", "6-12 M"])).toEqual([
+      { size: "0-3 M", weight: "2.5–5 kg", height: "45–58 cm" },
+      { size: "3-6 M", weight: "5–7 kg", height: "58–67 cm" },
+      { size: "6-12 M", weight: "7–9 kg", height: "67–74 cm" },
+    ]);
+    expect(sizeGuideRowsForProduct(["One Size"])).toEqual([
+      { size: "One Size", weight: "—", height: "—" },
+    ]);
   });
 });

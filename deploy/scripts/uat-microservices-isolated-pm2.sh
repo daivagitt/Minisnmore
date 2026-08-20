@@ -226,10 +226,10 @@ ZOHO_HTTPS_ARGS=(
   --application.zoho.oauth.javascript-domains[1]=https://uat.minisnmore.com
 )
 
-# Skip api-docs on UAT — OpenAPI init adds several minutes to each JVM boot on a small VPS.
-SPRING_ARGS_CATALOG=(--spring.profiles.active=prod --server.port="${CATALOG_PORT}" "${CONSUL_OFF[@]}" "${LIQUIBASE_OFF[@]}")
+# Catalog core serves the public /api/v1 OpenAPI contract (springdoc + path remap).
+SPRING_ARGS_CATALOG=(--spring.profiles.active=prod,api-docs --server.port="${CATALOG_PORT}" "${CONSUL_OFF[@]}" "${LIQUIBASE_OFF[@]}")
 SPRING_ARGS_GATEWAY=(
-  --spring.profiles.active=prod,uat-isolated
+  --spring.profiles.active=prod,uat-isolated,api-docs
   --server.port="${GATEWAY_PORT}"
   "${CONSUL_OFF[@]}"
   "${LIQUIBASE_OFF[@]}"

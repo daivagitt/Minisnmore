@@ -201,6 +201,11 @@ class InternalAccountResourceTest {
 
     @Test
     void wishlist_replace_overwritesIds() throws Exception {
+        when(wishlistItemRepository.findAllByUserLoginOrderByIdAsc("customer1")).thenReturn(
+            List.of(new WishlistItem().id(1L).userLogin("customer1").productId("p1"))
+        );
+        when(wishlistItemRepository.existsByUserLoginAndProductId("customer1", "p2")).thenReturn(false);
+        when(wishlistItemRepository.existsByUserLoginAndProductId("customer1", "p3")).thenReturn(false);
         when(wishlistItemRepository.save(any(WishlistItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
         mockMvc
@@ -214,7 +219,18 @@ class InternalAccountResourceTest {
             .andExpect(jsonPath("$.data.product_ids[0]").value("p2"))
             .andExpect(jsonPath("$.data.product_ids[1]").value("p3"));
 
-        verify(wishlistItemRepository).deleteByUserLogin("customer1");
+        verify(wishlistItemRepository).deleteByUserLoginAndProductId("customer1", "p1");
+        verify(wishlistItemRepository, org.mockito.Mockito.times(2)).save(any(WishlistItem.class));
+    }
+
+    @Test
+    void wishlist_removeItem() throws Exception {
+        mockMvc
+            .perform(delete("/internal/v1/account/wishlist/items/p1").with(user("customer1")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(true));
+
+        verify(wishlistItemRepository).deleteByUserLoginAndProductId("customer1", "p1");
     }
 
     @Test

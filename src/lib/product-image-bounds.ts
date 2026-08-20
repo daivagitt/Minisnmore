@@ -106,18 +106,41 @@ export function isFullImageBounds(bounds: ImageContentBounds): boolean {
   return bounds.x <= 1 && bounds.y <= 1 && coverW >= 0.98 && coverH >= 0.98;
 }
 
-/** Position + scale a full image so its content region fills a matching aspect box. */
-export function imageFitStyles(bounds: ImageContentBounds): CSSProperties {
+/**
+ * Position + scale a full image so its content region fits the frame without distortion.
+ * Uses uniform scale (contain) when frame aspect differs from content aspect.
+ */
+export function imageFitStyles(bounds: ImageContentBounds, frameAspect?: number): CSSProperties {
   const { x, y, width, height, naturalWidth, naturalHeight } = bounds;
   if (!width || !height || !naturalWidth || !naturalHeight) return {};
+
+  const contentAspect = width / height;
+  const targetAspect =
+    frameAspect && frameAspect > 0 ? frameAspect : contentAspect;
+
+  /** Image width as a fraction of the container width (container width = 1). */
+  const imageWidthFraction = Math.min(
+    naturalWidth / width,
+    naturalWidth / (height * targetAspect),
+  );
+
+  const contentDisplayW = imageWidthFraction * (width / naturalWidth);
+  const contentDisplayH = imageWidthFraction * (height / naturalWidth) * targetAspect;
+
+  const widthPct = imageWidthFraction * 100;
+  const heightPct = imageWidthFraction * (naturalHeight / naturalWidth) * targetAspect * 100;
+  const leftPct =
+    ((1 - contentDisplayW) / 2 - (x / naturalWidth) * imageWidthFraction) * 100;
+  const topPct =
+    ((1 - contentDisplayH) / 2 - (y / naturalWidth) * imageWidthFraction * targetAspect) * 100;
 
   return {
     position: "absolute",
     maxWidth: "none",
-    width: `${(naturalWidth / width) * 100}%`,
-    height: `${(naturalHeight / height) * 100}%`,
-    left: `${-(x / width) * 100}%`,
-    top: `${-(y / height) * 100}%`,
+    width: `${widthPct}%`,
+    height: `${heightPct}%`,
+    left: `${leftPct}%`,
+    top: `${topPct}%`,
   };
 }
 

@@ -236,7 +236,8 @@ jhipster:
   mail:
     from: ${JHIPSTER_MAIL_FROM:gateway@localhost}
   api-docs:
-    default-include-pattern: /api/**
+  # Suppress JHipster default group; gatewayAuthApi GroupedOpenApi owns auth paths only.
+    default-include-pattern: /openapi-disabled/**
     management-include-pattern: /management/**
     title: Gateway API
     description: Gateway API documentation

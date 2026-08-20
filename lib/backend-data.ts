@@ -666,6 +666,11 @@ export const saveProduct = (row: ProductRow) => {
 
 export const deleteProduct = (id: Id) => deleteAdmin("products", id);
 
+export const clearVariantPhotos = (id: Id) =>
+  api.post<ProductDto>(adminPath("products", id) + "/clear-variant-photos", undefined, { auth: true }).then(
+    fromProductDto,
+  );
+
 export type BlogPostRow = {
   id?: string;
   slug: string;

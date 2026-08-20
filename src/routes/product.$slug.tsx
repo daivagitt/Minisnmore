@@ -3,15 +3,16 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { Product } from "@/data/products";
 import { useProduct, useProducts } from "@/hooks/useProducts";
 import { useShop } from "@/store/shop";
-import { Heart, Truck, Leaf, ChevronRight, MessageCircle, Ruler, Plus, Minus, Share2, X, BadgeCheck, Banknote, RotateCcw } from "lucide-react";
+import { Heart, Truck, Leaf, ChevronRight, Ruler, Plus, Minus, Share2, X, BadgeCheck, Banknote, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductGallery } from "@/components/ProductGallery";
-import { checkSizeFit, clampQuantity } from "@/lib/product-fit";
+import { checkSizeFit, clampQuantity, sizeGuideRowsForProduct } from "@/lib/product-fit";
 import { galleryForSelectedColor } from "@/lib/product-gallery";
 import { resolveStorefrontColorLabel } from "@/lib/expected-prints";
 import { lookupPincode, normalizePincode } from "@/lib/pincode";
 import {
+  catalogSizesForProduct,
   colorNameInList,
   defaultSellableSelection,
   findVariant,
@@ -106,8 +107,8 @@ function ProductPage() {
   }, [product, size]);
 
   const colorGallery = useMemo(
-    () => (product ? galleryForSelectedColor(product, color) : { image: "", gallery: [] as string[] }),
-    [product, color],
+    () => (product ? galleryForSelectedColor(product, color, size) : { image: "", gallery: [] as string[] }),
+    [product, color, size],
   );
 
   const sizeFit = useMemo(() => {
@@ -115,6 +116,11 @@ function ProductPage() {
     const result = checkSizeFit({ heightCm, chestCm, sizes: sizesForDisplay(product) });
     return result.ok ? { size: result.size } : { error: result.error };
   }, [heightCm, chestCm, product]);
+
+  const sizeGuideRows = useMemo(
+    () => (product ? sizeGuideRowsForProduct(catalogSizesForProduct(product)) : []),
+    [product],
+  );
 
   const handleAdd = () => {
     if (!product || !canAdd) {
@@ -146,7 +152,7 @@ function ProductPage() {
     { i: Leaf, t: "Organic" },
     { i: Banknote, t: "COD" },
     { i: Truck, t: "Free ₹1499+" },
-    { i: RotateCcw, t: "30 days" },
+    { i: RotateCcw, t: "3 days" },
   ] as const;
 
   const checkPin = async () => {
@@ -336,7 +342,7 @@ function ProductPage() {
             </button>
             <button
               type="button"
-              onClick={() => toggleWish(product.id)}
+              onClick={() => toggleWish(product.id, product.name)}
               aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
               aria-pressed={wished}
               className={`h-11 w-11 shrink-0 grid place-items-center rounded-full glass transition ${wished ? "text-primary bg-primary/10" : ""}`}
@@ -423,12 +429,6 @@ function ProductPage() {
             <li>Avoid direct sunlight or high heat.</li>
           </ul>
         </details>
-
-        <a href={`https://wa.me/919876543210?text=Hi%2C%20I%27d%20like%20to%20know%20more%20about%20${encodeURIComponent(product.name)}`}
-          target="_blank" rel="noreferrer"
-          className="flex items-center justify-center gap-2 text-xs text-muted-foreground hover:text-primary pt-1">
-          <MessageCircle className="h-3.5 w-3.5" /> Ask on WhatsApp
-        </a>
       </div>
 
       <section className="space-y-6">
@@ -476,8 +476,12 @@ function ProductPage() {
             <table className="w-full text-sm">
               <thead><tr className="text-xs uppercase tracking-wider text-muted-foreground"><th className="text-left py-2">Size</th><th>Weight</th><th>Height</th></tr></thead>
               <tbody className="text-foreground/80">
-                {[["0-3m","2.5–5 kg","45–58 cm"],["3-6m","5–7 kg","58–67 cm"],["6-12m","7–9 kg","67–74 cm"],["12-18m","9–11 kg","74–82 cm"],["18-24m","11–13 kg","82–90 cm"]].map((r) => (
-                  <tr key={r[0]} className="border-t border-border/40"><td className="py-2 font-medium">{r[0]}</td><td className="text-center">{r[1]}</td><td className="text-center">{r[2]}</td></tr>
+                {sizeGuideRows.map((row) => (
+                  <tr key={row.size} className="border-t border-border/40">
+                    <td className="py-2 font-medium">{row.size}</td>
+                    <td className="text-center">{row.weight}</td>
+                    <td className="text-center">{row.height}</td>
+                  </tr>
                 ))}
               </tbody>
             </table>

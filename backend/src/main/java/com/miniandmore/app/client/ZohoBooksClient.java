@@ -145,6 +145,20 @@ public class ZohoBooksClient {
         }
     }
 
+    public void deleteItemImage(String itemId) {
+        if (StringUtils.isBlank(itemId)) {
+            return;
+        }
+        try {
+            executeImageDelete(itemId, false);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Zoho item image delete interrupted", e);
+        } catch (IOException e) {
+            throw new IllegalStateException("Zoho item image delete failed", e);
+        }
+    }
+
     public Optional<BinaryDownload> downloadDocument(String documentId, long maxBytes) {
         if (StringUtils.isBlank(documentId)) {
             return Optional.empty();
@@ -215,6 +229,25 @@ public class ZohoBooksClient {
 
     public Map<String, Object> getSalesOrder(String salesOrderId) {
         return get("/salesorders/" + salesOrderId + "?" + orgIdParam());
+    }
+
+    /**
+     * Zoho rejects inline {@code billing_address}/{@code shipping_address} on create when the
+     * serialized object exceeds 100 characters. Apply one-off addresses after SO creation instead.
+     */
+    public Map<String, Object> updateSalesOrderBillingAddress(String salesOrderId, Map<String, Object> address) {
+        return updateSalesOrderAddress(salesOrderId, "billing", address);
+    }
+
+    public Map<String, Object> updateSalesOrderShippingAddress(String salesOrderId, Map<String, Object> address) {
+        return updateSalesOrderAddress(salesOrderId, "shipping", address);
+    }
+
+    private Map<String, Object> updateSalesOrderAddress(String salesOrderId, String type, Map<String, Object> address) {
+        Map<String, Object> payload = new java.util.LinkedHashMap<>(address);
+        payload.put("is_one_off_address", true);
+        payload.put("is_update_customer", false);
+        return put("/salesorders/" + salesOrderId + "/address/" + type + "?" + orgIdParam(), payload);
     }
 
     @SuppressWarnings("unchecked")
@@ -313,6 +346,28 @@ public class ZohoBooksClient {
         }
         if (statusCode < 200 || statusCode >= 300) {
             throw new IOException("Zoho item image upload failed: HTTP " + statusCode + " " + response.body());
+        }
+    }
+
+    private void executeImageDelete(String itemId, boolean retriedAfterUnauthorized) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(apiBase() + "/items/" + itemId + "/image?" + orgIdParam()))
+            .timeout(BINARY_TIMEOUT)
+            .header("Authorization", "Zoho-oauthtoken " + oauthService.accessToken())
+            .DELETE()
+            .build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        int statusCode = response.statusCode();
+        if (statusCode == 401 && !retriedAfterUnauthorized) {
+            oauthService.accessToken();
+            executeImageDelete(itemId, true);
+            return;
+        }
+        if (statusCode == 404) {
+            return;
+        }
+        if (statusCode < 200 || statusCode >= 300) {
+            throw new IOException("Zoho item image delete failed: HTTP " + statusCode + " " + response.body());
         }
     }
 

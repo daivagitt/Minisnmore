@@ -8,6 +8,8 @@ import {
   summarizeZohoVariantLinkage,
   variantAmountBlur,
   variantAmountInput,
+  rowsFromVariantsJson,
+  serializeVariantRows,
 } from "./admin-variants";
 
 describe("admin-variants SKU helpers", () => {
@@ -83,5 +85,34 @@ describe("admin-variants SKU helpers", () => {
       { sku: "A-M", size: "M", color: "Red", rate: 100, stock: 1, active: true },
     ]);
     expect(summarizeZohoVariantLinkage(json).label).toBe("1/2 variant item(s) in Zoho");
+  });
+
+  it("round-trips per-size imageUrl on same-colour rows", () => {
+    const json = JSON.stringify([
+      {
+        sku: "KEDAR-03-PINK",
+        size: "0-3M",
+        color: "Pink",
+        rate: 100,
+        stock: 1,
+        active: true,
+        imageUrl: "https://cdn.example.com/pink-03.jpg",
+      },
+      {
+        sku: "KEDAR-36-PINK",
+        size: "3-6M",
+        color: "Pink",
+        rate: 100,
+        stock: 1,
+        active: true,
+        imageUrl: "https://cdn.example.com/pink-36.jpg",
+      },
+    ]);
+    const rows = rowsFromVariantsJson(json);
+    expect(rows[0]?.imageUrl).toBe("https://cdn.example.com/pink-03.jpg");
+    expect(rows[1]?.imageUrl).toBe("https://cdn.example.com/pink-36.jpg");
+    const out = serializeVariantRows(rows);
+    expect(out).toContain("pink-03.jpg");
+    expect(out).toContain("pink-36.jpg");
   });
 });

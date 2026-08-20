@@ -15,6 +15,10 @@ export type VariantEditorRow = {
   active: boolean;
   /** Zoho Books item_id for this variant SKU (read-only in admin; set by sync/pull). */
   zohoItemId?: string;
+  /** Lifestyle photo for this size×colour SKU (Zoho item image). */
+  imageUrl?: string;
+  /** Extra photos for this SKU (rear, lifestyle) — preserved on admin save. */
+  imageUrls?: string[];
 };
 
 export type ZohoVariantLinkageSummary = {
@@ -172,6 +176,12 @@ export function rowsFromVariantsJson(raw: string | null | undefined): VariantEdi
             rate = Math.round(rateRaw * 0.8 * 100) / 100;
           }
           const zohoRaw = r.zohoItemId ?? r.zoho_item_id;
+          const imageRaw = r.imageUrl ?? r.image_url;
+          const extraImages = Array.isArray(r.imageUrls)
+            ? r.imageUrls.map((u) => String(u).trim()).filter(Boolean)
+            : Array.isArray(r.image_urls)
+              ? r.image_urls.map((u) => String(u).trim()).filter(Boolean)
+              : [];
           return {
             id: r.id != null ? String(r.id) : undefined,
             sku: String(r.sku ?? "").trim(),
@@ -183,6 +193,8 @@ export function rowsFromVariantsJson(raw: string | null | undefined): VariantEdi
             stock: r.stock != null && r.stock !== "" ? Number(r.stock) : 0,
             active: r.active === false || r.active === "false" || r.active === 0 ? false : true,
             zohoItemId: zohoRaw != null && String(zohoRaw).trim() ? String(zohoRaw).trim() : undefined,
+            imageUrl: imageRaw != null && String(imageRaw).trim() ? String(imageRaw).trim() : undefined,
+            imageUrls: extraImages.length ? extraImages : undefined,
           };
         });
       }
@@ -204,6 +216,8 @@ export function rowsFromVariantsJson(raw: string | null | undefined): VariantEdi
     cost: "",
     stock: v.stock,
     active: v.active,
+    imageUrl: v.imageUrl,
+    imageUrls: v.imageUrls,
   }));
 }
 
@@ -223,6 +237,8 @@ export function serializeVariantRows(rows: VariantEditorRow[]): string {
       if (r.size.trim()) out.size = r.size.trim();
       if (r.color.trim()) out.color = r.color.trim();
       if (r.zohoItemId?.trim()) out.zohoItemId = r.zohoItemId.trim();
+      if (r.imageUrl?.trim()) out.imageUrl = r.imageUrl.trim();
+      if (r.imageUrls?.length) out.imageUrls = r.imageUrls.map((u) => u.trim()).filter(Boolean);
       return out;
     });
   return JSON.stringify(payload);

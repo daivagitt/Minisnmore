@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { LazyImage } from "@/components/LazyImage";
+import { EmptyCartState } from "@/components/EmptyCartState";
 import { cartLineColorLabel, cartLineImage } from "@/lib/cart-catalog";
 import { useShop } from "@/store/shop";
 import { ShoppingBag, Plus, Minus, X, ArrowRight } from "lucide-react";
@@ -18,9 +19,8 @@ function CartPage() {
       <p className="text-sm text-muted-foreground mb-6">{cartCount} item{cartCount === 1 ? "" : "s"} ready to ship.</p>
 
       {cart.length === 0 ? (
-        <div className="glass rounded-2xl p-8 text-center">
-          <p className="text-sm text-muted-foreground">Your cart is empty.</p>
-          <Link to="/shop" className="mt-4 inline-block rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm">Start shopping</Link>
+        <div className="glass rounded-2xl">
+          <EmptyCartState compact />
         </div>
       ) : (
         <>

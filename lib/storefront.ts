@@ -90,7 +90,7 @@ function mapProduct(row: DbProductRow): Product {
   const badge = (row.badge ?? "").toLowerCase();
   const variants = parseVariantsJson(row.variants ?? row.variants_json);
   const itemStructure = (row.item_structure ?? (variants.length ? "VARIANTS" : "SIMPLE")).toUpperCase();
-  const sizes = normalizeSizes(row.sizes);
+  const catalogSizes = normalizeSizes(row.sizes);
   const parentPrice = Number(row.price) || 0;
   const parentCompareAt =
     row.compare_at_price && Number(row.compare_at_price) > parentPrice
@@ -105,10 +105,10 @@ function mapProduct(row: DbProductRow): Product {
     compareAt: parentCompareAt,
     image: heroImage,
     gallery: gallery.length ? gallery : perPrint ? [] : heroImage ? [heroImage] : [],
-    ages: agesFromSizes(sizes, { min: row.age_min_months, max: row.age_max_months }),
+    ages: agesFromSizes(catalogSizes, { min: row.age_min_months, max: row.age_max_months }),
     fabric: fabricFromText(row.fabric_type, row.description, row.story, row.name, row.badge),
     colors: normalizeColors(row.colors),
-    sizes,
+    sizes: catalogSizes,
     rating: 4.8,
     reviewCount: 0,
     category: categoryFromAge(row.age_min_months),

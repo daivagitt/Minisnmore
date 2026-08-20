@@ -163,4 +163,19 @@ public class ProductService {
         LOG.debug("Request to delete Product : {}", id);
         productRepository.deleteById(id);
     }
+
+    /**
+     * Remove all per-variant imageUrl/imageUrls fields from a VARIANTS product.
+     */
+    public ProductDTO clearVariantPhotos(Long id) {
+        LOG.debug("Request to clear variant photos for Product : {}", id);
+        Product product = productRepository
+            .findOneWithEagerRelationships(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
+        if (variantSupport.isVariants(product)) {
+            variantSupport.clearAllVariantImages(product);
+            product = productRepository.save(product);
+        }
+        return productMapper.toDto(product);
+    }
 }

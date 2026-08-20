@@ -39,6 +39,7 @@ import {
   listCategories,
   listProducts,
   categoryNameFromSlug,
+  clearVariantPhotos,
   disambiguateProductImportSlugs,
   parseSpreadsheetActive,
   parseSpreadsheetBoolean,
@@ -107,6 +108,7 @@ function ProductsPage() {
   const [editing, setEditing] = useState<number | null>(null);
   const [ledgerlySyncing, setLedgerlySyncing] = useState<Set<number>>(() => new Set());
   const [zohoSyncing, setZohoSyncing] = useState<Set<number>>(() => new Set());
+  const [clearingVariantPhotos, setClearingVariantPhotos] = useState<Set<number>>(() => new Set());
   const [imageUploading, setImageUploading] = useState<number | null>(null);
   const [skuWiseImporting, setSkuWiseImporting] = useState(false);
 
@@ -257,6 +259,35 @@ function ProductsPage() {
       showApiError(error, "Zoho sync failed");
     } finally {
       setZohoSyncing((prev) => {
+        const next = new Set(prev);
+        next.delete(i);
+        return next;
+      });
+    }
+  };
+
+  const clearVariantPhotosForProduct = async (i: number, p: Product) => {
+    if (!p.id) {
+      toast.error("Save the product first.");
+      return;
+    }
+    if (!isVariantsItemStructure(p.item_structure)) {
+      toast.error("This action applies only to VARIANTS products.");
+      return;
+    }
+    if (!confirm("Clear all variant row photos for this product?")) return;
+    setClearingVariantPhotos((prev) => new Set(prev).add(i));
+    try {
+      const updated = await clearVariantPhotos(Number(p.id));
+      update(i, {
+        variants_json: updated.variants_json,
+        item_structure: updated.item_structure,
+      });
+      toast.success("Variant row photos cleared.");
+    } catch (error) {
+      showApiError(error, "Could not clear variant photos");
+    } finally {
+      setClearingVariantPhotos((prev) => {
         const next = new Set(prev);
         next.delete(i);
         return next;
@@ -931,6 +962,22 @@ function ProductsPage() {
                             <CloudUpload className="h-4 w-4" />
                           )}
                           {zohoSyncing.has(i) ? "Syncing…" : "Sync to Zoho"}
+                        </button>
+                      )}
+                      {p.id && isVariantsItemStructure(p.item_structure) && (
+                        <button
+                          type="button"
+                          disabled={clearingVariantPhotos.has(i)}
+                          onClick={() => void clearVariantPhotosForProduct(i, p)}
+                          className="rounded-full glass px-4 py-2 text-sm flex items-center gap-2 disabled:opacity-50"
+                          title="Remove all photo URLs from variant rows"
+                        >
+                          {clearingVariantPhotos.has(i) ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <X className="h-4 w-4" />
+                          )}
+                          {clearingVariantPhotos.has(i) ? "Clearing…" : "Clear variant photos"}
                         </button>
                       )}
                       <button

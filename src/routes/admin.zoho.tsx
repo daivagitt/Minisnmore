@@ -360,7 +360,7 @@ function ZohoSyncPanel({ connected }: { connected: boolean }) {
       id: "products",
       label: "Sync products to Zoho",
       description:
-        "Push all active products (SKU and category required). Syncs stock and the first product image when enabled in Zoho Books (Locations + Item Image).",
+        "Push all active products (SKU and category required). Syncs stock and each variant SKU's own image when enabled in Zoho Books (Locations + Item Image).",
       icon: Package,
       run: syncAllZohoProducts,
     },

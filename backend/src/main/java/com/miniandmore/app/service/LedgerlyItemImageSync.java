@@ -52,7 +52,7 @@ public class LedgerlyItemImageSync {
     }
 
     /**
-     * Sync Ledgerly's primary image URL onto the product. Replaces slot 0 so repeated pulls do not grow the gallery.
+     * Sync Ledgerly's primary image URL onto the product. Updates slot 0 and keeps extra photos (front/rear).
      */
     public void importItemImage(Product product, String sourceUrl) {
         if (sourceUrl == null || sourceUrl.isBlank()) {
@@ -71,8 +71,10 @@ public class LedgerlyItemImageSync {
                 DownloadedImage downloaded = download(trimmed);
                 String filename = filenameFor(product, downloaded.contentType());
                 String publicUrl = s3StorageService.uploadObject("products", filename, downloaded.body(), downloaded.contentType());
-                setPrimaryImage(product, publicUrl);
-                return;
+                if (publicUrl != null && !publicUrl.isBlank()) {
+                    setPrimaryImage(product, publicUrl);
+                    return;
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 LOG.warn(
@@ -170,7 +172,14 @@ public class LedgerlyItemImageSync {
     }
 
     private void setPrimaryImage(Product product, String url) {
-        writeImages(product, List.of(url));
+        if (url == null || url.isBlank()) {
+            return;
+        }
+        List<String> images = readImages(product);
+        String trimmed = url.trim();
+        images.removeIf(trimmed::equals);
+        images.add(0, trimmed);
+        writeImages(product, images);
     }
 
     private boolean alreadyPrimaryImage(Product product, String url) {

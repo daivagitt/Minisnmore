@@ -1,7 +1,10 @@
 package com.miniandmore.app.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.miniandmore.app.domain.Product;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -243,9 +246,7 @@ public class ProductVariantSupport {
         product.setItemStructure(structure.toUpperCase(Locale.ROOT));
 
         if (!isVariantsStructure(structure)) {
-            if (variantsJson != null) {
-                product.setVariantsJson(null);
-            }
+            product.setVariantsJson(null);
             return true;
         }
 
@@ -258,16 +259,24 @@ public class ProductVariantSupport {
         if (rows.isEmpty() && json != null && !json.isBlank() && !"[]".equals(json.trim())) {
             return false;
         }
-        product.setVariantsJson(serialize(rows));
 
         List<String> sizeList = sizes(rows);
         List<String> colorList = colors(rows);
+        String sizesJson;
+        String mergedColors;
         try {
-            product.setSizesJson(objectMapper.writeValueAsString(sizeList));
-            product.setColorsJson(objectMapper.writeValueAsString(colorList));
-        } catch (Exception ignored) {
-            // keep previous
+            sizesJson = objectMapper.writeValueAsString(sizeList);
+            mergedColors = mergeColorsPreservingGalleries(
+                product.getColorsJson(),
+                product.getColorImagesJson(),
+                colorList
+            );
+        } catch (Exception e) {
+            return false;
         }
+        product.setVariantsJson(serialize(rows));
+        product.setSizesJson(sizesJson);
+        product.setColorsJson(mergedColors);
 
         Aggregates agg = aggregates(rows);
         if (agg.minSelling() != null) {
@@ -282,6 +291,100 @@ public class ProductVariantSupport {
         }
         product.setStock(agg.stockSum());
         return true;
+    }
+
+    /**
+     * Matrix rebuild emits colour names; keep existing front/rear gallery URLs and swatches for those names.
+     */
+    String mergeColorsPreservingGalleries(String previousColorsJson, List<String> colorNames) throws Exception {
+        return mergeColorsPreservingGalleries(previousColorsJson, null, colorNames);
+    }
+
+    String mergeColorsPreservingGalleries(String previousColorsJson, String colorImagesJson, List<String> colorNames)
+        throws Exception {
+        if (colorNames == null || colorNames.isEmpty()) {
+            return previousColorsJson != null ? previousColorsJson : "[]";
+        }
+        Map<String, JsonNode> richByKey = indexRichColorNodes(previousColorsJson, colorImagesJson);
+        if (richByKey.isEmpty()) {
+            return objectMapper.writeValueAsString(colorNames);
+        }
+        ArrayNode out = objectMapper.createArrayNode();
+        Set<String> seen = new LinkedHashSet<>();
+        for (String rawName : colorNames) {
+            String name = normalize(rawName);
+            if (name == null || !seen.add(name.toLowerCase(Locale.ROOT))) {
+                continue;
+            }
+            JsonNode previous = richByKey.get(name.toLowerCase(Locale.ROOT));
+            if (previous != null && previous.isObject()) {
+                ObjectNode copy = previous.deepCopy();
+                copy.put("name", name);
+                out.add(copy);
+            } else {
+                out.add(name);
+            }
+        }
+        return objectMapper.writeValueAsString(out);
+    }
+
+    private Map<String, JsonNode> indexRichColorNodes(String colorsJson, String colorImagesJson) {
+        Map<String, JsonNode> out = new LinkedHashMap<>();
+        if (colorsJson != null && !colorsJson.isBlank()) {
+            try {
+                JsonNode root = objectMapper.readTree(colorsJson);
+                if (root != null && root.isArray()) {
+                    for (JsonNode node : root) {
+                        if (node == null || !node.isObject()) {
+                            continue;
+                        }
+                        String name = node.path("name").asText("");
+                        if (name.isBlank()) {
+                            continue;
+                        }
+                        boolean hasMedia =
+                            node.hasNonNull("imageUrl") ||
+                            node.hasNonNull("swatchUrl") ||
+                            (node.has("imageUrls") && node.get("imageUrls").isArray() && node.get("imageUrls").size() > 0);
+                        if (!hasMedia) {
+                            continue;
+                        }
+                        out.putIfAbsent(name.trim().toLowerCase(Locale.ROOT), node);
+                    }
+                }
+            } catch (Exception ignored) {
+                // keep whatever was indexed
+            }
+        }
+        if (colorImagesJson == null || colorImagesJson.isBlank()) {
+            return out;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(colorImagesJson);
+            if (root == null || !root.isObject()) {
+                return out;
+            }
+            var fields = root.fields();
+            while (fields.hasNext()) {
+                var entry = fields.next();
+                String name = entry.getKey();
+                JsonNode urls = entry.getValue();
+                if (name == null || name.isBlank() || urls == null || !urls.isArray() || urls.isEmpty()) {
+                    continue;
+                }
+                String key = name.trim().toLowerCase(Locale.ROOT);
+                if (out.containsKey(key)) {
+                    continue;
+                }
+                ObjectNode node = objectMapper.createObjectNode();
+                node.put("name", name.trim());
+                node.set("imageUrls", urls.deepCopy());
+                out.put(key, node);
+            }
+        } catch (Exception ignored) {
+            return out;
+        }
+        return out;
     }
 
     /** Keep variant matrix colour labels in sync after print names are realigned to gallery keys. */
@@ -405,6 +508,94 @@ public class ProductVariantSupport {
         return true;
     }
 
+    /** Attach a pulled Zoho image to this SKU so same-colour sizes keep distinct photos. */
+    public boolean setVariantImageUrl(Product product, String variantSku, String imageUrl) {
+        if (product == null || StringUtils.isBlank(variantSku) || StringUtils.isBlank(imageUrl)) {
+            return false;
+        }
+        List<String> merged = new ArrayList<>();
+        merged.add(imageUrl.trim());
+        Optional<VariantRow> existing = findBySku(parseProduct(product), variantSku);
+        if (existing.isPresent() && existing.orElseThrow().imageUrls() != null) {
+            for (String extra : existing.orElseThrow().imageUrls()) {
+                if (StringUtils.isNotBlank(extra) && !extra.trim().equals(imageUrl.trim())) {
+                    merged.add(extra.trim());
+                }
+            }
+        }
+        return setVariantImages(product, variantSku, merged);
+    }
+
+    /** Store this SKU's Zoho photos: first is the hero, the rest are extras (rear, lifestyle). */
+    public boolean setVariantImages(Product product, String variantSku, List<String> imageUrls) {
+        if (product == null || StringUtils.isBlank(variantSku) || imageUrls == null || imageUrls.isEmpty()) {
+            return false;
+        }
+        LinkedHashSet<String> unique = new LinkedHashSet<>();
+        for (String url : imageUrls) {
+            if (StringUtils.isNotBlank(url)) {
+                unique.add(url.trim());
+            }
+        }
+        if (unique.isEmpty()) {
+            return false;
+        }
+        List<VariantRow> rows = new ArrayList<>(parseProduct(product));
+        Optional<VariantRow> match = findBySku(rows, variantSku);
+        if (match.isEmpty()) {
+            return false;
+        }
+        VariantRow row = match.orElseThrow();
+        int targetIndex = rows.indexOf(row);
+        List<String> ordered = new ArrayList<>(unique);
+        String hero = ordered.get(0);
+        List<String> extras = ordered.size() > 1 ? List.copyOf(ordered.subList(1, ordered.size())) : List.of();
+        product.setVariantsJson(
+            serialize(replaceRowAt(rows, targetIndex, row.withImageUrl(hero).withImageUrls(extras)))
+        );
+        return true;
+    }
+
+    /** Remove photos from a SKU after Zoho no longer has an item image. */
+    public boolean clearVariantImages(Product product, String variantSku) {
+        if (product == null || StringUtils.isBlank(variantSku)) {
+            return false;
+        }
+        List<VariantRow> rows = new ArrayList<>(parseProduct(product));
+        Optional<VariantRow> match = findBySku(rows, variantSku);
+        if (match.isEmpty()) {
+            return false;
+        }
+        VariantRow row = match.orElseThrow();
+        int targetIndex = rows.indexOf(row);
+        product.setVariantsJson(serialize(replaceRowAt(rows, targetIndex, row.withImageUrl(null).withImageUrls(List.of()))));
+        return true;
+    }
+
+    /** Drop every SKU photo on a variant parent (Zoho/Ledgerly pull must not resurrect them). */
+    public void clearAllVariantImages(Product product) {
+        if (product == null || !isVariants(product)) {
+            return;
+        }
+        List<VariantRow> rows = parseProduct(product);
+        if (rows.isEmpty()) {
+            return;
+        }
+        List<VariantRow> cleared = new ArrayList<>(rows.size());
+        boolean changed = false;
+        for (VariantRow row : rows) {
+            if (StringUtils.isNotBlank(row.imageUrl()) || (row.imageUrls() != null && !row.imageUrls().isEmpty())) {
+                changed = true;
+                cleared.add(row.withImageUrl(null).withImageUrls(List.of()));
+            } else {
+                cleared.add(row);
+            }
+        }
+        if (changed) {
+            product.setVariantsJson(serialize(cleared));
+        }
+    }
+
     /**
      * Merge one Zoho Books item (matched by variant SKU) into the parent matrix.
      * @return false when the SKU is not on the matrix
@@ -417,13 +608,52 @@ public class ProductVariantSupport {
         Integer stock,
         String zohoItemId
     ) {
-        if (!isVariants(product) || StringUtils.isBlank(variantSku)) {
+        return upsertPulledVariantFromZoho(product, variantSku, null, null, sellingRate, mrp, stock, zohoItemId, false);
+    }
+
+    /**
+     * Update an existing matrix row or append a new one (Zoho Books grouped items / new SKUs).
+     * @param addIfMissing when false, behaves like {@link #mergePulledVariantFromZoho}
+     */
+    public boolean upsertPulledVariantFromZoho(
+        Product product,
+        String variantSku,
+        String size,
+        String color,
+        BigDecimal sellingRate,
+        BigDecimal mrp,
+        Integer stock,
+        String zohoItemId,
+        boolean addIfMissing
+    ) {
+        if (product == null || StringUtils.isBlank(variantSku)) {
             return false;
         }
         List<VariantRow> rows = new ArrayList<>(parseProduct(product));
         Optional<VariantRow> match = findBySku(rows, variantSku);
         if (match.isEmpty()) {
-            return false;
+            if (!addIfMissing) {
+                return false;
+            }
+            String id = "z-" + variantSku.trim().replaceAll("[^A-Za-z0-9]+", "-");
+            rows.add(
+                new VariantRow(
+                    id,
+                    variantSku.trim(),
+                    normalize(size),
+                    normalize(color),
+                    sellingRate != null ? sellingRate : BigDecimal.ZERO,
+                    mrp,
+                    BigDecimal.ZERO,
+                    stock != null ? Math.max(0, stock) : 0,
+                    true,
+                    null,
+                    StringUtils.trimToNull(zohoItemId),
+                    null,
+                    List.of()
+                )
+            );
+            return applyMatrixToProduct(product, STRUCTURE_VARIANTS, serialize(rows));
         }
         VariantRow row = match.orElseThrow();
         int targetIndex = rows.indexOf(row);
@@ -437,21 +667,16 @@ public class ProductVariantSupport {
         }
         int nextStock = stock != null ? Math.max(0, stock) : row.stock();
         String nextZohoId = StringUtils.isNotBlank(zohoItemId) ? zohoItemId.trim() : row.zohoItemId();
-        List<VariantRow> updated = replaceRowAt(
-            rows,
-            targetIndex,
-            row.withPricing(nextRate, nextMrp).withStock(nextStock).withZohoItemId(nextZohoId)
-        );
-        product.setVariantsJson(serialize(updated));
-        Aggregates agg = aggregates(updated);
-        if (agg.minSelling() != null) {
-            product.setPrice(agg.minSelling());
-        }
-        if (agg.minMrp() != null) {
-            product.setCompareAtPrice(agg.minMrp());
-        }
-        product.setStock(agg.stockSum());
-        return true;
+        String nextSize = StringUtils.isNotBlank(size) ? size.trim() : row.size();
+        String nextColor = StringUtils.isNotBlank(color) ? color.trim() : row.color();
+        VariantRow updatedRow = row
+            .withPricing(nextRate, nextMrp)
+            .withStock(nextStock)
+            .withZohoItemId(nextZohoId)
+            .withSize(nextSize)
+            .withColor(nextColor);
+        List<VariantRow> updated = replaceRowAt(rows, targetIndex, updatedRow);
+        return applyMatrixToProduct(product, STRUCTURE_VARIANTS, serialize(updated));
     }
 
     /** Whether any variant row on this parent still appears in the pulled Zoho SKU set. */
@@ -518,22 +743,54 @@ public class ProductVariantSupport {
         int stock,
         boolean active,
         String swatchUrl,
-        String zohoItemId
+        String zohoItemId,
+        String imageUrl,
+        List<String> imageUrls
     ) {
+        public VariantRow {
+            imageUrls = imageUrls == null ? List.of() : imageUrls;
+        }
+
         VariantRow withColor(String nextColor) {
-            return new VariantRow(id, sku, size, nextColor, rate, mrp, cost, stock, active, swatchUrl, zohoItemId);
+            return new VariantRow(id, sku, size, nextColor, rate, mrp, cost, stock, active, swatchUrl, zohoItemId, imageUrl, imageUrls);
+        }
+
+        VariantRow withSize(String nextSize) {
+            return new VariantRow(id, sku, nextSize, color, rate, mrp, cost, stock, active, swatchUrl, zohoItemId, imageUrl, imageUrls);
         }
 
         VariantRow withStock(int nextStock) {
-            return new VariantRow(id, sku, size, color, rate, mrp, cost, nextStock, active, swatchUrl, zohoItemId);
+            return new VariantRow(id, sku, size, color, rate, mrp, cost, nextStock, active, swatchUrl, zohoItemId, imageUrl, imageUrls);
         }
 
         VariantRow withPricing(BigDecimal nextRate, BigDecimal nextMrp) {
-            return new VariantRow(id, sku, size, color, nextRate, nextMrp, cost, stock, active, swatchUrl, zohoItemId);
+            return new VariantRow(id, sku, size, color, nextRate, nextMrp, cost, stock, active, swatchUrl, zohoItemId, imageUrl, imageUrls);
         }
 
         VariantRow withZohoItemId(String nextZohoItemId) {
-            return new VariantRow(id, sku, size, color, rate, mrp, cost, stock, active, swatchUrl, nextZohoItemId);
+            return new VariantRow(id, sku, size, color, rate, mrp, cost, stock, active, swatchUrl, nextZohoItemId, imageUrl, imageUrls);
+        }
+
+        VariantRow withImageUrl(String nextImageUrl) {
+            return new VariantRow(id, sku, size, color, rate, mrp, cost, stock, active, swatchUrl, zohoItemId, nextImageUrl, imageUrls);
+        }
+
+        VariantRow withImageUrls(List<String> nextImageUrls) {
+            return new VariantRow(
+                id,
+                sku,
+                size,
+                color,
+                rate,
+                mrp,
+                cost,
+                stock,
+                active,
+                swatchUrl,
+                zohoItemId,
+                imageUrl,
+                nextImageUrls == null ? List.of() : List.copyOf(nextImageUrls)
+            );
         }
 
         static VariantRow fromMap(Map<String, Object> map) {
@@ -565,7 +822,9 @@ public class ProductVariantSupport {
                 toInt(map.get("stock")),
                 toBoolean(map.get("active"), true),
                 swatchUrlValue(map),
-                zohoItemIdValue(map)
+                zohoItemIdValue(map),
+                imageUrlValue(map),
+                imageUrlsValue(map)
             );
         }
 
@@ -596,6 +855,20 @@ public class ProductVariantSupport {
             if (zohoItemId != null && !zohoItemId.isBlank()) {
                 map.put("zohoItemId", zohoItemId.trim());
             }
+            if (imageUrl != null && !imageUrl.isBlank()) {
+                map.put("imageUrl", imageUrl.trim());
+            }
+            if (imageUrls != null && !imageUrls.isEmpty()) {
+                List<String> extras = new ArrayList<>();
+                for (String url : imageUrls) {
+                    if (url != null && !url.isBlank() && (imageUrl == null || !imageUrl.trim().equals(url.trim()))) {
+                        extras.add(url.trim());
+                    }
+                }
+                if (!extras.isEmpty()) {
+                    map.put("imageUrls", extras);
+                }
+            }
             return map;
         }
 
@@ -613,6 +886,32 @@ public class ProductVariantSupport {
                 return camel;
             }
             return stringValue(map.get("swatch_url"));
+        }
+
+        private static String imageUrlValue(Map<String, Object> map) {
+            String camel = stringValue(map.get("imageUrl"));
+            if (camel != null) {
+                return camel;
+            }
+            return stringValue(map.get("image_url"));
+        }
+
+        private static List<String> imageUrlsValue(Map<String, Object> map) {
+            Object raw = map.get("imageUrls");
+            if (raw == null) {
+                raw = map.get("image_urls");
+            }
+            if (!(raw instanceof List<?> list) || list.isEmpty()) {
+                return List.of();
+            }
+            LinkedHashSet<String> unique = new LinkedHashSet<>();
+            for (Object value : list) {
+                String url = stringValue(value);
+                if (url != null) {
+                    unique.add(url);
+                }
+            }
+            return unique.isEmpty() ? List.of() : List.copyOf(unique);
         }
 
         private static String stringValue(Object value) {

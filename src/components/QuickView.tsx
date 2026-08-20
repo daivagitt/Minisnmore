@@ -56,8 +56,8 @@ export function QuickView() {
   }, [quickView, size]);
 
   const colorGallery = useMemo(
-    () => (quickView ? galleryForSelectedColor(quickView, color) : { image: "", gallery: [] as string[] }),
-    [quickView, color],
+    () => (quickView ? galleryForSelectedColor(quickView, color, size) : { image: "", gallery: [] as string[] }),
+    [quickView, color, size],
   );
 
   return (

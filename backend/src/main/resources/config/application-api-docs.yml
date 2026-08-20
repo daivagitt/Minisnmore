@@ -1,0 +1,17 @@
+# OpenAPI profile — Swagger UI lists catalog + gateway auth specs.
+---
+spring:
+  config:
+    activate:
+      on-profile: api-docs
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    config-url: /v3/api-docs/swagger-config
+    urls:
+      - name: Catalog & commerce
+        url: /v3/api-docs
+      - name: Gateway (auth & users)
+        url: /v3/api-docs/gateway
+    urls-primary-name: Catalog & commerce

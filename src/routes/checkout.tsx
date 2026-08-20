@@ -5,9 +5,10 @@ import { useShop } from "@/store/shop";
 import { useAuth } from "@/hooks/useAuth";
 import { useProducts } from "@/hooks/useProducts";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
-import { Check, ChevronLeft, Loader2, Smartphone, CreditCard, Building2, Wallet, Banknote, Shield, MapPin, Plus, Zap, Minus, X, ShoppingBag, Tag } from "lucide-react";
+import { Check, ChevronLeft, Loader2, Smartphone, CreditCard, Building2, Wallet, Banknote, Shield, MapPin, Plus, Zap, Minus, X, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
+import { EmptyCartState } from "@/components/EmptyCartState";
 import { cartLineColorLabel, cartLineImage, formatCartSyncMessage } from "@/lib/cart-catalog";
 import { createOrder, verifyPayment, getMyProfile, updateMyProfile, ProfileUpdate, fullNameFieldError } from "@/lib/orders.functions";
 import {
@@ -105,6 +106,7 @@ function Checkout() {
   const [selectedAddrId, setSelectedAddrId] = useState<string>("");
   const [saveAddress, setSaveAddress] = useState(true);
   const [profileLoaded, setProfileLoaded] = useState(false);
+  const [fullNameTouched, setFullNameTouched] = useState(false);
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [addressErrors, setAddressErrors] = useState<CheckoutAddressFieldErrors>({});
   const [addressTouched, setAddressTouched] = useState<Partial<Record<CheckoutAddressFieldName, boolean>>>({});
@@ -379,7 +381,7 @@ function Checkout() {
   const validateDetailsStep = () => {
     const nameError = fullNameFieldError(fullName);
     if (nameError) return nameError;
-    if (!fullName.trim()) return "Add your full name in your profile before checkout";
+    if (!fullName.trim()) return "Enter your full name";
     if (!/^\S+@\S+\.\S+$/.test(accountEmail)) return "Your account email is missing or invalid";
     return phoneFieldError(phone);
   };
@@ -396,6 +398,7 @@ function Checkout() {
 
   const next = () => {
     if (step === 0) {
+      setFullNameTouched(true);
       setPhoneTouched(true);
       const detailsError = validateDetailsStep();
       if (detailsError) return toast.error(detailsError);
@@ -600,11 +603,8 @@ function Checkout() {
   if (cart.length === 0) {
     return (
       <div className="px-4 md:px-6 max-w-xl mx-auto">
-        <div className="glass-strong rounded-[2rem] p-10 text-center">
-          <div className="mx-auto h-14 w-14 rounded-full glass grid place-items-center"><ShoppingBag className="h-6 w-6 text-muted-foreground" /></div>
-          <h1 className="font-display text-3xl mt-4">Your basket is empty</h1>
-          <p className="text-sm text-muted-foreground mt-2">Add a few pieces before heading to checkout.</p>
-          <Link to="/shop" className="mt-5 inline-block rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm">Browse shop</Link>
+        <div className="glass-strong rounded-[2rem]">
+          <EmptyCartState />
         </div>
       </div>
     );
@@ -613,14 +613,6 @@ function Checkout() {
   return (
     <div className="px-4 md:px-6 grid lg:grid-cols-[1fr_360px] gap-6 max-w-6xl mx-auto">
       <div className="glass-strong rounded-[2rem] p-6 md:p-10">
-        {couponOff === 0 && (
-          <div className="mb-5 rounded-2xl border border-primary/30 bg-primary/10 text-primary px-4 py-3 text-sm flex items-center gap-2">
-            <Zap className="h-4 w-4" />
-            <span>
-              First order? Use code <strong>WELCOME10</strong> at checkout for 10% off.
-            </span>
-          </div>
-        )}
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
           {step > 0 && <button onClick={back} className="flex items-center gap-1 hover:text-foreground"><ChevronLeft className="h-4 w-4" /> Back</button>}
         </div>
@@ -666,9 +658,11 @@ function Checkout() {
                 <Field
                   label="Full name"
                   required
-                  readOnly
-                  disabled
+                  maxLength={120}
                   value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  onBlur={() => setFullNameTouched(true)}
+                  error={fullNameTouched ? fullNameFieldError(fullName) : undefined}
                   placeholder="Ananya Sharma"
                 />
                 <Field label="Email" type="email" required readOnly disabled value={accountEmail} placeholder="ananya@email.com" />
@@ -685,13 +679,6 @@ function Checkout() {
                   error={phoneTouched ? phoneFieldError(phone) : undefined}
                   placeholder="9999999999"
                 />
-                {!fullName.trim() ? (
-                  <p className="md:col-span-2 text-xs text-muted-foreground">
-                    Add your name in{" "}
-                    <Link to="/account/profile" className="text-primary story-link">your profile</Link>
-                    {" "}before placing an order.
-                  </p>
-                ) : null}
                 <Field label="Baby's name (optional)" value={babyName} onChange={(e) => setBabyName(e.target.value)} placeholder="Aarav" />
               </div>
             )}

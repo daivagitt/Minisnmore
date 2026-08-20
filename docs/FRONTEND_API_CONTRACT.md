@@ -56,6 +56,8 @@ Subscribe CMS fields: `subscribeHeroTitle`, … or snake_case on `/subscribe-pag
 | `listMyPayments` | GET `/api/v1/payments` |
 | Order returns | `/api/v1/order-returns/*` |
 
+**Order & return JSON (snake_case payloads, field tables, examples):** [order-return-json-contract.md](./order-return-json-contract.md)
+
 ## Catalog v1 — admin (JWT + ROLE_ADMIN)
 
 | Frontend | Path prefix |
@@ -70,6 +72,8 @@ Subscribe CMS fields: `subscribeHeroTitle`, … or snake_case on `/subscribe-pag
 
 JHipster DTOs use **camelCase** (`compareAtPrice`, `sortOrder`, `sizesJson`).  
 `backend-data.ts` maps to **snake_case** rows for the UI (`compare_at_price`, `sort_order`, …).
+
+Orders, returns, profile, and checkout use **snake_case** in request/response bodies, except create-order / Razorpay responses which mix in camelCase (`orderId`, `orderNumber`, `razorpayOrderId`). Full field reference: [order-return-json-contract.md](./order-return-json-contract.md).
 
 ## Do not use on catalog
 

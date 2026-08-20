@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
 import { ProductCard } from "./ProductCard";
 import { ShopProvider, useShop } from "@/store/shop";
 import type { Product } from "@/data/products";
@@ -26,7 +27,7 @@ vi.mock("@/hooks/useAuth", () => ({
 }));
 
 vi.mock("sonner", () => ({
-  toast: { error: vi.fn(), success: vi.fn() },
+  toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
 
 vi.mock("@/lib/account.functions", () => ({

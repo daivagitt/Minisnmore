@@ -198,6 +198,12 @@ public class InternalAdminStoreResource {
         return ApiResponse.ok(Map.of("deleted", true));
     }
 
+    @PostMapping("/products/{id}/clear-variant-photos")
+    public ApiResponse<ProductDTO> clearVariantPhotos(@PathVariable Long id) {
+        requireExists(id, productRepository::existsById, "Product");
+        return ApiResponse.ok(productService.clearVariantPhotos(id));
+    }
+
     @GetMapping("/blog-posts")
     public ApiResponse<List<BlogPostDTO>> blogPosts() {
         return ApiResponse.ok(blogPostRepository.findAllByOrderByIdDesc().stream().map(blogPostMapper::toDto).toList());

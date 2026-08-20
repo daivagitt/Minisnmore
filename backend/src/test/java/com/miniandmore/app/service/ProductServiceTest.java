@@ -1,6 +1,7 @@
 package com.miniandmore.app.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -20,6 +21,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class ProductServiceTest {
@@ -125,6 +127,35 @@ class ProductServiceTest {
     void delete() {
         productService.delete(ID);
         verify(productRepository).deleteById(ID);
+    }
+
+    @Test
+    void clearVariantPhotos_clearsAndSavesWhenVariants() {
+        Product entity = new Product()
+            .id(ID)
+            .itemStructure("VARIANTS")
+            .variantsJson("[{\"sku\":\"A\",\"imageUrl\":\"https://cdn.example/a.jpg\"}]");
+        ProductDTO dto = new ProductDTO();
+        dto.setId(ID);
+        when(productRepository.findOneWithEagerRelationships(ID)).thenReturn(Optional.of(entity));
+        when(productRepository.save(entity)).thenReturn(entity);
+        when(productMapper.toDto(entity)).thenReturn(dto);
+
+        ProductDTO result = productService.clearVariantPhotos(ID);
+
+        assertThat(result).isSameAs(dto);
+        assertThat(entity.getVariantsJson()).doesNotContain("imageUrl");
+        verify(productRepository).save(entity);
+    }
+
+    @Test
+    void clearVariantPhotos_missingProduct_throwsNotFound() {
+        when(productRepository.findOneWithEagerRelationships(ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> productService.clearVariantPhotos(ID))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("404 NOT_FOUND")
+            .hasMessageContaining("Product not found");
     }
 
     @Test

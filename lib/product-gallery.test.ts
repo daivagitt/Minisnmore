@@ -1,5 +1,63 @@
 import { describe, expect, it } from "vitest";
-import { galleryForSelectedColor } from "@/lib/product-gallery";
+import { galleryForSelectedColor, sortGalleryByLeadingOrientation } from "@/lib/product-gallery";
+
+describe("sortGalleryByLeadingOrientation", () => {
+  const aspect = (url: string) => {
+    if (url.includes("portrait")) return 0.75;
+    if (url.includes("landscape")) return 1.5;
+    if (url.includes("square")) return 1;
+    return undefined;
+  };
+
+  it("keeps landscape together first when the first image is landscape", () => {
+    const urls = [
+      "https://cdn.example.com/landscape-1.jpg",
+      "https://cdn.example.com/portrait-1.jpg",
+      "https://cdn.example.com/square-1.jpg",
+      "https://cdn.example.com/landscape-2.jpg",
+      "https://cdn.example.com/portrait-2.jpg",
+    ];
+    expect(sortGalleryByLeadingOrientation(urls, aspect)).toEqual([
+      "https://cdn.example.com/landscape-1.jpg",
+      "https://cdn.example.com/landscape-2.jpg",
+      "https://cdn.example.com/portrait-1.jpg",
+      "https://cdn.example.com/portrait-2.jpg",
+      "https://cdn.example.com/square-1.jpg",
+    ]);
+  });
+
+  it("keeps portraits together first when the first image is portrait", () => {
+    const urls = [
+      "https://cdn.example.com/portrait-1.jpg",
+      "https://cdn.example.com/landscape-1.jpg",
+      "https://cdn.example.com/portrait-2.jpg",
+      "https://cdn.example.com/portrait-3.jpg",
+      "https://cdn.example.com/landscape-2.jpg",
+    ];
+    expect(sortGalleryByLeadingOrientation(urls, aspect)).toEqual([
+      "https://cdn.example.com/portrait-1.jpg",
+      "https://cdn.example.com/portrait-2.jpg",
+      "https://cdn.example.com/portrait-3.jpg",
+      "https://cdn.example.com/landscape-1.jpg",
+      "https://cdn.example.com/landscape-2.jpg",
+    ]);
+  });
+
+  it("preserves relative order within the same orientation", () => {
+    const urls = [
+      "https://cdn.example.com/portrait-b.jpg",
+      "https://cdn.example.com/landscape-b.jpg",
+      "https://cdn.example.com/portrait-a.jpg",
+      "https://cdn.example.com/landscape-a.jpg",
+    ];
+    expect(sortGalleryByLeadingOrientation(urls, aspect)).toEqual([
+      "https://cdn.example.com/portrait-b.jpg",
+      "https://cdn.example.com/portrait-a.jpg",
+      "https://cdn.example.com/landscape-b.jpg",
+      "https://cdn.example.com/landscape-a.jpg",
+    ]);
+  });
+});
 
 describe("galleryForSelectedColor", () => {
   it("uses per-colour gallery when the selected colour has images", () => {
@@ -24,6 +82,51 @@ describe("galleryForSelectedColor", () => {
 
     expect(result.image).toBe("https://cdn.example.com/print1-front.jpg");
     expect(result.gallery).toEqual(["https://cdn.example.com/print1-back.jpg"]);
+  });
+
+  it("keeps rear photos when a print-specific front image is mixed in a shared gallery", () => {
+    const shared = [
+      "https://cdn.example.com/navy-front.jpg",
+      "https://cdn.example.com/rear.jpg",
+    ];
+    const result = galleryForSelectedColor(
+      {
+        image: shared[0],
+        gallery: [],
+        colors: [
+          { name: "Navy", hex: "#2c3e58", imageUrls: shared },
+          { name: "Ivory", hex: "#f2eee8", imageUrls: shared },
+        ],
+      },
+      "Navy",
+    );
+
+    expect(result.image).toBe("https://cdn.example.com/navy-front.jpg");
+    expect(result.gallery).toEqual(["https://cdn.example.com/rear.jpg"]);
+  });
+
+  it("does not attach another print's front or rear from a shared gallery", () => {
+    const shared = [
+      "https://cdn.example.com/navy-front.jpg",
+      "https://cdn.example.com/navy-rear.jpg",
+      "https://cdn.example.com/ivory-front.jpg",
+      "https://cdn.example.com/ivory-rear.jpg",
+    ];
+    const navy = galleryForSelectedColor(
+      {
+        image: shared[0],
+        gallery: [],
+        colors: [
+          { name: "Navy", hex: "#2c3e58", imageUrls: shared },
+          { name: "Ivory", hex: "#f2eee8", imageUrls: shared },
+        ],
+      },
+      "Navy",
+    );
+
+    expect(navy.image).toBe("https://cdn.example.com/navy-front.jpg");
+    expect(navy.gallery).toEqual(["https://cdn.example.com/navy-rear.jpg"]);
+    expect(navy.gallery.join(" ")).not.toContain("ivory");
   });
 
   it("does not use print swatches in the main gallery when no lifestyle photos exist", () => {
@@ -163,5 +266,307 @@ describe("galleryForSelectedColor", () => {
     expect(happy.image).not.toBe(snailUrls[0]);
     const pink = galleryForSelectedColor(product, "PINK BUDS");
     expect(pink.image).toBe(pinkUrls[0]);
+  });
+
+  it("uses the selected size SKU photo instead of mixing same-colour galleries", () => {
+    const product = {
+      image: "https://cdn.example.com/card.jpg",
+      gallery: ["https://cdn.example.com/card.jpg"],
+      colors: [
+        {
+          name: "Pink",
+          hex: "#f4c",
+          imageUrls: ["https://cdn.example.com/pink-03.jpg", "https://cdn.example.com/pink-36.jpg"],
+        },
+      ],
+      variants: [
+        {
+          sku: "KEDAR-03-PINK",
+          size: "0-3M",
+          color: "Pink",
+          price: 100,
+          stock: 2,
+          active: true,
+          imageUrl: "https://cdn.example.com/pink-03.jpg",
+        },
+        {
+          sku: "KEDAR-36-PINK",
+          size: "3-6M",
+          color: "Pink",
+          price: 100,
+          stock: 2,
+          active: true,
+          imageUrl: "https://cdn.example.com/pink-36.jpg",
+        },
+      ],
+    };
+    expect(galleryForSelectedColor(product, "Pink", "0-3M")).toEqual({
+      image: "https://cdn.example.com/pink-03.jpg",
+      gallery: [],
+    });
+    expect(galleryForSelectedColor(product, "Pink", "3-6M")).toEqual({
+      image: "https://cdn.example.com/pink-36.jpg",
+      gallery: [],
+    });
+  });
+
+  it("keeps rear extras with the selected size SKU photo", () => {
+    const product = {
+      image: "https://cdn.example.com/card.jpg",
+      gallery: ["https://cdn.example.com/card.jpg", "https://cdn.example.com/pink-rear.jpg"],
+      colors: [
+        {
+          name: "Pink",
+          hex: "#f4c",
+          imageUrls: [
+            "https://cdn.example.com/pink-03.jpg",
+            "https://cdn.example.com/pink-rear.jpg",
+            "https://cdn.example.com/pink-36.jpg",
+          ],
+        },
+      ],
+      variants: [
+        {
+          sku: "KEDAR-03-PINK",
+          size: "0-3M",
+          color: "Pink",
+          price: 100,
+          stock: 2,
+          active: true,
+          imageUrl: "https://cdn.example.com/pink-03.jpg",
+        },
+        {
+          sku: "KEDAR-36-PINK",
+          size: "3-6M",
+          color: "Pink",
+          price: 100,
+          stock: 2,
+          active: true,
+          imageUrl: "https://cdn.example.com/pink-36.jpg",
+        },
+      ],
+    };
+    expect(galleryForSelectedColor(product, "Pink", "0-3M")).toEqual({
+      image: "https://cdn.example.com/pink-03.jpg",
+      gallery: [],
+    });
+    expect(galleryForSelectedColor(product, "Pink", "3-6M")).toEqual({
+      image: "https://cdn.example.com/pink-36.jpg",
+      gallery: [],
+    });
+  });
+
+  it("shows rear photos stored on the variant row", () => {
+    const product = {
+      image: "https://cdn.example.com/card.jpg",
+      gallery: [],
+      colors: [{ name: "Pink", hex: "#f4c", imageUrls: [] }],
+      variants: [
+        {
+          sku: "KEDAR-03-PINK",
+          size: "0-3M",
+          color: "Pink",
+          price: 100,
+          stock: 2,
+          active: true,
+          imageUrl: "https://cdn.example.com/pink-03.jpg",
+          imageUrls: ["https://cdn.example.com/pink-03-rear.jpg"],
+        },
+      ],
+    };
+    expect(galleryForSelectedColor(product, "Pink", "0-3M")).toEqual({
+      image: "https://cdn.example.com/pink-03.jpg",
+      gallery: ["https://cdn.example.com/pink-03-rear.jpg"],
+    });
+  });
+
+  it("shares one gallery when same-colour sizes use the same photos", () => {
+    const product = {
+      image: "https://cdn.example.com/card.jpg",
+      gallery: ["https://cdn.example.com/card.jpg"],
+      colors: [
+        {
+          name: "Pink",
+          hex: "#f4c",
+          imageUrls: ["https://cdn.example.com/pink.jpg", "https://cdn.example.com/pink-rear.jpg"],
+        },
+      ],
+      variants: [
+        {
+          sku: "KEDAR-03-PINK",
+          size: "0-3M",
+          color: "Pink",
+          price: 100,
+          stock: 2,
+          active: true,
+          imageUrl: "https://cdn.example.com/pink.jpg",
+          imageUrls: ["https://cdn.example.com/pink-rear.jpg"],
+        },
+        {
+          sku: "KEDAR-36-PINK",
+          size: "3-6M",
+          color: "Pink",
+          price: 100,
+          stock: 2,
+          active: true,
+          imageUrl: "https://cdn.example.com/pink.jpg",
+        },
+      ],
+    };
+    expect(galleryForSelectedColor(product, "Pink", "0-3M")).toEqual({
+      image: "https://cdn.example.com/pink.jpg",
+      gallery: ["https://cdn.example.com/pink-rear.jpg"],
+    });
+    expect(galleryForSelectedColor(product, "Pink", "3-6M")).toEqual({
+      image: "https://cdn.example.com/pink.jpg",
+      gallery: [],
+    });
+  });
+
+  it("falls back to another size of the same colour when this size has no photo", () => {
+    const product = {
+      image: "https://cdn.example.com/card.jpg",
+      gallery: ["https://cdn.example.com/card.jpg"],
+      colors: [{ name: "red", hex: "#c00", imageUrls: [] }],
+      variants: [
+        {
+          sku: "KED-RED-0-3",
+          size: "0-3",
+          color: "red",
+          price: 380,
+          stock: 0,
+          active: true,
+        },
+        {
+          sku: "KED-RED-3-6",
+          size: "3-6",
+          color: "red",
+          price: 380,
+          stock: 0,
+          active: true,
+          imageUrl: "https://cdn.example.com/red-36.jpg",
+        },
+        {
+          sku: "KED-RED-6-12",
+          size: "6-12",
+          color: "red",
+          price: 380,
+          stock: 0,
+          active: true,
+        },
+      ],
+    };
+    expect(galleryForSelectedColor(product, "red", "3-6")).toEqual({
+      image: "https://cdn.example.com/red-36.jpg",
+      gallery: [],
+    });
+    expect(galleryForSelectedColor(product, "red", "0-3")).toEqual({
+      image: "https://cdn.example.com/red-36.jpg",
+      gallery: [],
+    });
+    expect(galleryForSelectedColor(product, "red", "6-12")).toEqual({
+      image: "https://cdn.example.com/red-36.jpg",
+      gallery: [],
+    });
+  });
+
+  it("does not mix other size photos into a SKU that already has its own gallery", () => {
+    const product = {
+      image: "https://cdn.example.com/card.jpg",
+      gallery: ["https://cdn.example.com/card.jpg", "https://cdn.example.com/tablet.jpg"],
+      colors: [
+        {
+          name: "Blue",
+          hex: "#00f",
+          imageUrls: [
+            "https://cdn.example.com/blue-03.jpg",
+            "https://cdn.example.com/blue-03-rear.jpg",
+            "https://cdn.example.com/blue-36.jpg",
+            "https://cdn.example.com/blue-612.jpg",
+          ],
+        },
+      ],
+      variants: [
+        {
+          sku: "KED-BLU-0-3",
+          size: "0-3",
+          color: "Blue",
+          price: 380,
+          stock: 2,
+          active: true,
+          imageUrl: "https://cdn.example.com/blue-03.jpg",
+          imageUrls: ["https://cdn.example.com/blue-03-rear.jpg"],
+        },
+        {
+          sku: "KED-BLU-3-6",
+          size: "3-6",
+          color: "Blue",
+          price: 380,
+          stock: 2,
+          active: true,
+          imageUrl: "https://cdn.example.com/blue-36.jpg",
+          imageUrls: ["https://cdn.example.com/tablet.jpg"],
+        },
+        {
+          sku: "KED-BLU-6-12",
+          size: "6-12",
+          color: "Blue",
+          price: 380,
+          stock: 2,
+          active: true,
+          imageUrl: "https://cdn.example.com/blue-612.jpg",
+        },
+      ],
+    };
+    expect(galleryForSelectedColor(product, "Blue", "0-3")).toEqual({
+      image: "https://cdn.example.com/blue-03.jpg",
+      gallery: ["https://cdn.example.com/blue-03-rear.jpg"],
+    });
+  });
+
+  it("does not mix different same-colour photos onto an empty size", () => {
+    const product = {
+      image: "https://cdn.example.com/card.jpg",
+      gallery: ["https://cdn.example.com/card.jpg"],
+      colors: [
+        {
+          name: "Blue",
+          hex: "#00f",
+          imageUrls: ["https://cdn.example.com/blue-03.jpg", "https://cdn.example.com/blue-36.jpg"],
+        },
+      ],
+      variants: [
+        {
+          sku: "KED-BLU-0-3",
+          size: "0-3",
+          color: "Blue",
+          price: 380,
+          stock: 2,
+          active: true,
+          imageUrl: "https://cdn.example.com/blue-03.jpg",
+        },
+        {
+          sku: "KED-BLU-3-6",
+          size: "3-6",
+          color: "Blue",
+          price: 380,
+          stock: 2,
+          active: true,
+          imageUrl: "https://cdn.example.com/blue-36.jpg",
+        },
+        {
+          sku: "KED-BLU-6-12",
+          size: "6-12",
+          color: "Blue",
+          price: 380,
+          stock: 2,
+          active: true,
+        },
+      ],
+    };
+    expect(galleryForSelectedColor(product, "Blue", "6-12")).toEqual({
+      image: "",
+      gallery: [],
+    });
   });
 });

@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ShopProvider, useShop } from "./shop";
 import type { Product } from "@/data/products";
-import { addMyWishlistItem, replaceMyCart, replaceMyWishlist, removeMyWishlistItem } from "@/lib/account.functions";
+import { toast } from "sonner";
+import { replaceMyCart, replaceMyWishlist } from "@/lib/account.functions";
 
 const authState = vi.hoisted(() => ({
   user: null as { id: number } | null,
@@ -26,7 +27,7 @@ vi.mock("@/hooks/useAuth", () => ({
 }));
 
 vi.mock("sonner", () => ({
-  toast: { error: vi.fn(), success: vi.fn() },
+  toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
 
 vi.mock("@/lib/account.functions", () => ({
@@ -142,18 +143,19 @@ describe("ShopProvider", () => {
     await userEvent.click(screen.getByRole("button", { name: "wish" }));
     expect(screen.getByTestId("wishlist")).toHaveTextContent("p1");
     expect(localStorage.getItem("mnm_wish_u_1")).toContain("p1");
-    await waitFor(() => expect(addMyWishlistItem).toHaveBeenCalledWith("p1"));
-    await waitFor(() => expect(replaceMyWishlist).toHaveBeenCalled());
+    await waitFor(() => expect(replaceMyWishlist).toHaveBeenCalledWith(["p1"]));
     await waitFor(() => expect(replaceMyCart).toHaveBeenCalled());
     await userEvent.click(screen.getByRole("button", { name: "wish" }));
     expect(screen.getByTestId("wishlist")).toHaveTextContent("");
-    await waitFor(() => expect(removeMyWishlistItem).toHaveBeenCalledWith("p1"));
+    await waitFor(() => expect(replaceMyWishlist).toHaveBeenCalledWith([]));
 
     await userEvent.click(screen.getByRole("button", { name: "remove" }));
     expect(screen.getByTestId("count")).toHaveTextContent("0");
 
     await userEvent.click(screen.getByRole("button", { name: "add" }));
     await userEvent.click(screen.getByRole("button", { name: "zero" }));
+    expect(screen.getByTestId("count")).toHaveTextContent("1");
+    await userEvent.click(screen.getByRole("button", { name: "Remove only" }));
     expect(screen.getByTestId("count")).toHaveTextContent("0");
 
     await userEvent.click(screen.getByRole("button", { name: "add" }));

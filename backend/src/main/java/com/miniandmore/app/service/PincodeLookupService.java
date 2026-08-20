@@ -9,8 +9,11 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -18,6 +21,8 @@ public class PincodeLookupService {
 
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(8);
     private static final String USER_AGENT = "MiniSnMore/1.0 (+https://minisnmore.com)";
+    private static final int DELIVERY_ETA_BUFFER_DAYS = 3;
+    private static final Pattern ETA_DAY_PATTERN = Pattern.compile("(\\d+)");
     private static final List<String> METRO_NAMES = List.of(
         "Mumbai",
         "Delhi",
@@ -50,12 +55,46 @@ public class PincodeLookupService {
         if (xpressBeesClient.isConfigured()) {
             Optional<PincodeLookupDTO> serviceable = lookupXpressBees(pincode);
             if (serviceable.isPresent()) {
-                return serviceable;
+                return serviceable.map(this::withDeliveryBuffer);
             }
             return Optional.empty();
         }
         // India Post has broader coverage for Indian pincodes; Zippopotam is the fallback.
-        return lookupIndiaPost(pincode).or(() -> lookupZippopotam(pincode));
+        return lookupIndiaPost(pincode).or(() -> lookupZippopotam(pincode)).map(this::withDeliveryBuffer);
+    }
+
+    private PincodeLookupDTO withDeliveryBuffer(PincodeLookupDTO dto) {
+        return new PincodeLookupDTO(dto.city(), dto.state(), adjustEtaWithBuffer(dto.eta()));
+    }
+
+    static String adjustEtaWithBuffer(String eta) {
+        if (eta == null || eta.isBlank()) {
+            return eta;
+        }
+        String trimmed = eta.trim();
+        if ("Same day".equalsIgnoreCase(trimmed)) {
+            return formatBufferedDays(DELIVERY_ETA_BUFFER_DAYS);
+        }
+        Matcher matcher = ETA_DAY_PATTERN.matcher(trimmed);
+        if (!matcher.find()) {
+            return eta;
+        }
+        List<Integer> adjusted = new ArrayList<>();
+        matcher.reset();
+        while (matcher.find()) {
+            adjusted.add(Integer.parseInt(matcher.group(1)) + DELIVERY_ETA_BUFFER_DAYS);
+        }
+        if (adjusted.size() >= 2) {
+            return adjusted.get(0) + "–" + adjusted.get(1) + " days";
+        }
+        return formatBufferedDays(adjusted.get(0));
+    }
+
+    private static String formatBufferedDays(int days) {
+        if (days == 1) {
+            return "1 day";
+        }
+        return days + " days";
     }
 
     private Optional<PincodeLookupDTO> lookupXpressBees(String pincode) {

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -65,6 +66,12 @@ class OrderReturnServiceTest {
     @Spy
     private ProductVariantSupport variantSupport = new ProductVariantSupport(new com.fasterxml.jackson.databind.ObjectMapper());
 
+    @Mock
+    private OrderMailService orderMailService;
+
+    @Mock
+    private OrderSmsService orderSmsService;
+
     @InjectMocks
     private OrderReturnService orderReturnService;
 
@@ -98,6 +105,33 @@ class OrderReturnServiceTest {
         assertThat(result.getOrder()).isSameAs(order);
         assertThat(result.getReturnNumber()).startsWith("RET-" + ORDER_NUMBER);
         verify(orderReturnRepository).save(any(OrderReturn.class));
+        verify(orderMailService).sendReturnUpdate(eq(order), any(OrderReturn.class));
+    }
+
+    @Test
+    void requestReturn_mailFailure_stillPersists() {
+        CustomerOrder order = eligibleOrder();
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin(ORDER_NUMBER, USER)).thenReturn(Optional.of(order));
+        when(orderReturnRepository.existsByOrderIdAndStatusIn(eq(order.getId()), any())).thenReturn(false);
+        when(orderReturnRepository.save(any(OrderReturn.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        doThrow(new RuntimeException("smtp down")).when(orderMailService).sendReturnUpdate(any(), any());
+
+        OrderReturn result = orderReturnService.requestReturn(USER, ORDER_NUMBER, "Product arrived damaged in transit");
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REQUESTED);
+    }
+
+    @Test
+    void cancelByCustomer_nullOrder_skipsEmail() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.REQUESTED);
+        orderReturn.setUserLogin(USER);
+        orderReturn.setOrder(null);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        orderReturnService.cancelByCustomer(USER, "RET-1");
+
+        verify(orderMailService, never()).sendReturnUpdate(any(), any());
     }
 
     @Test
@@ -122,6 +156,7 @@ class OrderReturnServiceTest {
 
         assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.CANCELLED);
         assertThat(result.getResolvedAt()).isNotNull();
+        verify(orderMailService).sendReturnUpdate(any(), eq(orderReturn));
     }
 
     @Test
@@ -134,6 +169,7 @@ class OrderReturnServiceTest {
 
         assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.APPROVED);
         assertThat(result.getAdminNotes()).isEqualTo("Approved by admin");
+        verify(orderMailService).sendReturnUpdate(any(), eq(orderReturn));
     }
 
     @Test

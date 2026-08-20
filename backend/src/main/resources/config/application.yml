@@ -203,9 +203,11 @@ info:
 
 jhipster:
   mail:
-    from: miniandmore@localhost
+    from: ${JHIPSTER_MAIL_FROM:miniandmore@localhost}
+    base-url: ${JHIPSTER_MAIL_BASE_URL:http://127.0.0.1:8080}
   api-docs:
-    default-include-pattern: /api/v1/**
+  # Suppress JHipster default group; catalogPublicApi GroupedOpenApi owns the contract.
+    default-include-pattern: /openapi-disabled/**
     management-include-pattern: /management/**
     title: Miniandmore API
     description: Miniandmore API documentation
@@ -296,6 +298,21 @@ application:
     password: ${XPRESSBEES_PASSWORD:}
     origin-pincode: ${XPRESSBEES_ORIGIN_PINCODE:560074}
     payment-type: ${XPRESSBEES_PAYMENT_TYPE:prepaid}
+  fastsms:
+    enabled: ${FASTSMS_ENABLED:false}
+    base-url: ${FASTSMS_BASE_URL:https://s.fastsmsindia.com/api/sms/v1.0}
+    access-token: ${FASTSMS_ACCESS_TOKEN:}
+    access-token-key: ${FASTSMS_ACCESS_TOKEN_KEY:}
+    sms-header: ${FASTSMS_SMS_HEADER:MININM}
+    route: ${FASTSMS_ROUTE:transactional}
+    entity-id: ${FASTSMS_ENTITY_ID:1701178669941271239}
+    template-id: ${FASTSMS_TEMPLATE_ID:}
+    expire-seconds: ${FASTSMS_EXPIRE_SECONDS:3600}
+    # DLT message bodies live as Java defaults in ApplicationProperties.FastSms.Templates
+    # (brace placeholders like {name} must not appear inside ${ENV:default} YAML defaults).
+    templates:
+      order-confirmed-template-id: ${FASTSMS_TMPL_ORDER_CONFIRMED_ID:1777178696636494530}
+      order-cancelled-template-id: ${FASTSMS_TMPL_ORDER_CANCELLED_ID:1777178696692470339}
 
 razorpay:
   key-id: ${RAZORPAY_KEY_ID:}
