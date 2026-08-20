@@ -169,6 +169,40 @@ class ZohoSyncServiceTest {
     }
 
     @Test
+    void syncProduct_create_duplicateItemName_updatesExistingInsteadOfFailing() {
+        Product product = new Product()
+            .id(12L)
+            .sku("SKU-12")
+            .name("Baby Swaddle")
+            .stock(3)
+            .price(BigDecimal.valueOf(499))
+            .active(true);
+        when(productRepository.findOneWithEagerRelationships(12L)).thenReturn(Optional.of(product));
+        when(booksClient.createItem(any()))
+            .thenThrow(
+                new RestClientResponseException(
+                    "Item already exists.",
+                    400,
+                    "Bad Request",
+                    null,
+                    "{\"code\":1001,\"message\":\"Item \\\"Baby Swaddle\\\" already exists.\"}".getBytes(),
+                    null
+                )
+            );
+        when(booksClient.findItemBySku("SKU-12"))
+            .thenReturn(null)
+            .thenReturn(Map.of("item_id", "zoho-existing-12"));
+        when(booksClient.updateItem(eq("zoho-existing-12"), any())).thenReturn(Map.of("item", Map.of("item_id", "zoho-existing-12")));
+
+        service.syncProduct(12L);
+
+        verify(booksClient).createItem(any());
+        verify(booksClient).updateItem(eq("zoho-existing-12"), any());
+        verify(productRepository).updateZohoSyncSuccess(eq(12L), eq("zoho-existing-12"), eq(ZohoSyncStatus.SYNCED), any());
+        verify(productRepository, never()).updateZohoSyncFailure(eq(12L), any(), any());
+    }
+
+    @Test
     void syncProduct_create_withoutInventoryAccount_usesSalesItem() {
         when(booksClient.listAssetAccounts()).thenReturn(List.of());
 
@@ -1027,8 +1061,9 @@ class ZohoSyncServiceTest {
                     !payload.containsKey("group_id")
             )
         );
-        verify(productRepository).save(argThat(saved ->
-            saved.getVariantsJson().contains("zoho-s") && saved.getVariantsJson().contains("zoho-m")
+        // Saved once per row as each Zoho item id lands, plus the final save — not just once at the end.
+        verify(productRepository, times(2)).save(argThat(saved ->
+            saved.getVariantsJson().contains("zoho-s") || saved.getVariantsJson().contains("zoho-m")
         ));
         verify(productRepository).updateZohoSyncSuccess(eq(20L), any(), eq(ZohoSyncStatus.SYNCED), any());
     }

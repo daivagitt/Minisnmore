@@ -247,12 +247,15 @@ public class ZohoSyncService {
             }
             String zohoItemId = pushVariantRowToZoho(product, row);
             variantSupport.setVariantZohoItemId(product, row.sku(), zohoItemId);
+            // Persist each row's new id as soon as it succeeds. If a later row in this same pass
+            // fails, this row's freshly created Zoho item is not left stranded in memory only — a
+            // retry would otherwise still see the old stale id and try to create a duplicate.
+            productRepository.save(product);
             pushed++;
         }
         if (pushed == 0) {
             throw new IllegalStateException("No active variant SKUs for Zoho sync");
         }
-        productRepository.save(product);
         String parentItemId = StringUtils.trimToNull(product.getZohoItemId());
         productRepository.updateZohoSyncSuccess(product.getId(), parentItemId, ZohoSyncStatus.SYNCED, Instant.now());
     }
@@ -416,7 +419,7 @@ public class ZohoSyncService {
 
     private Map<String, Object> saveZohoItem(boolean openingStock, String itemId, Map<String, Object> payload) {
         try {
-            return openingStock ? booksClient.createItem(payload) : booksClient.updateItem(itemId, payload);
+            return openingStock ? createItemSelfHealing(payload) : booksClient.updateItem(itemId, payload);
         } catch (RestClientResponseException e) {
             if (!openingStock && isItemNotFound(e)) {
                 // The stored zohoItemId points at an item that no longer exists in this Zoho org
@@ -424,7 +427,7 @@ public class ZohoSyncService {
                 // instead of failing the whole sync; stock is reconciled separately after push, so a
                 // fresh create without initial-stock fields is safe.
                 LOG.warn("Zoho item {} no longer exists; re-creating instead of updating: {}", itemId, e.getMessage());
-                return booksClient.createItem(payload);
+                return createItemSelfHealing(payload);
             }
             if (
                 e.getStatusCode().value() == 400 &&
@@ -435,9 +438,33 @@ public class ZohoSyncService {
                 LOG.warn("Zoho rejected variant group/attribute fields; retrying as a plain item: {}", e.getMessage());
                 Map<String, Object> plain = new LinkedHashMap<>(payload);
                 stripExtraVariantFields(plain);
-                return openingStock ? booksClient.createItem(plain) : booksClient.updateItem(itemId, plain);
+                return openingStock ? createItemSelfHealing(plain) : booksClient.updateItem(itemId, plain);
             }
             throw e;
+        }
+    }
+
+    /**
+     * A create can race a concurrent sync of the same product, or land right after a previous
+     * attempt's create succeeded but a later step in that same attempt failed before the new id
+     * was persisted (so the retry tries to create the same SKU again). Either way Zoho rejects it
+     * as a duplicate name — look the real item up by SKU and update it instead of failing.
+     */
+    private Map<String, Object> createItemSelfHealing(Map<String, Object> payload) {
+        try {
+            return booksClient.createItem(payload);
+        } catch (RestClientResponseException e) {
+            if (!isDuplicateItemName(e)) {
+                throw e;
+            }
+            String sku = stringValue(payload.get("sku"));
+            Map<String, Object> existing = StringUtils.isNotBlank(sku) ? booksClient.findItemBySku(sku) : null;
+            String existingId = existing != null ? stringValue(existing.get("item_id")) : null;
+            if (StringUtils.isBlank(existingId)) {
+                throw e;
+            }
+            LOG.warn("Zoho item for SKU {} already exists ({}); updating it instead of creating a duplicate", sku, existingId);
+            return booksClient.updateItem(existingId, payload);
         }
     }
 
@@ -447,6 +474,14 @@ public class ZohoSyncService {
             return false;
         }
         return body.contains("\"code\":2006") || (body.contains("cannot be edited") && body.contains("does not exist"));
+    }
+
+    private static boolean isDuplicateItemName(RestClientResponseException exception) {
+        String body = StringUtils.defaultString(exception.getResponseBodyAsString()).toLowerCase();
+        if (exception.getStatusCode().value() != 400) {
+            return false;
+        }
+        return body.contains("\"code\":1001") || body.contains("already exists");
     }
 
     private static boolean hasExtraVariantFields(Map<String, Object> payload) {
