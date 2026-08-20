@@ -1741,6 +1741,62 @@ class ZohoSyncServiceTest {
     }
 
     @Test
+    void syncProduct_inactiveVariants_staleZohoItemId_skipsRatherThanFailingWholeProduct() {
+        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository
+            );
+
+        Product product = new Product()
+            .id(40801L)
+            .sku("BABY-SWADDLE")
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                """
+                [
+                  {"sku":"BABY-SWADDLE-CS-BROWN","size":"COMMON SIZE","color":"Brown","rate":10,"stock":1,"active":true,"zohoItemId":"stale-1"},
+                  {"sku":"BABY-SWADDLE-CS-GREEN","size":"COMMON SIZE","color":"Green","rate":10,"stock":1,"active":true,"zohoItemId":"stale-2"},
+                  {"sku":"BABY-SWADDLE-CS-WHITE","size":"COMMON SIZE","color":"White","rate":10,"stock":1,"active":true,"zohoItemId":"stale-3"}
+                ]
+                """
+            )
+            .zohoSyncStatus(ZohoSyncStatus.SYNCED)
+            .active(false);
+        when(productRepository.findOneWithEagerRelationships(40801L)).thenReturn(Optional.of(product));
+        RestClientResponseException notFound = new RestClientResponseException(
+            "Resource does not exist",
+            400,
+            "Bad Request",
+            null,
+            "{\"code\":2006,\"message\":\"Resource does not exist\"}".getBytes(),
+            null
+        );
+        when(booksClient.markItemInactive("stale-1")).thenThrow(notFound);
+        when(booksClient.markItemInactive("stale-2")).thenReturn(Map.of());
+        when(booksClient.markItemInactive("stale-3")).thenThrow(notFound);
+
+        service.syncProduct(40801L);
+
+        verify(booksClient).markItemInactive("stale-1");
+        verify(booksClient).markItemInactive("stale-2");
+        verify(booksClient).markItemInactive("stale-3");
+        verify(productRepository, never()).updateZohoSyncFailure(eq(40801L), eq(ZohoSyncStatus.FAILED), any());
+        verify(productRepository).updateZohoSyncFailure(40801L, ZohoSyncStatus.SYNCED, null);
+    }
+
+    @Test
     void syncOrder_simpleProduct_stillUsesParentZohoItemId() {
         Product product = new Product().id(50L).sku("SWADDLE").zohoItemId("zoho-simple").itemStructure("SIMPLE");
         OrderItem line = new OrderItem().productId("50").productName("Muslin Swaddle").qty(2).price(BigDecimal.TEN);

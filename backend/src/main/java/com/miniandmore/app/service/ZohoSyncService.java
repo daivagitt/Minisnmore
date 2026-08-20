@@ -479,14 +479,31 @@ public class ZohoSyncService {
         if (variantSupport.isVariants(product)) {
             for (ProductVariantSupport.VariantRow row : variantSupport.parseProduct(product)) {
                 if (StringUtils.isNotBlank(row.zohoItemId())) {
-                    booksClient.markItemInactive(row.zohoItemId().trim());
+                    markItemInactiveIfPresent(row.zohoItemId().trim(), "variant " + row.sku());
                 }
             }
         }
         if (StringUtils.isNotBlank(product.getZohoItemId()) && zohoGroupId(product).isEmpty()) {
-            booksClient.markItemInactive(product.getZohoItemId());
+            markItemInactiveIfPresent(product.getZohoItemId(), "product " + product.getSku());
         }
         productRepository.updateZohoSyncFailure(product.getId(), ZohoSyncStatus.SYNCED, null);
+    }
+
+    /**
+     * A stored zohoItemId can point at an item that was already deleted in Zoho (e.g. manually, or
+     * by an earlier bug). There is nothing left to deactivate in that case — skip it rather than
+     * failing the whole product's sync over one stale id among several.
+     */
+    private void markItemInactiveIfPresent(String itemId, String label) {
+        try {
+            booksClient.markItemInactive(itemId);
+        } catch (RestClientResponseException e) {
+            if (isItemNotFound(e)) {
+                LOG.debug("Zoho item {} for {} no longer exists; nothing to deactivate", itemId, label);
+                return;
+            }
+            throw e;
+        }
     }
 
     private static boolean isZohoLinked(Product product) {
