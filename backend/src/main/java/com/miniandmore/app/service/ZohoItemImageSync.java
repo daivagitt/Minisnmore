@@ -101,6 +101,11 @@ public class ZohoItemImageSync {
         ProductVariantSupport.VariantRow variant = row.orElseThrow();
         addResolvedUrl(urls, seen, variant.imageUrl());
         addResolvedUrls(urls, seen, variant.imageUrls());
+        if (urls.isEmpty()) {
+            // Admin-curated photos are usually uploaded once per colour (the colour gallery) rather
+            // than per SKU, so a size with no photo of its own still has a print to push to Zoho.
+            addResolvedUrls(urls, seen, colorImagesSupport.galleryUrlsForColor(product, variant.color()));
+        }
         return urls;
     }
 

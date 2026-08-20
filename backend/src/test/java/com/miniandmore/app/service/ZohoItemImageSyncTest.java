@@ -149,6 +149,30 @@ class ZohoItemImageSyncTest {
     }
 
     @Test
+    void resolveVariantImageUrls_fallsBackToColourGalleryWhenSkuHasNoOwnPhoto() {
+        Product product = new Product()
+            .id(19L)
+            .sku("BASIC-SHORTS")
+            .itemStructure("VARIANTS")
+            .colorImagesJson(
+                "{\"Snail Blue\":[\"https://cdn.example.com/snail-blue-1.png\",\"https://cdn.example.com/snail-blue-2.png\"]}"
+            )
+            .variantsJson(
+                """
+                [
+                  {"sku":"BASIC-SHORTS-03-SNAIL-BLUE","size":"0-3","color":"Snail Blue","rate":100,"stock":2,"active":true},
+                  {"sku":"BASIC-SHORTS-36-SNAIL-BLUE","size":"3-6","color":"Snail Blue","rate":100,"stock":2,"active":true}
+                ]
+                """
+            );
+
+        assertThat(itemImageSync.resolveVariantImageUrls(product, "BASIC-SHORTS-03-SNAIL-BLUE"))
+            .containsExactly("https://cdn.example.com/snail-blue-1.png", "https://cdn.example.com/snail-blue-2.png");
+        assertThat(itemImageSync.resolveVariantImageUrls(product, "BASIC-SHORTS-36-SNAIL-BLUE"))
+            .containsExactly("https://cdn.example.com/snail-blue-1.png", "https://cdn.example.com/snail-blue-2.png");
+    }
+
+    @Test
     void resolveVariantImageUrls_emptySkuDoesNotPushSiblingPhotosToZoho() {
         Product product = new Product()
             .id(17L)
