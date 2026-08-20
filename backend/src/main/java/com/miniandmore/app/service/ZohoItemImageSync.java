@@ -281,8 +281,14 @@ public class ZohoItemImageSync {
             }
             boolean sharedFronts = primaries.size() <= 1;
             if (sharedFronts) {
-                LinkedHashSet<String> shared = new LinkedHashSet<>(orderedPhotos(colorRows));
-                colorImagesSupport.replaceColorGallery(product, label, new ArrayList<>(shared));
+                // Every size is pushed to Zoho with the same single representative photo (a Zoho
+                // item only holds one image), so a photo pulled back is never richer than the
+                // admin's own colour gallery. Seed the gallery only if it is still empty — never
+                // replace an existing multi-photo gallery with this single re-imported photo.
+                List<String> shared = orderedPhotos(colorRows);
+                if (!shared.isEmpty()) {
+                    colorImagesSupport.seedGalleryUrlIfEmpty(product, label, shared.get(0));
+                }
                 continue;
             }
             LinkedHashSet<String> sharedExtras = new LinkedHashSet<>();

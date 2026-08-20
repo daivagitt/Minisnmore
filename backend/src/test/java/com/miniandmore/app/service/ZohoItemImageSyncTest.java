@@ -269,6 +269,49 @@ class ZohoItemImageSyncTest {
     }
 
     @Test
+    void importZohoVariantColorImage_samePhotoAcrossSizes_doesNotCollapseRichColourGallery() {
+        // The shop uploads photos once per colour, never per size — every size's Zoho item is
+        // pushed the same single representative photo (Zoho items hold only one image each).
+        // Pulling that single photo back down must not replace the admin's richer local gallery.
+        Product product = new Product()
+            .id(24L)
+            .sku("BASIC-SHORTS")
+            .itemStructure("VARIANTS")
+            .colorsJson(
+                "[{\"name\":\"Blue\",\"imageUrls\":[" +
+                "\"https://cdn.example.com/blue-1.png\",\"https://cdn.example.com/blue-2.png\"," +
+                "\"https://cdn.example.com/blue-3.png\"]}]"
+            )
+            .variantsJson(
+                """
+                [
+                  {"sku":"BS-03-BLUE","size":"0-3","color":"Blue","rate":100,"stock":2,"active":true},
+                  {"sku":"BS-36-BLUE","size":"3-6","color":"Blue","rate":100,"stock":2,"active":true}
+                ]
+                """
+            );
+
+        itemImageSync.importZohoVariantColorImage(
+            product,
+            "Blue",
+            "zoho-03",
+            Map.of("sku", "BS-03-BLUE", "image_name", "blue-1.png", "image_url", "https://cdn.example.com/blue-1.png"),
+            false
+        );
+        itemImageSync.importZohoVariantColorImage(
+            product,
+            "Blue",
+            "zoho-36",
+            Map.of("sku", "BS-36-BLUE", "image_name", "blue-1.png", "image_url", "https://cdn.example.com/blue-1.png"),
+            false
+        );
+
+        assertThat(product.getColorsJson()).contains("blue-1.png");
+        assertThat(product.getColorsJson()).contains("blue-2.png");
+        assertThat(product.getColorsJson()).contains("blue-3.png");
+    }
+
+    @Test
     void importZohoVariantColorImage_emptySameColorSizeInheritsSiblingPhotos() {
         Product product = new Product()
             .id(16L)
