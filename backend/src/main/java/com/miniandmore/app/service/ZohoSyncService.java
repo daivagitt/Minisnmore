@@ -418,6 +418,14 @@ public class ZohoSyncService {
         try {
             return openingStock ? booksClient.createItem(payload) : booksClient.updateItem(itemId, payload);
         } catch (RestClientResponseException e) {
+            if (!openingStock && isItemNotFound(e)) {
+                // The stored zohoItemId points at an item that no longer exists in this Zoho org
+                // (deleted in Zoho, org changed, or the id was never actually created). Re-create it
+                // instead of failing the whole sync; stock is reconciled separately after push, so a
+                // fresh create without initial-stock fields is safe.
+                LOG.warn("Zoho item {} no longer exists; re-creating instead of updating: {}", itemId, e.getMessage());
+                return booksClient.createItem(payload);
+            }
             if (
                 e.getStatusCode().value() == 400 &&
                 hasExtraVariantFields(payload) &&
@@ -431,6 +439,14 @@ public class ZohoSyncService {
             }
             throw e;
         }
+    }
+
+    private static boolean isItemNotFound(RestClientResponseException exception) {
+        String body = StringUtils.defaultString(exception.getResponseBodyAsString()).toLowerCase();
+        if (exception.getStatusCode().value() != 400) {
+            return false;
+        }
+        return body.contains("\"code\":2006") || (body.contains("cannot be edited") && body.contains("does not exist"));
     }
 
     private static boolean hasExtraVariantFields(Map<String, Object> payload) {

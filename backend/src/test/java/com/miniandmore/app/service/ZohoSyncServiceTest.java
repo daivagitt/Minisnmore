@@ -138,6 +138,37 @@ class ZohoSyncServiceTest {
     }
 
     @Test
+    void syncProduct_update_staleZohoItemId_recreatesInsteadOfFailing() {
+        Product product = new Product()
+            .id(11L)
+            .sku("SKU-11")
+            .name("Basic Shorts")
+            .zohoItemId("zoho-deleted")
+            .stock(10)
+            .price(BigDecimal.valueOf(499))
+            .active(true);
+        when(productRepository.findOneWithEagerRelationships(11L)).thenReturn(Optional.of(product));
+        when(booksClient.updateItem(eq("zoho-deleted"), any()))
+            .thenThrow(
+                new RestClientResponseException(
+                    "This item cannot be edited as it does not exist.",
+                    400,
+                    "Bad Request",
+                    null,
+                    "{\"code\":2006,\"message\":\"This item cannot be edited as it does not exist.\"}".getBytes(),
+                    null
+                )
+            );
+        when(booksClient.createItem(any())).thenReturn(Map.of("item", Map.of("item_id", "zoho-11-new")));
+
+        service.syncProduct(11L);
+
+        verify(booksClient).createItem(any());
+        verify(productRepository).updateZohoSyncSuccess(eq(11L), eq("zoho-11-new"), eq(ZohoSyncStatus.SYNCED), any());
+        verify(productRepository, never()).updateZohoSyncFailure(eq(11L), any(), any());
+    }
+
+    @Test
     void syncProduct_create_withoutInventoryAccount_usesSalesItem() {
         when(booksClient.listAssetAccounts()).thenReturn(List.of());
 
@@ -1000,6 +1031,60 @@ class ZohoSyncServiceTest {
             saved.getVariantsJson().contains("zoho-s") && saved.getVariantsJson().contains("zoho-m")
         ));
         verify(productRepository).updateZohoSyncSuccess(eq(20L), any(), eq(ZohoSyncStatus.SYNCED), any());
+    }
+
+    @Test
+    void syncProduct_variants_staleZohoItemId_recreatesRowInsteadOfFailing() {
+        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository
+            );
+
+        Product product = new Product()
+            .id(21L)
+            .sku("SHORTS")
+            .name("Basic Shorts")
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                """
+                [{"sku":"SHORTS-S-BLUE","size":"S","color":"Blue","rate":399.20,"mrp":499,"stock":3,"active":true,"zohoItemId":"zoho-stale"}]
+                """
+            )
+            .active(true);
+        when(productRepository.findOneWithEagerRelationships(21L)).thenReturn(Optional.of(product));
+        when(booksClient.updateItem(eq("zoho-stale"), any()))
+            .thenThrow(
+                new RestClientResponseException(
+                    "This item cannot be edited as it does not exist.",
+                    400,
+                    "Bad Request",
+                    null,
+                    "{\"code\":2006,\"message\":\"This item cannot be edited as it does not exist.\"}".getBytes(),
+                    null
+                )
+            );
+        when(booksClient.createItem(any())).thenReturn(Map.of("item", Map.of("item_id", "zoho-fresh")));
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.syncProduct(21L);
+
+        verify(booksClient, never()).findItemBySku(any());
+        verify(booksClient).createItem(argThat(payload -> "SHORTS-S-BLUE".equals(payload.get("sku"))));
+        verify(productRepository).save(argThat(saved -> saved.getVariantsJson().contains("zoho-fresh")));
+        verify(productRepository).updateZohoSyncSuccess(eq(21L), any(), eq(ZohoSyncStatus.SYNCED), any());
+        verify(productRepository, never()).updateZohoSyncFailure(eq(21L), any(), any());
     }
 
     @Test

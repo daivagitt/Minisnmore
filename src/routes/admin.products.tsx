@@ -246,11 +246,18 @@ function ProductsPage() {
         variants_json: result.variantsJson ?? p.variants_json,
         item_structure: result.itemStructure ?? p.item_structure,
       });
-      toast.success(
-        isVariantsItemStructure(p.item_structure)
-          ? `Synced to Zoho — ${summarizeZohoVariantLinkage(result.variantsJson ?? p.variants_json).label}`
-          : "Product synced to Zoho",
-      );
+      if (result.zohoSyncStatus === "FAILED") {
+        // The sync endpoint always responds 200 even when the underlying Zoho push failed
+        // (the failure is recorded on the product instead of thrown), so success must be
+        // read from zohoSyncStatus rather than inferred from the request not throwing.
+        toast.error(result.zohoSyncError || "Zoho sync failed");
+      } else {
+        toast.success(
+          isVariantsItemStructure(p.item_structure)
+            ? `Synced to Zoho — ${summarizeZohoVariantLinkage(result.variantsJson ?? p.variants_json).label}`
+            : "Product synced to Zoho",
+        );
+      }
     } catch (error) {
       update(i, {
         zoho_sync_status: "FAILED",
