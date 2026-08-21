@@ -12,7 +12,11 @@ import jakarta.mail.internet.MimeMessage;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -36,6 +40,8 @@ public class OrderMailService {
 
     private static final Logger LOG = LoggerFactory.getLogger(OrderMailService.class);
     private static final Locale DEFAULT_LOCALE = Locale.ENGLISH;
+    private static final ZoneId ORDER_ZONE = ZoneId.of("Asia/Kolkata");
+    private static final DateTimeFormatter ORDER_DATE_FORMAT = DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.ENGLISH);
 
     private final JHipsterProperties jHipsterProperties;
     private final JavaMailSender javaMailSender;
@@ -114,11 +120,29 @@ public class OrderMailService {
             context.setVariable("customerName", customerName);
             context.setVariable("orderNumber", orderNumber);
             context.setVariable("orderUrl", orderUrl);
+            context.setVariable("supportEmail", StringUtils.defaultIfBlank(jHipsterProperties.getMail().getFrom(), "hello@minisnmore.com"));
+            context.setVariable("placedOnFormatted", formatOrderDate(order.getPlacedAt()));
             context.setVariable("totalFormatted", formatInr(order.getTotal()));
+            context.setVariable("subtotalFormatted", formatInr(order.getSubtotal()));
+            context.setVariable("hasDiscount", isPositive(order.getDiscount()));
+            context.setVariable("discountFormatted", formatInr(order.getDiscount()));
+            context.setVariable("hasShipping", isPositive(order.getShipping()));
+            context.setVariable("shippingFormatted", formatInr(order.getShipping()));
+            context.setVariable("hasCodFee", isPositive(order.getCodFee()));
+            context.setVariable("codFeeFormatted", formatInr(order.getCodFee()));
+            context.setVariable("hasTax", isPositive(order.getTax()));
+            context.setVariable("taxFormatted", formatInr(order.getTax()));
+            context.setVariable("hasDonation", isPositive(order.getDonation()));
+            context.setVariable("donationFormatted", formatInr(order.getDonation()));
+            context.setVariable("couponCode", StringUtils.defaultString(order.getCouponCode()));
             context.setVariable("paymentMethod", displayPaymentMethod(order.getPaymentMethod()));
             context.setVariable("trackingNumber", StringUtils.defaultString(order.getTrackingNumber()));
             context.setVariable("trackingCarrier", StringUtils.defaultString(order.getTrackingCarrier()));
             context.setVariable("shippingAddress", formatAddress(order.getShippingAddressJson()));
+            Map<String, Object> address = buildAddress(order.getShippingAddressJson());
+            context.setVariable("addressName", address.get("name"));
+            context.setVariable("addressPhone", address.get("phone"));
+            context.setVariable("addressLines", address.get("lines"));
             context.setVariable("items", loadLineItems(order.getId()));
             extra.forEach(context::setVariable);
             String content = templateEngine.process(templateName, context);
@@ -174,18 +198,14 @@ public class OrderMailService {
         List<OrderItem> items = orderItemRepository.findAllByOrderId(orderId);
         for (OrderItem item : items) {
             String details = joinNonBlank(" · ", item.getItemSize(), item.getColor());
-            rows.add(
-                Map.of(
-                    "name",
-                    StringUtils.defaultString(item.getProductName()),
-                    "details",
-                    details,
-                    "qty",
-                    item.getQty() == null ? "1" : String.valueOf(item.getQty()),
-                    "amount",
-                    formatInr(lineAmount(item))
-                )
-            );
+            Map<String, String> row = new LinkedHashMap<>();
+            row.put("name", StringUtils.defaultString(item.getProductName()));
+            row.put("details", details);
+            row.put("qty", item.getQty() == null ? "1" : String.valueOf(item.getQty()));
+            row.put("unitPrice", formatInr(item.getPrice()));
+            row.put("amount", formatInr(lineAmount(item)));
+            row.put("image", StringUtils.defaultString(item.getProductImage()));
+            rows.add(row);
         }
         return rows;
     }
@@ -217,6 +237,43 @@ public class OrderMailService {
             text(address, "state"),
             text(address, "pincode")
         );
+    }
+
+    private Map<String, Object> buildAddress(String json) {
+        JsonNode node = parseAddress(json);
+        List<String> lines = new ArrayList<>();
+        String line1 = text(node, "line1");
+        String line2 = text(node, "line2");
+        String city = text(node, "city");
+        String stateZip = joinNonBlank(" - ", text(node, "state"), text(node, "pincode"));
+        if (StringUtils.isNotBlank(line1)) {
+            lines.add(line1);
+        }
+        if (StringUtils.isNotBlank(line2)) {
+            lines.add(line2);
+        }
+        if (StringUtils.isNotBlank(city)) {
+            lines.add(city);
+        }
+        if (StringUtils.isNotBlank(stateZip)) {
+            lines.add(stateZip);
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("name", text(node, "full_name"));
+        result.put("phone", text(node, "phone"));
+        result.put("lines", lines);
+        return result;
+    }
+
+    private static boolean isPositive(BigDecimal value) {
+        return value != null && value.signum() > 0;
+    }
+
+    private static String formatOrderDate(Instant instant) {
+        if (instant == null) {
+            return "";
+        }
+        return ORDER_DATE_FORMAT.format(instant.atZone(ORDER_ZONE));
     }
 
     private static String text(JsonNode node, String field) {

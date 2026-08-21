@@ -5,13 +5,21 @@
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   </head>
-  <body style="margin: 0; padding: 0; background-color: #fff8f3; font-family: Georgia, 'Times New Roman', serif; color: #4a3f45;">
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      background-color: #f4eff1;
+      font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #4a3f45;
+    "
+  >
     <span
       th:text="#{email.order.shipped.preheader(${orderNumber})}"
       style="display: none !important; visibility: hidden; opacity: 0; color: transparent; height: 0; width: 0; overflow: hidden; mso-hide: all;"
       >Your order is on its way.</span
     >
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #fff8f3; padding: 24px 12px;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4eff1; padding: 24px 12px;">
       <tr>
         <td align="center">
           <table
@@ -20,64 +28,130 @@
             cellspacing="0"
             cellpadding="0"
             border="0"
-            style="max-width: 560px; background-color: #ffffff; border-radius: 24px; border: 1px solid #f3dbe4; overflow: hidden;"
+            style="max-width: 600px; background-color: #ffffff; border-radius: 12px; border: 1px solid #ece0e4; overflow: hidden;"
           >
+            <!-- Header -->
             <tr>
-              <td style="padding: 32px 28px 12px; text-align: center; font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; color: #c77d98;">
-                Minis n More
+              <td style="background-color: #1c1417; padding: 22px 26px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                  <tr>
+                    <td style="font-size: 16px; font-weight: bold; letter-spacing: 0.14em; color: #ffffff; text-transform: uppercase;">
+                      Minis n More
+                    </td>
+                    <td align="right" style="font-size: 13px; color: #ffffff;">
+                      <div style="font-weight: bold;" th:text="#{email.order.shipped.subheading}">Shipment Update</div>
+                      <div style="color: #cbb9c1; margin-top: 2px;">
+                        <span th:text="#{email.order.label.number}">Order ID</span>
+                        <span style="color: #ffffff; text-decoration: underline;" th:text="${orderNumber}">MNM-000</span>
+                      </div>
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
+
+            <!-- Greeting -->
             <tr>
-              <td style="padding: 0 28px 8px; text-align: center; font-size: 28px; line-height: 1.3; color: #5c3d4f;" th:text="#{email.order.shipped.headline}">
-                Out for delivery
+              <td style="padding: 26px 26px 4px; font-size: 15px; line-height: 1.7; color: #5f4f56;">
+                <p style="margin: 0 0 14px;" th:text="#{email.order.greeting(${customerName})}">Dear Customer,</p>
+                <p style="margin: 0 0 4px; font-size: 20px; font-weight: bold; color: #3a2e34;" th:text="#{email.order.shipped.headline}">Out for delivery</p>
+                <p style="margin: 8px 0 0;" th:text="#{email.order.shipped.intro(${orderNumber})}">Good news — your order is on its way to you.</p>
               </td>
             </tr>
+
+            <!-- Order details card -->
             <tr>
-              <td style="padding: 8px 28px 0; font-size: 16px; line-height: 1.7; color: #5f4f56;">
-                <p style="margin: 0 0 16px;" th:text="#{email.order.greeting(${customerName})}">Dear Customer,</p>
-                <p style="margin: 0 0 16px;" th:text="#{email.order.shipped.intro(${orderNumber})}">
-                  Good news — your order is on its way to you.
-                </p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding: 0 28px 16px; font-size: 15px; line-height: 1.7; color: #5f4f56;">
-                <p style="margin: 0 0 8px;"><strong th:text="#{email.order.label.number}">Order</strong>: <span th:text="${orderNumber}">MNM-000</span></p>
-                <p style="margin: 0 0 8px;" th:if="${!#strings.isEmpty(trackingNumber)}">
-                  <strong th:text="#{email.order.label.tracking}">Tracking</strong>:
-                  <span th:text="${trackingNumber}">TRACK</span>
-                  <span th:if="${!#strings.isEmpty(trackingCarrier)}" th:text="' · ' + ${trackingCarrier}"></span>
-                </p>
-                <p style="margin: 0;" th:if="${!#strings.isEmpty(shippingAddress)}">
-                  <strong th:text="#{email.order.label.address}">Delivering to</strong>: <span th:text="${shippingAddress}">Address</span>
-                </p>
-              </td>
-            </tr>
-            <tr>
-              <td align="center" style="padding: 8px 28px 20px;">
-                <a
-                  th:href="${orderUrl}"
-                  th:text="#{email.order.cta}"
-                  style="display: inline-block; background-color: #d889a8; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: bold; padding: 14px 28px; border-radius: 999px;"
-                  >View my order</a
+              <td style="padding: 18px 26px 0;">
+                <table
+                  role="presentation"
+                  width="100%"
+                  cellspacing="0"
+                  cellpadding="0"
+                  border="0"
+                  style="background-color: #f7f4f5; border-radius: 10px;"
                 >
+                  <tr>
+                    <td style="padding: 18px 20px; font-size: 13px; line-height: 1.9; color: #5f4f56;">
+                      <div>
+                        <strong th:text="#{email.order.label.number}">Order ID</strong>
+                        <span style="color: #c77d98; font-weight: bold;" th:text="${orderNumber}">MNM-000</span>
+                      </div>
+                      <div th:if="${!#strings.isEmpty(trackingNumber)}">
+                        <strong th:text="#{email.order.label.tracking}">Tracking</strong>
+                        <span th:text="${trackingNumber}">TRACK</span>
+                        <span th:if="${!#strings.isEmpty(trackingCarrier)}" th:text="' · ' + ${trackingCarrier}"></span>
+                      </div>
+                      <div>
+                        <strong th:text="#{email.order.label.deliveredTo}">Delivered to</strong>
+                        <span th:text="${!#strings.isEmpty(addressName)} ? ${addressName} : ${customerName}">Customer</span>
+                      </div>
+                    </td>
+                    <td align="right" style="padding: 18px 20px;">
+                      <a
+                        th:href="${orderUrl}"
+                        th:text="#{email.order.cta.short}"
+                        style="
+                          display: inline-block;
+                          background-color: #1c1417;
+                          color: #ffffff;
+                          text-decoration: none;
+                          font-size: 13px;
+                          font-weight: bold;
+                          padding: 12px 20px;
+                          border-radius: 6px;
+                          white-space: nowrap;
+                        "
+                        >View Order</a
+                      >
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
+
+            <!-- After note -->
             <tr>
-              <td style="padding: 0 28px 16px; font-size: 14px; line-height: 1.6; color: #7a6670; word-break: break-all;">
-                <a th:href="${orderUrl}" th:text="${orderUrl}" style="color: #c77d98;">Order link</a>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding: 0 28px 16px; font-size: 15px; line-height: 1.7; color: #5f4f56;">
+              <td style="padding: 20px 26px 0; font-size: 14px; line-height: 1.7; color: #5f4f56;">
                 <p style="margin: 0;" th:text="#{email.order.shipped.after}">Keep this note handy in case the courier needs to reach you.</p>
               </td>
             </tr>
+
+            <!-- Closing -->
             <tr>
-              <td style="padding: 8px 28px 28px; font-size: 15px; line-height: 1.7; color: #5f4f56;">
+              <td style="padding: 16px 26px 0; font-size: 14px; line-height: 1.7; color: #5f4f56;">
                 <p style="margin: 0 0 4px;" th:text="#{email.order.closing}">Warm regards,</p>
-                <p style="margin: 0 0 4px; font-weight: bold;" th:text="#{email.signature}">Team Minis n More</p>
-                <p style="margin: 0; font-size: 13px; color: #9a7f8d;" th:text="#{email.tagline}">Made for little ones. Chosen with love.</p>
+                <p style="margin: 0; font-weight: bold;" th:text="#{email.signature}">Team Minis n More</p>
+              </td>
+            </tr>
+
+            <!-- Footer note -->
+            <tr>
+              <td style="padding: 22px 26px; font-size: 12px; line-height: 1.7; color: #9a7f8d;">
+                <p style="margin: 0;" th:text="#{email.order.footer.note(${supportEmail})}">
+                  Please do not share your OTP, card, or bank details with anyone. For help, write to us.
+                </p>
+              </td>
+            </tr>
+
+            <!-- Footer badges -->
+            <tr>
+              <td style="background-color: #1c1417; padding: 22px 26px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                  <tr>
+                    <td align="center" style="width: 33%; color: #ffffff; font-size: 11px; line-height: 1.8;">
+                      <div style="font-size: 18px;">✔</div>
+                      <span th:text="#{email.order.footer.quality}">Assured Quality</span>
+                    </td>
+                    <td align="center" style="width: 33%; color: #ffffff; font-size: 11px; line-height: 1.8;">
+                      <div style="font-size: 18px;">🤍</div>
+                      <span th:text="#{email.order.footer.handpicked}">Handpicked With Care</span>
+                    </td>
+                    <td align="center" style="width: 33%; color: #ffffff; font-size: 11px; line-height: 1.8;">
+                      <div style="font-size: 18px;">↩</div>
+                      <span th:text="#{email.order.footer.returns}">Easy Returns</span>
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
           </table>
