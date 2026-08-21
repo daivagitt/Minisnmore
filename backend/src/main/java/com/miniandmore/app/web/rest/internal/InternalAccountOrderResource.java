@@ -1027,9 +1027,30 @@ public class InternalAccountOrderResource {
         data.put("notes", order.getNotes());
         data.put("razorpay_order_id", order.getRazorpayOrderId());
         data.put("razorpay_payment_id", order.getRazorpayPaymentId());
+        data.put("invoice_pdf_url", invoicePdfUrl(order));
         data.put("tracking_status", OrderTrackingStatusResolver.resolve(order));
         trackingFields(order).forEach(data::put);
         return data;
+    }
+
+    /**
+     * Returns the cached invoice PDF URL, lazily backfilling it for orders that already have a
+     * Zoho invoice but synced before this feature existed. Best-effort — a Zoho hiccup here must
+     * not break the order-detail page.
+     */
+    private String invoicePdfUrl(CustomerOrder order) {
+        if (StringUtils.isNotBlank(order.getZohoInvoicePdfUrl())) {
+            return order.getZohoInvoicePdfUrl();
+        }
+        if (StringUtils.isBlank(order.getZohoInvoiceId())) {
+            return null;
+        }
+        try {
+            return zohoSyncService.ensureInvoicePdfCached(order.getId());
+        } catch (Exception ex) {
+            LOG.debug("Invoice PDF backfill failed for {}: {}", order.getOrderNumber(), ex.getMessage());
+            return null;
+        }
     }
 
     private Map<String, Object> publicTrackingSummary(CustomerOrder order) {

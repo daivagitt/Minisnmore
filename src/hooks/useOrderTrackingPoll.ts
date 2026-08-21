@@ -13,6 +13,7 @@ export type TrackingOrder = OrderTrackingFields & {
   created_at?: string;
   coupon_code?: string;
   razorpay_payment_id?: string;
+  invoice_pdf_url?: string;
   subtotal?: number;
   discount?: number;
   shipping?: number;

@@ -131,6 +131,54 @@ public class ZohoBooksClient {
         }
     }
 
+    /**
+     * Pushes every gallery photo onto the item's photo set via {@code POST /items/{id}/images}
+     * (plural) rather than the single-photo {@code /items/{id}/image} endpoint. Not part of Zoho's
+     * published Books v3 reference — confirmed only via community reports of the same
+     * {@code books/v3} host. Confirmed live against a real UAT org: each call adds exactly ONE
+     * document (its {@code attachment_order} increments per call) — sending multiple files in one
+     * multipart request silently keeps only the last part, so images must be posted one at a time.
+     * Callers should fall back to {@link #uploadItemImage} on failure in case an org/plan doesn't
+     * support this endpoint at all.
+     */
+    public void uploadItemImages(String itemId, List<ImageUpload> images) {
+        if (images == null || images.isEmpty()) {
+            throw new IllegalArgumentException("Item images are empty");
+        }
+        try {
+            deleteItemImagesQuiet(itemId);
+            for (ImageUpload image : images) {
+                executeImagesUpload(itemId, image, false);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Zoho item images upload interrupted", e);
+        } catch (IOException e) {
+            throw new IllegalStateException("Zoho item images upload failed", e);
+        }
+    }
+
+    /**
+     * Clears any photos already on the item (single-endpoint front image, plus any documents added
+     * via the plural endpoint) before re-adding the current gallery — otherwise repeated syncs would
+     * keep appending duplicate copies of the same photos forever. Best-effort: a resync should not
+     * fail outright just because there was nothing to clear.
+     */
+    private void deleteItemImagesQuiet(String itemId) {
+        try {
+            executeImageDelete(itemId, false);
+        } catch (Exception ignored) {
+            // no existing single front image — nothing to clear
+        }
+        try {
+            executeImagesDelete(itemId, false);
+        } catch (Exception ignored) {
+            // no existing plural-endpoint documents, or org doesn't support the bulk-delete endpoint
+        }
+    }
+
+    public record ImageUpload(byte[] bytes, String filename, String contentType) {}
+
     public Optional<BinaryDownload> downloadItemImage(String itemId, long maxBytes) {
         if (StringUtils.isBlank(itemId)) {
             return Optional.empty();
@@ -227,6 +275,24 @@ public class ZohoBooksClient {
         return get("/invoices/" + invoiceId + "?" + orgIdParam());
     }
 
+    /**
+     * Downloads one invoice as a PDF via the bulk-export endpoint reused with a single id
+     * ({@code invoice_ids}) — Zoho Books has no dedicated single-invoice PDF path.
+     */
+    public Optional<BinaryDownload> downloadInvoicePdf(String invoiceId, long maxBytes) {
+        if (StringUtils.isBlank(invoiceId)) {
+            return Optional.empty();
+        }
+        try {
+            return executeBinaryDownload("/invoices/pdf?" + orgIdParam() + "&invoice_ids=" + encode(invoiceId), maxBytes, false);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Zoho invoice PDF download interrupted", e);
+        } catch (IOException e) {
+            throw new IllegalStateException("Zoho invoice PDF download failed", e);
+        }
+    }
+
     public Map<String, Object> getSalesOrder(String salesOrderId) {
         return get("/salesorders/" + salesOrderId + "?" + orgIdParam());
     }
@@ -312,8 +378,11 @@ public class ZohoBooksClient {
             return Optional.empty();
         }
         if (statusCode < 200 || statusCode >= 300) {
-            response.body().close();
-            throw new IOException("Zoho Books download failed: HTTP " + statusCode);
+            String errorBody;
+            try (InputStream errorStream = response.body()) {
+                errorBody = new String(errorStream.readAllBytes(), StandardCharsets.UTF_8);
+            }
+            throw new IOException("Zoho Books download failed: HTTP " + statusCode + " " + errorBody);
         }
         String contentType = response.headers().firstValue("Content-Type").orElse("application/octet-stream");
         if (contentType.toLowerCase(Locale.ROOT).startsWith("application/json")) {
@@ -346,6 +415,51 @@ public class ZohoBooksClient {
         }
         if (statusCode < 200 || statusCode >= 300) {
             throw new IOException("Zoho item image upload failed: HTTP " + statusCode + " " + response.body());
+        }
+    }
+
+    private void executeImagesUpload(String itemId, ImageUpload image, boolean retriedAfterUnauthorized)
+        throws IOException, InterruptedException {
+        String boundary = "----ZohoBooksBoundary" + System.currentTimeMillis();
+        byte[] body = multipartImageBody(boundary, image.filename(), image.contentType(), image.bytes());
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(apiBase() + "/items/" + itemId + "/images?" + orgIdParam()))
+            .timeout(BINARY_TIMEOUT)
+            .header("Authorization", "Zoho-oauthtoken " + oauthService.accessToken())
+            .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+            .POST(HttpRequest.BodyPublishers.ofByteArray(body))
+            .build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        int statusCode = response.statusCode();
+        if (statusCode == 401 && !retriedAfterUnauthorized) {
+            oauthService.accessToken();
+            executeImagesUpload(itemId, image, true);
+            return;
+        }
+        if (statusCode < 200 || statusCode >= 300) {
+            throw new IOException("Zoho item images upload failed: HTTP " + statusCode + " " + response.body());
+        }
+    }
+
+    private void executeImagesDelete(String itemId, boolean retriedAfterUnauthorized) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(apiBase() + "/items/" + itemId + "/images?" + orgIdParam()))
+            .timeout(BINARY_TIMEOUT)
+            .header("Authorization", "Zoho-oauthtoken " + oauthService.accessToken())
+            .DELETE()
+            .build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        int statusCode = response.statusCode();
+        if (statusCode == 401 && !retriedAfterUnauthorized) {
+            oauthService.accessToken();
+            executeImagesDelete(itemId, true);
+            return;
+        }
+        if (statusCode == 404) {
+            return;
+        }
+        if (statusCode < 200 || statusCode >= 300) {
+            throw new IOException("Zoho item images delete failed: HTTP " + statusCode + " " + response.body());
         }
     }
 

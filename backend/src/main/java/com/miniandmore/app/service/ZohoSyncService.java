@@ -67,6 +67,7 @@ public class ZohoSyncService {
     private final CustomerOrderRepository customerOrderRepository;
     private final CustomerProfileRepository customerProfileRepository;
     private final OrderItemRepository orderItemRepository;
+    private final S3StorageService s3StorageService;
     private volatile String cachedLocationId;
     private volatile String cachedInventoryAccountId;
     private volatile String cachedAdjustmentAccountId;
@@ -86,7 +87,8 @@ public class ZohoSyncService {
         ZohoSettingRepository zohoSettingRepository,
         CustomerOrderRepository customerOrderRepository,
         CustomerProfileRepository customerProfileRepository,
-        OrderItemRepository orderItemRepository
+        OrderItemRepository orderItemRepository,
+        S3StorageService s3StorageService
     ) {
         this.booksClient = booksClient;
         this.objectMapper = objectMapper;
@@ -100,6 +102,7 @@ public class ZohoSyncService {
         this.customerOrderRepository = customerOrderRepository;
         this.customerProfileRepository = customerProfileRepository;
         this.orderItemRepository = orderItemRepository;
+        this.s3StorageService = s3StorageService;
     }
 
     public Map<String, Object> testConnection() {
@@ -1058,9 +1061,25 @@ public class ZohoSyncService {
             productRepository.findAll().stream().filter(variantSupport::isVariants).toList()
         );
         int page = 1;
-        List<Map<String, Object>> items;
-        do {
-            items = booksClient.listItems(page);
+        boolean completedAllPages = false;
+        while (true) {
+            List<Map<String, Object>> items;
+            try {
+                items = booksClient.listItems(page);
+            } catch (RestClientResponseException e) {
+                // A transient Zoho failure (most commonly a rate limit) mid-pagination must not
+                // bubble up as a raw 500 — stop the pull, keep what was already merged, and never
+                // run deactivateStaleZohoProducts below since pulledSkus is only a partial page set
+                // here (treating unpulled-but-still-active Zoho items as "stale" would wrongly
+                // deactivate them).
+                builder.failure(pullStoppedMessage(e, page));
+                LOG.warn("Zoho pullProducts stopped early on page {}: {}", page, e.getMessage());
+                break;
+            }
+            if (items.isEmpty()) {
+                completedAllPages = true;
+                break;
+            }
             for (Map<String, Object> item : items) {
                 String sku = stringValue(item.get("sku"));
                 if (StringUtils.isBlank(sku)) {
@@ -1075,35 +1094,20 @@ public class ZohoSyncService {
                 }
             }
             page++;
-        } while (!items.isEmpty());
-        if (!pulledSkus.isEmpty()) {
+        }
+        if (completedAllPages && !pulledSkus.isEmpty()) {
             deactivateStaleZohoProducts(pulledSkus, variantParents, builder);
         }
-        finishVariantPhotoSharing(variantParents);
         return builder.build().toMap();
     }
 
-    /**
-     * Each variant SKU is imported with {@code shareEmptySizes=false} since sibling sizes of the
-     * same colour may land on a later page / later item. Once every pulled item has been merged,
-     * fill any size still missing its own photo from a same-colour sibling that has one.
-     */
-    private void finishVariantPhotoSharing(List<Product> variantParents) {
-        if (variantParents == null || variantParents.isEmpty()) {
-            return;
+    private static String pullStoppedMessage(RestClientResponseException e, int page) {
+        if (e.getStatusCode().value() == 429) {
+            return "Zoho API rate limit reached — pull stopped after page " +
+                (page - 1) +
+                ". Products already processed were saved; retry once Zoho's rate limit resets.";
         }
-        Set<Long> seen = new HashSet<>();
-        for (Product parent : variantParents) {
-            if (parent == null || parent.getId() == null || !seen.add(parent.getId())) {
-                continue;
-            }
-            try {
-                itemImageSync.applySameColorPhotoSharing(parent);
-                productRepository.save(parent);
-            } catch (Exception e) {
-                LOG.warn("Could not finish variant photo sharing after Zoho pull for product {} ({}): {}", parent.getId(), parent.getSku(), e.getMessage());
-            }
-        }
+        return "Zoho pull stopped on page " + page + ": HTTP " + e.getStatusCode().value() + " " + e.getMessage();
     }
 
     private void upsertPulledProduct(
@@ -1225,7 +1229,7 @@ public class ZohoSyncService {
             variantSupport.clearVariantImages(product, variantSku);
             if (itemImageSync.isEnabled()) {
                 try {
-                    itemImageSync.importZohoVariantColorImage(product, color, itemId, zohoItem, false);
+                    itemImageSync.importZohoVariantColorImage(product, color, itemId, zohoItem);
                 } catch (Exception e) {
                     LOG.warn("Zoho image pull failed for variant {} ({}): {}", variantSku, itemId, e.getMessage());
                 }
@@ -1659,6 +1663,7 @@ public class ZohoSyncService {
                         if (StringUtils.isNotBlank(invoiceId)) {
                             order.setZohoInvoiceId(invoiceId);
                             finalizeInvoiceForInventory(invoiceId);
+                            cacheInvoicePdf(order, invoiceId);
                         }
                     }
                     if (isCodOrder(order) && order.getPaymentStatus() == PaymentStatus.PAID) {
@@ -1938,6 +1943,59 @@ public class ZohoSyncService {
 
     private boolean shouldAdjustZohoInventory() {
         return applicationProperties.getZoho().isSyncProductStock() && resolveInventoryAccountId().isPresent();
+    }
+
+    /**
+     * Downloads the invoice PDF from Zoho once and caches it to the store's own storage so the
+     * storefront never has to call Zoho (or expose Zoho credentials to the browser) to show a
+     * customer their invoice. Best-effort — a failure here must not fail the order sync.
+     */
+    private void cacheInvoicePdf(CustomerOrder order, String invoiceId) {
+        if (StringUtils.isNotBlank(order.getZohoInvoicePdfUrl()) || StringUtils.isBlank(invoiceId)) {
+            return;
+        }
+        try {
+            long maxBytes = applicationProperties.getStorage().getS3().getMaxUploadBytes();
+            Optional<ZohoBooksClient.BinaryDownload> pdf = booksClient.downloadInvoicePdf(invoiceId, maxBytes);
+            if (pdf.isEmpty()) {
+                return;
+            }
+            ZohoBooksClient.BinaryDownload download = pdf.orElseThrow();
+            String url = s3StorageService.uploadInvoicePdf("invoice-" + invoiceId + ".pdf", download.bytes());
+            if (StringUtils.isNotBlank(url)) {
+                order.setZohoInvoicePdfUrl(url.trim());
+            }
+        } catch (RuntimeException e) {
+            LOG.debug(
+                "Zoho invoice PDF cache failed for invoice {}: {}",
+                invoiceId,
+                e.getCause() != null ? e.getCause().getMessage() : e.getMessage()
+            );
+        }
+    }
+
+    /**
+     * Lazily backfills the cached invoice PDF for orders that synced before this feature existed
+     * (or where the initial cache attempt failed). Returns the cached URL, or null if there's no
+     * Zoho invoice to fetch yet.
+     */
+    public String ensureInvoicePdfCached(Long orderId) {
+        return customerOrderRepository
+            .findById(orderId)
+            .map(order -> {
+                if (StringUtils.isNotBlank(order.getZohoInvoicePdfUrl())) {
+                    return order.getZohoInvoicePdfUrl();
+                }
+                if (StringUtils.isBlank(order.getZohoInvoiceId())) {
+                    return null;
+                }
+                cacheInvoicePdf(order, order.getZohoInvoiceId());
+                if (StringUtils.isNotBlank(order.getZohoInvoicePdfUrl())) {
+                    customerOrderRepository.save(order);
+                }
+                return order.getZohoInvoicePdfUrl();
+            })
+            .orElse(null);
     }
 
     private Optional<String> resolveZohoItemId(OrderItem item) {

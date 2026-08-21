@@ -4,19 +4,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.miniandmore.app.client.ZohoBooksClient;
 import com.miniandmore.app.client.ZohoBooksClient.BinaryDownload;
+import com.miniandmore.app.client.ZohoBooksClient.ImageUpload;
 import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.Product;
+import com.sun.net.httpserver.HttpServer;
+import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.Optional;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -33,6 +39,29 @@ class ZohoItemImageSyncTest {
     private S3StorageService s3StorageService;
 
     private ZohoItemImageSync itemImageSync;
+    private HttpServer imageServer;
+
+    @AfterEach
+    void tearDown() {
+        if (imageServer != null) {
+            imageServer.stop(0);
+        }
+    }
+
+    private String startImageServer(Map<String, byte[]> pathsToBytes) throws java.io.IOException {
+        imageServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        pathsToBytes.forEach((path, bytes) ->
+            imageServer.createContext(path, exchange -> {
+                exchange.getResponseHeaders().add("Content-Type", "image/jpeg");
+                exchange.sendResponseHeaders(200, bytes.length);
+                try (var body = exchange.getResponseBody()) {
+                    body.write(bytes);
+                }
+            })
+        );
+        imageServer.start();
+        return "http://127.0.0.1:" + imageServer.getAddress().getPort();
+    }
 
     @BeforeEach
     void setUp() {
@@ -93,7 +122,55 @@ class ZohoItemImageSyncTest {
     }
 
     @Test
-    void importZohoVariantColorImage_storesDistinctZohoPhotosPerSameColorSize() {
+    void importZohoVariantColorImage_pullsEveryDocumentNotJustTheSingleItemImage() {
+        // Zoho Books items can carry several photos (front/back/other) as a "documents" array —
+        // GET /items/{id}/image (image_document_id) only ever returns the single front photo.
+        Product product = new Product()
+            .id(30L)
+            .sku("JABLA")
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                """
+                [
+                  {"sku":"JAB-AQU","size":"0-3","color":"aqua","rate":380,"stock":0,"active":true}
+                ]
+                """
+            );
+        when(booksClient.downloadDocument(eq("doc-1"), any(Long.class)))
+            .thenReturn(Optional.of(new BinaryDownload("front".getBytes(), "image/png")));
+        when(booksClient.downloadDocument(eq("doc-2"), any(Long.class)))
+            .thenReturn(Optional.of(new BinaryDownload("back".getBytes(), "image/png")));
+        when(booksClient.downloadDocument(eq("doc-3"), any(Long.class)))
+            .thenReturn(Optional.of(new BinaryDownload("other".getBytes(), "image/png")));
+        when(s3StorageService.uploadObject(eq("products"), any(), eq("front".getBytes()), eq("image/png")))
+            .thenReturn("https://cdn.example.com/uat/products/aqua-front.png");
+        when(s3StorageService.uploadObject(eq("products"), any(), eq("back".getBytes()), eq("image/png")))
+            .thenReturn("https://cdn.example.com/uat/products/aqua-back.png");
+        when(s3StorageService.uploadObject(eq("products"), any(), eq("other".getBytes()), eq("image/png")))
+            .thenReturn("https://cdn.example.com/uat/products/aqua-other.png");
+
+        itemImageSync.importZohoVariantColorImage(
+            product,
+            "aqua",
+            "zoho-item-1",
+            Map.of(
+                "sku", "JAB-AQU",
+                "image_name", "1.png",
+                "documents", List.of(
+                    Map.of("document_id", "doc-1", "attachment_order", 1),
+                    Map.of("document_id", "doc-2", "attachment_order", 2, "is_back_image", true),
+                    Map.of("document_id", "doc-3", "attachment_order", 3)
+                )
+            )
+        );
+
+        assertThat(product.getColorsJson()).contains("aqua-front.png");
+        assertThat(product.getColorsJson()).contains("aqua-back.png");
+        assertThat(product.getColorsJson()).contains("aqua-other.png");
+    }
+
+    @Test
+    void importZohoVariantColorImage_sameColorDifferentSizesShareOnePrintGallery() {
         Product product = new Product()
             .id(5L)
             .sku("KEDAR")
@@ -119,18 +196,23 @@ class ZohoItemImageSyncTest {
             Map.of("sku", "KEDAR-36-PINK", "image_name", "photo.jpg", "image_url", "https://cdn.example.com/uat/products/pink-36.jpg")
         );
 
-        assertThat(product.getVariantsJson()).contains("pink-03.jpg");
-        assertThat(product.getVariantsJson()).contains("pink-36.jpg");
-        assertThat(product.getVariantsJson()).contains("imageUrl");
+        // Zoho has no size axis for photos — every size of a colour is uploaded with the same set.
+        // The first size we pull seeds the Pink gallery; the second size's own (duplicate) photo
+        // must NOT also be appended, or the gallery would inflate every time a sibling size is pulled.
+        assertThat(product.getColorsJson()).contains("pink-03.jpg");
+        assertThat(product.getColorsJson()).doesNotContain("pink-36.jpg");
+        assertThat(product.getVariantsJson()).doesNotContain("pink-03.jpg");
+        assertThat(product.getVariantsJson()).doesNotContain("pink-36.jpg");
     }
 
     @Test
-    void resolveVariantImageUrls_prefersSkuPhotoOverParentGallery() {
+    void resolveVariantImageUrls_ignoresPerSkuPhotoUsesColorGalleryOnly() {
         Product product = new Product()
             .id(6L)
             .sku("KEDAR")
             .itemStructure("VARIANTS")
             .imagesJson("[\"https://cdn.example.com/parent-mixed.jpg\"]")
+            .colorImagesJson("{\"Pink\":[\"https://cdn.example.com/pink-print.jpg\"]}")
             .variantsJson(
                 """
                 [
@@ -140,10 +222,12 @@ class ZohoItemImageSyncTest {
                 """
             );
 
+        // Every size of the same print pushes the print's shared gallery — the per-SKU imageUrl
+        // fields (leftover/manually set) are not consulted, matching the Ledgerly image model.
         assertThat(itemImageSync.resolveVariantImageUrls(product, "KEDAR-03-PINK"))
-            .containsExactly("https://cdn.example.com/pink-03.jpg");
+            .containsExactly("https://cdn.example.com/pink-print.jpg");
         assertThat(itemImageSync.resolveVariantImageUrls(product, "KEDAR-36-PINK"))
-            .containsExactly("https://cdn.example.com/pink-36.jpg");
+            .containsExactly("https://cdn.example.com/pink-print.jpg");
         assertThat(itemImageSync.resolveVariantImageUrls(product, "KEDAR-03-PINK"))
             .doesNotContain("https://cdn.example.com/parent-mixed.jpg");
     }
@@ -173,7 +257,10 @@ class ZohoItemImageSyncTest {
     }
 
     @Test
-    void resolveVariantImageUrls_emptySkuDoesNotPushSiblingPhotosToZoho() {
+    void resolveVariantImageUrls_leftoverPerSkuPhotosAreIgnoredWithoutPrintGallery() {
+        // Stale per-SKU imageUrl values (e.g. from before this model existed) must not leak into a
+        // Zoho push — a print with no shared gallery pushes nothing, regardless of what individual
+        // variant rows still carry.
         Product product = new Product()
             .id(17L)
             .sku("KEDAR")
@@ -189,30 +276,33 @@ class ZohoItemImageSyncTest {
             );
 
         assertThat(itemImageSync.resolveVariantImageUrls(product, "KED-RED-0-3")).isEmpty();
+        assertThat(itemImageSync.resolveVariantImageUrls(product, "KED-RED-3-6")).isEmpty();
         assertThat(itemImageSync.resolveVariantImageUrls(product, "KED-RED-6-12")).isEmpty();
-        assertThat(itemImageSync.resolveVariantImageUrls(product, "KED-RED-3-6"))
-            .containsExactly("https://cdn.example.com/red-36.jpg");
     }
 
     @Test
-    void resolveVariantImageUrls_doesNotMixDifferentSameColourPhotos() {
+    void resolveVariantImageUrls_everySizeOfSamePrintGetsSameGallery() {
         Product product = new Product()
             .id(18L)
             .sku("KEDAR")
             .itemStructure("VARIANTS")
+            .colorImagesJson("{\"blue\":[\"https://cdn.example.com/blue-print.jpg\"]}")
             .variantsJson(
                 """
                 [
-                  {"sku":"KED-BLU-0-3","size":"0-3","color":"blue","rate":100,"stock":2,"active":true,"imageUrl":"https://cdn.example.com/blue-03.jpg"},
-                  {"sku":"KED-BLU-3-6","size":"3-6","color":"blue","rate":100,"stock":2,"active":true,"imageUrl":"https://cdn.example.com/blue-36.jpg"},
+                  {"sku":"KED-BLU-0-3","size":"0-3","color":"blue","rate":100,"stock":2,"active":true},
+                  {"sku":"KED-BLU-3-6","size":"3-6","color":"blue","rate":100,"stock":2,"active":true},
                   {"sku":"KED-BLU-6-12","size":"6-12","color":"blue","rate":100,"stock":2,"active":true}
                 ]
                 """
             );
 
-        assertThat(itemImageSync.resolveVariantImageUrls(product, "KED-BLU-6-12")).isEmpty();
         assertThat(itemImageSync.resolveVariantImageUrls(product, "KED-BLU-0-3"))
-            .containsExactly("https://cdn.example.com/blue-03.jpg");
+            .containsExactly("https://cdn.example.com/blue-print.jpg");
+        assertThat(itemImageSync.resolveVariantImageUrls(product, "KED-BLU-3-6"))
+            .containsExactly("https://cdn.example.com/blue-print.jpg");
+        assertThat(itemImageSync.resolveVariantImageUrls(product, "KED-BLU-6-12"))
+            .containsExactly("https://cdn.example.com/blue-print.jpg");
     }
 
     @Test
@@ -235,7 +325,7 @@ class ZohoItemImageSyncTest {
     }
 
     @Test
-    void importZohoVariantColorImage_replacesStoredPhotosWithZohoPhotos() {
+    void importZohoVariantColorImage_replacesPerSkuPhotosWithPrintGalleryPhotos() {
         Product product = new Product()
             .id(22L)
             .sku("KEDAR")
@@ -262,10 +352,15 @@ class ZohoItemImageSyncTest {
             Map.of("sku", "KED-BLU-3-6", "image_name", "wood.jpg", "image_url", "https://cdn.example.com/uat/products/fresh-36.jpg")
         );
 
+        // Old per-SKU photos are gone, and the pull never writes new ones onto individual SKUs.
+        // The first size pulled (0-3) seeds the "blue" print gallery; the second size's own photo
+        // is a duplicate upload of the same set from Zoho's point of view and must not be appended.
         assertThat(product.getVariantsJson()).doesNotContain("screenshot.jpg");
         assertThat(product.getVariantsJson()).doesNotContain("wood.jpg");
-        assertThat(product.getVariantsJson()).contains("fresh-03.jpg");
-        assertThat(product.getVariantsJson()).contains("fresh-36.jpg");
+        assertThat(product.getVariantsJson()).doesNotContain("fresh-03.jpg");
+        assertThat(product.getVariantsJson()).doesNotContain("fresh-36.jpg");
+        assertThat(product.getColorsJson()).contains("fresh-03.jpg");
+        assertThat(product.getColorsJson()).doesNotContain("fresh-36.jpg");
     }
 
     @Test
@@ -295,15 +390,13 @@ class ZohoItemImageSyncTest {
             product,
             "Blue",
             "zoho-03",
-            Map.of("sku", "BS-03-BLUE", "image_name", "blue-1.png", "image_url", "https://cdn.example.com/blue-1.png"),
-            false
+            Map.of("sku", "BS-03-BLUE", "image_name", "blue-1.png", "image_url", "https://cdn.example.com/blue-1.png")
         );
         itemImageSync.importZohoVariantColorImage(
             product,
             "Blue",
             "zoho-36",
-            Map.of("sku", "BS-36-BLUE", "image_name", "blue-1.png", "image_url", "https://cdn.example.com/blue-1.png"),
-            false
+            Map.of("sku", "BS-36-BLUE", "image_name", "blue-1.png", "image_url", "https://cdn.example.com/blue-1.png")
         );
 
         assertThat(product.getColorsJson()).contains("blue-1.png");
@@ -312,7 +405,10 @@ class ZohoItemImageSyncTest {
     }
 
     @Test
-    void importZohoVariantColorImage_emptySameColorSizeInheritsSiblingPhotos() {
+    void importZohoVariantColorImage_emptySameColorSizeSharesSiblingPrintGallery() {
+        // The 0-3 size's photo was pulled first onto the "blue" print gallery. When the 3-6 size's
+        // Zoho item has no photo of its own, it still resolves the same print photo because images
+        // are looked up by colour, not by SKU.
         Product product = new Product()
             .id(16L)
             .sku("KEDAR")
@@ -320,7 +416,7 @@ class ZohoItemImageSyncTest {
             .variantsJson(
                 """
                 [
-                  {"sku":"KED-BLU-0-3","size":"0-3","color":"blue","rate":380,"stock":2,"active":true,"imageUrl":"https://cdn.example.com/blue-03.jpg"},
+                  {"sku":"KED-BLU-0-3","size":"0-3","color":"blue","rate":380,"stock":2,"active":true},
                   {"sku":"KED-BLU-3-6","size":"3-6","color":"blue","rate":380,"stock":2,"active":true}
                 ]
                 """
@@ -328,21 +424,55 @@ class ZohoItemImageSyncTest {
         itemImageSync.importZohoVariantColorImage(
             product,
             "blue",
+            "zoho-03",
+            Map.of("sku", "KED-BLU-0-3", "image_name", "photo.jpg", "image_url", "https://cdn.example.com/uat/products/blue-03.jpg")
+        );
+        itemImageSync.importZohoVariantColorImage(
+            product,
+            "blue",
             "zoho-36",
             Map.of("sku", "KED-BLU-3-6")
         );
 
-        ProductVariantSupport variants = new ProductVariantSupport(new com.fasterxml.jackson.databind.ObjectMapper());
-        Map<String, String> imageBySku = new java.util.LinkedHashMap<>();
-        for (ProductVariantSupport.VariantRow row : variants.parseProduct(product)) {
-            imageBySku.put(row.sku(), row.imageUrl());
-        }
-        assertThat(imageBySku.get("KED-BLU-0-3")).contains("blue-03.jpg");
-        assertThat(imageBySku.get("KED-BLU-3-6")).contains("blue-03.jpg");
+        assertThat(itemImageSync.resolveVariantImageUrls(product, "KED-BLU-0-3"))
+            .containsExactly("https://cdn.example.com/uat/products/blue-03.jpg");
+        assertThat(itemImageSync.resolveVariantImageUrls(product, "KED-BLU-3-6"))
+            .containsExactly("https://cdn.example.com/uat/products/blue-03.jpg");
     }
 
     @Test
-    void fullPull_twoColorsTwoSizesEach_yieldsExactlyTwoColorSwatches() {
+    void importZohoVariantColorImage_emptySizePulledFirstStillSharesLaterSiblingsPhoto() {
+        // Same as the sibling-sharing case above but in the opposite pull order: the photo-less
+        // size (3-6) is pulled before the size that actually has a photo (0-3). Order must not
+        // matter — the gallery should still end up seeded and shared by both sizes.
+        Product product = new Product()
+            .id(27L)
+            .sku("KEDAR")
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                """
+                [
+                  {"sku":"KED-BLU-0-3","size":"0-3","color":"blue","rate":380,"stock":2,"active":true},
+                  {"sku":"KED-BLU-3-6","size":"3-6","color":"blue","rate":380,"stock":2,"active":true}
+                ]
+                """
+            );
+        itemImageSync.importZohoVariantColorImage(product, "blue", "zoho-36", Map.of("sku", "KED-BLU-3-6"));
+        itemImageSync.importZohoVariantColorImage(
+            product,
+            "blue",
+            "zoho-03",
+            Map.of("sku", "KED-BLU-0-3", "image_name", "photo.jpg", "image_url", "https://cdn.example.com/uat/products/blue-03.jpg")
+        );
+
+        assertThat(itemImageSync.resolveVariantImageUrls(product, "KED-BLU-0-3"))
+            .containsExactly("https://cdn.example.com/uat/products/blue-03.jpg");
+        assertThat(itemImageSync.resolveVariantImageUrls(product, "KED-BLU-3-6"))
+            .containsExactly("https://cdn.example.com/uat/products/blue-03.jpg");
+    }
+
+    @Test
+    void fullPull_twoColorsTwoSizesEach_firstSizePulledSeedsSharedGalleryOthersIgnored() {
         Product product = new Product()
             .id(23L)
             .sku("KEDAR")
@@ -358,38 +488,32 @@ class ZohoItemImageSyncTest {
                 """
             );
 
-        // Mirrors ZohoSyncService.mergePulledZohoVariantItem: each SKU imported with
-        // shareEmptySizes=false as its own Zoho item arrives, in arbitrary/page order.
+        // Mirrors ZohoSyncService.mergePulledZohoVariantItem: each SKU imported as its own Zoho
+        // item arrives, in arbitrary/page order.
         itemImageSync.importZohoVariantColorImage(
             product,
             "Pink",
             "zoho-pink-03",
-            Map.of("sku", "KED-PINK-0-3", "image_name", "p.jpg", "image_url", "https://cdn.example.com/uat/pink-03.jpg"),
-            false
+            Map.of("sku", "KED-PINK-0-3", "image_name", "p.jpg", "image_url", "https://cdn.example.com/uat/pink-03.jpg")
         );
         itemImageSync.importZohoVariantColorImage(
             product,
             "Blue",
             "zoho-blue-03",
-            Map.of("sku", "KED-BLUE-0-3", "image_name", "b.jpg", "image_url", "https://cdn.example.com/uat/blue-03.jpg"),
-            false
+            Map.of("sku", "KED-BLUE-0-3", "image_name", "b.jpg", "image_url", "https://cdn.example.com/uat/blue-03.jpg")
         );
         itemImageSync.importZohoVariantColorImage(
             product,
             "Pink",
             "zoho-pink-36",
-            Map.of("sku", "KED-PINK-3-6", "image_name", "p2.jpg", "image_url", "https://cdn.example.com/uat/pink-36.jpg"),
-            false
+            Map.of("sku", "KED-PINK-3-6", "image_name", "p2.jpg", "image_url", "https://cdn.example.com/uat/pink-36.jpg")
         );
         itemImageSync.importZohoVariantColorImage(
             product,
             "Blue",
             "zoho-blue-36",
-            Map.of("sku", "KED-BLUE-3-6", "image_name", "b2.jpg", "image_url", "https://cdn.example.com/uat/blue-36.jpg"),
-            false
+            Map.of("sku", "KED-BLUE-3-6", "image_name", "b2.jpg", "image_url", "https://cdn.example.com/uat/blue-36.jpg")
         );
-        // Mirrors ZohoSyncService.finishVariantPhotoSharing, run once after every item is merged.
-        itemImageSync.applySameColorPhotoSharing(product);
 
         com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
         com.fasterxml.jackson.databind.JsonNode colorEntries;
@@ -401,35 +525,70 @@ class ZohoItemImageSyncTest {
         assertThat(colorEntries.isArray()).isTrue();
         assertThat(colorEntries).hasSize(2);
         java.util.List<String> names = new java.util.ArrayList<>();
-        java.util.Map<String, String> thumbnailByColor = new java.util.LinkedHashMap<>();
-        colorEntries.forEach(node -> {
-            if (node.isObject()) {
-                names.add(node.path("name").asText());
-                String thumb = node.hasNonNull("imageUrl")
-                    ? node.path("imageUrl").asText()
-                    : node.path("imageUrls").isArray() && node.path("imageUrls").size() > 0
-                        ? node.path("imageUrls").get(0).asText()
-                        : null;
-                thumbnailByColor.put(node.path("name").asText(), thumb);
-            } else {
-                names.add(node.asText());
-            }
-        });
+        colorEntries.forEach(node -> names.add(node.isObject() ? node.path("name").asText() : node.asText()));
         assertThat(names).containsExactlyInAnyOrder("Pink", "Blue");
-        // Neither size's front is shared with the other for the same colour — the colour entry
-        // must still carry a representative print thumbnail (one size's front) so the storefront
-        // swatch chip has something to show, instead of falling back to a plain hex dot.
-        assertThat(thumbnailByColor.get("Pink")).isNotBlank();
-        assertThat(thumbnailByColor.get("Blue")).isNotBlank();
 
-        ProductVariantSupport variants = new ProductVariantSupport(mapper);
-        Map<String, String> imageBySku = new java.util.LinkedHashMap<>();
-        for (ProductVariantSupport.VariantRow row : variants.parseProduct(product)) {
-            imageBySku.put(row.sku(), row.imageUrl());
-        }
-        assertThat(imageBySku.get("KED-PINK-0-3")).contains("pink-03.jpg");
-        assertThat(imageBySku.get("KED-PINK-3-6")).contains("pink-36.jpg");
-        assertThat(imageBySku.get("KED-BLUE-0-3")).contains("blue-03.jpg");
-        assertThat(imageBySku.get("KED-BLUE-3-6")).contains("blue-36.jpg");
+        // The first size pulled for each print (the 0-3 SKUs, imported first above) seeds that
+        // print's one shared gallery. The 3-6 SKUs' own photos are Zoho's duplicate copy of the
+        // same set and must not also be appended — every size still resolves to one shared set,
+        // it's just sourced from whichever size we saw photos for first, not a union of both.
+        assertThat(itemImageSync.resolveVariantImageUrls(product, "KED-PINK-0-3"))
+            .containsExactly("https://cdn.example.com/uat/pink-03.jpg");
+        assertThat(itemImageSync.resolveVariantImageUrls(product, "KED-PINK-3-6"))
+            .containsExactly("https://cdn.example.com/uat/pink-03.jpg");
+        assertThat(itemImageSync.resolveVariantImageUrls(product, "KED-BLUE-0-3"))
+            .containsExactly("https://cdn.example.com/uat/blue-03.jpg");
+        assertThat(itemImageSync.resolveVariantImageUrls(product, "KED-BLUE-3-6"))
+            .containsExactly("https://cdn.example.com/uat/blue-03.jpg");
+    }
+
+    @Test
+    void syncVariantImage_pushesEveryColourGalleryPhotoInOneMultiImageUpload() throws Exception {
+        String base = startImageServer(Map.of("/1.jpg", "one".getBytes(), "/2.jpg", "two".getBytes()));
+        Product product = new Product()
+            .id(25L)
+            .sku("KEDAR")
+            .itemStructure("VARIANTS")
+            .colorImagesJson("{\"blue\":[\"" + base + "/1.jpg\",\"" + base + "/2.jpg\"]}")
+            .variantsJson(
+                """
+                [
+                  {"sku":"KED-BLU-0-3","size":"0-3","color":"blue","rate":100,"stock":2,"active":true}
+                ]
+                """
+            );
+
+        itemImageSync.syncVariantImage("zoho-03", product, "KED-BLU-0-3");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ImageUpload>> captor = ArgumentCaptor.forClass(List.class);
+        verify(booksClient).uploadItemImages(eq("zoho-03"), captor.capture());
+        assertThat(captor.getValue()).hasSize(2);
+        verify(booksClient, never()).uploadItemImage(any(), any(), any(), any());
+    }
+
+    @Test
+    void syncVariantImage_fallsBackToSingleImageWhenMultiUploadRejected() throws Exception {
+        String base = startImageServer(Map.of("/1.jpg", "one".getBytes(), "/2.jpg", "two".getBytes()));
+        Product product = new Product()
+            .id(26L)
+            .sku("KEDAR")
+            .itemStructure("VARIANTS")
+            .colorImagesJson("{\"blue\":[\"" + base + "/1.jpg\",\"" + base + "/2.jpg\"]}")
+            .variantsJson(
+                """
+                [
+                  {"sku":"KED-BLU-0-3","size":"0-3","color":"blue","rate":100,"stock":2,"active":true}
+                ]
+                """
+            );
+        org.mockito.Mockito
+            .doThrow(new IllegalStateException("HTTP 404"))
+            .when(booksClient)
+            .uploadItemImages(any(), any());
+
+        itemImageSync.syncVariantImage("zoho-03", product, "KED-BLU-0-3");
+
+        verify(booksClient).uploadItemImage(eq("zoho-03"), any(), any(), any());
     }
 }

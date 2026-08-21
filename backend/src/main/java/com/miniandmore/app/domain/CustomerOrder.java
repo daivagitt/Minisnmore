@@ -134,6 +134,10 @@ public class CustomerOrder implements Serializable {
     @Column(name = "zoho_invoice_id", length = 120)
     private String zohoInvoiceId;
 
+    @Size(max = 600)
+    @Column(name = "zoho_invoice_pdf_url", length = 600)
+    private String zohoInvoicePdfUrl;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "zoho_sync_status")
     private ZohoSyncStatus zohoSyncStatus;
@@ -506,6 +510,19 @@ public class CustomerOrder implements Serializable {
 
     public void setZohoInvoiceId(String zohoInvoiceId) {
         this.zohoInvoiceId = zohoInvoiceId;
+    }
+
+    public String getZohoInvoicePdfUrl() {
+        return this.zohoInvoicePdfUrl;
+    }
+
+    public CustomerOrder zohoInvoicePdfUrl(String zohoInvoicePdfUrl) {
+        this.setZohoInvoicePdfUrl(zohoInvoicePdfUrl);
+        return this;
+    }
+
+    public void setZohoInvoicePdfUrl(String zohoInvoicePdfUrl) {
+        this.zohoInvoicePdfUrl = zohoInvoicePdfUrl;
     }
 
     public ZohoSyncStatus getZohoSyncStatus() {

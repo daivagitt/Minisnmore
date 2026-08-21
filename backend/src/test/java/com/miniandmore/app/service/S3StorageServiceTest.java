@@ -145,6 +145,36 @@ class S3StorageServiceTest {
     }
 
     @Test
+    void uploadInvoicePdf_success_returnsPublicUrl() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+
+        String url = s3StorageService.uploadInvoicePdf("invoice-inv-1.pdf", "pdf-bytes".getBytes());
+
+        assertThat(url).startsWith("https://cdn.example.com/my-bucket/invoices/");
+        assertThat(url).contains("invoice-inv-1.pdf");
+    }
+
+    @Test
+    void uploadInvoicePdf_exceedsMaxBytes_throwsBadRequest() {
+        byte[] body = new byte[6_000_000];
+
+        assertThatThrownBy(() -> s3StorageService.uploadInvoicePdf("invoice-inv-1.pdf", body))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("too large");
+    }
+
+    @Test
+    void uploadInvoicePdf_filenameWithoutExtension_appendsPdf() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+
+        String url = s3StorageService.uploadInvoicePdf("invoice-inv-2", "pdf-bytes".getBytes());
+
+        assertThat(url).endsWith("-invoice-inv-2.pdf");
+    }
+
+    @Test
     void uploadObject_storageFailure_throwsBadGateway() {
         software.amazon.awssdk.services.s3.S3Client mockClient = org.mockito.Mockito.mock(software.amazon.awssdk.services.s3.S3Client.class);
         org.mockito.Mockito.doThrow(new RuntimeException("network")).when(mockClient).putObject(

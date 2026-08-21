@@ -72,6 +72,9 @@ class ZohoSyncServiceTest {
     @Mock
     private OrderItemRepository orderItemRepository;
 
+    @Mock
+    private S3StorageService s3StorageService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private ZohoSyncService service;
@@ -91,7 +94,8 @@ class ZohoSyncServiceTest {
                 zohoSettingRepository,
                 customerOrderRepository,
                 customerProfileRepository,
-                orderItemRepository
+                orderItemRepository,
+                s3StorageService
             );
         ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
         zoho.setSyncProductStock(true);
@@ -492,6 +496,102 @@ class ZohoSyncServiceTest {
     }
 
     @Test
+    void syncOrder_newInvoice_cachesPdfToStorageAndSavesUrlOnOrder() {
+        ApplicationProperties.Storage storage = new ApplicationProperties.Storage();
+        storage.getS3().setMaxUploadBytes(8_192_000L);
+        when(applicationProperties.getStorage()).thenReturn(storage);
+
+        Product product = new Product().id(11L).sku("SKU-11").zohoItemId("zoho-item-11");
+        OrderItem line = new OrderItem().productId("11").productName("Romper").qty(1).price(BigDecimal.valueOf(699));
+        CustomerOrder order = new CustomerOrder().id(101L).orderNumber("MNM-TEST-2").userLogin("buyer@example.com");
+        order.addItems(line);
+        line.setOrder(order);
+
+        when(customerOrderRepository.findById(101L)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(101L)).thenReturn(List.of(line));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-2"));
+        when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-2")));
+        when(booksClient.createInvoiceFromSalesOrder("so-2")).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-2")));
+        when(productRepository.findById(11L)).thenReturn(Optional.of(product));
+        when(booksClient.downloadInvoicePdf(eq("inv-2"), any(Long.class)))
+            .thenReturn(Optional.of(new ZohoBooksClient.BinaryDownload("pdf-bytes".getBytes(), "application/pdf")));
+        when(s3StorageService.uploadInvoicePdf(eq("invoice-inv-2.pdf"), any()))
+            .thenReturn("https://cdn.example.com/uat/invoices/invoice-inv-2.pdf");
+
+        service.syncOrder(101L);
+
+        assertThat(order.getZohoInvoicePdfUrl()).isEqualTo("https://cdn.example.com/uat/invoices/invoice-inv-2.pdf");
+    }
+
+    @Test
+    void syncOrder_invoicePdfDownloadFails_syncStillSucceeds() {
+        ApplicationProperties.Storage storage = new ApplicationProperties.Storage();
+        storage.getS3().setMaxUploadBytes(8_192_000L);
+        when(applicationProperties.getStorage()).thenReturn(storage);
+
+        Product product = new Product().id(12L).sku("SKU-12b").zohoItemId("zoho-item-12b");
+        OrderItem line = new OrderItem().productId("12").productName("Onesie").qty(1).price(BigDecimal.valueOf(399));
+        CustomerOrder order = new CustomerOrder().id(102L).orderNumber("MNM-TEST-3").userLogin("buyer@example.com");
+        order.addItems(line);
+        line.setOrder(order);
+
+        when(customerOrderRepository.findById(102L)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(102L)).thenReturn(List.of(line));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-3"));
+        when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-3")));
+        when(booksClient.createInvoiceFromSalesOrder("so-3")).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-3")));
+        when(productRepository.findById(12L)).thenReturn(Optional.of(product));
+        when(booksClient.downloadInvoicePdf(eq("inv-3"), any(Long.class))).thenThrow(new IllegalStateException("Zoho unreachable"));
+
+        service.syncOrder(102L);
+
+        assertThat(order.getZohoInvoicePdfUrl()).isNull();
+        assertThat(order.getZohoInvoiceId()).isEqualTo("inv-3");
+        assertThat(order.getZohoSyncStatus()).isEqualTo(com.miniandmore.app.domain.enumeration.ZohoSyncStatus.SYNCED);
+    }
+
+    @Test
+    void ensureInvoicePdfCached_alreadyCached_returnsExistingUrlWithoutCallingZoho() {
+        CustomerOrder order = new CustomerOrder()
+            .id(103L)
+            .zohoInvoiceId("inv-4")
+            .zohoInvoicePdfUrl("https://cdn.example.com/uat/invoices/invoice-inv-4.pdf");
+        when(customerOrderRepository.findById(103L)).thenReturn(Optional.of(order));
+
+        String url = service.ensureInvoicePdfCached(103L);
+
+        assertThat(url).isEqualTo("https://cdn.example.com/uat/invoices/invoice-inv-4.pdf");
+        verify(booksClient, never()).downloadInvoicePdf(any(), any(Long.class));
+    }
+
+    @Test
+    void ensureInvoicePdfCached_noZohoInvoiceYet_returnsNull() {
+        CustomerOrder order = new CustomerOrder().id(104L);
+        when(customerOrderRepository.findById(104L)).thenReturn(Optional.of(order));
+
+        assertThat(service.ensureInvoicePdfCached(104L)).isNull();
+        verify(booksClient, never()).downloadInvoicePdf(any(), any(Long.class));
+    }
+
+    @Test
+    void ensureInvoicePdfCached_notYetCached_downloadsAndSavesOrder() {
+        ApplicationProperties.Storage storage = new ApplicationProperties.Storage();
+        storage.getS3().setMaxUploadBytes(8_192_000L);
+        when(applicationProperties.getStorage()).thenReturn(storage);
+        CustomerOrder order = new CustomerOrder().id(105L).zohoInvoiceId("inv-5");
+        when(customerOrderRepository.findById(105L)).thenReturn(Optional.of(order));
+        when(booksClient.downloadInvoicePdf(eq("inv-5"), any(Long.class)))
+            .thenReturn(Optional.of(new ZohoBooksClient.BinaryDownload("pdf-bytes".getBytes(), "application/pdf")));
+        when(s3StorageService.uploadInvoicePdf(eq("invoice-inv-5.pdf"), any()))
+            .thenReturn("https://cdn.example.com/uat/invoices/invoice-inv-5.pdf");
+
+        String url = service.ensureInvoicePdfCached(105L);
+
+        assertThat(url).isEqualTo("https://cdn.example.com/uat/invoices/invoice-inv-5.pdf");
+        verify(customerOrderRepository).save(order);
+    }
+
+    @Test
     void syncOrder_codOrder_includesPaymentTermsShippingAndCodFee() {
         Product product = new Product().id(10L).sku("SKU-10").zohoItemId("zoho-item-10");
         OrderItem line = new OrderItem()
@@ -869,6 +969,38 @@ class ZohoSyncServiceTest {
     }
 
     @Test
+    void pullProducts_zohoRateLimitMidPagination_stopsCleanlyInsteadOfThrowing() {
+        // A 429 mid-pagination must not bubble up as an unhandled 500 to the admin UI, and must not
+        // run deactivateStaleZohoProducts on the partial SKU set (that would wrongly deactivate every
+        // product on pages never reached).
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.listItems(1))
+            .thenReturn(List.of(Map.of("sku", "OK-ITEM", "item_id", "zoho-ok", "name", "Ok Item", "rate", 100)));
+        when(productRepository.findOneBySku("OK-ITEM")).thenReturn(Optional.empty());
+        when(productRepository.findOneByZohoItemId("zoho-ok")).thenReturn(Optional.empty());
+        when(productRepository.findMaxSortOrder()).thenReturn(0);
+        when(productFieldMapper.applyPulledItem(any(), any(), eq(false))).thenReturn(Optional.empty());
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(booksClient.listItems(2))
+            .thenThrow(
+                org.springframework.web.client.HttpClientErrorException.create(
+                    org.springframework.http.HttpStatus.TOO_MANY_REQUESTS,
+                    "Too Many Requests",
+                    null,
+                    null,
+                    null
+                )
+            );
+
+        Map<String, Object> result = org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> service.pullProducts());
+
+        org.junit.jupiter.api.Assertions.assertEquals(1, result.get("success"));
+        org.junit.jupiter.api.Assertions.assertEquals(1, result.get("failed"));
+        verify(productRepository, never()).findAllByZohoItemIdIsNotNull();
+    }
+
+    @Test
     void pullProducts_fetchesItemDetailEvenWhenImageSyncDisabled() {
         when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
         when(itemImageSync.isEnabled()).thenReturn(false);
@@ -948,7 +1080,8 @@ class ZohoSyncServiceTest {
                 zohoSettingRepository,
                 customerOrderRepository,
                 customerProfileRepository,
-                orderItemRepository
+                orderItemRepository,
+                s3StorageService
             );
         when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
         when(itemImageSync.isEnabled()).thenReturn(false);
@@ -1022,7 +1155,8 @@ class ZohoSyncServiceTest {
                 zohoSettingRepository,
                 customerOrderRepository,
                 customerProfileRepository,
-                orderItemRepository
+                orderItemRepository,
+                s3StorageService
             );
 
         Product product = new Product()
@@ -1084,7 +1218,8 @@ class ZohoSyncServiceTest {
                 zohoSettingRepository,
                 customerOrderRepository,
                 customerProfileRepository,
-                orderItemRepository
+                orderItemRepository,
+                s3StorageService
             );
         ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
         zoho.setSyncProductStock(true);
@@ -1135,7 +1270,8 @@ class ZohoSyncServiceTest {
                 zohoSettingRepository,
                 customerOrderRepository,
                 customerProfileRepository,
-                orderItemRepository
+                orderItemRepository,
+                s3StorageService
             );
 
         Product product = new Product()
@@ -1189,7 +1325,8 @@ class ZohoSyncServiceTest {
                 zohoSettingRepository,
                 customerOrderRepository,
                 customerProfileRepository,
-                orderItemRepository
+                orderItemRepository,
+                s3StorageService
             );
 
         Product parent = new Product()
@@ -1271,7 +1408,8 @@ class ZohoSyncServiceTest {
                 zohoSettingRepository,
                 customerOrderRepository,
                 customerProfileRepository,
-                orderItemRepository
+                orderItemRepository,
+                s3StorageService
             );
 
         Product product = new Product()
@@ -1335,7 +1473,8 @@ class ZohoSyncServiceTest {
                 zohoSettingRepository,
                 customerOrderRepository,
                 customerProfileRepository,
-                orderItemRepository
+                orderItemRepository,
+                s3StorageService
             );
 
         Map<String, Object> small = groupedZohoItem("zoho-s", "HORIZON-S-NAVY", "S", "Navy", 799.20, 3);
@@ -1407,7 +1546,8 @@ class ZohoSyncServiceTest {
                 zohoSettingRepository,
                 customerOrderRepository,
                 customerProfileRepository,
-                orderItemRepository
+                orderItemRepository,
+                s3StorageService
             );
 
         Map<String, Object> pink = groupedZohoItem("zoho-pink", "KEDAR-S-PINK", "S", "Pink", 799.20, 2);
@@ -1442,11 +1582,8 @@ class ZohoSyncServiceTest {
         service.pullProducts();
 
         verify(productFieldMapper, times(2)).applyPulledItem(any(Product.class), any(), anyBoolean());
-        verify(itemImageSync).importZohoVariantColorImage(any(Product.class), eq("Pink"), eq("zoho-pink"), any(), eq(false));
-        verify(itemImageSync).importZohoVariantColorImage(any(Product.class), eq("Blue"), eq("zoho-blue"), any(), eq(false));
-        // Never called per-item (shareEmptySizes=false); called once after all pages/items are merged
-        // so an empty same-colour size can inherit a sibling's photo instead of a partial pull's.
-        verify(itemImageSync, times(1)).applySameColorPhotoSharing(any(Product.class));
+        verify(itemImageSync).importZohoVariantColorImage(any(Product.class), eq("Pink"), eq("zoho-pink"), any());
+        verify(itemImageSync).importZohoVariantColorImage(any(Product.class), eq("Blue"), eq("zoho-blue"), any());
     }
 
     @Test
@@ -1465,7 +1602,8 @@ class ZohoSyncServiceTest {
                 zohoSettingRepository,
                 customerOrderRepository,
                 customerProfileRepository,
-                orderItemRepository
+                orderItemRepository,
+                s3StorageService
             );
 
         Map<String, Object> small = booksVariantItem("zoho-s", "HORIZON-S-NAVY", "S", "Navy", 799.20, 3);
@@ -1523,7 +1661,8 @@ class ZohoSyncServiceTest {
                 zohoSettingRepository,
                 customerOrderRepository,
                 customerProfileRepository,
-                orderItemRepository
+                orderItemRepository,
+                s3StorageService
             );
 
         Product parent = new Product()
@@ -1582,7 +1721,8 @@ class ZohoSyncServiceTest {
                 zohoSettingRepository,
                 customerOrderRepository,
                 customerProfileRepository,
-                orderItemRepository
+                orderItemRepository,
+                s3StorageService
             );
 
         Product parent = new Product()
@@ -1649,7 +1789,8 @@ class ZohoSyncServiceTest {
                 zohoSettingRepository,
                 customerOrderRepository,
                 customerProfileRepository,
-                orderItemRepository
+                orderItemRepository,
+                s3StorageService
             );
 
         Product product = new Product()
@@ -1700,7 +1841,8 @@ class ZohoSyncServiceTest {
                 zohoSettingRepository,
                 customerOrderRepository,
                 customerProfileRepository,
-                orderItemRepository
+                orderItemRepository,
+                s3StorageService
             );
 
         Product product = new Product()
@@ -1753,7 +1895,8 @@ class ZohoSyncServiceTest {
                 zohoSettingRepository,
                 customerOrderRepository,
                 customerProfileRepository,
-                orderItemRepository
+                orderItemRepository,
+                s3StorageService
             );
 
         Product product = new Product()
@@ -1791,7 +1934,8 @@ class ZohoSyncServiceTest {
                 zohoSettingRepository,
                 customerOrderRepository,
                 customerProfileRepository,
-                orderItemRepository
+                orderItemRepository,
+                s3StorageService
             );
 
         Product product = new Product()

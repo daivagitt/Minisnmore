@@ -124,6 +124,32 @@ public class S3StorageService {
     }
 
     /**
+     * Caches one Zoho invoice PDF to the "invoices" folder. Deliberately separate from
+     * {@link #uploadObject} — that method's folder/extension whitelists are an image-only
+     * invariant for admin uploads and must not be loosened to let PDFs through everywhere.
+     */
+    public String uploadInvoicePdf(String filename, byte[] body) {
+        if (body.length > properties.getMaxUploadBytes()) {
+            var maxMb = Math.max(1, Math.round(properties.getMaxUploadBytes() / (1024.0 * 1024.0)));
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invoice PDF is too large. Maximum size is " + maxMb + " MB.");
+        }
+        validateConfig();
+        var safeName = filename == null ? "invoice.pdf" : filename.replaceAll("[^A-Za-z0-9._-]", "-");
+        if (!safeName.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
+            safeName = safeName + ".pdf";
+        }
+        var objectKey = buildObjectKey("invoices", safeName);
+        var bucket = properties.getBucket();
+        var putObjectRequest = PutObjectRequest.builder().bucket(bucket).key(objectKey).contentType("application/pdf").build();
+        try {
+            client().putObject(putObjectRequest, RequestBody.fromBytes(body));
+        } catch (Exception ex) {
+            throw storageUploadException(ex);
+        }
+        return publicObjectUrl(objectKey);
+    }
+
+    /**
      * List stored objects under a folder (for gallery recovery). Requires R2 token with ListBucket permission.
      */
     public List<StoredObject> listObjects(String folder, String suffix, int maxKeys) {

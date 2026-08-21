@@ -193,7 +193,17 @@ public class ZohoAdminResource {
 
     @PostMapping("/pull-products")
     public Map<String, Object> pullProducts() {
-        return syncService.pullProducts();
+        try {
+            return syncService.pullProducts();
+        } catch (RestClientResponseException ex) {
+            int status = ex.getStatusCode().value();
+            String message = status == 429
+                ? "Zoho API rate limit reached. Products already processed were saved; retry once the limit resets."
+                : "Zoho pull failed: HTTP " + status + ".";
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, message, ex);
+        } catch (ResourceAccessException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Could not reach Zoho. Check network access.", ex);
+        }
     }
 
     @PostMapping("/pull-inventory")

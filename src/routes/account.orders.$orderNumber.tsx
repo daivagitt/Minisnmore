@@ -6,7 +6,7 @@ import { formatOrderDate } from "@/lib/dates";
 import { formatOrderStatusSummary, formatPaymentStatusLabel } from "@/lib/order-status";
 import { useOrderTrackingPoll } from "@/hooks/useOrderTrackingPoll";
 import { shouldPollOrderTracking } from "@/lib/order-tracking";
-import { Loader2, ArrowLeft, MapPin, CreditCard, Package2, CheckCircle2, Clock, XCircle, Truck, Wallet } from "lucide-react";
+import { Loader2, ArrowLeft, MapPin, CreditCard, Package2, CheckCircle2, Clock, XCircle, Truck, Wallet, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { LazyImage } from "@/components/LazyImage";
 import { CopyButton } from "@/components/CopyButton";
@@ -264,6 +264,16 @@ function OrderDetail() {
                 </div>
               )}
               {order.coupon_code && <div className="text-xs text-primary mt-1">Coupon: {order.coupon_code}</div>}
+              {order.invoice_pdf_url && (
+                <a
+                  href={order.invoice_pdf_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 rounded-full glass px-4 py-2 text-xs inline-flex items-center gap-2 hover:bg-white/60 transition"
+                >
+                  <FileText className="h-3.5 w-3.5" /> View invoice
+                </a>
+              )}
             </div>
           </div>
         </div>
