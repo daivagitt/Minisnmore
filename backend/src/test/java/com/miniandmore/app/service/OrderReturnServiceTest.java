@@ -5,12 +5,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
 import com.miniandmore.app.client.ZohoBooksIntegrationClient;
+import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.OrderReturn;
@@ -72,8 +74,23 @@ class OrderReturnServiceTest {
     @Mock
     private OrderSmsService orderSmsService;
 
+    @Mock
+    private ApplicationProperties applicationProperties;
+
     @InjectMocks
     private OrderReturnService orderReturnService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        lenient().when(applicationProperties.getZoho()).thenReturn(new ApplicationProperties.Zoho());
+        lenient().when(applicationProperties.getLedgerly()).thenReturn(new ApplicationProperties.Ledgerly());
+    }
+
+    private void enableLedgerlyReturnsSync() {
+        ApplicationProperties.Ledgerly ledgerly = new ApplicationProperties.Ledgerly();
+        ledgerly.setSyncReturns(true);
+        when(applicationProperties.getLedgerly()).thenReturn(ledgerly);
+    }
 
     @Test
     void requestReturn_shortReason_throwsBadRequest() {
@@ -261,6 +278,35 @@ class OrderReturnServiceTest {
     }
 
     @Test
+    void processRefund_zohoSyncReturnsDisabledByDefault_neverCallsZoho() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo_ORD-9001");
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        orderReturnService.processRefund("RET-1", "Refunded");
+
+        verify(zohoBooksIntegrationClient, never()).createCreditNote(any(), any());
+    }
+
+    @Test
+    void processRefund_ledgerlySyncReturnsDisabledByDefault_neverCallsLedgerly() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo_ORD-9001");
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderReturn result = orderReturnService.processRefund("RET-1", "Refunded");
+
+        verify(ledgerlyIntegrationClient, never()).cancelOrder(any(), any(), any());
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REFUNDED);
+    }
+
+    @Test
     void assertReturnEligible_unpaidOrder_throwsBadRequest() {
         CustomerOrder order = eligibleOrder().paymentStatus(PaymentStatus.PENDING);
 
@@ -300,6 +346,7 @@ class OrderReturnServiceTest {
 
     @Test
     void processRefund_ledgerlySuccess_setsCreditNoteId() {
+        enableLedgerlyReturnsSync();
         OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
         when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo_ORD-9001");
@@ -333,6 +380,7 @@ class OrderReturnServiceTest {
 
     @Test
     void processRefund_ledgerlyFailure_stillRefunds() {
+        enableLedgerlyReturnsSync();
         OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(java.util.Optional.of(orderReturn));
         when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo_ORD-9001");
@@ -348,6 +396,7 @@ class OrderReturnServiceTest {
 
     @Test
     void processRefund_ledgerlyEmptyResponse_demoOrder_stubsCreditNoteId() {
+        enableLedgerlyReturnsSync();
         OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
         CustomerOrder order = orderReturn.getOrder();
         order.setRazorpayPaymentId("pay_demo_scenario_123");
@@ -587,6 +636,7 @@ class OrderReturnServiceTest {
 
     @Test
     void processRefund_ledgerlyFailure_recordsAdminNote() {
+        enableLedgerlyReturnsSync();
         OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
         when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_live_1");

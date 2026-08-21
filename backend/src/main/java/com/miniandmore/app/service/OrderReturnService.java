@@ -2,6 +2,7 @@ package com.miniandmore.app.service;
 
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
 import com.miniandmore.app.client.ZohoBooksIntegrationClient;
+import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.OrderReturn;
@@ -60,6 +61,7 @@ public class OrderReturnService {
     private final ProductVariantSupport variantSupport;
     private final OrderMailService orderMailService;
     private final OrderSmsService orderSmsService;
+    private final ApplicationProperties applicationProperties;
 
     public OrderReturnService(
         OrderReturnRepository orderReturnRepository,
@@ -71,7 +73,8 @@ public class OrderReturnService {
         ZohoBooksIntegrationClient zohoBooksIntegrationClient,
         ProductVariantSupport variantSupport,
         OrderMailService orderMailService,
-        OrderSmsService orderSmsService
+        OrderSmsService orderSmsService,
+        ApplicationProperties applicationProperties
     ) {
         this.orderReturnRepository = orderReturnRepository;
         this.customerOrderRepository = customerOrderRepository;
@@ -83,6 +86,7 @@ public class OrderReturnService {
         this.variantSupport = variantSupport;
         this.orderMailService = orderMailService;
         this.orderSmsService = orderSmsService;
+        this.applicationProperties = applicationProperties;
     }
 
     public List<OrderReturn> listForUser(String login) {
@@ -196,7 +200,7 @@ public class OrderReturnService {
                 order.setPaymentStatus(PaymentStatus.REFUNDED);
                 customerOrderRepository.save(order);
             }
-            if (StringUtils.isBlank(orderReturn.getLedgerlyCreditNoteId())) {
+            if (applicationProperties.getLedgerly().isSyncReturns() && StringUtils.isBlank(orderReturn.getLedgerlyCreditNoteId())) {
                 try {
                     Optional<String> creditNoteId = ledgerlyIntegrationClient.cancelOrder(
                         order.getOrderNumber(),
@@ -229,7 +233,7 @@ public class OrderReturnService {
                     }
                 }
             }
-            if (StringUtils.isBlank(orderReturn.getZohoCreditNoteId())) {
+            if (applicationProperties.getZoho().isSyncReturns() && StringUtils.isBlank(orderReturn.getZohoCreditNoteId())) {
                 try {
                     Optional<String> zohoCreditNoteId = zohoBooksIntegrationClient.createCreditNote(
                         order.getId(),

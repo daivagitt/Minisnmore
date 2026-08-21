@@ -208,6 +208,8 @@ public class ApplicationProperties {
 
         private boolean syncProductStock = true;
 
+        private boolean syncReturns = false;
+
         private String defaultLocationId;
 
         private String defaultLocationName = "Head Office";
@@ -236,6 +238,14 @@ public class ApplicationProperties {
 
         public void setSyncProductStock(boolean syncProductStock) {
             this.syncProductStock = syncProductStock;
+        }
+
+        public boolean isSyncReturns() {
+            return syncReturns;
+        }
+
+        public void setSyncReturns(boolean syncReturns) {
+            this.syncReturns = syncReturns;
         }
 
         public String getDefaultLocationId() {
@@ -720,6 +730,8 @@ public class ApplicationProperties {
 
         private boolean syncProductImages = false;
 
+        private boolean syncReturns = false;
+
         private boolean autoSyncEnabled = false;
 
         private boolean autoPullEnabled = false;
@@ -764,6 +776,14 @@ public class ApplicationProperties {
 
         public void setSyncProductImages(boolean syncProductImages) {
             this.syncProductImages = syncProductImages;
+        }
+
+        public boolean isSyncReturns() {
+            return syncReturns;
+        }
+
+        public void setSyncReturns(boolean syncReturns) {
+            this.syncReturns = syncReturns;
         }
 
         public boolean isAutoSyncEnabled() {
