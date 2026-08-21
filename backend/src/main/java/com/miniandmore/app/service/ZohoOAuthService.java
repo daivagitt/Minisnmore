@@ -158,15 +158,43 @@ public class ZohoOAuthService {
         if (StringUtils.isBlank(refreshToken) || "null".equals(refreshToken)) {
             throw new IllegalStateException("Zoho did not return a refresh token");
         }
+        String accessToken = response.get("access_token") != null ? String.valueOf(response.get("access_token")) : null;
 
         ZohoSetting setting = settingRepository.findActiveOrLatest().orElseGet(ZohoSetting::new);
         setting.setRefreshToken(refreshToken);
         setting.setDataCenter(dataCenter);
-        if (StringUtils.isBlank(setting.getOrgId())) {
+
+        String currentOrgId = setting.getOrgId();
+        if (StringUtils.isBlank(currentOrgId)) {
             setting.setOrgId(effectiveOrgId());
+        } else if (StringUtils.isNotBlank(accessToken) && !"null".equals(accessToken)) {
+            // Reconnecting can authorize a different Zoho account/org than the one already saved;
+            // if the saved org id isn't visible to the new token, don't keep silently using it.
+            try {
+                var orgs = fetchOrganizations(accessToken, dataCenter);
+                boolean stillAccessible = orgs.stream().anyMatch(o -> currentOrgId.equals(String.valueOf(o.get("organization_id"))));
+                if (!stillAccessible) {
+                    setting.setOrgId(orgs.size() == 1 ? String.valueOf(orgs.get(0).get("organization_id")) : null);
+                }
+            } catch (Exception ignored) {
+                // Couldn't verify right now; leave the existing org id rather than fail the reconnect.
+            }
         }
+
         setting.setConnected(true);
         settingRepository.save(setting);
+    }
+
+    @SuppressWarnings("unchecked")
+    private java.util.List<Map<String, Object>> fetchOrganizations(String accessToken, String dataCenter) {
+        Map<String, Object> response = restClient
+            .get()
+            .uri(apiHost(dataCenter) + "/books/v3/organizations")
+            .header("Authorization", "Zoho-oauthtoken " + accessToken)
+            .retrieve()
+            .body(Map.class);
+        Object orgs = response != null ? response.get("organizations") : null;
+        return orgs instanceof java.util.List<?> list ? (java.util.List<Map<String, Object>>) list : java.util.List.of();
     }
 
     /** Resolve (and cache) a live access token from the stored refresh token. */
