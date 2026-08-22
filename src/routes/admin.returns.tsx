@@ -17,8 +17,8 @@ export const Route = createFileRoute("/admin/returns")({ component: AdminReturns
 
 const STATUS_FILTERS = ["", "requested", "approved", "received", "refunded", "rejected", "failed"] as const;
 
-// Feature switch: returns & refunds are temporarily disabled site-wide. Flip to true to restore the full flow below.
-const RETURNS_REFUNDS_ENABLED = false;
+// Feature switch: returns & refunds. Flip to false to disable site-wide.
+const RETURNS_REFUNDS_ENABLED = true;
 
 function AdminReturnsPage() {
   const [status, setStatus] = useState<string>("requested");

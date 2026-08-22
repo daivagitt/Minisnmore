@@ -18,8 +18,8 @@ export const Route = createFileRoute("/account/returns")({
   component: ReturnsPage,
 });
 
-// Feature switch: returns & refunds are temporarily disabled site-wide. Flip to true to restore the full flow below.
-const RETURNS_REFUNDS_ENABLED = false;
+// Feature switch: returns & refunds. Flip to false to disable site-wide.
+const RETURNS_REFUNDS_ENABLED = true;
 
 function ReturnsPage() {
   const { orders: allOrders, loadingOrders } = useAccountData();

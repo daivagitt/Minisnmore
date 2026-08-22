@@ -44,8 +44,8 @@ public class OrderReturnService {
     private static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
     private static final int RETURN_WINDOW_DAYS = 7;
 
-    /** Feature switch: returns & refunds are temporarily disabled. Flip to true to re-enable; no other code needs to change. */
-    private static final boolean RETURNS_REFUNDS_ENABLED = false;
+    /** Feature switch: returns & refunds. Flip to false to disable; no other code needs to change. */
+    private static final boolean RETURNS_REFUNDS_ENABLED = true;
     private static final String RETURNS_DISABLED_MESSAGE = "Returns & refunds are currently unavailable. Please contact support.";
 
     private static final Set<OrderReturnStatus> OPEN_RETURN_STATUSES = EnumSet.of(
