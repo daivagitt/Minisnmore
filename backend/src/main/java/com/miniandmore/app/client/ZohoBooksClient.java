@@ -89,8 +89,27 @@ public class ZohoBooksClient {
 
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> listItems(int page) {
-        Map<String, Object> response = get("/items?" + orgIdParam() + "&page=" + page + "&per_page=200");
+        return listItems(page, null);
+    }
+
+    /**
+     * @param modifiedSince when set, only items Zoho has changed at/after this instant are returned
+     *                       (Zoho Books {@code last_modified_time} filter) — used for incremental product pulls.
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> listItems(int page, java.time.Instant modifiedSince) {
+        String url = "/items?" + orgIdParam() + "&page=" + page + "&per_page=200";
+        if (modifiedSince != null) {
+            url += "&last_modified_time=" + encode(formatLastModifiedTime(modifiedSince));
+        }
+        Map<String, Object> response = get(url);
         return (List<Map<String, Object>>) response.getOrDefault("items", List.of());
+    }
+
+    private static String formatLastModifiedTime(java.time.Instant instant) {
+        return java.time.format.DateTimeFormatter
+            .ofPattern("yyyy-MM-dd'T'HH:mm:ssXX")
+            .format(instant.atOffset(java.time.ZoneOffset.UTC));
     }
 
     @SuppressWarnings("unchecked")
@@ -265,6 +284,17 @@ public class ZohoBooksClient {
 
     public Map<String, Object> markInvoiceAsSent(String invoiceId) {
         return post("/invoices/" + invoiceId + "/status/sent?" + orgIdParam(), Map.of());
+    }
+
+    public Map<String, Object> voidInvoice(String invoiceId) {
+        return post("/invoices/" + invoiceId + "/status/void?" + orgIdParam(), Map.of());
+    }
+
+    public Map<String, Object> voidSalesOrder(String salesOrderId, String reason) {
+        return post(
+            "/salesorders/" + salesOrderId + "/status/void?" + orgIdParam(),
+            Map.of("reason", StringUtils.defaultString(reason))
+        );
     }
 
     public Map<String, Object> markCreditNoteAsOpen(String creditNoteId) {

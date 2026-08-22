@@ -256,6 +256,7 @@ export function VariantsMatrixEditor({
                           key={url}
                           src={normalizeProductImageUrl(url) ?? url}
                           alt=""
+                          loading="lazy"
                           className="h-10 w-10 rounded-md object-cover border border-border/60"
                         />
                       ))}

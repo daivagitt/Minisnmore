@@ -1513,6 +1513,7 @@ export type ZohoIntegrationStatus = {
   dataCenter: string;
   organizationId: string | null;
   pullProductsAutoCreateCategory: boolean;
+  lastProductPullAt: string | null;
 };
 
 export const getZohoIntegrationStatus = () =>
@@ -1578,8 +1579,12 @@ export const syncZohoProduct = (productId: number) =>
 export const pullZohoInventory = () =>
   api.post<ZohoSyncSummary>("/api/v1/admin/zoho/pull-inventory", undefined, { auth: true });
 
-export const pullZohoProducts = () =>
-  api.post<ZohoSyncSummary>("/api/v1/admin/zoho/pull-products", undefined, { auth: true });
+export const pullZohoProducts = (options?: { full?: boolean }) =>
+  api.post<ZohoSyncSummary>(
+    `/api/v1/admin/zoho/pull-products${options?.full ? "?full=true" : ""}`,
+    undefined,
+    { auth: true },
+  );
 
 export const retryZohoOrders = () =>
   api.post<ZohoSyncSummary>("/api/v1/admin/zoho/retry-orders", undefined, { auth: true });

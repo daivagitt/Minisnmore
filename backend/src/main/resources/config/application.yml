@@ -254,6 +254,7 @@ application:
     default-location-name: ${ZOHO_DEFAULT_LOCATION_NAME:Head Office}
     inventory-account-id: ${ZOHO_INVENTORY_ACCOUNT_ID:}
     inventory-adjustment-account-id: ${ZOHO_INVENTORY_ADJUSTMENT_ACCOUNT_ID:}
+    gst-tax-id: ${ZOHO_GST_TAX_ID:}
     product-fields:
       fabric-type-label: ${ZOHO_FIELD_FABRIC_TYPE:Fabric Type}
       sizes-label: ${ZOHO_FIELD_SIZES:sizes}

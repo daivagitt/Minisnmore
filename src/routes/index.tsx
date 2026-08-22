@@ -13,6 +13,7 @@ import { useProducts, useProductsLoaded } from "@/hooks/useProducts";
 import { ProductGridSkeleton } from "@/components/ProductGridSkeleton";
 import { WatchShopSkeleton } from "@/components/WatchShopSkeleton";
 import { LazyImage } from "@/components/LazyImage";
+import { LazyVideo } from "@/components/LazyVideo";
 import { ProductCard } from "@/components/ProductCard";
 import { SectionDivider } from "@/components/SectionDivider";
 import { FloatingDecor } from "@/components/FloatingDecor";
@@ -557,20 +558,16 @@ function FabricStorySection({
       >
         <div className="relative overflow-hidden min-h-[240px] md:min-h-0">
           {videoSrc ? (
-            <video
+            <LazyVideo
               src={videoSrc}
-              autoPlay
-              muted
-              loop
-              playsInline
-              preload="metadata"
               poster={poster}
-              className="absolute inset-0 h-full w-full object-cover"
+              className="h-full w-full object-cover"
             />
           ) : (
             <img
               src={poster}
               alt="Organic fabric story"
+              loading="lazy"
               className="absolute inset-0 h-full w-full object-cover animate-[kenburns_18s_ease-in-out_infinite_alternate]"
             />
           )}
@@ -663,15 +660,10 @@ function WatchAndShop() {
               aria-label={`Shop ${r.product.name}`}
               className="relative block overflow-hidden rounded-[1.75rem] glass-strong hover-lift aspect-3/4"
             >
-              <video
+              <LazyVideo
                 src={r.video}
-                autoPlay
-                muted
-                loop
-                playsInline
-                preload={i <= 1 ? "auto" : "metadata"}
                 poster={r.product.image}
-                className="absolute inset-0 h-full w-full object-cover transition-transform duration-1200 group-hover:scale-[1.06]"
+                className="h-full w-full object-cover transition-transform duration-1200 group-hover:scale-[1.06]"
               />
               <div className="absolute inset-0 bg-linear-to-t from-foreground/75 via-foreground/15 to-transparent" />
               <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-background/80 backdrop-blur px-2.5 py-1 text-[10px] uppercase tracking-[0.22em] text-primary">

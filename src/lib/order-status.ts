@@ -47,6 +47,9 @@ export function formatOrderStatusSummary(order: OrderStatusFields): string {
   const paymentStatus = (order.payment_status ?? "").toLowerCase();
   const orderStatus = (order.status ?? "").toLowerCase();
 
+  if (orderStatus === "cancelled" || orderStatus === "canceled") {
+    return paymentStatus === "refunded" ? "Refunded · Cancelled" : "Cancelled";
+  }
   if (paymentStatus === "pending" && orderStatus === "pending") return paymentLabel;
   return `${paymentLabel} · ${statusLabel}`;
 }

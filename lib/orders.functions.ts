@@ -76,7 +76,9 @@ export type RetryPaymentInit = {
   gatewayMode: "demo" | "test" | "live" | "unknown";
 };
 
-export async function retryOrderPayment(input: { data: z.infer<typeof RetryPaymentInput> }): Promise<RetryPaymentInit> {
+export async function retryOrderPayment(input: {
+  data: z.infer<typeof RetryPaymentInput>;
+}): Promise<RetryPaymentInit> {
   const parsed = RetryPaymentInput.parse(input.data);
   return api.post("/api/v1/orders/retry-payment", parsed, { auth: true });
 }
@@ -87,12 +89,25 @@ export async function listMyOrders(): Promise<{ orders: any[] }> {
 
 const OrderNumberInput = z.object({ orderNumber: z.string().min(3).max(40) });
 
-export async function getOrder(input: { data: z.infer<typeof OrderNumberInput> }): Promise<{ order: any }> {
+export async function getOrder(input: {
+  data: z.infer<typeof OrderNumberInput>;
+}): Promise<{ order: any }> {
   const parsed = OrderNumberInput.parse(input.data);
   return api.get(`/api/v1/orders/${encodeURIComponent(parsed.orderNumber)}`, { auth: true });
 }
 
-export async function trackOrderPublic(input: { data: z.infer<typeof OrderNumberInput> }): Promise<{ order: any }> {
+export async function cancelOrder(orderNumber: string): Promise<{ order: any }> {
+  const parsed = OrderNumberInput.parse({ orderNumber });
+  return api.post(
+    `/api/v1/orders/${encodeURIComponent(parsed.orderNumber)}/cancel`,
+    {},
+    { auth: true },
+  );
+}
+
+export async function trackOrderPublic(input: {
+  data: z.infer<typeof OrderNumberInput>;
+}): Promise<{ order: any }> {
   const parsed = OrderNumberInput.parse(input.data);
   return api.get(`/api/v1/orders/track/${encodeURIComponent(parsed.orderNumber)}`);
 }
@@ -111,7 +126,9 @@ export type NotificationEvent = {
 };
 
 export async function listMyNotifications(): Promise<{ events: NotificationEvent[] }> {
-  const res = await api.get<{ events: NotificationEvent[] }>("/api/v1/account/notifications", { auth: true });
+  const res = await api.get<{ events: NotificationEvent[] }>("/api/v1/account/notifications", {
+    auth: true,
+  });
   return { events: res?.events ?? [] };
 }
 
@@ -130,7 +147,10 @@ export const FullNameSchema = z
   .trim()
   .min(2, "Full name must be at least 2 characters")
   .max(120, "Full name is too long")
-  .regex(FULL_NAME_PATTERN, "Full name may only contain letters, spaces, apostrophes, periods and hyphens");
+  .regex(
+    FULL_NAME_PATTERN,
+    "Full name may only contain letters, spaces, apostrophes, periods and hyphens",
+  );
 
 export function fullNameFieldError(fullName: string): string | undefined {
   const result = FullNameSchema.safeParse(fullName);
@@ -148,9 +168,15 @@ export const ProfileUpdate = z.object({
     .regex(PHONE_PATTERN, "Enter a valid 10-digit Indian mobile number"),
 });
 
-export async function updateMyProfile(input: { data: z.infer<typeof ProfileUpdate> }): Promise<{ ok: boolean }> {
+export async function updateMyProfile(input: {
+  data: z.infer<typeof ProfileUpdate>;
+}): Promise<{ ok: boolean }> {
   const parsed = ProfileUpdate.parse(input.data);
-  return api.put("/api/v1/account/profile", { full_name: parsed.full_name, phone: parsed.phone }, { auth: true });
+  return api.put(
+    "/api/v1/account/profile",
+    { full_name: parsed.full_name, phone: parsed.phone },
+    { auth: true },
+  );
 }
 
 export type OrderReturnRow = {
@@ -174,7 +200,9 @@ export async function listMyOrderReturns(): Promise<{ returns: OrderReturnRow[] 
 export async function checkReturnEligibility(
   orderNumber: string,
 ): Promise<{ eligible: boolean; message?: string; order_number: string }> {
-  return api.get(`/api/v1/order-returns/eligibility/${encodeURIComponent(orderNumber)}`, { auth: true });
+  return api.get(`/api/v1/order-returns/eligibility/${encodeURIComponent(orderNumber)}`, {
+    auth: true,
+  });
 }
 
 const CreateReturnInput = z.object({
@@ -205,9 +233,13 @@ export type AdminOrderReturnRow = OrderReturnRow & {
   order_id?: number;
 };
 
-export async function listAdminOrderReturns(status?: string): Promise<{ returns: AdminOrderReturnRow[] }> {
+export async function listAdminOrderReturns(
+  status?: string,
+): Promise<{ returns: AdminOrderReturnRow[] }> {
   const query = status ? `?status=${encodeURIComponent(status)}` : "";
-  const returns = await api.get<AdminOrderReturnRow[]>(`/api/v1/admin/order-returns${query}`, { auth: true });
+  const returns = await api.get<AdminOrderReturnRow[]>(`/api/v1/admin/order-returns${query}`, {
+    auth: true,
+  });
   return { returns: returns ?? [] };
 }
 
@@ -260,7 +292,9 @@ export type AdminCodOrderRow = {
 };
 
 export async function listCodPendingOrders(): Promise<{ orders: AdminCodOrderRow[] }> {
-  const res = await api.get<{ orders: AdminCodOrderRow[] }>("/api/v1/admin/orders/cod-pending", { auth: true });
+  const res = await api.get<{ orders: AdminCodOrderRow[] }>("/api/v1/admin/orders/cod-pending", {
+    auth: true,
+  });
   return { orders: res.orders ?? [] };
 }
 

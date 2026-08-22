@@ -218,6 +218,12 @@ public class ApplicationProperties {
 
         private String inventoryAdjustmentAccountId;
 
+        // Zoho tax_id for the org's 5% GST rate (Settings > Taxes in Zoho Books). When set, it is
+        // attached to pushed items (so Zoho auto-applies it, splitting CGST+SGST or IGST per
+        // place_of_supply) and to the COD handling fee line, which has no item_id to inherit from.
+        // Leave blank to keep sales orders/invoices tax-line-free (current behaviour).
+        private String gstTaxId;
+
         private boolean pullProductsAutoCreateCategory = false;
 
         private boolean autoSyncEnabled = false;
@@ -278,6 +284,14 @@ public class ApplicationProperties {
 
         public void setInventoryAdjustmentAccountId(String inventoryAdjustmentAccountId) {
             this.inventoryAdjustmentAccountId = inventoryAdjustmentAccountId;
+        }
+
+        public String getGstTaxId() {
+            return gstTaxId;
+        }
+
+        public void setGstTaxId(String gstTaxId) {
+            this.gstTaxId = gstTaxId;
         }
 
         public boolean isPullProductsAutoCreateCategory() {

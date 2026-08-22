@@ -39,6 +39,23 @@ describe("order-status labels", () => {
     ).toBe("Payment pending");
   });
 
+  it("renders cancelled orders as terminal regardless of their old payment state", () => {
+    expect(
+      formatOrderStatusSummary({
+        payment_status: "pending",
+        payment_method: "cod",
+        status: "cancelled",
+      }),
+    ).toBe("Cancelled");
+    expect(
+      formatOrderStatusSummary({
+        payment_status: "refunded",
+        payment_method: "online",
+        status: "cancelled",
+      }),
+    ).toBe("Refunded · Cancelled");
+  });
+
   it("uses tracking_status for fulfillment when present", () => {
     expect(
       formatOrderStatusSummary({

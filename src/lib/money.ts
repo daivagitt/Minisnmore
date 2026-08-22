@@ -1,14 +1,14 @@
 import { type CommerceConfig, DEFAULT_COMMERCE, type ShipMode } from "@/lib/commerce";
 
-/** Whole rupees (INR). */
+/** INR rounded to the nearest paise. */
 export function roundInr(amount: number): number {
   const n = Number(amount);
   if (!Number.isFinite(n)) return 0;
-  return Math.round(n);
+  return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
 export function formatInr(amount: number): string {
-  return roundInr(amount).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+  return roundInr(amount).toLocaleString("en-IN", { maximumFractionDigits: 2 });
 }
 
 /** @deprecated use DEFAULT_COMMERCE.freeShippingMinInr */
@@ -50,8 +50,8 @@ export function shippingForOrder(
   return roundInr(commerce.shippingStandardInr);
 }
 
-/** Flat COD handling fee — matches backend InternalAccountOrderResource#COD_FEE and the ₹49 figure in the shipping policy. */
-export const COD_FEE_INR = 49;
+/** Flat, GST-inclusive COD handling fee used by the workbook scenarios and backend. */
+export const COD_FEE_INR = 99;
 
 export function orderTotals({
   subtotal,
@@ -68,27 +68,39 @@ export function orderTotals({
   shipMode?: ShipMode;
   commerce?: CommerceConfig;
 }) {
-  const taxableSubtotal = Math.max(0, roundInr(subtotal));
   const afterDiscount = Math.max(0, roundInr(subtotal - discount));
   const shipping = shippingForOrder(afterDiscount, shipMode, commerce);
-  const lineGst = gstAmount(taxableSubtotal, commerce);
+  // The catalogue price is GST-inclusive by default. Extract tax only after all product
+  // discounts, exactly as the invoice workbook does. COD is also GST-inclusive; shipping
+  // and donations do not carry GST in these scenarios.
+  const lineGst = gstAmount(afterDiscount, commerce);
+  const roundedCodFee = roundInr(codFee);
+  const codGst = gstIncludedInPrice(roundedCodFee, commerce.gstRate);
   const shippingGst = 0;
-  const gst = lineGst;
-  const grand =
+  const gst = roundInr(lineGst + codGst);
+  const grand = roundInr(
     afterDiscount +
     shipping +
-    roundInr(codFee) +
+    roundedCodFee +
     roundInr(donation) +
-    (commerce.pricesIncludeGst ? 0 : gst);
+    (commerce.pricesIncludeGst ? 0 : lineGst),
+  );
+  const taxableTotal = roundInr(
+    afterDiscount - (commerce.pricesIncludeGst ? lineGst : 0) + shipping + roundedCodFee - codGst,
+  );
+  const roundOff = roundInr(grand - roundInr(taxableTotal + gst + roundInr(donation)));
   return {
     afterDiscount,
     shipping,
-    codFee: roundInr(codFee),
-    gstIncluded: commerce.pricesIncludeGst ? gst : 0,
-    gstAdded: commerce.pricesIncludeGst ? 0 : gst,
+    codFee: roundedCodFee,
+    gstIncluded: roundInr((commerce.pricesIncludeGst ? lineGst : 0) + codGst),
+    gstAdded: commerce.pricesIncludeGst ? 0 : lineGst,
     gst,
     lineGst,
+    codGst,
     shippingGst,
+    taxableTotal,
+    roundOff,
     grand,
     pricesIncludeGst: commerce.pricesIncludeGst,
   };

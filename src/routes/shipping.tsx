@@ -33,8 +33,8 @@ function ShippingPage() {
       <h2>3. Shipping charges</h2>
       <ul>
         <li><strong>Free shipping</strong> on all prepaid orders above <strong>₹999</strong>.</li>
-        <li>Orders below ₹999: a flat shipping fee of <strong>₹69</strong> applies.</li>
-        <li><strong>Cash on Delivery</strong> (where available): an additional handling fee of <strong>₹49</strong> applies.</li>
+        <li>Orders below ₹999: a flat shipping fee of <strong>₹99</strong> applies.</li>
+        <li><strong>Cash on Delivery</strong> (where available): an additional GST-inclusive handling fee of <strong>₹99</strong> applies.</li>
       </ul>
 
       <h2>4. Order tracking</h2>

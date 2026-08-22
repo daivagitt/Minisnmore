@@ -23,13 +23,21 @@ const ORDER_FILTERS = [
   { key: "completed", label: "Completed" },
 ] as const;
 
-function needsOnlinePayment(order: { payment_status?: string; payment_method?: string }) {
-  return order.payment_status === "pending" && order.payment_method !== "cod";
+function needsOnlinePayment(order: {
+  payment_status?: string;
+  payment_method?: string;
+  status?: string;
+}) {
+  return (
+    order.payment_status === "pending" &&
+    order.payment_method !== "cod" &&
+    order.status !== "cancelled"
+  );
 }
 
 function OrdersPage() {
   const { orders, loadingOrders, refreshOrders } = useAccountData();
-  const [filter, setFilter] = useState<typeof ORDER_FILTERS[number]["key"]>("all");
+  const [filter, setFilter] = useState<(typeof ORDER_FILTERS)[number]["key"]>("all");
 
   useEffect(() => {
     if (orders === null && !loadingOrders) void refreshOrders();
@@ -44,14 +52,22 @@ function OrdersPage() {
 
   return (
     <div className="glass-strong rounded-[2rem] p-6 md:p-8">
-      <h1 className="font-display text-3xl mb-1 flex items-center gap-2"><Package className="h-6 w-6 text-primary" /> Your orders</h1>
-      <p className="text-sm text-muted-foreground mb-6">All your little adventures, in one place.</p>
+      <h1 className="font-display text-3xl mb-1 flex items-center gap-2">
+        <Package className="h-6 w-6 text-primary" /> Your orders
+      </h1>
+      <p className="text-sm text-muted-foreground mb-6">
+        All your little adventures, in one place.
+      </p>
 
       {orders && orders.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-5">
           {ORDER_FILTERS.map((f) => (
-            <button key={f.key} type="button" onClick={() => setFilter(f.key)}
-              className={`text-xs rounded-full px-3 py-1.5 border transition ${filter === f.key ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted/60"}`}>
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setFilter(f.key)}
+              className={`text-xs rounded-full px-3 py-1.5 border transition ${filter === f.key ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted/60"}`}
+            >
               {f.label}
             </button>
           ))}
@@ -61,7 +77,10 @@ function OrdersPage() {
       {loadingOrders && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
       {orders && orders.length === 0 && (
         <div className="text-sm text-muted-foreground glass rounded-2xl p-6 text-center">
-          No orders yet. <Link to="/shop" className="text-primary story-link">Begin discovering →</Link>
+          No orders yet.{" "}
+          <Link to="/shop" className="text-primary story-link">
+            Begin discovering →
+          </Link>
         </div>
       )}
       {orders && orders.length > 0 && filteredOrders?.length === 0 && (
@@ -83,13 +102,24 @@ function OrdersPage() {
               className="flex items-center gap-3 min-w-0 flex-1"
             >
               <div className="flex -space-x-2 shrink-0">
-                {(o.order_items ?? []).slice(0, 3).map((it: any, i: number) => (
-                  it.product_image ? (
-                    <LazyImage key={i} src={it.product_image} alt="" className="h-10 w-10 rounded-xl object-cover ring-2 ring-background" priority="auto" />
-                  ) : (
-                    <div key={i} className="h-10 w-10 rounded-xl bg-muted ring-2 ring-background" />
-                  )
-                ))}
+                {(o.order_items ?? [])
+                  .slice(0, 3)
+                  .map((it: any, i: number) =>
+                    it.product_image ? (
+                      <LazyImage
+                        key={i}
+                        src={it.product_image}
+                        alt=""
+                        className="h-10 w-10 rounded-xl object-cover ring-2 ring-background"
+                        priority="auto"
+                      />
+                    ) : (
+                      <div
+                        key={i}
+                        className="h-10 w-10 rounded-xl bg-muted ring-2 ring-background"
+                      />
+                    ),
+                  )}
               </div>
               <div className="min-w-0">
                 <div className="font-medium flex items-center gap-1.5 min-w-0">
@@ -105,8 +135,11 @@ function OrdersPage() {
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {formatOrderDate(o.created_at)}
-                  {" · "}{o.order_items?.length || 0} item(s)
-                  {needsOnlinePayment(o) && <span className="text-primary"> · Tap to complete payment</span>}
+                  {" · "}
+                  {o.order_items?.length || 0} item(s)
+                  {needsOnlinePayment(o) && (
+                    <span className="text-primary"> · Tap to complete payment</span>
+                  )}
                 </div>
               </div>
             </Link>
@@ -143,10 +176,16 @@ function OrdersPage() {
   );
 }
 
-function StatusPill({ order }: { order: { payment_status?: string; payment_method?: string; status?: string } }) {
+function StatusPill({
+  order,
+}: {
+  order: { payment_status?: string; payment_method?: string; status?: string };
+}) {
   const tone = paymentStatusTone(order.payment_status);
   return (
-    <span className={`text-[10px] tracking-wide rounded-full px-2 py-0.5 ${PAYMENT_STATUS_TONE_CLASS[tone]}`}>
+    <span
+      className={`text-[10px] tracking-wide rounded-full px-2 py-0.5 ${PAYMENT_STATUS_TONE_CLASS[tone]}`}
+    >
       {formatOrderStatusSummary(order)}
     </span>
   );

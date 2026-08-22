@@ -32,9 +32,19 @@ class OrderTrackingStatusResolverTest {
 
     @Test
     void resolve_unpaidOrder() {
-        CustomerOrder order = paidOrder().paymentStatus(PaymentStatus.PENDING);
+        CustomerOrder order = paidOrder().status(OrderStatus.PENDING).paymentStatus(PaymentStatus.PENDING);
 
         assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("pending");
+    }
+
+    @Test
+    void resolve_shippedCodOrderWhilePaymentIsPending() {
+        CustomerOrder order = paidOrder()
+            .paymentStatus(PaymentStatus.PENDING)
+            .paymentMethod("cod")
+            .ledgerlyOrderStatus("shipped");
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("shipped");
     }
 
     @Test

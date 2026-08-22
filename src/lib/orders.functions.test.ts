@@ -36,6 +36,7 @@ vi.mock("./coupons.functions", () => ({
 
 import {
   approveOrderReturn,
+  cancelOrder,
   cancelOrderReturn,
   checkReturnEligibility,
   createOrder,
@@ -98,7 +99,9 @@ describe("orders functions", () => {
   });
 
   it("rejects invalid order payloads before calling the API", async () => {
-    await expect(createOrder({ data: { items: [], shipping_address: validAddress } } as any)).rejects.toThrow();
+    await expect(
+      createOrder({ data: { items: [], shipping_address: validAddress } } as any),
+    ).rejects.toThrow();
     expect(postMock).not.toHaveBeenCalled();
   });
 
@@ -164,6 +167,19 @@ describe("orders functions", () => {
     const res = await getOrder({ data: { orderNumber: "MNM-1" } });
     expect(res.order.order_number).toBe("MNM-1");
     expect(getMock).toHaveBeenCalledWith("/api/v1/orders/MNM-1", { auth: true });
+  });
+
+  it("cancels an owned order", async () => {
+    postMock.mockResolvedValueOnce({ order: { order_number: "MNM-1", status: "cancelled" } });
+
+    await expect(cancelOrder("MNM-1", "Ordered by mistake")).resolves.toEqual({
+      order: { order_number: "MNM-1", status: "cancelled" },
+    });
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/orders/MNM-1/cancel",
+      { reason: "Ordered by mistake" },
+      { auth: true },
+    );
   });
 
   it("tracks orders publicly and manages return workflows", async () => {

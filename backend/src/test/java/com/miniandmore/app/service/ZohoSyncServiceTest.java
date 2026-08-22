@@ -429,7 +429,10 @@ class ZohoSyncServiceTest {
         Map<String, Object> payload = payloadCaptor.getValue();
         assertThat(payload).doesNotContainKey("shipping_address");
         assertThat(payload).doesNotContainKey("billing_address");
-        assertThat(payload).doesNotContainKey("place_of_supply");
+        assertThat(payload)
+            .containsEntry("place_of_supply", "TG")
+            .containsEntry("gst_treatment", "consumer")
+            .containsEntry("is_inclusive_tax", true);
 
         ArgumentCaptor<Map<String, Object>> billingAddressCaptor = ArgumentCaptor.forClass(Map.class);
         verify(booksClient).updateSalesOrderBillingAddress(eq("so-addr"), billingAddressCaptor.capture());
@@ -2010,6 +2013,91 @@ class ZohoSyncServiceTest {
                 );
             })
         );
+    }
+
+    @Test
+    void syncOrder_inactiveVariantItem_reactivatesMappingAndRetriesSalesOrder() {
+        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository,
+                s3StorageService
+            );
+        Product product = new Product()
+            .id(60L)
+            .name("Baby Swaddle")
+            .sku("BABY-SWADDLE")
+            .active(true)
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                """
+                [{"sku":"BABY-SWADDLE-CS-BROWN","size":"COMMON SIZE","color":"Brown","rate":10,"stock":5,"active":true,"zohoItemId":"stale-item"}]
+                """
+            );
+        OrderItem line = new OrderItem()
+            .productId("60")
+            .productName("Baby Swaddle")
+            .variantSku("BABY-SWADDLE-CS-BROWN")
+            .itemSize("COMMON SIZE")
+            .color("Brown")
+            .qty(1)
+            .price(BigDecimal.TEN);
+        CustomerOrder order = new CustomerOrder().id(202L).orderNumber("MNM-REPAIR-1").userLogin("buyer@example.com");
+        order.addItems(line);
+
+        RestClientResponseException unavailable = new RestClientResponseException(
+            "Inactive item",
+            400,
+            "Bad Request",
+            null,
+            "{\"code\":2006,\"message\":\"SalesOrder cannot be raised for items that have been deleted or marked as inactive.\"}".getBytes(),
+            null
+        );
+        when(customerOrderRepository.findById(202L)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(202L)).thenReturn(List.of(line));
+        when(productRepository.findById(60L)).thenReturn(Optional.of(product));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(booksClient.createSalesOrder(any()))
+            .thenThrow(unavailable)
+            .thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-repaired")));
+        when(booksClient.markItemActive("stale-item")).thenReturn(Map.of());
+        when(booksClient.updateItem(eq("stale-item"), any())).thenReturn(Map.of("item", Map.of("item_id", "stale-item")));
+        when(booksClient.createInvoiceFromSalesOrder("so-repaired"))
+            .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-repaired")));
+
+        service.syncOrder(202L);
+
+        verify(booksClient, times(2)).createSalesOrder(any());
+        verify(booksClient).markItemActive("stale-item");
+        verify(booksClient).updateItem(eq("stale-item"), any());
+        assertThat(order.getZohoSalesOrderId()).isEqualTo("so-repaired");
+        assertThat(order.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.SYNCED);
+    }
+
+    @Test
+    void cancelOrder_voidsZohoInvoiceAndSalesOrder() {
+        CustomerOrder order = new CustomerOrder()
+            .id(203L)
+            .orderNumber("MNM-CANCEL-ZOHO")
+            .zohoInvoiceId("inv-cancel")
+            .zohoSalesOrderId("so-cancel");
+        when(customerOrderRepository.findById(203L)).thenReturn(Optional.of(order));
+
+        service.cancelOrder(203L);
+
+        verify(booksClient).voidInvoice("inv-cancel");
+        verify(booksClient).voidSalesOrder("so-cancel", "Customer cancelled before dispatch");
     }
 
     private static Map<String, Object> groupedZohoItem(

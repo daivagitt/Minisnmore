@@ -405,7 +405,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   };
 
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
-  const cartTotal = cart.reduce((s, i) => s + roundInr(i.qty * i.unitPrice), 0);
+  const cartTotal = roundInr(cart.reduce((s, i) => s + roundInr(i.qty * i.unitPrice), 0));
 
   return (
     <Ctx.Provider

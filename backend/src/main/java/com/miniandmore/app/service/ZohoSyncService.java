@@ -6,6 +6,7 @@ import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.CustomerProfile;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.Product;
+import com.miniandmore.app.domain.ZohoSetting;
 import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
@@ -35,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -155,28 +157,36 @@ public class ZohoSyncService {
             });
     }
 
+    private static final int SYNC_PAGE_SIZE = 200;
+
     public Map<String, Object> syncAllProducts() {
         ZohoSyncSummary.Builder builder = ZohoSyncSummary.builder();
-        for (Product product : productRepository.findAllWithEagerRelationships()) {
-            try {
-                if (StringUtils.isBlank(product.getSku())) {
-                    builder.notice(product.getName(), "Skipped — SKU required");
-                    continue;
-                }
-                if (!Boolean.TRUE.equals(product.getActive())) {
-                    if (isZohoLinked(product)) {
-                        deactivateInZoho(product);
-                        builder.notice(product.getSku(), "Deactivated in Zoho");
+        int pageNumber = 0;
+        Page<Product> page;
+        do {
+            page = productRepository.findAllWithEagerRelationships(PageRequest.of(pageNumber, SYNC_PAGE_SIZE, Sort.by("id")));
+            for (Product product : page.getContent()) {
+                try {
+                    if (StringUtils.isBlank(product.getSku())) {
+                        builder.notice(product.getName(), "Skipped — SKU required");
+                        continue;
                     }
-                    continue;
+                    if (!Boolean.TRUE.equals(product.getActive())) {
+                        if (isZohoLinked(product)) {
+                            deactivateInZoho(product);
+                            builder.notice(product.getSku(), "Deactivated in Zoho");
+                        }
+                        continue;
+                    }
+                    pushProductToZoho(product);
+                    builder.success();
+                } catch (Exception e) {
+                    productRepository.updateZohoSyncFailure(product.getId(), ZohoSyncStatus.FAILED, e.getMessage());
+                    builder.failure(product.getId(), product.getName(), e.getMessage());
                 }
-                pushProductToZoho(product);
-                builder.success();
-            } catch (Exception e) {
-                productRepository.updateZohoSyncFailure(product.getId(), ZohoSyncStatus.FAILED, e.getMessage());
-                builder.failure(product.getId(), product.getName(), e.getMessage());
             }
-        }
+            pageNumber++;
+        } while (page.hasNext());
         return builder.build().toMap();
     }
 
@@ -202,6 +212,8 @@ public class ZohoSyncService {
             : existing != null
                 ? stringValue(existing.get("item_id"))
                 : null;
+
+        reactivateZohoItemIfNeeded(itemId, "product " + product.getSku());
 
         boolean openingStock = StringUtils.isBlank(itemId);
         Optional<String> inventoryAccountId = resolveInventoryAccountId();
@@ -271,6 +283,8 @@ public class ZohoSyncService {
             : existing != null
                 ? stringValue(existing.get("item_id"))
                 : null;
+
+        reactivateZohoItemIfNeeded(itemId, "variant " + variantSku);
 
         boolean openingStock = StringUtils.isBlank(itemId);
         Optional<String> inventoryAccountId = resolveInventoryAccountId();
@@ -442,6 +456,27 @@ public class ZohoSyncService {
                 Map<String, Object> plain = new LinkedHashMap<>(payload);
                 stripExtraVariantFields(plain);
                 return openingStock ? createItemSelfHealing(plain) : booksClient.updateItem(itemId, plain);
+            }
+            throw e;
+        }
+    }
+
+    private void reactivateZohoItemIfNeeded(String itemId, String label) {
+        if (StringUtils.isBlank(itemId)) {
+            return;
+        }
+        try {
+            booksClient.markItemActive(itemId);
+        } catch (RestClientResponseException e) {
+            if (isItemNotFound(e)) {
+                // Zoho uses code 2006 for both deleted and inactive items. The subsequent update
+                // path recreates genuinely deleted items and replaces the cached mapping.
+                LOG.debug("Zoho item {} for {} could not be reactivated; update will self-heal", itemId, label);
+                return;
+            }
+            String body = StringUtils.defaultString(e.getResponseBodyAsString()).toLowerCase();
+            if (e.getStatusCode().value() == 400 && body.contains("already") && body.contains("active")) {
+                return;
             }
             throw e;
         }
@@ -1051,11 +1086,24 @@ public class ZohoSyncService {
     }
 
     public Map<String, Object> pullProducts() {
+        return pullProducts(false);
+    }
+
+    /**
+     * @param forceFullPull when false (the normal case), only items Zoho has changed since the last
+     *                      successful pull are fetched — cutting per-item detail calls and Zoho API
+     *                      quota use down to whatever actually changed. The first-ever pull (no stored
+     *                      cursor yet) always pulls the full catalog regardless of this flag.
+     */
+    public Map<String, Object> pullProducts(boolean forceFullPull) {
         ZohoSyncSummary.Builder builder = ZohoSyncSummary.builder();
-        boolean autoCreateCategory = zohoSettingRepository
-            .findActiveOrLatest()
-            .map(setting -> Boolean.TRUE.equals(setting.getPullProductsAutoCreateCategory()))
+        Optional<ZohoSetting> setting = zohoSettingRepository.findActiveOrLatest();
+        boolean autoCreateCategory = setting
+            .map(s -> Boolean.TRUE.equals(s.getPullProductsAutoCreateCategory()))
             .orElse(applicationProperties.getZoho().isPullProductsAutoCreateCategory());
+        Instant since = forceFullPull ? null : setting.map(ZohoSetting::getLastProductPullAt).orElse(null);
+        boolean incremental = since != null;
+        Instant pullStartedAt = Instant.now();
         Set<String> pulledSkus = new HashSet<>();
         List<Product> variantParents = new ArrayList<>(
             productRepository.findAll().stream().filter(variantSupport::isVariants).toList()
@@ -1065,7 +1113,7 @@ public class ZohoSyncService {
         while (true) {
             List<Map<String, Object>> items;
             try {
-                items = booksClient.listItems(page);
+                items = since != null ? booksClient.listItems(page, since) : booksClient.listItems(page);
             } catch (RestClientResponseException e) {
                 // A transient Zoho failure (most commonly a rate limit) mid-pagination must not
                 // bubble up as a raw 500 — stop the pull, keep what was already merged, and never
@@ -1095,8 +1143,23 @@ public class ZohoSyncService {
             }
             page++;
         }
-        if (completedAllPages && !pulledSkus.isEmpty()) {
+        // Stale-product deactivation only makes sense against a full catalog listing — an incremental
+        // pull's pulledSkus is just the changed subset, so most untouched-but-still-active products
+        // would wrongly look "stale" and get deactivated.
+        if (completedAllPages && !incremental && !pulledSkus.isEmpty()) {
             deactivateStaleZohoProducts(pulledSkus, variantParents, builder);
+        }
+        if (completedAllPages) {
+            ZohoSyncSummary summary = builder.build();
+            if (summary.failureCount() == 0) {
+                ZohoSetting settingToUpdate = setting.orElseGet(ZohoSetting::new);
+                if (settingToUpdate.getConnected() == null) {
+                    settingToUpdate.setConnected(false);
+                }
+                settingToUpdate.setLastProductPullAt(pullStartedAt);
+                zohoSettingRepository.save(settingToUpdate);
+            }
+            return summary.toMap();
         }
         return builder.build().toMap();
     }
@@ -1645,7 +1708,7 @@ public class ZohoSyncService {
                     String customerId = resolveOrCreateContact(order);
                     String salesOrderId = order.getZohoSalesOrderId();
                     if (StringUtils.isBlank(salesOrderId)) {
-                        Map<String, Object> salesOrderResponse = booksClient.createSalesOrder(buildSalesOrderPayload(order, customerId));
+                        Map<String, Object> salesOrderResponse = createSalesOrderSelfHealing(order, customerId);
                         @SuppressWarnings("unchecked")
                         Map<String, Object> salesOrder = (Map<String, Object>) salesOrderResponse.getOrDefault(
                             "salesorder",
@@ -1678,6 +1741,112 @@ public class ZohoSyncService {
                     order.setZohoSyncStatus(ZohoSyncStatus.FAILED);
                     order.setZohoSyncError(e.getMessage());
                     customerOrderRepository.save(order);
+                }
+            });
+    }
+
+    private Map<String, Object> createSalesOrderSelfHealing(CustomerOrder order, String customerId) {
+        return createSalesOrderSelfHealing(order, customerId, true, true, false);
+    }
+
+    private Map<String, Object> createSalesOrderSelfHealing(
+        CustomerOrder order,
+        String customerId,
+        boolean includeGstTreatment,
+        boolean includePlaceOfSupply,
+        boolean itemsRepaired
+    ) {
+        try {
+            return booksClient.createSalesOrder(buildSalesOrderPayload(order, customerId, includeGstTreatment, includePlaceOfSupply));
+        } catch (RestClientResponseException e) {
+            if (includeGstTreatment && isInvalidGstTreatment(e)) {
+                LOG.warn(
+                    "Zoho organization does not accept gst_treatment for order {}; retrying without that field",
+                    order.getOrderNumber()
+                );
+                return createSalesOrderSelfHealing(order, customerId, false, includePlaceOfSupply, itemsRepaired);
+            }
+            if (includePlaceOfSupply && isInvalidPlaceOfSupply(e)) {
+                LOG.warn(
+                    "Zoho organization does not accept place_of_supply for order {}; retrying without that field",
+                    order.getOrderNumber()
+                );
+                return createSalesOrderSelfHealing(order, customerId, includeGstTreatment, false, itemsRepaired);
+            }
+            if (itemsRepaired || !isUnavailableSalesOrderItem(e)) {
+                throw e;
+            }
+            LOG.warn("Zoho rejected stale/inactive items for order {}; repairing order-line mappings and retrying", order.getOrderNumber());
+            repairOrderLineZohoItems(order);
+            return createSalesOrderSelfHealing(order, customerId, includeGstTreatment, includePlaceOfSupply, true);
+        }
+    }
+
+    private static boolean isInvalidGstTreatment(RestClientResponseException exception) {
+        String body = StringUtils.defaultString(exception.getResponseBodyAsString()).toLowerCase();
+        return exception.getStatusCode().value() == 400 && body.contains("\"code\":8") && body.contains("gst_treatment");
+    }
+
+    private static boolean isInvalidPlaceOfSupply(RestClientResponseException exception) {
+        String body = StringUtils.defaultString(exception.getResponseBodyAsString()).toLowerCase();
+        return exception.getStatusCode().value() == 400 && body.contains("\"code\":8") && body.contains("place_of_supply");
+    }
+
+    private void repairOrderLineZohoItems(CustomerOrder order) {
+        Set<String> repairedLines = new LinkedHashSet<>();
+        for (OrderItem orderItem : orderItemRepository.findAllByOrderId(order.getId())) {
+            Product product = resolveOrderProduct(orderItem).orElse(null);
+            if (product == null) {
+                continue;
+            }
+            String variantSku = StringUtils.trimToNull(orderItem.getVariantSku());
+            String repairKey = product.getId() + ":" + StringUtils.defaultString(variantSku);
+            if (!repairedLines.add(repairKey)) {
+                continue;
+            }
+            if (variantSupport.isVariants(product) && variantSku != null) {
+                ProductVariantSupport.VariantRow row = variantSupport
+                    .findBySku(variantSupport.parseProduct(product), variantSku)
+                    .filter(ProductVariantSupport.VariantRow::active)
+                    .orElseThrow(() -> new IllegalStateException("Active variant not found for Zoho repair: " + variantSku));
+                String repairedItemId = pushVariantRowToZoho(product, row);
+                variantSupport.setVariantZohoItemId(product, variantSku, repairedItemId);
+                productRepository.save(product);
+            } else {
+                pushProductToZoho(product);
+            }
+        }
+    }
+
+    private static boolean isUnavailableSalesOrderItem(RestClientResponseException exception) {
+        String body = StringUtils.defaultString(exception.getResponseBodyAsString()).toLowerCase();
+        return exception.getStatusCode().value() == 400 && body.contains("\"code\":2006") && body.contains("salesorder");
+    }
+
+    public void cancelOrder(Long orderId) {
+        customerOrderRepository
+            .findById(orderId)
+            .ifPresent(order -> {
+                String invoiceId = StringUtils.trimToNull(order.getZohoInvoiceId());
+                if (invoiceId != null) {
+                    try {
+                        booksClient.voidInvoice(invoiceId);
+                    } catch (RuntimeException e) {
+                        LOG.warn("Could not void Zoho invoice {} for cancelled order {}: {}", invoiceId, order.getOrderNumber(), e.getMessage());
+                    }
+                }
+                String salesOrderId = StringUtils.trimToNull(order.getZohoSalesOrderId());
+                if (salesOrderId != null) {
+                    try {
+                        booksClient.voidSalesOrder(salesOrderId, "Customer cancelled before dispatch");
+                    } catch (RuntimeException e) {
+                        LOG.warn(
+                            "Could not void Zoho sales order {} for cancelled order {}: {}",
+                            salesOrderId,
+                            order.getOrderNumber(),
+                            e.getMessage()
+                        );
+                    }
                 }
             });
     }
@@ -1744,10 +1913,28 @@ public class ZohoSyncService {
         }
     }
 
-    private Map<String, Object> buildSalesOrderPayload(CustomerOrder order, String customerId) {
+    private Map<String, Object> buildSalesOrderPayload(
+        CustomerOrder order,
+        String customerId,
+        boolean includeGstTreatment,
+        boolean includePlaceOfSupply
+    ) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("customer_id", customerId);
         payload.put("reference_number", order.getOrderNumber());
+        if (includeGstTreatment) {
+            payload.put("gst_treatment", "consumer");
+        }
+        payload.put("is_inclusive_tax", true);
+        if (includePlaceOfSupply) {
+            JsonNode shippingAddress = parseShippingAddress(order.getShippingAddressJson());
+            String placeOfSupply = resolvePlaceOfSupply(textFromJson(shippingAddress, "state"));
+            if (StringUtils.isNotBlank(placeOfSupply)) {
+                // Zoho uses place of supply to select CGST+SGST for intra-state sales or IGST for
+                // inter-state sales. The commerce admin therefore only needs one aggregate GST rate.
+                payload.put("place_of_supply", placeOfSupply);
+            }
+        }
         payload.put("line_items", buildOrderLineItems(order, null));
         BigDecimal shipping = moneyOrZero(order.getShipping());
         if (shipping.compareTo(BigDecimal.ZERO) > 0) {
@@ -1757,7 +1944,7 @@ public class ZohoSyncService {
         if (discount.compareTo(BigDecimal.ZERO) > 0) {
             payload.put("discount", discount);
             payload.put("discount_type", "entity_level");
-            payload.put("is_discount_before_tax", false);
+            payload.put("is_discount_before_tax", true);
         }
         if (isCodOrder(order)) {
             payload.put("payment_terms_label", COD_PAYMENT_TERMS_LABEL);
@@ -1867,6 +2054,12 @@ public class ZohoSyncService {
             codLine.put("name", COD_FEE_LINE_NAME);
             codLine.put("rate", codFee);
             codLine.put("quantity", 1);
+            // The COD line has no item_id to inherit a tax from, unlike product lines (see
+            // ZohoProductFieldMapper#enrichPushPayload), so it needs tax_id set explicitly here.
+            String gstTaxId = StringUtils.trimToNull(applicationProperties.getZoho().getGstTaxId());
+            if (gstTaxId != null) {
+                codLine.put("tax_id", gstTaxId);
+            }
             lineItems.add(codLine);
         }
         return lineItems;

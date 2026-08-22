@@ -68,6 +68,7 @@ public class ZohoAdminResource {
         status.put("dataCenter", normalizedDataCenter());
         status.put("organizationId", oauthService.orgId());
         status.put("pullProductsAutoCreateCategory", setting.map(ZohoSetting::getPullProductsAutoCreateCategory).orElse(false));
+        status.put("lastProductPullAt", setting.map(ZohoSetting::getLastProductPullAt).orElse(null));
         return status;
     }
 
@@ -192,9 +193,9 @@ public class ZohoAdminResource {
     }
 
     @PostMapping("/pull-products")
-    public Map<String, Object> pullProducts() {
+    public Map<String, Object> pullProducts(@RequestParam(name = "full", defaultValue = "false") boolean full) {
         try {
-            return syncService.pullProducts();
+            return syncService.pullProducts(full);
         } catch (RestClientResponseException ex) {
             int status = ex.getStatusCode().value();
             String message = status == 429

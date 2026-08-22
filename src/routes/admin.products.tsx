@@ -509,6 +509,7 @@ function ProductsPage() {
                       <img
                         src={normalizeImageUrl(String(previewImage)) ?? ""}
                         alt=""
+                        loading="lazy"
                         className="h-full w-full object-cover"
                       />
                     ) : (
@@ -804,6 +805,7 @@ function ProductsPage() {
                               <img
                                 src={normalizeImageUrl(String(url)) ?? ""}
                                 alt=""
+                                loading="lazy"
                                 className="h-full w-full object-cover"
                               />
                               {!fromColorGalleries ? (

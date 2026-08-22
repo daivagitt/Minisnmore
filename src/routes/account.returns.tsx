@@ -18,6 +18,9 @@ export const Route = createFileRoute("/account/returns")({
   component: ReturnsPage,
 });
 
+// Feature switch: returns & refunds are temporarily disabled site-wide. Flip to true to restore the full flow below.
+const RETURNS_REFUNDS_ENABLED = false;
+
 function ReturnsPage() {
   const { orders: allOrders, loadingOrders } = useAccountData();
   const [returns, setReturns] = useState<OrderReturnRow[]>([]);
@@ -42,6 +45,10 @@ function ReturnsPage() {
   }, [returns]);
 
   const loadReturns = useCallback(async () => {
+    if (!RETURNS_REFUNDS_ENABLED) {
+      setLoadingReturns(false);
+      return;
+    }
     setLoadingReturns(true);
     try {
       const res = await listMyOrderReturns();
@@ -58,6 +65,7 @@ function ReturnsPage() {
   }, [loadReturns]);
 
   useEffect(() => {
+    if (!RETURNS_REFUNDS_ENABLED) return;
     if (!paidOrders.length) return;
     void (async () => {
       const next: Record<string, { eligible: boolean; message?: string }> = {};
@@ -107,6 +115,21 @@ function ReturnsPage() {
       setSubmitting(null);
     }
   };
+
+  if (!RETURNS_REFUNDS_ENABLED) {
+    return (
+      <div className="space-y-4">
+        <div className="glass-strong rounded-[2rem] p-6 md:p-8">
+          <h1 className="font-display text-3xl mb-1 flex items-center gap-2">
+            <RotateCcw className="h-6 w-6 text-primary" /> Returns & refunds
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Returns & refunds are temporarily unavailable. Please reach out to support if you need help with an order.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

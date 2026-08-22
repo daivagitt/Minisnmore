@@ -114,6 +114,10 @@ public class CustomerOrder implements Serializable {
     @Column(name = "notes", length = 500)
     private String notes;
 
+    @Size(max = 500)
+    @Column(name = "cancellation_reason", length = 500)
+    private String cancellationReason;
+
     @Column(name = "inventory_reserved")
     private Boolean inventoryReserved;
 
@@ -432,6 +436,19 @@ public class CustomerOrder implements Serializable {
 
     public void setNotes(String notes) {
         this.notes = notes;
+    }
+
+    public String getCancellationReason() {
+        return this.cancellationReason;
+    }
+
+    public CustomerOrder cancellationReason(String cancellationReason) {
+        this.setCancellationReason(cancellationReason);
+        return this;
+    }
+
+    public void setCancellationReason(String cancellationReason) {
+        this.cancellationReason = cancellationReason;
     }
 
     public Boolean getInventoryReserved() {

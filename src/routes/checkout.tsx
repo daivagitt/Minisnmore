@@ -985,7 +985,7 @@ function Checkout() {
           {couponOff > 0 && <div className="flex justify-between text-primary"><span>Discount ({coupon})</span><span>− ₹{couponOff.toLocaleString("en-IN")}</span></div>}
           <div className="flex justify-between text-muted-foreground"><span>Shipping</span><span>{shipping === 0 ? "Free" : `₹${shipping}`}</span></div>
           {totals.codFee > 0 && <div className="flex justify-between text-muted-foreground"><span>COD handling fee</span><span>₹{totals.codFee.toLocaleString("en-IN")}</span></div>}
-          <div className="flex justify-between text-muted-foreground"><span>GST ({commerce.gstRate}%)</span><span>₹{gst.toLocaleString("en-IN")}</span></div>
+          <div className="flex justify-between text-muted-foreground"><span>{totals.pricesIncludeGst ? "GST included" : "GST"} ({commerce.gstRate}%)</span><span>₹{gst.toLocaleString("en-IN")}</span></div>
           {donation > 0 && <div className="flex justify-between text-primary"><span>Donation ♥</span><span>₹{donation.toLocaleString("en-IN")}</span></div>}
           <div className="flex justify-between font-display text-lg pt-2 border-t border-border/60 mt-2"><span>Total</span><span>₹{grand.toLocaleString("en-IN")}</span></div>
         </div>

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serial;
 import java.io.Serializable;
+import java.time.Instant;
 
 /**
  * A ZohoSetting.
@@ -49,6 +50,9 @@ public class ZohoSetting implements Serializable {
     @NotNull
     @Column(name = "pull_products_auto_create_category", nullable = false)
     private Boolean pullProductsAutoCreateCategory = false;
+
+    @Column(name = "last_product_pull_at")
+    private Instant lastProductPullAt;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
@@ -154,6 +158,19 @@ public class ZohoSetting implements Serializable {
 
     public void setPullProductsAutoCreateCategory(Boolean pullProductsAutoCreateCategory) {
         this.pullProductsAutoCreateCategory = pullProductsAutoCreateCategory;
+    }
+
+    public Instant getLastProductPullAt() {
+        return this.lastProductPullAt;
+    }
+
+    public ZohoSetting lastProductPullAt(Instant lastProductPullAt) {
+        this.setLastProductPullAt(lastProductPullAt);
+        return this;
+    }
+
+    public void setLastProductPullAt(Instant lastProductPullAt) {
+        this.lastProductPullAt = lastProductPullAt;
     }
 
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here

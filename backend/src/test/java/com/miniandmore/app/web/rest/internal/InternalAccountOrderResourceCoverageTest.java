@@ -97,6 +97,9 @@ class InternalAccountOrderResourceCoverageTest {
     @MockitoBean
     private OrderEventService orderEventService;
 
+    @MockitoBean
+    private com.miniandmore.app.service.RazorpayRefundService razorpayRefundService;
+
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(resource, "razorpayKeyId", "rzp_test_livemode");
@@ -507,12 +510,10 @@ class InternalAccountOrderResourceCoverageTest {
     }
 
     /**
-     * A raw percent discount on a non-round subtotal (10% of ₹999 = ₹99.90) must round to whole
-     * rupees before it's charged — otherwise the Razorpay amount silently drifts a few paise from
-     * the whole-rupee total shown on the storefront's checkout review screen.
+     * Percentage discounts retain paise so checkout matches the workbook and payment amount.
      */
     @Test
-    void createOrder_fractionalDiscount_roundsToWholeRupeeBeforeCharging() throws Exception {
+    void createOrder_fractionalDiscount_preservesPaiseWhenCharging() throws Exception {
         ReflectionTestUtils.setField(resource, "razorpayKeyId", "DEMO");
         ReflectionTestUtils.setField(resource, "razorpayKeySecret", "");
         Product product = new Product().id(1L).name("Dress").slug("dress").price(BigDecimal.valueOf(999)).stock(5).active(true);
@@ -547,15 +548,67 @@ class InternalAccountOrderResourceCoverageTest {
                     )
             )
             .andExpect(status().isOk())
-            // Raw discount is ₹99.90; rounded to ₹100 so afterDiscount (₹899) + shipping (₹99) = ₹998 whole rupees.
-            .andExpect(jsonPath("$.data.totals.discount").value(100.0))
-            .andExpect(jsonPath("$.data.totals.total").value(998.0))
-            .andExpect(jsonPath("$.data.amount").value(99800));
+            .andExpect(jsonPath("$.data.totals.discount").value(99.9))
+            .andExpect(jsonPath("$.data.totals.total").value(998.1))
+            .andExpect(jsonPath("$.data.amount").value(99810));
+    }
+
+    @Test
+    void createOrder_prepaidShipping_matchesWorkbookAggregateGst() throws Exception {
+        ReflectionTestUtils.setField(resource, "razorpayKeyId", "DEMO");
+        ReflectionTestUtils.setField(resource, "razorpayKeySecret", "");
+        Product product = new Product()
+            .id(1L)
+            .name("Body suit")
+            .slug("body-suit")
+            .price(new BigDecimal("279.20"))
+            .stock(5)
+            .active(true);
+        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+        Coupon coupon = new Coupon()
+            .code("WELCOME10")
+            .active(true)
+            .discountType(com.miniandmore.app.domain.enumeration.DiscountType.PERCENT)
+            .discountValue(BigDecimal.TEN)
+            .minOrder(BigDecimal.ZERO);
+        when(couponRepository.findOneByCodeIgnoreCase("WELCOME10")).thenReturn(Optional.of(coupon));
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> {
+            CustomerOrder order = inv.getArgument(0);
+            order.setId(412L);
+            return order;
+        });
+        when(orderItemRepository.saveAll(any())).thenReturn(List.of());
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "items":[{"product_id":"1","product_name":"Body suit","qty":1,"price":279.20}],
+                          "shipping_address":{"full_name":"Jane","email":"j@example.com","phone":"9876543210","line1":"Line 1","city":"City","state":"State","pincode":"560001"},
+                          "donation":0,
+                          "coupon_code":"WELCOME10"
+                        }
+                        """
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.totals.subtotal").value(279.2))
+            .andExpect(jsonPath("$.data.totals.discount").value(27.92))
+            .andExpect(jsonPath("$.data.totals.shipping").value(99.0))
+            .andExpect(jsonPath("$.data.totals.tax").value(11.97))
+            .andExpect(jsonPath("$.data.totals.total").value(350.28))
+            .andExpect(jsonPath("$.data.amount").value(35028));
     }
 
     /**
      * Cash on Delivery must place a real, fulfillable order without touching Razorpay: the order
-     * is confirmed immediately (no online payment step to wait on), the ₹49 COD handling fee is
+     * is confirmed immediately (no online payment step to wait on), the ₹99 COD handling fee is
      * added to the total, and the inventory hold never expires (no 30-minute TTL like online
      * orders, since there's no "abandoned checkout" to reap).
      */
@@ -594,10 +647,11 @@ class InternalAccountOrderResourceCoverageTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.cod").value(true))
             .andExpect(jsonPath("$.data.paymentMethod").value("cod"))
-            // Subtotal ₹1000 + shipping ₹99 (below free-shipping threshold) + ₹49 COD fee = ₹1148.
-            .andExpect(jsonPath("$.data.totals.cod_fee").value(49.0))
-            .andExpect(jsonPath("$.data.totals.total").value(1148.0))
-            .andExpect(jsonPath("$.data.amount").value(114800))
+            // Subtotal ₹1000 + shipping ₹99 + GST-inclusive ₹99 COD fee = ₹1198.
+            .andExpect(jsonPath("$.data.totals.cod_fee").value(99.0))
+            .andExpect(jsonPath("$.data.totals.tax").value(52.33))
+            .andExpect(jsonPath("$.data.totals.total").value(1198.0))
+            .andExpect(jsonPath("$.data.amount").value(119800))
             .andExpect(jsonPath("$.data.razorpayOrderId").doesNotExist())
             .andExpect(jsonPath("$.data.keyId").doesNotExist());
 
@@ -1188,6 +1242,134 @@ class InternalAccountOrderResourceCoverageTest {
                     .content("{\"orderId\":79}")
             )
             .andExpect(status().isConflict());
+    }
+
+    @Test
+    void cancelOrder_codBeforeDispatch_restoresInventoryAndCancels() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(80L)
+            .userLogin("customer1")
+            .orderNumber("MNM-COD-CANCEL")
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PENDING)
+            .paymentMethod("cod")
+            .inventoryReserved(true)
+            .zohoSalesOrderId("zoho-so-80")
+            .total(BigDecimal.valueOf(549));
+        OrderItem item = new OrderItem().productId("1").qty(2).order(order);
+        Product product = new Product().id(1L).stock(3);
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-COD-CANCEL", "customer1")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderItemRepository.findAllByOrderId(80L)).thenReturn(List.of(item));
+        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders/MNM-COD-CANCEL/cancel")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"Ordered by mistake\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.status").value("cancelled"))
+            .andExpect(jsonPath("$.data.order.can_cancel").value(false));
+
+        assertThat(product.getStock()).isEqualTo(5);
+        assertThat(order.getInventoryReleasedAt()).isNotNull();
+        verify(razorpayRefundService, never()).refundPayment(any(), any());
+        verify(zohoSyncService).cancelOrder(80L);
+        verify(orderEventService).syncLifecycleEvents(order);
+    }
+
+    @Test
+    void cancelOrder_paidBeforeDispatch_refundsAndRestoresInventory() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(81L)
+            .userLogin("customer1")
+            .orderNumber("MNM-PAID-CANCEL")
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .paymentMethod("online")
+            .inventoryReserved(false)
+            .total(BigDecimal.valueOf(999));
+        OrderItem item = new OrderItem().productId("1").qty(1).order(order);
+        Product product = new Product().id(1L).stock(4);
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-PAID-CANCEL", "customer1")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderItemRepository.findAllByOrderId(81L)).thenReturn(List.of(item));
+        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
+        when(razorpayRefundService.refundPayment(order, BigDecimal.valueOf(999))).thenReturn("rfnd_81");
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders/MNM-PAID-CANCEL/cancel")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"Found a better price elsewhere\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.status").value("cancelled"))
+            .andExpect(jsonPath("$.data.order.payment_status").value("refunded"));
+
+        assertThat(product.getStock()).isEqualTo(5);
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        verify(razorpayRefundService).refundPayment(order, BigDecimal.valueOf(999));
+        verify(ledgerlyIntegrationClient).cancelOrder("MNM-PAID-CANCEL", null, "rfnd_81");
+    }
+
+    @Test
+    void cancelOrder_whenRefundFails_keepsOrderAndInventoryUnchanged() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(83L)
+            .userLogin("customer1")
+            .orderNumber("MNM-REFUND-FAIL")
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .paymentMethod("online")
+            .inventoryReserved(false)
+            .total(BigDecimal.valueOf(750));
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-REFUND-FAIL", "customer1")).thenReturn(Optional.of(order));
+        when(razorpayRefundService.refundPayment(order, BigDecimal.valueOf(750))).thenThrow(
+            new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_GATEWAY, "gateway down")
+        );
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders/MNM-REFUND-FAIL/cancel")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"Changed my mind\"}")
+            )
+            .andExpect(status().isBadGateway());
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+        verify(orderItemRepository, never()).findAllByOrderId(83L);
+        verify(orderEventService, never()).syncLifecycleEvents(order);
+    }
+
+    @Test
+    void cancelOrder_afterDispatch_returnsConflictWithoutRefund() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(82L)
+            .userLogin("customer1")
+            .orderNumber("MNM-SHIPPED")
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .ledgerlyOrderStatus("shipped")
+            .total(BigDecimal.valueOf(500));
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-SHIPPED", "customer1")).thenReturn(Optional.of(order));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders/MNM-SHIPPED/cancel")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"No longer needed\"}")
+            )
+            .andExpect(status().isConflict());
+
+        verify(razorpayRefundService, never()).refundPayment(any(), any());
     }
 
     @Test

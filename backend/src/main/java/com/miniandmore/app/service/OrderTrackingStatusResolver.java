@@ -14,7 +14,8 @@ public final class OrderTrackingStatusResolver {
         if (order.getStatus() == OrderStatus.CANCELLED || LedgerlyOrderStatus.isCancelled(ledgerlyStatus)) {
             return "cancelled";
         }
-        if (order.getPaymentStatus() != PaymentStatus.PAID) {
+        // COD orders remain payment-pending until delivery, but their fulfillment still advances.
+        if (order.getPaymentStatus() != PaymentStatus.PAID && order.getStatus() == OrderStatus.PENDING) {
             return "pending";
         }
         if (

@@ -98,6 +98,19 @@ class CommerceOrdersProxyResourceTest {
     }
 
     @Test
+    void cancelOrder_delegatesToCatalog() throws Exception {
+        when(catalog.post(eq("/internal/v1/orders/ORD-1/cancel"), any())).thenReturn(ResponseEntity.ok("{}"));
+
+        mockMvc
+            .perform(
+                post("/api/v1/orders/ORD-1/cancel").contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Changed my mind\"}")
+            )
+            .andExpect(status().isOk());
+
+        verify(catalog).post(eq("/internal/v1/orders/ORD-1/cancel"), any());
+    }
+
+    @Test
     void accountCartAndWishlistReplace_delegate() throws Exception {
         when(catalog.get("/internal/v1/account/cart")).thenReturn(ResponseEntity.ok("{\"items\":[]}"));
         when(catalog.put(eq("/internal/v1/account/cart"), any())).thenReturn(ResponseEntity.ok("{}"));

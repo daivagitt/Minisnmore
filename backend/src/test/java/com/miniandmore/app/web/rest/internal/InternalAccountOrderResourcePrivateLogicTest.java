@@ -69,6 +69,9 @@ class InternalAccountOrderResourcePrivateLogicTest {
     @Mock
     private OrderEventService orderEventService;
 
+    @Mock
+    private com.miniandmore.app.service.RazorpayRefundService razorpayRefundService;
+
     private InternalAccountOrderResource resource;
 
     @BeforeEach
@@ -88,7 +91,8 @@ class InternalAccountOrderResourcePrivateLogicTest {
             ledgerlySyncService,
             zohoSyncService,
             new ProductVariantSupport(new ObjectMapper()),
-            orderEventService
+            orderEventService,
+            razorpayRefundService
         );
         ReflectionTestUtils.setField(resource, "razorpayKeyId", "rzp_test");
         ReflectionTestUtils.setField(resource, "razorpayKeySecret", "secret");
@@ -432,7 +436,7 @@ class InternalAccountOrderResourcePrivateLogicTest {
             Optional.of("customer1")
         );
 
-        assertThat(result.orElseThrow().get("discount")).isEqualTo(BigDecimal.valueOf(100));
+        assertThat((BigDecimal) result.orElseThrow().get("discount")).isEqualByComparingTo("100.00");
     }
 
     @Test
@@ -538,6 +542,18 @@ class InternalAccountOrderResourcePrivateLogicTest {
             commerce
         );
         assertThat(tax).isEqualByComparingTo("18.00");
+    }
+
+    @Test
+    void calculateIncludedTax_extractsCodGstAtAggregateRate() {
+        BigDecimal tax = (BigDecimal) ReflectionTestUtils.invokeMethod(
+            resource,
+            "calculateIncludedTax",
+            BigDecimal.valueOf(99),
+            BigDecimal.valueOf(5)
+        );
+
+        assertThat(tax).isEqualByComparingTo("4.71");
     }
 
     @Test

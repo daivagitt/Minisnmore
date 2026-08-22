@@ -211,7 +211,7 @@ export function ColorImagesEditor({
                   <div className="flex items-center gap-2 min-w-0">
                     {swatch ? (
                       <span className="h-6 w-6 shrink-0 rounded-full border border-white/80 ring-1 ring-border/40 overflow-hidden">
-                        <img src={previewUrl(swatch)} alt="" className="h-full w-full object-cover" />
+                        <img src={previewUrl(swatch)} alt="" loading="lazy" className="h-full w-full object-cover" />
                       </span>
                     ) : (
                       <span
@@ -229,7 +229,7 @@ export function ColorImagesEditor({
                 <div className="flex flex-wrap gap-2">
                   {swatch ? (
                     <div className="relative h-20 w-20 rounded-xl overflow-hidden ring-1 ring-border group shrink-0">
-                      <img src={previewUrl(swatch)} alt="" className="h-full w-full object-cover" />
+                      <img src={previewUrl(swatch)} alt="" loading="lazy" className="h-full w-full object-cover" />
                       <button
                         type="button"
                         title="Remove swatch"
@@ -282,7 +282,7 @@ export function ColorImagesEditor({
                 <div className="flex flex-wrap gap-2">
                   {gallery.map((url) => (
                     <div key={url} className="relative h-20 w-20 rounded-xl overflow-hidden ring-1 ring-border group shrink-0">
-                      <img src={previewUrl(url)} alt="" className="h-full w-full object-cover" />
+                      <img src={previewUrl(url)} alt="" loading="lazy" className="h-full w-full object-cover" />
                       <button
                         type="button"
                         title="Remove gallery image"

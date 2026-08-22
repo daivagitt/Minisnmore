@@ -73,6 +73,9 @@ class InternalAccountOrderResourceRazorpayTest {
     @Mock
     private OrderEventService orderEventService;
 
+    @Mock
+    private com.miniandmore.app.service.RazorpayRefundService razorpayRefundService;
+
     private InternalAccountOrderResource resource;
     private ObjectMapper objectMapper;
 
@@ -94,7 +97,8 @@ class InternalAccountOrderResourceRazorpayTest {
             ledgerlySyncService,
             zohoSyncService,
             new ProductVariantSupport(objectMapper),
-            orderEventService
+            orderEventService,
+            razorpayRefundService
         );
         ReflectionTestUtils.setField(resource, "razorpayKeyId", "rzp_test_key");
         ReflectionTestUtils.setField(resource, "razorpayKeySecret", SECRET);

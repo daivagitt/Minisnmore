@@ -313,13 +313,19 @@ function ZohoPage() {
             </label>
         </div>
 
-        <ZohoSyncPanel connected={connected} />
+        <ZohoSyncPanel connected={connected} lastProductPullAt={integration?.lastProductPullAt ?? null} />
       </div>
     </AdminPage>
   );
 }
 
-function ZohoSyncPanel({ connected }: { connected: boolean }) {
+function ZohoSyncPanel({
+  connected,
+  lastProductPullAt,
+}: {
+  connected: boolean;
+  lastProductPullAt: string | null;
+}) {
   const [busy, setBusy] = useState<SyncAction | null>(null);
   const [lastResult, setLastResult] = useState<{ label: string; summary: ZohoSyncSummary } | null>(null);
   const [orderNumber, setOrderNumber] = useState("");
@@ -367,10 +373,13 @@ function ZohoSyncPanel({ connected }: { connected: boolean }) {
     {
       id: "productsPull",
       label: "Pull products from Zoho",
-      description:
-        "Import/update items from Zoho into Admin products. Existing products are matched by Zoho item id, then SKU.",
+      description: lastProductPullAt
+        ? `Only items changed in Zoho since the last pull (${new Date(
+            lastProductPullAt,
+          ).toLocaleString()}) are fetched. Existing products are matched by Zoho item id, then SKU.`
+        : "First pull imports the full catalogue; later runs only fetch items changed in Zoho since. Existing products are matched by Zoho item id, then SKU.",
       icon: Package,
-      run: pullZohoProducts,
+      run: () => pullZohoProducts(),
     },
     {
       id: "inventory",

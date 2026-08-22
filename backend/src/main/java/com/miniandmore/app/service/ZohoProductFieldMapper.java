@@ -51,6 +51,15 @@ public class ZohoProductFieldMapper {
         if (product.getCompareAtPrice() != null && product.getCompareAtPrice().compareTo(BigDecimal.ZERO) > 0) {
             payload.put(fields.mrpApiName(), formatDecimal(product.getCompareAtPrice()));
         }
+        if (StringUtils.isNotBlank(product.getHsn())) {
+            payload.put("hsn_or_sac", product.getHsn().trim());
+        }
+        // Setting tax_id on the item itself means Zoho applies it (and computes CGST+SGST or IGST
+        // from place_of_supply) on every sales order/invoice line automatically, no per-order wiring needed.
+        String gstTaxId = StringUtils.trimToNull(applicationProperties.getZoho().getGstTaxId());
+        if (gstTaxId != null) {
+            payload.put("tax_id", gstTaxId);
+        }
         List<Map<String, Object>> customFields = new ArrayList<>();
         fields
             .fabricType()

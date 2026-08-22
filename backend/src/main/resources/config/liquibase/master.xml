@@ -69,4 +69,6 @@
     <include file="config/liquibase/changelog/20260814150000_add_order_event.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260814150100_seed_mock_notification_test_product.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260817120000_add_customer_cart.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260821130000_add_zoho_last_product_pull_at.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260822120000_add_customer_order_cancellation_reason.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>

@@ -17,6 +17,9 @@ export const Route = createFileRoute("/admin/returns")({ component: AdminReturns
 
 const STATUS_FILTERS = ["", "requested", "approved", "received", "refunded", "rejected", "failed"] as const;
 
+// Feature switch: returns & refunds are temporarily disabled site-wide. Flip to true to restore the full flow below.
+const RETURNS_REFUNDS_ENABLED = false;
+
 function AdminReturnsPage() {
   const [status, setStatus] = useState<string>("requested");
   const [rows, setRows] = useState<AdminOrderReturnRow[]>([]);
@@ -24,6 +27,10 @@ function AdminReturnsPage() {
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    if (!RETURNS_REFUNDS_ENABLED) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const res = await listAdminOrderReturns(status || undefined);
@@ -51,6 +58,20 @@ function AdminReturnsPage() {
       setBusy(null);
     }
   };
+
+  if (!RETURNS_REFUNDS_ENABLED) {
+    return (
+      <AdminPage
+        eyebrow="Fulfilment"
+        title="Order returns"
+        description="Returns & refunds are temporarily disabled."
+      >
+        <p className="text-sm text-muted-foreground">
+          This feature is currently switched off. No new return requests can be submitted or processed.
+        </p>
+      </AdminPage>
+    );
+  }
 
   return (
     <AdminPage

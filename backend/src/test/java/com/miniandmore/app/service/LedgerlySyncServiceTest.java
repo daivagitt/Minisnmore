@@ -417,7 +417,7 @@ class LedgerlySyncServiceTest {
     void syncAllProducts_aggregatesFailures() {
         Product ok = product(30L).active(true);
         Product bad = product(31L).active(true);
-        when(productRepository.findAllWithEagerRelationships()).thenReturn(List.of(ok, bad));
+        when(productRepository.findAllWithEagerRelationships(any(PageRequest.class))).thenReturn(new PageImpl<>(List.of(ok, bad)));
         when(ledgerlyClient.syncProductPayload(any()))
             .thenReturn(Map.of("ledgerlyItemId", "item-30"))
             .thenThrow(new RuntimeException("sync failed"));
@@ -435,7 +435,8 @@ class LedgerlySyncServiceTest {
         Product inactiveLocal = product(91L).active(false);
         Product inactiveLinked = product(92L).active(false).ledgerlyItemId("item-92");
         inactiveLinked.setLedgerlySyncStatus(LedgerlySyncStatus.SYNCED);
-        when(productRepository.findAllWithEagerRelationships()).thenReturn(List.of(active, inactiveLocal, inactiveLinked));
+        when(productRepository.findAllWithEagerRelationships(any(PageRequest.class)))
+            .thenReturn(new PageImpl<>(List.of(active, inactiveLocal, inactiveLinked)));
         when(ledgerlyClient.syncProductPayload(any()))
             .thenReturn(Map.of("ledgerlyItemId", "item-90"))
             .thenReturn(Map.of("noop", true));
@@ -1033,7 +1034,7 @@ class LedgerlySyncServiceTest {
     @Test
     void syncAllProducts_blankSku_skipsWithNotice() {
         Product noSku = product(96L).sku("").active(true);
-        when(productRepository.findAllWithEagerRelationships()).thenReturn(List.of(noSku));
+        when(productRepository.findAllWithEagerRelationships(any(PageRequest.class))).thenReturn(new PageImpl<>(List.of(noSku)));
 
         Map<String, Object> result = service.syncAllProducts();
 

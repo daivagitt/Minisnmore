@@ -276,8 +276,8 @@ function SettingsPage() {
           <div className="glass-strong rounded-3xl p-5 space-y-3">
             <div className="font-display text-lg">Pricing &amp; delivery</div>
             <p className="text-sm text-muted-foreground">
-              GST and shipping used on cart, checkout, and order totals. Product prices should match whether GST is
-              included or added at checkout.
+              Set one total GST rate; CGST/SGST or IGST is derived later from the delivery state and does not need
+              separate admin fields. Product prices should match whether GST is included or added at checkout.
             </p>
             <div className="grid sm:grid-cols-2 gap-3">
               <NumberField

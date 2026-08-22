@@ -16,6 +16,7 @@ import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.service.OrderTrackingStatusResolver;
 import com.miniandmore.app.service.ProductVariantSupport;
 import com.miniandmore.app.service.ProductVariantSupport.VariantRow;
+import com.miniandmore.app.service.RazorpayRefundService;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import com.miniandmore.app.web.rest.v1.ApiResponse;
 import jakarta.validation.Valid;
@@ -43,7 +44,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -54,8 +57,8 @@ public class InternalAccountOrderResource {
     private static final Logger LOG = LoggerFactory.getLogger(InternalAccountOrderResource.class);
     private static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
     private static final Duration INVENTORY_RESERVATION_TTL = Duration.ofMinutes(30);
-    /** Flat COD handling fee — matches the ₹49 figure quoted in the storefront's shipping policy. */
-    private static final BigDecimal COD_FEE = BigDecimal.valueOf(49);
+    /** Flat, GST-inclusive COD handling fee used by the storefront and invoice workbook. */
+    private static final BigDecimal COD_FEE = BigDecimal.valueOf(99);
     private static final Duration TRACKING_REFRESH_TTL = Duration.ofMinutes(5);
     private static final String FIELD_PHONE = "phone";
     private static final String FIELD_ERROR = "error";
@@ -72,6 +75,8 @@ public class InternalAccountOrderResource {
     private final ZohoSyncService zohoSyncService;
     private final ProductVariantSupport variantSupport;
     private final OrderEventService orderEventService;
+    private final RazorpayRefundService razorpayRefundService;
+    private final TransactionTemplate inventoryRestoreTransaction;
 
     @Value("${razorpay.key-id:DEMO}")
     private String razorpayKeyId;
@@ -88,7 +93,9 @@ public class InternalAccountOrderResource {
         LedgerlySyncService ledgerlySyncService,
         ZohoSyncService zohoSyncService,
         ProductVariantSupport variantSupport,
-        OrderEventService orderEventService
+        OrderEventService orderEventService,
+        RazorpayRefundService razorpayRefundService,
+        PlatformTransactionManager transactionManager
     ) {
         this.dataAccess = dataAccess;
         this.objectMapper = objectMapper;
@@ -96,6 +103,8 @@ public class InternalAccountOrderResource {
         this.zohoSyncService = zohoSyncService;
         this.variantSupport = variantSupport;
         this.orderEventService = orderEventService;
+        this.razorpayRefundService = razorpayRefundService;
+        this.inventoryRestoreTransaction = new TransactionTemplate(transactionManager);
     }
 
     @PostMapping("/coupons/validate")
@@ -320,6 +329,9 @@ public class InternalAccountOrderResource {
     public ApiResponse<Map<String, Object>> retryPayment(@Valid @RequestBody RetryPaymentRequest request) {
         String login = requireLogin();
         CustomerOrder order = requireOwnedOrder(request.orderId(), login);
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This order has been cancelled");
+        }
         if (order.getPaymentStatus() == PaymentStatus.PAID) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This order is already paid");
         }
@@ -440,6 +452,67 @@ public class InternalAccountOrderResource {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
         order = refreshTrackingIfStale(order);
         return ApiResponse.ok(Map.of("order", orderDetail(order)));
+    }
+
+    @PostMapping("/orders/{orderNumber}/cancel")
+    public ApiResponse<Map<String, Object>> cancelOrder(
+        @PathVariable String orderNumber,
+        @Valid @RequestBody CancelOrderRequest request
+    ) {
+        String login = requireLogin();
+        CustomerOrder order = dataAccess
+            .customerOrderRepository()
+            .findOneByOrderNumberAndUserLogin(orderNumber, login)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            syncCancellationToZoho(order);
+            return ApiResponse.ok(Map.of("order", orderDetail(order)));
+        }
+
+        order = refreshTrackingIfStale(order);
+        String trackingStatus = OrderTrackingStatusResolver.resolve(order);
+        if (order.getStatus() == OrderStatus.FULFILLED || "shipped".equals(trackingStatus) || "delivered".equals(trackingStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This order has already been dispatched and can no longer be cancelled");
+        }
+
+        // Only an "online" (Razorpay) payment can be refunded through this API. A COD order
+        // marked paid via markCodCollected() was settled in cash with no razorpay_payment_id —
+        // refunding that is a manual/offline process, not something to attempt here.
+        boolean onlinePayment =
+            "online".equalsIgnoreCase(order.getPaymentMethod()) && StringUtils.isNotBlank(order.getRazorpayPaymentId());
+        String refundId = null;
+        if (order.getPaymentStatus() == PaymentStatus.PAID && onlinePayment) {
+            refundId = razorpayRefundService.refundPayment(order, order.getTotal());
+            // The refund above is a real, irreversible call to Razorpay. Persist its outcome
+            // immediately, on its own, before touching anything else that could still fail
+            // (inventory restore below has been seen to throw on transient errors) — otherwise a
+            // later failure would roll back paymentStatus/status while the money has already left,
+            // and a retry (which only skips the refund when status is already CANCELLED) would
+            // refund the customer a second time.
+            order.setPaymentStatus(PaymentStatus.REFUNDED);
+            order = dataAccess.customerOrderRepository().save(order);
+        }
+
+        CustomerOrder orderForInventoryRestore = order;
+        try {
+            // restoreInventoryForCancellation takes a PESSIMISTIC_WRITE lock per product (see
+            // ProductRepository#findOneForInventoryUpdate), which needs its own real transaction —
+            // this method is no longer @Transactional (that's the whole point of the fix above), so
+            // give it one explicitly rather than relying on an enclosing one that no longer exists.
+            inventoryRestoreTransaction.executeWithoutResult(status -> restoreInventoryForCancellation(orderForInventoryRestore));
+        } catch (RuntimeException ex) {
+            // Any refund above is already durably recorded; inventory reconciliation is
+            // best-effort here so it can never re-expose the order to a duplicate refund attempt.
+            LOG.warn("Inventory restore failed while cancelling {}: {}", order.getOrderNumber(), ex.getMessage());
+        }
+        order.setStatus(OrderStatus.CANCELLED);
+        order.setCancellationReason(StringUtils.normalizeSpace(request.reason()).trim());
+        CustomerOrder cancelled = dataAccess.customerOrderRepository().save(order);
+        syncCancellationToLedgerly(cancelled, refundId);
+        syncCancellationToZoho(cancelled);
+        orderEventService.syncLifecycleEvents(cancelled);
+        return ApiResponse.ok(Map.of("order", orderDetail(cancelled)));
     }
 
     @GetMapping("/payments")
@@ -597,11 +670,8 @@ public class InternalAccountOrderResource {
             discount = discount.min(coupon.getMaxDiscount());
         }
         discount = discount.max(BigDecimal.ZERO).min(subtotal);
-        // Round to whole rupees here so every downstream total (and the coupon preview shown at
-        // cart/checkout) matches the whole-rupee amounts the storefront displays — the frontend
-        // rounds each line to the nearest rupee for display, but a raw percent discount (e.g. 10%
-        // of ₹999 = ₹99.90) previously left the Razorpay-charged total a few paise off from what
-        // the customer reviewed on screen.
+        // Preserve paise: the invoice workbook applies percentage discounts to two decimals
+        // (for example, 10% of ₹279.20 is ₹27.92).
         discount = roundInr(discount);
         return Optional.of(Map.of(FIELD_DISCOUNT, discount));
     }
@@ -623,29 +693,33 @@ public class InternalAccountOrderResource {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, couponResult.orElseThrow().get(FIELD_ERROR).toString());
         }
         BigDecimal discount = couponResult.map(m -> (BigDecimal) m.get(FIELD_DISCOUNT)).orElse(BigDecimal.ZERO);
-        // Rounded to whole rupees to match the storefront's checkout review, which rounds every
-        // line (afterDiscount, GST, total) for display — see src/lib/money.ts#orderTotals. Without
-        // this, a fractional discount left the Razorpay-charged amount a few paise off from what
-        // the customer approved on screen.
-        BigDecimal taxableSubtotal = roundInr(subtotal.max(BigDecimal.ZERO));
         BigDecimal afterDiscount = roundInr(subtotal.subtract(discount).max(BigDecimal.ZERO));
         CommerceSettings commerce = commerceSettings();
         BigDecimal shipping = calculateShipping(afterDiscount, shippingMode, commerce);
         BigDecimal codFee = cod ? COD_FEE : BigDecimal.ZERO;
-        BigDecimal lineGst = roundInr(calculateTax(taxableSubtotal, commerce));
-        BigDecimal tax = lineGst;
+        // Keep one aggregate GST amount in the store. The accounting/invoice layer can derive
+        // CGST+SGST or IGST from place of supply; the commerce admin does not need tax-type fields.
+        // Product GST is calculated after coupon discount. COD is always GST-inclusive and
+        // shipping/donation are non-taxable in the workbook scenarios.
+        BigDecimal productTax = calculateTax(afterDiscount, commerce);
+        BigDecimal codTax = calculateIncludedTax(codFee, commerce.gstRate());
+        BigDecimal tax = roundInr(productTax.add(codTax));
         BigDecimal roundedDonation = roundInr(donation == null ? BigDecimal.ZERO : donation);
-        BigDecimal total = afterDiscount
-            .add(shipping)
-            .add(codFee)
-            .add(roundedDonation)
-            .add(commerce.pricesIncludeGst() ? BigDecimal.ZERO : tax);
+        // The payable total is authoritative and independent of component-level tax rounding.
+        // This is what removes the +/- ₹0.01 drift demonstrated by the workbook.
+        BigDecimal total = roundInr(
+            afterDiscount
+                .add(shipping)
+                .add(codFee)
+                .add(roundedDonation)
+                .add(commerce.pricesIncludeGst() ? BigDecimal.ZERO : productTax)
+        );
         return new Totals(subtotal, discount, shipping, codFee, tax, total);
     }
 
-    /** Whole rupees (INR) — mirrors src/lib/money.ts#roundInr so backend totals match the storefront's display rounding. */
+    /** INR rounded to paise — mirrors src/lib/money.ts#roundInr. */
     private static BigDecimal roundInr(BigDecimal amount) {
-        return amount.setScale(0, RoundingMode.HALF_UP);
+        return amount.setScale(2, RoundingMode.HALF_UP);
     }
 
     private CommerceSettings commerceSettings() {
@@ -695,6 +769,13 @@ public class InternalAccountOrderResource {
                 .divide(commerce.gstRate().add(BigDecimal.valueOf(100)), 2, RoundingMode.HALF_UP);
         }
         return amountAfterDiscount.multiply(commerce.gstRate()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal calculateIncludedTax(BigDecimal inclusiveAmount, BigDecimal gstRate) {
+        if (inclusiveAmount.compareTo(BigDecimal.ZERO) <= 0 || gstRate.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        return inclusiveAmount.multiply(gstRate).divide(gstRate.add(BigDecimal.valueOf(100)), 2, RoundingMode.HALF_UP);
     }
 
     private static boolean isExpressShipping(String shippingMode) {
@@ -842,6 +923,47 @@ public class InternalAccountOrderResource {
         order.setInventoryReserved(false);
         order.setInventoryReleasedAt(Instant.now());
         dataAccess.customerOrderRepository().save(order);
+    }
+
+    private void restoreInventoryForCancellation(CustomerOrder order) {
+        if (order.getInventoryReleasedAt() != null) {
+            return;
+        }
+        // Paid orders no longer carry the temporary reservation flag, but their stock was still
+        // deducted at checkout and must be restored when they are cancelled before dispatch.
+        if (!Boolean.TRUE.equals(order.getInventoryReserved()) && order.getPaymentStatus() != PaymentStatus.REFUNDED) {
+            return;
+        }
+        order.setInventoryReserved(true);
+        releaseInventoryReservation(order);
+    }
+
+    private void syncCancellationToLedgerly(CustomerOrder order, String refundId) {
+        if (
+            StringUtils.isBlank(refundId) &&
+            StringUtils.isBlank(order.getLedgerlySalesOrderId()) &&
+            StringUtils.isBlank(order.getLedgerlyInvoiceId())
+        ) {
+            return;
+        }
+        try {
+            dataAccess.ledgerlyIntegrationClient().cancelOrder(order.getOrderNumber(), null, refundId);
+        } catch (RuntimeException ex) {
+            // Cancellation and any customer refund have already succeeded. Accounting sync is
+            // best-effort here and can be reconciled without making the customer retry/refund twice.
+            LOG.warn("Ledgerly cancellation sync failed for {}: {}", order.getOrderNumber(), ex.getMessage());
+        }
+    }
+
+    private void syncCancellationToZoho(CustomerOrder order) {
+        if (StringUtils.isBlank(order.getZohoSalesOrderId()) && StringUtils.isBlank(order.getZohoInvoiceId())) {
+            return;
+        }
+        try {
+            zohoSyncService.cancelOrder(order.getId());
+        } catch (RuntimeException ex) {
+            LOG.warn("Zoho cancellation sync failed for {}: {}", order.getOrderNumber(), ex.getMessage());
+        }
     }
 
     private void ensureInventoryStillReserved(CustomerOrder order) {
@@ -1009,9 +1131,18 @@ public class InternalAccountOrderResource {
         data.put("payment_method", order.getPaymentMethod());
         data.put(FIELD_TOTAL, order.getTotal());
         data.put("created_at", orderCreatedAtIso(order));
+        data.put("can_cancel", canCancel(order));
         data.put("order_items", dataAccess.orderItemRepository().findAllByOrderId(order.getId()).stream().map(this::orderItem).toList());
         trackingFields(order).forEach(data::putIfAbsent);
         return data;
+    }
+
+    private boolean canCancel(CustomerOrder order) {
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FULFILLED) {
+            return false;
+        }
+        String trackingStatus = OrderTrackingStatusResolver.resolve(order);
+        return !"shipped".equals(trackingStatus) && !"delivered".equals(trackingStatus);
     }
 
     private Map<String, Object> orderDetail(CustomerOrder order) {
@@ -1025,6 +1156,7 @@ public class InternalAccountOrderResource {
         data.put("coupon_code", order.getCouponCode());
         data.put("shipping_address", readJson(order.getShippingAddressJson()));
         data.put("notes", order.getNotes());
+        data.put("cancellation_reason", order.getCancellationReason());
         data.put("razorpay_order_id", order.getRazorpayOrderId());
         data.put("razorpay_payment_id", order.getRazorpayPaymentId());
         data.put("invoice_pdf_url", invoicePdfUrl(order));
@@ -1300,6 +1432,8 @@ public class InternalAccountOrderResource {
     public record SyncPaymentRequest(@NotNull Long orderId) {}
 
     public record RetryPaymentRequest(@NotNull Long orderId) {}
+
+    public record CancelOrderRequest(@NotBlank @Size(min = 3, max = 500) String reason) {}
 
     private record CommerceSettings(
         BigDecimal gstRate,

@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.web.client.RestClientResponseException;
 
 @Service
@@ -268,30 +269,38 @@ public class LedgerlySyncService {
             });
     }
 
+    private static final int SYNC_PAGE_SIZE = 200;
+
     public Map<String, Object> syncAllProducts() {
         LedgerlySyncSummary.Builder builder = LedgerlySyncSummary.builder();
         // Eager-fetch category: sync success/failure UPDATEs clear the persistence context
         // (clearAutomatically), which would otherwise leave lazy Category proxies unusable.
-        for (Product product : productRepository.findAllWithEagerRelationships()) {
-            try {
-                if (StringUtils.isBlank(product.getSku())) {
-                    builder.notice(product.getName(), "Skipped — SKU required");
-                    continue;
-                }
-                if (!Boolean.TRUE.equals(product.getActive())) {
-                    if (isLedgerlyLinked(product)) {
-                        deactivateInLedgerly(product);
-                        builder.notice(product.getSku(), "Deactivated in Ledgerly");
+        int pageNumber = 0;
+        Page<Product> page;
+        do {
+            page = productRepository.findAllWithEagerRelationships(PageRequest.of(pageNumber, SYNC_PAGE_SIZE, Sort.by("id")));
+            for (Product product : page.getContent()) {
+                try {
+                    if (StringUtils.isBlank(product.getSku())) {
+                        builder.notice(product.getName(), "Skipped — SKU required");
+                        continue;
                     }
-                    continue;
+                    if (!Boolean.TRUE.equals(product.getActive())) {
+                        if (isLedgerlyLinked(product)) {
+                            deactivateInLedgerly(product);
+                            builder.notice(product.getSku(), "Deactivated in Ledgerly");
+                        }
+                        continue;
+                    }
+                    pushProductToLedgerly(product);
+                    builder.success();
+                } catch (Exception e) {
+                    productRepository.updateLedgerlySyncFailure(product.getId(), LedgerlySyncStatus.FAILED, e.getMessage());
+                    builder.failure(product.getId(), product.getName(), e.getMessage());
                 }
-                pushProductToLedgerly(product);
-                builder.success();
-            } catch (Exception e) {
-                productRepository.updateLedgerlySyncFailure(product.getId(), LedgerlySyncStatus.FAILED, e.getMessage());
-                builder.failure(product.getId(), product.getName(), e.getMessage());
             }
-        }
+            pageNumber++;
+        } while (page.hasNext());
         return builder.build().toMap();
     }
 

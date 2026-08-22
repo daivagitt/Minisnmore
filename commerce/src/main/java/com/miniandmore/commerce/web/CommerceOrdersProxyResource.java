@@ -140,6 +140,11 @@ public class CommerceOrdersProxyResource {
         return catalog.get(CatalogInternalClient.encodedPath("/internal/v1/orders/{orderNumber}", orderNumber));
     }
 
+    @PostMapping("/orders/{orderNumber}/cancel")
+    public ResponseEntity<String> cancelOrder(@PathVariable String orderNumber, @RequestBody Object body) {
+        return catalog.post(CatalogInternalClient.encodedPath("/internal/v1/orders/{orderNumber}/cancel", orderNumber), body);
+    }
+
     @GetMapping("/payments")
     public ResponseEntity<String> listPayments() {
         return catalog.get("/internal/v1/payments");

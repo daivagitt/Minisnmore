@@ -44,6 +44,10 @@ public class OrderReturnService {
     private static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
     private static final int RETURN_WINDOW_DAYS = 7;
 
+    /** Feature switch: returns & refunds are temporarily disabled. Flip to true to re-enable; no other code needs to change. */
+    private static final boolean RETURNS_REFUNDS_ENABLED = false;
+    private static final String RETURNS_DISABLED_MESSAGE = "Returns & refunds are currently unavailable. Please contact support.";
+
     private static final Set<OrderReturnStatus> OPEN_RETURN_STATUSES = EnumSet.of(
         OrderReturnStatus.REQUESTED,
         OrderReturnStatus.APPROVED,
@@ -101,6 +105,7 @@ public class OrderReturnService {
     }
 
     public OrderReturn requestReturn(String userLogin, String orderNumber, String reason) {
+        assertFeatureEnabled();
         String normalizedReason = StringUtils.normalizeSpace(StringUtils.defaultString(reason)).trim();
         if (normalizedReason.length() < 10) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Please describe the return reason (at least 10 characters)");
@@ -137,6 +142,7 @@ public class OrderReturnService {
     }
 
     public OrderReturn approve(String returnNumber, String adminNotes) {
+        assertFeatureEnabled();
         OrderReturn orderReturn = loadReturn(returnNumber);
         if (orderReturn.getStatus() != OrderReturnStatus.REQUESTED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return is not awaiting approval");
@@ -149,6 +155,7 @@ public class OrderReturnService {
     }
 
     public OrderReturn reject(String returnNumber, String rejectionReason, String adminNotes) {
+        assertFeatureEnabled();
         OrderReturn orderReturn = loadReturn(returnNumber);
         if (orderReturn.getStatus() != OrderReturnStatus.REQUESTED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return is not awaiting approval");
@@ -167,6 +174,7 @@ public class OrderReturnService {
     }
 
     public OrderReturn markReceived(String returnNumber, String adminNotes) {
+        assertFeatureEnabled();
         OrderReturn orderReturn = loadReturn(returnNumber);
         if (orderReturn.getStatus() != OrderReturnStatus.APPROVED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return must be approved before marking received");
@@ -179,6 +187,7 @@ public class OrderReturnService {
     }
 
     public OrderReturn processRefund(String returnNumber, String adminNotes) {
+        assertFeatureEnabled();
         OrderReturn orderReturn = loadReturn(returnNumber);
         if (orderReturn.getStatus() != OrderReturnStatus.RECEIVED && orderReturn.getStatus() != OrderReturnStatus.FAILED) {
             throw new ResponseStatusException(
@@ -282,6 +291,13 @@ public class OrderReturnService {
     }
 
     public Map<String, Object> eligibilityForUser(String login, String orderNumber) {
+        if (!RETURNS_REFUNDS_ENABLED) {
+            var disabled = new LinkedHashMap<String, Object>();
+            disabled.put("order_number", orderNumber);
+            disabled.put("eligible", false);
+            disabled.put("message", RETURNS_DISABLED_MESSAGE);
+            return disabled;
+        }
         return customerOrderRepository
             .findOneByOrderNumberAndUserLogin(orderNumber, login)
             .map(order -> {
@@ -303,6 +319,12 @@ public class OrderReturnService {
                 result.put("message", "Order not found");
                 return result;
             });
+    }
+
+    private void assertFeatureEnabled() {
+        if (!RETURNS_REFUNDS_ENABLED) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, RETURNS_DISABLED_MESSAGE);
+        }
     }
 
     public void assertReturnEligible(CustomerOrder order) {
