@@ -1290,6 +1290,7 @@ class InternalAccountOrderResourceCoverageTest {
             .status(OrderStatus.CONFIRMED)
             .paymentStatus(PaymentStatus.PAID)
             .paymentMethod("online")
+            .razorpayPaymentId("pay_81")
             .inventoryReserved(false)
             .total(BigDecimal.valueOf(999));
         OrderItem item = new OrderItem().productId("1").qty(1).order(order);
@@ -1326,6 +1327,7 @@ class InternalAccountOrderResourceCoverageTest {
             .status(OrderStatus.CONFIRMED)
             .paymentStatus(PaymentStatus.PAID)
             .paymentMethod("online")
+            .razorpayPaymentId("pay_83")
             .inventoryReserved(false)
             .total(BigDecimal.valueOf(750));
         when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-REFUND-FAIL", "customer1")).thenReturn(Optional.of(order));
@@ -1450,6 +1452,11 @@ class InternalAccountOrderResourceCoverageTest {
         @Bean
         com.miniandmore.app.service.ProductVariantSupport productVariantSupport(ObjectMapper objectMapper) {
             return new com.miniandmore.app.service.ProductVariantSupport(objectMapper);
+        }
+
+        @Bean
+        org.springframework.transaction.PlatformTransactionManager transactionManager() {
+            return org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class);
         }
 
         @Bean
