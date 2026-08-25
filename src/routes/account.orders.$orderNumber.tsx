@@ -389,6 +389,10 @@ function OrderDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <div className="inline-flex items-center gap-2 glass rounded-full px-4 py-2 text-sm">
+              <StatusIcon className="h-4 w-4 text-primary" />
+              <span>{formatOrderStatusSummary(order)}</span>
+            </div>
             {order.can_cancel && (
               <button
                 type="button"
@@ -398,10 +402,6 @@ function OrderDetail() {
                 Cancel order
               </button>
             )}
-            <div className="inline-flex items-center gap-2 glass rounded-full px-4 py-2 text-sm">
-              <StatusIcon className="h-4 w-4 text-primary" />
-              <span>{formatOrderStatusSummary(order)}</span>
-            </div>
           </div>
         </div>
       </div>
