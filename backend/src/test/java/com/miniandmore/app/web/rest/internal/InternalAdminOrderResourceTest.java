@@ -11,7 +11,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
 import com.miniandmore.app.domain.CustomerOrder;
+import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
+import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
+import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import com.miniandmore.app.repository.*;
 import com.miniandmore.app.service.LedgerlySyncService;
 import com.miniandmore.app.service.OrderEventService;
@@ -96,6 +99,49 @@ class InternalAdminOrderResourceTest {
             .andExpect(jsonPath("$.data.orders[0].order_number").value("MNM-COD1"))
             .andExpect(jsonPath("$.data.orders[0].full_name").value("Jane Doe"))
             .andExpect(jsonPath("$.data.orders[0].phone").value("9876543210"));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
+    void listOrders_returnsSyncVisibilityForRequestedRange() throws Exception {
+        Instant from = Instant.parse("2026-08-01T00:00:00Z");
+        Instant to = Instant.parse("2026-08-08T00:00:00Z");
+        CustomerOrder order = codOrder()
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .zohoSyncStatus(ZohoSyncStatus.FAILED)
+            .zohoSyncError("Zoho unavailable")
+            .ledgerlySyncStatus(LedgerlySyncStatus.SYNCED)
+            .ledgerlyLastSyncedAt(Instant.parse("2026-08-01T10:05:00Z"));
+        when(customerOrderRepository.findAllByPlacedAtGreaterThanEqualAndPlacedAtLessThanOrderByPlacedAtDesc(from, to))
+            .thenReturn(List.of(order));
+
+        mockMvc
+            .perform(
+                get("/internal/v1/admin/orders")
+                    .param("from", "2026-08-01T00:00:00Z")
+                    .param("to", "2026-08-08T00:00:00Z")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.orders[0].order_number").value("MNM-COD1"))
+            .andExpect(jsonPath("$.data.orders[0].payment_status").value("paid"))
+            .andExpect(jsonPath("$.data.orders[0].zoho_sync_status").value("failed"))
+            .andExpect(jsonPath("$.data.orders[0].zoho_sync_error").value("Zoho unavailable"))
+            .andExpect(jsonPath("$.data.orders[0].zoho_sync_eligible").value(true))
+            .andExpect(jsonPath("$.data.orders[0].ledgerly_sync_status").value("synced"))
+            .andExpect(jsonPath("$.data.orders[0].ledgerly_sync_eligible").value(true));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
+    void listOrders_rejectsInvalidRange() throws Exception {
+        mockMvc
+            .perform(
+                get("/internal/v1/admin/orders")
+                    .param("from", "2026-08-08T00:00:00Z")
+                    .param("to", "2026-08-01T00:00:00Z")
+            )
+            .andExpect(status().isBadRequest());
     }
 
     @Test

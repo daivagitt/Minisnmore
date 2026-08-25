@@ -7,7 +7,6 @@ import {
   BookOpen,
   FileText,
   Package,
-  Plug,
   ArrowRight,
   Folder,
   Eye,
@@ -18,7 +17,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
-import { getAdminDashboard, getLedgerlyIntegrationStatus } from "@/lib/backend-data";
+import { getAdminDashboard } from "@/lib/backend-data";
 import { showApiError } from "@/lib/ui-errors";
 
 export const Route = createFileRoute("/admin/")({
@@ -55,12 +54,10 @@ function AdminDashboard() {
     banners: 0,
     policies: 0,
   });
-  const [ledgerly, setLedgerly] = useState(false);
-
   useEffect(() => {
     (async () => {
       try {
-        const [dashboard, ledgerlyStatus] = await Promise.all([getAdminDashboard(), getLedgerlyIntegrationStatus()]);
+        const dashboard = await getAdminDashboard();
         const total = Number(dashboard.pageVisibility ?? 0);
         const v = Number(dashboard.visiblePages ?? 0);
         setS({
@@ -77,7 +74,6 @@ function AdminDashboard() {
           banners: Number(dashboard.banners ?? 0),
           policies: Number(dashboard.policies ?? 0),
         });
-        setLedgerly(!!ledgerlyStatus?.connected);
       } catch (error) {
         showApiError(error, "Could not load dashboard");
       }
@@ -140,7 +136,6 @@ function AdminDashboard() {
     { to: "/admin/blog", label: "Blogs", icon: BookOpen, n: s.blogs },
     { to: "/admin/policies", label: "Policies", icon: FileText, n: s.policies },
     { to: "/admin/pages", label: "Page visibility", icon: EyeOff, n: `${s.visiblePages}/${s.pages}` },
-    { to: "/admin/integrations/ledgerly", label: "Ledgerly", icon: Plug, n: ledgerly ? "Connected" : "Not connected" },
   ];
 
   return (

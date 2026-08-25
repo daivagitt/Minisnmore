@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 type RemoveFromCartDialogProps = {
   open: boolean;
   productName: string;
-  alreadyInWishlist?: boolean;
   onOpenChange: (open: boolean) => void;
   onMoveToWishlist: () => void;
   onRemoveOnly: () => void;
@@ -21,7 +20,6 @@ type RemoveFromCartDialogProps = {
 export function RemoveFromCartDialog({
   open,
   productName,
-  alreadyInWishlist = false,
   onOpenChange,
   onMoveToWishlist,
   onRemoveOnly,
@@ -32,22 +30,14 @@ export function RemoveFromCartDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Remove from cart?</AlertDialogTitle>
           <AlertDialogDescription>
-            {alreadyInWishlist
-              ? `\u201c${productName}\u201d is already in your wishlist. Remove it from cart?`
-              : `Move \u201c${productName}\u201d to your wishlist instead, or remove it from cart.`}
+            Save &ldquo;{productName}&rdquo; to your wishlist instead, or remove it from cart.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          {alreadyInWishlist ? (
-            <AlertDialogAction onClick={onRemoveOnly}>Remove from cart</AlertDialogAction>
-          ) : (
-            <>
-              <Button type="button" variant="outline" onClick={onRemoveOnly}>
-                Remove only
-              </Button>
-              <AlertDialogAction onClick={onMoveToWishlist}>Move to wishlist</AlertDialogAction>
-            </>
-          )}
+          <Button type="button" variant="outline" onClick={onRemoveOnly}>
+            Remove only
+          </Button>
+          <AlertDialogAction onClick={onMoveToWishlist}>Save to wishlist</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

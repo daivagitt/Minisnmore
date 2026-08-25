@@ -43,6 +43,7 @@ import {
   getMyProfile,
   getOrder,
   listAdminOrderReturns,
+  listAdminOrders,
   listMyOrderReturns,
   listMyOrders,
   listMyPayments,
@@ -159,6 +160,18 @@ describe("orders functions", () => {
     const res = await listMyOrders();
     expect(res.orders).toEqual([{ id: "o1" }]);
     expect(getMock).toHaveBeenCalledWith("/api/v1/orders", { auth: true });
+  });
+
+  it("lists admin orders for an explicit date range", async () => {
+    getMock.mockResolvedValueOnce({ orders: [{ order_number: "MNM-10" }] });
+
+    await expect(
+      listAdminOrders("2026-08-01T00:00:00.000Z", "2026-08-08T00:00:00.000Z"),
+    ).resolves.toEqual({ orders: [{ order_number: "MNM-10" }] });
+    expect(getMock).toHaveBeenCalledWith(
+      "/api/v1/admin/orders?from=2026-08-01T00%3A00%3A00.000Z&to=2026-08-08T00%3A00%3A00.000Z",
+      { auth: true },
+    );
   });
 
   it("gets an order by order number", async () => {

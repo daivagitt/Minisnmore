@@ -698,6 +698,31 @@ public class ApplicationProperties {
 
             private String orderCancelledTemplateId = "1777178696692470339";
 
+            private String returnApproved =
+                "Dear {name}, your return/exchange for order {orderId} has been approved. We'll arrange pickup shortly. — Minis n More";
+
+            private String returnApprovedTemplateId;
+
+            private String returnRejected =
+                "Dear {name}, we're unable to approve your return/exchange request for order {orderId}. Contact support for details. — Minis n More";
+
+            private String returnRejectedTemplateId;
+
+            private String returnPickupScheduled =
+                "Dear {name}, pickup for your return/exchange on order {orderId} is scheduled. Please keep the item ready. — Minis n More";
+
+            private String returnPickupScheduledTemplateId;
+
+            private String returnRefunded =
+                "Dear {name}, your refund of Rs.{amount} for order {orderId} has been processed. — Minis n More";
+
+            private String returnRefundedTemplateId;
+
+            private String returnFailed =
+                "Dear {name}, we could not process your refund for order {orderId}. Our team will contact you shortly. — Minis n More";
+
+            private String returnFailedTemplateId;
+
             public String getOrderConfirmed() {
                 return orderConfirmed;
             }
@@ -728,6 +753,86 @@ public class ApplicationProperties {
 
             public void setOrderCancelledTemplateId(String orderCancelledTemplateId) {
                 this.orderCancelledTemplateId = orderCancelledTemplateId;
+            }
+
+            public String getReturnApproved() {
+                return returnApproved;
+            }
+
+            public void setReturnApproved(String returnApproved) {
+                this.returnApproved = returnApproved;
+            }
+
+            public String getReturnApprovedTemplateId() {
+                return returnApprovedTemplateId;
+            }
+
+            public void setReturnApprovedTemplateId(String returnApprovedTemplateId) {
+                this.returnApprovedTemplateId = returnApprovedTemplateId;
+            }
+
+            public String getReturnRejected() {
+                return returnRejected;
+            }
+
+            public void setReturnRejected(String returnRejected) {
+                this.returnRejected = returnRejected;
+            }
+
+            public String getReturnRejectedTemplateId() {
+                return returnRejectedTemplateId;
+            }
+
+            public void setReturnRejectedTemplateId(String returnRejectedTemplateId) {
+                this.returnRejectedTemplateId = returnRejectedTemplateId;
+            }
+
+            public String getReturnPickupScheduled() {
+                return returnPickupScheduled;
+            }
+
+            public void setReturnPickupScheduled(String returnPickupScheduled) {
+                this.returnPickupScheduled = returnPickupScheduled;
+            }
+
+            public String getReturnPickupScheduledTemplateId() {
+                return returnPickupScheduledTemplateId;
+            }
+
+            public void setReturnPickupScheduledTemplateId(String returnPickupScheduledTemplateId) {
+                this.returnPickupScheduledTemplateId = returnPickupScheduledTemplateId;
+            }
+
+            public String getReturnRefunded() {
+                return returnRefunded;
+            }
+
+            public void setReturnRefunded(String returnRefunded) {
+                this.returnRefunded = returnRefunded;
+            }
+
+            public String getReturnRefundedTemplateId() {
+                return returnRefundedTemplateId;
+            }
+
+            public void setReturnRefundedTemplateId(String returnRefundedTemplateId) {
+                this.returnRefundedTemplateId = returnRefundedTemplateId;
+            }
+
+            public String getReturnFailed() {
+                return returnFailed;
+            }
+
+            public void setReturnFailed(String returnFailed) {
+                this.returnFailed = returnFailed;
+            }
+
+            public String getReturnFailedTemplateId() {
+                return returnFailedTemplateId;
+            }
+
+            public void setReturnFailedTemplateId(String returnFailedTemplateId) {
+                this.returnFailedTemplateId = returnFailedTemplateId;
             }
         }
     }

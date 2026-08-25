@@ -48,7 +48,6 @@ import {
   saveCategory,
   saveProduct,
   slugifyProductSlug,
-  syncLedgerlyProduct,
   syncZohoProduct,
   uploadAdminImage,
   type ProductRow,
@@ -106,7 +105,6 @@ function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
   const [editing, setEditing] = useState<number | null>(null);
-  const [ledgerlySyncing, setLedgerlySyncing] = useState<Set<number>>(() => new Set());
   const [zohoSyncing, setZohoSyncing] = useState<Set<number>>(() => new Set());
   const [clearingVariantPhotos, setClearingVariantPhotos] = useState<Set<number>>(() => new Set());
   const [imageUploading, setImageUploading] = useState<number | null>(null);
@@ -188,43 +186,6 @@ function ProductsPage() {
         return { ...row, colors };
       }),
     );
-  };
-
-  const syncToLedgerly = async (i: number, p: Product) => {
-    if (!p.id) {
-      toast.error("Save the product first, then sync to Ledgerly.");
-      return;
-    }
-    if (!p.sku?.trim()) {
-      toast.error("SKU is required before syncing to Ledgerly.");
-      return;
-    }
-    if (!p.category_id) {
-      toast.error("Category is required before syncing to Ledgerly.");
-      return;
-    }
-    setLedgerlySyncing((prev) => new Set(prev).add(i));
-    try {
-      const result = await syncLedgerlyProduct(Number(p.id));
-      update(i, {
-        ledgerly_sync_status: result.ledgerlySyncStatus ?? null,
-        ledgerly_item_id: result.ledgerlyItemId ?? null,
-        ledgerly_sync_error: result.ledgerlySyncError ?? null,
-      });
-      toast.success("Product synced to Ledgerly");
-    } catch (error) {
-      update(i, {
-        ledgerly_sync_status: "FAILED",
-        ledgerly_sync_error: getUserErrorMessage(error, "Ledgerly sync failed"),
-      });
-      showApiError(error, "Ledgerly sync failed");
-    } finally {
-      setLedgerlySyncing((prev) => {
-        const next = new Set(prev);
-        next.delete(i);
-        return next;
-      });
-    }
   };
 
   const syncToZoho = async (i: number, p: Product) => {
@@ -400,7 +361,7 @@ function ProductsPage() {
                 note: "Must match an existing category slug",
               },
               { key: "price", required: true, example: 1039, note: "Selling price (storefront; 20% off MRP)" },
-              { key: "compare_at_price", example: 1299, note: "MRP — synced to Ledgerly as mrp (not rate)" },
+              { key: "compare_at_price", example: 1299, note: "MRP / list price" },
               {
                 key: "age_range",
                 required: true,
@@ -587,7 +548,7 @@ function ProductsPage() {
                           />
                           <button
                             type="button"
-                            title="Generate from product name (Ledgerly parity)"
+                            title="Generate from product name"
                             onClick={() => update(i, { sku: suggestParentSku(p.name || "") })}
                             className="shrink-0 rounded-full glass px-3 py-2 text-xs font-medium hover:bg-white/60"
                           >
@@ -793,7 +754,7 @@ function ProductsPage() {
                       <div className="space-y-3">
                         {fromColorGalleries ? (
                           <p className="text-xs text-muted-foreground rounded-lg glass px-3 py-2 leading-snug">
-                            Showing photos from colour galleries below. They sync into main images when you Save (for shop cards and Ledgerly).
+                            Showing photos from colour galleries below. They sync into main images when you Save for shop cards.
                           </p>
                         ) : null}
                         <div className="flex flex-wrap gap-2">
@@ -895,20 +856,6 @@ function ProductsPage() {
                       </label>
                     </div>
 
-                    {(p.ledgerly_sync_status || p.ledgerly_sync_error) && (
-                      <div className="text-xs rounded-xl bg-white/40 px-3 py-2 space-y-1">
-                        {p.ledgerly_sync_status && (
-                          <p>
-                            Ledgerly: <span className="font-medium">{p.ledgerly_sync_status}</span>
-                            {p.ledgerly_item_id ? ` · item ${p.ledgerly_item_id}` : ""}
-                          </p>
-                        )}
-                        {p.ledgerly_sync_error && (
-                          <p className="text-destructive">{p.ledgerly_sync_error}</p>
-                        )}
-                      </div>
-                    )}
-
                     {(p.zoho_sync_status || p.zoho_sync_error) && (
                       <div className="text-xs rounded-xl bg-white/40 px-3 py-2 space-y-1">
                         {p.zoho_sync_status && (
@@ -937,22 +884,6 @@ function ProductsPage() {
                       >
                         <Save className="h-4 w-4" /> Save
                       </button>
-                      {p.id && (
-                        <button
-                          type="button"
-                          disabled={ledgerlySyncing.has(i)}
-                          onClick={() => void syncToLedgerly(i, p)}
-                          className="rounded-full glass px-4 py-2 text-sm flex items-center gap-2 disabled:opacity-50"
-                          title="Push this product to Ledgerly (requires SKU and category)"
-                        >
-                          {ledgerlySyncing.has(i) ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <CloudUpload className="h-4 w-4" />
-                          )}
-                          {ledgerlySyncing.has(i) ? "Syncing…" : "Sync to Ledgerly"}
-                        </button>
-                      )}
                       {p.id && (
                         <button
                           type="button"

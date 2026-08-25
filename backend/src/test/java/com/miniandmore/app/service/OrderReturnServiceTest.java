@@ -17,6 +17,7 @@ import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.OrderReturn;
 import com.miniandmore.app.domain.Product;
+import com.miniandmore.app.domain.enumeration.OrderRequestType;
 import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
@@ -264,10 +265,9 @@ class OrderReturnServiceTest {
 
     @Test
     void processRefund_demoMode_marksRefunded() {
-        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.ACCEPTED);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
         when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo_ORD-9001");
-        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -279,10 +279,9 @@ class OrderReturnServiceTest {
 
     @Test
     void processRefund_zohoSyncReturnsDisabledByDefault_neverCallsZoho() {
-        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.ACCEPTED);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
         when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo_ORD-9001");
-        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -293,10 +292,9 @@ class OrderReturnServiceTest {
 
     @Test
     void processRefund_ledgerlySyncReturnsDisabledByDefault_neverCallsLedgerly() {
-        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.ACCEPTED);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
         when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo_ORD-9001");
-        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -347,10 +345,9 @@ class OrderReturnServiceTest {
     @Test
     void processRefund_ledgerlySuccess_setsCreditNoteId() {
         enableLedgerlyReturnsSync();
-        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.ACCEPTED);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
         when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo_ORD-9001");
-        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
         when(ledgerlyIntegrationClient.cancelOrder(eq(ORDER_NUMBER), eq("RET-1"), any())).thenReturn(Optional.of("cn-9001"));
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -364,11 +361,10 @@ class OrderReturnServiceTest {
 
     @Test
     void processRefund_existingCreditNoteId_skipsLedgerlyCall() {
-        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.ACCEPTED);
         orderReturn.setLedgerlyCreditNoteId("cn-existing");
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
         when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo");
-        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -381,10 +377,9 @@ class OrderReturnServiceTest {
     @Test
     void processRefund_ledgerlyFailure_stillRefunds() {
         enableLedgerlyReturnsSync();
-        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.ACCEPTED);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(java.util.Optional.of(orderReturn));
         when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo_ORD-9001");
-        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
         when(ledgerlyIntegrationClient.cancelOrder(any(), any(), any())).thenThrow(new RuntimeException("ledgerly down"));
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -397,14 +392,13 @@ class OrderReturnServiceTest {
     @Test
     void processRefund_ledgerlyEmptyResponse_demoOrder_stubsCreditNoteId() {
         enableLedgerlyReturnsSync();
-        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.ACCEPTED);
         CustomerOrder order = orderReturn.getOrder();
         order.setRazorpayPaymentId("pay_demo_scenario_123");
         order.setRazorpayOrderId("order_demo_ORD-9001");
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
         when(razorpayRefundService.isDemoMode()).thenReturn(true);
         when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo_ORD-9001");
-        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
         when(ledgerlyIntegrationClient.cancelOrder(any(), any(), any())).thenReturn(Optional.empty());
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -419,7 +413,6 @@ class OrderReturnServiceTest {
         OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.FAILED);
         orderReturn.setRazorpayRefundId("rfnd_existing");
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
-        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -429,19 +422,17 @@ class OrderReturnServiceTest {
     }
 
     @Test
-    void restoreInventory_incrementsProductStock() {
-        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+    void approve_incrementsProductStock() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.REQUESTED);
         OrderItem item = new OrderItem().productId("1").qty(2);
         Product product = new Product().id(1L).stock(5);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
-        when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo");
         when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
         when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
         when(productRepository.save(product)).thenReturn(product);
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
-        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        orderReturnService.processRefund("RET-1", null);
+        orderReturnService.approve("RET-1", null);
 
         assertThat(product.getStock()).isEqualTo(7);
     }
@@ -463,7 +454,7 @@ class OrderReturnServiceTest {
 
         assertThatThrownBy(() -> orderReturnService.markReceived("RET-1", null))
             .isInstanceOf(ResponseStatusException.class)
-            .hasMessageContaining("approved before marking received");
+            .hasMessageContaining("before marking received");
     }
 
     @Test
@@ -483,7 +474,7 @@ class OrderReturnServiceTest {
 
         assertThatThrownBy(() -> orderReturnService.processRefund("RET-1", null))
             .isInstanceOf(ResponseStatusException.class)
-            .hasMessageContaining("received");
+            .hasMessageContaining("accepted");
     }
 
     @Test
@@ -500,7 +491,7 @@ class OrderReturnServiceTest {
 
     @Test
     void processRefund_razorpayFailure_marksFailedAndRethrows() {
-        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.ACCEPTED);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
         when(razorpayRefundService.refundPayment(any(), any())).thenThrow(new RuntimeException("gateway down"));
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
@@ -578,36 +569,22 @@ class OrderReturnServiceTest {
     }
 
     @Test
-    void processRefund_orderAlreadyRefunded_skipsInventoryRestore() {
-        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
-        orderReturn.getOrder().setPaymentStatus(PaymentStatus.REFUNDED);
-        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
-        when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo");
-        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
-
-        orderReturnService.processRefund("RET-1", "done");
-
-        verify(productRepository, org.mockito.Mockito.never()).save(any());
-    }
-
-    @Test
-    void restoreInventory_variantProduct_incrementsVariantStock() {
-        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+    void approve_variantProduct_incrementsVariantStock() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.REQUESTED);
         String variantsJson =
             "[{\"sku\":\"TEE-S-RED\",\"size\":\"S\",\"color\":\"Red\",\"rate\":500,\"stock\":1,\"active\":true}]";
         OrderItem item = new OrderItem().productId("2").qty(1).variantSku("TEE-S-RED").itemSize("S").color("Red");
         Product product = new Product().id(2L).stock(1).itemStructure("VARIANTS").variantsJson(variantsJson);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
-        when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo");
         when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
         when(productRepository.findOneForInventoryUpdate(2L)).thenReturn(Optional.of(product));
         when(productRepository.save(product)).thenReturn(product);
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
-        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        orderReturnService.processRefund("RET-1", null);
+        orderReturnService.approve("RET-1", null);
 
         verify(productRepository).save(product);
+        assertThat(product.getStock()).isEqualTo(2);
     }
 
     @Test
@@ -637,10 +614,9 @@ class OrderReturnServiceTest {
     @Test
     void processRefund_ledgerlyFailure_recordsAdminNote() {
         enableLedgerlyReturnsSync();
-        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.ACCEPTED);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
         when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_live_1");
-        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
         when(ledgerlyIntegrationClient.cancelOrder(any(), any(), any())).thenThrow(new RuntimeException("ledgerly 500"));
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -658,6 +634,319 @@ class OrderReturnServiceTest {
         assertThatThrownBy(() -> orderReturnService.approve("MISSING", null))
             .isInstanceOf(ResponseStatusException.class)
             .hasMessageContaining("not found");
+    }
+
+    // ---------------------------------------------------------------------
+    // Exchange request creation
+    // ---------------------------------------------------------------------
+
+    @Test
+    void requestExchange_unavailableReplacement_throwsBadRequest() {
+        CustomerOrder order = eligibleOrder();
+        OrderItem item = new OrderItem().id(5L).productId("2").qty(1).itemSize("S").color("Red");
+        Product product = new Product()
+            .id(2L)
+            .itemStructure("VARIANTS")
+            .variantsJson("[{\"sku\":\"TEE-S-RED\",\"size\":\"S\",\"color\":\"Red\",\"rate\":500,\"stock\":0,\"active\":false}]");
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin(ORDER_NUMBER, USER)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByIdAndOrderId(5L, 10L)).thenReturn(Optional.of(item));
+        when(productRepository.findById(2L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() ->
+            orderReturnService.requestExchange(USER, ORDER_NUMBER, 5L, "Wrong size ordered by mistake", "M", "Blue")
+        )
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("unavailable for exchange");
+    }
+
+    @Test
+    void requestExchange_sellableReplacement_persistsExchange() {
+        CustomerOrder order = eligibleOrder();
+        OrderItem item = new OrderItem().id(5L).productId("2").qty(1).itemSize("S").color("Red");
+        Product product = new Product()
+            .id(2L)
+            .itemStructure("VARIANTS")
+            .variantsJson("[{\"sku\":\"TEE-M-BLUE\",\"size\":\"M\",\"color\":\"Blue\",\"rate\":500,\"stock\":3,\"active\":true}]");
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin(ORDER_NUMBER, USER)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByIdAndOrderId(5L, 10L)).thenReturn(Optional.of(item));
+        when(productRepository.findById(2L)).thenReturn(Optional.of(product));
+        when(orderReturnRepository.save(any(OrderReturn.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderReturn result = orderReturnService.requestExchange(USER, ORDER_NUMBER, 5L, "Wrong size ordered by mistake", "M", "Blue");
+
+        assertThat(result.getRequestType()).isEqualTo(OrderRequestType.EXCHANGE);
+        assertThat(result.getReplacementVariantSku()).isEqualTo("TEE-M-BLUE");
+        assertThat(result.getOrderItem()).isSameAs(item);
+        verify(orderMailService).sendReturnUpdate(eq(order), any(OrderReturn.class));
+    }
+
+    @Test
+    void requestExchange_openReturnOnOrder_throwsConflict() {
+        CustomerOrder order = eligibleOrder();
+        OrderItem item = new OrderItem().id(5L).productId("2").qty(1).itemSize("S").color("Red");
+        Product product = new Product()
+            .id(2L)
+            .itemStructure("VARIANTS")
+            .variantsJson("[{\"sku\":\"TEE-M-BLUE\",\"size\":\"M\",\"color\":\"Blue\",\"rate\":500,\"stock\":3,\"active\":true}]");
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin(ORDER_NUMBER, USER)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByIdAndOrderId(5L, 10L)).thenReturn(Optional.of(item));
+        when(productRepository.findById(2L)).thenReturn(Optional.of(product));
+        when(orderReturnRepository.existsByOrderIdAndRequestTypeAndStatusIn(eq(10L), eq(OrderRequestType.RETURN), any())).thenReturn(true);
+
+        assertThatThrownBy(() ->
+            orderReturnService.requestExchange(USER, ORDER_NUMBER, 5L, "Wrong size ordered by mistake", "M", "Blue")
+        )
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("open return already exists");
+    }
+
+    @Test
+    void requestExchange_openExchangeOnSameItem_throwsConflict() {
+        CustomerOrder order = eligibleOrder();
+        OrderItem item = new OrderItem().id(5L).productId("2").qty(1).itemSize("S").color("Red");
+        Product product = new Product()
+            .id(2L)
+            .itemStructure("VARIANTS")
+            .variantsJson("[{\"sku\":\"TEE-M-BLUE\",\"size\":\"M\",\"color\":\"Blue\",\"rate\":500,\"stock\":3,\"active\":true}]");
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin(ORDER_NUMBER, USER)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByIdAndOrderId(5L, 10L)).thenReturn(Optional.of(item));
+        when(productRepository.findById(2L)).thenReturn(Optional.of(product));
+        when(orderReturnRepository.existsByOrderIdAndOrderItemIdAndStatusIn(eq(10L), eq(5L), any())).thenReturn(true);
+
+        assertThatThrownBy(() ->
+            orderReturnService.requestExchange(USER, ORDER_NUMBER, 5L, "Wrong size ordered by mistake", "M", "Blue")
+        )
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("already open for this item");
+    }
+
+    @Test
+    void isReplacementSellable_matchingActiveVariant_returnsTrue() {
+        CustomerOrder order = eligibleOrder();
+        OrderItem item = new OrderItem().id(5L).productId("2");
+        item.setOrder(order);
+        Product product = new Product()
+            .id(2L)
+            .itemStructure("VARIANTS")
+            .variantsJson("[{\"sku\":\"TEE-M-BLUE\",\"size\":\"M\",\"color\":\"Blue\",\"rate\":500,\"stock\":3,\"active\":true}]");
+        when(orderItemRepository.findById(5L)).thenReturn(Optional.of(item));
+        when(productRepository.findById(2L)).thenReturn(Optional.of(product));
+
+        assertThat(orderReturnService.isReplacementSellable(USER, 5L, "M", "Blue")).isTrue();
+    }
+
+    // ---------------------------------------------------------------------
+    // Granular fulfilment transitions
+    // ---------------------------------------------------------------------
+
+    @Test
+    void markPickupRequested_approvedReturn_movesToPickupRequested() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.APPROVED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.markPickupRequested("RET-1", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.PICKUP_REQUESTED);
+        verify(orderMailService).sendReturnUpdate(any(), eq(orderReturn));
+    }
+
+    @Test
+    void markPickedUp_pickupRequestedReturn_movesToPickedUp() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.PICKUP_REQUESTED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.markPickedUp("RET-1", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.PICKED_UP);
+    }
+
+    @Test
+    void markInspected_receivedReturn_movesToInspected() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.markInspected("RET-1", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.INSPECTED);
+    }
+
+    @Test
+    void acceptAfterInspection_inspectedReturn_movesToAccepted() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.INSPECTED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.acceptAfterInspection("RET-1", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.ACCEPTED);
+    }
+
+    @Test
+    void rejectAtCurrentStage_requestedReturn_delegatesToReject() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.REQUESTED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.rejectAtCurrentStage("RET-1", "Not eligible", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REJECTED);
+    }
+
+    @Test
+    void rejectAtCurrentStage_wrongStatus_throwsBadRequest() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.APPROVED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+
+        assertThatThrownBy(() -> orderReturnService.rejectAtCurrentStage("RET-1", "Not eligible", null))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("cannot be rejected");
+    }
+
+    @Test
+    void rejectAfterInspection_wrongStatus_throwsBadRequest() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+
+        assertThatThrownBy(() -> orderReturnService.rejectAfterInspection("RET-1", "Damaged beyond use", null))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("inspected");
+    }
+
+    @Test
+    void rejectAfterInspection_reversesPreviouslyCreditedStock() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.INSPECTED);
+        OrderItem item = new OrderItem().productId("1").qty(2);
+        Product product = new Product().id(1L).stock(7);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
+        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.rejectAfterInspection("RET-1", "Item damaged by customer", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REJECTED);
+        assertThat(product.getStock()).isEqualTo(5);
+        assertThat(result.getAdminNotes()).isNull();
+    }
+
+    @Test
+    void rejectAfterInspection_stockAlreadyResold_notesDiscrepancy() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.INSPECTED);
+        OrderItem item = new OrderItem().productId("1").qty(5);
+        Product product = new Product().id(1L).stock(2);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
+        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.rejectAfterInspection("RET-1", "Item damaged by customer", null);
+
+        assertThat(product.getStock()).isEqualTo(0);
+        assertThat(result.getAdminNotes()).contains("already been resold");
+    }
+
+    // ---------------------------------------------------------------------
+    // Exchange-only fulfilment
+    // ---------------------------------------------------------------------
+
+    @Test
+    void allocateReplacementItem_notAnExchange_throwsBadRequest() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.ACCEPTED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+
+        assertThatThrownBy(() -> orderReturnService.allocateReplacementItem("RET-1", null))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Not an exchange request");
+    }
+
+    @Test
+    void allocateReplacementItem_insufficientStock_throwsConflictAndDoesNotTransition() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ACCEPTED, "TEE-M-BLUE", "M", "Blue");
+        Product product = new Product()
+            .id(2L)
+            .itemStructure("VARIANTS")
+            .variantsJson("[{\"sku\":\"TEE-M-BLUE\",\"size\":\"M\",\"color\":\"Blue\",\"rate\":500,\"stock\":0,\"active\":true}]");
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(productRepository.findOneForInventoryUpdate(2L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> orderReturnService.allocateReplacementItem("RET-1", null))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("no longer in stock");
+
+        assertThat(orderReturn.getStatus()).isEqualTo(OrderReturnStatus.ACCEPTED);
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void allocateReplacementItem_success_decrementsStockAndTransitions() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ACCEPTED, "TEE-M-BLUE", "M", "Blue");
+        Product product = new Product()
+            .id(2L)
+            .itemStructure("VARIANTS")
+            .variantsJson("[{\"sku\":\"TEE-M-BLUE\",\"size\":\"M\",\"color\":\"Blue\",\"rate\":500,\"stock\":3,\"active\":true}]");
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(productRepository.findOneForInventoryUpdate(2L)).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.allocateReplacementItem("RET-1", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.ITEM_ALLOCATED);
+        assertThat(product.getStock()).isEqualTo(2);
+    }
+
+    @Test
+    void convertExchangeToRefund_refundsItemAmountNotWholeOrder() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ACCEPTED, "TEE-M-BLUE", "M", "Blue");
+        orderReturn.getOrderItem().price(new BigDecimal("250.00")).qty(2);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(razorpayRefundService.refundPayment(any(), eq(new BigDecimal("500.00")))).thenReturn("rfnd_demo");
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.convertExchangeToRefund("RET-1", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REFUNDED);
+        assertThat(result.getRefundAmount()).isEqualByComparingTo("500.00");
+        verify(customerOrderRepository, never()).save(any());
+    }
+
+    @Test
+    void processRefund_exchangeType_throwsBadRequest() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ACCEPTED, "TEE-M-BLUE", "M", "Blue");
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+
+        assertThatThrownBy(() -> orderReturnService.processRefund("RET-1", null))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("convert-to-refund");
+    }
+
+    @Test
+    void exchangeFulfilment_walksThroughRemainingStates() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ITEM_ALLOCATED, "TEE-M-BLUE", "M", "Blue");
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        assertThat(orderReturnService.markRepacking("RET-1", null).getStatus()).isEqualTo(OrderReturnStatus.REPACKING);
+        assertThat(orderReturnService.markReadyToShip("RET-1", null).getStatus()).isEqualTo(OrderReturnStatus.READY_TO_SHIP);
+        assertThat(orderReturnService.markShipped("RET-1", null).getStatus()).isEqualTo(OrderReturnStatus.SHIPPED);
+        assertThat(orderReturnService.markDelivered("RET-1", null).getStatus()).isEqualTo(OrderReturnStatus.DELIVERED);
+        assertThat(orderReturnService.completeExchange("RET-1", null).getStatus()).isEqualTo(OrderReturnStatus.COMPLETED);
+    }
+
+    private OrderReturn exchangeReturnWithStatus(OrderReturnStatus status, String replacementSku, String size, String color) {
+        OrderReturn orderReturn = returnWithStatus(status);
+        orderReturn.setRequestType(OrderRequestType.EXCHANGE);
+        OrderItem item = new OrderItem().id(5L).productId("2").qty(1).itemSize("S").color("Red").price(BigDecimal.TEN);
+        orderReturn.setOrderItem(item);
+        orderReturn.setReplacementVariantSku(replacementSku);
+        orderReturn.setReplacementSize(size);
+        orderReturn.setReplacementColor(color);
+        return orderReturn;
     }
 
     private CustomerOrder eligibleOrder() {

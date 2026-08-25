@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { Heart, ShoppingBag, Search, Menu, X, User, ArrowRight, Sparkles, Star, Flame } from "lucide-react";
 import { useState, useEffect, useRef, useMemo, useId } from "react";
@@ -56,6 +56,11 @@ export function Navbar() {
   const lastY = useRef(0);
   const listboxId = useId();
   const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     const onScroll = () => {
@@ -201,7 +206,13 @@ export function Navbar() {
           <button onClick={() => setSearchOpen(true)} title="Search" className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/40 transition" aria-label="Search">
             <Search className="h-4.5 w-4.5" />
           </button>
-          <Link to={profileTo} title={profileLabel} className="hidden md:grid h-10 w-10 place-items-center rounded-full hover:bg-white/40 transition" aria-label={profileLabel}>
+          <Link
+            to={profileTo}
+            title={profileLabel}
+            onClick={() => setOpen(false)}
+            className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/40 transition"
+            aria-label={profileLabel}
+          >
             <User className="h-5 w-5" strokeWidth={1.6} />
           </Link>
            <Link to={user ? "/wishlist" : "/login"} title="Wishlist" className="relative h-10 w-10 grid place-items-center rounded-full hover:bg-white/40 transition" aria-label="Wishlist">
@@ -238,6 +249,9 @@ export function Navbar() {
             <button onClick={() => { setOpen(false); setSearchOpen(true); }} className="flex items-center gap-2 text-base py-1.5 text-left">
               <Search className="h-4 w-4" /> Search
             </button>
+            <Link to={profileTo} onClick={() => setOpen(false)} className="flex items-center gap-2 text-base py-1.5">
+              <User className="h-4 w-4" /> {profileLabel}
+            </Link>
             {nav.map((n) => (
               <Link key={n.to} to={n.to} onClick={() => setOpen(false)} className="text-base py-1.5">
                 {n.label}

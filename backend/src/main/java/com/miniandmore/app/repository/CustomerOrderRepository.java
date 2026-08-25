@@ -29,6 +29,8 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     @Query("select customerOrder from CustomerOrder customerOrder where customerOrder.userLogin = :login order by customerOrder.id desc")
     List<CustomerOrder> findAllByUserLoginOrderByIdDesc(@Param("login") String login);
 
+    List<CustomerOrder> findAllByPlacedAtGreaterThanEqualAndPlacedAtLessThanOrderByPlacedAtDesc(Instant from, Instant to);
+
     @Query(
         "select customerOrder from CustomerOrder customerOrder where customerOrder.userLogin = :login and customerOrder.orderNumber = :orderNumber"
     )

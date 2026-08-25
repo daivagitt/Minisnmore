@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260822150000-1" author="miniandmore">
+        <addColumn tableName="order_return">
+            <column name="request_type" type="varchar(16)" defaultValue="RETURN">
+                <constraints nullable="false"/>
+            </column>
+            <column name="order_item_id" type="bigint"/>
+            <column name="replacement_variant_sku" type="varchar(120)"/>
+            <column name="replacement_size" type="varchar(40)"/>
+            <column name="replacement_color" type="varchar(40)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20260822150000-2" author="miniandmore">
+        <addForeignKeyConstraint
+            baseTableName="order_return"
+            baseColumnNames="order_item_id"
+            constraintName="fk_order_return__order_item_id"
+            referencedTableName="order_item"
+            referencedColumnNames="id"/>
+        <createIndex indexName="idx_order_return__order_item_id" tableName="order_return">
+            <column name="order_item_id"/>
+        </createIndex>
+        <createIndex indexName="idx_order_return__request_type" tableName="order_return">
+            <column name="request_type"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

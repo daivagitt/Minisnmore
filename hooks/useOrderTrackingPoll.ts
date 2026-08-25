@@ -12,6 +12,7 @@ export type TrackingOrder = OrderTrackingFields & {
   id?: number;
   created_at?: string;
   coupon_code?: string;
+  cancellation_reason?: string;
   razorpay_payment_id?: string;
   invoice_pdf_url?: string;
   subtotal?: number;
@@ -23,6 +24,9 @@ export type TrackingOrder = OrderTrackingFields & {
   total?: number;
   order_items?: Array<{
     id?: number;
+    product_id?: string;
+    product_slug?: string;
+    sku?: string;
     product_image?: string;
     product_name?: string;
     size?: string;

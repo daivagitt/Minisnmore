@@ -7,7 +7,12 @@ import { Heart, Truck, Leaf, ChevronRight, Ruler, Plus, Minus, Share2, X, BadgeC
 import { toast } from "sonner";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductGallery } from "@/components/ProductGallery";
-import { checkSizeFit, clampQuantity, sizeGuideRowsForProduct } from "@/lib/product-fit";
+import {
+  checkSizeFit,
+  clampQuantity,
+  measurementLimitsForSizes,
+  sizeGuideRowsForProduct,
+} from "@/lib/product-fit";
 import { galleryForSelectedColor } from "@/lib/product-gallery";
 import { resolveStorefrontColorLabel } from "@/lib/expected-prints";
 import { lookupPincode, normalizePincode } from "@/lib/pincode";
@@ -111,15 +116,22 @@ function ProductPage() {
     [product, color, size],
   );
 
+  const catalogSizes = useMemo(
+    () => (product ? catalogSizesForProduct(product) : []),
+    [product],
+  );
+
+  const fitLimits = useMemo(() => measurementLimitsForSizes(catalogSizes), [catalogSizes]);
+
   const sizeFit = useMemo(() => {
-    if (!product || !heightCm.trim()) return null;
-    const result = checkSizeFit({ heightCm, chestCm, sizes: sizesForDisplay(product) });
+    if (!product || (!heightCm.trim() && !chestCm.trim())) return null;
+    const result = checkSizeFit({ heightCm, chestCm, sizes: catalogSizes });
     return result.ok ? { size: result.size } : { error: result.error };
-  }, [heightCm, chestCm, product]);
+  }, [heightCm, chestCm, product, catalogSizes]);
 
   const sizeGuideRows = useMemo(
-    () => (product ? sizeGuideRowsForProduct(catalogSizesForProduct(product)) : []),
-    [product],
+    () => sizeGuideRowsForProduct(catalogSizes),
+    [catalogSizes],
   );
 
   const handleAdd = () => {
@@ -262,23 +274,31 @@ function ProductPage() {
               <input
                 type="number"
                 inputMode="decimal"
-                min={30}
-                max={120}
+                min={fitLimits?.heightMin}
+                max={fitLimits?.heightMax}
                 value={heightCm}
                 onChange={(e) => setHeightCm(e.target.value)}
-                placeholder="Height (cm)"
+                placeholder={
+                  fitLimits
+                    ? `Height (${fitLimits.heightMin}–${fitLimits.heightMax} cm)`
+                    : "Height (cm)"
+                }
                 aria-label="Height in centimetres"
                 className="h-10 glass rounded-full px-3 sm:px-4 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40 min-w-0 w-full"
               />
               <input
                 type="number"
                 inputMode="decimal"
-                min={20}
-                max={70}
+                min={fitLimits?.chestMin}
+                max={fitLimits?.chestMax}
                 value={chestCm}
                 onChange={(e) => setChestCm(e.target.value)}
-                placeholder="Chest (cm)"
-                aria-label="Chest in centimetres (optional)"
+                placeholder={
+                  fitLimits
+                    ? `Chest (${fitLimits.chestMin}–${fitLimits.chestMax} cm)`
+                    : "Chest (cm)"
+                }
+                aria-label="Chest in centimetres"
                 className="h-10 glass rounded-full px-3 sm:px-4 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40 min-w-0 w-full"
               />
             </div>
@@ -474,13 +494,13 @@ function ProductPage() {
               <button onClick={() => setSizeChart(false)} className="h-9 w-9 grid place-items-center rounded-full hover:bg-white/40"><X className="h-4 w-4" /></button>
             </div>
             <table className="w-full text-sm">
-              <thead><tr className="text-xs uppercase tracking-wider text-muted-foreground"><th className="text-left py-2">Size</th><th>Weight</th><th>Height</th></tr></thead>
+              <thead><tr className="text-xs uppercase tracking-wider text-muted-foreground"><th className="text-left py-2">Size</th><th>Height</th><th>Chest</th></tr></thead>
               <tbody className="text-foreground/80">
                 {sizeGuideRows.map((row) => (
                   <tr key={row.size} className="border-t border-border/40">
                     <td className="py-2 font-medium">{row.size}</td>
-                    <td className="text-center">{row.weight}</td>
                     <td className="text-center">{row.height}</td>
+                    <td className="text-center">{row.chest}</td>
                   </tr>
                 ))}
               </tbody>

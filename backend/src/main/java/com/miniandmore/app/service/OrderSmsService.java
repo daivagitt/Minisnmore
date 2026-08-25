@@ -6,6 +6,7 @@ import com.miniandmore.app.client.FastSmsClient;
 import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderReturn;
+import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Map;
@@ -81,10 +82,57 @@ public class OrderSmsService {
     }
 
     public void sendReturnUpdate(CustomerOrder order, OrderReturn orderReturn) {
-        // No DLT return template in the integration guide — skip until registered.
-        LOG.debug(
-            "Skipping return SMS for '{}'; no DLT template configured",
-            orderReturn != null ? orderReturn.getReturnNumber() : null
+        if (order == null || orderReturn == null || orderReturn.getStatus() == null) {
+            return;
+        }
+        ApplicationProperties.FastSms.Templates templates = config.getTemplates();
+        String template;
+        String templateId;
+        switch (orderReturn.getStatus()) {
+            case APPROVED -> {
+                template = templates.getReturnApproved();
+                templateId = templates.getReturnApprovedTemplateId();
+            }
+            case REJECTED -> {
+                template = templates.getReturnRejected();
+                templateId = templates.getReturnRejectedTemplateId();
+            }
+            case PICKUP_REQUESTED -> {
+                template = templates.getReturnPickupScheduled();
+                templateId = templates.getReturnPickupScheduledTemplateId();
+            }
+            case REFUNDED -> {
+                template = templates.getReturnRefunded();
+                templateId = templates.getReturnRefundedTemplateId();
+            }
+            case FAILED -> {
+                template = templates.getReturnFailed();
+                templateId = templates.getReturnFailedTemplateId();
+            }
+            default -> {
+                return;
+            }
+        }
+        if (StringUtils.isBlank(templateId)) {
+            // No DLT template registered yet for this event — skip until one is configured.
+            LOG.debug("Skipping return SMS for '{}'; no DLT template configured", orderReturn.getReturnNumber());
+            return;
+        }
+        send(
+            order,
+            render(
+                template,
+                order,
+                Map.of(
+                    "name",
+                    resolveCustomerName(order),
+                    "orderId",
+                    StringUtils.defaultString(order.getOrderNumber()),
+                    "amount",
+                    formatAmount(orderReturn.getRefundAmount())
+                )
+            ),
+            templateId
         );
     }
 

@@ -41,6 +41,24 @@ class AdminOrdersProxyResourceTest {
     }
 
     @Test
+    void listOrders_forwardsDateRangeToCatalog() throws Exception {
+        String internalPath =
+            "/internal/v1/admin/orders?from=2026-08-01T00:00:00Z&to=2026-08-08T00:00:00Z";
+        when(catalog.get(internalPath)).thenReturn(ResponseEntity.ok("{\"orders\":[]}"));
+
+        mockMvc
+            .perform(
+                get("/api/v1/admin/orders")
+                    .param("from", "2026-08-01T00:00:00Z")
+                    .param("to", "2026-08-08T00:00:00Z")
+            )
+            .andExpect(status().isOk())
+            .andExpect(content().string("{\"orders\":[]}"));
+
+        verify(catalog).get(internalPath);
+    }
+
+    @Test
     void markCodCollected_delegatesToCatalog() throws Exception {
         when(catalog.post(eq("/internal/v1/admin/orders/MNM-42/mark-cod-collected"), eq(null)))
             .thenReturn(ResponseEntity.ok("{\"ok\":true}"));

@@ -67,7 +67,7 @@ class InternalAdminOrderReturnResourceTest {
     void reject_returns200() throws Exception {
         OrderReturn rejected = sampleReturn();
         rejected.setStatus(OrderReturnStatus.REJECTED);
-        when(orderReturnService.reject(eq("RET-1"), eq("Not eligible for return"), any())).thenReturn(rejected);
+        when(orderReturnService.rejectAtCurrentStage(eq("RET-1"), eq("Not eligible for return"), any())).thenReturn(rejected);
 
         mockMvc
             .perform(
@@ -77,6 +77,138 @@ class InternalAdminOrderReturnResourceTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("rejected"));
+    }
+
+    @Test
+    void pickupRequested_returns200() throws Exception {
+        OrderReturn updated = sampleReturn();
+        updated.setStatus(OrderReturnStatus.PICKUP_REQUESTED);
+        when(orderReturnService.markPickupRequested("RET-1", null)).thenReturn(updated);
+
+        mockMvc
+            .perform(post("/internal/v1/admin/order-returns/RET-1/pickup-requested"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("pickup_requested"));
+    }
+
+    @Test
+    void pickedUp_returns200() throws Exception {
+        OrderReturn updated = sampleReturn();
+        updated.setStatus(OrderReturnStatus.PICKED_UP);
+        when(orderReturnService.markPickedUp("RET-1", null)).thenReturn(updated);
+
+        mockMvc
+            .perform(post("/internal/v1/admin/order-returns/RET-1/picked-up"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("picked_up"));
+    }
+
+    @Test
+    void inspect_returns200() throws Exception {
+        OrderReturn updated = sampleReturn();
+        updated.setStatus(OrderReturnStatus.INSPECTED);
+        when(orderReturnService.markInspected("RET-1", null)).thenReturn(updated);
+
+        mockMvc
+            .perform(post("/internal/v1/admin/order-returns/RET-1/inspect"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("inspected"));
+    }
+
+    @Test
+    void accept_returns200() throws Exception {
+        OrderReturn updated = sampleReturn();
+        updated.setStatus(OrderReturnStatus.ACCEPTED);
+        when(orderReturnService.acceptAfterInspection("RET-1", null)).thenReturn(updated);
+
+        mockMvc
+            .perform(post("/internal/v1/admin/order-returns/RET-1/accept"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("accepted"));
+    }
+
+    @Test
+    void allocateReplacement_returns200() throws Exception {
+        OrderReturn updated = sampleReturn();
+        updated.setStatus(OrderReturnStatus.ITEM_ALLOCATED);
+        when(orderReturnService.allocateReplacementItem("RET-1", null)).thenReturn(updated);
+
+        mockMvc
+            .perform(post("/internal/v1/admin/order-returns/RET-1/allocate-replacement"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("item_allocated"));
+    }
+
+    @Test
+    void convertToRefund_returns200() throws Exception {
+        OrderReturn updated = sampleReturn();
+        updated.setStatus(OrderReturnStatus.REFUNDED);
+        when(orderReturnService.convertExchangeToRefund("RET-1", null)).thenReturn(updated);
+
+        mockMvc
+            .perform(post("/internal/v1/admin/order-returns/RET-1/convert-to-refund"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("refunded"));
+    }
+
+    @Test
+    void repacking_returns200() throws Exception {
+        OrderReturn updated = sampleReturn();
+        updated.setStatus(OrderReturnStatus.REPACKING);
+        when(orderReturnService.markRepacking("RET-1", null)).thenReturn(updated);
+
+        mockMvc
+            .perform(post("/internal/v1/admin/order-returns/RET-1/repacking"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("repacking"));
+    }
+
+    @Test
+    void readyToShip_returns200() throws Exception {
+        OrderReturn updated = sampleReturn();
+        updated.setStatus(OrderReturnStatus.READY_TO_SHIP);
+        when(orderReturnService.markReadyToShip("RET-1", null)).thenReturn(updated);
+
+        mockMvc
+            .perform(post("/internal/v1/admin/order-returns/RET-1/ready-to-ship"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("ready_to_ship"));
+    }
+
+    @Test
+    void shipped_returns200() throws Exception {
+        OrderReturn updated = sampleReturn();
+        updated.setStatus(OrderReturnStatus.SHIPPED);
+        when(orderReturnService.markShipped("RET-1", null)).thenReturn(updated);
+
+        mockMvc
+            .perform(post("/internal/v1/admin/order-returns/RET-1/shipped"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("shipped"));
+    }
+
+    @Test
+    void delivered_returns200() throws Exception {
+        OrderReturn updated = sampleReturn();
+        updated.setStatus(OrderReturnStatus.DELIVERED);
+        when(orderReturnService.markDelivered("RET-1", null)).thenReturn(updated);
+
+        mockMvc
+            .perform(post("/internal/v1/admin/order-returns/RET-1/delivered"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("delivered"));
+    }
+
+    @Test
+    void complete_returns200() throws Exception {
+        OrderReturn updated = sampleReturn();
+        updated.setStatus(OrderReturnStatus.COMPLETED);
+        when(orderReturnService.completeExchange("RET-1", null)).thenReturn(updated);
+
+        mockMvc
+            .perform(post("/internal/v1/admin/order-returns/RET-1/complete"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("completed"));
     }
 
     @Test

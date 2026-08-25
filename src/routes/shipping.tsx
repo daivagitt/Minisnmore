@@ -42,7 +42,7 @@ function ShippingPage() {
 
       <h2>5. Returns</h2>
       <ul>
-        <li>We accept returns within <strong>7 days</strong> of delivery for unused, unwashed items in original packaging with tags intact.</li>
+        <li>We accept returns within <strong>3 days</strong> of delivery for unused, unwashed items in original packaging with tags intact.</li>
         <li>For hygiene reasons, the following are <strong>non-returnable</strong>: innerwear, bibs, swaddles once unsealed, gift cards, and items marked "final sale".</li>
         <li>To initiate a return, visit <a href="/account/returns">My account → Returns</a> or write to <a href="mailto:care@minisnmore.in">care@minisnmore.in</a> within the return window.</li>
         <li>A reverse pickup is arranged free of cost on serviceable pin codes; for non-serviceable areas, you may self-ship and we will refund shipping up to ₹100.</li>
@@ -59,7 +59,7 @@ function ShippingPage() {
       </ul>
 
       <h2>8. Exchanges</h2>
-      <p>We offer free size exchanges within the 7-day window, subject to stock availability. If the desired size is unavailable, we will issue a refund or store credit.</p>
+      <p>We offer free size exchanges within the 3-day window, subject to stock availability. If the desired size is unavailable, we will issue a refund or store credit.</p>
 
       <h2>9. Care guidance</h2>
       <p>To help pieces last longer, we include wash-care guidance with every order. Use mild detergent, avoid harsh bleach and dry in shade to preserve softness and colour.</p>

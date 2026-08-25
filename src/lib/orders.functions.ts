@@ -183,6 +183,7 @@ export type OrderReturnRow = {
   id: number;
   return_number: string;
   status: string;
+  request_type: "return" | "exchange";
   reason: string;
   rejection_reason?: string | null;
   refund_amount?: number | null;
@@ -190,6 +191,13 @@ export type OrderReturnRow = {
   resolved_at?: string | null;
   order_number?: string;
   order_total?: number;
+  order_item_id?: number;
+  product_name?: string;
+  product_slug?: string;
+  original_size?: string | null;
+  original_color?: string | null;
+  replacement_size?: string | null;
+  replacement_color?: string | null;
 };
 
 export async function listMyOrderReturns(): Promise<{ returns: OrderReturnRow[] }> {
@@ -205,6 +213,10 @@ export async function checkReturnEligibility(
   });
 }
 
+export async function getReturnsConfig(): Promise<{ enabled: boolean; window_days: number }> {
+  return api.get("/api/v1/order-returns/config", { auth: true });
+}
+
 const CreateReturnInput = z.object({
   order_number: z.string().min(3).max(40),
   reason: z.string().min(10).max(4000),
@@ -215,6 +227,32 @@ export async function requestOrderReturn(input: {
 }): Promise<OrderReturnRow> {
   const parsed = CreateReturnInput.parse(input.data);
   return api.post("/api/v1/order-returns", parsed, { auth: true });
+}
+
+const CreateExchangeInput = z.object({
+  order_number: z.string().min(3).max(40),
+  order_item_id: z.number().int().positive(),
+  reason: z.string().min(10).max(4000),
+  replacement_size: z.string().min(1).max(40),
+  replacement_color: z.string().min(1).max(40),
+});
+
+export async function requestOrderExchange(input: {
+  data: z.infer<typeof CreateExchangeInput>;
+}): Promise<OrderReturnRow> {
+  const parsed = CreateExchangeInput.parse(input.data);
+  return api.post("/api/v1/order-returns/exchange", parsed, { auth: true });
+}
+
+export async function checkExchangeReplacementAvailability(
+  orderItemId: number,
+  size: string,
+  color: string,
+): Promise<{ sellable: boolean }> {
+  const query = `?size=${encodeURIComponent(size)}&color=${encodeURIComponent(color)}`;
+  return api.get(`/api/v1/order-returns/exchange-availability/${orderItemId}${query}`, {
+    auth: true,
+  });
 }
 
 export async function cancelOrderReturn(returnNumber: string): Promise<OrderReturnRow> {
@@ -243,12 +281,16 @@ export async function listAdminOrderReturns(
   return { returns: returns ?? [] };
 }
 
-export async function approveOrderReturn(returnNumber: string, adminNotes?: string) {
+function adminReturnAction(returnNumber: string, action: string, adminNotes?: string) {
   return api.post(
-    `/api/v1/admin/order-returns/${encodeURIComponent(returnNumber)}/approve`,
+    `/api/v1/admin/order-returns/${encodeURIComponent(returnNumber)}/${action}`,
     { admin_notes: adminNotes ?? "" },
     { auth: true },
   );
+}
+
+export async function approveOrderReturn(returnNumber: string, adminNotes?: string) {
+  return adminReturnAction(returnNumber, "approve", adminNotes);
 }
 
 export async function rejectOrderReturn(
@@ -263,20 +305,56 @@ export async function rejectOrderReturn(
   );
 }
 
+export async function markOrderReturnPickupRequested(returnNumber: string, adminNotes?: string) {
+  return adminReturnAction(returnNumber, "pickup-requested", adminNotes);
+}
+
+export async function markOrderReturnPickedUp(returnNumber: string, adminNotes?: string) {
+  return adminReturnAction(returnNumber, "picked-up", adminNotes);
+}
+
 export async function markOrderReturnReceived(returnNumber: string, adminNotes?: string) {
-  return api.post(
-    `/api/v1/admin/order-returns/${encodeURIComponent(returnNumber)}/mark-received`,
-    { admin_notes: adminNotes ?? "" },
-    { auth: true },
-  );
+  return adminReturnAction(returnNumber, "mark-received", adminNotes);
+}
+
+export async function markOrderReturnInspected(returnNumber: string, adminNotes?: string) {
+  return adminReturnAction(returnNumber, "inspect", adminNotes);
+}
+
+export async function acceptOrderReturnAfterInspection(returnNumber: string, adminNotes?: string) {
+  return adminReturnAction(returnNumber, "accept", adminNotes);
+}
+
+export async function allocateReplacementForOrderReturn(returnNumber: string, adminNotes?: string) {
+  return adminReturnAction(returnNumber, "allocate-replacement", adminNotes);
+}
+
+export async function convertOrderReturnToRefund(returnNumber: string, adminNotes?: string) {
+  return adminReturnAction(returnNumber, "convert-to-refund", adminNotes);
+}
+
+export async function markOrderReturnRepacking(returnNumber: string, adminNotes?: string) {
+  return adminReturnAction(returnNumber, "repacking", adminNotes);
+}
+
+export async function markOrderReturnReadyToShip(returnNumber: string, adminNotes?: string) {
+  return adminReturnAction(returnNumber, "ready-to-ship", adminNotes);
+}
+
+export async function markOrderReturnShipped(returnNumber: string, adminNotes?: string) {
+  return adminReturnAction(returnNumber, "shipped", adminNotes);
+}
+
+export async function markOrderReturnDelivered(returnNumber: string, adminNotes?: string) {
+  return adminReturnAction(returnNumber, "delivered", adminNotes);
+}
+
+export async function completeOrderReturnExchange(returnNumber: string, adminNotes?: string) {
+  return adminReturnAction(returnNumber, "complete", adminNotes);
 }
 
 export async function refundOrderReturn(returnNumber: string, adminNotes?: string) {
-  return api.post(
-    `/api/v1/admin/order-returns/${encodeURIComponent(returnNumber)}/refund`,
-    { admin_notes: adminNotes ?? "" },
-    { auth: true },
-  );
+  return adminReturnAction(returnNumber, "refund", adminNotes);
 }
 
 export type AdminCodOrderRow = {
@@ -290,6 +368,37 @@ export type AdminCodOrderRow = {
   phone?: string;
   city?: string;
 };
+
+export type AdminOrderRow = AdminCodOrderRow & {
+  payment_status: string;
+  payment_method: string;
+  zoho_sync_status: string;
+  zoho_sync_error: string;
+  zoho_last_synced_at: string;
+  zoho_sales_order_id: string;
+  zoho_invoice_id: string;
+  zoho_sync_eligible: boolean;
+  ledgerly_sync_status: string;
+  ledgerly_sync_error: string;
+  ledgerly_last_synced_at: string;
+  ledgerly_sales_order_id: string;
+  ledgerly_invoice_id: string;
+  ledgerly_sync_eligible: boolean;
+};
+
+export async function listAdminOrders(
+  from: string,
+  to: string,
+): Promise<{ orders: AdminOrderRow[] }> {
+  const query = new URLSearchParams({ from, to });
+  const res = await api.get<{ orders: AdminOrderRow[] }>(
+    `/api/v1/admin/orders?${query.toString()}`,
+    {
+      auth: true,
+    },
+  );
+  return { orders: res.orders ?? [] };
+}
 
 export async function listCodPendingOrders(): Promise<{ orders: AdminCodOrderRow[] }> {
   const res = await api.get<{ orders: AdminCodOrderRow[] }>("/api/v1/admin/orders/cod-pending", {

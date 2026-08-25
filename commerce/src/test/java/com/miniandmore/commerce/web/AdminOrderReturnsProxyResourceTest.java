@@ -76,4 +76,31 @@ class AdminOrderReturnsProxyResourceTest {
             )
             .andExpect(status().isOk());
     }
+
+    @Test
+    void newTransitionEndpoints_delegateToCatalog() throws Exception {
+        String[] paths = {
+            "pickup-requested",
+            "picked-up",
+            "inspect",
+            "accept",
+            "allocate-replacement",
+            "convert-to-refund",
+            "repacking",
+            "ready-to-ship",
+            "shipped",
+            "delivered",
+            "complete",
+        };
+        for (String path : paths) {
+            when(catalog.post(eq("/internal/v1/admin/order-returns/R3/" + path), any())).thenReturn(ResponseEntity.ok("{}"));
+            mockMvc
+                .perform(
+                    org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/admin/order-returns/R3/" + path)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{}")
+                )
+                .andExpect(status().isOk());
+        }
+    }
 }

@@ -92,6 +92,51 @@ class InternalOrderReturnResourceTest {
             .andExpect(jsonPath("$.data.status").value("cancelled"));
     }
 
+    @Test
+    void requestExchange_returns200() throws Exception {
+        OrderReturn exchange = sampleReturn();
+        exchange.setRequestType(com.miniandmore.app.domain.enumeration.OrderRequestType.EXCHANGE);
+        when(orderReturnService.requestExchange(any(), any(), any(), any(), any(), any())).thenReturn(exchange);
+
+        mockMvc
+            .perform(
+                post("/internal/v1/order-returns/exchange")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"order_number\":\"ORD-1\",\"order_item_id\":5,\"reason\":\"Wrong size ordered by mistake\","
+                            + "\"replacement_size\":\"M\",\"replacement_color\":\"Blue\"}"
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.request_type").value("exchange"));
+    }
+
+    @Test
+    void checkExchangeAvailability_returns200() throws Exception {
+        when(orderReturnService.isReplacementSellable("customer1", 5L, "M", "Blue")).thenReturn(true);
+
+        mockMvc
+            .perform(
+                get("/internal/v1/order-returns/exchange-availability/5")
+                    .with(user("customer1"))
+                    .param("size", "M")
+                    .param("color", "Blue")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.sellable").value(true));
+    }
+
+    @Test
+    void config_returns200() throws Exception {
+        when(orderReturnService.publicConfig()).thenReturn(Map.of("enabled", true, "window_days", 3));
+
+        mockMvc
+            .perform(get("/internal/v1/order-returns/config").with(user("customer1")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.window_days").value(3));
+    }
+
     private static OrderReturn sampleReturn() {
         CustomerOrder order = new CustomerOrder()
             .orderNumber("ORD-1")

@@ -1,16 +1,25 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   cancelOrder,
   syncPaymentStatus,
   retryOrderPayment,
   verifyPayment,
+  checkReturnEligibility,
+  listMyOrderReturns,
+  requestOrderReturn,
+  requestOrderExchange,
+  type OrderReturnRow,
 } from "@/lib/orders.functions";
 import { openRazorpayCheckout } from "@/lib/razorpay";
 import { formatOrderDate } from "@/lib/dates";
 import { formatOrderStatusSummary, formatPaymentStatusLabel } from "@/lib/order-status";
 import { useOrderTrackingPoll } from "@/hooks/useOrderTrackingPoll";
 import { shouldPollOrderTracking } from "@/lib/order-tracking";
+import { useProduct } from "@/hooks/useProducts";
+import { defaultSellableSelection } from "@/lib/product-variants";
+import { ExchangeReplacementPicker } from "@/components/ExchangeReplacementPicker";
+import { showApiError } from "@/lib/ui-errors";
 import {
   Loader2,
   ArrowLeft,
@@ -23,6 +32,7 @@ import {
   Truck,
   Wallet,
   FileText,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { LazyImage } from "@/components/LazyImage";
@@ -39,6 +49,29 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+const OPEN_RETURN_STATUSES = new Set([
+  "requested",
+  "approved",
+  "pickup_requested",
+  "picked_up",
+  "received",
+  "inspected",
+  "accepted",
+  "item_allocated",
+  "repacking",
+  "ready_to_ship",
+  "shipped",
+  "delivered",
+  "failed",
+]);
 
 export const Route = createFileRoute("/account/orders/$orderNumber")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -61,6 +94,125 @@ function OrderDetail() {
     orderNumber,
     "authenticated",
   );
+
+  const [orderReturns, setOrderReturns] = useState<OrderReturnRow[]>([]);
+  const [eligibility, setEligibility] = useState<{ eligible: boolean; message?: string } | null>(null);
+
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [returnReason, setReturnReason] = useState("");
+  const [submittingReturn, setSubmittingReturn] = useState(false);
+
+  const [exchangeItem, setExchangeItem] = useState<{
+    id: number;
+    product_slug?: string;
+    product_name?: string;
+    size?: string;
+    color?: string;
+  } | null>(null);
+  const [exchangeSize, setExchangeSize] = useState<string | null>(null);
+  const [exchangeColor, setExchangeColor] = useState<string | null>(null);
+  const [exchangeReason, setExchangeReason] = useState("");
+  const [submittingExchange, setSubmittingExchange] = useState(false);
+  const exchangeProduct = useProduct(exchangeItem?.product_slug);
+
+  const loadReturnsInfo = useCallback(async () => {
+    if (!orderNumber) return;
+    try {
+      const [returnsRes, eligRes] = await Promise.all([
+        listMyOrderReturns(),
+        checkReturnEligibility(orderNumber),
+      ]);
+      setOrderReturns((returnsRes.returns ?? []).filter((r) => r.order_number === orderNumber));
+      setEligibility({ eligible: eligRes.eligible, message: eligRes.message });
+    } catch {
+      // non-fatal — the returns card just won't render actions
+    }
+  }, [orderNumber]);
+
+  useEffect(() => {
+    void loadReturnsInfo();
+  }, [loadReturnsInfo]);
+
+  const openWholeOrderReturn = useMemo(
+    () => orderReturns.find((r) => OPEN_RETURN_STATUSES.has(r.status)),
+    [orderReturns],
+  );
+
+  const openExchangeByItemId = useMemo(() => {
+    const map = new Map<number, OrderReturnRow>();
+    for (const r of orderReturns) {
+      if (r.request_type === "exchange" && r.order_item_id != null && OPEN_RETURN_STATUSES.has(r.status)) {
+        map.set(r.order_item_id, r);
+      }
+    }
+    return map;
+  }, [orderReturns]);
+
+  const openExchangeDialog = (item: { id: number; product_slug?: string; product_name?: string; size?: string; color?: string }) => {
+    setExchangeItem(item);
+    setExchangeSize(item.size ?? null);
+    setExchangeColor(item.color ?? null);
+    setExchangeReason("");
+  };
+
+  useEffect(() => {
+    if (!exchangeItem || !exchangeProduct) return;
+    if (exchangeSize && exchangeColor) return;
+    const defaults = defaultSellableSelection(exchangeProduct);
+    setExchangeSize((prev) => prev ?? defaults.size);
+    setExchangeColor((prev) => prev ?? defaults.color);
+  }, [exchangeItem, exchangeProduct, exchangeSize, exchangeColor]);
+
+  const submitReturn = async () => {
+    if (!order?.order_number) return;
+    if (returnReason.trim().length < 10) {
+      toast.error("Please describe the issue in at least 10 characters");
+      return;
+    }
+    setSubmittingReturn(true);
+    try {
+      await requestOrderReturn({ data: { order_number: order.order_number, reason: returnReason.trim() } });
+      toast.success("Return request submitted");
+      setReturnDialogOpen(false);
+      setReturnReason("");
+      await loadReturnsInfo();
+    } catch (e) {
+      showApiError(e, "Could not submit return request");
+    } finally {
+      setSubmittingReturn(false);
+    }
+  };
+
+  const submitExchange = async () => {
+    if (!order?.order_number || !exchangeItem) return;
+    if (exchangeReason.trim().length < 10) {
+      toast.error("Please describe the issue in at least 10 characters");
+      return;
+    }
+    if (!exchangeSize || !exchangeColor) {
+      toast.error("Please choose a replacement size and colour");
+      return;
+    }
+    setSubmittingExchange(true);
+    try {
+      await requestOrderExchange({
+        data: {
+          order_number: order.order_number,
+          order_item_id: exchangeItem.id,
+          reason: exchangeReason.trim(),
+          replacement_size: exchangeSize,
+          replacement_color: exchangeColor,
+        },
+      });
+      toast.success("Exchange request submitted");
+      setExchangeItem(null);
+      await loadReturnsInfo();
+    } catch (e) {
+      showApiError(e, "Could not submit exchange request");
+    } finally {
+      setSubmittingExchange(false);
+    }
+  };
 
   const checkPaymentStatus = async () => {
     if (!order?.id) return;
@@ -324,6 +476,45 @@ function OrderDetail() {
         </div>
       )}
 
+      {order.payment_status === "paid" && (
+        <div className="glass-strong rounded-[2rem] p-6 md:p-8">
+          <h2 className="font-display text-xl mb-3 flex items-center gap-2">
+            <RotateCcw className="h-5 w-5 text-primary" /> Returns &amp; exchange
+          </h2>
+          {orderReturns.length > 0 ? (
+            <div className="space-y-2">
+              {orderReturns.map((r) => (
+                <div key={r.return_number} className="glass rounded-2xl p-3 flex items-center justify-between gap-3">
+                  <div className="text-sm">
+                    <span className="font-medium">{r.request_type === "exchange" ? "Exchange" : "Return"}</span>{" "}
+                    <span className="text-muted-foreground">{r.return_number}</span>
+                    {r.product_name ? <span className="text-muted-foreground"> · {r.product_name}</span> : null}
+                  </div>
+                  <span className="text-[10px] uppercase tracking-wider rounded-full px-3 py-1 bg-amber-500/15 text-amber-700">
+                    {r.status.replace(/_/g, " ")}
+                  </span>
+                </div>
+              ))}
+              <Link to="/account/returns" className="text-xs text-primary hover:underline">
+                Manage your return &amp; exchange requests
+              </Link>
+            </div>
+          ) : eligibility?.eligible ? (
+            <button
+              type="button"
+              onClick={() => setReturnDialogOpen(true)}
+              className="text-xs rounded-full bg-primary text-primary-foreground px-4 py-2"
+            >
+              Start a return
+            </button>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {eligibility?.message ?? "Returns aren't available for this order right now."}
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-[1fr_320px] gap-4">
         <div className="glass-strong rounded-[2rem] p-6 md:p-8">
           <h2 className="font-display text-xl mb-4 flex items-center gap-2">
@@ -332,27 +523,59 @@ function OrderDetail() {
             <span className="text-muted-foreground font-normal text-base">({itemCount})</span>
           </h2>
           <div className="space-y-3">
-            {order.order_items?.map((it: any) => (
-              <div key={it.id} className="glass rounded-2xl p-3 flex gap-3 items-center">
-                {it.product_image && (
-                  <LazyImage
-                    src={it.product_image}
-                    className="h-16 w-16 rounded-xl object-cover"
-                    alt=""
-                    priority="auto"
-                  />
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{it.product_name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {[it.size, it.color].filter(Boolean).join(" · ")} · ×{it.qty}
+            {order.order_items?.map((it: any) => {
+              const openExchange = it.id != null ? openExchangeByItemId.get(it.id) : undefined;
+              const canExchange =
+                order.payment_status === "paid" &&
+                eligibility?.eligible &&
+                !openWholeOrderReturn &&
+                !openExchange &&
+                it.id != null;
+              return (
+                <div key={it.id} className="glass rounded-2xl p-3 flex flex-col gap-2">
+                  <div className="flex gap-3 items-center">
+                    {it.product_image && (
+                      <LazyImage
+                        src={it.product_image}
+                        className="h-16 w-16 rounded-xl object-cover"
+                        alt=""
+                        priority="auto"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{it.product_name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {[it.size, it.color].filter(Boolean).join(" · ")} · ×{it.qty}
+                      </div>
+                    </div>
+                    <div className="text-sm font-medium">
+                      ₹{(it.qty * Number(it.price)).toLocaleString("en-IN")}
+                    </div>
                   </div>
+                  {openExchange ? (
+                    <span className="self-start text-[10px] uppercase tracking-wider rounded-full px-3 py-1 bg-amber-500/15 text-amber-700">
+                      Exchange {openExchange.status.replace(/_/g, " ")}
+                    </span>
+                  ) : canExchange ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openExchangeDialog({
+                          id: it.id,
+                          product_slug: it.product_slug,
+                          product_name: it.product_name,
+                          size: it.size,
+                          color: it.color,
+                        })
+                      }
+                      className="self-start text-xs rounded-full border border-border px-3 py-1.5 hover:bg-white/60 transition"
+                    >
+                      Request exchange
+                    </button>
+                  ) : null}
                 </div>
-                <div className="text-sm font-medium">
-                  ₹{(it.qty * Number(it.price)).toLocaleString("en-IN")}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4 mt-6">
@@ -527,6 +750,83 @@ function OrderDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={returnDialogOpen}
+        onOpenChange={(open) => {
+          setReturnDialogOpen(open);
+          if (!open) setReturnReason("");
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request a return</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <label htmlFor="return-reason" className="text-sm font-medium">
+              Why are you returning this order?
+            </label>
+            <textarea
+              id="return-reason"
+              className="w-full rounded-xl border border-border bg-background/60 px-3 py-2 text-sm min-h-[80px]"
+              placeholder="Tell us what went wrong"
+              value={returnReason}
+              onChange={(e) => setReturnReason(e.target.value)}
+              disabled={submittingReturn}
+            />
+          </div>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={submitReturn}
+              disabled={submittingReturn || returnReason.trim().length < 10}
+              className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm disabled:opacity-50"
+            >
+              {submittingReturn ? "Submitting…" : "Submit return request"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!exchangeItem} onOpenChange={(open) => !open && setExchangeItem(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Exchange {exchangeItem?.product_name ?? "item"}</DialogTitle>
+          </DialogHeader>
+          <ExchangeReplacementPicker
+            product={exchangeProduct}
+            originalSize={exchangeItem?.size}
+            originalColor={exchangeItem?.color}
+            size={exchangeSize}
+            color={exchangeColor}
+            onSizeChange={setExchangeSize}
+            onColorChange={setExchangeColor}
+          />
+          <div className="space-y-1.5">
+            <label htmlFor="exchange-reason" className="text-sm font-medium">
+              Why are you exchanging this item?
+            </label>
+            <textarea
+              id="exchange-reason"
+              className="w-full rounded-xl border border-border bg-background/60 px-3 py-2 text-sm min-h-[80px]"
+              placeholder="Tell us what went wrong"
+              value={exchangeReason}
+              onChange={(e) => setExchangeReason(e.target.value)}
+              disabled={submittingExchange}
+            />
+          </div>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={submitExchange}
+              disabled={submittingExchange || exchangeReason.trim().length < 10 || !exchangeSize || !exchangeColor}
+              className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm disabled:opacity-50"
+            >
+              {submittingExchange ? "Submitting…" : "Submit exchange request"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

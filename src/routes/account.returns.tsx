@@ -5,6 +5,7 @@ import { useAccountData } from "@/lib/account";
 import {
   cancelOrderReturn,
   checkReturnEligibility,
+  getReturnsConfig,
   listMyOrderReturns,
   requestOrderReturn,
   type OrderReturnRow,
@@ -18,16 +19,22 @@ export const Route = createFileRoute("/account/returns")({
   component: ReturnsPage,
 });
 
-// Feature switch: returns & refunds. Flip to false to disable site-wide.
-const RETURNS_REFUNDS_ENABLED = true;
+const TERMINAL_STATUSES = ["rejected", "cancelled", "refunded", "completed"];
 
 function ReturnsPage() {
   const { orders: allOrders, loadingOrders } = useAccountData();
+  const [config, setConfig] = useState<{ enabled: boolean; window_days: number } | null>(null);
   const [returns, setReturns] = useState<OrderReturnRow[]>([]);
   const [loadingReturns, setLoadingReturns] = useState(true);
   const [eligibility, setEligibility] = useState<Record<string, { eligible: boolean; message?: string }>>({});
   const [reasonByOrder, setReasonByOrder] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState<string | null>(null);
+
+  useEffect(() => {
+    void getReturnsConfig()
+      .then(setConfig)
+      .catch(() => setConfig({ enabled: true, window_days: 3 }));
+  }, []);
 
   const paidOrders = useMemo(
     () => (allOrders ?? []).filter((o: { payment_status?: string }) => o.payment_status === "paid"),
@@ -37,7 +44,7 @@ function ReturnsPage() {
   const openReturnByOrder = useMemo(() => {
     const map = new Map<string, OrderReturnRow>();
     for (const r of returns) {
-      if (r.order_number && !["rejected", "cancelled", "refunded"].includes(r.status)) {
+      if (r.order_number && r.request_type === "return" && !TERMINAL_STATUSES.includes(r.status)) {
         map.set(r.order_number, r);
       }
     }
@@ -45,7 +52,7 @@ function ReturnsPage() {
   }, [returns]);
 
   const loadReturns = useCallback(async () => {
-    if (!RETURNS_REFUNDS_ENABLED) {
+    if (config && !config.enabled) {
       setLoadingReturns(false);
       return;
     }
@@ -58,14 +65,14 @@ function ReturnsPage() {
     } finally {
       setLoadingReturns(false);
     }
-  }, []);
+  }, [config]);
 
   useEffect(() => {
     void loadReturns();
   }, [loadReturns]);
 
   useEffect(() => {
-    if (!RETURNS_REFUNDS_ENABLED) return;
+    if (config && !config.enabled) return;
     if (!paidOrders.length) return;
     void (async () => {
       const next: Record<string, { eligible: boolean; message?: string }> = {};
@@ -82,7 +89,7 @@ function ReturnsPage() {
       );
       setEligibility((prev) => ({ ...prev, ...next }));
     })();
-  }, [paidOrders, openReturnByOrder]);
+  }, [paidOrders, openReturnByOrder, config]);
 
   const submitReturn = async (orderNumber: string) => {
     const reason = (reasonByOrder[orderNumber] ?? "").trim();
@@ -116,7 +123,7 @@ function ReturnsPage() {
     }
   };
 
-  if (!RETURNS_REFUNDS_ENABLED) {
+  if (config && !config.enabled) {
     return (
       <div className="space-y-4">
         <div className="glass-strong rounded-[2rem] p-6 md:p-8">
@@ -131,6 +138,8 @@ function ReturnsPage() {
     );
   }
 
+  const windowDays = config?.window_days ?? 3;
+
   return (
     <div className="space-y-4">
       <div className="glass-strong rounded-[2rem] p-6 md:p-8">
@@ -138,7 +147,9 @@ function ReturnsPage() {
           <RotateCcw className="h-6 w-6 text-primary" /> Returns & refunds
         </h1>
         <p className="text-sm text-muted-foreground">
-          Eligible within 7 days of delivery. Refunds reach you in 5–7 business days after we receive the items.
+          Eligible within {windowDays} day{windowDays === 1 ? "" : "s"} of delivery. Exchanges depend on stock
+          availability — if the size you want isn't available, you can convert to a refund instead. Refunds reach
+          you in 5–7 business days after we receive the items.
         </p>
         <div className="mt-4 glass rounded-2xl p-3 inline-flex items-center gap-2 text-xs text-muted-foreground">
           <ShieldCheck className="h-4 w-4 text-primary" /> Free reverse pickup across India.
@@ -146,20 +157,30 @@ function ReturnsPage() {
       </div>
 
       <div className="glass-strong rounded-[2rem] p-6 md:p-8">
-        <h2 className="font-display text-xl mb-4">Your return requests</h2>
+        <h2 className="font-display text-xl mb-4">Your return &amp; exchange requests</h2>
         {loadingReturns && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
         {!loadingReturns && returns.length === 0 && (
-          <div className="text-sm text-muted-foreground">No return requests yet.</div>
+          <div className="text-sm text-muted-foreground">No return or exchange requests yet.</div>
         )}
         <div className="space-y-3">
           {returns.map((r) => (
             <div key={r.return_number} className="glass rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="font-medium">{r.return_number}</div>
+                <div className="font-medium">
+                  {r.request_type === "exchange" ? "Exchange" : "Return"} · {r.return_number}
+                </div>
                 <div className="text-xs text-muted-foreground">
                   {r.order_number} · {new Date(r.requested_at).toLocaleDateString("en-IN")} ·{" "}
-                  <span className="uppercase tracking-wide">{r.status}</span>
+                  <span className="uppercase tracking-wide">{r.status.replace(/_/g, " ")}</span>
                 </div>
+                {r.product_name ? (
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {r.product_name}
+                    {r.replacement_size || r.replacement_color
+                      ? ` → ${[r.replacement_size, r.replacement_color].filter(Boolean).join(" · ")}`
+                      : ""}
+                  </div>
+                ) : null}
                 {r.rejection_reason ? (
                   <p className="text-xs text-amber-700 mt-1">{r.rejection_reason}</p>
                 ) : null}

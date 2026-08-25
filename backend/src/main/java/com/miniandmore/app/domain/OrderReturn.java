@@ -1,6 +1,7 @@
 package com.miniandmore.app.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.miniandmore.app.domain.enumeration.OrderRequestType;
 import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -77,6 +78,28 @@ public class OrderReturn implements Serializable {
     @Size(min = 1, max = 50)
     @Column(name = "user_login", length = 50, nullable = false)
     private String userLogin;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "request_type", length = 16, nullable = false)
+    private OrderRequestType requestType = OrderRequestType.RETURN;
+
+    @ManyToOne
+    @JoinColumn(name = "order_item_id")
+    @JsonIgnoreProperties(value = { "order" }, allowSetters = true)
+    private OrderItem orderItem;
+
+    @Size(max = 120)
+    @Column(name = "replacement_variant_sku", length = 120)
+    private String replacementVariantSku;
+
+    @Size(max = 40)
+    @Column(name = "replacement_size", length = 40)
+    private String replacementSize;
+
+    @Size(max = 40)
+    @Column(name = "replacement_color", length = 40)
+    private String replacementColor;
 
     public Long getId() {
         return id;
@@ -188,5 +211,45 @@ public class OrderReturn implements Serializable {
 
     public void setUserLogin(String userLogin) {
         this.userLogin = userLogin;
+    }
+
+    public OrderRequestType getRequestType() {
+        return requestType;
+    }
+
+    public void setRequestType(OrderRequestType requestType) {
+        this.requestType = requestType;
+    }
+
+    public OrderItem getOrderItem() {
+        return orderItem;
+    }
+
+    public void setOrderItem(OrderItem orderItem) {
+        this.orderItem = orderItem;
+    }
+
+    public String getReplacementVariantSku() {
+        return replacementVariantSku;
+    }
+
+    public void setReplacementVariantSku(String replacementVariantSku) {
+        this.replacementVariantSku = replacementVariantSku;
+    }
+
+    public String getReplacementSize() {
+        return replacementSize;
+    }
+
+    public void setReplacementSize(String replacementSize) {
+        this.replacementSize = replacementSize;
+    }
+
+    public String getReplacementColor() {
+        return replacementColor;
+    }
+
+    public void setReplacementColor(String replacementColor) {
+        this.replacementColor = replacementColor;
     }
 }

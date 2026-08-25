@@ -55,4 +55,38 @@ class OrderReturnsProxyResourceTest {
             .andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/order-returns/eligibility/ORD-1")).andExpect(status().isOk());
     }
+
+    @Test
+    void requestExchange_delegates() throws Exception {
+        when(catalog.post(eq("/internal/v1/order-returns/exchange"), any())).thenReturn(ResponseEntity.ok("{}"));
+
+        mockMvc
+            .perform(
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/order-returns/exchange")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content("{}")
+            )
+            .andExpect(status().isOk());
+        verify(catalog).post(eq("/internal/v1/order-returns/exchange"), any());
+    }
+
+    @Test
+    void checkExchangeAvailability_delegates() throws Exception {
+        when(catalog.get(any())).thenReturn(ResponseEntity.ok("{}"));
+
+        mockMvc
+            .perform(
+                get("/api/v1/order-returns/exchange-availability/5").param("size", "M").param("color", "Blue")
+            )
+            .andExpect(status().isOk());
+        verify(catalog).get("/internal/v1/order-returns/exchange-availability/5?size=M&color=Blue");
+    }
+
+    @Test
+    void config_delegates() throws Exception {
+        when(catalog.get("/internal/v1/order-returns/config")).thenReturn(ResponseEntity.ok("{}"));
+
+        mockMvc.perform(get("/api/v1/order-returns/config")).andExpect(status().isOk());
+        verify(catalog).get("/internal/v1/order-returns/config");
+    }
 }

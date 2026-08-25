@@ -173,6 +173,26 @@ describe("ShopProvider remove dialog", () => {
     expect(screen.getByTestId("wishlist")).toHaveTextContent("p1");
   });
 
+  it("save to wishlist warns when item is already wishlisted", async () => {
+    const { toast } = await import("sonner");
+
+    render(
+      <ShopProvider>
+        <Harness />
+      </ShopProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+    await userEvent.click(screen.getByRole("button", { name: "wish" }));
+    await userEvent.click(screen.getByRole("button", { name: "add" }));
+    await userEvent.click(screen.getByRole("button", { name: "prompt-remove" }));
+    await userEvent.click(screen.getByRole("button", { name: "move-wish" }));
+
+    expect(toast.warning).toHaveBeenCalledWith('"Romper" is already in your wishlist.');
+    expect(screen.getByTestId("count")).toHaveTextContent("0");
+    expect(screen.getByTestId("wishlist")).toHaveTextContent("p1");
+  });
+
   it("updateQty to zero opens remove dialog instead of removing immediately", async () => {
     render(
       <ShopProvider>

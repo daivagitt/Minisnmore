@@ -71,4 +71,5 @@
     <include file="config/liquibase/changelog/20260817120000_add_customer_cart.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260821130000_add_zoho_last_product_pull_at.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260822120000_add_customer_order_cancellation_reason.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260822150000_add_exchange_support_to_order_return.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>

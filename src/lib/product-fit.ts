@@ -1,11 +1,11 @@
 import type { AgeRange } from "@/data/products";
-import { sizeToAgeBand } from "@/lib/product-ages";
+import { normalizeSizeKey, sizeToAgeBand } from "@/lib/product-ages";
 
 export const FIT_LIMITS = {
-  heightMin: 30,
-  heightMax: 120,
-  chestMin: 20,
-  chestMax: 70,
+  heightMin: 45,
+  heightMax: 90,
+  chestMin: 36,
+  chestMax: 54,
   qtyMin: 1,
   qtyMax: 10,
   maxBabyAgeMonths: 36,
@@ -21,6 +21,28 @@ export type BirthDateValidation =
   | { ok: false; error: string };
 
 export type FileValidation = { ok: true } | { ok: false; error: string };
+
+export type MeasurementLimits = {
+  heightMin: number;
+  heightMax: number;
+  chestMin: number;
+  chestMax: number;
+};
+
+type BandMeasurements = MeasurementLimits;
+
+/** Shared size-guide specs (cm) — source of truth for chart + calculator. */
+const BAND_MEASUREMENTS: Record<AgeRange, BandMeasurements> = {
+  "0-3m": { heightMin: 45, heightMax: 58, chestMin: 36, chestMax: 43 },
+  "3-6m": { heightMin: 58, heightMax: 67, chestMin: 43, chestMax: 45 },
+  "6-12m": { heightMin: 67, heightMax: 74, chestMin: 45, chestMax: 48 },
+  "12-18m": { heightMin: 74, heightMax: 82, chestMin: 48, chestMax: 51 },
+  "18-24m": { heightMin: 82, heightMax: 90, chestMin: 51, chestMax: 54 },
+};
+
+function formatCmRange(min: number, max: number): string {
+  return `${min}–${max} cm`;
+}
 
 export function ageMonthsFromBirthDate(dob: string, now = new Date()): number | null {
   const parsed = validateBirthDate(dob, now);
@@ -48,24 +70,34 @@ export function validateBirthDate(dob: string, now = new Date()): BirthDateValid
   return { ok: true, value: trimmed };
 }
 
-export function validateHeightCm(raw: string): FieldValidation {
+export function validateHeightCm(
+  raw: string,
+  limits?: Pick<MeasurementLimits, "heightMin" | "heightMax">,
+): FieldValidation {
   const trimmed = raw.trim();
   if (!trimmed) return { ok: false, error: "Enter height in cm" };
   const value = Number(trimmed);
   if (!Number.isFinite(value)) return { ok: false, error: "Enter a valid height" };
-  if (value < FIT_LIMITS.heightMin || value > FIT_LIMITS.heightMax) {
-    return { ok: false, error: `Height should be ${FIT_LIMITS.heightMin}–${FIT_LIMITS.heightMax} cm` };
+  const min = limits?.heightMin ?? FIT_LIMITS.heightMin;
+  const max = limits?.heightMax ?? FIT_LIMITS.heightMax;
+  if (value < min || value > max) {
+    return { ok: false, error: `Height should be ${min}–${max} cm for this item` };
   }
   return { ok: true, value };
 }
 
-export function validateChestCm(raw: string): FieldValidation | { ok: true; value: number | null } {
+export function validateChestCm(
+  raw: string,
+  limits?: Pick<MeasurementLimits, "chestMin" | "chestMax">,
+): FieldValidation | { ok: true; value: number | null } {
   const trimmed = raw.trim();
   if (!trimmed) return { ok: true, value: null };
   const value = Number(trimmed);
   if (!Number.isFinite(value)) return { ok: false, error: "Enter a valid chest measurement" };
-  if (value < FIT_LIMITS.chestMin || value > FIT_LIMITS.chestMax) {
-    return { ok: false, error: `Chest should be ${FIT_LIMITS.chestMin}–${FIT_LIMITS.chestMax} cm` };
+  const min = limits?.chestMin ?? FIT_LIMITS.chestMin;
+  const max = limits?.chestMax ?? FIT_LIMITS.chestMax;
+  if (value < min || value > max) {
+    return { ok: false, error: `Chest should be ${min}–${max} cm for this item` };
   }
   return { ok: true, value };
 }
@@ -90,29 +122,48 @@ export function validateVirtualFitFile(file: File | null | undefined): FileValid
 }
 
 export function normalizeSizeLabel(size: string): string {
-  return size.trim().toLowerCase();
+  return normalizeSizeKey(size);
 }
 
-export type SizeGuideRow = { size: string; weight: string; height: string };
+export type SizeGuideRow = { size: string; height: string; chest: string };
 
-const SIZE_GUIDE_BY_BAND: Record<AgeRange, { weight: string; height: string }> = {
-  "0-3m": { weight: "2.5–5 kg", height: "45–58 cm" },
-  "3-6m": { weight: "5–7 kg", height: "58–67 cm" },
-  "6-12m": { weight: "7–9 kg", height: "67–74 cm" },
-  "12-18m": { weight: "9–11 kg", height: "74–82 cm" },
-  "18-24m": { weight: "11–13 kg", height: "82–90 cm" },
-};
-
-/** Weight/height guide rows for the sizes this product actually carries. */
+/** Height/chest guide rows for the sizes this product actually carries. */
 export function sizeGuideRowsForProduct(sizes: string[]): SizeGuideRow[] {
   return sizes.map((size) => {
     const band = sizeToAgeBand(size);
     if (band) {
-      const guide = SIZE_GUIDE_BY_BAND[band];
-      return { size, weight: guide.weight, height: guide.height };
+      const m = BAND_MEASUREMENTS[band];
+      return {
+        size,
+        height: formatCmRange(m.heightMin, m.heightMax),
+        chest: formatCmRange(m.chestMin, m.chestMax),
+      };
     }
-    return { size, weight: "—", height: "—" };
+    return { size, height: "—", chest: "—" };
   });
+}
+
+/** Allowed height/chest window from the product's SKU age bands. */
+export function measurementLimitsForSizes(sizes: string[]): MeasurementLimits | null {
+  let heightMin = Number.POSITIVE_INFINITY;
+  let heightMax = Number.NEGATIVE_INFINITY;
+  let chestMin = Number.POSITIVE_INFINITY;
+  let chestMax = Number.NEGATIVE_INFINITY;
+  let found = false;
+
+  for (const size of sizes) {
+    const band = sizeToAgeBand(size);
+    if (!band) continue;
+    found = true;
+    const m = BAND_MEASUREMENTS[band];
+    heightMin = Math.min(heightMin, m.heightMin);
+    heightMax = Math.max(heightMax, m.heightMax);
+    chestMin = Math.min(chestMin, m.chestMin);
+    chestMax = Math.max(chestMax, m.chestMax);
+  }
+
+  if (!found) return null;
+  return { heightMin, heightMax, chestMin, chestMax };
 }
 
 /** Match a canonical band (e.g. 0-3m) to the product's size string (e.g. 0-3M). */
@@ -121,24 +172,40 @@ export function matchProductSize(label: string, sizes: string[]): string | null 
   return sizes.find((s) => normalizeSizeLabel(s) === norm) ?? null;
 }
 
-export function recommendSizeByHeight(height: number, sizes: string[]): string {
-  let label: string;
-  if (height < 58) label = "0-3m";
-  else if (height < 67) label = "3-6m";
-  else if (height < 74) label = "6-12m";
-  else if (height < 82) label = "12-18m";
-  else label = "18-24m";
-  return matchProductSize(label, sizes) ?? sizes[sizes.length - 1] ?? label;
+function sizesWithAgeBands(sizes: string[]): string[] {
+  return sizes.filter((s) => sizeToAgeBand(s) != null);
 }
 
-export function recommendSizeByChest(chest: number, sizes: string[]): string {
-  let label: string;
-  if (chest < 43) label = "0-3m";
-  else if (chest < 45) label = "3-6m";
-  else if (chest < 48) label = "6-12m";
-  else if (chest < 51) label = "12-18m";
-  else label = "18-24m";
-  return matchProductSize(label, sizes) ?? sizes[sizes.length - 1] ?? label;
+function recommendAmongMatchingBands(
+  sizes: string[],
+  matches: (band: AgeRange) => boolean,
+): string | null {
+  const bandSizes = sizesWithAgeBands(sizes);
+  if (bandSizes.length === 0) return sizes[0] ?? null;
+
+  const matched = bandSizes.filter((size) => {
+    const band = sizeToAgeBand(size);
+    return band != null && matches(band);
+  });
+  if (matched.length === 0) return null;
+
+  return matched.reduce((best, size) => pickLargerSize(best, size, sizes));
+}
+
+/** Recommend from this item's sizes only, using the shared height guide ranges. */
+export function recommendSizeByHeight(height: number, sizes: string[]): string | null {
+  return recommendAmongMatchingBands(sizes, (band) => {
+    const m = BAND_MEASUREMENTS[band];
+    return height >= m.heightMin && height <= m.heightMax;
+  });
+}
+
+/** Recommend from this item's sizes only, using the shared chest guide ranges. */
+export function recommendSizeByChest(chest: number, sizes: string[]): string | null {
+  return recommendAmongMatchingBands(sizes, (band) => {
+    const m = BAND_MEASUREMENTS[band];
+    return chest >= m.chestMin && chest <= m.chestMax;
+  });
 }
 
 function sizeBandIndex(label: string, sizes: string[]): number {
@@ -157,30 +224,87 @@ export type SizeFitResult =
   | { ok: false; error: string };
 
 export function checkSizeFit(input: {
-  heightCm: string;
+  heightCm?: string;
   chestCm?: string;
   sizes: string[];
 }): SizeFitResult {
-  const height = validateHeightCm(input.heightCm);
-  if (!height.ok) return { ok: false, error: height.error };
-  const chest = validateChestCm(input.chestCm ?? "");
-  if (!chest.ok) return { ok: false, error: chest.error };
-
-  let size = recommendSizeByHeight(height.value, input.sizes);
-  if (chest.value !== null) {
-    size = pickLargerSize(size, recommendSizeByChest(chest.value, input.sizes), input.sizes);
+  const heightRaw = input.heightCm?.trim() ?? "";
+  const chestRaw = input.chestCm?.trim() ?? "";
+  if (!heightRaw && !chestRaw) {
+    return { ok: false, error: "Enter height or chest measurement" };
   }
-  return { ok: true, size };
+
+  const limits = measurementLimitsForSizes(input.sizes) ?? {
+    heightMin: FIT_LIMITS.heightMin,
+    heightMax: FIT_LIMITS.heightMax,
+    chestMin: FIT_LIMITS.chestMin,
+    chestMax: FIT_LIMITS.chestMax,
+  };
+
+  let fromHeight: string | null = null;
+  let fromChest: string | null = null;
+
+  if (heightRaw) {
+    const height = validateHeightCm(heightRaw, limits);
+    if (!height.ok) return { ok: false, error: height.error };
+    fromHeight = recommendSizeByHeight(height.value, input.sizes);
+    if (!fromHeight) {
+      return {
+        ok: false,
+        error: `No size on this item for height ${height.value} cm (${limits.heightMin}–${limits.heightMax} cm)`,
+      };
+    }
+  }
+
+  if (chestRaw) {
+    const chest = validateChestCm(chestRaw, limits);
+    if (!chest.ok) return { ok: false, error: chest.error };
+    if (chest.value === null) {
+      return { ok: false, error: "Enter a valid chest measurement" };
+    }
+    fromChest = recommendSizeByChest(chest.value, input.sizes);
+    if (!fromChest) {
+      return {
+        ok: false,
+        error: `No size on this item for chest ${chest.value} cm (${limits.chestMin}–${limits.chestMax} cm)`,
+      };
+    }
+  }
+
+  if (fromHeight && fromChest) {
+    return { ok: true, size: pickLargerSize(fromHeight, fromChest, input.sizes) };
+  }
+  return { ok: true, size: (fromHeight ?? fromChest)! };
 }
 
-export function recommendSizeByAgeMonths(months: number, sizes: string[]): string {
-  let label: string;
+export function recommendSizeByAgeMonths(months: number, sizes: string[]): string | null {
+  let label: AgeRange;
   if (months < 3) label = "0-3m";
   else if (months < 6) label = "3-6m";
   else if (months < 12) label = "6-12m";
   else if (months < 18) label = "12-18m";
   else label = "18-24m";
-  return matchProductSize(label, sizes) ?? sizes[sizes.length - 1] ?? label;
+
+  const matched = matchProductSize(label, sizes);
+  if (matched) return matched;
+
+  // Prefer nearest roomier available SKU size; otherwise nearest smaller.
+  const bandSizes = sizesWithAgeBands(sizes);
+  if (bandSizes.length === 0) return sizes[0] ?? null;
+
+  const targetIdx = sizeBandIndex(label, ["0-3m", "3-6m", "6-12m", "12-18m", "18-24m"]);
+  let best: string | null = null;
+  let bestDist = Number.POSITIVE_INFINITY;
+  for (const size of bandSizes) {
+    const band = sizeToAgeBand(size)!;
+    const idx = sizeBandIndex(band, ["0-3m", "3-6m", "6-12m", "12-18m", "18-24m"]);
+    const dist = Math.abs(idx - targetIdx);
+    if (dist < bestDist || (dist === bestDist && best != null && pickLargerSize(best, size, sizes) === size)) {
+      best = size;
+      bestDist = dist;
+    }
+  }
+  return best;
 }
 
 export function resolveRecommendedSize(input: {
@@ -189,9 +313,10 @@ export function resolveRecommendedSize(input: {
   sizes: string[];
   now?: Date;
 }): string | null {
+  const limits = measurementLimitsForSizes(input.sizes) ?? undefined;
   const heightRaw = input.heightCm?.trim() ?? "";
   if (heightRaw) {
-    const height = validateHeightCm(heightRaw);
+    const height = validateHeightCm(heightRaw, limits);
     if (height.ok) return recommendSizeByHeight(height.value, input.sizes);
   }
   const dob = input.birthDate?.trim() ?? "";

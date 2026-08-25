@@ -14,11 +14,16 @@
       color: #4a3f45;
     "
   >
-    <span
-      style="display: none !important; visibility: hidden; opacity: 0; color: transparent; height: 0; width: 0; overflow: hidden; mso-hide: all;"
-      th:text="${returnStatus} == 'requested' ? #{email.order.return.requested.preheader(${orderNumber})} : (${returnStatus} == 'approved' ? #{email.order.return.approved.preheader(${orderNumber})} : (${returnStatus} == 'rejected' ? #{email.order.return.rejected.preheader(${orderNumber})} : (${returnStatus} == 'refunded' ? #{email.order.return.refunded.preheader(${orderNumber})} : #{email.order.return.cancelled.preheader(${orderNumber})})))"
-      >A return update for your order.</span
-    >
+    <span style="display: none !important; visibility: hidden; opacity: 0; color: transparent; height: 0; width: 0; overflow: hidden; mso-hide: all;">
+      <th:block th:if="${returnStatus} == 'requested'" th:text="#{email.order.return.requested.preheader(${orderNumber})}">A return update for your order.</th:block>
+      <th:block th:if="${returnStatus} == 'approved'" th:text="#{email.order.return.approved.preheader(${orderNumber})}">A return update for your order.</th:block>
+      <th:block th:if="${returnStatus} == 'rejected'" th:text="#{email.order.return.rejected.preheader(${orderNumber})}">A return update for your order.</th:block>
+      <th:block th:if="${returnStatus} == 'refunded'" th:text="#{email.order.return.refunded.preheader(${orderNumber})}">A return update for your order.</th:block>
+      <th:block th:if="${returnStatus} == 'cancelled'" th:text="#{email.order.return.cancelled.preheader(${orderNumber})}">A return update for your order.</th:block>
+      <th:block th:if="${returnStatus} == 'received'" th:text="#{email.order.return.received.preheader(${orderNumber})}">A return update for your order.</th:block>
+      <th:block th:if="${returnStatus} == 'pickup_requested'" th:text="#{email.order.return.pickup_requested.preheader(${orderNumber})}">A return update for your order.</th:block>
+      <th:block th:if="${returnStatus} == 'failed'" th:text="#{email.order.return.failed.preheader(${orderNumber})}">A return update for your order.</th:block>
+    </span>
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4eff1; padding: 24px 12px;">
       <tr>
         <td align="center">
@@ -61,6 +66,8 @@
                   <span th:if="${returnStatus} == 'refunded'" th:text="#{email.order.return.refunded.headline}">Refund processed</span>
                   <span th:if="${returnStatus} == 'cancelled'" th:text="#{email.order.return.cancelled.headline}">Return request cancelled</span>
                   <span th:if="${returnStatus} == 'received'" th:text="#{email.order.return.received.headline}">Return received</span>
+                  <span th:if="${returnStatus} == 'pickup_requested'" th:text="#{email.order.return.pickup_requested.headline}">Pickup scheduled</span>
+                  <span th:if="${returnStatus} == 'failed'" th:text="#{email.order.return.failed.headline}">Refund could not be processed</span>
                 </p>
                 <p style="margin: 8px 0 0;">
                   <span th:if="${returnStatus} == 'requested'" th:text="#{email.order.return.requested.intro(${orderNumber}, ${returnNumber})}">
@@ -80,6 +87,15 @@
                   </span>
                   <span th:if="${returnStatus} == 'received'" th:text="#{email.order.return.received.intro(${orderNumber}, ${returnNumber})}">
                     We have received your returned items.
+                  </span>
+                  <span
+                    th:if="${returnStatus} == 'pickup_requested'"
+                    th:text="#{email.order.return.pickup_requested.intro(${orderNumber}, ${returnNumber})}"
+                  >
+                    Pickup has been scheduled.
+                  </span>
+                  <span th:if="${returnStatus} == 'failed'" th:text="#{email.order.return.failed.intro(${orderNumber}, ${returnNumber})}">
+                    We were unable to process your refund.
                   </span>
                 </p>
               </td>

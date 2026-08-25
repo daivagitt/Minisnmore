@@ -434,7 +434,6 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       <RemoveFromCartDialog
         open={pendingRemove != null}
         productName={pendingRemove?.productName ?? ""}
-        alreadyInWishlist={pendingRemove != null && wishlist.includes(String(pendingRemove.id))}
         onOpenChange={(open) => {
           if (!open) setPendingRemove(null);
         }}

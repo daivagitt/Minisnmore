@@ -79,7 +79,7 @@ public class OrderMailService {
     }
 
     public void sendReturnUpdate(CustomerOrder order, OrderReturn orderReturn) {
-        if (orderReturn == null || orderReturn.getStatus() == OrderReturnStatus.FAILED) {
+        if (orderReturn == null) {
             return;
         }
         String statusKey = returnStatusKey(orderReturn.getStatus());
