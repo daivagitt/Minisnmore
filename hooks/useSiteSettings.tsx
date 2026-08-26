@@ -6,6 +6,7 @@ export type SiteSettings = {
   legal_entity_name: string | null;
   logo_url: string | null;
   logo_horizontal_url: string | null;
+  invoice_logo_url: string | null;
   contact_email: string | null;
   contact_phone: string | null;
   care_label: string | null;
@@ -52,6 +53,7 @@ const DEFAULTS: SiteSettings = {
   legal_entity_name: "Stolt Global Private Limited",
   logo_url: null,
   logo_horizontal_url: null,
+  invoice_logo_url: null,
   contact_email: "care@minisnmore.com",
   contact_phone: "+91 76765 25139",
   care_label: "Care",

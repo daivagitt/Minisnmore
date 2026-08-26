@@ -65,8 +65,8 @@ import { Route as AccountOrdersIndexRouteImport } from './routes/account.orders.
 import { Route as AdminIntegrationsLedgerlyRouteImport } from './routes/admin.integrations.ledgerly'
 import { Route as AccountResetFinishRouteImport } from './routes/account.reset.finish'
 import { Route as AccountOrdersOrderNumberRouteImport } from './routes/account.orders.$orderNumber'
-import { Route as AccountOrdersOrderNumberInvoiceRouteImport } from './routes/account.orders.$orderNumber_.invoice'
 import { Route as AdminOrdersOrderNumberInvoiceRouteImport } from './routes/admin.orders_.$orderNumber.invoice'
+import { Route as AccountOrdersOrderNumberInvoiceRouteImport } from './routes/account.orders.$orderNumber_.invoice'
 
 const WishlistRoute = WishlistRouteImport.update({
   id: '/wishlist',
@@ -350,17 +350,17 @@ const AccountOrdersOrderNumberRoute =
     path: '/$orderNumber',
     getParentRoute: () => AccountOrdersRoute,
   } as any)
-const AccountOrdersOrderNumberInvoiceRoute =
-  AccountOrdersOrderNumberInvoiceRouteImport.update({
-    id: '/$orderNumber_/invoice',
-    path: '/$orderNumber/invoice',
-    getParentRoute: () => AccountOrdersRoute,
-  } as any)
 const AdminOrdersOrderNumberInvoiceRoute =
   AdminOrdersOrderNumberInvoiceRouteImport.update({
     id: '/orders_/$orderNumber/invoice',
     path: '/orders/$orderNumber/invoice',
     getParentRoute: () => AdminRoute,
+  } as any)
+const AccountOrdersOrderNumberInvoiceRoute =
+  AccountOrdersOrderNumberInvoiceRouteImport.update({
+    id: '/$orderNumber_/invoice',
+    path: '/$orderNumber/invoice',
+    getParentRoute: () => AccountOrdersRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -537,8 +537,8 @@ export interface FileRoutesById {
   '/account/reset/finish': typeof AccountResetFinishRoute
   '/admin/integrations/ledgerly': typeof AdminIntegrationsLedgerlyRoute
   '/account/orders/': typeof AccountOrdersIndexRoute
-  '/account/orders/$orderNumber/invoice': typeof AccountOrdersOrderNumberInvoiceRoute
-  '/admin/orders/$orderNumber/invoice': typeof AdminOrdersOrderNumberInvoiceRoute
+  '/account/orders/$orderNumber_/invoice': typeof AccountOrdersOrderNumberInvoiceRoute
+  '/admin/orders_/$orderNumber/invoice': typeof AdminOrdersOrderNumberInvoiceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -715,8 +715,8 @@ export interface FileRouteTypes {
     | '/account/reset/finish'
     | '/admin/integrations/ledgerly'
     | '/account/orders/'
-    | '/account/orders/$orderNumber/invoice'
-    | '/admin/orders/$orderNumber/invoice'
+    | '/account/orders/$orderNumber_/invoice'
+    | '/admin/orders_/$orderNumber/invoice'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1139,33 +1139,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountOrdersOrderNumberRouteImport
       parentRoute: typeof AccountOrdersRoute
     }
-    '/account/orders/$orderNumber/invoice': {
-      id: '/account/orders/$orderNumber_/invoice'
-      path: '/$orderNumber/invoice'
-      fullPath: '/account/orders/$orderNumber/invoice'
-      preLoaderRoute: typeof AccountOrdersOrderNumberInvoiceRouteImport
-      parentRoute: typeof AccountOrdersRoute
-    }
-    '/admin/orders/$orderNumber/invoice': {
+    '/admin/orders_/$orderNumber/invoice': {
       id: '/admin/orders_/$orderNumber/invoice'
       path: '/orders/$orderNumber/invoice'
       fullPath: '/admin/orders/$orderNumber/invoice'
       preLoaderRoute: typeof AdminOrdersOrderNumberInvoiceRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/account/orders/$orderNumber_/invoice': {
+      id: '/account/orders/$orderNumber_/invoice'
+      path: '/$orderNumber/invoice'
+      fullPath: '/account/orders/$orderNumber/invoice'
+      preLoaderRoute: typeof AccountOrdersOrderNumberInvoiceRouteImport
+      parentRoute: typeof AccountOrdersRoute
+    }
   }
 }
 
 interface AccountOrdersRouteChildren {
   AccountOrdersOrderNumberRoute: typeof AccountOrdersOrderNumberRoute
-  AccountOrdersOrderNumberInvoiceRoute: typeof AccountOrdersOrderNumberInvoiceRoute
   AccountOrdersIndexRoute: typeof AccountOrdersIndexRoute
+  AccountOrdersOrderNumberInvoiceRoute: typeof AccountOrdersOrderNumberInvoiceRoute
 }
 
 const AccountOrdersRouteChildren: AccountOrdersRouteChildren = {
   AccountOrdersOrderNumberRoute: AccountOrdersOrderNumberRoute,
-  AccountOrdersOrderNumberInvoiceRoute: AccountOrdersOrderNumberInvoiceRoute,
   AccountOrdersIndexRoute: AccountOrdersIndexRoute,
+  AccountOrdersOrderNumberInvoiceRoute: AccountOrdersOrderNumberInvoiceRoute,
 }
 
 const AccountOrdersRouteWithChildren = AccountOrdersRoute._addFileChildren(
@@ -1214,7 +1214,6 @@ interface AdminRouteChildren {
   AdminInvoicesRoute: typeof AdminInvoicesRoute
   AdminLoginRoute: typeof AdminLoginRoute
   AdminOrdersRoute: typeof AdminOrdersRoute
-  AdminOrdersOrderNumberInvoiceRoute: typeof AdminOrdersOrderNumberInvoiceRoute
   AdminPagesRoute: typeof AdminPagesRoute
   AdminPoliciesRoute: typeof AdminPoliciesRoute
   AdminProductsRoute: typeof AdminProductsRoute
@@ -1224,6 +1223,7 @@ interface AdminRouteChildren {
   AdminZohoRoute: typeof AdminZohoRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminIntegrationsLedgerlyRoute: typeof AdminIntegrationsLedgerlyRoute
+  AdminOrdersOrderNumberInvoiceRoute: typeof AdminOrdersOrderNumberInvoiceRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -1235,7 +1235,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminInvoicesRoute: AdminInvoicesRoute,
   AdminLoginRoute: AdminLoginRoute,
   AdminOrdersRoute: AdminOrdersRoute,
-  AdminOrdersOrderNumberInvoiceRoute: AdminOrdersOrderNumberInvoiceRoute,
   AdminPagesRoute: AdminPagesRoute,
   AdminPoliciesRoute: AdminPoliciesRoute,
   AdminProductsRoute: AdminProductsRoute,
@@ -1245,6 +1244,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminZohoRoute: AdminZohoRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminIntegrationsLedgerlyRoute: AdminIntegrationsLedgerlyRoute,
+  AdminOrdersOrderNumberInvoiceRoute: AdminOrdersOrderNumberInvoiceRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)

@@ -4,7 +4,7 @@ import { InvoiceViewer } from "@/components/InvoiceViewer";
 import { getAdminOrder } from "@/lib/orders.functions";
 import type { InvoiceOrder } from "@/lib/invoice-breakdown";
 
-export const Route = createFileRoute("/admin/orders/$orderNumber/invoice")({
+export const Route = createFileRoute("/admin/orders_/$orderNumber/invoice")({
   head: ({ params }) => ({ meta: [{ title: `Invoice ${params.orderNumber} · Mini's n More` }] }),
   component: AdminOrderInvoicePage,
 });
