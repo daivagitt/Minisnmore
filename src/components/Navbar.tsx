@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Heart, ShoppingBag, Search, Menu, X, User, ArrowRight, Sparkles, Star, Flame } from "lucide-react";
 import { useState, useEffect, useRef, useMemo, useId } from "react";
 import { useShop } from "@/store/shop";
-import { useProducts } from "@/hooks/useProducts";
-import { wishlistCountForProducts } from "@/lib/wishlist";
+import { useProducts, useProductsLoaded } from "@/hooks/useProducts";
+import { wishlistCountForProducts, normalizeWishlistIds } from "@/lib/wishlist";
 import { usePageVisibility } from "@/hooks/usePageVisibility";
 import { useCategories, type Category } from "@/hooks/useCategories";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -35,10 +35,11 @@ export function Navbar() {
   const { isVisible } = usePageVisibility();
   const categories = useCategories();
   const products = useProducts();
-  const wishlistCount = useMemo(
-    () => wishlistCountForProducts(wishlist, products.map((p) => p.id)),
-    [wishlist, products],
-  );
+  const productsLoaded = useProductsLoaded();
+  const wishlistCount = useMemo(() => {
+    if (!productsLoaded) return normalizeWishlistIds(wishlist).length;
+    return wishlistCountForProducts(wishlist, products.map((p) => p.id));
+  }, [wishlist, products, productsLoaded]);
   const settings = useSiteSettings();
   const { user } = useAuth();
   const profileTo = user ? "/account" : "/login";
@@ -126,13 +127,13 @@ export function Navbar() {
               window.scrollTo({ top: 0, behavior: "smooth" });
             }
           }}
-          className="flex items-center group shrink-0 mr-4 md:mr-6 gap-3 md:gap-4"
+          className="flex items-center group shrink-0 mr-2 sm:mr-4 md:mr-6 gap-2 sm:gap-3 md:gap-4"
           aria-label={`${settings.brand_name} — home`}
         >
           <img
             src={logo}
             alt={settings.brand_name}
-            className="h-8 sm:h-9 md:h-10 lg:h-11 w-auto object-contain transition-transform duration-500 group-hover:scale-[1.02]"
+            className="h-7 sm:h-9 md:h-10 lg:h-11 w-auto max-w-[9.5rem] sm:max-w-none object-contain transition-transform duration-500 group-hover:scale-[1.02]"
             loading="eager"
             decoding="async"
           />
@@ -202,22 +203,23 @@ export function Navbar() {
           })}
         </nav>
 
-        <div className="flex items-center gap-1 sm:gap-2">
-          <button onClick={() => setSearchOpen(true)} title="Search" className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/40 transition" aria-label="Search">
+        <div className="flex items-center gap-0.5 sm:gap-1.5 md:gap-2 shrink-0">
+          {/* Search stays in the hamburger on the narrowest phones to avoid icon crowding */}
+          <button onClick={() => setSearchOpen(true)} title="Search" className="hidden sm:grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-full hover:bg-white/40 transition" aria-label="Search">
             <Search className="h-4.5 w-4.5" />
           </button>
           <Link
             to={profileTo}
             title={profileLabel}
             onClick={() => setOpen(false)}
-            className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/40 transition"
+            className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-full hover:bg-white/40 transition"
             aria-label={profileLabel}
           >
-            <User className="h-5 w-5" strokeWidth={1.6} />
+            <User className="h-4.5 w-4.5 sm:h-5 sm:w-5" strokeWidth={1.6} />
           </Link>
-           <Link to={user ? "/wishlist" : "/login"} title="Wishlist" className="relative h-10 w-10 grid place-items-center rounded-full hover:bg-white/40 transition" aria-label="Wishlist">
+           <Link to={user ? "/wishlist" : "/login"} title="Wishlist" className="relative h-9 w-9 sm:h-10 sm:w-10 grid place-items-center rounded-full hover:bg-white/40 transition" aria-label="Wishlist">
              <span className="relative">
-               <Heart className="h-5 w-5" strokeWidth={1.6} />
+               <Heart className="h-4.5 w-4.5 sm:h-5 sm:w-5" strokeWidth={1.6} />
                {wishlistCount > 0 && (
                  <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-bold grid place-items-center">{wishlistCount}</span>
                )}
@@ -227,10 +229,10 @@ export function Navbar() {
             onClick={() => setCartOpen(true)}
             onContextMenu={(e) => e.preventDefault()}
             title="Bag"
-            className="relative h-10 w-10 grid place-items-center rounded-full hover:bg-white/40 transition"
+            className="relative h-9 w-9 sm:h-10 sm:w-10 grid place-items-center rounded-full hover:bg-white/40 transition"
             aria-label="Bag">
             <span className="relative">
-              <ShoppingBag className="h-5 w-5" strokeWidth={1.6} />
+              <ShoppingBag className="h-4.5 w-4.5 sm:h-5 sm:w-5" strokeWidth={1.6} />
               {cartCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-bold grid place-items-center">{cartCount}</span>
               )}

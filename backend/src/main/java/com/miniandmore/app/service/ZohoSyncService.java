@@ -39,6 +39,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientResponseException;
@@ -2525,6 +2526,7 @@ public class ZohoSyncService {
         return builder.build().toMap();
     }
 
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Optional<String> createCreditNote(Long orderId, String returnNumber) {
         Optional<CustomerOrder> orderOpt = customerOrderRepository.findById(orderId);
         if (orderOpt.isEmpty()) {

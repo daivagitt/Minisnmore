@@ -33,13 +33,13 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
           </div>
         </Link>
 
-        <div className="absolute top-5 right-5 flex flex-col items-end gap-2 transition-all duration-500">
+        <div className="absolute top-3 right-3 md:top-5 md:right-5 flex flex-col items-end gap-1.5 md:gap-2 transition-all duration-500">
           <button onClick={handleWishlistClick}
             aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
             aria-pressed={wished}
-            className={`glass-strong inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] hover:scale-105 active:scale-95 transition ${wished ? "text-primary bg-primary/15" : ""}`}>
+            className={`glass-strong inline-flex items-center gap-1.5 rounded-full h-9 w-9 md:h-auto md:w-auto justify-center md:px-3 md:py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] hover:scale-105 active:scale-95 transition ${wished ? "text-primary bg-primary/15" : ""}`}>
             <Heart className={`h-3.5 w-3.5 transition-transform ${wished ? "fill-primary scale-110" : ""}`} />
-            <span>{wished ? "Saved" : "Wishlist"}</span>
+            <span className="hidden md:inline">{wished ? "Saved" : "Wishlist"}</span>
           </button>
           <button onClick={(e) => { e.preventDefault(); setQuickView(product); }}
             className="glass-strong h-9 w-9 grid place-items-center rounded-full hover:scale-110 transition" aria-label="Quick view">

@@ -908,17 +908,17 @@ function Checkout() {
           </motion.div>
         </AnimatePresence>
 
-        <div className="mt-8 flex justify-end">
+        <div className="mt-8 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
           {step < steps.length - 1 ? (
             <button
               onClick={next}
               disabled={shippingContinueDisabled}
-              className="rounded-full bg-primary text-primary-foreground px-6 py-3 font-medium hover:shadow-glow transition disabled:opacity-50 disabled:pointer-events-none"
+              className="w-full sm:w-auto rounded-full bg-primary text-primary-foreground px-6 py-3.5 sm:py-3 font-medium hover:shadow-glow transition disabled:opacity-50 disabled:pointer-events-none"
             >
               Continue
             </button>
           ) : (
-            <button onClick={place} disabled={cart.length === 0 || busy} className="rounded-full bg-primary text-primary-foreground px-6 py-3 font-medium hover:shadow-glow transition disabled:opacity-50 inline-flex items-center gap-2">
+            <button onClick={place} disabled={cart.length === 0 || busy} className="w-full sm:w-auto rounded-full bg-primary text-primary-foreground px-6 py-3.5 sm:py-3 font-medium hover:shadow-glow transition disabled:opacity-50 inline-flex items-center justify-center gap-2">
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
               {busy
                 ? (payMethod === "cod" ? "Placing order…" : "Starting payment…")

@@ -771,10 +771,11 @@ function HeroCarousel({
       </motion.a>
 
       {/* Top-left WELCOME10 promo — visible on SSR + all breakpoints */}
-      <div className="absolute top-4 left-4 md:top-6 md:left-6 z-30 inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-3 py-1.5 md:px-4 md:py-2 shadow-glow pointer-events-none">
+      <div className="absolute top-4 left-4 right-4 md:top-6 md:left-6 md:right-auto z-30 inline-flex max-w-[min(100%,20rem)] md:max-w-none items-center gap-2 rounded-full bg-primary text-primary-foreground px-3 py-1.5 md:px-4 md:py-2 shadow-glow pointer-events-none">
         <BadgePercent className="h-3.5 w-3.5 md:h-4 md:w-4 shrink-0" aria-hidden />
-        <span className="text-[10px] md:text-[11px] uppercase tracking-[0.22em] font-medium whitespace-nowrap">
-          WELCOME10 · 10% off your first order
+        <span className="text-[10px] md:text-[11px] uppercase tracking-[0.18em] md:tracking-[0.22em] font-medium leading-snug">
+          <span className="sm:hidden">WELCOME10 · 10% off</span>
+          <span className="hidden sm:inline">WELCOME10 · 10% off your first order</span>
         </span>
       </div>
 

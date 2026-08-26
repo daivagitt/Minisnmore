@@ -7,14 +7,13 @@ import {
   Leaf,
   Linkedin,
   Mail,
-  MessageCircle,
   Phone,
   Youtube,
 } from "lucide-react";
 import { useCategories } from "@/hooks/useCategories";
 import { usePageVisibility } from "@/hooks/usePageVisibility";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
-import { toDirectDownloadUrl } from "@/lib/utils";
+import { resolveContactEmail, toDirectDownloadUrl } from "@/lib/utils";
 import footerLogo from "@/assets/logo-footer.png";
 
 const defaultFooterTagline =
@@ -114,6 +113,25 @@ function socialHref(url: string | null | undefined) {
   return trimmed ? trimmed : null;
 }
 
+const FOOTER_CONTACT_VALUE_LINK =
+  "hover:text-foreground transition-colors cursor-pointer underline-offset-2 hover:underline";
+
+function FooterContactValueLink({
+  href,
+  children,
+  ariaLabel,
+}: {
+  href: string;
+  children: ReactNode;
+  ariaLabel?: string;
+}) {
+  return (
+    <a href={href} className={FOOTER_CONTACT_VALUE_LINK} aria-label={ariaLabel}>
+      {children}
+    </a>
+  );
+}
+
 function SocialIconLink({
   href,
   label,
@@ -164,9 +182,8 @@ export function Footer() {
   const shopRowCount = Math.max(shopColLeft.length, shopColRight.length);
   const logo = settings.logo_url || footerLogo;
   const tagline = settings.footer_tagline || defaultFooterTagline;
-  const waHref = settings.whatsapp_number
-    ? `https://wa.me/${settings.whatsapp_number.replace(/[^\d]/g, "")}`
-    : null;
+  const contactEmail = settings.contact_email ? resolveContactEmail(settings.contact_email) : null;
+  const mailtoHref = contactEmail ? `mailto:${contactEmail}` : null;
 
   return (
     <footer className="relative mt-10">
@@ -206,20 +223,20 @@ export function Footer() {
               {settings.contact_phone ? (
                 <div>
                   {settings.care_label || "Care"} Number:{" "}
-                  <a
+                  <FooterContactValueLink
                     href={`tel:${settings.contact_phone.replace(/\s+/g, "")}`}
-                    className="hover:text-foreground"
+                    ariaLabel={`Call ${settings.contact_phone}`}
                   >
                     {settings.contact_phone}
-                  </a>
+                  </FooterContactValueLink>
                 </div>
               ) : null}
-              {settings.contact_email ? (
+              {contactEmail && mailtoHref ? (
                 <div>
                   Email:{" "}
-                  <a href={`mailto:${settings.contact_email}`} className="hover:text-foreground">
-                    {settings.contact_email}
-                  </a>
+                  <FooterContactValueLink href={mailtoHref} ariaLabel={`Email ${contactEmail}`}>
+                    {contactEmail}
+                  </FooterContactValueLink>
                 </div>
               ) : null}
             </div>
@@ -315,9 +332,9 @@ export function Footer() {
               </FooterColumn>
 
 
-          <div className="sm:col-span-2 lg:col-span-4 lg:col-start-2 lg:row-start-2 flex items-center flex-nowrap w-fit max-w-full gap-2">
+          <div className="sm:col-span-2 lg:col-span-4 lg:col-start-2 lg:row-start-2 flex flex-wrap items-center w-full max-w-full gap-x-2 gap-y-2">
               <FooterSubheading>Follow us</FooterSubheading>
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-1.5">
                 <SocialIconLink href={socialHref(settings.instagram_url)} label="Instagram">
                   <Instagram className="h-4 w-4" />
                 </SocialIconLink>
@@ -331,13 +348,14 @@ export function Footer() {
                   <Youtube className="h-4 w-4" />
                 </SocialIconLink>
               </div>
-              <div className="flex items-center gap-2 shrink-0 ml-2 pl-2 border-l border-border/40">
+              <div className="flex flex-wrap items-center gap-2 sm:ml-2 sm:pl-2 sm:border-l border-border/40">
                 <FooterSubheading>Contact us</FooterSubheading>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {settings.contact_email ? (
+                <div className="flex items-center gap-1.5">
+                  {mailtoHref ? (
                     <a
-                      href={`mailto:${settings.contact_email}`}
-                      aria-label="Email"
+                      href={mailtoHref}
+                      aria-label={`Email ${contactEmail}`}
+                      title={contactEmail ?? undefined}
                       className="h-9 w-9 shrink-0 grid place-items-center rounded-full bg-primary text-primary-foreground shadow-sm hover:scale-110 hover:shadow-md transition"
                     >
                       <Mail className="h-4 w-4" />
@@ -350,17 +368,6 @@ export function Footer() {
                       className="h-9 w-9 shrink-0 grid place-items-center rounded-full bg-primary text-primary-foreground shadow-sm hover:scale-110 hover:shadow-md transition"
                     >
                       <Phone className="h-4 w-4" />
-                    </a>
-                  ) : null}
-                  {waHref ? (
-                    <a
-                      href={waHref}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label="WhatsApp"
-                      className="h-9 w-9 shrink-0 grid place-items-center rounded-full bg-[#25D366] text-white shadow-sm hover:scale-110 hover:shadow-md transition"
-                    >
-                      <MessageCircle className="h-4 w-4" />
                     </a>
                   ) : null}
                 </div>

@@ -274,7 +274,10 @@ public class InternalAccountOrderResource {
                 .color(blankToNull(itemRequest.color()))
                 .variantSku(blankToNull(reservedItem.variantSku()))
                 .qty(itemRequest.qty())
-                .price(reservedItem.unitPrice());
+                .price(reservedItem.unitPrice())
+                .mrp(reservedItem.mrp())
+                .hsn(StringUtils.trimToNull(reservedItem.product().getHsn()))
+                .taxPct(reservedItem.product().getTaxPct());
             orderItems.add(item);
         }
         dataAccess.orderItemRepository().saveAll(orderItems);
@@ -831,18 +834,20 @@ public class InternalAccountOrderResource {
                 if (unitPrice.compareTo(BigDecimal.ZERO) <= 0) {
                     unitPrice = Optional.ofNullable(product.getPrice()).orElse(BigDecimal.ZERO);
                 }
-                reserved.add(new ReservedOrderItem(product, item, variant.sku(), unitPrice));
+                reserved.add(new ReservedOrderItem(product, item, variant.sku(), unitPrice, invoiceMrp(variant.mrp(), unitPrice)));
             } else {
                 int available = Optional.ofNullable(product.getStock()).orElse(0);
                 if (available < item.qty()) {
                     // Check cumulative later via running stock on product
                 }
+                BigDecimal unitPrice = item.price() != null ? item.price() : Optional.ofNullable(product.getPrice()).orElse(BigDecimal.ZERO);
                 reserved.add(
                     new ReservedOrderItem(
                         product,
                         item,
                         null,
-                        item.price() != null ? item.price() : Optional.ofNullable(product.getPrice()).orElse(BigDecimal.ZERO)
+                        unitPrice,
+                        invoiceMrp(product.getCompareAtPrice(), unitPrice)
                     )
                 );
             }
@@ -1145,7 +1150,7 @@ public class InternalAccountOrderResource {
         return !"shipped".equals(trackingStatus) && !"delivered".equals(trackingStatus);
     }
 
-    private Map<String, Object> orderDetail(CustomerOrder order) {
+    Map<String, Object> orderDetail(CustomerOrder order) {
         Map<String, Object> data = orderSummary(order);
         data.put("subtotal", order.getSubtotal());
         data.put(FIELD_DISCOUNT, order.getDiscount());
@@ -1260,6 +1265,7 @@ public class InternalAccountOrderResource {
 
     private Map<String, Object> orderItem(OrderItem item) {
         Map<String, Object> data = new LinkedHashMap<>();
+        Product product = orderItemProduct(item).orElse(null);
         data.put("id", item.getId());
         data.put("product_id", item.getProductId());
         data.put("product_slug", item.getProductSlug());
@@ -1270,7 +1276,36 @@ public class InternalAccountOrderResource {
         data.put("sku", item.getVariantSku());
         data.put("qty", item.getQty());
         data.put("price", item.getPrice());
+        data.put("mrp", invoiceItemMrp(item, product));
+        data.put("hsn", StringUtils.defaultString(item.getHsn(), product == null ? "" : product.getHsn()));
+        data.put("tax_pct", Optional.ofNullable(item.getTaxPct()).orElse(product == null ? null : product.getTaxPct()));
         return data;
+    }
+
+    private Optional<Product> orderItemProduct(OrderItem item) {
+        try {
+            return dataAccess.productRepository().findById(Long.valueOf(item.getProductId()));
+        } catch (NumberFormatException ex) {
+            return Optional.empty();
+        }
+    }
+
+    private BigDecimal invoiceItemMrp(OrderItem item, Product product) {
+        if (item.getMrp() != null && item.getMrp().compareTo(BigDecimal.ZERO) > 0) {
+            return item.getMrp();
+        }
+        if (product != null && StringUtils.isNotBlank(item.getVariantSku())) {
+            Optional<VariantRow> variant = variantSupport.findBySku(variantSupport.parseProduct(product), item.getVariantSku());
+            if (variant.isPresent()) {
+                return invoiceMrp(variant.orElseThrow().mrp(), item.getPrice());
+            }
+        }
+        return invoiceMrp(product == null ? null : product.getCompareAtPrice(), item.getPrice());
+    }
+
+    private static BigDecimal invoiceMrp(BigDecimal candidate, BigDecimal sellingPrice) {
+        BigDecimal selling = Optional.ofNullable(sellingPrice).orElse(BigDecimal.ZERO);
+        return candidate != null && candidate.compareTo(selling) > 0 ? candidate : selling;
     }
 
     private Object readJson(String raw) {
@@ -1452,5 +1487,5 @@ public class InternalAccountOrderResource {
         BigDecimal total
     ) {}
 
-    private record ReservedOrderItem(Product product, OrderItemRequest request, String variantSku, BigDecimal unitPrice) {}
+    private record ReservedOrderItem(Product product, OrderItemRequest request, String variantSku, BigDecimal unitPrice, BigDecimal mrp) {}
 }

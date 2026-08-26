@@ -96,6 +96,11 @@ export async function getOrder(input: {
   return api.get(`/api/v1/orders/${encodeURIComponent(parsed.orderNumber)}`, { auth: true });
 }
 
+export async function getAdminOrder(orderNumber: string): Promise<{ order: any }> {
+  const parsed = OrderNumberInput.parse({ orderNumber });
+  return api.get(`/api/v1/admin/orders/${encodeURIComponent(parsed.orderNumber)}`, { auth: true });
+}
+
 export async function cancelOrder(orderNumber: string, reason: string): Promise<{ order: any }> {
   const parsed = OrderNumberInput.parse({ orderNumber });
   return api.post(

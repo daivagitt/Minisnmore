@@ -1,4 +1,4 @@
-import { Outlet, createRootRoute, HeadContent, Scripts, Link } from "@tanstack/react-router";
+import { Outlet, createRootRoute, HeadContent, Scripts, Link, useRouterState } from "@tanstack/react-router";
 import appCss from "../styles.css?url";
 import { ShopProvider } from "@/store/shop";
 import { AuthProvider } from "@/hooks/useAuth";
@@ -31,7 +31,7 @@ export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "Mini's n More — Heirloom baby clothing 0–24m" },
       { name: "description", content: "Minis today, memories forever. Premium organic baby clothing for the first 24 months — softly made in India." },
       { property: "og:title", content: "Mini's n More — Heirloom baby clothing 0–24m" },
@@ -75,22 +75,33 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isAdmin = pathname.startsWith("/admin");
+
   return (
     <AuthProvider>
     <ShopProvider>
       <CatalogSync />
-      <Watermark />
-      <ScrollProgress />
-      <div aria-hidden className="fixed inset-0 pointer-events-none z-0">
-        <FloatingDecor count={10} variant="leaves" />
-      </div>
-      <Navbar />
-      <main className="relative z-10 pt-24 md:pt-28">
+      {!isAdmin && (
+        <>
+          <Watermark />
+          <ScrollProgress />
+          <div aria-hidden className="fixed inset-0 pointer-events-none z-0">
+            <FloatingDecor count={10} variant="leaves" />
+          </div>
+          <Navbar />
+        </>
+      )}
+      <main className={isAdmin ? "relative z-10" : "relative z-10 pt-24 md:pt-28"}>
         <Outlet />
       </main>
-      <Footer />
-      <CartDrawer />
-      <QuickView />
+      {!isAdmin && (
+        <>
+          <Footer />
+          <CartDrawer />
+          <QuickView />
+        </>
+      )}
       <Toaster position="top-center" richColors />
     </ShopProvider>
     </AuthProvider>

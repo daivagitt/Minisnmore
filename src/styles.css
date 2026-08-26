@@ -131,16 +131,24 @@
   * { border-color: var(--color-border); }
   /* Global type scale ~1px smaller across the board; headings get an additional
      reduction so H1/H2 visually drop ~2px while body text drops ~1px. */
-  html { scroll-behavior: smooth; font-size: 15px; }
+  html {
+    scroll-behavior: smooth;
+    font-size: 15px;
+    overflow-x: clip;
+  }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
+    overflow-x: clip;
     background-image:
       radial-gradient(at 12% 8%, oklch(0.86 0.06 50 / 55%) 0px, transparent 55%),
       radial-gradient(at 88% 18%, oklch(0.82 0.08 45 / 50%) 0px, transparent 55%),
       radial-gradient(at 75% 92%, oklch(0.94 0.03 70 / 50%) 0px, transparent 55%);
     background-attachment: fixed;
+  }
+  @media (max-width: 767px) {
+    body { background-attachment: scroll; }
   }
   h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.01em; }
   h1 { font-size: calc(1em - 1px); }

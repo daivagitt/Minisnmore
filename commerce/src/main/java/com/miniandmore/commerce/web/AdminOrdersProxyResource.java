@@ -32,6 +32,11 @@ public class AdminOrdersProxyResource {
         return catalog.get("/internal/v1/admin/orders/cod-pending");
     }
 
+    @GetMapping("/{orderNumber}")
+    public ResponseEntity<String> getOrder(@PathVariable String orderNumber) {
+        return catalog.get(CatalogInternalClient.encodedPath("/internal/v1/admin/orders/{orderNumber}", orderNumber));
+    }
+
     @PostMapping("/{orderNumber}/mark-cod-collected")
     public ResponseEntity<String> markCodCollected(@PathVariable String orderNumber) {
         return catalog.post(

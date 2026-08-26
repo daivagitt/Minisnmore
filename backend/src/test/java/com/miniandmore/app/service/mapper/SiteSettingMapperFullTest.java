@@ -28,6 +28,7 @@ class SiteSettingMapperFullTest {
             .legalEntityName("Mini LLP")
             .logoHorizontalUrl("https://cdn/logo-h.png")
             .logoUrl("https://cdn/logo.png")
+            .invoiceLogoUrl("https://cdn/invoice-logo.png")
             .twitterUrl("https://twitter.com/m")
             .whatsappNumber("919876543210")
             .youtubeUrl("https://youtube.com/m")
@@ -51,6 +52,7 @@ class SiteSettingMapperFullTest {
         mapper.partialUpdate(copy, patch);
 
         assertThat(dto.getBrandName()).isEqualTo("Mini & More");
+        assertThat(dto.getInvoiceLogoUrl()).isEqualTo("https://cdn/invoice-logo.png");
         assertThat(dto.getSubscribeHeroTitle()).isEqualTo("Subscribe");
         assertThat(dto.getFreeShippingMinInr()).isEqualTo(2500);
         assertThat(roundTrip.getContactEmail()).isEqualTo("hello@example.com");

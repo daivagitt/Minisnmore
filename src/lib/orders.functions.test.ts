@@ -41,6 +41,7 @@ import {
   checkReturnEligibility,
   createOrder,
   getMyProfile,
+  getAdminOrder,
   getOrder,
   listAdminOrderReturns,
   listAdminOrders,
@@ -180,6 +181,14 @@ describe("orders functions", () => {
     const res = await getOrder({ data: { orderNumber: "MNM-1" } });
     expect(res.order.order_number).toBe("MNM-1");
     expect(getMock).toHaveBeenCalledWith("/api/v1/orders/MNM-1", { auth: true });
+  });
+
+  it("gets an admin order by order number", async () => {
+    getMock.mockResolvedValueOnce({ order: { id: "o1", order_number: "MNM-1" } });
+
+    const res = await getAdminOrder("MNM-1");
+    expect(res.order.order_number).toBe("MNM-1");
+    expect(getMock).toHaveBeenCalledWith("/api/v1/admin/orders/MNM-1", { auth: true });
   });
 
   it("cancels an owned order", async () => {

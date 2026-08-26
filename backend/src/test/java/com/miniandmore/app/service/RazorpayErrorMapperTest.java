@@ -27,6 +27,17 @@ class RazorpayErrorMapperTest {
     }
 
     @Test
+    void isAlreadyRefundedError_fullyRefunded_returnsTrue() {
+        RazorpayErrorMapper.ParsedRazorpayError parsed = new RazorpayErrorMapper.ParsedRazorpayError(
+            "BAD_REQUEST_ERROR",
+            "The payment has been fully refunded already",
+            null
+        );
+
+        assertThat(RazorpayErrorMapper.isAlreadyRefundedError(parsed)).isTrue();
+    }
+
+    @Test
     void refundHttpStatus_insufficientBalance_returnsConflict() {
         String body =
             """

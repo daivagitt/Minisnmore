@@ -68,6 +68,11 @@ export const ADMIN_IMAGE_SPECS = {
     recommendedPx: "600 × 200 px",
     notes: "Wide PNG with transparent background (navbar).",
   },
+  invoiceLogo: {
+    ratio: "Wide, up to ~4 : 1",
+    recommendedPx: "800 × 240 px",
+    notes: "PNG with transparent background. Printed at a maximum height of 80 px on A4 invoices.",
+  },
 } as const satisfies Record<string, ImageSpec>;
 
 export type AdminImageSpecKey = keyof typeof ADMIN_IMAGE_SPECS;

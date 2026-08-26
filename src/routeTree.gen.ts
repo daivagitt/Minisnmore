@@ -45,6 +45,7 @@ import { Route as AdminPoliciesRouteImport } from './routes/admin.policies'
 import { Route as AdminPagesRouteImport } from './routes/admin.pages'
 import { Route as AdminOrdersRouteImport } from './routes/admin.orders'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
+import { Route as AdminInvoicesRouteImport } from './routes/admin.invoices'
 import { Route as AdminHomeRouteImport } from './routes/admin.home'
 import { Route as AdminCouponsRouteImport } from './routes/admin.coupons'
 import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
@@ -64,6 +65,8 @@ import { Route as AccountOrdersIndexRouteImport } from './routes/account.orders.
 import { Route as AdminIntegrationsLedgerlyRouteImport } from './routes/admin.integrations.ledgerly'
 import { Route as AccountResetFinishRouteImport } from './routes/account.reset.finish'
 import { Route as AccountOrdersOrderNumberRouteImport } from './routes/account.orders.$orderNumber'
+import { Route as AccountOrdersOrderNumberInvoiceRouteImport } from './routes/account.orders.$orderNumber_.invoice'
+import { Route as AdminOrdersOrderNumberInvoiceRouteImport } from './routes/admin.orders_.$orderNumber.invoice'
 
 const WishlistRoute = WishlistRouteImport.update({
   id: '/wishlist',
@@ -245,6 +248,11 @@ const AdminLoginRoute = AdminLoginRouteImport.update({
   path: '/login',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminInvoicesRoute = AdminInvoicesRouteImport.update({
+  id: '/invoices',
+  path: '/invoices',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminHomeRoute = AdminHomeRouteImport.update({
   id: '/home',
   path: '/home',
@@ -342,6 +350,18 @@ const AccountOrdersOrderNumberRoute =
     path: '/$orderNumber',
     getParentRoute: () => AccountOrdersRoute,
   } as any)
+const AccountOrdersOrderNumberInvoiceRoute =
+  AccountOrdersOrderNumberInvoiceRouteImport.update({
+    id: '/$orderNumber_/invoice',
+    path: '/$orderNumber/invoice',
+    getParentRoute: () => AccountOrdersRoute,
+  } as any)
+const AdminOrdersOrderNumberInvoiceRoute =
+  AdminOrdersOrderNumberInvoiceRouteImport.update({
+    id: '/orders_/$orderNumber/invoice',
+    path: '/orders/$orderNumber/invoice',
+    getParentRoute: () => AdminRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -380,6 +400,7 @@ export interface FileRoutesByFullPath {
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/home': typeof AdminHomeRoute
+  '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/orders': typeof AdminOrdersRoute
   '/admin/pages': typeof AdminPagesRoute
@@ -399,6 +420,8 @@ export interface FileRoutesByFullPath {
   '/account/reset/finish': typeof AccountResetFinishRoute
   '/admin/integrations/ledgerly': typeof AdminIntegrationsLedgerlyRoute
   '/account/orders/': typeof AccountOrdersIndexRoute
+  '/account/orders/$orderNumber/invoice': typeof AccountOrdersOrderNumberInvoiceRoute
+  '/admin/orders/$orderNumber/invoice': typeof AdminOrdersOrderNumberInvoiceRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -433,6 +456,7 @@ export interface FileRoutesByTo {
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/home': typeof AdminHomeRoute
+  '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/orders': typeof AdminOrdersRoute
   '/admin/pages': typeof AdminPagesRoute
@@ -452,6 +476,8 @@ export interface FileRoutesByTo {
   '/account/reset/finish': typeof AccountResetFinishRoute
   '/admin/integrations/ledgerly': typeof AdminIntegrationsLedgerlyRoute
   '/account/orders': typeof AccountOrdersIndexRoute
+  '/account/orders/$orderNumber/invoice': typeof AccountOrdersOrderNumberInvoiceRoute
+  '/admin/orders/$orderNumber/invoice': typeof AdminOrdersOrderNumberInvoiceRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -491,6 +517,7 @@ export interface FileRoutesById {
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/home': typeof AdminHomeRoute
+  '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/orders': typeof AdminOrdersRoute
   '/admin/pages': typeof AdminPagesRoute
@@ -510,6 +537,8 @@ export interface FileRoutesById {
   '/account/reset/finish': typeof AccountResetFinishRoute
   '/admin/integrations/ledgerly': typeof AdminIntegrationsLedgerlyRoute
   '/account/orders/': typeof AccountOrdersIndexRoute
+  '/account/orders/$orderNumber/invoice': typeof AccountOrdersOrderNumberInvoiceRoute
+  '/admin/orders/$orderNumber/invoice': typeof AdminOrdersOrderNumberInvoiceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -550,6 +579,7 @@ export interface FileRouteTypes {
     | '/admin/categories'
     | '/admin/coupons'
     | '/admin/home'
+    | '/admin/invoices'
     | '/admin/login'
     | '/admin/orders'
     | '/admin/pages'
@@ -569,6 +599,8 @@ export interface FileRouteTypes {
     | '/account/reset/finish'
     | '/admin/integrations/ledgerly'
     | '/account/orders/'
+    | '/account/orders/$orderNumber/invoice'
+    | '/admin/orders/$orderNumber/invoice'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -603,6 +635,7 @@ export interface FileRouteTypes {
     | '/admin/categories'
     | '/admin/coupons'
     | '/admin/home'
+    | '/admin/invoices'
     | '/admin/login'
     | '/admin/orders'
     | '/admin/pages'
@@ -622,6 +655,8 @@ export interface FileRouteTypes {
     | '/account/reset/finish'
     | '/admin/integrations/ledgerly'
     | '/account/orders'
+    | '/account/orders/$orderNumber/invoice'
+    | '/admin/orders/$orderNumber/invoice'
   id:
     | '__root__'
     | '/'
@@ -660,6 +695,7 @@ export interface FileRouteTypes {
     | '/admin/categories'
     | '/admin/coupons'
     | '/admin/home'
+    | '/admin/invoices'
     | '/admin/login'
     | '/admin/orders'
     | '/admin/pages'
@@ -679,6 +715,8 @@ export interface FileRouteTypes {
     | '/account/reset/finish'
     | '/admin/integrations/ledgerly'
     | '/account/orders/'
+    | '/account/orders/$orderNumber/invoice'
+    | '/admin/orders/$orderNumber/invoice'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -961,6 +999,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/invoices': {
+      id: '/admin/invoices'
+      path: '/invoices'
+      fullPath: '/admin/invoices'
+      preLoaderRoute: typeof AdminInvoicesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/home': {
       id: '/admin/home'
       path: '/home'
@@ -1094,16 +1139,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountOrdersOrderNumberRouteImport
       parentRoute: typeof AccountOrdersRoute
     }
+    '/account/orders/$orderNumber/invoice': {
+      id: '/account/orders/$orderNumber_/invoice'
+      path: '/$orderNumber/invoice'
+      fullPath: '/account/orders/$orderNumber/invoice'
+      preLoaderRoute: typeof AccountOrdersOrderNumberInvoiceRouteImport
+      parentRoute: typeof AccountOrdersRoute
+    }
+    '/admin/orders/$orderNumber/invoice': {
+      id: '/admin/orders_/$orderNumber/invoice'
+      path: '/orders/$orderNumber/invoice'
+      fullPath: '/admin/orders/$orderNumber/invoice'
+      preLoaderRoute: typeof AdminOrdersOrderNumberInvoiceRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
 interface AccountOrdersRouteChildren {
   AccountOrdersOrderNumberRoute: typeof AccountOrdersOrderNumberRoute
+  AccountOrdersOrderNumberInvoiceRoute: typeof AccountOrdersOrderNumberInvoiceRoute
   AccountOrdersIndexRoute: typeof AccountOrdersIndexRoute
 }
 
 const AccountOrdersRouteChildren: AccountOrdersRouteChildren = {
   AccountOrdersOrderNumberRoute: AccountOrdersOrderNumberRoute,
+  AccountOrdersOrderNumberInvoiceRoute: AccountOrdersOrderNumberInvoiceRoute,
   AccountOrdersIndexRoute: AccountOrdersIndexRoute,
 }
 
@@ -1150,8 +1211,10 @@ interface AdminRouteChildren {
   AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminCouponsRoute: typeof AdminCouponsRoute
   AdminHomeRoute: typeof AdminHomeRoute
+  AdminInvoicesRoute: typeof AdminInvoicesRoute
   AdminLoginRoute: typeof AdminLoginRoute
   AdminOrdersRoute: typeof AdminOrdersRoute
+  AdminOrdersOrderNumberInvoiceRoute: typeof AdminOrdersOrderNumberInvoiceRoute
   AdminPagesRoute: typeof AdminPagesRoute
   AdminPoliciesRoute: typeof AdminPoliciesRoute
   AdminProductsRoute: typeof AdminProductsRoute
@@ -1169,8 +1232,10 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCategoriesRoute: AdminCategoriesRoute,
   AdminCouponsRoute: AdminCouponsRoute,
   AdminHomeRoute: AdminHomeRoute,
+  AdminInvoicesRoute: AdminInvoicesRoute,
   AdminLoginRoute: AdminLoginRoute,
   AdminOrdersRoute: AdminOrdersRoute,
+  AdminOrdersOrderNumberInvoiceRoute: AdminOrdersOrderNumberInvoiceRoute,
   AdminPagesRoute: AdminPagesRoute,
   AdminPoliciesRoute: AdminPoliciesRoute,
   AdminProductsRoute: AdminProductsRoute,

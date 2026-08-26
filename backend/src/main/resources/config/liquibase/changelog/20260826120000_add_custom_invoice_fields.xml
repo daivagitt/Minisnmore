@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="20260826120000-1" author="codex">
+        <addColumn tableName="site_setting">
+            <column name="invoice_logo_url" type="varchar(600)"/>
+        </addColumn>
+        <addColumn tableName="order_item">
+            <column name="mrp" type="decimal(21,2)"/>
+            <column name="hsn" type="varchar(20)"/>
+            <column name="tax_pct" type="decimal(5,2)"/>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>

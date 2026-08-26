@@ -1,14 +1,15 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { loadProducts } from "@/lib/storefront";
-import { useProducts } from "@/hooks/useProducts";
+import { useProducts, useProductsLoaded } from "@/hooks/useProducts";
 import { formatCartSyncMessage } from "@/lib/cart-catalog";
 import { useShop } from "@/store/shop";
 
 /** Keep wishlist and cart aligned with the live (active-only) product catalog. */
 export function CatalogSync() {
   const products = useProducts();
-  const { wishlist, pruneWishlist, syncCartWithCatalog } = useShop();
+  const productsLoaded = useProductsLoaded();
+  const { wishlist, pruneWishlist, syncCartWithCatalog, accountSyncReady } = useShop();
   const lastCartMessage = useRef("");
 
   useEffect(() => {
@@ -16,7 +17,7 @@ export function CatalogSync() {
   }, []);
 
   useEffect(() => {
-    if (products.length === 0) return;
+    if (!productsLoaded || !accountSyncReady || products.length === 0) return;
 
     const validIds = products.map((p) => p.id);
     const valid = new Set(validIds);
@@ -32,7 +33,7 @@ export function CatalogSync() {
       lastCartMessage.current = message;
       toast.info(message, { id: "cart-catalog-sync" });
     }
-  }, [products, wishlist, pruneWishlist, syncCartWithCatalog]);
+  }, [productsLoaded, accountSyncReady, products, wishlist, pruneWishlist, syncCartWithCatalog]);
 
   return null;
 }

@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   LayoutDashboard, Image as ImgIcon, Tag, BookOpen, FileText, Package, Plug, LogOut, Loader2,
-  Folder, Home, EyeOff, Settings as SettingsIcon, ExternalLink, RotateCcw, ShoppingCart,
+  Folder, Home, EyeOff, Settings as SettingsIcon, ExternalLink, RotateCcw, ShoppingCart, ReceiptText,
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
@@ -22,6 +22,7 @@ const nav = [
   { to: "/admin/coupons", label: "Coupons", icon: Tag },
   { to: "/admin/blog", label: "Blogs", icon: BookOpen },
   { to: "/admin/policies", label: "Policies", icon: FileText },
+  { to: "/admin/invoices", label: "Invoices", icon: ReceiptText },
   { to: "/admin/zoho", label: "Zoho settings", icon: Plug },
   { to: "/admin/orders", label: "Orders", icon: ShoppingCart },
   { to: "/admin/returns", label: "Order returns", icon: RotateCcw },
@@ -99,9 +100,9 @@ function AdminLayout() {
         </div>
       </aside>
 
-      {/* Mobile horizontal nav */}
+      {/* Mobile nav — wraps so long admin menus stay usable on phones */}
       <aside
-        className="lg:hidden rounded-[1.5rem] p-2 mb-4 flex gap-2 overflow-x-auto shadow-soft ring-1 ring-white/10 backdrop-blur-xl text-white"
+        className="lg:hidden rounded-[1.5rem] p-2 mb-4 flex flex-wrap gap-2 shadow-soft ring-1 ring-white/10 backdrop-blur-xl text-white"
         style={{
           backgroundImage:
             "linear-gradient(160deg, #6b3a1f 0%, #8a4a26 38%, #b56b3a 72%, #7a3f22 100%)",
@@ -111,18 +112,18 @@ function AdminLayout() {
           const active = n.exact ? path === n.to : path.startsWith(n.to);
           return (
             <Link key={n.to} to={n.to}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm whitespace-nowrap transition ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition ${
                 active
                   ? "bg-white text-[#6b3a1f] shadow-md font-semibold"
                   : "text-amber-50/90 hover:bg-white/10 hover:text-white"
               }`}>
-              <n.icon className="h-4 w-4" /> <span>{n.label}</span>
+              <n.icon className="h-4 w-4 shrink-0" /> <span>{n.label}</span>
             </Link>
           );
         })}
         <button onClick={() => signOut()}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-amber-50/90 hover:bg-white/10 hover:text-white whitespace-nowrap transition">
-          <LogOut className="h-4 w-4" /> Sign out
+          className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-amber-50/90 hover:bg-white/10 hover:text-white transition">
+          <LogOut className="h-4 w-4 shrink-0" /> Sign out
         </button>
       </aside>
 

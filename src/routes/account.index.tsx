@@ -6,8 +6,8 @@ import { useAccountData } from "@/lib/account";
 import { formatOrderDate } from "@/lib/dates";
 import { formatOrderStatusSummary } from "@/lib/order-status";
 import { useShop } from "@/store/shop";
-import { useProducts } from "@/hooks/useProducts";
-import { wishlistCountForProducts } from "@/lib/wishlist";
+import { useProducts, useProductsLoaded } from "@/hooks/useProducts";
+import { wishlistCountForProducts, normalizeWishlistIds } from "@/lib/wishlist";
 
 export const Route = createFileRoute("/account/")({
   head: () => ({ meta: [{ title: "Dashboard · Mini's n More" }] }),
@@ -18,7 +18,10 @@ function Dashboard() {
   const { user } = useAuth();
   const { wishlist } = useShop();
   const products = useProducts();
-  const wishlistCount = wishlistCountForProducts(wishlist, products.map((p) => p.id));
+  const productsLoaded = useProductsLoaded();
+  const wishlistCount = productsLoaded
+    ? wishlistCountForProducts(wishlist, products.map((p) => p.id))
+    : normalizeWishlistIds(wishlist).length;
   const { orders, profile, loadingOrders, refreshOrders } = useAccountData();
 
   useEffect(() => {

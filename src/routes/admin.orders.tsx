@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminPage } from "@/components/admin/AdminPage";
-import { AlertCircle, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileText, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { listAdminOrders, markCodCollected, type AdminOrderRow } from "@/lib/orders.functions";
 import { syncZohoOrderByNumber } from "@/lib/backend-data";
@@ -255,6 +255,13 @@ function AdminOrdersPage() {
                           : "Mark COD collected"}
                       </button>
                     )}
+                    <Link
+                      to="/admin/orders/$orderNumber/invoice"
+                      params={{ orderNumber: order.order_number }}
+                      className="mt-2 ml-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium"
+                    >
+                      <FileText className="h-3.5 w-3.5" /> View invoice
+                    </Link>
                   </div>
                 </div>
 

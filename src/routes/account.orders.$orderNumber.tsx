@@ -645,15 +645,14 @@ function OrderDetail() {
               {order.coupon_code && (
                 <div className="text-xs text-primary mt-1">Coupon: {order.coupon_code}</div>
               )}
-              {order.invoice_pdf_url && (
-                <a
-                  href={order.invoice_pdf_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+              {order.order_number && (
+                <Link
+                  to="/account/orders/$orderNumber/invoice"
+                  params={{ orderNumber: order.order_number }}
                   className="mt-3 rounded-full glass px-4 py-2 text-xs inline-flex items-center gap-2 hover:bg-white/60 transition"
                 >
                   <FileText className="h-3.5 w-3.5" /> View invoice
-                </a>
+                </Link>
               )}
             </div>
           </div>

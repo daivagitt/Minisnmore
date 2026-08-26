@@ -106,7 +106,7 @@ function AccountLayout() {
           <div className="text-[10px] uppercase tracking-[0.28em] text-primary">Signed in</div>
           <div className="font-medium text-sm mt-0.5 truncate text-foreground">{user?.email ?? "…"}</div>
         </div>
-        <nav className="flex gap-2 overflow-x-auto pb-1">
+        <nav className="flex flex-wrap gap-2">
           {flatNavItems.map((it) => {
             const Icon = it.icon;
             return (
@@ -114,19 +114,19 @@ function AccountLayout() {
                 key={it.to}
                 to={it.to}
                 activeOptions={{ exact: it.exact }}
-                className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-foreground/85 hover:bg-white/45 hover:text-foreground transition whitespace-nowrap"
+                className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-foreground/85 hover:bg-white/45 hover:text-foreground transition"
                 activeProps={{ className: "!bg-primary !text-primary-foreground" }}
               >
-                <Icon className="h-4 w-4" />
-                {it.label}
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="truncate max-w-[9rem]">{it.label}</span>
               </Link>
             );
           })}
           <button
             onClick={() => signOut()}
-            className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-foreground/85 hover:bg-white/45 hover:text-foreground transition whitespace-nowrap"
+            className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-foreground/85 hover:bg-white/45 hover:text-foreground transition"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-4 w-4 shrink-0" />
             Sign out
           </button>
         </nav>

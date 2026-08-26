@@ -36,6 +36,7 @@ const empty: SettingsForm = {
   legal_entity_name: "Stolt Global Private Limited",
   logo_url: "",
   logo_horizontal_url: "",
+  invoice_logo_url: "",
   contact_email: "care@minisnmore.com",
   contact_phone: "+91 76765 25139",
   care_label: "Care",

@@ -54,6 +54,9 @@ public class SiteSettingDTO implements Serializable {
     private String logoUrl;
 
     @Size(max = 600)
+    private String invoiceLogoUrl;
+
+    @Size(max = 600)
     private String twitterUrl;
 
     @Size(max = 60)
@@ -203,6 +206,14 @@ public class SiteSettingDTO implements Serializable {
 
     public void setLogoUrl(String logoUrl) {
         this.logoUrl = logoUrl;
+    }
+
+    public String getInvoiceLogoUrl() {
+        return invoiceLogoUrl;
+    }
+
+    public void setInvoiceLogoUrl(String invoiceLogoUrl) {
+        this.invoiceLogoUrl = invoiceLogoUrl;
     }
 
     public String getTwitterUrl() {
@@ -356,6 +367,7 @@ public class SiteSettingDTO implements Serializable {
             ", legalEntityName='" + getLegalEntityName() + "'" +
             ", logoHorizontalUrl='" + getLogoHorizontalUrl() + "'" +
             ", logoUrl='" + getLogoUrl() + "'" +
+            ", invoiceLogoUrl='" + getInvoiceLogoUrl() + "'" +
             ", twitterUrl='" + getTwitterUrl() + "'" +
             ", whatsappNumber='" + getWhatsappNumber() + "'" +
             ", youtubeUrl='" + getYoutubeUrl() + "'" +

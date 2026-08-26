@@ -69,6 +69,8 @@ type ShopState = {
   setCartOpen: (o: boolean) => void;
   quickView: Product | null;
   setQuickView: (p: Product | null) => void;
+  /** False while the signed-in account cart/wishlist is syncing from the server. */
+  accountSyncReady: boolean;
 };
 
 const Ctx = createContext<ShopState | null>(null);
@@ -149,6 +151,8 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   const lastSyncedWishlistRef = useRef<string[]>([]);
   const wishlistPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wishlistPersistSeqRef = useRef(0);
+  const userEditedDuringSyncRef = useRef(false);
+  const [accountSyncReady, setAccountSyncReady] = useState(() => userId == null);
 
   useLayoutEffect(() => {
     if (authLoading) return;
@@ -179,6 +183,8 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       nextWish = normalizeWishlistIds(readJson<string[]>(wKey, []));
       nextCoupon = coerceCoupon(readJson<PersistedCoupon>(couponKey, null));
 
+      userEditedDuringSyncRef.current = false;
+      setAccountSyncReady(false);
       const wishSyncId = ++wishlistSyncRef.current;
       void (async () => {
         const localWish = nextWish;
@@ -193,12 +199,11 @@ export function ShopProvider({ children }: { children: ReactNode }) {
             serverWish = normalizeWishlistIds((await replaceMyWishlist(localWish)).product_ids);
           }
           if (wishlistSyncRef.current !== wishSyncId) return;
-          setWishlist((current) => {
-            const next = current.join("\0") === localWish.join("\0") ? serverWish : current;
-            localStorage.setItem(wKey, JSON.stringify(next));
-            lastSyncedWishlistRef.current = next;
-            return next;
-          });
+          if (!userEditedDuringSyncRef.current) {
+            setWishlist(serverWish);
+            localStorage.setItem(wKey, JSON.stringify(serverWish));
+            lastSyncedWishlistRef.current = serverWish;
+          }
 
           const serverCart = coerceCart(cartRes.items);
           const serverCoupon = coerceCoupon(cartRes.coupon);
@@ -207,22 +212,25 @@ export function ShopProvider({ children }: { children: ReactNode }) {
             await replaceMyCart(localCart, localCoupon);
           }
           if (wishlistSyncRef.current !== wishSyncId) return;
-          setCart((current) => {
-            const next = cartsEqual(current, localCart) ? (adoptServer ? serverCart : localCart) : current;
-            localStorage.setItem(cKey, JSON.stringify(next));
-            return next;
-          });
-          setAppliedCoupon((current) => {
-            const next = current === localCoupon ? (adoptServer ? serverCoupon : localCoupon) : current;
-            if (next) localStorage.setItem(couponKey, JSON.stringify(next));
+          if (!userEditedDuringSyncRef.current) {
+            const nextCartState = adoptServer ? serverCart : localCart;
+            const nextCouponState = adoptServer ? serverCoupon : localCoupon;
+            setCart(nextCartState);
+            localStorage.setItem(cKey, JSON.stringify(nextCartState));
+            setAppliedCoupon(nextCouponState);
+            if (nextCouponState) localStorage.setItem(couponKey, JSON.stringify(nextCouponState));
             else localStorage.removeItem(couponKey);
-            return next;
-          });
+          }
         } catch {
           // Keep the local cache when the account API is unavailable.
+        } finally {
+          if (wishlistSyncRef.current === wishSyncId) {
+            setAccountSyncReady(true);
+          }
         }
       })();
     } else {
+      setAccountSyncReady(true);
       localStorage.setItem(cartStorageKey(null), "[]");
       localStorage.setItem(wishStorageKey(null), "[]");
       localStorage.removeItem(couponStorageKey(null));
@@ -244,6 +252,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     }
     if (hydratedScope.current !== scopeKey) return;
     if (userId == null) return;
+    if (!accountSyncReady) return;
     localStorage.setItem(cKey, JSON.stringify(cart));
     localStorage.setItem(wKey, JSON.stringify(wishlist));
     if (appliedCoupon) localStorage.setItem(couponKey, JSON.stringify(appliedCoupon));
@@ -271,13 +280,14 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     return () => {
       if (wishlistPersistTimerRef.current) clearTimeout(wishlistPersistTimerRef.current);
     };
-  }, [cart, wishlist, appliedCoupon, cKey, wKey, couponKey, scopeKey, authLoading, userId]);
+  }, [cart, wishlist, appliedCoupon, cKey, wKey, couponKey, scopeKey, authLoading, userId, accountSyncReady]);
 
   const addToCart: ShopState["addToCart"] = (p, opts = {}) => {
     if (userId == null) {
       requireSignedIn();
       return;
     }
+    userEditedDuringSyncRef.current = true;
     const defaults = defaultSellableSelection(p);
     const size = opts.size ?? defaults.size;
     const color = opts.color ?? defaults.color;
@@ -313,8 +323,10 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     (variantSku !== undefined
       ? x.variantSku === variantSku
       : (size === undefined || x.size === size) && (color === undefined || x.color === color));
-  const removeFromCart = (id: string, size?: string, color?: string, variantSku?: string) =>
+  const removeFromCart = (id: string, size?: string, color?: string, variantSku?: string) => {
+    userEditedDuringSyncRef.current = true;
     setCart((c) => c.filter((x) => !matches(x, id, size, color, variantSku)));
+  };
   const promptRemoveFromCart = (id: string, size?: string, color?: string, variantSku?: string) => {
     const item = cart.find((x) => matches(x, id, size, color, variantSku));
     if (!item) return;
@@ -329,6 +341,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   const updateQty = (id: string, qty: number, size?: string, color?: string, variantSku?: string) => {
     const item = cart.find((x) => matches(x, id, size, color, variantSku));
     if (!item) return;
+    userEditedDuringSyncRef.current = true;
     const n = Math.max(0, Math.min(FIT_LIMITS.qtyMax, qty));
     if (n === 0) {
       promptRemoveFromCart(id, size, color, variantSku);
@@ -346,6 +359,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       requireSignedIn();
       return;
     }
+    userEditedDuringSyncRef.current = true;
     const key = String(id);
     if (wishlist.includes(key)) {
       warnWishlistDuplicate(productName);
@@ -364,6 +378,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       requireSignedIn();
       return;
     }
+    userEditedDuringSyncRef.current = true;
     const key = String(id);
     if (wishlist.includes(key)) {
       setWishlist((w) => w.filter((x) => x !== key));
@@ -400,6 +415,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     return result;
   }, []);
   const clearCart = () => {
+    userEditedDuringSyncRef.current = true;
     setCart([]);
     setAppliedCoupon(null);
   };
@@ -428,6 +444,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
         setCartOpen,
         quickView,
         setQuickView,
+        accountSyncReady,
       }}
     >
       {children}

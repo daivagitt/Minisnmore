@@ -40,19 +40,22 @@ public class InternalAdminOrderResource {
     private final ZohoSyncService zohoSyncService;
     private final ObjectMapper objectMapper;
     private final OrderEventService orderEventService;
+    private final InternalAccountOrderResource accountOrders;
 
     public InternalAdminOrderResource(
         AccountOrderDataAccess dataAccess,
         LedgerlySyncService ledgerlySyncService,
         ZohoSyncService zohoSyncService,
         ObjectMapper objectMapper,
-        OrderEventService orderEventService
+        OrderEventService orderEventService,
+        InternalAccountOrderResource accountOrders
     ) {
         this.dataAccess = dataAccess;
         this.ledgerlySyncService = ledgerlySyncService;
         this.zohoSyncService = zohoSyncService;
         this.objectMapper = objectMapper;
         this.orderEventService = orderEventService;
+        this.accountOrders = accountOrders;
     }
 
     @GetMapping
@@ -81,6 +84,15 @@ public class InternalAdminOrderResource {
             .map(this::summary)
             .toList();
         return ApiResponse.ok(Map.of("orders", orders));
+    }
+
+    @GetMapping("/{orderNumber}")
+    public ApiResponse<Map<String, Object>> getOrder(@PathVariable String orderNumber) {
+        CustomerOrder order = dataAccess
+            .customerOrderRepository()
+            .findOneByOrderNumber(orderNumber)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+        return ApiResponse.ok(Map.of("order", accountOrders.orderDetail(order)));
     }
 
     @PostMapping("/{orderNumber}/mark-cod-collected")

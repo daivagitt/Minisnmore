@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Package, ChevronRight } from "lucide-react";
+import { Loader2, Package, ChevronRight, FileText } from "lucide-react";
 import { useAccountData } from "@/lib/account";
 import { LazyImage } from "@/components/LazyImage";
 import { CopyButton } from "@/components/CopyButton";
@@ -148,15 +148,26 @@ function OrdersPage() {
                 <div className="text-right">
                   <div className="font-medium">₹{Number(o.total).toLocaleString("en-IN")}</div>
                   <StatusPill order={o} />
-                  {shouldPollOrderTracking(o) && (
-                    <Link
-                      to="/track"
-                      search={{ order: o.order_number }}
-                      className="text-[10px] text-primary hover:underline mt-1 inline-block"
-                    >
-                      Track order
-                    </Link>
-                  )}
+                  <div className="mt-1 flex flex-col items-end gap-1">
+                    {shouldPollOrderTracking(o) && (
+                      <Link
+                        to="/track"
+                        search={{ order: o.order_number }}
+                        className="text-[10px] text-primary hover:underline"
+                      >
+                        Track order
+                      </Link>
+                    )}
+                    {o.order_number && (
+                      <Link
+                        to="/account/orders/$orderNumber/invoice"
+                        params={{ orderNumber: o.order_number }}
+                        className="text-[10px] text-primary hover:underline inline-flex items-center gap-1"
+                      >
+                        <FileText className="h-3 w-3" /> Invoice
+                      </Link>
+                    )}
+                  </div>
                 </div>
                 <Link
                   to="/account/orders/$orderNumber"

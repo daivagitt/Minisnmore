@@ -70,4 +70,16 @@ class AdminOrdersProxyResourceTest {
 
         verify(catalog).post(eq("/internal/v1/admin/orders/MNM-42/mark-cod-collected"), eq(null));
     }
+
+    @Test
+    void getOrder_delegatesToCatalog() throws Exception {
+        when(catalog.get("/internal/v1/admin/orders/MNM-42")).thenReturn(ResponseEntity.ok("{\"order\":{}}"));
+
+        mockMvc
+            .perform(get("/api/v1/admin/orders/MNM-42"))
+            .andExpect(status().isOk())
+            .andExpect(content().string("{\"order\":{}}"));
+
+        verify(catalog).get("/internal/v1/admin/orders/MNM-42");
+    }
 }

@@ -69,9 +69,9 @@ export function QuickView() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ duration: 0.4, ease: [0.2, 0.8, 0.2, 1] }}
-            className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-[71] md:w-[820px] max-h-[90vh]">
-            <div className="glass-strong rounded-[2rem] overflow-hidden grid md:grid-cols-2 h-full">
-              <div className="relative aspect-square md:aspect-auto min-h-0 overflow-hidden bg-secondary/40">
+            className="fixed inset-3 sm:inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-[71] md:w-[820px] max-h-[min(90vh,100dvh)] overflow-hidden">
+            <div className="glass-strong rounded-[1.75rem] sm:rounded-[2rem] overflow-y-auto md:overflow-hidden grid md:grid-cols-2 h-full max-h-[min(90vh,100dvh)]">
+              <div className="relative aspect-[4/3] sm:aspect-square md:aspect-auto min-h-0 overflow-hidden bg-secondary/40 shrink-0">
                 <AnimatePresence mode="wait">
                   <motion.img
                     key={colorGallery.image || quickView.image}
@@ -86,7 +86,7 @@ export function QuickView() {
                   />
                 </AnimatePresence>
               </div>
-              <div className="p-6 md:p-8 flex flex-col overflow-y-auto relative">
+              <div className="p-5 sm:p-6 md:p-8 flex flex-col overflow-y-visible md:overflow-y-auto relative min-h-0">
                 <button onClick={() => setQuickView(null)} className="absolute top-4 right-4 h-9 w-9 grid place-items-center rounded-full glass hover:scale-105 transition">
                   <X className="h-4 w-4" />
                 </button>

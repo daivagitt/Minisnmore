@@ -1019,6 +1019,7 @@ const siteStringMap: Record<string, string> = {
   legal_entity_name: "legalEntityName",
   logo_url: "logoUrl",
   logo_horizontal_url: "logoHorizontalUrl",
+  invoice_logo_url: "invoiceLogoUrl",
   contact_email: "contactEmail",
   contact_phone: "contactPhone",
   care_label: "careLabel",

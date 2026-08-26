@@ -32,6 +32,9 @@ class OrderItemMapperFullTest {
             .color("Pink")
             .qty(2)
             .price(BigDecimal.valueOf(499))
+            .mrp(BigDecimal.valueOf(699))
+            .hsn("61112000")
+            .taxPct(BigDecimal.valueOf(5))
             .order(order);
 
         OrderItemDTO dto = mapper.toDto(item);
@@ -43,6 +46,9 @@ class OrderItemMapperFullTest {
 
         assertThat(dto.getId()).isEqualTo(7L);
         assertThat(dto.getProductName()).isEqualTo("Summer Dress");
+        assertThat(dto.getMrp()).isEqualByComparingTo("699");
+        assertThat(dto.getHsn()).isEqualTo("61112000");
+        assertThat(dto.getTaxPct()).isEqualByComparingTo("5");
         assertThat(dto.getOrder()).isNotNull();
         assertThat(dto.getOrder().getId()).isEqualTo(42L);
         assertThat(entity.getProductSlug()).isEqualTo("dress");

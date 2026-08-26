@@ -44,6 +44,16 @@ public class OrderItemDTO implements Serializable {
     @DecimalMin(value = "0")
     private BigDecimal price;
 
+    @DecimalMin(value = "0")
+    private BigDecimal mrp;
+
+    @Size(max = 20)
+    private String hsn;
+
+    @DecimalMin(value = "0")
+    @DecimalMax(value = "100")
+    private BigDecimal taxPct;
+
     @NotNull
     private CustomerOrderDTO order;
 
@@ -127,6 +137,30 @@ public class OrderItemDTO implements Serializable {
         this.price = price;
     }
 
+    public BigDecimal getMrp() {
+        return mrp;
+    }
+
+    public void setMrp(BigDecimal mrp) {
+        this.mrp = mrp;
+    }
+
+    public String getHsn() {
+        return hsn;
+    }
+
+    public void setHsn(String hsn) {
+        this.hsn = hsn;
+    }
+
+    public BigDecimal getTaxPct() {
+        return taxPct;
+    }
+
+    public void setTaxPct(BigDecimal taxPct) {
+        this.taxPct = taxPct;
+    }
+
     public CustomerOrderDTO getOrder() {
         return order;
     }
@@ -169,6 +203,9 @@ public class OrderItemDTO implements Serializable {
             ", color='" + getColor() + "'" +
             ", qty=" + getQty() +
             ", price=" + getPrice() +
+            ", mrp=" + getMrp() +
+            ", hsn='" + getHsn() + "'" +
+            ", taxPct=" + getTaxPct() +
             ", order=" + getOrder() +
             "}";
     }

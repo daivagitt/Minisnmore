@@ -77,6 +77,10 @@ public class SiteSetting implements Serializable {
     private String logoUrl;
 
     @Size(max = 600)
+    @Column(name = "invoice_logo_url", length = 600)
+    private String invoiceLogoUrl;
+
+    @Size(max = 600)
     @Column(name = "twitter_url", length = 600)
     private String twitterUrl;
 
@@ -319,6 +323,19 @@ public class SiteSetting implements Serializable {
         this.logoUrl = logoUrl;
     }
 
+    public String getInvoiceLogoUrl() {
+        return this.invoiceLogoUrl;
+    }
+
+    public SiteSetting invoiceLogoUrl(String invoiceLogoUrl) {
+        this.setInvoiceLogoUrl(invoiceLogoUrl);
+        return this;
+    }
+
+    public void setInvoiceLogoUrl(String invoiceLogoUrl) {
+        this.invoiceLogoUrl = invoiceLogoUrl;
+    }
+
     public String getTwitterUrl() {
         return this.twitterUrl;
     }
@@ -508,6 +525,7 @@ public class SiteSetting implements Serializable {
             ", legalEntityName='" + getLegalEntityName() + "'" +
             ", logoHorizontalUrl='" + getLogoHorizontalUrl() + "'" +
             ", logoUrl='" + getLogoUrl() + "'" +
+            ", invoiceLogoUrl='" + getInvoiceLogoUrl() + "'" +
             ", twitterUrl='" + getTwitterUrl() + "'" +
             ", whatsappNumber='" + getWhatsappNumber() + "'" +
             ", youtubeUrl='" + getYoutubeUrl() + "'" +

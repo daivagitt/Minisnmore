@@ -64,6 +64,19 @@ public class OrderItem implements Serializable {
     @Column(name = "price", precision = 21, scale = 2, nullable = false)
     private BigDecimal price;
 
+    @DecimalMin(value = "0")
+    @Column(name = "mrp", precision = 21, scale = 2)
+    private BigDecimal mrp;
+
+    @Size(max = 20)
+    @Column(name = "hsn", length = 20)
+    private String hsn;
+
+    @DecimalMin(value = "0")
+    @DecimalMax(value = "100")
+    @Column(name = "tax_pct", precision = 5, scale = 2)
+    private BigDecimal taxPct;
+
     @ManyToOne(optional = false)
     @NotNull
     @JsonIgnoreProperties(value = { "itemses" }, allowSetters = true)
@@ -201,6 +214,45 @@ public class OrderItem implements Serializable {
         this.price = price;
     }
 
+    public BigDecimal getMrp() {
+        return this.mrp;
+    }
+
+    public OrderItem mrp(BigDecimal mrp) {
+        this.setMrp(mrp);
+        return this;
+    }
+
+    public void setMrp(BigDecimal mrp) {
+        this.mrp = mrp;
+    }
+
+    public String getHsn() {
+        return this.hsn;
+    }
+
+    public OrderItem hsn(String hsn) {
+        this.setHsn(hsn);
+        return this;
+    }
+
+    public void setHsn(String hsn) {
+        this.hsn = hsn;
+    }
+
+    public BigDecimal getTaxPct() {
+        return this.taxPct;
+    }
+
+    public OrderItem taxPct(BigDecimal taxPct) {
+        this.setTaxPct(taxPct);
+        return this;
+    }
+
+    public void setTaxPct(BigDecimal taxPct) {
+        this.taxPct = taxPct;
+    }
+
     public CustomerOrder getOrder() {
         return this.order;
     }
@@ -247,6 +299,9 @@ public class OrderItem implements Serializable {
             ", variantSku='" + getVariantSku() + "'" +
             ", qty=" + getQty() +
             ", price=" + getPrice() +
+            ", mrp=" + getMrp() +
+            ", hsn='" + getHsn() + "'" +
+            ", taxPct=" + getTaxPct() +
             "}";
     }
 }

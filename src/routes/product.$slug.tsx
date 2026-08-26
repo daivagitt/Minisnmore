@@ -351,7 +351,7 @@ function ProductPage() {
             </div>
           </div>
 
-          <div className="hidden sm:flex gap-2">
+          <div className="hidden lg:flex gap-2">
             <button
               type="button"
               disabled={!canAdd}
@@ -395,7 +395,7 @@ function ProductPage() {
                 <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg border border-primary/35 grid place-items-center bg-white/60 shrink-0">
                   <b.i className="h-3 w-3 text-primary" />
                 </div>
-                <div className="text-[7px] min-[360px]:text-[8px] sm:text-[9px] font-medium text-primary leading-tight">{b.t}</div>
+                <div className="text-[8px] min-[360px]:text-[9px] sm:text-[10px] font-medium text-primary leading-tight">{b.t}</div>
               </div>
             ))}
           </div>
@@ -467,16 +467,41 @@ function ProductPage() {
       </section>
 
       <div className="lg:hidden fixed inset-x-0 bottom-0 z-30 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <div className="glass-strong rounded-full p-2 flex items-center gap-2 sm:gap-3 max-w-7xl mx-auto">
+        <div className="glass-strong rounded-full p-2 flex items-center gap-1.5 sm:gap-2 max-w-7xl mx-auto">
           <div className="pl-2 sm:pl-3 flex-1 min-w-0">
             <div className="text-[11px] text-muted-foreground truncate">{product.name}</div>
             <div className="font-medium text-sm">&#8377;{displayPrice.toLocaleString("en-IN")}</div>
           </div>
           <button
             type="button"
+            onClick={() => toggleWish(product.id, product.name)}
+            aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
+            aria-pressed={wished}
+            className={`h-10 w-10 shrink-0 grid place-items-center rounded-full glass transition ${wished ? "text-primary bg-primary/10" : ""}`}
+          >
+            <Heart className={`h-4 w-4 ${wished ? "fill-primary" : ""}`} />
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              const url = typeof window !== "undefined" ? window.location.href : "";
+              if (navigator.share) {
+                try { await navigator.share({ title: product.name, url }); } catch {}
+              } else {
+                await navigator.clipboard.writeText(url);
+                toast.success("Link copied");
+              }
+            }}
+            aria-label="Share"
+            className="h-10 w-10 shrink-0 grid place-items-center rounded-full glass"
+          >
+            <Share2 className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
             disabled={!canAdd}
             onClick={handleAdd}
-            className="shrink-0 rounded-full bg-primary text-primary-foreground px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-medium disabled:opacity-50"
+            className="shrink-0 rounded-full bg-primary text-primary-foreground px-3.5 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-medium disabled:opacity-50"
           >
             {canAdd ? "Add to basket" : "Out of stock"}
           </button>
@@ -493,18 +518,20 @@ function ProductPage() {
               <div className="font-display text-2xl">Size guide</div>
               <button onClick={() => setSizeChart(false)} className="h-9 w-9 grid place-items-center rounded-full hover:bg-white/40"><X className="h-4 w-4" /></button>
             </div>
-            <table className="w-full text-sm">
-              <thead><tr className="text-xs uppercase tracking-wider text-muted-foreground"><th className="text-left py-2">Size</th><th>Height</th><th>Chest</th></tr></thead>
-              <tbody className="text-foreground/80">
-                {sizeGuideRows.map((row) => (
-                  <tr key={row.size} className="border-t border-border/40">
-                    <td className="py-2 font-medium">{row.size}</td>
-                    <td className="text-center">{row.height}</td>
-                    <td className="text-center">{row.chest}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto -mx-1 px-1">
+              <table className="w-full text-sm min-w-[16rem]">
+                <thead><tr className="text-xs uppercase tracking-wider text-muted-foreground"><th className="text-left py-2">Size</th><th>Height</th><th>Chest</th></tr></thead>
+                <tbody className="text-foreground/80">
+                  {sizeGuideRows.map((row) => (
+                    <tr key={row.size} className="border-t border-border/40">
+                      <td className="py-2 font-medium">{row.size}</td>
+                      <td className="text-center">{row.height}</td>
+                      <td className="text-center">{row.chest}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             <p className="text-xs text-muted-foreground mt-4">Most pieces have generous seams for grow-into-it comfort.</p>
           </div>
         </div>

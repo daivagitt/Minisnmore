@@ -60,6 +60,11 @@ final class RazorpayErrorMapper {
         return "Refund could not be processed. Please try again or contact support.";
     }
 
+    static boolean isAlreadyRefundedError(ParsedRazorpayError error) {
+        String description = StringUtils.defaultString(error.description()).toLowerCase(Locale.ROOT);
+        return description.contains("already been refunded") || description.contains("fully refunded");
+    }
+
     static HttpStatus refundHttpStatus(ParsedRazorpayError error, int razorpayStatus) {
         String description = StringUtils.defaultString(error.description()).toLowerCase(Locale.ROOT);
         if (description.contains("enough balance") || description.contains("insufficient balance")) {

@@ -73,6 +73,12 @@ public class RazorpayRefundService {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() >= 300) {
                 RazorpayErrorMapper.ParsedRazorpayError razorpayError = RazorpayErrorMapper.parse(objectMapper, response.body());
+                if (RazorpayErrorMapper.isAlreadyRefundedError(razorpayError)) {
+                    Optional<String> existingRefundId = findExistingRefundId(paymentId, order.getOrderNumber(), amountPaise);
+                    if (existingRefundId.isPresent()) {
+                        return existingRefundId.orElseThrow();
+                    }
+                }
                 throw new ResponseStatusException(
                     RazorpayErrorMapper.refundHttpStatus(razorpayError, response.statusCode()),
                     RazorpayErrorMapper.refundUserMessage(razorpayError, response.statusCode())
@@ -88,5 +94,55 @@ public class RazorpayRefundService {
         } catch (IOException | ArithmeticException e) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Refund could not be processed. Please try again.");
         }
+    }
+
+    /**
+     * When Razorpay reports a payment is already refunded (e.g. refund issued outside this flow),
+     * look up the existing refund id so the return can still be completed.
+     */
+    private Optional<String> findExistingRefundId(String paymentId, String orderNumber, long amountPaise) {
+        try {
+            String token = Base64.getEncoder().encodeToString(
+                (razorpayKeyId + ":" + razorpayKeySecret).getBytes(StandardCharsets.UTF_8)
+            );
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://api.razorpay.com/v1/payments/" + paymentId + "/refunds"))
+                .header(HttpHeaders.AUTHORIZATION, "Basic " + token)
+                .timeout(Duration.ofSeconds(10))
+                .GET()
+                .build();
+            HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 300) {
+                return Optional.empty();
+            }
+            JsonNode items = objectMapper.readTree(response.body()).path("items");
+            if (!items.isArray() || items.isEmpty()) {
+                return Optional.empty();
+            }
+            String orderNote = StringUtils.trimToEmpty(orderNumber);
+            for (JsonNode refund : items) {
+                String notesOrder = StringUtils.trimToEmpty(refund.path("notes").path("order_number").asText(""));
+                long refundAmount = refund.path("amount").asLong(-1);
+                if (orderNote.equals(notesOrder) && refundAmount == amountPaise) {
+                    return refundId(refund);
+                }
+            }
+            for (JsonNode refund : items) {
+                if (refund.path("amount").asLong(-1) == amountPaise) {
+                    return refundId(refund);
+                }
+            }
+            return refundId(items.get(items.size() - 1));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return Optional.empty();
+        } catch (IOException e) {
+            return Optional.empty();
+        }
+    }
+
+    private static Optional<String> refundId(JsonNode refund) {
+        return Optional.ofNullable(refund.path("id").asText(null)).filter(StringUtils::isNotBlank);
     }
 }
