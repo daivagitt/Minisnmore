@@ -1,16 +1,59 @@
 import { CheckCircle2, Home, Package, Truck, type LucideIcon } from "lucide-react";
 
+export type TrackingStageState = "current" | "done" | "upcoming";
+
 export const TRACKING_STAGES = [
-  { key: "pending", icon: CheckCircle2, label: "Order placed" },
-  { key: "processing", icon: Package, label: "Hand-wrapped" },
-  { key: "shipped", icon: Truck, label: "On the way" },
-  { key: "delivered", icon: Home, label: "Delivered" },
+  {
+    key: "pending",
+    icon: CheckCircle2,
+    label: "Order placed",
+    detail: {
+      current: "We've received your order and are confirming it.",
+      done: "Order received.",
+      upcoming: "Waiting for your order.",
+    },
+  },
+  {
+    key: "processing",
+    icon: Package,
+    label: "Hand-wrapped",
+    detail: {
+      current:
+        "We're packing yours with tissue, twine, and a tiny note — usually 1–3 business days before dispatch.",
+      done: "Hand-wrapped with care.",
+      upcoming: "We'll hand-wrap yours with tissue, twine, and a tiny note before dispatch.",
+    },
+  },
+  {
+    key: "shipped",
+    icon: Truck,
+    label: "On the way",
+    detail: {
+      current: "Your parcel is with the courier — tracking updates appear as they move.",
+      done: "Handed to the courier.",
+      upcoming: "Tracking appears once we dispatch.",
+    },
+  },
+  {
+    key: "delivered",
+    icon: Home,
+    label: "Delivered",
+    detail: {
+      current: "It's with you — enjoy the little moments.",
+      done: "Delivered to your door.",
+      upcoming: "Almost there.",
+    },
+  },
 ] as const;
 
+/**
+ * Paid / confirmed orders stay on stage 0 until shipment.
+ * Hand-wrapped (index 1) is not auto-advanced — it only completes once the order ships.
+ */
 const STATUS_INDEX: Record<string, number> = {
   pending: 0,
-  confirmed: 1,
-  processing: 1,
+  confirmed: 0,
+  processing: 0,
   shipped: 2,
   delivered: 3,
   fulfilled: 3,
@@ -33,8 +76,48 @@ export function resolveTrackingStage(order: OrderTrackingFields) {
   return STATUS_INDEX[String(order.status ?? "").toLowerCase()] ?? 0;
 }
 
+function normalizedTrackingKey(order: OrderTrackingFields): string {
+  const tracking = (order.tracking_status ?? order.status ?? "pending").toLowerCase();
+  if (tracking === "fulfilled") return "delivered";
+  return tracking;
+}
+
+function isConfirmedAwaitingPack(order: OrderTrackingFields): boolean {
+  const key = normalizedTrackingKey(order);
+  return key === "processing" || key === "confirmed";
+}
+
 export function trackingStatusLabel(order: OrderTrackingFields) {
+  const key = normalizedTrackingKey(order);
+  if (key === "cancelled" || key === "canceled") return "Cancelled";
+  if (isConfirmedAwaitingPack(order)) return "Order confirmed";
+  const stage = TRACKING_STAGES.find((s) => s.key === key);
+  if (stage) return stage.label;
   return (order.tracking_status ?? order.status ?? "pending").replace(/_/g, " ");
+}
+
+/** Label for a timeline row — stage 0 becomes "Order confirmed" after payment. */
+export function trackingStageLabel(order: OrderTrackingFields, stageKey: string): string {
+  if (stageKey === "pending" && isConfirmedAwaitingPack(order)) return "Order confirmed";
+  return TRACKING_STAGES.find((s) => s.key === stageKey)?.label ?? stageKey;
+}
+
+export function trackingStageDetail(
+  order: OrderTrackingFields,
+  stageKey: string,
+  state: TrackingStageState,
+): string {
+  if (stageKey === "pending" && isConfirmedAwaitingPack(order)) {
+    if (state === "current") {
+      return "Your order is confirmed — we'll hand-wrap it with care before dispatch (usually 1–3 business days).";
+    }
+    if (state === "done") return "Order confirmed.";
+  }
+  const stage = TRACKING_STAGES.find((s) => s.key === stageKey);
+  if (stage) return stage.detail[state];
+  if (state === "done") return "Completed";
+  if (state === "current") return "In progress";
+  return "Upcoming";
 }
 
 const TERMINAL_TRACKING_STATUSES = new Set(["delivered", "fulfilled", "cancelled", "canceled"]);
@@ -58,25 +141,20 @@ export function trackingStageIcon(key: string): LucideIcon {
   return TRACKING_STAGES.find((s) => s.key === key)?.icon ?? Package;
 }
 
-function normalizedTrackingKey(order: OrderTrackingFields): string {
-  const tracking = (order.tracking_status ?? order.status ?? "pending").toLowerCase();
-  if (tracking === "fulfilled") return "delivered";
-  return tracking;
-}
-
 /** Customer-facing headline for order activity feeds (notifications, etc.). */
 export function trackingActivityTitle(order: OrderTrackingFields): string {
   const key = normalizedTrackingKey(order);
   if (key === "cancelled" || key === "canceled") return "Order cancelled";
+  if (isConfirmedAwaitingPack(order)) return "Order confirmed";
   const stage = TRACKING_STAGES.find((s) => s.key === key);
   if (stage) return stage.label;
-  if (key === "confirmed") return "Order confirmed";
   return "Order update";
 }
 
 export function trackingActivityIcon(order: OrderTrackingFields): LucideIcon {
   const key = normalizedTrackingKey(order);
   if (key === "cancelled" || key === "canceled") return Package;
+  if (isConfirmedAwaitingPack(order)) return CheckCircle2;
   return trackingStageIcon(key);
 }
 

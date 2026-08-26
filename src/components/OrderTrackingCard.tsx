@@ -3,6 +3,8 @@ import {
   TRACKING_STAGES,
   type OrderTrackingFields,
   resolveTrackingStage,
+  trackingStageDetail,
+  trackingStageLabel,
   trackingStatusLabel,
 } from "@/lib/order-tracking";
 
@@ -22,10 +24,12 @@ export function OrderTrackingCard({ order, showHeader = true }: Props) {
     );
   }
 
+  const currentStage = TRACKING_STAGES[idx];
+
   return (
     <div>
       <p className="sr-only">
-        Step {idx + 1} of {TRACKING_STAGES.length}: {TRACKING_STAGES[idx].label}
+        Step {idx + 1} of {TRACKING_STAGES.length}: {trackingStageLabel(order, currentStage.key)}
       </p>
       {showHeader && (
         <>
@@ -41,7 +45,10 @@ export function OrderTrackingCard({ order, showHeader = true }: Props) {
               />
             </div>
           )}
-          <div className="font-display text-2xl mt-1 capitalize">{trackingStatusLabel(order)}</div>
+          <div className="font-display text-2xl mt-1">{trackingStatusLabel(order)}</div>
+          <p className="text-sm text-muted-foreground mt-1 max-w-xl">
+            {trackingStageDetail(order, currentStage.key, "current")}
+          </p>
         </>
       )}
 
@@ -81,12 +88,15 @@ export function OrderTrackingCard({ order, showHeader = true }: Props) {
             const Icon = stage.icon;
             const done = i <= idx;
             const current = i === idx;
-            const state = done ? "Completed" : "Upcoming";
+            const state = current ? "current" : done ? "done" : "upcoming";
+            const label = trackingStageLabel(order, stage.key);
+            const detail = trackingStageDetail(order, stage.key, state);
+            const ariaState = current ? "Current" : done ? "Completed" : "Upcoming";
             return (
               <div
                 key={stage.key}
                 role="listitem"
-                aria-label={`${stage.label}: ${state}`}
+                aria-label={`${label}: ${ariaState}. ${detail}`}
                 aria-current={current ? "step" : undefined}
                 className="flex gap-4 items-start relative"
               >
@@ -98,10 +108,8 @@ export function OrderTrackingCard({ order, showHeader = true }: Props) {
                   <Icon className="h-4 w-4" />
                 </div>
                 <div className={`glass rounded-2xl p-4 flex-1 ${current ? "ring-2 ring-primary/40" : ""}`}>
-                  <div className="font-medium text-sm">{stage.label}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    {done ? "Completed" : "Upcoming"}
-                  </div>
+                  <div className="font-medium text-sm">{label}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{detail}</div>
                 </div>
               </div>
             );

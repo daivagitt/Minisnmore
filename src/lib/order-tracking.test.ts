@@ -5,6 +5,9 @@ import {
   shouldPollOrderTracking,
   trackingActivityDate,
   trackingActivityTitle,
+  trackingStageDetail,
+  trackingStageLabel,
+  trackingStatusLabel,
 } from "@/lib/order-tracking";
 
 describe("order-tracking helpers", () => {
@@ -22,14 +25,30 @@ describe("order-tracking helpers", () => {
     expect(shouldPollOrderTracking({ payment_status: "paid", status: "fulfilled" })).toBe(false);
   });
 
-  it("prefers tracking_status for stage resolution", () => {
+  it("does not auto-advance Hand-wrapped on payment confirmation", () => {
+    expect(resolveTrackingStage({ status: "confirmed", tracking_status: "processing" })).toBe(0);
+    expect(resolveTrackingStage({ status: "confirmed" })).toBe(0);
+    expect(trackingStatusLabel({ tracking_status: "processing" })).toBe("Order confirmed");
+    expect(trackingStageLabel({ tracking_status: "processing" }, "pending")).toBe("Order confirmed");
+    expect(trackingStageLabel({ tracking_status: "processing" }, "processing")).toBe("Hand-wrapped");
+  });
+
+  it("marks Hand-wrapped complete only once shipped", () => {
+    expect(resolveTrackingStage({ tracking_status: "shipped" })).toBe(2);
     expect(resolveTrackingStage({ status: "confirmed", tracking_status: "shipped" })).toBe(2);
   });
 
   it("builds activity titles from tracking_status", () => {
+    expect(trackingActivityTitle({ tracking_status: "processing" })).toBe("Order confirmed");
     expect(trackingActivityTitle({ tracking_status: "shipped" })).toBe("On the way");
     expect(trackingActivityTitle({ tracking_status: "delivered" })).toBe("Delivered");
     expect(trackingActivityTitle({ status: "cancelled" })).toBe("Order cancelled");
+  });
+
+  it("keeps hand-wrapped as upcoming copy while confirmed", () => {
+    const order = { tracking_status: "processing" };
+    expect(trackingStageDetail(order, "processing", "upcoming")).toMatch(/hand-wrap/i);
+    expect(trackingStageDetail(order, "pending", "current")).toMatch(/confirmed/i);
   });
 
   it("prefers shipment date for in-transit activity", () => {
