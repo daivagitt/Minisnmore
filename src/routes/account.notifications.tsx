@@ -52,6 +52,8 @@ function datePrefixForEventType(eventType: string): string {
       return "Ordered";
     case "payment_received":
       return "Paid";
+    case "hand_wrapped":
+      return "Wrapped";
     case "shipped":
       return "Shipped";
     case "delivered":

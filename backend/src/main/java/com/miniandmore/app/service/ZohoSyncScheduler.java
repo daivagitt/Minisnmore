@@ -62,7 +62,7 @@ public class ZohoSyncScheduler {
         customerOrderRepository
             .findOrdersForZohoTrackingPull(
                 PaymentStatus.PAID,
-                List.of(OrderStatus.PENDING, OrderStatus.CONFIRMED),
+                List.of(OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.HAND_WRAPPED),
                 PageRequest.of(0, TRACKING_PULL_BATCH)
             )
             .forEach(order -> {

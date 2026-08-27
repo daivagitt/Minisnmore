@@ -15,6 +15,7 @@ describe("order-status labels", () => {
 
   it("maps order status to customer-facing labels", () => {
     expect(formatOrderStatusLabel("confirmed")).toBe("Order confirmed");
+    expect(formatOrderStatusLabel("hand_wrapped")).toBe("Hand-wrapped");
     expect(formatOrderStatusLabel("pending")).toBe("Awaiting payment");
     expect(formatOrderStatusLabel("fulfilled")).toBe("Delivered");
   });
@@ -62,9 +63,9 @@ describe("order-status labels", () => {
         payment_status: "paid",
         payment_method: "online",
         status: "fulfilled",
-        tracking_status: "processing",
+        tracking_status: "hand_wrapped",
       }),
-    ).toBe("Paid · Order confirmed");
+    ).toBe("Paid · Hand-wrapped");
   });
 
   it("detects COD orders", () => {

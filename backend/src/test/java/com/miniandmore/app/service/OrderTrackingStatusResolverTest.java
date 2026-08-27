@@ -38,6 +38,13 @@ class OrderTrackingStatusResolverTest {
     }
 
     @Test
+    void resolve_paidPendingOrderDoesNotImplicitlyBecomeHandWrapped() {
+        CustomerOrder order = paidOrder().status(OrderStatus.PENDING);
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("confirmed");
+    }
+
+    @Test
     void resolve_shippedCodOrderWhilePaymentIsPending() {
         CustomerOrder order = paidOrder()
             .paymentStatus(PaymentStatus.PENDING)
@@ -62,10 +69,17 @@ class OrderTrackingStatusResolverTest {
     }
 
     @Test
-    void resolve_processingForConfirmedPaidOrder() {
+    void resolve_confirmedForConfirmedPaidOrder() {
         CustomerOrder order = paidOrder().status(OrderStatus.CONFIRMED);
 
-        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("processing");
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("confirmed");
+    }
+
+    @Test
+    void resolve_handWrappedForExplicitBackendState() {
+        CustomerOrder order = paidOrder().status(OrderStatus.HAND_WRAPPED);
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("hand_wrapped");
     }
 
     @Test
@@ -90,9 +104,9 @@ class OrderTrackingStatusResolverTest {
     }
 
     @Test
-    void resolve_processingWhenZohoOrderClosedButNotShipped() {
+    void resolve_confirmedWhenZohoOrderClosedButNotShipped() {
         CustomerOrder order = paidOrder().zohoOrderStatus("closed");
 
-        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("processing");
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("confirmed");
     }
 }

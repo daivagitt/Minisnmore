@@ -79,6 +79,16 @@ class ZohoOrderStatusTest {
     }
 
     @Test
+    void applySalesOrderTracking_marksDeliveredWhenZohoIsFulfilledWithoutChallan() {
+        CustomerOrder order = paidOrder();
+
+        ZohoOrderStatus.applySalesOrderTracking(order, Map.of("status", "fulfilled"));
+
+        assertThat(order.getZohoOrderStatus()).isEqualTo("fulfilled");
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+    }
+
+    @Test
     void applySalesOrderTracking_invoicedClosedOrderStaysConfirmed() {
         CustomerOrder order = paidOrder();
         Map<String, Object> salesOrder = Map.of(
@@ -98,8 +108,9 @@ class ZohoOrderStatusTest {
     }
 
     @Test
-    void isDelivered_onlyMatchesDeliveredStatus() {
+    void isDelivered_recognizesFulfilledAndDeliveredStatuses() {
         assertThat(ZohoOrderStatus.isDelivered("delivered")).isTrue();
+        assertThat(ZohoOrderStatus.isDelivered("fulfilled")).isTrue();
         assertThat(ZohoOrderStatus.isDelivered("closed")).isFalse();
         assertThat(ZohoOrderStatus.isDelivered("invoiced")).isFalse();
     }
@@ -108,6 +119,7 @@ class ZohoOrderStatusTest {
     void isShipped_recognizesZohoVariants() {
         assertThat(ZohoOrderStatus.isShipped("shipped")).isTrue();
         assertThat(ZohoOrderStatus.isShipped("in_transit")).isTrue();
+        assertThat(ZohoOrderStatus.isShipped("fulfilled")).isFalse();
         assertThat(ZohoOrderStatus.isShipped("invoiced")).isFalse();
     }
 }

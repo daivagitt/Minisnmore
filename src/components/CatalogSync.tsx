@@ -17,7 +17,7 @@ export function CatalogSync() {
   }, []);
 
   useEffect(() => {
-    if (!productsLoaded || !accountSyncReady || products.length === 0) return;
+    if (!productsLoaded || !accountSyncReady) return;
 
     const validIds = products.map((p) => p.id);
     const valid = new Set(validIds);

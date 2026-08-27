@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { Product } from "@/data/products";
-import { useProduct, useProducts } from "@/hooks/useProducts";
+import { useProduct, useProducts, useProductsLoaded } from "@/hooks/useProducts";
 import { useShop } from "@/store/shop";
 import { Heart, Truck, Leaf, ChevronRight, Ruler, Plus, Minus, Share2, X, BadgeCheck, Banknote, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
@@ -49,6 +49,7 @@ export const Route = createFileRoute("/product/$slug")({
 function ProductPage() {
   const { slug } = Route.useParams();
   const products = useProducts();
+  const productsLoaded = useProductsLoaded();
   const product = useProduct(slug) as Product | undefined;
   const { addToCart, toggleWish, wishlist } = useShop();
   const defaults = product ? defaultSellableSelection(product) : { size: null as string | null, color: null as string | null };
@@ -148,9 +149,17 @@ function ProductPage() {
   };
 
   if (!product) {
+    if (!productsLoaded) {
+      return (
+        <div className="px-6 py-24 text-center">
+          <div className="font-display text-3xl">Loading…</div>
+        </div>
+      );
+    }
     return (
       <div className="px-6 py-24 text-center">
-        <div className="font-display text-3xl">Loading…</div>
+        <div className="font-display text-3xl">Piece not found</div>
+        <Link to="/shop" className="story-link mt-4 inline-block">Back to shop</Link>
       </div>
     );
   }

@@ -90,12 +90,14 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     @Query(
         value = "select customerOrder from CustomerOrder customerOrder where customerOrder.paymentMethod = 'cod' and " +
-        "customerOrder.status = com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED and " +
+        "customerOrder.status in (com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED, " +
+        "com.miniandmore.app.domain.enumeration.OrderStatus.HAND_WRAPPED) and " +
         "(customerOrder.zohoSyncStatus in :statuses or customerOrder.zohoSyncStatus is null) and " +
         "(customerOrder.zohoSalesOrderId is null or customerOrder.zohoInvoiceId is null or customerOrder.zohoInvoiceId = '') " +
         "order by customerOrder.id asc",
         countQuery = "select count(customerOrder) from CustomerOrder customerOrder where customerOrder.paymentMethod = 'cod' and " +
-        "customerOrder.status = com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED and " +
+        "customerOrder.status in (com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED, " +
+        "com.miniandmore.app.domain.enumeration.OrderStatus.HAND_WRAPPED) and " +
         "(customerOrder.zohoSyncStatus in :statuses or customerOrder.zohoSyncStatus is null) and " +
         "(customerOrder.zohoSalesOrderId is null or customerOrder.zohoInvoiceId is null or customerOrder.zohoInvoiceId = '')"
     )

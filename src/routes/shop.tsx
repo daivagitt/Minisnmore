@@ -2,9 +2,10 @@ import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router"
 import { useEffect, useMemo, useState } from "react";
 import { ProductCard } from "@/components/ProductCard";
 import { ListPagination } from "@/components/ListPagination";
+import { ProductGridSkeleton } from "@/components/ProductGridSkeleton";
 import { type AgeRange, type Fabric } from "@/data/products";
 import { useCategories } from "@/hooks/useCategories";
-import { useProducts } from "@/hooks/useProducts";
+import { useProducts, useProductsLoaded } from "@/hooks/useProducts";
 import {
   buildShopSearch,
   filterAndSortProducts,
@@ -34,6 +35,7 @@ export const Route = createFileRoute("/shop")({
 
 function Shop() {
   const products = useProducts();
+  const productsLoaded = useProductsLoaded();
   const categories = useCategories();
   const search = useSearch({ from: "/shop" });
   const navigate = useNavigate({ from: "/shop" });
@@ -221,32 +223,38 @@ function Shop() {
         </select>
       </div>
 
-      <div id="shop-product-grid" className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
-        {pageItems.map((p, i) => (
-          <ProductCard key={p.id} product={p} index={i} />
-        ))}
-      </div>
-      <ListPagination
-        page={page}
-        totalPages={pages}
-        totalItems={filtered.length}
-        pageSize={GRID_PAGE_SIZE}
-        scrollToId="shop-product-grid"
-        onPageChange={(next) => patchSearch({ page: next > 1 ? next : undefined })}
-      />
-      {filtered.length === 0 && (
-        <div className="glass-strong rounded-3xl p-16 text-center text-muted-foreground">
-          {activeFilters
-            ? "Nothing matches your search or filters yet."
-            : "No products are available right now."}
-          {activeFilters && (
-            <div className="mt-4">
-              <button type="button" onClick={clearFilters} className="text-primary story-link text-sm">
-                Clear search and filters
-              </button>
+      {!productsLoaded && filtered.length === 0 ? (
+        <ProductGridSkeleton count={10} />
+      ) : (
+        <>
+          <div id="shop-product-grid" className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
+            {pageItems.map((p, i) => (
+              <ProductCard key={p.id} product={p} index={i} />
+            ))}
+          </div>
+          <ListPagination
+            page={page}
+            totalPages={pages}
+            totalItems={filtered.length}
+            pageSize={GRID_PAGE_SIZE}
+            scrollToId="shop-product-grid"
+            onPageChange={(next) => patchSearch({ page: next > 1 ? next : undefined })}
+          />
+          {filtered.length === 0 && (
+            <div className="glass-strong rounded-3xl p-16 text-center text-muted-foreground">
+              {activeFilters
+                ? "Nothing matches your search or filters yet."
+                : "No products are available right now."}
+              {activeFilters && (
+                <div className="mt-4">
+                  <button type="button" onClick={clearFilters} className="text-primary story-link text-sm">
+                    Clear search and filters
+                  </button>
+                </div>
+              )}
             </div>
           )}
-        </div>
+        </>
       )}
     </div>
   );

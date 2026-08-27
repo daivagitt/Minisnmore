@@ -432,7 +432,7 @@ public class LedgerlySyncService {
         LedgerlySyncSummary.Builder builder = LedgerlySyncSummary.builder();
         Page<CustomerOrder> page = customerOrderRepository.findOrdersForLedgerlyTrackingPull(
             PaymentStatus.PAID,
-            List.of(OrderStatus.PENDING, OrderStatus.CONFIRMED),
+            List.of(OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.HAND_WRAPPED),
             PageRequest.of(0, 3)
         );
         for (CustomerOrder order : page.getContent()) {

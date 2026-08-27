@@ -19,7 +19,7 @@ export const TRACKING_STAGES = [
     label: "Hand-wrapped",
     detail: {
       current:
-        "We're packing yours with tissue, twine, and a tiny note — usually 1–3 business days before dispatch.",
+        "Your order has been hand-wrapped with tissue, twine, and a tiny note — it's waiting for dispatch.",
       done: "Hand-wrapped with care.",
       upcoming: "We'll hand-wrap yours with tissue, twine, and a tiny note before dispatch.",
     },
@@ -47,13 +47,15 @@ export const TRACKING_STAGES = [
 ] as const;
 
 /**
- * Paid / confirmed orders stay on stage 0 until shipment.
- * Hand-wrapped (index 1) is not auto-advanced — it only completes once the order ships.
+ * Confirmed orders stay at stage 0 until operations explicitly marks them hand-wrapped.
+ * The Hand-wrapped phase completes once the order ships.
  */
 const STATUS_INDEX: Record<string, number> = {
   pending: 0,
   confirmed: 0,
-  processing: 0,
+  processing: 1,
+  hand_wrapped: 1,
+  wrapped: 1,
   shipped: 2,
   delivered: 3,
   fulfilled: 3,
@@ -79,18 +81,20 @@ export function resolveTrackingStage(order: OrderTrackingFields) {
 function normalizedTrackingKey(order: OrderTrackingFields): string {
   const tracking = (order.tracking_status ?? order.status ?? "pending").toLowerCase();
   if (tracking === "fulfilled") return "delivered";
+  if (tracking === "wrapped") return "hand_wrapped";
   return tracking;
 }
 
-function isConfirmedAwaitingPack(order: OrderTrackingFields): boolean {
+function isHandWrapped(order: OrderTrackingFields): boolean {
   const key = normalizedTrackingKey(order);
-  return key === "processing" || key === "confirmed";
+  return key === "processing" || key === "hand_wrapped";
 }
 
 export function trackingStatusLabel(order: OrderTrackingFields) {
   const key = normalizedTrackingKey(order);
   if (key === "cancelled" || key === "canceled") return "Cancelled";
-  if (isConfirmedAwaitingPack(order)) return "Order confirmed";
+  if (key === "confirmed") return "Order confirmed";
+  if (isHandWrapped(order)) return "Hand-wrapped";
   const stage = TRACKING_STAGES.find((s) => s.key === key);
   if (stage) return stage.label;
   return (order.tracking_status ?? order.status ?? "pending").replace(/_/g, " ");
@@ -98,7 +102,8 @@ export function trackingStatusLabel(order: OrderTrackingFields) {
 
 /** Label for a timeline row — stage 0 becomes "Order confirmed" after payment. */
 export function trackingStageLabel(order: OrderTrackingFields, stageKey: string): string {
-  if (stageKey === "pending" && isConfirmedAwaitingPack(order)) return "Order confirmed";
+  const key = normalizedTrackingKey(order);
+  if (stageKey === "pending" && (key === "confirmed" || isHandWrapped(order))) return "Order confirmed";
   return TRACKING_STAGES.find((s) => s.key === stageKey)?.label ?? stageKey;
 }
 
@@ -107,7 +112,8 @@ export function trackingStageDetail(
   stageKey: string,
   state: TrackingStageState,
 ): string {
-  if (stageKey === "pending" && isConfirmedAwaitingPack(order)) {
+  const key = normalizedTrackingKey(order);
+  if (stageKey === "pending" && (key === "confirmed" || isHandWrapped(order))) {
     if (state === "current") {
       return "Your order is confirmed — we'll hand-wrap it with care before dispatch (usually 1–3 business days).";
     }
@@ -145,7 +151,8 @@ export function trackingStageIcon(key: string): LucideIcon {
 export function trackingActivityTitle(order: OrderTrackingFields): string {
   const key = normalizedTrackingKey(order);
   if (key === "cancelled" || key === "canceled") return "Order cancelled";
-  if (isConfirmedAwaitingPack(order)) return "Order confirmed";
+  if (key === "confirmed") return "Order confirmed";
+  if (isHandWrapped(order)) return "Hand-wrapped";
   const stage = TRACKING_STAGES.find((s) => s.key === key);
   if (stage) return stage.label;
   return "Order update";
@@ -154,7 +161,7 @@ export function trackingActivityTitle(order: OrderTrackingFields): string {
 export function trackingActivityIcon(order: OrderTrackingFields): LucideIcon {
   const key = normalizedTrackingKey(order);
   if (key === "cancelled" || key === "canceled") return Package;
-  if (isConfirmedAwaitingPack(order)) return CheckCircle2;
+  if (isHandWrapped(order)) return Package;
   return trackingStageIcon(key);
 }
 

@@ -376,6 +376,7 @@ export type AdminCodOrderRow = {
 };
 
 export type AdminOrderRow = AdminCodOrderRow & {
+  tracking_status?: string;
   payment_status: string;
   payment_method: string;
   zoho_sync_status: string;
@@ -459,6 +460,14 @@ export async function listCodPendingOrders(): Promise<{ orders: AdminCodOrderRow
 export async function markCodCollected(orderNumber: string) {
   return api.post(
     `/api/v1/admin/orders/${encodeURIComponent(orderNumber)}/mark-cod-collected`,
+    undefined,
+    { auth: true },
+  );
+}
+
+export async function markOrderHandWrapped(orderNumber: string) {
+  return api.post(
+    `/api/v1/admin/orders/${encodeURIComponent(orderNumber)}/mark-hand-wrapped`,
     undefined,
     { auth: true },
   );

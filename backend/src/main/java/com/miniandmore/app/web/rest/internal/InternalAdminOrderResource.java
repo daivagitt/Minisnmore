@@ -9,6 +9,7 @@ import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import com.miniandmore.app.service.LedgerlySyncService;
 import com.miniandmore.app.service.OrderEventService;
+import com.miniandmore.app.service.OrderTrackingStatusResolver;
 import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import com.miniandmore.app.web.rest.v1.ApiResponse;
@@ -168,6 +169,47 @@ public class InternalAdminOrderResource {
         return ApiResponse.ok(Map.of("ok", true, "orderNumber", saved.getOrderNumber(), "paymentStatus", "paid"));
     }
 
+    @PostMapping("/{orderNumber}/mark-hand-wrapped")
+    @Transactional
+    public ApiResponse<Map<String, Object>> markHandWrapped(@PathVariable String orderNumber) {
+        CustomerOrder order = dataAccess
+            .customerOrderRepository()
+            .findOneByOrderNumber(orderNumber)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+
+        String trackingStatus = OrderTrackingStatusResolver.resolve(order);
+        if ("shipped".equals(trackingStatus) || "delivered".equals(trackingStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This order has already been dispatched");
+        }
+        if (order.getStatus() == OrderStatus.HAND_WRAPPED) {
+            orderEventService.syncLifecycleEvents(order);
+            return handWrappedResponse(order);
+        }
+        if (order.getStatus() != OrderStatus.CONFIRMED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only a confirmed order can be marked as hand-wrapped");
+        }
+
+        order.setStatus(OrderStatus.HAND_WRAPPED);
+        CustomerOrder saved = dataAccess.customerOrderRepository().save(order);
+        orderEventService.syncLifecycleEvents(saved);
+        return handWrappedResponse(saved);
+    }
+
+    private static ApiResponse<Map<String, Object>> handWrappedResponse(CustomerOrder order) {
+        return ApiResponse.ok(
+            Map.of(
+                "ok",
+                true,
+                "orderNumber",
+                order.getOrderNumber(),
+                "status",
+                "hand_wrapped",
+                "trackingStatus",
+                "hand_wrapped"
+            )
+        );
+    }
+
     private Map<String, Object> summary(CustomerOrder order) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("id", order.getId());
@@ -175,6 +217,7 @@ public class InternalAdminOrderResource {
         data.put("total", order.getTotal());
         data.put("cod_fee", order.getCodFee());
         data.put("status", order.getStatus() == null ? "" : order.getStatus().name().toLowerCase());
+        data.put("tracking_status", OrderTrackingStatusResolver.resolve(order));
         data.put("payment_status", order.getPaymentStatus() == null ? "" : order.getPaymentStatus().name().toLowerCase());
         data.put("payment_method", StringUtils.defaultString(order.getPaymentMethod()).toLowerCase());
         data.put("placed_at", order.getPlacedAt() == null ? "" : order.getPlacedAt().toString());
@@ -199,7 +242,8 @@ public class InternalAdminOrderResource {
 
     private static boolean isZohoSyncEligible(CustomerOrder order) {
         return order.getPaymentStatus() == PaymentStatus.PAID ||
-        (ZohoSyncService.isCodOrder(order) && order.getStatus() == OrderStatus.CONFIRMED);
+        (ZohoSyncService.isCodOrder(order) &&
+            (order.getStatus() == OrderStatus.CONFIRMED || order.getStatus() == OrderStatus.HAND_WRAPPED));
     }
 
     private static String lower(Enum<?> value) {

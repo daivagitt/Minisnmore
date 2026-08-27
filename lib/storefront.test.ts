@@ -304,10 +304,26 @@ describe("storefront cache", () => {
     await vi.waitFor(() => expect(storefront.getCachedProducts()?.[0]?.slug).toBe("a"));
   });
 
-  it("falls back to seed products when the backend is empty", async () => {
+  it("returns an empty catalog when the backend has no products", async () => {
     const storefront = await loadStorefront({ products: [] });
     const products = await storefront.loadProducts();
-    expect(products.length).toBeGreaterThan(0);
+    expect(products).toEqual([]);
+  });
+
+  it("returns an empty catalog when the product API fails", async () => {
+    vi.resetModules();
+    const listProducts = vi.fn(async () => {
+      throw new Error("catalog down");
+    });
+    vi.doMock("@/lib/backend-data", () => ({
+      listProducts,
+      listCategories: vi.fn(async () => []),
+      listBlogPosts: vi.fn(async () => []),
+      getPolicy: vi.fn(async () => null),
+    }));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const storefront = await import("./storefront");
+    await expect(storefront.loadProducts()).resolves.toEqual([]);
   });
 
   it("maps blog posts and falls back to excerpts for body content", async () => {

@@ -193,13 +193,13 @@ Create-order responses use **camelCase** for Razorpay integration fields. `total
 |-------|------|-------------|
 | `id` | number | Internal order id |
 | `order_number` | string | Public order number (`MNM-…`) |
-| `status` | string | `pending`, `confirmed`, `fulfilled`, `cancelled` |
+| `status` | string | `pending`, `confirmed`, `hand_wrapped`, `fulfilled`, `cancelled` |
 | `payment_status` | string | `pending`, `paid`, `failed`, `refunded` |
 | `payment_method` | string | `online`, `cod` |
 | `total` | number | Order total (INR) |
 | `created_at` | string | ISO-8601 instant |
 | `order_items` | array | Line items — see below |
-| `tracking_status` | string | `pending`, `processing`, `shipped`, `delivered`, `cancelled` |
+| `tracking_status` | string | `pending`, `confirmed`, `hand_wrapped`, `shipped`, `delivered`, `cancelled` |
 | `tracking_number` | string | Carrier tracking id (may be empty) |
 | `tracking_carrier` | string | Carrier name (may be empty) |
 | `shipment_date` | string | `YYYY-MM-DD` or empty |
@@ -233,7 +233,7 @@ Create-order responses use **camelCase** for Razorpay integration fields. `total
   "order": {
     "order_number": "MNM-20260818-ABC",
     "status": "confirmed",
-    "tracking_status": "processing",
+    "tracking_status": "confirmed",
     "tracking_number": "",
     "tracking_carrier": "",
     "shipment_date": ""

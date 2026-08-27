@@ -2769,7 +2769,7 @@ public class ZohoSyncService {
         ZohoSyncSummary.Builder builder = ZohoSyncSummary.builder();
         Page<CustomerOrder> page = customerOrderRepository.findOrdersForZohoTrackingPull(
             PaymentStatus.PAID,
-            List.of(OrderStatus.PENDING, OrderStatus.CONFIRMED),
+            List.of(OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.HAND_WRAPPED),
             PageRequest.of(0, 50)
         );
         for (CustomerOrder order : page.getContent()) {

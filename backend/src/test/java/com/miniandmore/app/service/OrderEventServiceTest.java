@@ -95,6 +95,20 @@ class OrderEventServiceTest {
     }
 
     @Test
+    void syncLifecycleEvents_handWrapped_recordsCustomerVisibleEvent() {
+        CustomerOrder order = baseOrder().status(OrderStatus.HAND_WRAPPED).paymentStatus(PaymentStatus.PAID);
+        when(orderEventRepository.existsByOrderIdAndEventType(any(), any())).thenReturn(true);
+        when(orderEventRepository.existsByOrderIdAndEventType(42L, OrderEventService.TYPE_HAND_WRAPPED)).thenReturn(false);
+
+        service.syncLifecycleEvents(order);
+
+        ArgumentCaptor<OrderEvent> captor = ArgumentCaptor.forClass(OrderEvent.class);
+        verify(orderEventRepository).save(captor.capture());
+        assertThat(captor.getValue().getEventType()).isEqualTo(OrderEventService.TYPE_HAND_WRAPPED);
+        assertThat(captor.getValue().getTitle()).isEqualTo("Hand-wrapped");
+    }
+
+    @Test
     void onOrderPaid_cod_skipsPaidConfirmation() {
         CustomerOrder order = baseOrder().paymentMethod("cod").status(OrderStatus.CONFIRMED).paymentStatus(PaymentStatus.PAID);
         when(orderEventRepository.existsByOrderIdAndEventType(42L, OrderEventService.TYPE_ORDER_PLACED)).thenReturn(true);

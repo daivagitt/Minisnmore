@@ -78,7 +78,10 @@ final class AdminOrderListSpec {
                         cb.equal(root.get("paymentStatus"), PaymentStatus.PAID),
                         cb.and(
                             cb.equal(cb.lower(cb.coalesce(root.get("paymentMethod"), "")), "cod"),
-                            cb.equal(root.get("status"), OrderStatus.CONFIRMED)
+                            cb.or(
+                                cb.equal(root.get("status"), OrderStatus.CONFIRMED),
+                                cb.equal(root.get("status"), OrderStatus.HAND_WRAPPED)
+                            )
                         )
                     )
                 );

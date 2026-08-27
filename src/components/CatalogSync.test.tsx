@@ -57,7 +57,7 @@ describe("CatalogSync", () => {
     localStorage.setItem("mnm_wish_u_30600", JSON.stringify(["39351", "999901"]));
   });
 
-  it("does not prune wishlist against seed catalog before live products load", async () => {
+  it("does not prune wishlist before live products load", async () => {
     productsState.products = [{ id: "p1" }, { id: "p2" }];
     productsState.loaded = false;
 
@@ -95,6 +95,22 @@ describe("CatalogSync", () => {
 
     await waitFor(() => {
       expect(localStorage.getItem("mnm_wish_u_30600")).toBe(JSON.stringify(["39351"]));
+    });
+  });
+
+  it("clears wishlist when the live catalog is empty", async () => {
+    productsState.products = [];
+    productsState.loaded = true;
+
+    render(
+      <ShopProvider>
+        <CatalogSync />
+        <WishlistProbe />
+      </ShopProvider>,
+    );
+
+    await waitFor(() => {
+      expect(localStorage.getItem("mnm_wish_u_30600")).toBe(JSON.stringify([]));
     });
   });
 });

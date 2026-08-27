@@ -602,7 +602,8 @@ public class InternalAccountOrderResource {
         if (order.getPaymentStatus() == PaymentStatus.PAID) {
             return true;
         }
-        return ZohoSyncService.isCodOrder(order) && order.getStatus() == OrderStatus.CONFIRMED;
+        return ZohoSyncService.isCodOrder(order) &&
+        (order.getStatus() == OrderStatus.CONFIRMED || order.getStatus() == OrderStatus.HAND_WRAPPED);
     }
 
     private void attemptLedgerlyOrderSync(CustomerOrder order) {

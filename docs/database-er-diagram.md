@@ -191,7 +191,7 @@ erDiagram
 | `DiscountType` | PERCENT, FLAT |
 | `LedgerlySyncStatus` | PENDING, SYNCED, FAILED |
 | `OrderReturnStatus` | REQUESTED, APPROVED, REJECTED, RECEIVED, REFUNDED, FAILED, CANCELLED |
-| `OrderStatus` | PENDING, CONFIRMED, CANCELLED, FULFILLED |
+| `OrderStatus` | PENDING, CONFIRMED, HAND_WRAPPED, CANCELLED, FULFILLED |
 | `PaymentStatus` | PENDING, PAID, FAILED, REFUNDED |
 
 ### Design note: Product variants/colors are JSON columns, not tables

@@ -614,7 +614,7 @@ class LedgerlySyncServiceTest {
         when(
             customerOrderRepository.findOrdersForLedgerlyTrackingPull(
                 eq(PaymentStatus.PAID),
-                eq(List.of(OrderStatus.PENDING, OrderStatus.CONFIRMED)),
+                eq(List.of(OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.HAND_WRAPPED)),
                 any(PageRequest.class)
             )
         ).thenReturn(new PageImpl<>(List.of(order)));
@@ -1049,7 +1049,7 @@ class LedgerlySyncServiceTest {
         when(
             customerOrderRepository.findOrdersForLedgerlyTrackingPull(
                 eq(PaymentStatus.PAID),
-                eq(List.of(OrderStatus.PENDING, OrderStatus.CONFIRMED)),
+                eq(List.of(OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.HAND_WRAPPED)),
                 any(PageRequest.class)
             )
         ).thenReturn(new PageImpl<>(List.of(order)));

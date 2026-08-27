@@ -76,7 +76,6 @@ public final class ZohoOrderStatus {
         String normalized = normalize(zohoOrderStatus);
         return normalized != null
             && (normalized.equals("shipped")
-                || normalized.equals("fulfilled")
                 || normalized.equals("dispatched")
                 || normalized.equals("in_transit")
                 || normalized.equals("partially_shipped"));
@@ -84,7 +83,7 @@ public final class ZohoOrderStatus {
 
     public static boolean isDelivered(String zohoOrderStatus) {
         String normalized = normalize(zohoOrderStatus);
-        return normalized != null && normalized.equals("delivered");
+        return normalized != null && (normalized.equals("fulfilled") || normalized.equals("delivered"));
     }
 
     @SuppressWarnings("unchecked")
@@ -119,8 +118,13 @@ public final class ZohoOrderStatus {
             order.setStatus(OrderStatus.CANCELLED);
             return;
         }
-        // Zoho "closed" / "invoiced" means the sales order is fully billed — not that the parcel was delivered.
-        // Fulfillment is set only from delivery challans (see applyDeliveryChallans).
+        // Operations use Zoho "fulfilled" as the explicit final-delivery action. This keeps
+        // storefront delivery tracking independent of delivery challans. "closed" / "invoiced"
+        // remain accounting states and do not mean that the parcel was delivered.
+        if ("fulfilled".equals(status) || "delivered".equals(status)) {
+            order.setStatus(OrderStatus.FULFILLED);
+            return;
+        }
         if (order.getStatus() == OrderStatus.PENDING && order.getPaymentStatus() == PaymentStatus.PAID) {
             order.setStatus(OrderStatus.CONFIRMED);
         }

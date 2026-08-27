@@ -6,6 +6,7 @@ package com.miniandmore.app.domain.enumeration;
 public enum OrderStatus {
     PENDING,
     CONFIRMED,
+    HAND_WRAPPED,
     CANCELLED,
     FULFILLED,
 }

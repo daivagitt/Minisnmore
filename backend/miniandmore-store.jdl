@@ -115,6 +115,7 @@ entity CustomerProfile {
 enum OrderStatus {
   PENDING,
   CONFIRMED,
+  HAND_WRAPPED,
   CANCELLED,
   FULFILLED
 }

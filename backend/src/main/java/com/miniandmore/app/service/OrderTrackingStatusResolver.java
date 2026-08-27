@@ -33,8 +33,13 @@ public final class OrderTrackingStatusResolver {
         ) {
             return "shipped";
         }
+        if (order.getStatus() == OrderStatus.HAND_WRAPPED) {
+            return "hand_wrapped";
+        }
         if (order.getStatus() == OrderStatus.CONFIRMED || order.getStatus() == OrderStatus.PENDING) {
-            return "processing";
+            // Payment alone must never imply that wrapping is complete. A paid PENDING row is an
+            // inconsistent/transitional record, but "confirmed" is still safer than advancing it.
+            return "confirmed";
         }
         return "pending";
     }

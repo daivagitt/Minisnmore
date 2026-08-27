@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { getCachedProducts, loadProducts, subscribeProducts } from "@/lib/storefront";
-import { products as seedProducts, type Product } from "@/data/products";
+import type { Product } from "@/data/products";
 
 export function useProducts(): Product[] {
-  const [list, setList] = useState<Product[]>(() => getCachedProducts() ?? seedProducts);
+  const [list, setList] = useState<Product[]>(() => getCachedProducts() ?? []);
   useEffect(() => {
     let alive = true;
     const unsub = subscribeProducts((p) => {
@@ -22,7 +22,7 @@ export function useProducts(): Product[] {
   return list;
 }
 
-/** True once live catalog data is available (seed data still renders immediately). */
+/** True once the live catalog request has finished (empty list is a real empty catalog). */
 export function useProductsLoaded(): boolean {
   const [loaded, setLoaded] = useState(() => getCachedProducts() !== null);
   useEffect(() => {
@@ -49,10 +49,6 @@ export function useProductsLoaded(): boolean {
 
 export function useProduct(slug: string | undefined): Product | undefined {
   const all = useProducts();
-  const loaded = useProductsLoaded();
   if (!slug) return undefined;
-  const found = all.find((p) => p.slug === slug);
-  if (found) return found;
-  if (!loaded) return undefined;
-  return seedProducts.find((p) => p.slug === slug);
+  return all.find((p) => p.slug === slug);
 }

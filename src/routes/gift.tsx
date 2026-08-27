@@ -3,7 +3,8 @@ import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 import { Gift as GiftIcon, Check, ArrowLeft, ArrowRight, Baby, Sparkles, Flower2, ShoppingBag } from "lucide-react";
 import heroBaby from "@/assets/hero-smiling-baby.jpg";
-import { products, type Product, type AgeRange } from "@/data/products";
+import { type Product, type AgeRange } from "@/data/products";
+import { useProducts, useProductsLoaded } from "@/hooks/useProducts";
 import { useShop } from "@/store/shop";
 import { toast } from "sonner";
 
@@ -41,17 +42,19 @@ function Gift() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const navigate = useNavigate();
   const { addToCart, setCartOpen } = useShop();
+  const catalog = useProducts();
+  const productsLoaded = useProductsLoaded();
 
   const bud = budgets.find((b) => b.id === budId)!;
 
   const curated = useMemo<Product[]>(() => {
-    return products
+    return catalog
       .filter((p) => p.ages.includes(age))
       .filter((p) => p.price <= bud.max)
       .slice(0, 8);
-  }, [age, bud]);
+  }, [age, bud, catalog]);
 
-  const fallbackCurated = curated.length > 0 ? curated : products.slice(0, 6);
+  const fallbackCurated = curated.length > 0 ? curated : catalog.slice(0, 6);
   const selectedTotal = fallbackCurated
     .filter((p) => selectedIds.includes(p.id))
     .reduce((s, p) => s + p.price, 0);
@@ -188,9 +191,17 @@ function Gift() {
                   </div>
                 )}
               </div>
-              {curated.length === 0 && (
+              {!productsLoaded && (
+                <div className="glass rounded-2xl p-6 text-sm text-muted-foreground">Loading gifts…</div>
+              )}
+              {productsLoaded && catalog.length === 0 && (
+                <div className="glass rounded-2xl p-6 text-sm text-muted-foreground">
+                  No products are available to gift right now.
+                </div>
+              )}
+              {productsLoaded && catalog.length > 0 && curated.length === 0 && (
                 <div className="glass rounded-2xl p-3 text-xs text-muted-foreground">
-                  No exact matches in that budget — showing our most-loved pieces instead.
+                  No exact matches in that budget — showing other pieces from the shop instead.
                 </div>
               )}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">

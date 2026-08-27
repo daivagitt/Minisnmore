@@ -25,6 +25,7 @@ export function formatOrderStatusLabel(status?: string): string {
   const normalized = (status ?? "").toLowerCase();
 
   if (normalized === "confirmed") return "Order confirmed";
+  if (normalized === "hand_wrapped" || normalized === "wrapped") return "Hand-wrapped";
   if (normalized === "pending") return "Awaiting payment";
   if (normalized === "fulfilled") return "Delivered";
   if (normalized === "cancelled" || normalized === "canceled") return "Cancelled";
@@ -33,7 +34,10 @@ export function formatOrderStatusLabel(status?: string): string {
 
 function formatFulfillmentLabel(order: OrderStatusFields): string {
   const tracking = (order.tracking_status ?? "").toLowerCase();
-  if (tracking === "processing") return "Order confirmed";
+  if (tracking === "confirmed") return "Order confirmed";
+  if (tracking === "processing" || tracking === "hand_wrapped" || tracking === "wrapped") {
+    return "Hand-wrapped";
+  }
   if (tracking === "shipped") return "On the way";
   if (tracking === "delivered") return "Delivered";
   if (tracking === "cancelled" || tracking === "canceled") return "Cancelled";

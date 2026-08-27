@@ -1,13 +1,13 @@
 import { listProducts, listBlogPosts, getPolicy, listCategories } from "@/lib/backend-data";
 import { agesFromSizes, sortSizesAsc } from "@/lib/product-ages";
 import { normalizeStorefrontColors, resolveStorefrontProductImages, hasPerColorGalleries } from "@/lib/product-colors";
-import { products as seedProducts, type Product, type Fabric } from "@/data/products";
+import { type Product, type Fabric } from "@/data/products";
 import { posts as seedPosts, type BlogPost } from "@/data/blog";
 import { parseVariantsJson, storefrontListPricing } from "@/lib/product-variants";
 
 /**
  * Storefront data layer.
- * Live data is fetched from the Spring Boot API; if empty, static seed data is used.
+ * Live catalog only — an empty or failed API response must not fall back to mock seed products.
  * Module-level caches dedupe in-flight requests across components.
  */
 
@@ -176,17 +176,17 @@ export async function loadProducts(): Promise<Product[]> {
             stock: row.stock,
           });
         });
-      const list = mapped.length > 0 ? mapped : seedProducts;
-      productsCache = list;
-      productSubs.forEach((fn) => fn(list));
-      return list;
+      productsCache = mapped;
+      productSubs.forEach((fn) => fn(mapped));
+      return mapped;
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error("loadProducts", error);
       }
-      productsCache = seedProducts;
-      productSubs.forEach((fn) => fn(seedProducts));
-      return seedProducts;
+      const empty: Product[] = [];
+      productsCache = empty;
+      productSubs.forEach((fn) => fn(empty));
+      return empty;
     } finally {
       productsInflight = null;
     }

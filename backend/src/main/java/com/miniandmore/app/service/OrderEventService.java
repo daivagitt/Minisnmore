@@ -27,6 +27,7 @@ public class OrderEventService {
 
     public static final String TYPE_ORDER_PLACED = "order_placed";
     public static final String TYPE_PAYMENT_RECEIVED = "payment_received";
+    public static final String TYPE_HAND_WRAPPED = "hand_wrapped";
     public static final String TYPE_SHIPPED = "shipped";
     public static final String TYPE_DELIVERED = "delivered";
     public static final String TYPE_CANCELLED = "cancelled";
@@ -89,6 +90,15 @@ public class OrderEventService {
 
         String tracking = OrderTrackingStatusResolver.resolve(order);
         switch (tracking) {
+            case "hand_wrapped":
+                recordIfAbsent(
+                    order,
+                    TYPE_HAND_WRAPPED,
+                    titleFor(TYPE_HAND_WRAPPED),
+                    bodyFor(order, TYPE_HAND_WRAPPED),
+                    Instant.now()
+                );
+                break;
             case "cancelled":
                 recordIfAbsent(
                     order,
@@ -212,6 +222,8 @@ public class OrderEventService {
                 return "Order placed";
             case TYPE_PAYMENT_RECEIVED:
                 return "Payment received";
+            case TYPE_HAND_WRAPPED:
+                return "Hand-wrapped";
             case TYPE_SHIPPED:
                 return "On the way";
             case TYPE_DELIVERED:
