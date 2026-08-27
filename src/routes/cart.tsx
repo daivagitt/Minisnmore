@@ -61,7 +61,6 @@ function CartPage() {
   const commerce = commerceFromSiteSettings(settings);
   const totals = orderTotals({ subtotal: cartTotal, discount, shipMode: "std", commerce });
   const shipping = totals.shipping;
-  const gst = totals.gst;
   const grand = totals.grand;
 
   if (cart.length === 0) {
@@ -142,7 +141,6 @@ function CartPage() {
                 : undefined
             }
           />
-          <Row label={`GST (${commerce.gstRate}%)`} val={`₹${gst.toLocaleString("en-IN")}`} muted />
           <div className="border-t border-border/60 my-2" />
           <Row label="Total" val={`₹${grand.toLocaleString("en-IN")}`} big />
         </div>

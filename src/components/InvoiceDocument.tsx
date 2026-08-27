@@ -92,7 +92,7 @@ export function InvoiceDocument({
     <article
       className={`invoice-document mx-auto bg-white text-slate-950 shadow-xl print:shadow-none ${compact ? "w-full p-4 text-[9px]" : "w-full max-w-[1120px] p-5 text-[10px] sm:p-8 sm:text-xs"}`}
     >
-      <header className="flex items-start justify-between gap-6 border-b-2 border-slate-900 pb-5">
+      <header className="flex flex-col sm:flex-row items-start justify-between gap-4 sm:gap-6 border-b-2 border-slate-900 pb-5">
         <div className="min-w-0">
           {logo ? (
             <img
@@ -111,8 +111,8 @@ export function InvoiceDocument({
           {settings.contact_email && <p>{settings.contact_email}</p>}
           {settings.contact_phone && <p>{settings.contact_phone}</p>}
         </div>
-        <div className="shrink-0 text-right">
-          <h1 className="text-2xl font-black uppercase tracking-[0.12em]">Tax Invoice</h1>
+        <div className="shrink-0 sm:text-right">
+          <h1 className="text-xl sm:text-2xl font-black uppercase tracking-[0.12em]">Tax Invoice</h1>
           <p className="mt-2">
             <span className="font-semibold">Invoice No:</span> {order.order_number}
           </p>
@@ -130,7 +130,7 @@ export function InvoiceDocument({
         </div>
       </header>
 
-      <section className="grid grid-cols-2 gap-6 border-b border-slate-300 py-4">
+      <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 border-b border-slate-300 py-4">
         <div>
           <h2 className="mb-1 font-bold uppercase tracking-wider text-slate-600">
             Bill to / Ship to
@@ -141,7 +141,7 @@ export function InvoiceDocument({
             <p>Customer address unavailable</p>
           )}
         </div>
-        <div className="text-right">
+        <div className="sm:text-right">
           <h2 className="mb-1 font-bold uppercase tracking-wider text-slate-600">Tax treatment</h2>
           <p className="font-semibold">
             {breakdown.taxKind === "local" ? "Intra-state supply" : "Inter-state supply"}
@@ -151,7 +151,7 @@ export function InvoiceDocument({
         </div>
       </section>
 
-      <div className="mt-5 overflow-x-auto">
+      <div className="mt-5 -mx-1 overflow-x-auto overscroll-x-contain [scrollbar-width:thin]">
         <table className="w-full min-w-[900px] border-collapse border border-slate-400">
           <thead>
             <tr className="bg-slate-100 text-center font-bold">

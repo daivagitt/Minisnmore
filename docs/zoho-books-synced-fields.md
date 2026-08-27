@@ -86,16 +86,22 @@ Catalog stored sync metadata on DB columns named `zoho_*` (renamed to `ledgerly_
 
 **Pull side effects:**
 
+- Full catalogue and inventory list requests use **`filter_by=Status.Active`** — inactive Zoho items are never imported as in-stock prints. Incremental product pulls include all changed statuses so newly inactive items can be deactivated locally.
+- On a **full** pull, Zoho-linked matrix rows whose item IDs/SKUs are missing from the active Zoho catalog are marked **inactive**. Local-only rows are preserved, and the parent deactivates only when no active variant rows remain.
+- Variant rows without parseable **size and color** (attrs / name / description) are **skipped** with an admin notice — not imported as blank PDP options.
+- Image import failures are logged and surfaced as pull **notices**; price/SKU merge still proceeds.
 - Items **removed from Zoho** during a full pull could mark matching Admin products **inactive**.
 - Admin **delete product** could mark the linked Zoho item **inactive** in Books.
 
-**Not pulled:** slug changes, compare-at price, badges, homepage/PDP-only content, site settings.
+**Not pulled:** slug changes, compare-at price, badges, homepage/PDP-only content, site settings. Parallel Zoho parents with different display names (e.g. Book Style Jabla vs Book Style Tying Jabla) stay separate — pull merges within a name/`group_id` family only.
 
 ---
 
 ## 3. Inventory pull only
 
 Updates **stock** only for products already linked (`zoho_item_id`) or matched by SKU (`findAllEligibleForZohoInventoryPull`).
+
+Items without a usable `stock_on_hand` value are skipped so a sales-only/malformed Zoho row cannot wipe existing store stock. Variant rows are matched by stable Zoho item ID before SKU, and partial progress is retained and reported if a later page is rate-limited.
 
 Requires **inventory tracking** enabled on the Zoho item and (for push) `ZOHO_INVENTORY_ACCOUNT_ID` / `ZOHO_DEFAULT_LOCATION_ID` when using inventory items.
 
@@ -110,7 +116,7 @@ Controlled by **`ZOHO_SYNC_PRODUCT_IMAGES=true`**.
 | **Push** | Store image URL(s) → Zoho item image API |
 | **Pull** | Zoho image binary/URL → upload to store R2 → `images_json` |
 
-Failures are logged only; name/SKU/price sync still proceeds.
+Failures are logged and shown as Admin pull notices; name/SKU/price sync still proceeds.
 
 See also [product-images-and-ledgerly-sync.md](./product-images-and-ledgerly-sync.md).
 
@@ -229,6 +235,7 @@ After cutover, the same *business* flows use Ledgerly with similar (not identica
 
 ## Related docs
 
+- [zoho-books-api-usage.md](./zoho-books-api-usage.md) — Zoho endpoints we call, daily quotas, which flows burn calls, incremental product pull
 - [zoho-integration-test-scenarios.md](./zoho-integration-test-scenarios.md) — deprecated Z-01…Z-71 QA checklist
 - [ledgerly-uat-cutover.md](./ledgerly-uat-cutover.md) — cutover notes
 - Integration Javadocs (archived): `artifacts/javadocs/integration/`

@@ -34,7 +34,7 @@ export function OrderTrackingCard({ order, showHeader = true }: Props) {
       {showHeader && (
         <>
           {order.order_number && (
-            <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
+            <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground flex-wrap">
               <span>Order {order.order_number}</span>
               <CopyButton
                 value={order.order_number}

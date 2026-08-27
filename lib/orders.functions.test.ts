@@ -168,9 +168,64 @@ describe("orders functions", () => {
 
     await expect(
       listAdminOrders("2026-08-01T00:00:00.000Z", "2026-08-08T00:00:00.000Z"),
-    ).resolves.toEqual({ orders: [{ order_number: "MNM-10" }] });
+    ).resolves.toEqual({
+      orders: [{ order_number: "MNM-10" }],
+      page: 1,
+      pageSize: 10,
+      totalItems: 1,
+      totalPages: 1,
+    });
     expect(getMock).toHaveBeenCalledWith(
-      "/api/v1/admin/orders?from=2026-08-01T00%3A00%3A00.000Z&to=2026-08-08T00%3A00%3A00.000Z",
+      "/api/v1/admin/orders?from=2026-08-01T00%3A00%3A00.000Z&to=2026-08-08T00%3A00%3A00.000Z&page=1&size=10",
+      { auth: true },
+    );
+  });
+
+  it("lists all admin orders with an explicit page", async () => {
+    getMock.mockResolvedValueOnce({
+      orders: [{ order_number: "MNM-20" }],
+      page: 2,
+      pageSize: 10,
+      totalItems: 12,
+      totalPages: 2,
+    });
+
+    await expect(listAdminOrders(undefined, undefined, { page: 2, size: 10 })).resolves.toMatchObject({
+      page: 2,
+      totalItems: 12,
+      totalPages: 2,
+    });
+    expect(getMock).toHaveBeenCalledWith("/api/v1/admin/orders?page=2&size=10", { auth: true });
+  });
+
+  it("lists admin orders with search and status filters", async () => {
+    getMock.mockResolvedValueOnce({
+      orders: [{ order_number: "MNM-20" }],
+      page: 1,
+      pageSize: 10,
+      totalItems: 1,
+      totalPages: 1,
+    });
+
+    await listAdminOrders(undefined, undefined, {
+      q: "Jane",
+      status: "confirmed",
+      paymentStatus: "paid",
+      paymentMethod: "cod",
+      zohoSyncStatus: "attention",
+    });
+    expect(getMock).toHaveBeenCalledWith(
+      "/api/v1/admin/orders?q=Jane&status=confirmed&paymentStatus=paid&paymentMethod=cod&zohoSyncStatus=attention&page=1&size=10",
+      { auth: true },
+    );
+  });
+
+  it("encodes search text and omits blank filters", async () => {
+    getMock.mockResolvedValueOnce({ orders: [], page: 1, pageSize: 10, totalItems: 0, totalPages: 1 });
+
+    await listAdminOrders(undefined, undefined, { q: "MNM 1%", status: "", page: 1 });
+    expect(getMock).toHaveBeenCalledWith(
+      "/api/v1/admin/orders?q=MNM+1%25&page=1&size=10",
       { auth: true },
     );
   });

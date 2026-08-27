@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ProductCard } from "@/components/ProductCard";
+import { ListPagination } from "@/components/ListPagination";
 import { type AgeRange, type Fabric } from "@/data/products";
 import { useCategories } from "@/hooks/useCategories";
 import { useProducts } from "@/hooks/useProducts";
@@ -13,6 +14,7 @@ import {
   SHOP_FILTER_FABRICS,
   type ShopSearch,
 } from "@/lib/shop-filters";
+import { GRID_PAGE_SIZE, clampPage, pageSlice, totalPages } from "@/lib/pagination";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { StorefrontPageHeader } from "@/components/StorefrontPageHeader";
 
@@ -53,7 +55,7 @@ function Shop() {
       const currentQ = filters.q ?? "";
       if (nextQ.toLowerCase() === currentQ.toLowerCase()) return;
       navigate({
-        search: buildShopSearch({ ...filters, q: nextQ || undefined }),
+        search: buildShopSearch({ ...filters, q: nextQ || undefined, page: undefined }),
         replace: true,
       });
     }, 250);
@@ -61,8 +63,13 @@ function Shop() {
   }, [queryDraft, filters, navigate]);
 
   const patchSearch = (patch: Partial<ShopSearch>) => {
+    const keepPage = Object.prototype.hasOwnProperty.call(patch, "page");
     navigate({
-      search: buildShopSearch({ ...filters, ...patch }),
+      search: buildShopSearch({
+        ...filters,
+        ...patch,
+        page: keepPage ? patch.page : undefined,
+      }),
       replace: true,
     });
   };
@@ -88,6 +95,18 @@ function Shop() {
   };
 
   const activeFilters = hasActiveFilters(filters);
+  const pages = totalPages(filtered.length, GRID_PAGE_SIZE);
+  const page = clampPage(filters.page ?? 1, pages);
+  const pageItems = pageSlice(filtered, page, GRID_PAGE_SIZE);
+
+  useEffect(() => {
+    if (filtered.length === 0) return;
+    if ((filters.page ?? 1) === page) return;
+    navigate({
+      search: buildShopSearch({ ...filters, page: page > 1 ? page : undefined }),
+      replace: true,
+    });
+  }, [filtered.length, filters, page, navigate]);
 
   return (
     <div className="px-4 md:px-6">
@@ -202,11 +221,19 @@ function Shop() {
         </select>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
-        {filtered.map((p, i) => (
+      <div id="shop-product-grid" className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
+        {pageItems.map((p, i) => (
           <ProductCard key={p.id} product={p} index={i} />
         ))}
       </div>
+      <ListPagination
+        page={page}
+        totalPages={pages}
+        totalItems={filtered.length}
+        pageSize={GRID_PAGE_SIZE}
+        scrollToId="shop-product-grid"
+        onPageChange={(next) => patchSearch({ page: next > 1 ? next : undefined })}
+      />
       {filtered.length === 0 && (
         <div className="glass-strong rounded-3xl p-16 text-center text-muted-foreground">
           {activeFilters

@@ -123,6 +123,17 @@ public class ProductVariantSupport {
             .findFirst();
     }
 
+    public Optional<VariantRow> findByZohoItemId(List<VariantRow> rows, String zohoItemId) {
+        String want = normalize(zohoItemId);
+        if (want == null) {
+            return Optional.empty();
+        }
+        return rows
+            .stream()
+            .filter(row -> want.equals(normalize(row.zohoItemId())))
+            .findFirst();
+    }
+
     public Optional<VariantRow> findBySizeColor(List<VariantRow> rows, String size, String color) {
         String wantSize = normalizeKey(size);
         String wantColor = normalizeKey(color);
@@ -485,6 +496,22 @@ public class ProductVariantSupport {
         return true;
     }
 
+    public boolean updateVariantStockByZohoItemId(Product product, String zohoItemId, int stock) {
+        if (!isVariants(product)) {
+            return false;
+        }
+        List<VariantRow> rows = new ArrayList<>(parseProduct(product));
+        Optional<VariantRow> match = findByZohoItemId(rows, zohoItemId);
+        if (match.isEmpty()) {
+            return false;
+        }
+        int targetIndex = rows.indexOf(match.orElseThrow());
+        List<VariantRow> updated = replaceRowAt(rows, targetIndex, match.orElseThrow().withStock(Math.max(0, stock)));
+        product.setVariantsJson(serialize(updated));
+        product.setStock(aggregates(updated).stockSum());
+        return true;
+    }
+
     public Optional<String> zohoItemIdForSku(Product product, String variantSku) {
         if (!isVariants(product)) {
             return Optional.empty();
@@ -630,7 +657,9 @@ public class ProductVariantSupport {
             return false;
         }
         List<VariantRow> rows = new ArrayList<>(parseProduct(product));
-        Optional<VariantRow> match = findBySku(rows, variantSku);
+        // Zoho item_id is stable when an admin renames a SKU. Prefer it so a rename updates the
+        // existing row instead of appending a duplicate and later stale-deactivating the old row.
+        Optional<VariantRow> match = findByZohoItemId(rows, zohoItemId).or(() -> findBySku(rows, variantSku));
         if (match.isEmpty()) {
             if (!addIfMissing) {
                 return false;
@@ -658,11 +687,11 @@ public class ProductVariantSupport {
         VariantRow row = match.orElseThrow();
         int targetIndex = rows.indexOf(row);
         BigDecimal nextRate = row.rate();
-        if (sellingRate != null && sellingRate.compareTo(BigDecimal.ZERO) > 0) {
+        if (sellingRate != null) {
             nextRate = sellingRate;
         }
         BigDecimal nextMrp = row.mrp();
-        if (mrp != null && mrp.compareTo(BigDecimal.ZERO) > 0) {
+        if (mrp != null) {
             nextMrp = mrp;
         }
         int nextStock = stock != null ? Math.max(0, stock) : row.stock();
@@ -670,11 +699,13 @@ public class ProductVariantSupport {
         String nextSize = StringUtils.isNotBlank(size) ? size.trim() : row.size();
         String nextColor = StringUtils.isNotBlank(color) ? color.trim() : row.color();
         VariantRow updatedRow = row
+            .withSku(variantSku.trim())
             .withPricing(nextRate, nextMrp)
             .withStock(nextStock)
             .withZohoItemId(nextZohoId)
             .withSize(nextSize)
-            .withColor(nextColor);
+            .withColor(nextColor)
+            .withActive(true);
         List<VariantRow> updated = replaceRowAt(rows, targetIndex, updatedRow);
         return applyMatrixToProduct(product, STRUCTURE_VARIANTS, serialize(updated));
     }
@@ -686,11 +717,114 @@ public class ProductVariantSupport {
         }
         for (VariantRow row : parseProduct(product)) {
             String sku = normalize(row.sku());
-            if (sku != null && pulledSkus.contains(sku)) {
+            if (sku != null && setContainsIgnoreCase(pulledSkus, sku)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * Mark matrix rows inactive when their SKU was not among active Zoho items on a full pull.
+     * @return number of rows flipped from active → inactive
+     */
+    public int deactivateVariantsNotInPulledSet(Product product, Set<String> pulledSkus) {
+        return deactivateVariantsNotInPulledSet(product, pulledSkus, Set.of(), false);
+    }
+
+    /**
+     * Deactivate only rows that were previously linked to Zoho. Local-only/failed-to-sync rows are
+     * not part of Zoho's catalogue and must survive an authoritative full pull.
+     */
+    public int deactivateVariantsNotInPulledSet(Product product, Set<String> pulledSkus, Set<String> pulledItemIds) {
+        return deactivateVariantsNotInPulledSet(product, pulledSkus, pulledItemIds, true);
+    }
+
+    private int deactivateVariantsNotInPulledSet(
+        Product product,
+        Set<String> pulledSkus,
+        Set<String> pulledItemIds,
+        boolean linkedOnly
+    ) {
+        if (!isVariants(product) || pulledSkus == null) {
+            return 0;
+        }
+        List<VariantRow> rows = parseProduct(product);
+        List<VariantRow> updated = new ArrayList<>(rows.size());
+        int deactivated = 0;
+        for (VariantRow row : rows) {
+            String sku = normalize(row.sku());
+            String itemId = normalize(row.zohoItemId());
+            boolean linkedToZoho = itemId != null;
+            boolean stillPresent =
+                (itemId != null && pulledItemIds != null && pulledItemIds.contains(itemId)) ||
+                (sku != null && setContainsIgnoreCase(pulledSkus, sku));
+            if (row.active() && (!linkedOnly || linkedToZoho) && !stillPresent) {
+                updated.add(row.withActive(false));
+                deactivated++;
+            } else {
+                updated.add(row);
+            }
+        }
+        if (deactivated == 0) {
+            return 0;
+        }
+        return applyMatrixToProduct(product, STRUCTURE_VARIANTS, serialize(updated)) ? deactivated : 0;
+    }
+
+    public boolean hasActiveVariants(Product product) {
+        return isVariants(product) && parseProduct(product).stream().anyMatch(VariantRow::active);
+    }
+
+    public boolean hasZohoLinkedVariants(Product product) {
+        return isVariants(product) && parseProduct(product).stream().anyMatch(row -> StringUtils.isNotBlank(row.zohoItemId()));
+    }
+
+    private static boolean setContainsIgnoreCase(Set<String> values, String wanted) {
+        if (values == null || wanted == null) {
+            return false;
+        }
+        return values.stream().anyMatch(value -> value != null && wanted.equalsIgnoreCase(value.trim()));
+    }
+
+    /** Mark one matrix row inactive by variant SKU (Zoho item marked inactive). */
+    public boolean deactivateVariantBySku(Product product, String variantSku) {
+        if (!isVariants(product) || StringUtils.isBlank(variantSku)) {
+            return false;
+        }
+        List<VariantRow> rows = new ArrayList<>(parseProduct(product));
+        Optional<VariantRow> match = findBySku(rows, variantSku);
+        if (match.isEmpty() || !match.orElseThrow().active()) {
+            return false;
+        }
+        int index = rows.indexOf(match.orElseThrow());
+        List<VariantRow> updated = replaceRowAt(rows, index, match.orElseThrow().withActive(false));
+        return applyMatrixToProduct(product, STRUCTURE_VARIANTS, serialize(updated));
+    }
+
+    /** Mark one matrix row inactive by its stable Zoho item id (covers SKU renames). */
+    public boolean deactivateVariantByZohoItemId(Product product, String zohoItemId) {
+        if (!isVariants(product) || StringUtils.isBlank(zohoItemId)) {
+            return false;
+        }
+        List<VariantRow> rows = new ArrayList<>(parseProduct(product));
+        Optional<VariantRow> match = findByZohoItemId(rows, zohoItemId);
+        if (match.isEmpty() || !match.orElseThrow().active()) {
+            return false;
+        }
+        int index = rows.indexOf(match.orElseThrow());
+        return applyMatrixToProduct(
+            product,
+            STRUCTURE_VARIANTS,
+            serialize(replaceRowAt(rows, index, match.orElseThrow().withActive(false)))
+        );
+    }
+
+    /** True when an existing matrix row already has both size and color filled. */
+    public boolean variantHasSizeAndColor(Product product, String variantSku) {
+        return findBySku(parseProduct(product), variantSku)
+            .filter(row -> normalize(row.size()) != null && normalize(row.color()) != null)
+            .isPresent();
     }
 
     private static List<VariantRow> replaceRowAt(List<VariantRow> rows, int index, VariantRow replacement) {
@@ -711,6 +845,19 @@ public class ProductVariantSupport {
                 continue;
             }
             if (findBySku(parseProduct(product), want).isPresent()) {
+                return Optional.of(product);
+            }
+        }
+        return Optional.empty();
+    }
+
+    public Optional<Product> findProductContainingVariantZohoItemId(List<Product> candidates, String zohoItemId) {
+        String want = normalize(zohoItemId);
+        if (want == null) {
+            return Optional.empty();
+        }
+        for (Product product : candidates) {
+            if (isVariants(product) && findByZohoItemId(parseProduct(product), want).isPresent()) {
                 return Optional.of(product);
             }
         }
@@ -769,6 +916,14 @@ public class ProductVariantSupport {
 
         VariantRow withZohoItemId(String nextZohoItemId) {
             return new VariantRow(id, sku, size, color, rate, mrp, cost, stock, active, swatchUrl, nextZohoItemId, imageUrl, imageUrls);
+        }
+
+        VariantRow withActive(boolean nextActive) {
+            return new VariantRow(id, sku, size, color, rate, mrp, cost, stock, nextActive, swatchUrl, zohoItemId, imageUrl, imageUrls);
+        }
+
+        VariantRow withSku(String nextSku) {
+            return new VariantRow(id, nextSku, size, color, rate, mrp, cost, stock, active, swatchUrl, zohoItemId, imageUrl, imageUrls);
         }
 
         VariantRow withImageUrl(String nextImageUrl) {

@@ -344,7 +344,7 @@ function OrderDetail() {
           : Clock;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4 min-w-0">
       <Link
         to="/account/orders"
         className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
@@ -352,12 +352,12 @@ function OrderDetail() {
         <ArrowLeft className="h-4 w-4" /> Back to orders
       </Link>
 
-      <div className="glass-strong rounded-[2rem] p-6 md:p-8">
+      <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 md:p-8 min-w-0">
         <div className="flex items-start justify-between flex-wrap gap-3">
-          <div>
+          <div className="min-w-0">
             <div className="text-xs uppercase tracking-[0.28em] text-primary">Order</div>
-            <div className="flex items-center gap-2 mt-1">
-              <h1 className="font-display text-3xl">{order.order_number}</h1>
+            <div className="flex items-center gap-2 mt-1 min-w-0">
+              <h1 className="font-display text-xl sm:text-3xl break-all">{order.order_number}</h1>
               <CopyButton
                 value={order.order_number}
                 label="Copy order ID"
@@ -407,7 +407,7 @@ function OrderDetail() {
       </div>
 
       {order.status === "cancelled" && (
-        <div className="glass-strong rounded-[2rem] p-5 md:p-6 border border-muted bg-muted/30">
+        <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-5 md:p-6 border border-muted bg-muted/30">
           <div className="flex items-start gap-3">
             <XCircle className="h-5 w-5 text-muted-foreground mt-0.5" />
             <div>
@@ -428,7 +428,7 @@ function OrderDetail() {
       {order.status !== "cancelled" &&
         order.payment_status === "pending" &&
         order.payment_method === "cod" && (
-          <div className="glass-strong rounded-[2rem] p-5 md:p-6 border border-primary/20 bg-primary/5">
+          <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-5 md:p-6 border border-primary/20 bg-primary/5">
             <div className="text-sm font-medium">Pay on delivery</div>
             <p className="text-sm text-muted-foreground mt-1">
               Your order is confirmed and being prepared. Pay ₹
@@ -440,9 +440,9 @@ function OrderDetail() {
       {order.status !== "cancelled" &&
         order.payment_status === "pending" &&
         order.payment_method !== "cod" && (
-          <div className="glass-strong rounded-[2rem] p-5 md:p-6 border border-amber-500/30 bg-amber-500/10">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
+          <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-5 md:p-6 border border-amber-500/30 bg-amber-500/10">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-3 sm:gap-4">
+              <div className="min-w-0">
                 <div className="text-sm font-medium text-amber-900">Payment pending</div>
                 <p className="text-sm text-muted-foreground mt-1">
                   Complete payment of ₹{Number(order.total).toLocaleString("en-IN")} to confirm this
@@ -453,7 +453,7 @@ function OrderDetail() {
                 type="button"
                 onClick={payNow}
                 disabled={paying || syncing}
-                className="rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm inline-flex items-center gap-2 disabled:opacity-50"
+                className="rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm inline-flex items-center justify-center gap-2 disabled:opacity-50 w-full sm:w-auto"
               >
                 {paying ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -467,9 +467,9 @@ function OrderDetail() {
         )}
 
       {order.payment_status === "paid" && (
-        <div className="glass-strong rounded-[2rem] p-6 md:p-8">
-          <h2 className="font-display text-xl mb-4 flex items-center gap-2">
-            <Truck className="h-5 w-5 text-primary" /> Delivery tracking
+        <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 md:p-8">
+          <h2 className="font-display text-lg sm:text-xl mb-4 flex items-center gap-2">
+            <Truck className="h-5 w-5 text-primary shrink-0" /> Delivery tracking
           </h2>
           <OrderTrackingCard order={order} showHeader={false} />
           <TrackingRefreshHint lastUpdated={lastUpdated} polling={polling} />
@@ -477,20 +477,20 @@ function OrderDetail() {
       )}
 
       {order.payment_status === "paid" && (
-        <div className="glass-strong rounded-[2rem] p-6 md:p-8">
-          <h2 className="font-display text-xl mb-3 flex items-center gap-2">
-            <RotateCcw className="h-5 w-5 text-primary" /> Returns &amp; exchange
+        <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 md:p-8">
+          <h2 className="font-display text-lg sm:text-xl mb-3 flex items-center gap-2">
+            <RotateCcw className="h-5 w-5 text-primary shrink-0" /> Returns &amp; exchange
           </h2>
           {orderReturns.length > 0 ? (
             <div className="space-y-2">
               {orderReturns.map((r) => (
-                <div key={r.return_number} className="glass rounded-2xl p-3 flex items-center justify-between gap-3">
-                  <div className="text-sm">
+                <div key={r.return_number} className="glass rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 min-w-0">
+                  <div className="text-sm min-w-0 break-words">
                     <span className="font-medium">{r.request_type === "exchange" ? "Exchange" : "Return"}</span>{" "}
                     <span className="text-muted-foreground">{r.return_number}</span>
                     {r.product_name ? <span className="text-muted-foreground"> · {r.product_name}</span> : null}
                   </div>
-                  <span className="text-[10px] uppercase tracking-wider rounded-full px-3 py-1 bg-amber-500/15 text-amber-700">
+                  <span className="self-start sm:self-auto shrink-0 text-[10px] uppercase tracking-wider rounded-full px-3 py-1 bg-amber-500/15 text-amber-700">
                     {r.status.replace(/_/g, " ")}
                   </span>
                 </div>
@@ -515,10 +515,10 @@ function OrderDetail() {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-[1fr_320px] gap-4">
-        <div className="glass-strong rounded-[2rem] p-6 md:p-8">
-          <h2 className="font-display text-xl mb-4 flex items-center gap-2">
-            <Package2 className="h-5 w-5 text-primary" />
+      <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-4 min-w-0">
+        <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 md:p-8 min-w-0">
+          <h2 className="font-display text-lg sm:text-xl mb-4 flex items-center gap-2">
+            <Package2 className="h-5 w-5 text-primary shrink-0" />
             Items
             <span className="text-muted-foreground font-normal text-base">({itemCount})</span>
           </h2>
@@ -532,23 +532,23 @@ function OrderDetail() {
                 !openExchange &&
                 it.id != null;
               return (
-                <div key={it.id} className="glass rounded-2xl p-3 flex flex-col gap-2">
-                  <div className="flex gap-3 items-center">
+                <div key={it.id} className="glass rounded-2xl p-3 flex flex-col gap-2 min-w-0">
+                  <div className="flex gap-3 items-start sm:items-center min-w-0">
                     {it.product_image && (
                       <LazyImage
                         src={it.product_image}
-                        className="h-16 w-16 rounded-xl object-cover"
+                        className="h-14 w-14 sm:h-16 sm:w-16 rounded-xl object-cover shrink-0"
                         alt=""
                         priority="auto"
                       />
                     )}
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{it.product_name}</div>
+                      <div className="font-medium break-words">{it.product_name}</div>
                       <div className="text-xs text-muted-foreground">
                         {[it.size, it.color].filter(Boolean).join(" · ")} · ×{it.qty}
                       </div>
                     </div>
-                    <div className="text-sm font-medium">
+                    <div className="text-sm font-medium shrink-0 tabular-nums">
                       ₹{(it.qty * Number(it.price)).toLocaleString("en-IN")}
                     </div>
                   </div>
@@ -583,15 +583,15 @@ function OrderDetail() {
               <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground mb-2">
                 <MapPin className="h-4 w-4 text-primary" /> Shipping address
               </div>
-              <div className="text-sm font-medium">{addr.full_name}</div>
-              <div className="text-sm text-muted-foreground">
+              <div className="text-sm font-medium break-words">{addr.full_name}</div>
+              <div className="text-sm text-muted-foreground break-words">
                 {addr.line1}
                 {addr.line2 ? `, ${addr.line2}` : ""}
               </div>
-              <div className="text-sm text-muted-foreground">
+              <div className="text-sm text-muted-foreground break-words">
                 {addr.city}, {addr.state} {addr.pincode}
               </div>
-              <div className="text-xs text-muted-foreground mt-1">
+              <div className="text-xs text-muted-foreground mt-1 break-all">
                 {addr.phone} · {addr.email}
               </div>
             </div>
@@ -617,12 +617,12 @@ function OrderDetail() {
               {order.status !== "cancelled" &&
                 order.payment_status === "pending" &&
                 order.payment_method !== "cod" && (
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-3 flex flex-col sm:flex-row flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={payNow}
                       disabled={paying || syncing}
-                      className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-xs inline-flex items-center gap-2 disabled:opacity-50"
+                      className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-xs inline-flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       {paying ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -635,7 +635,7 @@ function OrderDetail() {
                       type="button"
                       onClick={checkPaymentStatus}
                       disabled={syncing || paying}
-                      className="rounded-full glass px-4 py-2 text-xs inline-flex items-center gap-2 disabled:opacity-50 hover:bg-white/60 transition"
+                      className="rounded-full glass px-4 py-2 text-xs inline-flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-white/60 transition"
                     >
                       {syncing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                       {syncing ? "Checking…" : "Already paid? Refresh status"}
@@ -649,7 +649,7 @@ function OrderDetail() {
                 <Link
                   to="/account/orders/$orderNumber/invoice"
                   params={{ orderNumber: order.order_number }}
-                  className="mt-3 rounded-full glass px-4 py-2 text-xs inline-flex items-center gap-2 hover:bg-white/60 transition"
+                  className="mt-3 rounded-full glass px-4 py-2 text-xs inline-flex items-center justify-center gap-2 hover:bg-white/60 transition w-full sm:w-auto"
                 >
                   <FileText className="h-3.5 w-3.5" /> View invoice
                 </Link>
@@ -658,8 +658,8 @@ function OrderDetail() {
           </div>
         </div>
 
-        <aside className="glass-strong rounded-[2rem] p-6 h-fit space-y-1.5 text-sm">
-          <div className="font-display text-xl mb-3">Summary</div>
+        <aside className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 h-fit space-y-1.5 text-sm min-w-0">
+          <div className="font-display text-lg sm:text-xl mb-3">Summary</div>
           <Row label="Subtotal" value={`₹${Number(order.subtotal).toLocaleString("en-IN")}`} />
           {Number(order.discount) > 0 && (
             <Row
@@ -684,7 +684,6 @@ function OrderDetail() {
               muted
             />
           )}
-          <Row label="GST included" value={`₹${Number(order.tax).toLocaleString("en-IN")}`} muted />
           {Number(order.donation) > 0 && (
             <Row
               label="Donation ♥"
@@ -843,7 +842,7 @@ function Row({
 }) {
   return (
     <div
-      className={`flex justify-between ${muted ? "text-muted-foreground" : ""} ${accent ? "text-primary" : ""}`}
+      className={`flex justify-between gap-3 ${muted ? "text-muted-foreground" : ""} ${accent ? "text-primary" : ""}`}
     >
       <span>{label}</span>
       <span>{value}</span>

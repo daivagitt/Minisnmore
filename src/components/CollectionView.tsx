@@ -1,7 +1,10 @@
 import { motion } from "framer-motion";
 import { useMemo } from "react";
 import { ProductCard } from "@/components/ProductCard";
+import { ListPagination } from "@/components/ListPagination";
+import { useListPagination } from "@/hooks/useListPagination";
 import { useProducts } from "@/hooks/useProducts";
+import { GRID_PAGE_SIZE } from "@/lib/pagination";
 import type { Product } from "@/data/products";
 
 type Props = {
@@ -24,6 +27,11 @@ export function CollectionView({ eyebrow, title, script, subtitle, products: pre
     return l;
   }, [catalog, preset, filter, sort]);
 
+  const paging = useListPagination(list, {
+    pageSize: GRID_PAGE_SIZE,
+    resetKey: `${list.length}:${list[0]?.id ?? ""}:${title}`,
+  });
+
   return (
     <div className="px-4 md:px-6">
       <motion.div
@@ -44,11 +52,21 @@ export function CollectionView({ eyebrow, title, script, subtitle, products: pre
           No products found in this collection yet.
         </div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 items-stretch">
-          {list.map((p, i) => (
-            <ProductCard key={p.id} product={p} index={i} />
-          ))}
-        </div>
+        <>
+          <div id="collection-product-grid" className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 items-stretch">
+            {paging.pageItems.map((p, i) => (
+              <ProductCard key={p.id} product={p} index={i} />
+            ))}
+          </div>
+          <ListPagination
+            page={paging.page}
+            totalPages={paging.totalPages}
+            totalItems={paging.totalItems}
+            pageSize={paging.pageSize}
+            scrollToId="collection-product-grid"
+            onPageChange={paging.setPage}
+          />
+        </>
       )}
     </div>
   );

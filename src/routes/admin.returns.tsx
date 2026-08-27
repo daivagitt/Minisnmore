@@ -23,6 +23,9 @@ import {
   type AdminOrderReturnRow,
 } from "@/lib/orders.functions";
 import { showApiError } from "@/lib/ui-errors";
+import { ListPagination } from "@/components/ListPagination";
+import { useListPagination } from "@/hooks/useListPagination";
+import { LIST_PAGE_SIZE } from "@/lib/pagination";
 import {
   Dialog,
   DialogContent,
@@ -206,6 +209,8 @@ function AdminReturnsPage() {
     void load();
   }, [load]);
 
+  const paging = useListPagination(rows, { pageSize: LIST_PAGE_SIZE, resetKey: status });
+
   const run = async (returnNumber: string, action: () => Promise<unknown>, label: string) => {
     setBusy(returnNumber);
     try {
@@ -255,8 +260,8 @@ function AdminReturnsPage() {
       ) : rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">No returns in this filter.</p>
       ) : (
-        <ul className="space-y-4">
-          {rows.map((r) => {
+        <ul id="admin-returns-list" className="space-y-4">
+          {paging.pageItems.map((r) => {
             const { primary, secondary } = nextActions(
               r,
               (label, action) => void run(r.return_number, action, label),
@@ -327,6 +332,16 @@ function AdminReturnsPage() {
             );
           })}
         </ul>
+      )}
+      {!loading && rows.length > 0 && (
+        <ListPagination
+          page={paging.page}
+          totalPages={paging.totalPages}
+          totalItems={paging.totalItems}
+          pageSize={paging.pageSize}
+          scrollToId="admin-returns-list"
+          onPageChange={paging.setPage}
+        />
       )}
 
       <Dialog open={!!rejectTarget} onOpenChange={(open) => !open && setRejectTarget(null)}>

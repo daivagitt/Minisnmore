@@ -56,6 +56,9 @@ import { invalidateProducts } from "@/lib/storefront";
 import { isBestsellerFromBadge } from "@/lib/product-flags";
 import { filterAdminProductsByQuery } from "@/lib/product-search";
 import { colorNames, ensureColorEntries, mergeColorNames, normalizeColorEntries, resolveProductImages, type ProductColorEntry } from "@/lib/product-colors";
+import { ListPagination } from "@/components/ListPagination";
+import { useListPagination } from "@/hooks/useListPagination";
+import { ADMIN_PAGE_SIZE } from "@/lib/pagination";
 
 export const Route = createFileRoute("/admin/products")({ component: ProductsPage });
 
@@ -331,6 +334,7 @@ function ProductsPage() {
 
   const filtered = useMemo(() => filterAdminProductsByQuery(rows, filter), [rows, filter]);
   const filterActive = filter.trim().length > 0;
+  const paging = useListPagination(filtered, { pageSize: ADMIN_PAGE_SIZE, resetKey: filter });
 
   const rowIndexFor = (product: Product) =>
     rows.findIndex((row) => (product.id ? row.id === product.id : row === product));
@@ -389,6 +393,7 @@ function ProductsPage() {
             onClick={() => {
               setRows((r) => [{ ...empty }, ...r]);
               setEditing(0);
+              paging.setPage(1);
             }}
             className="rounded-full bg-primary text-primary-foreground px-4 py-2.5 text-sm flex items-center gap-2"
           >
@@ -433,7 +438,7 @@ function ProductsPage() {
       {loading ? (
         <div className="text-sm text-muted-foreground">Loading…</div>
       ) : (
-        <div className="space-y-3">
+        <div id="admin-products-list" className="space-y-3">
           {filtered.length === 0 && (
             <div className="glass rounded-2xl p-6 text-sm text-muted-foreground text-center">
               {filterActive
@@ -454,7 +459,7 @@ function ProductsPage() {
               ) : null}
             </div>
           )}
-          {filtered.map((p) => {
+          {paging.pageItems.map((p) => {
             const i = rowIndexFor(p);
             if (i < 0) return null;
             const isOpen = editing === i;
@@ -933,6 +938,16 @@ function ProductsPage() {
             );
           })}
         </div>
+      )}
+      {!loading && filtered.length > 0 && (
+        <ListPagination
+          page={paging.page}
+          totalPages={paging.totalPages}
+          totalItems={paging.totalItems}
+          pageSize={paging.pageSize}
+          scrollToId="admin-products-list"
+          onPageChange={paging.setPage}
+        />
       )}
     </AdminPage>
   );

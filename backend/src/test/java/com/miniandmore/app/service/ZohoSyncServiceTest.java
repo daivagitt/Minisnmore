@@ -17,6 +17,7 @@ import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.Product;
+import com.miniandmore.app.domain.ZohoSetting;
 import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.CustomerProfileRepository;
@@ -25,6 +26,7 @@ import com.miniandmore.app.repository.ProductRepository;
 import com.miniandmore.app.repository.ZohoSettingRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -1649,6 +1651,424 @@ class ZohoSyncServiceTest {
     }
 
     @Test
+    void pullProducts_skipsInactiveZohoItemsAndDoesNotImportThem() {
+        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository,
+                s3StorageService
+            );
+
+        Map<String, Object> inactive = new java.util.LinkedHashMap<>(
+            groupedZohoItem("zoho-dead", "HORIZON-S-PINK", "S", "Pink", 100, 9)
+        );
+        inactive.put("status", "inactive");
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(booksClient.listItems(1)).thenReturn(List.of(inactive));
+        when(booksClient.listItems(2)).thenReturn(List.of());
+        when(productRepository.findAll()).thenReturn(List.of());
+
+        Map<String, Object> result = service.pullProducts();
+
+        verify(booksClient, never()).getItem(any());
+        verify(productRepository, never()).save(any());
+        assertThat(result.get("notices").toString()).contains("inactive");
+    }
+
+    @Test
+    void pullProducts_fullPull_deactivatesMatrixRowsMissingFromActiveCatalog() {
+        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository,
+                s3StorageService
+            );
+
+        Product parent = new Product()
+            .id(120L)
+            .sku("HORIZON")
+            .name("Horizon Set")
+            .zohoItemId("grp-horizon")
+            .itemStructure("VARIANTS")
+            .active(true)
+            .variantsJson(
+                """
+                [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":799.20,"stock":3,"active":true,"zohoItemId":"zoho-s"},\
+                {"sku":"HORIZON-S-PINK","size":"S","color":"Pink","rate":100,"stock":9,"active":true,"zohoItemId":"zoho-pink"}]
+                """
+            );
+        Map<String, Object> activeOnly = groupedZohoItem("zoho-s", "HORIZON-S-NAVY", "S", "Navy", 799.20, 3);
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(booksClient.listItems(1)).thenReturn(List.of(activeOnly));
+        when(booksClient.listItems(2)).thenReturn(List.of());
+        when(booksClient.getItem("zoho-s")).thenReturn(Map.of("item", activeOnly));
+        when(productRepository.findAll()).thenReturn(List.of(parent));
+        when(productRepository.findAllByZohoItemIdIsNotNull()).thenReturn(List.of());
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(productFieldMapper.applyPulledItem(any(), any(), anyBoolean())).thenReturn(Optional.empty());
+
+        service.pullProducts();
+
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository, atLeastOnce()).save(saved.capture());
+        Product last = saved
+            .getAllValues()
+            .stream()
+            .filter(p -> p.getId() != null && p.getId().equals(120L))
+            .reduce((a, b) -> b)
+            .orElseThrow();
+        assertThat(last.getVariantsJson()).contains("\"active\":false");
+        assertThat(last.getVariantsJson()).contains("HORIZON-S-PINK");
+        assertThat(realVariantSupport.findBySku(realVariantSupport.parseProduct(last), "HORIZON-S-NAVY").orElseThrow().active())
+            .isTrue();
+        assertThat(realVariantSupport.findBySku(realVariantSupport.parseProduct(last), "HORIZON-S-PINK").orElseThrow().active())
+            .isFalse();
+    }
+
+    @Test
+    void pullProducts_skipsVariantWhenSizeAndColorCannotBeParsed() {
+        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository,
+                s3StorageService
+            );
+
+        Map<String, Object> unparseable = new java.util.LinkedHashMap<>();
+        unparseable.put("item_id", "zoho-bad");
+        unparseable.put("sku", "BAD-VARIANT-SKU");
+        unparseable.put("name", "Mystery Item");
+        unparseable.put("group_id", "grp-mystery");
+        unparseable.put("group_name", "Mystery Item");
+        unparseable.put("rate", 50);
+        unparseable.put("stock_on_hand", 2);
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(booksClient.listItems(1)).thenReturn(List.of(unparseable));
+        when(booksClient.listItems(2)).thenReturn(List.of());
+        when(booksClient.getItem("zoho-bad")).thenReturn(Map.of("item", unparseable));
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(productRepository.findAllByZohoItemIdIsNotNull()).thenReturn(List.of());
+        when(productRepository.findOneByZohoItemId(any())).thenReturn(Optional.empty());
+
+        Map<String, Object> result = service.pullProducts();
+
+        verify(productRepository, never()).save(any());
+        assertThat(result.get("notices").toString()).containsIgnoringCase("missing size/color");
+    }
+
+    @Test
+    void pullProducts_emptyFullCatalogue_deactivatesLinkedProductsButPreservesLocalOnlyVariants() {
+        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository,
+                s3StorageService
+            );
+        Product linkedSimple = new Product().id(301L).sku("GONE").zohoItemId("zoho-gone").active(true);
+        Product linkedVariants = new Product()
+            .id(302L)
+            .sku("LINKED-PARENT")
+            .itemStructure("VARIANTS")
+            .active(true)
+            .variantsJson(
+                """
+                [{"sku":"LINKED-ROW","size":"S","color":"Blue","rate":10,"stock":2,"active":true,"zohoItemId":"zoho-row"}]
+                """
+            );
+        Product localOnlyVariants = new Product()
+            .id(303L)
+            .sku("LOCAL-PARENT")
+            .itemStructure("VARIANTS")
+            .active(true)
+            .variantsJson(
+                """
+                [{"sku":"LOCAL-ROW","size":"S","color":"Pink","rate":10,"stock":3,"active":true}]
+                """
+            );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(booksClient.listItems(1)).thenReturn(List.of());
+        when(productRepository.findAll()).thenReturn(List.of(linkedVariants, localOnlyVariants));
+        when(productRepository.findAllByZohoItemIdIsNotNull()).thenReturn(List.of(linkedSimple));
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.pullProducts(true);
+
+        assertThat(linkedSimple.getActive()).isFalse();
+        assertThat(linkedVariants.getActive()).isFalse();
+        assertThat(realVariantSupport.parseProduct(linkedVariants).get(0).active()).isFalse();
+        assertThat(localOnlyVariants.getActive()).isTrue();
+        assertThat(realVariantSupport.parseProduct(localOnlyVariants).get(0).active()).isTrue();
+    }
+
+    @Test
+    void pullProducts_incrementalInactiveVariant_deactivatesRowAndParent() {
+        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository,
+                s3StorageService
+            );
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
+        Product parent = new Product()
+            .id(304L)
+            .sku("PARENT")
+            .itemStructure("VARIANTS")
+            .active(true)
+            .variantsJson(
+                """
+                [{"sku":"OLD-SKU","size":"S","color":"Blue","rate":10,"stock":2,"active":true,"zohoItemId":"zoho-stable"}]
+                """
+            );
+        Map<String, Object> inactive = Map.of(
+            "sku",
+            "RENAMED-SKU",
+            "item_id",
+            "zoho-stable",
+            "status",
+            "inactive"
+        );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
+        when(booksClient.listItems(1, cursor)).thenReturn(List.of(inactive));
+        when(booksClient.listItems(2, cursor)).thenReturn(List.of());
+        when(productRepository.findAll()).thenReturn(List.of(parent));
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = service.pullProducts(false);
+
+        assertThat(result.get("failed")).isEqualTo(0);
+        assertThat(parent.getActive()).isFalse();
+        assertThat(realVariantSupport.findByZohoItemId(realVariantSupport.parseProduct(parent), "zoho-stable").orElseThrow().active())
+            .isFalse();
+        verify(booksClient).listItems(1, cursor);
+        assertThat(setting.getLastProductPullAt()).isAfter(cursor);
+    }
+
+    @Test
+    void pullProducts_variantSkuRename_updatesExistingRowAndReactivatesParent() {
+        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository,
+                s3StorageService
+            );
+        Product parent = new Product()
+            .id(305L)
+            .sku("HORIZON")
+            .name("Horizon Set")
+            .zohoItemId("grp-horizon")
+            .itemStructure("VARIANTS")
+            .active(false)
+            .variantsJson(
+                """
+                [{"sku":"OLD-SKU","size":"S","color":"Navy","rate":100,"stock":0,"active":false,"zohoItemId":"zoho-stable"}]
+                """
+            );
+        Map<String, Object> renamed = groupedZohoItem("zoho-stable", "NEW-SKU", "S", "Navy", 0, 4);
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(booksClient.listItems(1)).thenReturn(List.of(renamed));
+        when(booksClient.listItems(2)).thenReturn(List.of());
+        when(booksClient.getItem("zoho-stable")).thenReturn(Map.of("item", renamed));
+        when(productRepository.findAll()).thenReturn(List.of(parent));
+        when(productRepository.findAllByZohoItemIdIsNotNull()).thenReturn(List.of());
+        when(productRepository.findOneBySku("NEW-SKU")).thenReturn(Optional.empty());
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.pullProducts(true);
+
+        assertThat(parent.getActive()).isTrue();
+        assertThat(realVariantSupport.parseProduct(parent)).hasSize(1);
+        ProductVariantSupport.VariantRow row = realVariantSupport
+            .findByZohoItemId(realVariantSupport.parseProduct(parent), "zoho-stable")
+            .orElseThrow();
+        assertThat(row.sku()).isEqualTo("NEW-SKU");
+        assertThat(row.rate()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(row.stock()).isEqualTo(4);
+        assertThat(row.active()).isTrue();
+    }
+
+    @Test
+    void pullProducts_detailFailureDoesNotAdvanceIncrementalCursor() {
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
+        Map<String, Object> listed = Map.of("sku", "RETRY-ME", "item_id", "zoho-retry", "name", "Retry Me");
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.listItems(1, cursor)).thenReturn(List.of(listed));
+        when(booksClient.listItems(2, cursor)).thenReturn(List.of());
+        when(booksClient.getItem("zoho-retry"))
+            .thenThrow(
+                new RestClientResponseException(
+                    "Too many requests",
+                    429,
+                    "Too Many Requests",
+                    null,
+                    null,
+                    null
+                )
+            );
+
+        Map<String, Object> result = service.pullProducts(false);
+
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(setting.getLastProductPullAt()).isEqualTo(cursor);
+        verify(zohoSettingRepository, never()).save(any());
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void pullInventory_blankStockPreservesExistingValue() {
+        Product product = new Product().id(306L).sku("NO-STOCK").stock(9).active(true);
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.listItems(1)).thenReturn(List.of(Map.of("sku", "NO-STOCK", "item_id", "zoho-no-stock")));
+        when(booksClient.listItems(2)).thenReturn(List.of());
+
+        Map<String, Object> result = service.pullInventory();
+
+        assertThat(result.get("skipped")).isEqualTo(1);
+        assertThat(product.getStock()).isEqualTo(9);
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void pullInventory_parentLinkedByVariantItemId_updatesMatrixRowNotRawParentStock() {
+        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository,
+                s3StorageService
+            );
+        Product parent = new Product()
+            .id(307L)
+            .sku("PARENT")
+            .zohoItemId("zoho-child")
+            .itemStructure("VARIANTS")
+            .active(true)
+            .variantsJson(
+                """
+                [{"sku":"OLD-CHILD-SKU","size":"S","color":"Blue","rate":10,"stock":2,"active":true,"zohoItemId":"zoho-child"},
+                 {"sku":"OTHER-SKU","size":"M","color":"Blue","rate":10,"stock":3,"active":true,"zohoItemId":"zoho-other"}]
+                """
+            );
+        when(productRepository.findAll()).thenReturn(List.of(parent));
+        when(booksClient.listItems(1))
+            .thenReturn(List.of(Map.of("sku", "RENAMED-CHILD-SKU", "item_id", "zoho-child", "stock_on_hand", 8)));
+        when(booksClient.listItems(2)).thenReturn(List.of());
+        when(productRepository.findOneByZohoItemId("zoho-child")).thenReturn(Optional.of(parent));
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = service.pullInventory();
+
+        assertThat(result.get("success")).isEqualTo(1);
+        assertThat(parent.getStock()).isEqualTo(11);
+        assertThat(realVariantSupport.findByZohoItemId(realVariantSupport.parseProduct(parent), "zoho-child").orElseThrow().stock())
+            .isEqualTo(8);
+    }
+
+    @Test
+    void pullInventory_rateLimitAfterFirstPageKeepsPartialSuccessInSummary() {
+        Product product = new Product().id(308L).sku("FIRST").stock(1).active(true);
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.listItems(1))
+            .thenReturn(List.of(Map.of("sku", "FIRST", "item_id", "zoho-first", "stock_on_hand", 5)));
+        when(productRepository.findOneByZohoItemId("zoho-first")).thenReturn(Optional.of(product));
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(booksClient.listItems(2))
+            .thenThrow(
+                org.springframework.web.client.HttpClientErrorException.create(
+                    org.springframework.http.HttpStatus.TOO_MANY_REQUESTS,
+                    "Too Many Requests",
+                    null,
+                    null,
+                    null
+                )
+            );
+
+        Map<String, Object> result = service.pullInventory();
+
+        assertThat(result.get("success")).isEqualTo(1);
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(product.getStock()).isEqualTo(5);
+    }
+
+    @Test
     void pullProducts_attachesGroupedItemToExistingParentAndDeactivatesSimpleDuplicate() {
         ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
         service =
@@ -1976,6 +2396,129 @@ class ZohoSyncServiceTest {
         verify(booksClient).markItemInactive("stale-3");
         verify(productRepository, never()).updateZohoSyncFailure(eq(40801L), eq(ZohoSyncStatus.FAILED), any());
         verify(productRepository).updateZohoSyncFailure(40801L, ZohoSyncStatus.SYNCED, null);
+    }
+
+    @Test
+    void syncProduct_activeParent_deactivatesLinkedInactiveVariantRows() {
+        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository,
+                s3StorageService
+            );
+        Product product = new Product()
+            .id(40802L)
+            .sku("HORIZON")
+            .name("Horizon")
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                """
+                [{"sku":"HORIZON-S-BLUE","size":"S","color":"Blue","rate":10,"stock":0,"active":false,"zohoItemId":"zoho-inactive"}]
+                """
+            )
+            .active(true);
+        when(productRepository.findOneWithEagerRelationships(40802L)).thenReturn(Optional.of(product));
+
+        service.syncProduct(40802L);
+
+        verify(booksClient).markItemInactive("zoho-inactive");
+        verify(booksClient, never()).createItem(any());
+        verify(booksClient, never()).updateItem(any(), any());
+        verify(productRepository).updateZohoSyncSuccess(eq(40802L), eq(null), eq(ZohoSyncStatus.SYNCED), any());
+        verify(productRepository, never()).updateZohoSyncFailure(eq(40802L), eq(ZohoSyncStatus.FAILED), any());
+    }
+
+    @Test
+    void syncProduct_variantValidationRejectsDuplicateActiveSkusBeforeCallingZoho() {
+        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository,
+                s3StorageService
+            );
+        Product product = new Product()
+            .id(40803L)
+            .sku("HORIZON")
+            .name("Horizon")
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                """
+                [{"sku":"DUP-SKU","size":"S","color":"Blue","rate":10,"stock":1,"active":true},
+                 {"sku":"dup-sku","size":"M","color":"Blue","rate":10,"stock":1,"active":true}]
+                """
+            )
+            .active(true);
+        when(productRepository.findOneWithEagerRelationships(40803L)).thenReturn(Optional.of(product));
+
+        service.syncProduct(40803L);
+
+        verify(booksClient, never()).findItemBySku(any());
+        verify(booksClient, never()).createItem(any());
+        verify(booksClient, never()).updateItem(any(), any());
+        verify(productRepository).updateZohoSyncFailure(
+            eq(40803L),
+            eq(ZohoSyncStatus.FAILED),
+            argThat(message -> message.contains("Duplicate active variant SKU"))
+        );
+    }
+
+    @Test
+    void syncProduct_inactiveParentWithOnlyRowLinks_stillDeactivatesZohoItems() {
+        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository,
+                s3StorageService
+            );
+        Product product = new Product()
+            .id(40804L)
+            .sku("ROW-LINKS-ONLY")
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                """
+                [{"sku":"ROW-SKU","size":"S","color":"Blue","rate":10,"stock":0,"active":true,"zohoItemId":"zoho-row-only"}]
+                """
+            )
+            .active(false);
+        when(productRepository.findOneWithEagerRelationships(40804L)).thenReturn(Optional.of(product));
+
+        service.syncProduct(40804L);
+
+        verify(booksClient).markItemInactive("zoho-row-only");
+        verify(productRepository).updateZohoSyncFailure(40804L, ZohoSyncStatus.SYNCED, null);
     }
 
     @Test

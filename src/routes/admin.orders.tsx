@@ -1,15 +1,22 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminPage } from "@/components/admin/AdminPage";
-import { AlertCircle, CheckCircle2, FileText, Loader2, RefreshCw } from "lucide-react";
+import { AlertCircle, CheckCircle2, CloudUpload, FileText, Loader2, RefreshCw, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { listAdminOrders, markCodCollected, type AdminOrderRow } from "@/lib/orders.functions";
-import { syncZohoOrderByNumber } from "@/lib/backend-data";
+import {
+  formatZohoSyncFailures,
+  formatZohoSyncSummary,
+  retryZohoOrders,
+  syncZohoOrderByNumber,
+} from "@/lib/backend-data";
 import { showApiError } from "@/lib/ui-errors";
+import { ListPagination } from "@/components/ListPagination";
+import { LIST_PAGE_SIZE } from "@/lib/pagination";
 
 export const Route = createFileRoute("/admin/orders")({ component: AdminOrdersPage });
 
-type Period = "day" | "week";
+type Period = "all" | "day" | "week";
 
 function localDateValue(date: Date) {
   const year = date.getFullYear();
@@ -19,6 +26,9 @@ function localDateValue(date: Date) {
 }
 
 function selectedRange(value: string, period: Period) {
+  if (period === "all") {
+    return { from: undefined as string | undefined, to: undefined as string | undefined, label: "All orders" };
+  }
   const [year, month, day] = value.split("-").map(Number);
   const start = new Date(year, month - 1, day);
   if (period === "week") {
@@ -65,25 +75,96 @@ function SyncBadge({ status, eligible }: { status: string; eligible: boolean }) 
   );
 }
 
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <label className="block min-w-[9.5rem]">
+      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+      >
+        {options.map((option) => (
+          <option key={option.value || "all"} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function AdminOrdersPage() {
   const [rows, setRows] = useState<AdminOrderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
-  const [period, setPeriod] = useState<Period>("day");
+  const [period, setPeriod] = useState<Period>("all");
+  const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [selectedDate, setSelectedDate] = useState(() => localDateValue(new Date()));
+  const [qInput, setQInput] = useState("");
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [zohoSyncStatus, setZohoSyncStatus] = useState("");
+  const [ledgerlySyncStatus, setLedgerlySyncStatus] = useState("");
   const range = useMemo(() => selectedRange(selectedDate, period), [selectedDate, period]);
+  const loadGen = useRef(0);
+  const filtersKey = `${period}:${selectedDate}:${q}:${status}:${paymentStatus}:${paymentMethod}:${zohoSyncStatus}:${ledgerlySyncStatus}`;
+  const filtersActive = Boolean(
+    q || status || paymentStatus || paymentMethod || zohoSyncStatus || ledgerlySyncStatus || period !== "all",
+  );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setQ(qInput.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [qInput]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filtersKey]);
 
   const load = useCallback(async () => {
+    const gen = ++loadGen.current;
     setLoading(true);
     try {
-      const res = await listAdminOrders(range.from, range.to);
+      const res = await listAdminOrders(range.from, range.to, {
+        page,
+        size: LIST_PAGE_SIZE,
+        q,
+        status,
+        paymentStatus,
+        paymentMethod,
+        zohoSyncStatus,
+        ledgerlySyncStatus,
+      });
+      if (gen !== loadGen.current) return;
       setRows(res.orders ?? []);
+      setTotalItems(res.totalItems);
+      setTotalPages(Math.max(1, res.totalPages));
+      const nextPage = Math.min(Math.max(1, res.page), Math.max(1, res.totalPages));
+      if (nextPage !== page) setPage(nextPage);
     } catch (error) {
+      if (gen !== loadGen.current) return;
       showApiError(error, "Could not load orders");
     } finally {
-      setLoading(false);
+      if (gen === loadGen.current) setLoading(false);
     }
-  }, [range.from, range.to]);
+  }, [range.from, range.to, page, q, status, paymentStatus, paymentMethod, zohoSyncStatus, ledgerlySyncStatus]);
 
   useEffect(() => {
     void load();
@@ -118,6 +199,23 @@ function AdminOrdersPage() {
     }
   };
 
+  const syncPending = async () => {
+    setBusy("zoho:pending");
+    try {
+      const summary = await retryZohoOrders();
+      toast.success(formatZohoSyncSummary(summary, "Order sync"));
+      const notes = formatZohoSyncFailures(summary);
+      if (notes.length > 0) {
+        toast.message(notes.slice(0, 3).join(" · "));
+      }
+      await load();
+    } catch (error) {
+      showApiError(error, "Could not sync pending orders to Zoho");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const attentionOrders = useMemo(
     () =>
       rows.filter(
@@ -134,7 +232,7 @@ function AdminOrdersPage() {
     <AdminPage
       eyebrow="Fulfilment"
       title="Orders"
-      description="Review orders by day or week, confirm COD collection, and immediately see or retry Zoho syncs."
+      description="Search and filter orders, confirm COD collection, and sync paid orders to Zoho Books."
     >
       <div className="mb-5 flex flex-wrap items-end gap-3 rounded-2xl border border-border/70 bg-card/70 p-4">
         <div>
@@ -142,38 +240,150 @@ function AdminOrdersPage() {
             View
           </p>
           <div className="flex rounded-xl bg-muted p-1">
-            {(["day", "week"] as Period[]).map((option) => (
+            {(["all", "day", "week"] as Period[]).map((option) => (
               <button
                 key={option}
                 type="button"
                 onClick={() => setPeriod(option)}
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${period === option ? "bg-background shadow-sm" : "text-muted-foreground"}`}
               >
-                {option === "day" ? "By date" : "By week"}
+                {option === "all" ? "All" : option === "day" ? "By date" : "By week"}
               </button>
             ))}
           </div>
         </div>
-        <label className="block">
-          <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Selected date
-          </span>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(event) => setSelectedDate(event.target.value || localDateValue(new Date()))}
-            className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
-          />
-        </label>
+        {period !== "all" && (
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Selected date
+            </span>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(event) => setSelectedDate(event.target.value || localDateValue(new Date()))}
+              className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+            />
+          </label>
+        )}
         <p className="pb-2 text-sm text-muted-foreground">{range.label}</p>
-        <button
-          type="button"
-          onClick={() => void load()}
-          disabled={loading}
-          className="ml-auto inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background px-3 text-sm font-medium disabled:opacity-60"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
-        </button>
+        <label className="block min-w-[16rem] flex-1">
+          <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Search
+          </span>
+          <span className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="search"
+              value={qInput}
+              onChange={(event) => setQInput(event.target.value)}
+              placeholder="Order no., name, phone, city, email"
+              className="h-10 w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-sm"
+            />
+          </span>
+        </label>
+        <div className="ml-auto flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void syncPending()}
+            disabled={loading || busy !== null}
+            className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background px-3 text-sm font-medium disabled:opacity-60"
+          >
+            {busy === "zoho:pending" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CloudUpload className="h-4 w-4" />
+            )}
+            {busy === "zoho:pending" ? "Syncing…" : "Sync pending to Zoho"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background px-3 text-sm font-medium disabled:opacity-60"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-5 flex flex-wrap items-end gap-3 rounded-2xl border border-border/70 bg-card/70 p-4">
+        <FilterSelect
+          label="Order status"
+          value={status}
+          onChange={setStatus}
+          options={[
+            { value: "", label: "All statuses" },
+            { value: "pending", label: "Pending" },
+            { value: "confirmed", label: "Confirmed" },
+            { value: "fulfilled", label: "Delivered" },
+            { value: "cancelled", label: "Cancelled" },
+          ]}
+        />
+        <FilterSelect
+          label="Payment"
+          value={paymentStatus}
+          onChange={setPaymentStatus}
+          options={[
+            { value: "", label: "All payments" },
+            { value: "pending", label: "Pending" },
+            { value: "paid", label: "Paid" },
+            { value: "failed", label: "Failed" },
+            { value: "refunded", label: "Refunded" },
+          ]}
+        />
+        <FilterSelect
+          label="Method"
+          value={paymentMethod}
+          onChange={setPaymentMethod}
+          options={[
+            { value: "", label: "All methods" },
+            { value: "online", label: "Online" },
+            { value: "cod", label: "COD" },
+          ]}
+        />
+        <FilterSelect
+          label="Zoho"
+          value={zohoSyncStatus}
+          onChange={setZohoSyncStatus}
+          options={[
+            { value: "", label: "All Zoho" },
+            { value: "attention", label: "Needs sync" },
+            { value: "not_synced", label: "Not synced" },
+            { value: "pending", label: "Pending" },
+            { value: "synced", label: "Synced" },
+            { value: "failed", label: "Failed" },
+          ]}
+        />
+        <FilterSelect
+          label="Ledgerly"
+          value={ledgerlySyncStatus}
+          onChange={setLedgerlySyncStatus}
+          options={[
+            { value: "", label: "All Ledgerly" },
+            { value: "pending", label: "Pending" },
+            { value: "synced", label: "Synced" },
+            { value: "failed", label: "Failed" },
+          ]}
+        />
+        {filtersActive && (
+          <button
+            type="button"
+            onClick={() => {
+              setPeriod("all");
+              setQInput("");
+              setQ("");
+              setStatus("");
+              setPaymentStatus("");
+              setPaymentMethod("");
+              setZohoSyncStatus("");
+              setLedgerlySyncStatus("");
+              setSelectedDate(localDateValue(new Date()));
+            }}
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-border bg-background px-3 text-sm font-medium"
+          >
+            <X className="h-4 w-4" /> Clear filters
+          </button>
+        )}
       </div>
 
       {!loading && rows.length > 0 && (
@@ -188,12 +398,12 @@ function AdminOrdersPage() {
             )}
             <p className="font-semibold">
               {attentionOrders.length === 0
-                ? "All eligible orders in this period are synced to Zoho"
-                : `${attentionOrders.length} ${attentionOrders.length === 1 ? "order needs" : "orders need"} Zoho sync attention`}
+                ? "Eligible orders on this page are synced to Zoho"
+                : `${attentionOrders.length} ${attentionOrders.length === 1 ? "order on this page needs" : "orders on this page need"} Zoho sync attention`}
             </p>
             <div className="ml-auto flex gap-2 text-xs text-muted-foreground">
               <span className="rounded-full bg-white/70 px-2.5 py-1">
-                Zoho {zohoSynced}/{zohoEligible.length}
+                Zoho {zohoSynced}/{zohoEligible.length} on this page
               </span>
             </div>
           </div>
@@ -203,12 +413,14 @@ function AdminOrdersPage() {
       {loading ? (
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       ) : rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No orders found for {range.label}.</p>
+        <p className="text-sm text-muted-foreground">No orders match the current filters.</p>
       ) : (
-        <ul className="space-y-4">
+        <ul id="admin-orders-list" className="space-y-4">
           {rows.map((order) => {
             const isPendingCod =
               order.payment_method === "cod" && order.payment_status === "pending";
+            const alreadySynced = normalizedStatus(order.zoho_sync_status) === "synced";
+            const canSync = order.zoho_sync_eligible;
             return (
               <li key={order.order_number} className="glass-strong rounded-2xl p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-3">
@@ -280,26 +492,45 @@ function AdminOrdersPage() {
                       Last synced {new Date(order.zoho_last_synced_at).toLocaleString("en-IN")}
                     </p>
                   )}
-                  {order.zoho_sync_eligible && normalizedStatus(order.zoho_sync_status) !== "synced" && (
-                    <button
-                      type="button"
-                      disabled={busy !== null}
-                      onClick={() => void sync(order.order_number)}
-                      className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium disabled:opacity-60"
-                    >
-                      {busy === `zoho:${order.order_number}` ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-3.5 w-3.5" />
-                      )}
-                      {busy === `zoho:${order.order_number}` ? "Syncing…" : "Sync to Zoho"}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    disabled={busy !== null || !canSync}
+                    title={
+                      canSync
+                        ? alreadySynced
+                          ? "Push this order to Zoho Books again"
+                          : "Create the sales order and invoice in Zoho Books"
+                        : "Available after payment (or once a COD order is confirmed)"
+                    }
+                    onClick={() => void sync(order.order_number)}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium disabled:opacity-60"
+                  >
+                    {busy === `zoho:${order.order_number}` ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <CloudUpload className="h-3.5 w-3.5" />
+                    )}
+                    {busy === `zoho:${order.order_number}`
+                      ? "Syncing…"
+                      : alreadySynced
+                        ? "Re-sync to Zoho"
+                        : "Sync to Zoho"}
+                  </button>
                 </div>
               </li>
             );
           })}
         </ul>
+      )}
+      {!loading && totalItems > 0 && (
+        <ListPagination
+          page={page}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={LIST_PAGE_SIZE}
+          scrollToId="admin-orders-list"
+          onPageChange={setPage}
+        />
       )}
     </AdminPage>
   );

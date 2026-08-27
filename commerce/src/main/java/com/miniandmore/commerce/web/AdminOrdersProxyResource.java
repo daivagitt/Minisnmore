@@ -1,6 +1,7 @@
 package com.miniandmore.commerce.web;
 
 import com.miniandmore.commerce.client.CatalogInternalClient;
+import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -16,15 +17,14 @@ public class AdminOrdersProxyResource {
     }
 
     @GetMapping
-    public ResponseEntity<String> listOrders(@RequestParam String from, @RequestParam String to) {
-        String path = UriComponentsBuilder
-            .fromPath("/internal/v1/admin/orders")
-            .queryParam("from", from)
-            .queryParam("to", to)
-            .build()
-            .encode()
-            .toUriString();
-        return catalog.get(path);
+    public ResponseEntity<String> listOrders(@RequestParam Map<String, String> query) {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/internal/v1/admin/orders");
+        query.forEach((key, value) -> {
+            if (value != null && !value.isBlank()) {
+                builder.queryParam(key, value);
+            }
+        });
+        return catalog.get(builder.build().encode().toUriString());
     }
 
     @GetMapping("/cod-pending")

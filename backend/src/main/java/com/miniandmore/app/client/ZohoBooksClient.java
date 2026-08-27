@@ -95,12 +95,17 @@ public class ZohoBooksClient {
     /**
      * @param modifiedSince when set, only items Zoho has changed at/after this instant are returned
      *                       (Zoho Books {@code last_modified_time} filter) — used for incremental product pulls.
+     *                       Incremental pulls intentionally include every status so an item changed to inactive
+     *                       can be deactivated locally. Full catalogue/inventory pulls request active items only.
      */
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> listItems(int page, java.time.Instant modifiedSince) {
         String url = "/items?" + orgIdParam() + "&page=" + page + "&per_page=200";
         if (modifiedSince != null) {
-            url += "&last_modified_time=" + encode(formatLastModifiedTime(modifiedSince));
+            // RestClient encodes URI strings; pre-encoding here would turn ':' into '%253A'.
+            url += "&last_modified_time=" + formatLastModifiedTime(modifiedSince);
+        } else {
+            url += "&filter_by=Status.Active";
         }
         Map<String, Object> response = get(url);
         return (List<Map<String, Object>>) response.getOrDefault("items", List.of());

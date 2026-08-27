@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import { LIST_PAGE_SIZE } from "@/lib/pagination";
 import { z } from "zod";
 
 const AddressSchema = z.object({
@@ -391,18 +392,61 @@ export type AdminOrderRow = AdminCodOrderRow & {
   ledgerly_sync_eligible: boolean;
 };
 
+export type AdminOrderList = {
+  orders: AdminOrderRow[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+};
+
+export type AdminOrderListFilters = {
+  page?: number;
+  size?: number;
+  q?: string;
+  status?: string;
+  paymentStatus?: string;
+  paymentMethod?: string;
+  zohoSyncStatus?: string;
+  ledgerlySyncStatus?: string;
+};
+
 export async function listAdminOrders(
-  from: string,
-  to: string,
-): Promise<{ orders: AdminOrderRow[] }> {
-  const query = new URLSearchParams({ from, to });
-  const res = await api.get<{ orders: AdminOrderRow[] }>(
+  from?: string,
+  to?: string,
+  options?: AdminOrderListFilters,
+): Promise<AdminOrderList> {
+  const query = new URLSearchParams();
+  if (from) query.set("from", from);
+  if (to) query.set("to", to);
+  const q = options?.q?.trim();
+  if (q) query.set("q", q);
+  if (options?.status) query.set("status", options.status);
+  if (options?.paymentStatus) query.set("paymentStatus", options.paymentStatus);
+  if (options?.paymentMethod) query.set("paymentMethod", options.paymentMethod);
+  if (options?.zohoSyncStatus) query.set("zohoSyncStatus", options.zohoSyncStatus);
+  if (options?.ledgerlySyncStatus) query.set("ledgerlySyncStatus", options.ledgerlySyncStatus);
+  query.set("page", String(options?.page ?? 1));
+  query.set("size", String(options?.size ?? LIST_PAGE_SIZE));
+  const res = await api.get<Partial<AdminOrderList> & { orders?: AdminOrderRow[] }>(
     `/api/v1/admin/orders?${query.toString()}`,
     {
       auth: true,
     },
   );
-  return { orders: res.orders ?? [] };
+  const orders = res.orders ?? [];
+  const pageSize = res.pageSize ?? options?.size ?? LIST_PAGE_SIZE;
+  const totalItems = res.totalItems ?? orders.length;
+  return {
+    orders,
+    page: res.page ?? options?.page ?? 1,
+    pageSize,
+    totalItems,
+    totalPages: Math.max(
+      1,
+      res.totalPages ?? Math.ceil(totalItems / Math.max(1, pageSize)),
+    ),
+  };
 }
 
 export async function listCodPendingOrders(): Promise<{ orders: AdminCodOrderRow[] }> {

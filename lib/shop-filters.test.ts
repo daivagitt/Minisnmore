@@ -64,6 +64,13 @@ describe("buildShopSearch", () => {
   it("keeps q when present", () => {
     expect(buildShopSearch({ q: "swaddle", sort: "new" })).toEqual({ q: "swaddle", sort: "new" });
   });
+
+  it("omits page 1 and keeps later pages", () => {
+    expect(buildShopSearch({ sort: "new", page: 1 })).toEqual({ sort: "new" });
+    expect(buildShopSearch({ sort: "new", page: 3 })).toEqual({ sort: "new", page: 3 });
+    expect(parseShopSearch({ page: "2" }).page).toBe(2);
+    expect(parseShopSearch({ page: "0" }).page).toBeUndefined();
+  });
 });
 
 describe("shop product filters", () => {

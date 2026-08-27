@@ -23,8 +23,14 @@ if [ ! -f "$REPO_ROOT/dist/server/server.js" ] || [ ! -d "$REPO_ROOT/dist/client
 fi
 
 cd "$REPO_ROOT"
-fuser -k "${FRONTEND_PORT}/tcp" >/dev/null 2>&1 || true
+# Delete every process with this name (duplicate ids can linger after a failed restart).
 pm2 delete "$PM2_NAME" >/dev/null 2>&1 || true
+while pm2 jlist 2>/dev/null | grep -q "\"name\":\"$PM2_NAME\""; do
+  pm2 delete "$PM2_NAME" >/dev/null 2>&1 || true
+  sleep 0.2
+done
+fuser -k "${FRONTEND_PORT}/tcp" >/dev/null 2>&1 || true
+sleep 0.3
 pm2 start npm --name "$PM2_NAME" --cwd "$REPO_ROOT" --update-env -- run preview -- --host 127.0.0.1 --port "$FRONTEND_PORT" --strictPort
 pm2 save
 

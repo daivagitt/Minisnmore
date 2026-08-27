@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Bell, CreditCard, Home, Loader2, Package, Truck, type LucideIcon } from "lucide-react";
+import { ListPagination } from "@/components/ListPagination";
+import { useListPagination } from "@/hooks/useListPagination";
+import { LIST_PAGE_SIZE } from "@/lib/pagination";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccountData } from "@/lib/account";
 import { formatOrderDate } from "@/lib/dates";
@@ -155,6 +158,11 @@ function NotificationsPage() {
     return [];
   }, [events, orders, prefs.orders]);
 
+  const paging = useListPagination(items, {
+    pageSize: LIST_PAGE_SIZE,
+    resetKey: prefs.orders,
+  });
+
   const showLoading = loadingOrders || loadingEvents;
 
   return (
@@ -178,8 +186,8 @@ function NotificationsPage() {
         {!showLoading && prefs.orders && items.length === 0 && (
           <div className="text-sm text-muted-foreground">Nothing yet — your updates will appear here.</div>
         )}
-        <div className="space-y-2">
-          {items.map((n) => {
+        <div id="account-notifications-list" className="space-y-2">
+          {paging.pageItems.map((n) => {
             const Icon = n.icon;
             return (
               <div key={n.key} className="glass rounded-2xl p-3 flex items-start gap-3">
@@ -197,6 +205,14 @@ function NotificationsPage() {
             );
           })}
         </div>
+        <ListPagination
+          page={paging.page}
+          totalPages={paging.totalPages}
+          totalItems={paging.totalItems}
+          pageSize={paging.pageSize}
+          scrollToId="account-notifications-list"
+          onPageChange={paging.setPage}
+        />
       </div>
     </div>
   );

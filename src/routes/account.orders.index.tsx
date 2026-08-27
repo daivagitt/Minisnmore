@@ -4,6 +4,9 @@ import { Loader2, Package, ChevronRight, FileText } from "lucide-react";
 import { useAccountData } from "@/lib/account";
 import { LazyImage } from "@/components/LazyImage";
 import { CopyButton } from "@/components/CopyButton";
+import { ListPagination } from "@/components/ListPagination";
+import { useListPagination } from "@/hooks/useListPagination";
+import { LIST_PAGE_SIZE } from "@/lib/pagination";
 import { formatOrderDate } from "@/lib/dates";
 import {
   formatOrderStatusSummary,
@@ -50,10 +53,15 @@ function OrdersPage() {
     return orders;
   }, [orders, filter]);
 
+  const paging = useListPagination(filteredOrders ?? [], {
+    pageSize: LIST_PAGE_SIZE,
+    resetKey: filter,
+  });
+
   return (
-    <div className="glass-strong rounded-[2rem] p-6 md:p-8">
-      <h1 className="font-display text-3xl mb-1 flex items-center gap-2">
-        <Package className="h-6 w-6 text-primary" /> Your orders
+    <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 md:p-8">
+      <h1 className="font-display text-2xl sm:text-3xl mb-1 flex items-center gap-2">
+        <Package className="h-6 w-6 text-primary shrink-0" /> Your orders
       </h1>
       <p className="text-sm text-muted-foreground mb-6">
         All your little adventures, in one place.
@@ -89,11 +97,11 @@ function OrdersPage() {
         </div>
       )}
 
-      <div className="space-y-3">
-        {filteredOrders?.map((o) => (
+      <div id="account-orders-list" className="space-y-3">
+        {paging.pageItems.map((o) => (
           <div
             key={o.id}
-            className="glass rounded-2xl p-4 flex items-center justify-between gap-4 hover:bg-white/60 transition group"
+            className="glass rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/60 transition group min-w-0"
           >
             <Link
               to="/account/orders/$orderNumber"
@@ -143,46 +151,52 @@ function OrdersPage() {
                 </div>
               </div>
             </Link>
-            <div className="flex items-center gap-2 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="text-right">
-                  <div className="font-medium">₹{Number(o.total).toLocaleString("en-IN")}</div>
-                  <StatusPill order={o} />
-                  <div className="mt-1 flex flex-col items-end gap-1">
-                    {shouldPollOrderTracking(o) && (
-                      <Link
-                        to="/track"
-                        search={{ order: o.order_number }}
-                        className="text-[10px] text-primary hover:underline"
-                      >
-                        Track order
-                      </Link>
-                    )}
-                    {o.order_number && (
-                      <Link
-                        to="/account/orders/$orderNumber/invoice"
-                        params={{ orderNumber: o.order_number }}
-                        className="text-[10px] text-primary hover:underline inline-flex items-center gap-1"
-                      >
-                        <FileText className="h-3 w-3" /> Invoice
-                      </Link>
-                    )}
-                  </div>
+            <div className="flex items-center justify-between sm:justify-end gap-3 min-w-0 pl-0 sm:pl-0">
+              <div className="min-w-0 sm:text-right">
+                <div className="font-medium">₹{Number(o.total).toLocaleString("en-IN")}</div>
+                <StatusPill order={o} />
+                <div className="mt-1 flex flex-wrap sm:flex-col sm:items-end gap-x-3 gap-y-1">
+                  {shouldPollOrderTracking(o) && (
+                    <Link
+                      to="/track"
+                      search={{ order: o.order_number }}
+                      className="text-[10px] text-primary hover:underline"
+                    >
+                      Track order
+                    </Link>
+                  )}
+                  {o.order_number && (
+                    <Link
+                      to="/account/orders/$orderNumber/invoice"
+                      params={{ orderNumber: o.order_number }}
+                      className="text-[10px] text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      <FileText className="h-3 w-3" /> Invoice
+                    </Link>
+                  )}
                 </div>
-                <Link
-                  to="/account/orders/$orderNumber"
-                  params={{ orderNumber: o.order_number }}
-                  search={needsOnlinePayment(o) ? { pay: "1" } : {}}
-                  className="text-muted-foreground group-hover:translate-x-0.5 transition"
-                  aria-label={`View order ${o.order_number}`}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Link>
               </div>
+              <Link
+                to="/account/orders/$orderNumber"
+                params={{ orderNumber: o.order_number }}
+                search={needsOnlinePayment(o) ? { pay: "1" } : {}}
+                className="text-muted-foreground group-hover:translate-x-0.5 transition shrink-0"
+                aria-label={`View order ${o.order_number}`}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Link>
             </div>
           </div>
         ))}
       </div>
+      <ListPagination
+        page={paging.page}
+        totalPages={paging.totalPages}
+        totalItems={paging.totalItems}
+        pageSize={paging.pageSize}
+        scrollToId="account-orders-list"
+        onPageChange={paging.setPage}
+      />
     </div>
   );
 }
@@ -195,7 +209,7 @@ function StatusPill({
   const tone = paymentStatusTone(order.payment_status);
   return (
     <span
-      className={`text-[10px] tracking-wide rounded-full px-2 py-0.5 ${PAYMENT_STATUS_TONE_CLASS[tone]}`}
+      className={`inline-flex text-[10px] tracking-wide rounded-full px-2 py-0.5 ${PAYMENT_STATUS_TONE_CLASS[tone]}`}
     >
       {formatOrderStatusSummary(order)}
     </span>

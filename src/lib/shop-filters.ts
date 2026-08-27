@@ -1,4 +1,5 @@
 import { ages, fabrics, type AgeRange, type Fabric, type Product } from "@/data/products";
+import { parsePageParam } from "@/lib/pagination";
 import { productMatchesQuery, normalizeSearchQuery } from "@/lib/product-search";
 import { z } from "zod";
 
@@ -15,6 +16,8 @@ export type ShopSearch = {
   age?: AgeRange;
   fabric?: Fabric;
   sort?: ShopSort;
+  /** 1-based; omitted from URLs when 1. */
+  page?: number;
 };
 
 export function parseShopSearch(raw: unknown): ShopSearch {
@@ -25,11 +28,13 @@ export function parseShopSearch(raw: unknown): ShopSearch {
   const age = ageEnum.safeParse(input.age).success ? ageEnum.parse(input.age) : undefined;
   const fabric = fabricEnum.safeParse(input.fabric).success ? fabricEnum.parse(input.fabric) : undefined;
   const sort = sortEnum.safeParse(input.sort).success ? sortEnum.parse(input.sort) : "new";
+  const page = parsePageParam(input.page);
   const out: ShopSearch = { sort };
   if (qRaw) out.q = qRaw;
   if (category) out.category = category;
   if (age) out.age = age;
   if (fabric) out.fabric = fabric;
+  if (page && page > 1) out.page = page;
   return out;
 }
 
@@ -101,6 +106,7 @@ export function buildShopSearch(next: Partial<ShopSearch>): ShopSearch {
   if (parsed.category) out.category = parsed.category;
   if (parsed.age) out.age = parsed.age;
   if (parsed.fabric) out.fabric = parsed.fabric;
+  if (parsed.page && parsed.page > 1) out.page = parsed.page;
   return out;
 }
 

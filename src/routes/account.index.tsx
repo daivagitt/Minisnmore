@@ -34,9 +34,9 @@ function Dashboard() {
 
   return (
     <div className="space-y-4">
-      <div className="glass-strong rounded-[2rem] p-6 md:p-8">
+      <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 md:p-8">
         <div className="text-xs uppercase tracking-[0.28em] text-primary">Welcome back</div>
-        <h1 className="font-display text-3xl md:text-4xl mt-1">Hi, {greeting} 👋</h1>
+        <h1 className="font-display text-2xl sm:text-3xl md:text-4xl mt-1">Hi, {greeting} 👋</h1>
         <p className="text-sm text-muted-foreground mt-2">Here's a quick look at your little universe.</p>
       </div>
 
@@ -46,10 +46,10 @@ function Dashboard() {
         <StatCard icon={Heart} label="Wishlist" value={wishlistCount} />
       </div>
 
-      <div className="glass-strong rounded-[2rem] p-6 md:p-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display text-2xl flex items-center gap-2"><Truck className="h-5 w-5 text-primary" /> Recent orders</h2>
-          <Link to="/account/orders" className="text-sm text-primary story-link inline-flex items-center gap-1">View all <ArrowRight className="h-3.5 w-3.5" /></Link>
+      <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 md:p-8">
+        <div className="flex items-center justify-between gap-3 mb-4 min-w-0">
+          <h2 className="font-display text-xl sm:text-2xl flex items-center gap-2 min-w-0"><Truck className="h-5 w-5 text-primary shrink-0" /> Recent orders</h2>
+          <Link to="/account/orders" className="text-sm text-primary story-link inline-flex items-center gap-1 shrink-0">View all <ArrowRight className="h-3.5 w-3.5" /></Link>
         </div>
         {loadingOrders && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
         {orders && orders.length === 0 && (
@@ -58,15 +58,15 @@ function Dashboard() {
         <div className="space-y-3">
           {recent.map((o) => (
             <Link key={o.id} to="/account/orders/$orderNumber" params={{ orderNumber: o.order_number }}
-              className="glass rounded-2xl p-4 flex items-center justify-between gap-4 hover:bg-white/60 transition">
+              className="glass rounded-2xl p-3 sm:p-4 flex items-center justify-between gap-3 min-w-0 hover:bg-white/60 transition">
               <div className="min-w-0">
-                <div className="font-medium">{o.order_number}</div>
+                <div className="font-medium truncate">{o.order_number}</div>
                 <div className="text-xs text-muted-foreground">
                   {formatOrderDate(o.created_at)}
                   {" · "}{o.order_items?.length || 0} item(s)
                 </div>
               </div>
-              <div className="text-right">
+              <div className="text-right shrink-0">
                 <div className="font-medium">₹{Number(o.total).toLocaleString("en-IN")}</div>
                 <div className="text-[11px] tracking-wide text-primary">{formatOrderStatusSummary(o)}</div>
               </div>

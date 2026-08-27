@@ -31,12 +31,17 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(InternalAdminOrderResource.class)
 @AutoConfigureMockMvc(addFilters = false)
+@SuppressWarnings({ "unchecked", "rawtypes" })
 @Import({
     InternalAdminOrderResourceTest.DataAccessConfig.class,
     com.miniandmore.app.web.rest.errors.ResponseStatusExceptionHandler.class,
@@ -107,8 +112,6 @@ class InternalAdminOrderResourceTest {
     @Test
     @WithMockUser(authorities = "ROLE_ADMIN")
     void listOrders_returnsSyncVisibilityForRequestedRange() throws Exception {
-        Instant from = Instant.parse("2026-08-01T00:00:00Z");
-        Instant to = Instant.parse("2026-08-08T00:00:00Z");
         CustomerOrder order = codOrder()
             .status(OrderStatus.CONFIRMED)
             .paymentStatus(PaymentStatus.PAID)
@@ -116,8 +119,8 @@ class InternalAdminOrderResourceTest {
             .zohoSyncError("Zoho unavailable")
             .ledgerlySyncStatus(LedgerlySyncStatus.SYNCED)
             .ledgerlyLastSyncedAt(Instant.parse("2026-08-01T10:05:00Z"));
-        when(customerOrderRepository.findAllByPlacedAtGreaterThanEqualAndPlacedAtLessThanOrderByPlacedAtDesc(from, to))
-            .thenReturn(List.of(order));
+        when(customerOrderRepository.findAll(any(Specification.class), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(order), PageRequest.of(0, 10), 1));
 
         mockMvc
             .perform(
@@ -132,7 +135,99 @@ class InternalAdminOrderResourceTest {
             .andExpect(jsonPath("$.data.orders[0].zoho_sync_error").value("Zoho unavailable"))
             .andExpect(jsonPath("$.data.orders[0].zoho_sync_eligible").value(true))
             .andExpect(jsonPath("$.data.orders[0].ledgerly_sync_status").value("synced"))
-            .andExpect(jsonPath("$.data.orders[0].ledgerly_sync_eligible").value(true));
+            .andExpect(jsonPath("$.data.orders[0].ledgerly_sync_eligible").value(true))
+            .andExpect(jsonPath("$.data.page").value(1))
+            .andExpect(jsonPath("$.data.pageSize").value(10))
+            .andExpect(jsonPath("$.data.totalItems").value(1))
+            .andExpect(jsonPath("$.data.totalPages").value(1));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
+    void listOrders_paginatesAllOrdersWhenNoDateRange() throws Exception {
+        CustomerOrder order = codOrder().status(OrderStatus.CONFIRMED).paymentStatus(PaymentStatus.PAID);
+        when(customerOrderRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(
+            new PageImpl<>(List.of(order), PageRequest.of(1, 10), 20)
+        );
+
+        mockMvc
+            .perform(get("/internal/v1/admin/orders").param("page", "2").param("size", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.orders[0].order_number").value("MNM-COD1"))
+            .andExpect(jsonPath("$.data.page").value(2))
+            .andExpect(jsonPath("$.data.totalItems").value(20))
+            .andExpect(jsonPath("$.data.totalPages").value(2));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
+    void listOrders_appliesStatusAndSearchFilters() throws Exception {
+        CustomerOrder order = codOrder().status(OrderStatus.CONFIRMED).paymentStatus(PaymentStatus.PAID);
+        when(customerOrderRepository.findAll(any(Specification.class), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(order), PageRequest.of(0, 10), 1));
+
+        mockMvc
+            .perform(
+                get("/internal/v1/admin/orders")
+                    .param("q", "MNM-COD")
+                    .param("status", "confirmed")
+                    .param("paymentStatus", "paid")
+                    .param("paymentMethod", "cod")
+                    .param("zohoSyncStatus", "attention")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.orders[0].order_number").value("MNM-COD1"))
+            .andExpect(jsonPath("$.data.totalItems").value(1));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
+    void listOrders_rejectsInvalidStatusFilter() throws Exception {
+        mockMvc
+            .perform(get("/internal/v1/admin/orders").param("status", "nope"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
+    void listOrders_rejectsRangeLongerThan31Days() throws Exception {
+        mockMvc
+            .perform(
+                get("/internal/v1/admin/orders")
+                    .param("from", "2026-08-01T00:00:00Z")
+                    .param("to", "2026-09-02T00:00:00Z")
+            )
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
+    void listOrders_capsPageSizeAndClampsPageToOneWhenEmpty() throws Exception {
+        when(customerOrderRepository.findAll(any(Specification.class), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 50), 0));
+
+        mockMvc
+            .perform(get("/internal/v1/admin/orders").param("page", "0").param("size", "999"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.page").value(1))
+            .andExpect(jsonPath("$.data.pageSize").value(50))
+            .andExpect(jsonPath("$.data.totalPages").value(1));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
+    void listOrders_rejectsInvalidZohoFilter() throws Exception {
+        mockMvc
+            .perform(get("/internal/v1/admin/orders").param("zohoSyncStatus", "nope"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
+    void listOrders_rejectsPartialRange() throws Exception {
+        mockMvc
+            .perform(get("/internal/v1/admin/orders").param("from", "2026-08-01T00:00:00Z"))
+            .andExpect(status().isBadRequest());
     }
 
     @Test

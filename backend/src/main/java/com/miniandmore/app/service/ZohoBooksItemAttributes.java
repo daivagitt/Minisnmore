@@ -20,6 +20,18 @@ public final class ZohoBooksItemAttributes {
         "^(?i)(.+)-(XXL|XL|[SML]|\\d{1,2}-\\d{1,2}\\s*M)-(.+)$"
     );
 
+    /**
+     * Mini MN catalog: {@code Baby Swaddle - Aqua - COMMON SIZE} (spaces around hyphens, color then size).
+     * Size token is last so multi-word prints like {@code Pink Buds} stay intact.
+     */
+    private static final Pattern SPACED_COLOR_THEN_SIZE = Pattern.compile(
+        "^(?i)(.+?)\\s+-\\s+(.+?)\\s+-\\s+(COMMON\\s+SIZE|NEWBORN|XXL|XL|[SML]|\\d{1,2}\\s*-\\s*\\d{1,2}\\s*M)$"
+    );
+
+    private static final Pattern SIZE_TOKEN = Pattern.compile(
+        "^(?i)(COMMON\\s+SIZE|NEWBORN|XXL|XL|[SML]|\\d{1,2}\\s*-\\s*\\d{1,2}\\s*M)$"
+    );
+
     private ZohoBooksItemAttributes() {}
 
     public static String groupId(Map<String, Object> item) {
@@ -32,6 +44,28 @@ public final class ZohoBooksItemAttributes {
 
     public static boolean isGrouped(Map<String, Object> item) {
         return StringUtils.isNotBlank(groupId(item)) || StringUtils.isNotBlank(groupName(item));
+    }
+
+    /**
+     * Zoho Books item {@code status} is {@code active}/{@code inactive}; some payloads also send
+     * boolean {@code is_active}. Missing status is treated as active (list already filters Active).
+     */
+    public static boolean isActive(Map<String, Object> item) {
+        if (item == null || item.isEmpty()) {
+            return true;
+        }
+        Object flag = item.get("is_active");
+        if (flag instanceof Boolean bool) {
+            return bool;
+        }
+        if (flag != null) {
+            String text = flag.toString().trim();
+            if ("true".equalsIgnoreCase(text) || "false".equalsIgnoreCase(text)) {
+                return Boolean.parseBoolean(text);
+            }
+        }
+        String status = stringValue(item, "status");
+        return status == null || "active".equalsIgnoreCase(status);
     }
 
     /**
@@ -51,7 +85,10 @@ public final class ZohoBooksItemAttributes {
             return true;
         }
         ParsedName parsed = parseNameSuffix(itemName(item));
-        return parsed.baseName() != null && parsed.size() != null && parsed.color() != null;
+        if (parsed.baseName() != null && parsed.size() != null && parsed.color() != null) {
+            return true;
+        }
+        return pipeDescriptionSize(item) != null && pipeDescriptionColor(item) != null;
     }
 
     public static boolean hasVariantNameSuffix(String name) {
@@ -70,7 +107,10 @@ public final class ZohoBooksItemAttributes {
             return fromAttrs;
         }
         ParsedName parsed = parseNameSuffix(itemName(item));
-        return parsed.size();
+        if (parsed.size() != null) {
+            return parsed.size();
+        }
+        return pipeDescriptionSize(item);
     }
 
     /** Color / print option: named Color attribute, else remaining attribute, else name suffix. */
@@ -80,19 +120,44 @@ public final class ZohoBooksItemAttributes {
             return fromAttrs;
         }
         ParsedName parsed = parseNameSuffix(itemName(item));
-        return parsed.color();
+        if (parsed.color() != null) {
+            return parsed.color();
+        }
+        return pipeDescriptionColor(item);
     }
 
+    /**
+     * Parent title for admin/storefront. Zoho sometimes stores the full variant label as
+     * {@code group_name} (e.g. {@code Book Style Tying Jabla — 0-3 M / Aqua}) when each size×print
+     * is its own singleton group — strip that suffix so siblings still merge under one parent.
+     */
     public static String parentDisplayName(Map<String, Object> item) {
         String group = groupName(item);
         if (group != null) {
+            ParsedName fromGroup = parseNameSuffix(group);
+            if (fromGroup.baseName() != null) {
+                return fromGroup.baseName();
+            }
             return group;
         }
         ParsedName parsed = parseNameSuffix(itemName(item));
         if (parsed.baseName() != null) {
             return parsed.baseName();
         }
+        String fromDesc = pipeDescriptionBase(item);
+        if (fromDesc != null) {
+            return fromDesc;
+        }
         return itemName(item);
+    }
+
+    /** Strip {@code — Size / Color} (or MN spaced) suffix; returns original when none. */
+    public static String stripVariantSuffix(String name) {
+        ParsedName parsed = parseNameSuffix(name);
+        if (parsed.baseName() != null) {
+            return parsed.baseName();
+        }
+        return StringUtils.trimToNull(name);
     }
 
     private static String namedOption(Map<String, Object> item, AttributeRole want) {
@@ -161,7 +226,8 @@ public final class ZohoBooksItemAttributes {
     }
 
     /**
-     * Mini's push format: {@code Horizon Set — S / Navy}. Also accepts {@code Horizon Set-S-Navy}.
+     * Mini's push format: {@code Horizon Set — S / Navy}. Also accepts {@code Horizon Set-S-Navy}
+     * and MN spaced form {@code Baby Swaddle - Aqua - COMMON SIZE}.
      */
     static ParsedName parseNameSuffix(String name) {
         if (name == null || name.isBlank()) {
@@ -173,6 +239,14 @@ public final class ZohoBooksItemAttributes {
             String base = trimmed.substring(0, em).trim();
             String rest = trimmed.substring(em + 3).trim();
             return splitOptions(base, rest);
+        }
+        Matcher spaced = SPACED_COLOR_THEN_SIZE.matcher(trimmed);
+        if (spaced.matches()) {
+            return new ParsedName(
+                blankToNull(spaced.group(1)),
+                blankToNull(spaced.group(3)),
+                blankToNull(spaced.group(2))
+            );
         }
         Matcher hyphen = HYPHEN_SIZE_COLOR.matcher(trimmed);
         if (hyphen.matches()) {
@@ -190,9 +264,52 @@ public final class ZohoBooksItemAttributes {
         if (slash >= 0) {
             String left = rest.substring(0, slash).trim();
             String right = rest.substring(slash + 3).trim();
+            // Em-dash form is usually Size / Color; COMMON SIZE / Brown matches that.
+            // If left looks like a print and right looks like a size, swap.
+            if (!looksLikeSize(left) && looksLikeSize(right)) {
+                return new ParsedName(blankToNull(base), blankToNull(right), blankToNull(left));
+            }
             return new ParsedName(blankToNull(base), blankToNull(left), blankToNull(right));
         }
         return new ParsedName(blankToNull(base), blankToNull(rest), null);
+    }
+
+    private static boolean looksLikeSize(String value) {
+        return value != null && SIZE_TOKEN.matcher(value.trim()).matches();
+    }
+
+    /** Zoho MN descriptions: {@code Baby Swaddle | Age: COMMON SIZE | Print: Aqua}. */
+    private static String pipeDescriptionSize(Map<String, Object> item) {
+        return pipeDescriptionField(item, "age");
+    }
+
+    private static String pipeDescriptionColor(Map<String, Object> item) {
+        return firstNonBlank(pipeDescriptionField(item, "print"), pipeDescriptionField(item, "color"));
+    }
+
+    private static String pipeDescriptionBase(Map<String, Object> item) {
+        String desc = stringValue(item, "description");
+        if (desc == null) {
+            return null;
+        }
+        String first = desc.split("\\|", 2)[0].trim();
+        return StringUtils.isNotBlank(first) && !first.contains(":") ? first : null;
+    }
+
+    private static String pipeDescriptionField(Map<String, Object> item, String label) {
+        String desc = stringValue(item, "description");
+        if (desc == null || label == null) {
+            return null;
+        }
+        String want = label.trim().toLowerCase(Locale.ROOT) + ":";
+        for (String part : desc.split("\\|")) {
+            String trimmed = part.trim();
+            if (trimmed.toLowerCase(Locale.ROOT).startsWith(want)) {
+                String value = trimmed.substring(want.length()).trim();
+                return value.isEmpty() ? null : value;
+            }
+        }
+        return null;
     }
 
     private static String stringValue(Map<String, Object> item, String key) {

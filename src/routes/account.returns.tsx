@@ -13,6 +13,9 @@ import {
 import { showApiError } from "@/lib/ui-errors";
 import { formatOrderDate } from "@/lib/dates";
 import { toast } from "sonner";
+import { ListPagination } from "@/components/ListPagination";
+import { useListPagination } from "@/hooks/useListPagination";
+import { LIST_PAGE_SIZE } from "@/lib/pagination";
 
 export const Route = createFileRoute("/account/returns")({
   head: () => ({ meta: [{ title: "Returns & Refunds · Mini's n More" }] }),
@@ -40,6 +43,9 @@ function ReturnsPage() {
     () => (allOrders ?? []).filter((o: { payment_status?: string }) => o.payment_status === "paid"),
     [allOrders],
   );
+
+  const returnsPaging = useListPagination(returns, { pageSize: LIST_PAGE_SIZE });
+  const paidPaging = useListPagination(paidOrders, { pageSize: LIST_PAGE_SIZE });
 
   const openReturnByOrder = useMemo(() => {
     const map = new Map<string, OrderReturnRow>();
@@ -126,7 +132,7 @@ function ReturnsPage() {
   if (config && !config.enabled) {
     return (
       <div className="space-y-4">
-        <div className="glass-strong rounded-[2rem] p-6 md:p-8">
+        <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 md:p-8">
           <h1 className="font-display text-3xl mb-1 flex items-center gap-2">
             <RotateCcw className="h-6 w-6 text-primary" /> Returns & refunds
           </h1>
@@ -142,7 +148,7 @@ function ReturnsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="glass-strong rounded-[2rem] p-6 md:p-8">
+      <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 md:p-8">
         <h1 className="font-display text-3xl mb-1 flex items-center gap-2">
           <RotateCcw className="h-6 w-6 text-primary" /> Returns & refunds
         </h1>
@@ -156,14 +162,14 @@ function ReturnsPage() {
         </div>
       </div>
 
-      <div className="glass-strong rounded-[2rem] p-6 md:p-8">
+      <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 md:p-8">
         <h2 className="font-display text-xl mb-4">Your return &amp; exchange requests</h2>
         {loadingReturns && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
         {!loadingReturns && returns.length === 0 && (
           <div className="text-sm text-muted-foreground">No return or exchange requests yet.</div>
         )}
-        <div className="space-y-3">
-          {returns.map((r) => (
+        <div id="account-returns-list" className="space-y-3">
+          {returnsPaging.pageItems.map((r) => (
             <div key={r.return_number} className="glass rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="font-medium">
@@ -198,21 +204,29 @@ function ReturnsPage() {
             </div>
           ))}
         </div>
+        <ListPagination
+          page={returnsPaging.page}
+          totalPages={returnsPaging.totalPages}
+          totalItems={returnsPaging.totalItems}
+          pageSize={returnsPaging.pageSize}
+          scrollToId="account-returns-list"
+          onPageChange={returnsPaging.setPage}
+        />
       </div>
 
-      <div className="glass-strong rounded-[2rem] p-6 md:p-8">
+      <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 md:p-8">
         <h2 className="font-display text-xl mb-4">Eligible orders</h2>
         {loadingOrders && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
         {paidOrders.length === 0 && !loadingOrders && (
           <div className="text-sm text-muted-foreground">No paid orders yet.</div>
         )}
-        <div className="space-y-4">
-          {paidOrders.map((o: { id: string; order_number: string; created_at: string; total: number }) => {
+        <div id="account-eligible-orders-list" className="space-y-4">
+          {paidPaging.pageItems.map((o: { id: string; order_number: string; created_at: string; total: number }) => {
             const open = openReturnByOrder.get(o.order_number);
             const elig = eligibility[o.order_number];
             return (
               <div key={o.id} className="glass rounded-2xl p-4 space-y-3">
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 min-w-0">
                   <div className="min-w-0">
                     <Link
                       to="/account/orders/$orderNumber"
@@ -267,6 +281,14 @@ function ReturnsPage() {
             );
           })}
         </div>
+        <ListPagination
+          page={paidPaging.page}
+          totalPages={paidPaging.totalPages}
+          totalItems={paidPaging.totalItems}
+          pageSize={paidPaging.pageSize}
+          scrollToId="account-eligible-orders-list"
+          onPageChange={paidPaging.setPage}
+        />
       </div>
     </div>
   );

@@ -59,6 +59,40 @@ class AdminOrdersProxyResourceTest {
     }
 
     @Test
+    void listOrders_forwardsPaginationWithoutDateRange() throws Exception {
+        String internalPath = "/internal/v1/admin/orders?page=2&size=10";
+        when(catalog.get(internalPath)).thenReturn(ResponseEntity.ok("{\"orders\":[]}"));
+
+        mockMvc
+            .perform(get("/api/v1/admin/orders").param("page", "2").param("size", "10"))
+            .andExpect(status().isOk())
+            .andExpect(content().string("{\"orders\":[]}"));
+
+        verify(catalog).get(internalPath);
+    }
+
+    @Test
+    void listOrders_forwardsFiltersToCatalog() throws Exception {
+        String internalPath =
+            "/internal/v1/admin/orders?q=MNM-1&status=confirmed&paymentStatus=paid&paymentMethod=cod&zohoSyncStatus=attention";
+        when(catalog.get(internalPath)).thenReturn(ResponseEntity.ok("{\"orders\":[]}"));
+
+        mockMvc
+            .perform(
+                get("/api/v1/admin/orders")
+                    .param("q", "MNM-1")
+                    .param("status", "confirmed")
+                    .param("paymentStatus", "paid")
+                    .param("paymentMethod", "cod")
+                    .param("zohoSyncStatus", "attention")
+            )
+            .andExpect(status().isOk())
+            .andExpect(content().string("{\"orders\":[]}"));
+
+        verify(catalog).get(internalPath);
+    }
+
+    @Test
     void markCodCollected_delegatesToCatalog() throws Exception {
         when(catalog.post(eq("/internal/v1/admin/orders/MNM-42/mark-cod-collected"), eq(null)))
             .thenReturn(ResponseEntity.ok("{\"ok\":true}"));

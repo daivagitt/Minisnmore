@@ -17,6 +17,10 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +38,8 @@ import org.springframework.web.server.ResponseStatusException;
 public class InternalAdminOrderResource {
 
     private static final Duration MAX_ORDER_RANGE = Duration.ofDays(31);
+    private static final int DEFAULT_PAGE_SIZE = 10;
+    private static final int MAX_PAGE_SIZE = 50;
 
     private final AccountOrderDataAccess dataAccess;
     private final LedgerlySyncService ledgerlySyncService;
@@ -59,20 +65,64 @@ public class InternalAdminOrderResource {
     }
 
     @GetMapping
-    public ApiResponse<Map<String, Object>> listOrders(@RequestParam Instant from, @RequestParam Instant to) {
-        if (!from.isBefore(to)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The order date range is invalid");
+    public ApiResponse<Map<String, Object>> listOrders(
+        @RequestParam(required = false) Instant from,
+        @RequestParam(required = false) Instant to,
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size,
+        @RequestParam(required = false) String q,
+        @RequestParam(required = false) String status,
+        @RequestParam(required = false) String paymentStatus,
+        @RequestParam(required = false) String paymentMethod,
+        @RequestParam(required = false) String zohoSyncStatus,
+        @RequestParam(required = false) String ledgerlySyncStatus
+    ) {
+        boolean hasRange = from != null || to != null;
+        if (hasRange) {
+            if (from == null || to == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Both from and to are required when filtering by date");
+            }
+            if (!from.isBefore(to)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The order date range is invalid");
+            }
+            if (Duration.between(from, to).compareTo(MAX_ORDER_RANGE) > 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order date range cannot exceed 31 days");
+            }
         }
-        if (Duration.between(from, to).compareTo(MAX_ORDER_RANGE) > 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order date range cannot exceed 31 days");
-        }
-        var orders = dataAccess
+        int pageSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        int pageNumber = Math.max(page, 1);
+        Pageable pageable = PageRequest.of(
+            pageNumber - 1,
+            pageSize,
+            Sort.by(Sort.Direction.DESC, "placedAt").and(Sort.by(Sort.Direction.DESC, "id"))
+        );
+        Page<CustomerOrder> result = dataAccess
             .customerOrderRepository()
-            .findAllByPlacedAtGreaterThanEqualAndPlacedAtLessThanOrderByPlacedAtDesc(from, to)
-            .stream()
-            .map(this::summary)
-            .toList();
-        return ApiResponse.ok(Map.of("orders", orders));
+            .findAll(
+                AdminOrderListSpec.create(from, to, q, status, paymentStatus, paymentMethod, zohoSyncStatus, ledgerlySyncStatus),
+                pageable
+            );
+        if (result.getTotalPages() > 0 && pageNumber > result.getTotalPages()) {
+            pageNumber = result.getTotalPages();
+            pageable = PageRequest.of(
+                pageNumber - 1,
+                pageSize,
+                Sort.by(Sort.Direction.DESC, "placedAt").and(Sort.by(Sort.Direction.DESC, "id"))
+            );
+            result = dataAccess
+                .customerOrderRepository()
+                .findAll(
+                    AdminOrderListSpec.create(from, to, q, status, paymentStatus, paymentMethod, zohoSyncStatus, ledgerlySyncStatus),
+                    pageable
+                );
+        }
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("orders", result.getContent().stream().map(this::summary).toList());
+        payload.put("page", pageNumber);
+        payload.put("pageSize", pageSize);
+        payload.put("totalItems", result.getTotalElements());
+        payload.put("totalPages", Math.max(result.getTotalPages(), 1));
+        return ApiResponse.ok(payload);
     }
 
     @GetMapping("/cod-pending")

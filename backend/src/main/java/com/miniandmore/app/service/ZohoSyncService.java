@@ -256,9 +256,15 @@ public class ZohoSyncService {
      */
     private void pushVariantMatrixToZoho(Product product) {
         List<ProductVariantSupport.VariantRow> rows = variantSupport.parseProduct(product);
+        validateVariantRowsForZohoSync(product, rows);
         int pushed = 0;
+        int deactivated = 0;
         for (ProductVariantSupport.VariantRow row : rows) {
-            if (!row.active() || StringUtils.isBlank(row.sku())) {
+            if (!row.active()) {
+                if (StringUtils.isNotBlank(row.zohoItemId())) {
+                    markItemInactiveIfPresent(row.zohoItemId().trim(), "variant " + row.sku());
+                    deactivated++;
+                }
                 continue;
             }
             String zohoItemId = pushVariantRowToZoho(product, row);
@@ -269,11 +275,37 @@ public class ZohoSyncService {
             productRepository.save(product);
             pushed++;
         }
-        if (pushed == 0) {
+        if (pushed == 0 && deactivated == 0) {
             throw new IllegalStateException("No active variant SKUs for Zoho sync");
         }
         String parentItemId = StringUtils.trimToNull(product.getZohoItemId());
         productRepository.updateZohoSyncSuccess(product.getId(), parentItemId, ZohoSyncStatus.SYNCED, Instant.now());
+    }
+
+    private static void validateVariantRowsForZohoSync(Product product, List<ProductVariantSupport.VariantRow> rows) {
+        if (rows == null || rows.isEmpty()) {
+            throw new IllegalStateException("No variant rows for Zoho sync");
+        }
+        Set<String> activeSkus = new HashSet<>();
+        Set<String> itemIds = new HashSet<>();
+        for (ProductVariantSupport.VariantRow row : rows) {
+            if (StringUtils.isNotBlank(row.zohoItemId()) && !itemIds.add(row.zohoItemId().trim())) {
+                throw new IllegalStateException("Duplicate Zoho item id in variant matrix: " + row.zohoItemId().trim());
+            }
+            if (!row.active()) {
+                continue;
+            }
+            String sku = canonicalSku(row.sku());
+            if (sku == null) {
+                throw new IllegalStateException("Active variant is missing SKU on " + product.getSku());
+            }
+            if (!activeSkus.add(sku)) {
+                throw new IllegalStateException("Duplicate active variant SKU: " + row.sku().trim());
+            }
+            if (StringUtils.isBlank(row.size()) || StringUtils.isBlank(row.color())) {
+                throw new IllegalStateException("Active variant " + row.sku().trim() + " requires both size and color");
+            }
+        }
     }
 
     private String pushVariantRowToZoho(Product product, ProductVariantSupport.VariantRow row) {
@@ -580,8 +612,12 @@ public class ZohoSyncService {
         }
     }
 
-    private static boolean isZohoLinked(Product product) {
-        return StringUtils.isNotBlank(product.getZohoItemId()) || product.getZohoSyncStatus() == ZohoSyncStatus.SYNCED;
+    private boolean isZohoLinked(Product product) {
+        return (
+            StringUtils.isNotBlank(product.getZohoItemId()) ||
+            product.getZohoSyncStatus() == ZohoSyncStatus.SYNCED ||
+            variantSupport.hasZohoLinkedVariants(product)
+        );
     }
 
     private Map<String, Object> buildItemPayload(
@@ -1106,6 +1142,7 @@ public class ZohoSyncService {
         boolean incremental = since != null;
         Instant pullStartedAt = Instant.now();
         Set<String> pulledSkus = new HashSet<>();
+        Set<String> pulledItemIds = new HashSet<>();
         List<Product> variantParents = new ArrayList<>(
             productRepository.findAll().stream().filter(variantSupport::isVariants).toList()
         );
@@ -1124,31 +1161,60 @@ public class ZohoSyncService {
                 builder.failure(pullStoppedMessage(e, page));
                 LOG.warn("Zoho pullProducts stopped early on page {}: {}", page, e.getMessage());
                 break;
+            } catch (ResourceAccessException e) {
+                builder.failure("Zoho unreachable on page " + page + ": " + exceptionMessage(e));
+                LOG.warn("Zoho pullProducts could not reach page {}: {}", page, e.getMessage());
+                break;
+            }
+            if (items == null) {
+                builder.failure("Zoho returned no item list on page " + page);
+                break;
             }
             if (items.isEmpty()) {
                 completedAllPages = true;
                 break;
             }
             for (Map<String, Object> item : items) {
-                String sku = stringValue(item.get("sku"));
-                if (StringUtils.isBlank(sku)) {
-                    builder.notice("missing-sku", "Zoho item has no SKU — skipped");
-                    continue;
-                }
-                pulledSkus.add(sku.trim());
+                String sku = item == null ? null : stringValue(item.get("sku"));
                 try {
-                    upsertPulledProduct(item, autoCreateCategory, builder, variantParents);
+                    if (item == null) {
+                        builder.failure("Zoho returned a null item on page " + page);
+                        continue;
+                    }
+                    if (StringUtils.isBlank(sku)) {
+                        // An unmatchable active item makes the full listing non-authoritative. Treat
+                        // it as a failure so stale cleanup and the incremental cursor do not advance.
+                        builder.failure("missing-sku", "Zoho item has no SKU — skipped");
+                        continue;
+                    }
+                    if (!ZohoBooksItemAttributes.isActive(item)) {
+                        // Incremental listings include inactive changes; this also defends against a
+                        // stale/mixed-status payload from a nominally active-only full listing.
+                        deactivateExistingForInactiveZohoItem(item, sku.trim(), variantParents, builder);
+                        continue;
+                    }
+                    if (upsertPulledProduct(item, autoCreateCategory, builder, variantParents)) {
+                        pulledSkus.add(canonicalSku(sku));
+                        String pulledItemId = canonicalItemId(stringValue(item.get("item_id")));
+                        if (pulledItemId != null) {
+                            pulledItemIds.add(pulledItemId);
+                        }
+                    }
                 } catch (Exception e) {
-                    builder.failure(sku, e.getMessage());
+                    String message = exceptionMessage(e);
+                    LOG.warn("Zoho pull failed for {}: {}", sku, message, e);
+                    builder.failure(sku, message);
                 }
             }
             page++;
         }
         // Stale-product deactivation only makes sense against a full catalog listing — an incremental
         // pull's pulledSkus is just the changed subset, so most untouched-but-still-active products
-        // would wrongly look "stale" and get deactivated.
-        if (completedAllPages && !incremental && !pulledSkus.isEmpty()) {
-            deactivateStaleZohoProducts(pulledSkus, variantParents, builder);
+        // would wrongly look "stale" and get deactivated. Also skip when any item failed to merge:
+        // empty variant matrices would look like "removed from Zoho" and wipe parents.
+        ZohoSyncSummary interim = builder.build();
+        if (completedAllPages && !incremental && interim.failureCount() == 0) {
+            deactivateStaleZohoProducts(pulledSkus, pulledItemIds, variantParents, builder);
         }
         if (completedAllPages) {
             ZohoSyncSummary summary = builder.build();
@@ -1165,6 +1231,21 @@ public class ZohoSyncService {
         return builder.build().toMap();
     }
 
+    private static String exceptionMessage(Throwable e) {
+        if (e == null) {
+            return "Unknown error";
+        }
+        String message = e.getMessage();
+        if (StringUtils.isNotBlank(message)) {
+            return message;
+        }
+        Throwable cause = e.getCause();
+        if (cause != null && StringUtils.isNotBlank(cause.getMessage())) {
+            return e.getClass().getSimpleName() + ": " + cause.getMessage();
+        }
+        return e.getClass().getSimpleName();
+    }
+
     private static String pullStoppedMessage(RestClientResponseException e, int page) {
         if (e.getStatusCode().value() == 429) {
             return "Zoho API rate limit reached — pull stopped after page " +
@@ -1174,7 +1255,11 @@ public class ZohoSyncService {
         return "Zoho pull stopped on page " + page + ": HTTP " + e.getStatusCode().value() + " " + e.getMessage();
     }
 
-    private void upsertPulledProduct(
+    /**
+     * @return true when the Zoho SKU should count toward the active pulled set (stale deactivation).
+     *         Inactive Zoho items return false so they are not treated as still-present.
+     */
+    private boolean upsertPulledProduct(
         Map<String, Object> item,
         boolean autoCreateCategory,
         ZohoSyncSummary.Builder builder,
@@ -1182,19 +1267,37 @@ public class ZohoSyncService {
     ) {
         String sku = stringValue(item.get("sku"));
         Map<String, Object> zohoItemPreview = resolveZohoItemDetail(item, stringValue(item.get("item_id")));
+        if (!ZohoBooksItemAttributes.isActive(zohoItemPreview)) {
+            deactivateExistingForInactiveZohoItem(zohoItemPreview, sku, variantParents, builder);
+            return false;
+        }
         Optional<Product> variantParent = findVariantParentForZohoItem(zohoItemPreview, sku, variantParents);
         if (variantParent.isEmpty() && ZohoBooksItemAttributes.isVariantSku(zohoItemPreview)) {
+            String previewSize = ZohoBooksItemAttributes.size(zohoItemPreview);
+            String previewColor = ZohoBooksItemAttributes.color(zohoItemPreview);
+            if (StringUtils.isBlank(previewSize) || StringUtils.isBlank(previewColor)) {
+                builder.notice(
+                    sku,
+                    "Skipped — missing size/color from Zoho (attributes, name, and description all failed to parse)"
+                );
+                return true;
+            }
             variantParent = Optional.of(createVariantParentFromZohoGroup(zohoItemPreview, sku, variantParents));
         }
         if (variantParent.isPresent()) {
-            mergePulledZohoVariantItem(variantParent.orElseThrow(), zohoItemPreview, sku, autoCreateCategory, builder);
-            return;
+            return mergePulledZohoVariantItem(
+                variantParent.orElseThrow(),
+                zohoItemPreview,
+                sku,
+                autoCreateCategory,
+                builder
+            );
         }
         String itemId = stringValue(item.get("item_id"));
-        Product product = productRepository
-            .findOneBySku(sku)
-            .or(() -> StringUtils.isNotBlank(itemId) ? productRepository.findOneByZohoItemId(itemId) : Optional.empty())
-            .orElseGet(Product::new);
+        Optional<Product> linkedByItemId = StringUtils.isNotBlank(itemId)
+            ? productRepository.findOneByZohoItemId(itemId)
+            : Optional.empty();
+        Product product = linkedByItemId.or(() -> productRepository.findOneBySku(sku)).orElseGet(Product::new);
 
         boolean created = product.getId() == null;
         if (created) {
@@ -1209,6 +1312,9 @@ public class ZohoSyncService {
             product.setBestSeller(false);
             product.setStock(0);
             product.setPrice(BigDecimal.ZERO);
+        } else if (!sku.trim().equals(product.getSku())) {
+            // item_id is stable across a Zoho SKU rename; keep the local identity aligned.
+            product.setSku(sku.trim());
         }
         product.setActive(true);
         if (StringUtils.isNotBlank(itemId)) {
@@ -1219,34 +1325,41 @@ public class ZohoSyncService {
             product.setName(name.trim());
         }
         Map<String, Object> zohoItem = zohoItemPreview;
-        Object rate = zohoItem.get("rate");
+        BigDecimal rate = blankToBigDecimal(zohoItem.get("rate"));
         if (rate != null && !variantSupport.isVariants(product)) {
-            product.setPrice(toBigDecimal(rate));
+            product.setPrice(rate);
         }
         Object stockOnHand = zohoItem.get("stock_on_hand");
-        if (stockOnHand != null && !variantSupport.isVariants(product)) {
+        if (stockOnHand != null && !isBlankNumber(stockOnHand) && !variantSupport.isVariants(product)) {
             product.setStock(nonNegativeStock(stockOnHand));
         }
         applyPulledDescription(product, stringValue(zohoItem.get("description")));
-        productFieldMapper.applyPulledItem(product, zohoItem, autoCreateCategory).ifPresent(notice -> builder.notice(sku, notice));
+        Optional<String> fieldNotice = Optional.ofNullable(
+            productFieldMapper.applyPulledItem(product, zohoItem, autoCreateCategory)
+        ).orElseGet(Optional::empty);
+        fieldNotice.ifPresent(notice -> builder.notice(sku, notice));
         if (StringUtils.isNotBlank(itemId) && itemImageSync.isEnabled()) {
             try {
                 itemImageSync.importZohoItemImage(product, itemId, zohoItem);
             } catch (Exception e) {
                 LOG.warn("Zoho image pull failed for {} ({}): {}", sku, itemId, e.getMessage());
+                builder.notice(sku, "Image import failed: " + exceptionMessage(e));
             }
         }
         product.setZohoSyncStatus(ZohoSyncStatus.SYNCED);
         product.setZohoLastSyncedAt(Instant.now());
         product.setZohoSyncError(null);
+        product.setActive(true);
         productRepository.save(product);
         if (created) {
             builder.notice(sku, "Created from Zoho pull");
         }
         builder.success();
+        return true;
     }
 
-    private void mergePulledZohoVariantItem(
+    /** @return true when the SKU should remain in the active pulled set */
+    private boolean mergePulledZohoVariantItem(
         Product product,
         Map<String, Object> item,
         String variantSku,
@@ -1255,11 +1368,26 @@ public class ZohoSyncService {
     ) {
         String itemId = stringValue(item.get("item_id"));
         Map<String, Object> zohoItem = item;
-        BigDecimal rate = zohoItem.get("rate") != null ? toBigDecimal(zohoItem.get("rate")) : null;
-        BigDecimal mrp = zohoItem.get("label_rate") != null ? toBigDecimal(zohoItem.get("label_rate")) : null;
-        Integer stock = zohoItem.get("stock_on_hand") != null ? nonNegativeStock(zohoItem.get("stock_on_hand")) : null;
+        BigDecimal rate = blankToBigDecimal(zohoItem.get("rate"));
+        BigDecimal mrp = blankToBigDecimal(zohoItem.get("label_rate"));
+        Integer stock = zohoItem.get("stock_on_hand") != null && !isBlankNumber(zohoItem.get("stock_on_hand"))
+            ? nonNegativeStock(zohoItem.get("stock_on_hand"))
+            : null;
         String size = ZohoBooksItemAttributes.size(zohoItem);
         String color = ZohoBooksItemAttributes.color(zohoItem);
+        if (
+            (StringUtils.isBlank(size) || StringUtils.isBlank(color)) &&
+            !variantSupport.variantHasSizeAndColor(product, variantSku)
+        ) {
+            // Do not import unsellable blank size/color rows; keep SKU in pulled set so a prior good
+            // matrix row is not stale-deactivated, and use notice (not failure) so one bad SKU does
+            // not block full-pull stale cleanup for inactive Zoho items.
+            builder.notice(
+                variantSku,
+                "Skipped — missing size/color from Zoho (attributes, name, and description all failed to parse)"
+            );
+            return true;
+        }
         if (!variantSupport.upsertPulledVariantFromZoho(
                 product,
                 variantSku,
@@ -1273,7 +1401,7 @@ public class ZohoSyncService {
             )
         ) {
             builder.failure(variantSku, "Could not merge Zoho variant into parent " + product.getSku());
-            return;
+            return true;
         }
         String groupId = ZohoBooksItemAttributes.groupId(zohoItem);
         if (StringUtils.isNotBlank(groupId) && StringUtils.isBlank(product.getZohoItemId())) {
@@ -1286,9 +1414,10 @@ public class ZohoSyncService {
             }
         }
         deactivateSimpleDuplicateForVariantSku(product, variantSku, builder);
-        productFieldMapper.applyPulledItem(product, zohoItem, autoCreateCategory).ifPresent(notice ->
-            builder.notice(variantSku, notice)
-        );
+        Optional<String> fieldNotice = Optional.ofNullable(
+            productFieldMapper.applyPulledItem(product, zohoItem, autoCreateCategory)
+        ).orElseGet(Optional::empty);
+        fieldNotice.ifPresent(notice -> builder.notice(variantSku, notice));
         if (StringUtils.isNotBlank(itemId)) {
             variantSupport.clearVariantImages(product, variantSku);
             if (itemImageSync.isEnabled()) {
@@ -1296,14 +1425,17 @@ public class ZohoSyncService {
                     itemImageSync.importZohoVariantColorImage(product, color, itemId, zohoItem);
                 } catch (Exception e) {
                     LOG.warn("Zoho image pull failed for variant {} ({}): {}", variantSku, itemId, e.getMessage());
+                    builder.notice(variantSku, "Image import failed: " + exceptionMessage(e));
                 }
             }
         }
         product.setZohoSyncStatus(ZohoSyncStatus.SYNCED);
         product.setZohoLastSyncedAt(Instant.now());
         product.setZohoSyncError(null);
+        product.setActive(true);
         productRepository.save(product);
         builder.success();
+        return true;
     }
 
     /**
@@ -1313,15 +1445,14 @@ public class ZohoSyncService {
         if (StringUtils.isBlank(itemId)) {
             return item;
         }
-        try {
-            Map<String, Object> detailResponse = booksClient.getItem(itemId);
-            @SuppressWarnings("unchecked")
-            Map<String, Object> detailItem = (Map<String, Object>) detailResponse.getOrDefault("item", detailResponse);
-            if (detailItem != null && !detailItem.isEmpty()) {
-                return detailItem;
-            }
-        } catch (Exception e) {
-            LOG.debug("Could not fetch Zoho item detail for {}: {}", itemId, e.getMessage());
+        Map<String, Object> detailResponse = booksClient.getItem(itemId);
+        if (detailResponse == null || detailResponse.isEmpty()) {
+            return item;
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> detailItem = (Map<String, Object>) detailResponse.getOrDefault("item", detailResponse);
+        if (detailItem != null && !detailItem.isEmpty()) {
+            return detailItem;
         }
         return item;
     }
@@ -1331,6 +1462,11 @@ public class ZohoSyncService {
         String sku,
         List<Product> variantParents
     ) {
+        String itemId = stringValue(zohoItem.get("item_id"));
+        Optional<Product> byItemId = variantSupport.findProductContainingVariantZohoItemId(variantParents, itemId);
+        if (byItemId.isPresent()) {
+            return byItemId;
+        }
         Optional<Product> bySku = variantSupport.findProductContainingVariantSku(variantParents, sku);
         if (bySku.isPresent()) {
             return bySku;
@@ -1357,7 +1493,12 @@ public class ZohoSyncService {
         String parentName = ZohoBooksItemAttributes.parentDisplayName(zohoItem);
         if (StringUtils.isNotBlank(parentName)) {
             for (Product parent : variantParents) {
-                if (parentName.equalsIgnoreCase(StringUtils.trimToEmpty(parent.getName()))) {
+                String existingName = StringUtils.trimToEmpty(parent.getName());
+                if (parentName.equalsIgnoreCase(existingName)) {
+                    return Optional.of(parent);
+                }
+                String stripped = ZohoBooksItemAttributes.stripVariantSuffix(existingName);
+                if (stripped != null && parentName.equalsIgnoreCase(stripped)) {
                     return Optional.of(parent);
                 }
             }
@@ -1603,12 +1744,17 @@ public class ZohoSyncService {
 
     private void deactivateStaleZohoProducts(
         Set<String> pulledSkus,
+        Set<String> pulledItemIds,
         List<Product> variantParents,
         ZohoSyncSummary.Builder builder
     ) {
         for (Product product : productRepository.findAllByZohoItemIdIsNotNull()) {
             String sku = StringUtils.trimToNull(product.getSku());
-            if (sku == null || pulledSkus.contains(sku) || !Boolean.TRUE.equals(product.getActive())) {
+            String itemId = canonicalItemId(product.getZohoItemId());
+            boolean stillPresent =
+                (itemId != null && pulledItemIds.contains(itemId)) ||
+                (sku != null && pulledSkus.contains(canonicalSku(sku)));
+            if (stillPresent || !Boolean.TRUE.equals(product.getActive())) {
                 continue;
             }
             if (variantSupport.isVariants(product)) {
@@ -1620,10 +1766,25 @@ public class ZohoSyncService {
             builder.notice(sku, "Deactivated — removed from Zoho");
         }
         for (Product product : variantParents) {
+            if (!variantSupport.hasZohoLinkedVariants(product)) {
+                continue;
+            }
+            int deactivatedRows = variantSupport.deactivateVariantsNotInPulledSet(product, pulledSkus, pulledItemIds);
+            if (deactivatedRows > 0) {
+                String parentSku = StringUtils.trimToNull(product.getSku());
+                product.setZohoLastSyncedAt(Instant.now());
+                productRepository.save(product);
+                if (parentSku != null) {
+                    builder.notice(
+                        parentSku,
+                        "Deactivated " + deactivatedRows + " variant row(s) missing from active Zoho catalog"
+                    );
+                }
+            }
             if (!Boolean.TRUE.equals(product.getActive())) {
                 continue;
             }
-            if (variantSupport.anyVariantSkuInSet(product, pulledSkus)) {
+            if (variantSupport.hasActiveVariants(product)) {
                 continue;
             }
             String sku = StringUtils.trimToNull(product.getSku());
@@ -1636,6 +1797,63 @@ public class ZohoSyncService {
         }
     }
 
+    /**
+     * When Zoho marks an item inactive (or detail reveals inactive), drop it from sellable catalog
+     * without importing stock as active prints.
+     */
+    private void deactivateExistingForInactiveZohoItem(
+        Map<String, Object> zohoItem,
+        String sku,
+        List<Product> variantParents,
+        ZohoSyncSummary.Builder builder
+    ) {
+        String itemId = stringValue(zohoItem.get("item_id"));
+        Optional<Product> byVariant = StringUtils.isNotBlank(itemId)
+            ? variantSupport.findProductContainingVariantZohoItemId(variantParents, itemId)
+            : Optional.empty();
+        byVariant = byVariant.or(() -> variantSupport.findProductContainingVariantSku(variantParents, sku));
+        if (byVariant.isPresent()) {
+            Product parent = byVariant.orElseThrow();
+            boolean deactivated = StringUtils.isNotBlank(itemId) && variantSupport.deactivateVariantByZohoItemId(parent, itemId);
+            if (!deactivated) {
+                deactivated = variantSupport.deactivateVariantBySku(parent, sku);
+            }
+            if (deactivated) {
+                parent.setZohoLastSyncedAt(Instant.now());
+                if (!variantSupport.hasActiveVariants(parent)) {
+                    parent.setActive(false);
+                    parent.setZohoSyncError("No active variant SKUs remain in Zoho");
+                }
+                productRepository.save(parent);
+                builder.notice(sku, "Deactivated — Zoho item is inactive");
+            } else {
+                builder.notice(sku, "Skipped inactive Zoho item (already inactive on parent " + parent.getSku() + ")");
+            }
+            return;
+        }
+        Optional<Product> product = StringUtils.isNotBlank(itemId)
+            ? productRepository.findOneByZohoItemId(itemId)
+            : Optional.empty();
+        product = product.or(() -> StringUtils.isNotBlank(sku) ? productRepository.findOneBySku(sku) : Optional.empty());
+        if (product.isPresent()) {
+            Product p = product.orElseThrow();
+            if (variantSupport.isVariants(p)) {
+                builder.notice(sku, "Skipped inactive Zoho item (parent SKU " + p.getSku() + ")");
+                return;
+            }
+            if (Boolean.TRUE.equals(p.getActive())) {
+                p.setActive(false);
+                p.setZohoSyncError("Zoho item marked inactive");
+                productRepository.save(p);
+                builder.notice(sku, "Deactivated — Zoho item is inactive");
+            } else {
+                builder.notice(sku, "Skipped inactive Zoho item");
+            }
+            return;
+        }
+        builder.notice(sku, "Skipped inactive Zoho item");
+    }
+
     public Map<String, Object> pullInventory() {
         ZohoSyncSummary.Builder builder = ZohoSyncSummary.builder();
         List<Product> variantParents = productRepository
@@ -1643,15 +1861,32 @@ public class ZohoSyncService {
             .stream()
             .filter(variantSupport::isVariants)
             .toList();
+        int page = 1;
         try {
-            int page = 1;
             List<Map<String, Object>> items;
             do {
                 items = booksClient.listItems(page);
+                if (items == null) {
+                    builder.failure("Zoho returned no inventory item list on page " + page);
+                    break;
+                }
                 for (Map<String, Object> item : items) {
-                    String sku = stringValue(item.get("sku"));
-                    String itemId = stringValue(item.get("item_id"));
+                    String sku = item == null ? null : stringValue(item.get("sku"));
+                    String itemId = item == null ? null : stringValue(item.get("item_id"));
                     try {
+                        if (item == null) {
+                            builder.failure("Zoho returned a null inventory item on page " + page);
+                            continue;
+                        }
+                        Object stockValue = item.get("stock_on_hand");
+                        if (isBlankNumber(stockValue)) {
+                            builder.skipped(
+                                StringUtils.firstNonBlank(sku, itemId, "missing-item"),
+                                "No stock_on_hand value; existing store stock was preserved"
+                            );
+                            continue;
+                        }
+                        int stock = nonNegativeStock(stockValue);
                         Optional<Product> product = StringUtils.isNotBlank(itemId)
                             ? productRepository.findOneByZohoItemId(itemId)
                             : Optional.empty();
@@ -1660,18 +1895,35 @@ public class ZohoSyncService {
                         }
                         if (product.isPresent()) {
                             Product p = product.orElseThrow();
-                            if (variantSupport.isVariants(p) && sku != null && sku.equals(StringUtils.trimToNull(p.getSku()))) {
-                                builder.success();
-                                continue;
+                            if (variantSupport.isVariants(p)) {
+                                if (sku != null && sku.equalsIgnoreCase(StringUtils.trimToEmpty(p.getSku()))) {
+                                    builder.skipped(sku, "Parent/group item has no sellable variant row");
+                                    continue;
+                                }
+                                boolean updated =
+                                    variantSupport.updateVariantStockByZohoItemId(p, itemId, stock) ||
+                                    variantSupport.updateVariantStockBySku(p, sku, stock);
+                                if (!updated) {
+                                    builder.failure(sku, "Variant row not found on parent " + p.getSku());
+                                    continue;
+                                }
+                            } else {
+                                p.setStock(stock);
                             }
-                            p.setStock(nonNegativeStock(item.get("stock_on_hand")));
                             productRepository.save(p);
                             builder.success();
                         } else if (sku != null) {
-                            Optional<Product> byVariant = variantSupport.findProductContainingVariantSku(variantParents, sku);
+                            Optional<Product> byVariant = variantSupport.findProductContainingVariantZohoItemId(
+                                variantParents,
+                                itemId
+                            );
+                            byVariant = byVariant.or(() -> variantSupport.findProductContainingVariantSku(variantParents, sku));
                             if (byVariant.isPresent()) {
                                 Product p = byVariant.orElseThrow();
-                                if (variantSupport.updateVariantStockBySku(p, sku, nonNegativeStock(item.get("stock_on_hand")))) {
+                                boolean updated =
+                                    variantSupport.updateVariantStockByZohoItemId(p, itemId, stock) ||
+                                    variantSupport.updateVariantStockBySku(p, sku, stock);
+                                if (updated) {
                                     productRepository.save(p);
                                     builder.success();
                                 } else {
@@ -1684,19 +1936,25 @@ public class ZohoSyncService {
                             builder.skipped(itemId, "No linked store product for SKU or Zoho item id");
                         }
                     } catch (Exception e) {
-                        builder.failure(sku != null ? sku : itemId, e.getMessage());
+                        builder.failure(sku != null ? sku : itemId, exceptionMessage(e));
                     }
                 }
                 page++;
             } while (!items.isEmpty());
         } catch (RestClientResponseException ex) {
-            String message = "Zoho inventory pull failed (HTTP " + ex.getStatusCode().value() + "): " + StringUtils.defaultString(ex.getStatusText());
+            String message =
+                "Zoho inventory pull stopped on page " +
+                page +
+                " (HTTP " +
+                ex.getStatusCode().value() +
+                "): " +
+                StringUtils.defaultString(ex.getStatusText());
             LOG.warn(message);
-            return ZohoSyncSummary.builder().failure(message).build().toMap();
+            builder.failure(message);
         } catch (ResourceAccessException ex) {
-            String message = "Zoho unreachable: " + ex.getMessage();
+            String message = "Zoho unreachable on inventory page " + page + ": " + exceptionMessage(ex);
             LOG.warn(message);
-            return ZohoSyncSummary.builder().failure(message).build().toMap();
+            builder.failure(message);
         }
         return builder.build().toMap();
     }
@@ -2583,6 +2841,33 @@ public class ZohoSyncService {
         return value == null ? null : value.toString();
     }
 
+    private static boolean isBlankNumber(Object value) {
+        if (value == null) {
+            return true;
+        }
+        if (value instanceof Number) {
+            return false;
+        }
+        return value.toString().trim().isEmpty();
+    }
+
+    private static String canonicalSku(String value) {
+        String normalized = StringUtils.trimToNull(value);
+        return normalized == null ? null : normalized.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private static String canonicalItemId(String value) {
+        return StringUtils.trimToNull(value);
+    }
+
+    /** Null/blank Zoho numeric fields → null (do not coerce to 0 — that would wipe real prices). */
+    private BigDecimal blankToBigDecimal(Object value) {
+        if (isBlankNumber(value)) {
+            return null;
+        }
+        return toBigDecimal(value);
+    }
+
     private BigDecimal toBigDecimal(Object value) {
         if (value == null) {
             return BigDecimal.ZERO;
@@ -2590,7 +2875,14 @@ public class ZohoSyncService {
         if (value instanceof BigDecimal bd) {
             return bd;
         }
-        return new BigDecimal(value.toString());
+        if (value instanceof Number number) {
+            return BigDecimal.valueOf(number.doubleValue());
+        }
+        String text = value.toString().trim();
+        if (text.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        return new BigDecimal(text);
     }
 
     private int toInteger(Object value) {
@@ -2600,7 +2892,11 @@ public class ZohoSyncService {
         if (value instanceof Number number) {
             return number.intValue();
         }
-        return new BigDecimal(value.toString()).intValue();
+        String text = value.toString().trim();
+        if (text.isEmpty()) {
+            return 0;
+        }
+        return new BigDecimal(text).intValue();
     }
 
     private int nonNegativeStock(Object value) {

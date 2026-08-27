@@ -9,6 +9,7 @@ import com.miniandmore.app.service.ProductVariantSupport.VariantRow;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -523,6 +524,46 @@ class ProductVariantSupportTest {
     }
 
     @Test
+    void deactivateVariantsNotInPulledSet_marksMissingRowsInactive() {
+        Product product = variantProduct(
+            """
+            [{"sku":"KEEP-ME","size":"S","color":"Navy","rate":10,"stock":1,"active":true},\
+            {"sku":"DROP-ME","size":"S","color":"Pink","rate":10,"stock":2,"active":true}]
+            """
+        );
+
+        assertThat(support.deactivateVariantsNotInPulledSet(product, Set.of("KEEP-ME"))).isEqualTo(1);
+        assertThat(support.findBySku(support.parseProduct(product), "KEEP-ME").orElseThrow().active()).isTrue();
+        assertThat(support.findBySku(support.parseProduct(product), "DROP-ME").orElseThrow().active()).isFalse();
+        assertThat(product.getStock()).isEqualTo(1);
+    }
+
+    @Test
+    void upsertPulledVariantFromZoho_reactivatesPreviouslyInactiveRow() {
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":10,"stock":0,"active":false,"zohoItemId":"zoho-s"}]
+            """
+        );
+
+        assertThat(
+            support.upsertPulledVariantFromZoho(
+                product,
+                "HORIZON-S-NAVY",
+                "S",
+                "Navy",
+                BigDecimal.TEN,
+                BigDecimal.TEN,
+                3,
+                "zoho-s",
+                true
+            )
+        ).isTrue();
+        assertThat(support.findBySku(support.parseProduct(product), "HORIZON-S-NAVY").orElseThrow().active()).isTrue();
+        assertThat(product.getStock()).isEqualTo(3);
+    }
+
+    @Test
     void incrementVariantStock_restoresParentAggregate() {
         Product product = variantProduct(
             """
@@ -567,6 +608,78 @@ class ProductVariantSupportTest {
     void applyMatrix_invalidJson_returnsFalse() {
         Product product = new Product().sku("BAD").price(BigDecimal.TEN).stock(1);
         assertThat(support.applyMatrixToProduct(product, "VARIANTS", "not-json")).isFalse();
+    }
+
+    @Test
+    void upsertPulledVariant_matchesStableZohoIdAcrossSkuRenameAndAcceptsZeroPrices() {
+        Product product = variantProduct(
+            """
+            [{"sku":"OLD-SKU","size":"S","color":"Navy","rate":100,"mrp":120,"stock":1,"active":false,"zohoItemId":"zoho-stable"}]
+            """
+        );
+
+        assertThat(
+            support.upsertPulledVariantFromZoho(
+                product,
+                "NEW-SKU",
+                "S",
+                "Navy",
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                4,
+                "zoho-stable",
+                true
+            )
+        ).isTrue();
+
+        assertThat(support.parseProduct(product)).hasSize(1);
+        VariantRow renamed = support.findByZohoItemId(support.parseProduct(product), "zoho-stable").orElseThrow();
+        assertThat(renamed.sku()).isEqualTo("NEW-SKU");
+        assertThat(renamed.rate()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(renamed.mrp()).isNull();
+        assertThat(renamed.stock()).isEqualTo(4);
+        assertThat(renamed.active()).isTrue();
+    }
+
+    @Test
+    void fullPullReconciliation_deactivatesOnlyMissingZohoLinkedRows() {
+        Product product = variantProduct(
+            """
+            [{"sku":"LOCAL-ONLY","size":"S","color":"Navy","rate":10,"stock":2,"active":true},
+             {"sku":"LINKED-MISSING","size":"M","color":"Navy","rate":10,"stock":3,"active":true,"zohoItemId":"zoho-missing"}]
+            """
+        );
+
+        assertThat(support.deactivateVariantsNotInPulledSet(product, Set.of(), Set.of())).isEqualTo(1);
+        assertThat(support.findBySku(support.parseProduct(product), "LOCAL-ONLY").orElseThrow().active()).isTrue();
+        assertThat(support.findBySku(support.parseProduct(product), "LINKED-MISSING").orElseThrow().active()).isFalse();
+        assertThat(support.hasActiveVariants(product)).isTrue();
+        assertThat(product.getStock()).isEqualTo(2);
+    }
+
+    @Test
+    void fullPullReconciliation_matchesSkuCaseInsensitively() {
+        Product product = variantProduct(
+            """
+            [{"sku":"Mixed-Case-Sku","size":"S","color":"Navy","rate":10,"stock":2,"active":true,"zohoItemId":"zoho-case"}]
+            """
+        );
+
+        assertThat(support.deactivateVariantsNotInPulledSet(product, Set.of("mixed-case-sku"), Set.of())).isZero();
+        assertThat(support.findBySku(support.parseProduct(product), "MIXED-CASE-SKU").orElseThrow().active()).isTrue();
+    }
+
+    @Test
+    void updateVariantStockByZohoItemId_handlesSkuRenameDuringInventoryOnlyPull() {
+        Product product = variantProduct(
+            """
+            [{"sku":"OLD-SKU","size":"S","color":"Navy","rate":10,"stock":2,"active":true,"zohoItemId":"zoho-stable"}]
+            """
+        );
+
+        assertThat(support.updateVariantStockByZohoItemId(product, "zoho-stable", 7)).isTrue();
+        assertThat(support.findByZohoItemId(support.parseProduct(product), "zoho-stable").orElseThrow().stock()).isEqualTo(7);
+        assertThat(product.getStock()).isEqualTo(7);
     }
 
     private Product variantProduct(String json) {
