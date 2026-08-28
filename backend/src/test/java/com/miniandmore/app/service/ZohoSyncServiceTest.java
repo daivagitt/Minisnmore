@@ -2228,6 +2228,68 @@ class ZohoSyncServiceTest {
     }
 
     @Test
+    void pullProducts_reusesExistingVariantParentBySlugWhenZohoOmitsGroupId() {
+        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository,
+                s3StorageService
+            );
+
+        Product parent = new Product()
+            .id(2951L)
+            .sku("BABY-SWADDLE")
+            .slug("baby-swaddle")
+            .name("Baby Swaddle")
+            .itemStructure("VARIANTS")
+            .variantsJson("[]")
+            .active(true);
+        Map<String, Object> variant = Map.of(
+            "item_id",
+            "zoho-new",
+            "sku",
+            "MN-06-1218M-P01-058",
+            "name",
+            "Baby Swaddle | Age: COMMON SIZE | Print: Cycle",
+            "description",
+            "Baby Swaddle | Age: COMMON SIZE | Print: Cycle",
+            "rate",
+            799.20,
+            "stock_on_hand",
+            3
+        );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(booksClient.listItems(1)).thenReturn(List.of(variant));
+        when(booksClient.listItems(2)).thenReturn(List.of());
+        when(booksClient.getItem("zoho-new")).thenReturn(Map.of("item", variant));
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(productRepository.findAllByZohoItemIdIsNotNull()).thenReturn(List.of());
+        when(productRepository.findOneBySlug("baby-swaddle")).thenReturn(Optional.of(parent));
+        when(productRepository.findOneBySku("MN-06-1218M-P01-058")).thenReturn(Optional.empty());
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(productFieldMapper.applyPulledItem(any(), any(), eq(false))).thenReturn(Optional.empty());
+
+        Map<String, Object> result = service.pullProducts();
+
+        assertThat(result.get("success")).isEqualTo(1);
+        verify(productRepository, never()).save(argThat(saved -> saved.getId() == null && "baby-swaddle".equals(saved.getSlug())));
+        verify(productRepository, atLeastOnce()).save(argThat(saved ->
+            saved.getId() != null && saved.getId().equals(2951L) && saved.getVariantsJson() != null && saved.getVariantsJson().contains("MN-06-1218M-P01-058")
+        ));
+    }
+
+    @Test
     void pullProducts_doesNotAbsorbSimpleItemThatSharesVariantParentName() {
         ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
         service =

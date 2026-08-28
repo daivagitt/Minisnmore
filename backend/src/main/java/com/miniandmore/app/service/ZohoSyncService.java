@@ -1126,6 +1126,7 @@ public class ZohoSyncService {
      *                      quota use down to whatever actually changed. The first-ever pull (no stored
      *                      cursor yet) always pulls the full catalog regardless of this flag.
      */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Map<String, Object> pullProducts(boolean forceFullPull) {
         ZohoSyncSummary.Builder builder = ZohoSyncSummary.builder();
         Optional<ZohoSetting> setting = zohoSettingRepository.findActiveOrLatest();
@@ -1502,6 +1503,12 @@ public class ZohoSyncService {
                     return Optional.of(parent);
                 }
             }
+            Optional<Product> existing = resolveExistingVariantParentByCatalogKeys(groupId, parentName, sku);
+            if (existing.isPresent()) {
+                Product parent = existing.orElseThrow();
+                attachVariantParent(parent, variantParents);
+                return Optional.of(parent);
+            }
         }
         return Optional.empty();
     }
@@ -1515,6 +1522,15 @@ public class ZohoSyncService {
         String displayName = ZohoBooksItemAttributes.parentDisplayName(zohoItem);
         if (StringUtils.isBlank(displayName)) {
             displayName = firstVariantSku;
+        }
+        Optional<Product> existing = resolveExistingVariantParentByCatalogKeys(groupId, displayName, firstVariantSku);
+        if (existing.isPresent()) {
+            Product parent = existing.orElseThrow();
+            attachVariantParent(parent, variantParents);
+            if (StringUtils.isNotBlank(groupId) && StringUtils.isBlank(parent.getZohoItemId())) {
+                parent.setZohoItemId(groupId);
+            }
+            return parent;
         }
         Product product = new Product();
         product.setSku(uniqueGroupSku(displayName, groupId, firstVariantSku));
@@ -1538,6 +1554,41 @@ public class ZohoSyncService {
         Product saved = productRepository.save(product);
         variantParents.add(saved);
         return saved;
+    }
+
+    private Optional<Product> resolveExistingVariantParentByCatalogKeys(String groupId, String displayName, String fallbackSku) {
+        if (StringUtils.isNotBlank(groupId)) {
+            Optional<Product> byGroup = productRepository.findOneByZohoItemId(groupId);
+            if (byGroup.isPresent()) {
+                return byGroup;
+            }
+        }
+        if (StringUtils.isNotBlank(displayName)) {
+            Optional<Product> bySlug = productRepository.findOneBySlug(slugify(displayName));
+            if (bySlug.isPresent()) {
+                return bySlug;
+            }
+            String groupSku = slugify(displayName).toUpperCase(java.util.Locale.ROOT);
+            if (StringUtils.isNotBlank(groupSku)) {
+                Optional<Product> bySku = productRepository.findOneBySku(groupSku);
+                if (bySku.isPresent()) {
+                    return bySku;
+                }
+            }
+        }
+        return productRepository.findOneBySku(fallbackSku);
+    }
+
+    private void attachVariantParent(Product parent, List<Product> variantParents) {
+        if (!variantParents.contains(parent)) {
+            variantParents.add(parent);
+        }
+        if (!variantSupport.isVariants(parent)) {
+            parent.setItemStructure(ProductVariantSupport.STRUCTURE_VARIANTS);
+            if (StringUtils.isBlank(parent.getVariantsJson())) {
+                parent.setVariantsJson("[]");
+            }
+        }
     }
 
     private String uniqueGroupSku(String displayName, String groupId, String fallbackSku) {
