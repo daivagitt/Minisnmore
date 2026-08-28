@@ -26,6 +26,7 @@ export type InvoiceOrder = {
   coupon_code?: string | null;
   payment_method?: string | null;
   payment_status?: string | null;
+  tracking_number?: string | null;
   shipping_address?: { state?: string | null } | null;
   order_items: InvoiceOrderItem[];
 };

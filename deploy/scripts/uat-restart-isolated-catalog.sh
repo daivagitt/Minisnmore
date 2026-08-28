@@ -42,6 +42,17 @@ export ZOHO_INTEGRATION_BASE_URL="http://127.0.0.1:${INTEGRATION_PORT}"
 export RAZORPAY_PAYMENT_DEMO="${RAZORPAY_PAYMENT_DEMO:-false}"
 export RAZORPAY_REFUND_DEMO="${RAZORPAY_REFUND_DEMO:-false}"
 
+export SPRING_DATASOURCE_URL="${SPRING_DATASOURCE_URL:-jdbc:postgresql://127.0.0.1:5432/miniandmore}"
+export SPRING_DATASOURCE_USERNAME="${SPRING_DATASOURCE_USERNAME:-minisandmore_user}"
+if [ -n "${SPRING_DATASOURCE_PASSWORD:-}" ]; then
+  export SPRING_LIQUIBASE_PASSWORD="${SPRING_LIQUIBASE_PASSWORD:-$SPRING_DATASOURCE_PASSWORD}"
+fi
+export SPRING_LIQUIBASE_URL="${SPRING_LIQUIBASE_URL:-$SPRING_DATASOURCE_URL}"
+export SPRING_LIQUIBASE_USERNAME="${SPRING_LIQUIBASE_USERNAME:-$SPRING_DATASOURCE_USERNAME}"
+
+# Migrate first. On failure, the currently running catalog is left untouched.
+bash "${REPO_ROOT}/deploy/scripts/run-catalog-liquibase.sh" "$CATALOG_JAR"
+
 echo "=== Restart catalog core on :${CATALOG_PORT} ==="
 pm2 delete mini-uat-ms-catalog-core >/dev/null 2>&1 || true
 fuser -k "${CATALOG_PORT}/tcp" >/dev/null 2>&1 || true

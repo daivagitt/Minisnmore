@@ -344,6 +344,16 @@ function assertValidCoupon(row: CouponRow) {
 const GST_RATE_MAX = 100;
 const SHIPPING_INR_MAX = 10_000;
 const FREE_SHIPPING_MIN_INR_MAX = 1_000_000;
+const GSTIN_PATTERN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+
+function optionalGstinFieldError(value: string | null | undefined): string | null {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  if (!GSTIN_PATTERN.test(text.toUpperCase())) {
+    return "GSTIN must be a valid 15-character GST number.";
+  }
+  return null;
+}
 
 export function getSiteSettingsValidationErrors(row: SiteSettingsRow): string[] {
   const errors: string[] = [];
@@ -356,6 +366,15 @@ export function getSiteSettingsValidationErrors(row: SiteSettingsRow): string[] 
   const ecatalogue = String(row.ecatalogue_url ?? "").trim();
   const ecatalogueError = optionalPublicUrlFieldError(ecatalogue, "E-catalogue URL");
   if (ecatalogueError) errors.push(ecatalogueError);
+  const invoiceWebsiteError = optionalPublicUrlFieldError(row.invoice_website, "Invoice website");
+  if (invoiceWebsiteError) errors.push(invoiceWebsiteError);
+  const gstinError = optionalGstinFieldError(row.invoice_gstin);
+  if (gstinError) errors.push(gstinError);
+  const gstin = String(row.invoice_gstin ?? "").trim();
+  const soldBy = String(row.invoice_sold_by_address ?? "").trim();
+  if (gstin && !soldBy) {
+    errors.push("Sold by address is required when GSTIN is provided.");
+  }
 
   const gstError = requireNumberField(row.gst_rate, "GST rate", { allowZero: true, max: GST_RATE_MAX });
   if (gstError) errors.push(gstError);
@@ -1020,6 +1039,15 @@ const siteStringMap: Record<string, string> = {
   logo_url: "logoUrl",
   logo_horizontal_url: "logoHorizontalUrl",
   invoice_logo_url: "invoiceLogoUrl",
+  invoice_website: "invoiceWebsite",
+  invoice_gstin: "invoiceGstin",
+  invoice_sold_by_address: "invoiceSoldByAddress",
+  invoice_dispatch_from_address: "invoiceDispatchFromAddress",
+  invoice_registered_office_address: "invoiceRegisteredOfficeAddress",
+  invoice_cin: "invoiceCin",
+  invoice_qr_url: "invoiceQrUrl",
+  invoice_footer_note: "invoiceFooterNote",
+  invoice_seller_state: "invoiceSellerState",
   contact_email: "contactEmail",
   contact_phone: "contactPhone",
   care_label: "careLabel",

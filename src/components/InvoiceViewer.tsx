@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Loader2, Printer } from "lucide-react";
-import { InvoiceDocument } from "@/components/InvoiceDocument";
+import { PortraitInvoiceDocument } from "@/components/PortraitInvoiceDocument";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import type { InvoiceOrder } from "@/lib/invoice-breakdown";
 
@@ -35,8 +35,8 @@ export function InvoiceViewer({
 
   return (
     <div className="invoice-print-root fixed inset-0 z-[100] overflow-auto bg-slate-200 px-2 py-4 sm:px-6 print:static print:bg-white print:p-0">
-      <style>{`@media print { body * { visibility: hidden !important; } .invoice-document, .invoice-document * { visibility: visible !important; } .invoice-document { position: absolute; inset: 0; width: 100%; max-width: none; } @page { size: A4 landscape; margin: 8mm; } }`}</style>
-      <div className="mx-auto mb-3 flex w-full max-w-[1120px] items-center justify-between gap-2 sm:gap-3 print:hidden flex-wrap">
+      <style>{`@media print { html, body { margin: 0 !important; padding: 0 !important; } body * { visibility: hidden !important; } .invoice-document, .invoice-document * { visibility: visible !important; } .invoice-document { position: absolute; left: 0; top: 0; box-sizing: border-box; width: 210mm !important; max-width: none !important; min-height: auto !important; height: auto !important; padding: 8mm !important; overflow: visible !important; } .invoice-document tbody tr { break-inside: avoid; page-break-inside: avoid; } @page { size: A4 portrait; margin: 0; } }`}</style>
+      <div className="mx-auto mb-3 flex w-full max-w-[794px] items-center justify-between gap-2 sm:gap-3 print:hidden flex-wrap">
         <button
           type="button"
           onClick={onBack}
@@ -65,7 +65,7 @@ export function InvoiceViewer({
           {error}
         </div>
       )}
-      {order && <InvoiceDocument order={order} settings={settings} />}
+      {order && <PortraitInvoiceDocument order={order} settings={settings} />}
     </div>
   );
 }

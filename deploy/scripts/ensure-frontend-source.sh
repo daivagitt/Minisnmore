@@ -14,12 +14,21 @@ link_if_missing() {
     exit 1
   fi
   if [ -L "$name" ]; then
+    if [ "$(readlink "$name")" != "$target" ]; then
+      echo "ERROR: $name points to $(readlink "$name"), expected $target" >&2
+      exit 1
+    fi
     return 0
   fi
   if [ -d "$name" ]; then
-    echo "WARN: $name/ is a real directory; expected symlink to $target/" >&2
-    echo "      Run: mv $name ${name}._backup && ln -s $target $name" >&2
-    exit 1
+    if ! diff -qr "$name" "$target" >/dev/null; then
+      echo "ERROR: $name/ differs from $target/; refusing automatic source migration" >&2
+      exit 1
+    fi
+    local backup_dir="deploy/backups/frontend-source-$(date +%Y%m%d%H%M%S)"
+    mkdir -p "$backup_dir"
+    mv "$name" "$backup_dir/$name"
+    echo "Moved identical legacy $name/ mirror to $backup_dir/$name"
   fi
   ln -s "$target" "$name"
   echo "Linked $name -> $target"
@@ -27,12 +36,13 @@ link_if_missing() {
 
 link_if_missing routes
 link_if_missing components
+link_if_missing hooks
 
 # Never copy root -> src (that reverts fixes). Sync src -> root mirrors only.
-for dir in hooks lib data; do
+for dir in lib data; do
   if [ -d "src/$dir" ] && [ -d "$dir" ] && [ ! -L "$dir" ]; then
     rsync -a "src/$dir/" "$dir/"
   fi
 done
 
-echo "OK: frontend source is src/ (routes + components symlinked)"
+echo "OK: frontend source is src/ (routes + components + hooks symlinked)"
