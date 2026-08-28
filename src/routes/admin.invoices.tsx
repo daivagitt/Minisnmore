@@ -2,9 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
-import { AdminPage } from "@/components/admin/AdminPage";
+import { AdminPage, Field, inputCls } from "@/components/admin/AdminPage";
 import { ImageUploadField } from "@/components/admin/ImageUploadField";
-import { InvoiceDocument, type InvoiceBrandSettings } from "@/components/InvoiceDocument";
+import {
+  PortraitInvoiceDocument,
+  type InvoiceBrandSettings,
+} from "@/components/PortraitInvoiceDocument";
 import { getAdminSiteSettings, saveSiteSettings, type SiteSettingsRow } from "@/lib/backend-data";
 import { invalidateSiteSettings } from "@/hooks/useSiteSettings";
 import { showApiError } from "@/lib/ui-errors";
@@ -16,6 +19,15 @@ const DEFAULTS: SiteSettingsRow = {
   brand_name: "Minis n More",
   legal_entity_name: "Stolt Global Private Limited",
   invoice_logo_url: "",
+  invoice_website: "",
+  invoice_gstin: "",
+  invoice_sold_by_address: "",
+  invoice_dispatch_from_address: "",
+  invoice_registered_office_address: "",
+  invoice_cin: "",
+  invoice_qr_url: "",
+  invoice_footer_note: "",
+  invoice_seller_state: "Karnataka",
   logo_url: "",
   logo_horizontal_url: "",
   contact_email: "care@minisnmore.com",
@@ -122,7 +134,7 @@ function AdminInvoicesPage() {
     <AdminPage
       eyebrow="Sales"
       title="Invoices"
-      description="Configure the logo used by Mini's n More custom invoices. The preview uses the exact tax and round-off breakdown from the supplied workbook."
+      description="Configure the identity and legal details printed on custom invoices. The preview keeps the store's existing tax and round-off calculations."
       action={
         <button
           type="button"
@@ -139,17 +151,99 @@ function AdminInvoicesPage() {
       ) : (
         <div className="space-y-6">
           <section className="glass-strong rounded-3xl p-5">
-            <ImageUploadField
-              label="Invoice logo"
-              folder="branding"
-              spec="invoiceLogo"
-              value={String(row.invoice_logo_url ?? "")}
-              onChange={(invoice_logo_url) =>
-                setRow((current) => ({ ...current, invoice_logo_url }))
-              }
-              previewClassName="h-20 w-56 rounded-xl bg-white object-contain p-2 shrink-0"
-              hint="This logo is independent of the navbar and footer logos. If left blank, invoices fall back to the horizontal brand logo."
-            />
+            <div className="space-y-5">
+              <ImageUploadField
+                label="Invoice logo"
+                folder="branding"
+                spec="invoiceLogo"
+                value={String(row.invoice_logo_url ?? "")}
+                onChange={(invoice_logo_url) =>
+                  setRow((current) => ({ ...current, invoice_logo_url }))
+                }
+                previewClassName="h-20 w-56 rounded-xl bg-white object-contain p-2 shrink-0"
+                hint="If left blank, invoices use the horizontal brand logo and then the main logo."
+              />
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <InvoiceInput
+                  label="Invoice website"
+                  placeholder="https://www.example.com"
+                  value={row.invoice_website}
+                  onChange={(invoice_website) =>
+                    setRow((current) => ({ ...current, invoice_website }))
+                  }
+                />
+                <InvoiceInput
+                  label="GSTIN"
+                  placeholder="Enter company GSTIN"
+                  value={row.invoice_gstin}
+                  onChange={(invoice_gstin) => setRow((current) => ({ ...current, invoice_gstin }))}
+                />
+                <InvoiceInput
+                  label="CIN"
+                  placeholder="Enter company CIN"
+                  value={row.invoice_cin}
+                  onChange={(invoice_cin) => setRow((current) => ({ ...current, invoice_cin }))}
+                />
+                <InvoiceInput
+                  label="Seller state"
+                  placeholder="Karnataka"
+                  value={row.invoice_seller_state}
+                  onChange={(invoice_seller_state) =>
+                    setRow((current) => ({ ...current, invoice_seller_state }))
+                  }
+                />
+                <ImageUploadField
+                  label="Invoice QR image"
+                  folder="branding"
+                  spec={{
+                    ratio: "1 : 1",
+                    recommendedPx: "400 × 400 px",
+                    notes: "Upload a square QR image. It prints in the invoice header.",
+                  }}
+                  value={String(row.invoice_qr_url ?? "")}
+                  onChange={(invoice_qr_url) =>
+                    setRow((current) => ({ ...current, invoice_qr_url }))
+                  }
+                  previewClassName="h-20 w-20 rounded-lg bg-white object-contain p-1 shrink-0"
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <InvoiceTextarea
+                  label="Sold by address"
+                  placeholder="Enter the legal seller name and full address"
+                  value={row.invoice_sold_by_address}
+                  onChange={(invoice_sold_by_address) =>
+                    setRow((current) => ({ ...current, invoice_sold_by_address }))
+                  }
+                />
+                <InvoiceTextarea
+                  label="Dispatch from address"
+                  placeholder="Enter the warehouse or dispatch address"
+                  value={row.invoice_dispatch_from_address}
+                  onChange={(invoice_dispatch_from_address) =>
+                    setRow((current) => ({ ...current, invoice_dispatch_from_address }))
+                  }
+                />
+                <InvoiceTextarea
+                  label="Registered office address"
+                  placeholder="Enter the registered-office address"
+                  value={row.invoice_registered_office_address}
+                  onChange={(invoice_registered_office_address) =>
+                    setRow((current) => ({ ...current, invoice_registered_office_address }))
+                  }
+                />
+                <InvoiceTextarea
+                  label="Invoice footer note"
+                  placeholder="Optional tax, membership or customer note"
+                  value={row.invoice_footer_note}
+                  onChange={(invoice_footer_note) =>
+                    setRow((current) => ({ ...current, invoice_footer_note }))
+                  }
+                />
+              </div>
+            </div>
           </section>
 
           <section>
@@ -160,11 +254,57 @@ function AdminInvoicesPage() {
               </p>
             </div>
             <div className="max-h-[780px] overflow-auto rounded-3xl border border-border bg-slate-200 p-3">
-              <InvoiceDocument order={PREVIEW_ORDER} settings={settings} compact />
+              <PortraitInvoiceDocument order={PREVIEW_ORDER} settings={settings} compact />
             </div>
           </section>
         </div>
       )}
     </AdminPage>
+  );
+}
+
+function InvoiceInput({
+  label,
+  placeholder,
+  value,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  value: SiteSettingsRow[string];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Field label={label}>
+      <input
+        className={inputCls()}
+        placeholder={placeholder}
+        value={String(value ?? "")}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </Field>
+  );
+}
+
+function InvoiceTextarea({
+  label,
+  placeholder,
+  value,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  value: SiteSettingsRow[string];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Field label={label}>
+      <textarea
+        className={`${inputCls()} min-h-24 resize-y`}
+        placeholder={placeholder}
+        value={String(value ?? "")}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </Field>
   );
 }

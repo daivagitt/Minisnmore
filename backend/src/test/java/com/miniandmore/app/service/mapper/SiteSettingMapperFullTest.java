@@ -29,6 +29,15 @@ class SiteSettingMapperFullTest {
             .logoHorizontalUrl("https://cdn/logo-h.png")
             .logoUrl("https://cdn/logo.png")
             .invoiceLogoUrl("https://cdn/invoice-logo.png")
+            .invoiceWebsite("https://minisnmore.example")
+            .invoiceGstin("29ABCDE1234F1Z5")
+            .invoiceSoldByAddress("Seller address")
+            .invoiceDispatchFromAddress("Dispatch address")
+            .invoiceRegisteredOfficeAddress("Registered office")
+            .invoiceCin("U12345KA2026PTC123456")
+            .invoiceQrUrl("https://cdn/invoice-qr.png")
+            .invoiceFooterNote("Thank you for shopping")
+            .invoiceSellerState("Karnataka")
             .twitterUrl("https://twitter.com/m")
             .whatsappNumber("919876543210")
             .youtubeUrl("https://youtube.com/m")
@@ -53,6 +62,11 @@ class SiteSettingMapperFullTest {
 
         assertThat(dto.getBrandName()).isEqualTo("Mini & More");
         assertThat(dto.getInvoiceLogoUrl()).isEqualTo("https://cdn/invoice-logo.png");
+        assertThat(dto.getInvoiceGstin()).isEqualTo("29ABCDE1234F1Z5");
+        assertThat(dto.getInvoiceDispatchFromAddress()).isEqualTo("Dispatch address");
+        assertThat(roundTrip.getInvoiceRegisteredOfficeAddress()).isEqualTo("Registered office");
+        assertThat(roundTrip.getInvoiceQrUrl()).isEqualTo("https://cdn/invoice-qr.png");
+        assertThat(roundTrip.getInvoiceSellerState()).isEqualTo("Karnataka");
         assertThat(dto.getSubscribeHeroTitle()).isEqualTo("Subscribe");
         assertThat(dto.getFreeShippingMinInr()).isEqualTo(2500);
         assertThat(roundTrip.getContactEmail()).isEqualTo("hello@example.com");

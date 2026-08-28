@@ -114,6 +114,26 @@ describe("admin validation helpers", () => {
     );
   });
 
+  it("validates invoice legal fields", () => {
+    const errors = getSiteSettingsValidationErrors({
+      brand_name: "Mini",
+      gst_rate: 5,
+      shipping_standard_inr: 99,
+      shipping_express_inr: 150,
+      free_shipping_min_inr: 2500,
+      invoice_gstin: "INVALID",
+      invoice_website: "http://localhost/invoice",
+      invoice_sold_by_address: "",
+    });
+    expect(errors).toEqual(
+      expect.arrayContaining([
+        "GSTIN must be a valid 15-character GST number.",
+        "Invoice website must be a relative path or full http/https URL.",
+        "Sold by address is required when GSTIN is provided.",
+      ]),
+    );
+  });
+
   it("collects subscribe page plan errors but skips blank badge rows", () => {
     const errors = getSubscribePageValidationErrors({
       brand_name: "Mini",

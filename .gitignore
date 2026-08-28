@@ -46,6 +46,15 @@ artifacts/load/index.html
 # Local / CI-generated coverage & dashboard HTML (JaCoCo, lifecycle reports, etc.)
 artifacts/reports-site/
 
+# Local invoice reference and deployment backups (not release inputs)
+/Invoice-8926631GOP0FF7A09.pdf
+/deploy/backups/
+
+# Local integration notes maintained outside the product release
+/docs/user-order-tracking-pull.md
+/docs/zoho-books-inventory-deduction.md
+/docs/zoho-order-tracking-pull.md
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars

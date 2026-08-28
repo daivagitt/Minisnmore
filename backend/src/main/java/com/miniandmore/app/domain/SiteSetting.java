@@ -80,6 +80,42 @@ public class SiteSetting implements Serializable {
     @Column(name = "invoice_logo_url", length = 600)
     private String invoiceLogoUrl;
 
+    @Size(max = 240)
+    @Column(name = "invoice_website", length = 240)
+    private String invoiceWebsite;
+
+    @Size(max = 40)
+    @Column(name = "invoice_gstin", length = 40)
+    private String invoiceGstin;
+
+    @Size(max = 1000)
+    @Column(name = "invoice_sold_by_address", length = 1000)
+    private String invoiceSoldByAddress;
+
+    @Size(max = 1000)
+    @Column(name = "invoice_dispatch_from_address", length = 1000)
+    private String invoiceDispatchFromAddress;
+
+    @Size(max = 1000)
+    @Column(name = "invoice_registered_office_address", length = 1000)
+    private String invoiceRegisteredOfficeAddress;
+
+    @Size(max = 40)
+    @Column(name = "invoice_cin", length = 40)
+    private String invoiceCin;
+
+    @Size(max = 600)
+    @Column(name = "invoice_qr_url", length = 600)
+    private String invoiceQrUrl;
+
+    @Size(max = 500)
+    @Column(name = "invoice_footer_note", length = 500)
+    private String invoiceFooterNote;
+
+    @Size(max = 100)
+    @Column(name = "invoice_seller_state", length = 100)
+    private String invoiceSellerState;
+
     @Size(max = 600)
     @Column(name = "twitter_url", length = 600)
     private String twitterUrl;
@@ -334,6 +370,123 @@ public class SiteSetting implements Serializable {
 
     public void setInvoiceLogoUrl(String invoiceLogoUrl) {
         this.invoiceLogoUrl = invoiceLogoUrl;
+    }
+
+    public String getInvoiceWebsite() {
+        return this.invoiceWebsite;
+    }
+
+    public SiteSetting invoiceWebsite(String invoiceWebsite) {
+        this.setInvoiceWebsite(invoiceWebsite);
+        return this;
+    }
+
+    public void setInvoiceWebsite(String invoiceWebsite) {
+        this.invoiceWebsite = invoiceWebsite;
+    }
+
+    public String getInvoiceGstin() {
+        return this.invoiceGstin;
+    }
+
+    public SiteSetting invoiceGstin(String invoiceGstin) {
+        this.setInvoiceGstin(invoiceGstin);
+        return this;
+    }
+
+    public void setInvoiceGstin(String invoiceGstin) {
+        this.invoiceGstin = invoiceGstin;
+    }
+
+    public String getInvoiceSoldByAddress() {
+        return this.invoiceSoldByAddress;
+    }
+
+    public SiteSetting invoiceSoldByAddress(String invoiceSoldByAddress) {
+        this.setInvoiceSoldByAddress(invoiceSoldByAddress);
+        return this;
+    }
+
+    public void setInvoiceSoldByAddress(String invoiceSoldByAddress) {
+        this.invoiceSoldByAddress = invoiceSoldByAddress;
+    }
+
+    public String getInvoiceDispatchFromAddress() {
+        return this.invoiceDispatchFromAddress;
+    }
+
+    public SiteSetting invoiceDispatchFromAddress(String invoiceDispatchFromAddress) {
+        this.setInvoiceDispatchFromAddress(invoiceDispatchFromAddress);
+        return this;
+    }
+
+    public void setInvoiceDispatchFromAddress(String invoiceDispatchFromAddress) {
+        this.invoiceDispatchFromAddress = invoiceDispatchFromAddress;
+    }
+
+    public String getInvoiceRegisteredOfficeAddress() {
+        return this.invoiceRegisteredOfficeAddress;
+    }
+
+    public SiteSetting invoiceRegisteredOfficeAddress(String invoiceRegisteredOfficeAddress) {
+        this.setInvoiceRegisteredOfficeAddress(invoiceRegisteredOfficeAddress);
+        return this;
+    }
+
+    public void setInvoiceRegisteredOfficeAddress(String invoiceRegisteredOfficeAddress) {
+        this.invoiceRegisteredOfficeAddress = invoiceRegisteredOfficeAddress;
+    }
+
+    public String getInvoiceCin() {
+        return this.invoiceCin;
+    }
+
+    public SiteSetting invoiceCin(String invoiceCin) {
+        this.setInvoiceCin(invoiceCin);
+        return this;
+    }
+
+    public void setInvoiceCin(String invoiceCin) {
+        this.invoiceCin = invoiceCin;
+    }
+
+    public String getInvoiceQrUrl() {
+        return this.invoiceQrUrl;
+    }
+
+    public SiteSetting invoiceQrUrl(String invoiceQrUrl) {
+        this.setInvoiceQrUrl(invoiceQrUrl);
+        return this;
+    }
+
+    public void setInvoiceQrUrl(String invoiceQrUrl) {
+        this.invoiceQrUrl = invoiceQrUrl;
+    }
+
+    public String getInvoiceFooterNote() {
+        return this.invoiceFooterNote;
+    }
+
+    public SiteSetting invoiceFooterNote(String invoiceFooterNote) {
+        this.setInvoiceFooterNote(invoiceFooterNote);
+        return this;
+    }
+
+    public void setInvoiceFooterNote(String invoiceFooterNote) {
+        this.invoiceFooterNote = invoiceFooterNote;
+    }
+
+    public String getInvoiceSellerState() {
+        return this.invoiceSellerState;
+    }
+
+    public SiteSetting invoiceSellerState(String invoiceSellerState) {
+        this.setInvoiceSellerState(invoiceSellerState);
+        return this;
+    }
+
+    public void setInvoiceSellerState(String invoiceSellerState) {
+        this.invoiceSellerState = invoiceSellerState;
     }
 
     public String getTwitterUrl() {

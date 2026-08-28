@@ -2,7 +2,8 @@
 # Start an isolated microservices stack on 9180–9184 without touching the monolith on :8081.
 #
 # Database safety (UAT):
-#   - Liquibase is DISABLED on catalog, integration, and gateway — no schema migrations, no CSV seeds.
+#   - Catalog Liquibase migrations run once, before any service is stopped or a new JAR serves traffic.
+#   - Runtime Liquibase remains disabled on catalog, integration, and gateway.
 #   - Never uses the "faker" Liquibase context (no mock products/users/orders).
 #   - Catalog/integration connect read/write to existing miniandmore data only; do not run against prod DB.
 #
@@ -179,6 +180,9 @@ echo "  catalog:     ${CATALOG_JAR_PATH}" >&2
 echo "  store:       ${STORE_JAR_PATH}" >&2
 echo "  commerce:    ${COMMERCE_JAR_PATH}" >&2
 echo "  integration: ${INTEGRATION_JAR_PATH}" >&2
+
+# Fail before stopping the healthy stack if the release schema cannot be applied.
+bash "${SCRIPT_DIR}/run-catalog-liquibase.sh" "$CATALOG_JAR_PATH"
 
 # UAT VPS is often memory/CPU constrained — smaller heaps boot faster than 5 parallel 1GB JVMs.
 JAVA_OPTS_CATALOG="-Xms256m -Xmx512m -XX:+UseG1GC"

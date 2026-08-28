@@ -7,6 +7,15 @@ export type SiteSettings = {
   logo_url: string | null;
   logo_horizontal_url: string | null;
   invoice_logo_url: string | null;
+  invoice_website: string | null;
+  invoice_gstin: string | null;
+  invoice_sold_by_address: string | null;
+  invoice_dispatch_from_address: string | null;
+  invoice_registered_office_address: string | null;
+  invoice_cin: string | null;
+  invoice_qr_url: string | null;
+  invoice_footer_note: string | null;
+  invoice_seller_state: string | null;
   contact_email: string | null;
   contact_phone: string | null;
   care_label: string | null;
@@ -54,6 +63,15 @@ const DEFAULTS: SiteSettings = {
   logo_url: null,
   logo_horizontal_url: null,
   invoice_logo_url: null,
+  invoice_website: null,
+  invoice_gstin: null,
+  invoice_sold_by_address: null,
+  invoice_dispatch_from_address: null,
+  invoice_registered_office_address: null,
+  invoice_cin: null,
+  invoice_qr_url: null,
+  invoice_footer_note: null,
+  invoice_seller_state: null,
   contact_email: "care@minisnmore.com",
   contact_phone: "+91 76765 25139",
   care_label: "Care",
