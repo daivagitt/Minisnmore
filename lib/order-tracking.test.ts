@@ -25,12 +25,14 @@ describe("order-tracking helpers", () => {
     expect(shouldPollOrderTracking({ payment_status: "paid", status: "fulfilled" })).toBe(false);
   });
 
-  it("does not auto-advance Hand-wrapped on payment confirmation", () => {
-    expect(resolveTrackingStage({ status: "confirmed", tracking_status: "processing" })).toBe(0);
+  it("keeps confirmed separate from the explicit Hand-wrapped state", () => {
+    expect(resolveTrackingStage({ status: "confirmed", tracking_status: "confirmed" })).toBe(0);
     expect(resolveTrackingStage({ status: "confirmed" })).toBe(0);
-    expect(trackingStatusLabel({ tracking_status: "processing" })).toBe("Order confirmed");
-    expect(trackingStageLabel({ tracking_status: "processing" }, "pending")).toBe("Order confirmed");
-    expect(trackingStageLabel({ tracking_status: "processing" }, "processing")).toBe("Hand-wrapped");
+    expect(trackingStatusLabel({ tracking_status: "confirmed" })).toBe("Order confirmed");
+    expect(resolveTrackingStage({ status: "hand_wrapped", tracking_status: "hand_wrapped" })).toBe(1);
+    expect(trackingStatusLabel({ tracking_status: "hand_wrapped" })).toBe("Hand-wrapped");
+    expect(trackingStageLabel({ tracking_status: "hand_wrapped" }, "pending")).toBe("Order confirmed");
+    expect(trackingStageLabel({ tracking_status: "hand_wrapped" }, "processing")).toBe("Hand-wrapped");
   });
 
   it("marks Hand-wrapped complete only once shipped", () => {
@@ -39,16 +41,17 @@ describe("order-tracking helpers", () => {
   });
 
   it("builds activity titles from tracking_status", () => {
-    expect(trackingActivityTitle({ tracking_status: "processing" })).toBe("Order confirmed");
+    expect(trackingActivityTitle({ tracking_status: "confirmed" })).toBe("Order confirmed");
+    expect(trackingActivityTitle({ tracking_status: "hand_wrapped" })).toBe("Hand-wrapped");
     expect(trackingActivityTitle({ tracking_status: "shipped" })).toBe("On the way");
     expect(trackingActivityTitle({ tracking_status: "delivered" })).toBe("Delivered");
     expect(trackingActivityTitle({ status: "cancelled" })).toBe("Order cancelled");
   });
 
-  it("keeps hand-wrapped as upcoming copy while confirmed", () => {
-    const order = { tracking_status: "processing" };
-    expect(trackingStageDetail(order, "processing", "upcoming")).toMatch(/hand-wrap/i);
-    expect(trackingStageDetail(order, "pending", "current")).toMatch(/confirmed/i);
+  it("shows hand-wrapped as current only after the backend transition", () => {
+    const order = { tracking_status: "hand_wrapped" };
+    expect(trackingStageDetail(order, "processing", "current")).toMatch(/has been hand-wrapped/i);
+    expect(trackingStageDetail(order, "pending", "done")).toMatch(/confirmed/i);
   });
 
   it("prefers shipment date for in-transit activity", () => {
@@ -62,7 +65,7 @@ describe("order-tracking helpers", () => {
 
     expect(
       trackingActivityDate({
-        tracking_status: "processing",
+        tracking_status: "hand_wrapped",
         created_at: "2026-08-01T10:00:00Z",
       }),
     ).toEqual({ prefix: "Ordered", value: "2026-08-01T10:00:00Z" });

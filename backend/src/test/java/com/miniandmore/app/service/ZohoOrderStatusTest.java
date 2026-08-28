@@ -89,6 +89,20 @@ class ZohoOrderStatusTest {
     }
 
     @Test
+    void applySalesOrderTracking_marksDeliveredWhenZohoShipmentIsCompletelyFulfilled() {
+        CustomerOrder order = paidOrder();
+
+        ZohoOrderStatus.applySalesOrderTracking(
+            order,
+            Map.of("status", "invoiced", "shipped_status", "fulfilled", "shipment_date", "2026-08-30")
+        );
+
+        assertThat(order.getZohoOrderStatus()).isEqualTo("invoiced");
+        assertThat(order.getShipmentDate()).isEqualTo("2026-08-30");
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+    }
+
+    @Test
     void applySalesOrderTracking_invoicedClosedOrderStaysConfirmed() {
         CustomerOrder order = paidOrder();
         Map<String, Object> salesOrder = Map.of(

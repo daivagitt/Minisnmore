@@ -113,15 +113,23 @@ public final class ZohoOrderStatus {
         if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FULFILLED) {
             return;
         }
-        String status = StringUtils.defaultString(stringValue(salesOrder.get("status"))).toLowerCase();
+        String status = normalize(stringValue(salesOrder.get("status")));
         if ("void".equals(status)) {
             order.setStatus(OrderStatus.CANCELLED);
             return;
         }
+        String shippedStatus = normalize(stringValue(salesOrder.get("shipped_status")));
         // Operations use Zoho "fulfilled" as the explicit final-delivery action. This keeps
         // storefront delivery tracking independent of delivery challans. "closed" / "invoiced"
-        // remain accounting states and do not mean that the parcel was delivered.
-        if ("fulfilled".equals(status) || "delivered".equals(status)) {
+        // remain accounting states and do not mean that the parcel was delivered. Zoho Books
+        // exposes "Completely Fulfilled" as shipped_status=fulfilled while the main sales-order
+        // status can remain invoiced, so both fields must be considered.
+        if (
+            "fulfilled".equals(status) ||
+            "delivered".equals(status) ||
+            "fulfilled".equals(shippedStatus) ||
+            "delivered".equals(shippedStatus)
+        ) {
             order.setStatus(OrderStatus.FULFILLED);
             return;
         }

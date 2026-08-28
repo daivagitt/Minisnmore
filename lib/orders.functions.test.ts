@@ -49,6 +49,7 @@ import {
   listMyOrders,
   listMyPayments,
   markOrderReturnReceived,
+  markOrderHandWrapped,
   refundOrderReturn,
   rejectOrderReturn,
   requestOrderReturn,
@@ -196,6 +197,18 @@ describe("orders functions", () => {
       totalPages: 2,
     });
     expect(getMock).toHaveBeenCalledWith("/api/v1/admin/orders?page=2&size=10", { auth: true });
+  });
+
+  it("marks an admin order as hand-wrapped", async () => {
+    postMock.mockResolvedValueOnce({ status: "hand_wrapped" });
+
+    await markOrderHandWrapped("MNM / 10");
+
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/admin/orders/MNM%20%2F%2010/mark-hand-wrapped",
+      undefined,
+      { auth: true },
+    );
   });
 
   it("lists admin orders with search and status filters", async () => {

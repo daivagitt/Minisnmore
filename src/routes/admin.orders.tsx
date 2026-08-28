@@ -126,12 +126,11 @@ function AdminOrdersPage() {
   const [paymentStatus, setPaymentStatus] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [zohoSyncStatus, setZohoSyncStatus] = useState("");
-  const [ledgerlySyncStatus, setLedgerlySyncStatus] = useState("");
   const range = useMemo(() => selectedRange(selectedDate, period), [selectedDate, period]);
   const loadGen = useRef(0);
-  const filtersKey = `${period}:${selectedDate}:${q}:${status}:${paymentStatus}:${paymentMethod}:${zohoSyncStatus}:${ledgerlySyncStatus}`;
+  const filtersKey = `${period}:${selectedDate}:${q}:${status}:${paymentStatus}:${paymentMethod}:${zohoSyncStatus}`;
   const filtersActive = Boolean(
-    q || status || paymentStatus || paymentMethod || zohoSyncStatus || ledgerlySyncStatus || period !== "all",
+    q || status || paymentStatus || paymentMethod || zohoSyncStatus || period !== "all",
   );
 
   useEffect(() => {
@@ -155,7 +154,6 @@ function AdminOrdersPage() {
         paymentStatus,
         paymentMethod,
         zohoSyncStatus,
-        ledgerlySyncStatus,
       });
       if (gen !== loadGen.current) return;
       setRows(res.orders ?? []);
@@ -169,7 +167,7 @@ function AdminOrdersPage() {
     } finally {
       if (gen === loadGen.current) setLoading(false);
     }
-  }, [range.from, range.to, page, q, status, paymentStatus, paymentMethod, zohoSyncStatus, ledgerlySyncStatus]);
+  }, [range.from, range.to, page, q, status, paymentStatus, paymentMethod, zohoSyncStatus]);
 
   useEffect(() => {
     void load();
@@ -373,17 +371,6 @@ function AdminOrdersPage() {
             { value: "failed", label: "Failed" },
           ]}
         />
-        <FilterSelect
-          label="Ledgerly"
-          value={ledgerlySyncStatus}
-          onChange={setLedgerlySyncStatus}
-          options={[
-            { value: "", label: "All Ledgerly" },
-            { value: "pending", label: "Pending" },
-            { value: "synced", label: "Synced" },
-            { value: "failed", label: "Failed" },
-          ]}
-        />
         {filtersActive && (
           <button
             type="button"
@@ -395,7 +382,6 @@ function AdminOrdersPage() {
               setPaymentStatus("");
               setPaymentMethod("");
               setZohoSyncStatus("");
-              setLedgerlySyncStatus("");
               setSelectedDate(localDateValue(new Date()));
             }}
             className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-border bg-background px-3 text-sm font-medium"
