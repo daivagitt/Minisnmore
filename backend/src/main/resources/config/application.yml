@@ -246,6 +246,7 @@ application:
   internal-api-key: ${INTERNAL_API_KEY:}
   zoho:
     sync-product-images: ${ZOHO_SYNC_PRODUCT_IMAGES:true}
+    max-product-images: ${ZOHO_MAX_PRODUCT_IMAGES:10}
     sync-product-stock: ${ZOHO_SYNC_PRODUCT_STOCK:true}
     sync-returns: ${ZOHO_SYNC_RETURNS:true}
     pull-products-auto-create-category: ${ZOHO_PULL_PRODUCTS_AUTO_CREATE_CATEGORY:false}

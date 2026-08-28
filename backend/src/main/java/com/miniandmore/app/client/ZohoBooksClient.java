@@ -162,15 +162,14 @@ public class ZohoBooksClient {
      * {@code books/v3} host. Confirmed live against a real UAT org: each call adds exactly ONE
      * document (its {@code attachment_order} increments per call) — sending multiple files in one
      * multipart request silently keeps only the last part, so images must be posted one at a time.
-     * Callers should fall back to {@link #uploadItemImage} on failure in case an org/plan doesn't
-     * support this endpoint at all.
+     * A failure is propagated so the product cannot be reported as fully synced with a partial gallery.
      */
     public void uploadItemImages(String itemId, List<ImageUpload> images) {
         if (images == null || images.isEmpty()) {
             throw new IllegalArgumentException("Item images are empty");
         }
         try {
-            deleteItemImagesQuiet(itemId);
+            deleteItemImages(itemId);
             for (ImageUpload image : images) {
                 executeImagesUpload(itemId, image, false);
             }
@@ -185,19 +184,46 @@ public class ZohoBooksClient {
     /**
      * Clears any photos already on the item (single-endpoint front image, plus any documents added
      * via the plural endpoint) before re-adding the current gallery — otherwise repeated syncs would
-     * keep appending duplicate copies of the same photos forever. Best-effort: a resync should not
-     * fail outright just because there was nothing to clear.
+     * keep appending duplicate copies of the same photos forever. Zoho requires document ids on the
+     * plural delete endpoint, so resolve them before clearing the front image whenever the response
+     * exposes {@code documents}; older Books responses retain the post-delete fallback.
      */
-    private void deleteItemImagesQuiet(String itemId) {
-        try {
-            executeImageDelete(itemId, false);
-        } catch (Exception ignored) {
-            // no existing single front image — nothing to clear
+    public void deleteItemImages(String itemId) {
+        if (StringUtils.isBlank(itemId)) {
+            return;
         }
         try {
-            executeImagesDelete(itemId, false);
-        } catch (Exception ignored) {
-            // no existing plural-endpoint documents, or org doesn't support the bulk-delete endpoint
+            // Resolve the documented gallery list before mutating the item. A failed GET therefore
+            // leaves the existing front image intact instead of creating a half-deleted gallery.
+            Map<String, Object> itemResponse;
+            try {
+                itemResponse = getItem(itemId);
+            } catch (RuntimeException e) {
+                throw new IllegalStateException("Zoho item fetch failed while clearing images for " + itemId, e);
+            }
+            boolean documentsExposed = ZohoItemDocuments.exposesDocuments(itemResponse);
+            List<String> documentIds = ZohoItemDocuments.pluralDocumentIdsBeforeFrontImageDelete(itemResponse);
+
+            executeImageDelete(itemId, false);
+
+            // Some Books responses omit `documents`. Preserve the existing UAT fallback: after the
+            // front image is removed, Zoho may promote the next gallery id to image_document_id.
+            if (!documentsExposed) {
+                try {
+                    itemResponse = getItem(itemId);
+                } catch (RuntimeException e) {
+                    throw new IllegalStateException("Zoho item fetch failed after clearing the front image for " + itemId, e);
+                }
+                documentIds = ZohoItemDocuments.documentIdsRemainingAfterFrontImageDelete(itemResponse);
+            }
+            if (!documentIds.isEmpty()) {
+                executeImagesDelete(itemId, documentIds, false);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Zoho item images delete interrupted", e);
+        } catch (IOException e) {
+            throw new IllegalStateException("Zoho item images delete failed", e);
         }
     }
 
@@ -476,9 +502,23 @@ public class ZohoBooksClient {
         }
     }
 
-    private void executeImagesDelete(String itemId, boolean retriedAfterUnauthorized) throws IOException, InterruptedException {
+    private void executeImagesDelete(String itemId, List<String> documentIds, boolean retriedAfterUnauthorized)
+        throws IOException, InterruptedException {
+        if (documentIds == null || documentIds.isEmpty()) {
+            return;
+        }
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(apiBase() + "/items/" + itemId + "/images?" + orgIdParam()))
+            .uri(
+                URI.create(
+                    apiBase() +
+                    "/items/" +
+                    itemId +
+                    "/images?" +
+                    orgIdParam() +
+                    "&document_ids=" +
+                    encode(String.join(",", documentIds))
+                )
+            )
             .timeout(BINARY_TIMEOUT)
             .header("Authorization", "Zoho-oauthtoken " + oauthService.accessToken())
             .DELETE()
@@ -487,7 +527,7 @@ public class ZohoBooksClient {
         int statusCode = response.statusCode();
         if (statusCode == 401 && !retriedAfterUnauthorized) {
             oauthService.accessToken();
-            executeImagesDelete(itemId, true);
+            executeImagesDelete(itemId, documentIds, true);
             return;
         }
         if (statusCode == 404) {

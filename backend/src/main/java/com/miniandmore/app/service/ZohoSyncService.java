@@ -138,8 +138,9 @@ public class ZohoSyncService {
                 try {
                     pushProductToZoho(product);
                 } catch (Exception e) {
-                    LOG.warn("Zoho product sync failed for {}: {}", productId, e.getMessage());
-                    productRepository.updateZohoSyncFailure(productId, ZohoSyncStatus.FAILED, e.getMessage());
+                    String failure = storedSyncFailure(e);
+                    LOG.warn("Zoho product sync failed for {}: {}", productId, failure);
+                    productRepository.updateZohoSyncFailure(productId, ZohoSyncStatus.FAILED, failure);
                 }
             });
     }
@@ -182,8 +183,9 @@ public class ZohoSyncService {
                     pushProductToZoho(product);
                     builder.success();
                 } catch (Exception e) {
-                    productRepository.updateZohoSyncFailure(product.getId(), ZohoSyncStatus.FAILED, e.getMessage());
-                    builder.failure(product.getId(), product.getName(), e.getMessage());
+                    String failure = storedSyncFailure(e);
+                    productRepository.updateZohoSyncFailure(product.getId(), ZohoSyncStatus.FAILED, failure);
+                    builder.failure(product.getId(), product.getName(), failure);
                 }
             }
             pageNumber++;
@@ -242,11 +244,7 @@ public class ZohoSyncService {
         if (StringUtils.isBlank(newItemId)) {
             throw new IllegalStateException("Zoho did not return an item id");
         }
-        try {
-            itemImageSync.syncProductImage(newItemId, product);
-        } catch (Exception e) {
-            LOG.warn("Zoho image push failed for product {} ({}): {}", product.getId(), product.getName(), e.getMessage());
-        }
+        itemImageSync.syncProductImage(newItemId, product);
         syncZohoStockAfterPush(product, newItemId);
         productRepository.updateZohoSyncSuccess(product.getId(), newItemId, ZohoSyncStatus.SYNCED, Instant.now());
     }
@@ -345,11 +343,7 @@ public class ZohoSyncService {
         if (StringUtils.isBlank(newItemId)) {
             throw new IllegalStateException("Zoho did not return an item id for variant " + variantSku);
         }
-        try {
-            itemImageSync.syncVariantImage(newItemId, product, variantSku);
-        } catch (Exception e) {
-            LOG.warn("Zoho image push failed for variant {} ({}): {}", variantSku, product.getName(), e.getMessage());
-        }
+        itemImageSync.syncVariantImage(newItemId, product, variantSku);
         syncZohoVariantStockAfterPush(product, row, newItemId);
         return newItemId;
     }
@@ -1244,6 +1238,12 @@ public class ZohoSyncService {
             return e.getClass().getSimpleName() + ": " + cause.getMessage();
         }
         return e.getClass().getSimpleName();
+    }
+
+    /** Keep failure persistence inside Product.zoho_sync_error's 1000-character column and redact signed URL queries. */
+    private static String storedSyncFailure(Throwable error) {
+        String message = exceptionMessage(error).replaceAll("(?i)(https?://[^\\s?]+)\\?[^\\s;]*", "$1?<redacted>");
+        return StringUtils.abbreviate(message, 1000);
     }
 
     private static String pullStoppedMessage(RestClientResponseException e, int page) {

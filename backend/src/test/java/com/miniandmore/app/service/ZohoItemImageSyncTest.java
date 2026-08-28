@@ -1,6 +1,7 @@
 package com.miniandmore.app.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -321,7 +322,7 @@ class ZohoItemImageSyncTest {
 
         itemImageSync.syncVariantImage("zoho-03", product, "KED-BLU-0-3");
 
-        verify(booksClient).deleteItemImage("zoho-03");
+        verify(booksClient).deleteItemImages("zoho-03");
     }
 
     @Test
@@ -568,7 +569,79 @@ class ZohoItemImageSyncTest {
     }
 
     @Test
-    void syncVariantImage_fallsBackToSingleImageWhenMultiUploadRejected() throws Exception {
+    void syncProductImage_combinesPrimaryAndColourGalleryImages() throws Exception {
+        String base = startImageServer(Map.of("/1.jpg", "one".getBytes(), "/2.jpg", "two".getBytes(), "/3.jpg", "three".getBytes()));
+        Product product = new Product()
+            .id(27L)
+            .name("Side Button")
+            .sku("SIDE-BUTTON-T-SHIRT-HALF-SLEEVE")
+            .itemStructure("SIMPLE")
+            .imagesJson("[\"" + base + "/1.jpg\"]")
+            .colorsJson(
+                "[{\"name\":\"Aqua\",\"imageUrls\":[\"" +
+                base +
+                "/1.jpg\",\"" +
+                base +
+                "/2.jpg\",\"" +
+                base +
+                "/3.jpg\"]}]"
+            )
+            .colorImagesJson("{\"Aqua\":[\"" + base + "/1.jpg\",\"" + base + "/2.jpg\",\"" + base + "/3.jpg\"]}");
+
+        itemImageSync.syncProductImage("zoho-side-button", product);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ImageUpload>> captor = ArgumentCaptor.forClass(List.class);
+        verify(booksClient).uploadItemImages(eq("zoho-side-button"), captor.capture());
+        assertThat(captor.getValue()).hasSize(3);
+    }
+
+    @Test
+    void syncVariantImage_doesNotTruncateColourGalleryAfterThreePhotos() throws Exception {
+        String base = startImageServer(
+            Map.of(
+                "/1.jpg", "one".getBytes(),
+                "/2.jpg", "two".getBytes(),
+                "/3.jpg", "three".getBytes(),
+                "/4.jpg", "four".getBytes(),
+                "/5.jpg", "five".getBytes()
+            )
+        );
+        Product product = new Product()
+            .id(28L)
+            .sku("KEDAR")
+            .itemStructure("VARIANTS")
+            .colorImagesJson(
+                "{\"blue\":[\"" +
+                base +
+                "/1.jpg\",\"" +
+                base +
+                "/2.jpg\",\"" +
+                base +
+                "/3.jpg\",\"" +
+                base +
+                "/4.jpg\",\"" +
+                base +
+                "/5.jpg\"]}"
+            )
+            .variantsJson(
+                """
+                [
+                  {"sku":"KED-BLU-0-3","size":"0-3","color":"blue","rate":100,"stock":2,"active":true}
+                ]
+                """
+            );
+
+        itemImageSync.syncVariantImage("zoho-03", product, "KED-BLU-0-3");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ImageUpload>> captor = ArgumentCaptor.forClass(List.class);
+        verify(booksClient).uploadItemImages(eq("zoho-03"), captor.capture());
+        assertThat(captor.getValue()).hasSize(5);
+    }
+
+    @Test
+    void syncVariantImage_reportsFailureWhenZohoRejectsMultiImageUpload() throws Exception {
         String base = startImageServer(Map.of("/1.jpg", "one".getBytes(), "/2.jpg", "two".getBytes()));
         Product product = new Product()
             .id(26L)
@@ -587,8 +660,72 @@ class ZohoItemImageSyncTest {
             .when(booksClient)
             .uploadItemImages(any(), any());
 
+        assertThatThrownBy(() -> itemImageSync.syncVariantImage("zoho-03", product, "KED-BLU-0-3"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("HTTP 404");
+
+        verify(booksClient, never()).uploadItemImage(any(), any(), any(), any());
+    }
+
+    @Test
+    void syncVariantImage_truncatesGalleryAtMaxImagesPerColor() throws Exception {
+        applicationProperties.getZoho().setMaxProductImages(3);
+        java.util.Map<String, byte[]> files = new java.util.LinkedHashMap<>();
+        for (int i = 1; i <= ProductColorImagesSupport.MAX_IMAGES_PER_COLOR + 2; i++) {
+            files.put("/" + i + ".jpg", ("img-" + i).getBytes());
+        }
+        String base = startImageServer(files);
+        StringBuilder gallery = new StringBuilder("[");
+        for (int i = 1; i <= ProductColorImagesSupport.MAX_IMAGES_PER_COLOR + 2; i++) {
+            if (i > 1) {
+                gallery.append(',');
+            }
+            gallery.append("\"").append(base).append("/").append(i).append(".jpg\"");
+        }
+        gallery.append(']');
+        Product product = new Product()
+            .id(29L)
+            .sku("KEDAR")
+            .itemStructure("VARIANTS")
+            .colorImagesJson("{\"blue\":" + gallery + "}")
+            .variantsJson(
+                """
+                [
+                  {"sku":"KED-BLU-0-3","size":"0-3","color":"blue","rate":100,"stock":2,"active":true}
+                ]
+                """
+            );
+
         itemImageSync.syncVariantImage("zoho-03", product, "KED-BLU-0-3");
 
-        verify(booksClient).uploadItemImage(eq("zoho-03"), any(), any(), any());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ImageUpload>> captor = ArgumentCaptor.forClass(List.class);
+        verify(booksClient).uploadItemImages(eq("zoho-03"), captor.capture());
+        assertThat(captor.getValue()).hasSize(3);
+    }
+
+    @Test
+    void syncVariantImage_failsWhenAnyImageDownloadFails() throws Exception {
+        String base = startImageServer(Map.of("/1.jpg", "one".getBytes(), "/2.jpg", "two".getBytes()));
+        Product product = new Product()
+            .id(30L)
+            .sku("KEDAR")
+            .itemStructure("VARIANTS")
+            .colorImagesJson(
+                "{\"blue\":[\"" + base + "/1.jpg\",\"https://invalid.example.test/missing.jpg\",\"" + base + "/2.jpg\"]}"
+            )
+            .variantsJson(
+                """
+                [
+                  {"sku":"KED-BLU-0-3","size":"0-3","color":"blue","rate":100,"stock":2,"active":true}
+                ]
+                """
+            );
+
+        assertThatThrownBy(() -> itemImageSync.syncVariantImage("zoho-03", product, "KED-BLU-0-3"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Could not download");
+
+        verify(booksClient, never()).uploadItemImages(any(), any());
     }
 }

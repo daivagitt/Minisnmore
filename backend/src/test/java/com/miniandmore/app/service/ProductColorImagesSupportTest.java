@@ -190,6 +190,19 @@ class ProductColorImagesSupportTest {
     }
 
     @Test
+    void allSimpleProductGallerySourceUrls_mergesPrimaryAndColourGalleriesWithoutDuplicates() {
+        Product product = new Product()
+            .imagesJson("[\"https://cdn.example.com/primary.jpg\"]")
+            .colorsJson(
+                "[{\"name\":\"Aqua\",\"imageUrls\":[\"https://cdn.example.com/primary.jpg\",\"https://cdn.example.com/g2.jpg\"]}]"
+            )
+            .colorImagesJson("{\"Aqua\":[\"https://cdn.example.com/primary.jpg\",\"https://cdn.example.com/g2.jpg\"]}");
+
+        assertThat(support.allSimpleProductGallerySourceUrls(product))
+            .containsExactly("https://cdn.example.com/primary.jpg", "https://cdn.example.com/g2.jpg");
+    }
+
+    @Test
     void normalizeColorsJson_dedupesPlainStringEntries() {
         String normalized = support.normalizeColorsJson("[\"Navy\",\"navy\",\"Blush\"]");
 

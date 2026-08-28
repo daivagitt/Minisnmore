@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.client.ZohoBooksClient;
 import com.miniandmore.app.client.ZohoBooksClient.BinaryDownload;
+import com.miniandmore.app.client.ZohoItemDocuments;
 import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.Product;
 import java.io.ByteArrayOutputStream;
@@ -38,14 +39,6 @@ public class ZohoItemImageSync {
 
     private static final Logger LOG = LoggerFactory.getLogger(ZohoItemImageSync.class);
     private static final Duration DOWNLOAD_TIMEOUT = Duration.ofSeconds(30);
-    /**
-     * Zoho Books items only appear to hold a handful of photos (the dedicated front/back-image
-     * endpoints suggest a small fixed set of slots) and each one costs a separate API call via the
-     * plural endpoint — cap what a single sync pushes so a large local gallery can't multiply into
-     * excessive Zoho API calls per item.
-     */
-    private static final int MAX_IMAGES_PER_ZOHO_ITEM = 3;
-
     private final ObjectMapper objectMapper;
     private final ApplicationProperties applicationProperties;
     private final ZohoBooksClient booksClient;
@@ -79,7 +72,20 @@ public class ZohoItemImageSync {
         if (!isEnabled() || StringUtils.isBlank(zohoItemId) || product == null) {
             return;
         }
-        uploadFirstWorkingImage(zohoItemId, product, parseImageUrls(product.getImagesJson()));
+        uploadImages(zohoItemId, product, resolveProductImageUrls(product));
+    }
+
+    /**
+     * A simple product can still have colour-specific galleries. The admin keeps the card/primary
+     * photo in {@code images_json}, while the rest of the uploaded gallery is stored in
+     * {@code colors_json}/{@code color_images_json}. Zoho has only one item for a simple product,
+     * so combine all of those galleries in stable order and remove duplicates.
+     */
+    List<String> resolveProductImageUrls(Product product) {
+        List<String> urls = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        addResolvedUrls(urls, seen, colorImagesSupport.allSimpleProductGallerySourceUrls(product));
+        return urls;
     }
 
     /**
@@ -89,7 +95,7 @@ public class ZohoItemImageSync {
         if (!isEnabled() || StringUtils.isBlank(zohoItemId) || product == null) {
             return;
         }
-        uploadFirstWorkingImage(zohoItemId, product, resolveVariantImageUrls(product, variantSku));
+        uploadImages(zohoItemId, product, resolveVariantImageUrls(product, variantSku));
     }
 
     /**
@@ -129,13 +135,9 @@ public class ZohoItemImageSync {
         }
     }
 
-    private void uploadFirstWorkingImage(String zohoItemId, Product product, List<String> imageUrls) {
+    private void uploadImages(String zohoItemId, Product product, List<String> imageUrls) {
         if (imageUrls == null || imageUrls.isEmpty()) {
-            try {
-                booksClient.deleteItemImage(zohoItemId);
-            } catch (RuntimeException e) {
-                LOG.debug("Zoho item image delete skipped for {}: {}", zohoItemId, e.getMessage());
-            }
+            booksClient.deleteItemImages(zohoItemId);
             LOG.debug(
                 "No public image URL for product {} ({}); check images_json, variant imageUrl, and S3_PUBLIC_BASE_URL",
                 product.getId(),
@@ -143,72 +145,86 @@ public class ZohoItemImageSync {
             );
             return;
         }
+        int maxImages = maxProductImages();
+        if (imageUrls.size() > maxImages) {
+            LOG.debug(
+                "Truncating Zoho gallery from {} to {} image(s) for product {} ({})",
+                imageUrls.size(),
+                maxImages,
+                product.getId(),
+                product.getName()
+            );
+            imageUrls = new ArrayList<>(imageUrls.subList(0, maxImages));
+        }
         List<DownloadedImage> downloaded = new ArrayList<>();
-        RuntimeException lastFailure = null;
-        List<String> candidates = imageUrls.size() > MAX_IMAGES_PER_ZOHO_ITEM
-            ? imageUrls.subList(0, MAX_IMAGES_PER_ZOHO_ITEM)
-            : imageUrls;
-        for (String imageUrl : candidates) {
+        List<String> failures = new ArrayList<>();
+        for (int index = 0; index < imageUrls.size(); index++) {
+            String imageUrl = imageUrls.get(index);
             try {
                 downloaded.add(downloadImage(imageUrl));
             } catch (RuntimeException e) {
-                lastFailure = e;
+                failures.add(
+                    "image " +
+                    (index + 1) +
+                    " (" +
+                    safeImageReference(imageUrl) +
+                    "): " +
+                    safeFailureDetail(e)
+                );
                 LOG.debug(
                     "Zoho image candidate failed for product {} ({}): {} — {}",
                     product.getId(),
                     product.getName(),
-                    imageUrl,
-                    e.getMessage()
+                    safeImageReference(imageUrl),
+                    safeFailureDetail(e)
                 );
             }
         }
-        if (downloaded.isEmpty()) {
-            LOG.warn(
-                "Zoho item image sync failed for product {} ({}): tried {} URL(s), last error: {}",
-                product.getId(),
-                product.getName(),
-                candidates.size(),
-                lastFailure != null ? lastFailure.getMessage() : "unknown"
+        if (!failures.isEmpty()) {
+            throw new IllegalStateException(
+                "Could not download " + failures.size() + " of " + imageUrls.size() + " product image(s): " + String.join("; ", failures)
             );
-            return;
         }
-        if (downloaded.size() > 1) {
-            try {
-                booksClient.uploadItemImages(
-                    zohoItemId,
-                    downloaded
-                        .stream()
-                        .map(image -> new ZohoBooksClient.ImageUpload(image.bytes(), image.filename(), image.contentType()))
-                        .toList()
-                );
-                LOG.debug(
-                    "Uploaded {} product images to Zoho item {} for product {}",
-                    downloaded.size(),
-                    zohoItemId,
-                    product.getId()
-                );
-                return;
-            } catch (RuntimeException e) {
-                LOG.debug(
-                    "Zoho multi-image upload failed for product {} ({}), falling back to single image: {}",
-                    product.getId(),
-                    product.getName(),
-                    e.getMessage()
-                );
-            }
+        booksClient.uploadItemImages(
+            zohoItemId,
+            downloaded
+                .stream()
+                .map(image -> new ZohoBooksClient.ImageUpload(image.bytes(), image.filename(), image.contentType()))
+                .toList()
+        );
+        LOG.debug(
+            "Uploaded {} product image(s) to Zoho item {} for product {}",
+            downloaded.size(),
+            zohoItemId,
+            product.getId()
+        );
+    }
+
+    private int maxProductImages() {
+        int configured = applicationProperties.getZoho().getMaxProductImages();
+        return Math.max(1, Math.min(configured, ProductColorImagesSupport.MAX_IMAGES_PER_COLOR));
+    }
+
+    private static String safeImageReference(String imageUrl) {
+        if (StringUtils.isBlank(imageUrl)) {
+            return "unknown URL";
         }
-        DownloadedImage first = downloaded.get(0);
         try {
-            booksClient.uploadItemImage(zohoItemId, first.bytes(), first.filename(), first.contentType());
-            LOG.debug("Uploaded product image to Zoho item {} for product {}", zohoItemId, product.getId());
-        } catch (RuntimeException e) {
-            LOG.warn(
-                "Zoho item image sync failed for product {} ({}): {}",
-                product.getId(),
-                product.getName(),
-                e.getMessage()
-            );
+            URI uri = URI.create(imageUrl);
+            String path = StringUtils.defaultString(uri.getPath());
+            int slash = path.lastIndexOf('/');
+            String filename = slash >= 0 ? path.substring(slash + 1) : path;
+            String host = StringUtils.defaultIfBlank(uri.getHost(), "image host");
+            return StringUtils.isBlank(filename) ? host : host + "/" + filename;
+        } catch (IllegalArgumentException ignored) {
+            return "invalid URL";
         }
+    }
+
+    private static String safeFailureDetail(RuntimeException failure) {
+        String detail = StringUtils.defaultIfBlank(failure.getMessage(), failure.getClass().getSimpleName());
+        detail = detail.replaceAll("(?i)(https?://[^\\s?]+)\\?[^\\s;]*", "$1?<redacted>");
+        return StringUtils.abbreviate(detail, 240);
     }
 
     public void importZohoItemImage(Product product, String zohoItemId, Map<String, Object> item) {
@@ -259,7 +275,7 @@ public class ZohoItemImageSync {
         }
         long maxBytes = applicationProperties.getStorage().getS3().getMaxUploadBytes();
         int index = 0;
-        for (String documentId : primaryDocumentIds(item)) {
+        for (String documentId : ZohoItemDocuments.documentIdsForImport(item)) {
             Optional<BinaryDownload> downloaded = booksClient.downloadDocument(documentId, maxBytes);
             if (downloaded.isEmpty() || !isImageDownload(downloaded.orElseThrow())) {
                 continue;
@@ -382,30 +398,6 @@ public class ZohoItemImageSync {
     }
 
     /**
-     * Zoho Books items support multiple photos (front/back/other) exposed as {@code documents} on
-     * the item, each independently downloadable via {@code GET /documents/{document_id}} — the
-     * {@code image_document_id}/{@code GET /items/{id}/image} pair covers only the single front
-     * photo. Prefer the full {@code documents} list so pull picks up every uploaded photo.
-     */
-    private static List<String> primaryDocumentIds(Map<String, Object> item) {
-        LinkedHashSet<String> documentIds = new LinkedHashSet<>();
-        if (item != null && item.get("documents") instanceof List<?> documents) {
-            for (Object entry : documents) {
-                if (entry instanceof Map<?, ?> document) {
-                    Object id = document.get("document_id");
-                    if (id != null) {
-                        addIfPresent(documentIds, id.toString());
-                    }
-                }
-            }
-        }
-        if (documentIds.isEmpty()) {
-            addIfPresent(documentIds, textOf(item, "image_document_id"));
-        }
-        return new ArrayList<>(documentIds);
-    }
-
-    /**
      * True when Zoho Books has a real item image ({@code image_document_id} / {@code image_name}).
      * HTTP {@code image_url} alone is not enough — leftover CDN links from an older push must not
      * be treated as a live Zoho photo on re-pull.
@@ -434,12 +426,6 @@ public class ZohoItemImageSync {
         return type.startsWith("image/") || type.startsWith("application/octet-stream");
     }
 
-    private static void addIfPresent(Set<String> ids, String value) {
-        if (StringUtils.isNotBlank(value)) {
-            ids.add(value.trim());
-        }
-    }
-
     private static String textOf(Map<String, Object> item, String field) {
         if (item == null || !item.containsKey(field) || item.get(field) == null) {
             return "";
@@ -454,9 +440,10 @@ public class ZohoItemImageSync {
         try {
             List<String> raw = objectMapper.readValue(imagesJson, new TypeReference<List<String>>() {});
             List<String> urls = new ArrayList<>();
+            Set<String> seen = new LinkedHashSet<>();
             for (String value : raw) {
                 String resolved = resolvePublicUrl(value);
-                if (StringUtils.isNotBlank(resolved)) {
+                if (StringUtils.isNotBlank(resolved) && seen.add(resolved)) {
                     urls.add(resolved);
                 }
             }

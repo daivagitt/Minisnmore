@@ -264,6 +264,51 @@ public class ProductColorImagesSupport {
         return out;
     }
 
+    /**
+     * Canonical gallery URLs for a simple product: card/primary photos from {@code images_json}, then
+     * every colour gallery from {@code colors_json}. {@code color_images_json} is intentionally omitted
+     * because {@link #syncProductColorImages} keeps it aligned with {@code colors_json}.
+     */
+    public List<String> allSimpleProductGallerySourceUrls(Product product) {
+        if (product == null) {
+            return List.of();
+        }
+        List<String> urls = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (String url : parseImagesJsonUrls(product.getImagesJson())) {
+            if (seen.add(url)) {
+                urls.add(url);
+            }
+        }
+        for (String url : collectGalleryUrlsFromColorsJson(product.getColorsJson())) {
+            if (seen.add(url)) {
+                urls.add(url);
+            }
+        }
+        return urls;
+    }
+
+    private List<String> parseImagesJsonUrls(String imagesJson) {
+        if (imagesJson == null || imagesJson.isBlank()) {
+            return List.of();
+        }
+        try {
+            List<String> raw = objectMapper.readValue(imagesJson, new TypeReference<List<String>>() {});
+            List<String> urls = new ArrayList<>();
+            for (String value : raw) {
+                if (value != null) {
+                    String trimmed = value.trim();
+                    if (!trimmed.isEmpty()) {
+                        urls.add(trimmed);
+                    }
+                }
+            }
+            return urls;
+        } catch (Exception ignored) {
+            return List.of();
+        }
+    }
+
     public boolean isImagesJsonEmpty(String imagesJson) {
         if (imagesJson == null || imagesJson.isBlank()) {
             return true;

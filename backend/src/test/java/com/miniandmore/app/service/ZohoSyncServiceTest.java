@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -141,6 +142,104 @@ class ZohoSyncServiceTest {
             )
         );
         verify(productRepository).updateZohoSyncSuccess(eq(1L), eq("zoho-1"), eq(ZohoSyncStatus.SYNCED), any());
+    }
+
+    @Test
+    void syncProduct_imageFailureMarksProductFailedInsteadOfReportingSuccess() {
+        Product product = new Product()
+            .id(2L)
+            .sku("SKU-2")
+            .name("Image failure")
+            .zohoItemId("zoho-2")
+            .price(BigDecimal.valueOf(499))
+            .active(true);
+        when(productRepository.findOneWithEagerRelationships(2L)).thenReturn(Optional.of(product));
+        when(booksClient.updateItem(eq("zoho-2"), any())).thenReturn(Map.of("item", Map.of("item_id", "zoho-2")));
+        doThrow(new IllegalStateException("Zoho rejected image 4"))
+            .when(itemImageSync)
+            .syncProductImage("zoho-2", product);
+
+        service.syncProduct(2L);
+
+        verify(productRepository).updateZohoSyncFailure(2L, ZohoSyncStatus.FAILED, "Zoho rejected image 4");
+        verify(productRepository, never()).updateZohoSyncSuccess(eq(2L), any(), any(), any());
+    }
+
+    @Test
+    void syncProduct_imageFailureRedactsSignedUrlAndFitsDatabaseColumn() {
+        Product product = new Product()
+            .id(22L)
+            .sku("SKU-22")
+            .name("Long image failure")
+            .zohoItemId("zoho-22")
+            .price(BigDecimal.valueOf(499))
+            .active(true);
+        when(productRepository.findOneWithEagerRelationships(22L)).thenReturn(Optional.of(product));
+        when(booksClient.updateItem(eq("zoho-22"), any())).thenReturn(Map.of("item", Map.of("item_id", "zoho-22")));
+        doThrow(
+            new IllegalStateException(
+                "Download failed https://cdn.example.com/photo.jpg?token=SECRET&signature=PRIVATE " + "x".repeat(1200)
+            )
+        )
+            .when(itemImageSync)
+            .syncProductImage("zoho-22", product);
+
+        service.syncProduct(22L);
+
+        verify(productRepository)
+            .updateZohoSyncFailure(
+                eq(22L),
+                eq(ZohoSyncStatus.FAILED),
+                argThat(message ->
+                    message.length() <= 1000 &&
+                    message.contains("photo.jpg?<redacted>") &&
+                    !message.contains("SECRET") &&
+                    !message.contains("PRIVATE")
+                )
+            );
+    }
+
+    @Test
+    void syncProduct_variantImageFailureMarksProductFailedInsteadOfReportingSuccess() {
+        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository,
+                s3StorageService
+            );
+
+        Product product = new Product()
+            .id(23L)
+            .sku("HORIZON")
+            .name("Horizon Set")
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                """
+                [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":799.20,"stock":3,"active":true,"zohoItemId":"zoho-s"}]
+                """
+            )
+            .active(true);
+        when(productRepository.findOneWithEagerRelationships(23L)).thenReturn(Optional.of(product));
+        when(booksClient.updateItem(eq("zoho-s"), any())).thenReturn(Map.of("item", Map.of("item_id", "zoho-s")));
+        doThrow(new IllegalStateException("Zoho rejected variant gallery"))
+            .when(itemImageSync)
+            .syncVariantImage(eq("zoho-s"), eq(product), eq("HORIZON-S-NAVY"));
+
+        service.syncProduct(23L);
+
+        verify(productRepository).updateZohoSyncFailure(23L, ZohoSyncStatus.FAILED, "Zoho rejected variant gallery");
+        verify(productRepository, never()).updateZohoSyncSuccess(eq(23L), any(), any(), any());
     }
 
     @Test

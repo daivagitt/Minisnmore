@@ -206,6 +206,9 @@ public class ApplicationProperties {
 
         private boolean syncProductImages = true;
 
+        /** Maximum photos pushed to a single Zoho item during one sync. */
+        private int maxProductImages = 10;
+
         private boolean syncProductStock = true;
 
         private boolean syncReturns = false;
@@ -236,6 +239,14 @@ public class ApplicationProperties {
 
         public void setSyncProductImages(boolean syncProductImages) {
             this.syncProductImages = syncProductImages;
+        }
+
+        public int getMaxProductImages() {
+            return maxProductImages;
+        }
+
+        public void setMaxProductImages(int maxProductImages) {
+            this.maxProductImages = maxProductImages;
         }
 
         public boolean isSyncProductStock() {
