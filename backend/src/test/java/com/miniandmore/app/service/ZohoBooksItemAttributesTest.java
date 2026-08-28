@@ -156,4 +156,34 @@ class ZohoBooksItemAttributesTest {
         assertThat(ZohoBooksItemAttributes.isActive(Map.of("is_active", true, "status", "inactive"))).isTrue();
         assertThat(ZohoBooksItemAttributes.isActive(Map.of("name", "No status"))).isTrue();
     }
+
+    @Test
+    void lastModifiedAt_parsesCommonZohoTimestampFormats() {
+        assertThat(ZohoBooksItemAttributes.parseZohoTimestamp("2026-08-27T01:02:03Z"))
+            .contains(java.time.Instant.parse("2026-08-27T01:02:03Z"));
+        assertThat(ZohoBooksItemAttributes.parseZohoTimestamp("2016-06-11T17:38:06-0700"))
+            .contains(java.time.Instant.parse("2016-06-11T17:38:06-07:00"));
+        assertThat(ZohoBooksItemAttributes.parseZohoTimestamp("2013-01-24"))
+            .contains(java.time.LocalDate.parse("2013-01-24").atStartOfDay(java.time.ZoneOffset.UTC).toInstant());
+    }
+
+    @Test
+    void isChangedOnOrAfter_treatsMissingTimestampAsChanged() {
+        java.time.Instant cursor = java.time.Instant.parse("2026-08-27T01:02:03Z");
+        assertThat(ZohoBooksItemAttributes.isChangedOnOrAfter(Map.of("sku", "X"), cursor)).isTrue();
+        assertThat(
+            ZohoBooksItemAttributes.isChangedOnOrAfter(
+                Map.of("sku", "X", "last_modified_time", "2026-08-26T12:00:00Z"),
+                cursor
+            )
+        )
+            .isFalse();
+        assertThat(
+            ZohoBooksItemAttributes.isChangedOnOrAfter(
+                Map.of("sku", "X", "last_modified_time", "2026-08-27T01:02:03Z"),
+                cursor
+            )
+        )
+            .isTrue();
+    }
 }

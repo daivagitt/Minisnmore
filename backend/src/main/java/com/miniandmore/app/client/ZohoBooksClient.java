@@ -89,32 +89,29 @@ public class ZohoBooksClient {
 
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> listItems(int page) {
-        return listItems(page, null);
+        return listActiveItems(page);
+    }
+
+    /** Active catalogue / inventory pulls. */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> listActiveItems(int page) {
+        return listItemsByStatus(page, "Status.Active");
     }
 
     /**
-     * @param modifiedSince when set, only items Zoho has changed at/after this instant are returned
-     *                       (Zoho Books {@code last_modified_time} filter) — used for incremental product pulls.
-     *                       Incremental pulls intentionally include every status so an item changed to inactive
-     *                       can be deactivated locally. Full catalogue/inventory pulls request active items only.
+     * Incremental product pulls — Zoho Books has no {@code last_modified_time} list filter, so callers
+     * page every status and filter locally by each row's timestamp.
      */
     @SuppressWarnings("unchecked")
-    public List<Map<String, Object>> listItems(int page, java.time.Instant modifiedSince) {
-        String url = "/items?" + orgIdParam() + "&page=" + page + "&per_page=200";
-        if (modifiedSince != null) {
-            // RestClient encodes URI strings; pre-encoding here would turn ':' into '%253A'.
-            url += "&last_modified_time=" + formatLastModifiedTime(modifiedSince);
-        } else {
-            url += "&filter_by=Status.Active";
-        }
-        Map<String, Object> response = get(url);
-        return (List<Map<String, Object>>) response.getOrDefault("items", List.of());
+    public List<Map<String, Object>> listAllStatusItems(int page) {
+        return listItemsByStatus(page, "Status.All");
     }
 
-    private static String formatLastModifiedTime(java.time.Instant instant) {
-        return java.time.format.DateTimeFormatter
-            .ofPattern("yyyy-MM-dd'T'HH:mm:ssXX")
-            .format(instant.atOffset(java.time.ZoneOffset.UTC));
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> listItemsByStatus(int page, String statusFilter) {
+        String url = "/items?" + orgIdParam() + "&page=" + page + "&per_page=200&filter_by=" + statusFilter;
+        Map<String, Object> response = get(url);
+        return (List<Map<String, Object>>) response.getOrDefault("items", List.of());
     }
 
     @SuppressWarnings("unchecked")

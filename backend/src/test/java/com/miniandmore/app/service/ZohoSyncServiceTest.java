@@ -33,6 +33,8 @@ import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -1943,8 +1945,9 @@ class ZohoSyncServiceTest {
         assertThat(realVariantSupport.parseProduct(localOnlyVariants).get(0).active()).isTrue();
     }
 
-    @Test
-    void pullProducts_incrementalInactiveVariant_deactivatesRowAndParent() {
+    @ParameterizedTest
+    @ValueSource(booleans = { false, true })
+    void pullProducts_incrementalInactiveVariant_deactivatesRowAndParent(boolean staleTimestamp) {
         ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
         service =
             new ZohoSyncService(
@@ -1974,17 +1977,16 @@ class ZohoSyncServiceTest {
                 [{"sku":"OLD-SKU","size":"S","color":"Blue","rate":10,"stock":2,"active":true,"zohoItemId":"zoho-stable"}]
                 """
             );
-        Map<String, Object> inactive = Map.of(
-            "sku",
-            "RENAMED-SKU",
-            "item_id",
-            "zoho-stable",
-            "status",
-            "inactive"
-        );
+        java.util.LinkedHashMap<String, Object> inactive = new java.util.LinkedHashMap<>();
+        inactive.put("sku", "RENAMED-SKU");
+        inactive.put("item_id", "zoho-stable");
+        inactive.put("status", "inactive");
+        if (staleTimestamp) {
+            inactive.put("last_modified_time", "2026-08-26T12:00:00Z");
+        }
         when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
-        when(booksClient.listItems(1, cursor)).thenReturn(List.of(inactive));
-        when(booksClient.listItems(2, cursor)).thenReturn(List.of());
+        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(inactive));
+        when(booksClient.listAllStatusItems(2)).thenReturn(List.of());
         when(productRepository.findAll()).thenReturn(List.of(parent));
         when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -1994,7 +1996,131 @@ class ZohoSyncServiceTest {
         assertThat(parent.getActive()).isFalse();
         assertThat(realVariantSupport.findByZohoItemId(realVariantSupport.parseProduct(parent), "zoho-stable").orElseThrow().active())
             .isFalse();
-        verify(booksClient).listItems(1, cursor);
+        verify(booksClient).listAllStatusItems(1);
+        verify(booksClient, never()).getItem(any());
+        assertThat(setting.getLastProductPullAt()).isAfter(cursor);
+    }
+
+    @Test
+    void pullProducts_incrementalInactiveSimpleProduct_stillDeactivates() {
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
+        Product simple = new Product()
+            .id(306L)
+            .sku("SWADDLE")
+            .zohoItemId("zoho-simple")
+            .itemStructure("SIMPLE")
+            .active(true);
+        Map<String, Object> inactive = Map.of(
+            "sku",
+            "SWADDLE",
+            "item_id",
+            "zoho-simple",
+            "status",
+            "inactive",
+            "last_modified_time",
+            "2026-08-26T12:00:00Z"
+        );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
+        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(inactive));
+        when(booksClient.listAllStatusItems(2)).thenReturn(List.of());
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(productRepository.findOneByZohoItemId("zoho-simple")).thenReturn(Optional.of(simple));
+        when(variantSupport.isVariants(simple)).thenReturn(false);
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = service.pullProducts(false);
+
+        assertThat(result.get("failed")).isEqualTo(0);
+        assertThat(simple.getActive()).isFalse();
+        verify(booksClient, never()).getItem(any());
+        assertThat(setting.getLastProductPullAt()).isAfter(cursor);
+    }
+
+    @Test
+    void pullProducts_incremental_skipsUnchangedSkuLessItemsWithoutFailure() {
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
+        Map<String, Object> unchangedNoSku = Map.of(
+            "item_id",
+            "zoho-legacy",
+            "status",
+            "active",
+            "last_modified_time",
+            "2026-08-26T12:00:00Z"
+        );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
+        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(unchangedNoSku));
+        when(booksClient.listAllStatusItems(2)).thenReturn(List.of());
+        when(productRepository.findAll()).thenReturn(List.of());
+
+        Map<String, Object> result = service.pullProducts(false);
+
+        assertThat(result.get("failed")).isEqualTo(0);
+        verify(booksClient, never()).getItem(any());
+        verify(productRepository, never()).save(any());
+        assertThat(setting.getLastProductPullAt()).isAfter(cursor);
+    }
+
+    @Test
+    void pullProducts_incremental_skipsItemsUnchangedSinceCursor() {
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
+        Map<String, Object> unchanged = Map.of(
+            "sku",
+            "OLD-SKU",
+            "item_id",
+            "zoho-old",
+            "status",
+            "active",
+            "last_modified_time",
+            "2026-08-26T12:00:00Z"
+        );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
+        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(unchanged));
+        when(booksClient.listAllStatusItems(2)).thenReturn(List.of());
+        when(productRepository.findAll()).thenReturn(List.of());
+
+        Map<String, Object> result = service.pullProducts(false);
+
+        assertThat(result.get("failed")).isEqualTo(0);
+        verify(booksClient, never()).getItem(any());
+        verify(productRepository, never()).save(any());
+        assertThat(setting.getLastProductPullAt()).isAfter(cursor);
+    }
+
+    @Test
+    void pullProducts_incrementalActiveSkuRenameWithStaleTimestamp_isIntentionallySkipped() {
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
+        Product existing = new Product()
+            .id(307L)
+            .sku("OLD-SKU")
+            .zohoItemId("zoho-stable")
+            .itemStructure("SIMPLE")
+            .active(true);
+        Map<String, Object> staleRename = Map.of(
+            "sku",
+            "RENAMED-SKU",
+            "item_id",
+            "zoho-stable",
+            "status",
+            "active",
+            "last_modified_time",
+            "2026-08-26T12:00:00Z"
+        );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
+        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(staleRename));
+        when(booksClient.listAllStatusItems(2)).thenReturn(List.of());
+        when(productRepository.findAll()).thenReturn(List.of(existing));
+
+        Map<String, Object> result = service.pullProducts(false);
+
+        assertThat(result.get("failed")).isEqualTo(0);
+        assertThat(existing.getSku()).isEqualTo("OLD-SKU");
+        verify(booksClient, never()).getItem(any());
+        verify(productRepository, never()).findOneByZohoItemId(any());
+        verify(productRepository, never()).save(any());
         assertThat(setting.getLastProductPullAt()).isAfter(cursor);
     }
 
@@ -2059,8 +2185,8 @@ class ZohoSyncServiceTest {
         Map<String, Object> listed = Map.of("sku", "RETRY-ME", "item_id", "zoho-retry", "name", "Retry Me");
         when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
         when(productRepository.findAll()).thenReturn(List.of());
-        when(booksClient.listItems(1, cursor)).thenReturn(List.of(listed));
-        when(booksClient.listItems(2, cursor)).thenReturn(List.of());
+        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(listed));
+        when(booksClient.listAllStatusItems(2)).thenReturn(List.of());
         when(booksClient.getItem("zoho-retry"))
             .thenThrow(
                 new RestClientResponseException(

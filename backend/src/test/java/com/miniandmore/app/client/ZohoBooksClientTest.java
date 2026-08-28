@@ -67,16 +67,16 @@ class ZohoBooksClientTest {
     }
 
     @Test
-    void incrementalItemList_doesNotFilterOutInactiveChanges() {
+    void incrementalItemList_requestsAllStatusesWithoutLastModifiedFilter() {
         server
             .expect(
                 requestTo(
-                    "https://www.zohoapis.in/books/v3/items?organization_id=org-1&page=2&per_page=200&last_modified_time=2026-08-27T01:02:03Z"
+                    "https://www.zohoapis.in/books/v3/items?organization_id=org-1&page=2&per_page=200&filter_by=Status.All"
                 )
             )
             .andRespond(withSuccess("{\"items\":[{\"sku\":\"INACTIVE\",\"status\":\"inactive\"}]}", MediaType.APPLICATION_JSON));
 
-        assertThat(client.listItems(2, java.time.Instant.parse("2026-08-27T01:02:03Z")))
+        assertThat(client.listAllStatusItems(2))
             .singleElement()
             .satisfies(item -> assertThat(item.get("status")).isEqualTo("inactive"));
         server.verify();

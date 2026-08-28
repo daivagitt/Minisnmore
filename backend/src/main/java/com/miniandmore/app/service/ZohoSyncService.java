@@ -1121,10 +1121,11 @@ public class ZohoSyncService {
     }
 
     /**
-     * @param forceFullPull when false (the normal case), only items Zoho has changed since the last
-     *                      successful pull are fetched — cutting per-item detail calls and Zoho API
-     *                      quota use down to whatever actually changed. The first-ever pull (no stored
-     *                      cursor yet) always pulls the full catalog regardless of this flag.
+     * @param forceFullPull when false (the normal case), incremental mode pages every item status from
+     *                      Zoho and skips unchanged rows locally (by {@code last_modified_time}) before
+     *                      per-item detail calls — reducing {@code GET /items/{id}} traffic, not list
+     *                      pagination. The first-ever pull (no stored cursor yet) always pulls the full
+     *                      active catalog regardless of this flag.
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Map<String, Object> pullProducts(boolean forceFullPull) {
@@ -1134,7 +1135,6 @@ public class ZohoSyncService {
             .map(s -> Boolean.TRUE.equals(s.getPullProductsAutoCreateCategory()))
             .orElse(applicationProperties.getZoho().isPullProductsAutoCreateCategory());
         Instant since = forceFullPull ? null : setting.map(ZohoSetting::getLastProductPullAt).orElse(null);
-        boolean incremental = since != null;
         Instant pullStartedAt = Instant.now();
         Set<String> pulledSkus = new HashSet<>();
         Set<String> pulledItemIds = new HashSet<>();
@@ -1146,7 +1146,7 @@ public class ZohoSyncService {
         while (true) {
             List<Map<String, Object>> items;
             try {
-                items = since != null ? booksClient.listItems(page, since) : booksClient.listItems(page);
+                items = since != null ? booksClient.listAllStatusItems(page) : booksClient.listItems(page);
             } catch (RestClientResponseException e) {
                 // A transient Zoho failure (most commonly a rate limit) mid-pagination must not
                 // bubble up as a raw 500 — stop the pull, keep what was already merged, and never
@@ -1174,6 +1174,9 @@ public class ZohoSyncService {
                 try {
                     if (item == null) {
                         builder.failure("Zoho returned a null item on page " + page);
+                        continue;
+                    }
+                    if (!shouldProcessIncrementalListRow(item, since, sku)) {
                         continue;
                     }
                     if (StringUtils.isBlank(sku)) {
@@ -1208,7 +1211,7 @@ public class ZohoSyncService {
         // would wrongly look "stale" and get deactivated. Also skip when any item failed to merge:
         // empty variant matrices would look like "removed from Zoho" and wipe parents.
         ZohoSyncSummary interim = builder.build();
-        if (completedAllPages && !incremental && interim.failureCount() == 0) {
+        if (completedAllPages && since == null && interim.failureCount() == 0) {
             deactivateStaleZohoProducts(pulledSkus, pulledItemIds, variantParents, builder);
         }
         if (completedAllPages) {
@@ -1846,6 +1849,21 @@ public class ZohoSyncService {
                 builder.notice(sku, "Deactivated — variant SKUs removed from Zoho");
             }
         }
+    }
+
+    /**
+     * Whether an incremental list row should be processed before per-item detail calls.
+     * Unchanged active rows are skipped; inactive rows with a SKU are still processed so local
+     * deactivation can run even when Zoho's {@code last_modified_time} predates the cursor.
+     */
+    private static boolean shouldProcessIncrementalListRow(Map<String, Object> item, Instant since, String sku) {
+        if (since == null) {
+            return true;
+        }
+        if (ZohoBooksItemAttributes.isChangedOnOrAfter(item, since)) {
+            return true;
+        }
+        return StringUtils.isNotBlank(sku) && !ZohoBooksItemAttributes.isActive(item);
     }
 
     /**

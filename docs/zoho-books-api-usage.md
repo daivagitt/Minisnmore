@@ -53,14 +53,15 @@ If you exceed either limit, Zoho returns **HTTP 429** (error code **45**). Our p
 
 | Rank | Flow | Why it burns quota |
 |------|------|--------------------|
-| 1 | **Full product pull** | Lists every active item in pages, then **one detail call per SKU** (list responses omit custom fields). With image sync on, adds image downloads. |
-| 2 | **Bulk product push + images** | Per product: find by SKU + create/update (+ activate). Images: clear old photos + **up to 3 uploads** per item. |
-| 3 | **Inventory pull** | Pages the **whole** active item list (not incremental today). |
-| 4 | **Paid order sync** | Several calls per order (contact, sales order, 2 address updates, invoice, payment, mark sent). |
-| 5 | **Tracking / returns** | Light: get sales order + delivery challans, or credit note. |
+| 1 | **Product pull — list pagination** | **Full:** pages every active item. **Incremental:** pages **every status** (`Status.All`) on each run — list cost can match or exceed full pull when many inactive items exist. Local filtering only skips unchanged rows before detail calls. |
+| 2 | **Product pull — detail & images** | **Full:** one `GET /items/{id}` per listed SKU (list omits custom fields). **Incremental:** detail only for changed rows (+ inactive deactivation rows). Image sync adds downloads when enabled. |
+| 3 | **Bulk product push + images** | Per product: find by SKU + create/update (+ activate). Images: clear old photos + **up to 3 uploads** per item. |
+| 4 | **Inventory pull** | Pages the **whole** active item list (not incremental today). |
+| 5 | **Paid order sync** | Several calls per order (contact, sales order, 2 address updates, invoice, payment, mark sent). |
+| 6 | **Tracking / returns** | Light: get sales order + delivery challans, or credit note. |
 | — | Connection test / chart of accounts / locations / field metadata | Cheap; occasional or cached. |
 
-**Practical tip:** Prefer the default **incremental** product pull. Use a **full** pull only when you need stale-SKU deactivation or a complete rebuild. Keep image sync off unless you need gallery sync.
+**Practical tip:** Default **incremental** pull saves detail calls, not list pagination. Use **`?full=true`** when you need stale-SKU deactivation, a complete rebuild, or active items may have changed without a fresh `last_modified_time`. Keep image sync off unless you need gallery sync.
 
 ---
 
@@ -73,17 +74,23 @@ If you exceed either limit, Zoho returns **HTTP 429** (error code **45**). Our p
 | Situation | What we do |
 |-----------|------------|
 | First successful pull ever (no cursor) | **Full** catalog (`filter_by=Status.Active`) |
-| Later Admin “Pull products” | **Incremental** — only items Zoho changed since last success |
+| Later Admin “Pull products” | **Incremental** — pages all statuses, skips unchanged rows locally before detail calls |
 | API `?full=true` | Force **full** catalog again |
 
 ### How it works
 
 1. After a **successful** full or incremental pull that finishes all pages with **zero** merge failures, we save a cursor:  
    `zoho_setting.last_product_pull_at`
-2. Next incremental pull asks Zoho (without an active-only filter, so status changes are visible):  
-   `GET /items?...&last_modified_time=<cursor>`
-3. We still call **`GET /items/{id}`** for each returned SKU (needed for sizes/colors/custom fields).
-4. **Stale deactivation** (Admin products whose SKUs vanished from Zoho) runs **only on a completed full pull** — never on incremental (would wrongly deactivate untouched products).
+2. Next incremental pull pages every item status (`filter_by=Status.All`) and skips unchanged rows locally using each item's `last_modified_time` when Zoho includes it. Books does **not** support an Inventory-style `last_modified_time` list filter.
+3. **Exception:** inactive list rows with a SKU are still processed when their timestamp predates the cursor, so local deactivation can run from the list payload without a detail call.
+4. We still call **`GET /items/{id}`** for each **changed** SKU after the local filter (needed for sizes/colors/custom fields).
+5. **Stale deactivation** (Admin products whose SKUs vanished from Zoho) runs **only on a completed full pull** — never on incremental (would wrongly deactivate untouched products).
+
+### Limitations
+
+- **Active-item catch-up** (reactivation, SKU rename, price/stock changes) depends on Zoho including an accurate `last_modified_time` on list rows at or after the cursor. Rows with a stale timestamp are skipped on incremental pulls (inactive + SKU rows are the exception — see step 3).
+- **`?full=true`** remains the escape hatch for a complete rebuild, stale-SKU deactivation, and any case where incremental timestamps may be unreliable.
+- **429 risk:** incremental pulls still paginate the full item list (all statuses). Monitor rate-limit errors on large catalogs; a failed pull does not advance the cursor.
 
 ### Admin vs API
 
@@ -132,7 +139,7 @@ India data center example: `https://www.zohoapis.in/books/v3`
 |--------|------|---------|
 | GET | `/items?sku={sku}` | Find item by SKU |
 | GET | `/items?page={n}&per_page=200&filter_by=Status.Active` | List active items (full pull / inventory) |
-| GET | `/items?...&last_modified_time={iso}` | **Incremental** list (all statuses changed since cursor) |
+| GET | `/items?...&filter_by=Status.All` | **Incremental** list (all statuses; filter unchanged rows locally) |
 | GET | `/items/{item_id}` | Item detail (custom fields, stock, images meta) |
 | POST | `/items` | Create item |
 | PUT | `/items/{item_id}` | Update item |

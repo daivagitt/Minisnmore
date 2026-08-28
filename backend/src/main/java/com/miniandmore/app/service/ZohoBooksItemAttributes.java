@@ -1,7 +1,14 @@
 package com.miniandmore.app.service;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
@@ -32,6 +39,8 @@ public final class ZohoBooksItemAttributes {
         "^(?i)(COMMON\\s+SIZE|NEWBORN|XXL|XL|[SML]|\\d{1,2}\\s*-\\s*\\d{1,2}\\s*M)$"
     );
 
+    private static final DateTimeFormatter ZOHO_OFFSET_NO_COLON = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssZ");
+
     private ZohoBooksItemAttributes() {}
 
     public static String groupId(Map<String, Object> item) {
@@ -48,7 +57,7 @@ public final class ZohoBooksItemAttributes {
 
     /**
      * Zoho Books item {@code status} is {@code active}/{@code inactive}; some payloads also send
-     * boolean {@code is_active}. Missing status is treated as active (list already filters Active).
+     * boolean {@code is_active}. Missing status is treated as active.
      */
     public static boolean isActive(Map<String, Object> item) {
         if (item == null || item.isEmpty()) {
@@ -66,6 +75,51 @@ public final class ZohoBooksItemAttributes {
         }
         String status = stringValue(item, "status");
         return status == null || "active".equalsIgnoreCase(status);
+    }
+
+    /**
+     * True when the list/detail payload exposes a {@code last_modified_time} at or after {@code since}.
+     * Missing or unparseable timestamps are treated as changed so incremental pulls stay safe.
+     */
+    public static boolean isChangedOnOrAfter(Map<String, Object> item, Instant since) {
+        if (since == null || item == null || item.isEmpty()) {
+            return true;
+        }
+        Optional<Instant> modifiedAt = lastModifiedAt(item);
+        if (modifiedAt.isEmpty()) {
+            return true;
+        }
+        Instant cursor = since.truncatedTo(ChronoUnit.SECONDS);
+        return !modifiedAt.get().truncatedTo(ChronoUnit.SECONDS).isBefore(cursor);
+    }
+
+    public static Optional<Instant> lastModifiedAt(Map<String, Object> item) {
+        if (item == null || item.isEmpty()) {
+            return Optional.empty();
+        }
+        return parseZohoTimestamp(stringValue(item, "last_modified_time"));
+    }
+
+    static Optional<Instant> parseZohoTimestamp(String raw) {
+        if (StringUtils.isBlank(raw)) {
+            return Optional.empty();
+        }
+        String trimmed = raw.trim();
+        try {
+            return Optional.of(Instant.parse(trimmed));
+        } catch (DateTimeParseException ignored) {
+            // fall through
+        }
+        try {
+            return Optional.of(ZOHO_OFFSET_NO_COLON.parse(trimmed, java.time.OffsetDateTime::from).toInstant());
+        } catch (DateTimeParseException ignored) {
+            // fall through
+        }
+        try {
+            return Optional.of(LocalDate.parse(trimmed).atStartOfDay(ZoneOffset.UTC).toInstant());
+        } catch (DateTimeParseException ignored) {
+            return Optional.empty();
+        }
     }
 
     /**
