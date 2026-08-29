@@ -39,6 +39,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientResponseException;
 
 @ExtendWith(MockitoExtension.class)
@@ -115,6 +117,46 @@ class ZohoSyncServiceTest {
         verify(productRepository, never()).findOneWithEagerRelationships(any());
         verify(booksClient, never()).createItem(any());
         verify(booksClient, never()).updateItem(any(), any());
+    }
+
+    @Test
+    void syncAllProducts_rateLimitStopsBeforeRemainingProducts() {
+        Product first = new Product().id(501L).sku("FIRST-SYNC").name("First Sync").zohoItemId("zoho-first").active(true);
+        Product later = new Product().id(502L).sku("LATER-SYNC").name("Later Sync").zohoItemId("zoho-later").active(true);
+        when(productRepository.findAllWithEagerRelationships(any())).thenReturn(new PageImpl<>(List.of(first, later)));
+        when(booksClient.markItemActive("zoho-first"))
+            .thenThrow(new RestClientResponseException("Rate limited", 429, "Too Many Requests", null, null, null));
+
+        Map<String, Object> result = service.syncAllProducts();
+
+        assertThat(result.get("success")).isEqualTo(0);
+        assertThat(result.get("failed")).isEqualTo(1);
+        verify(productRepository).updateZohoSyncFailure(
+            eq(501L),
+            eq(ZohoSyncStatus.FAILED),
+            argThat(message -> message.contains("Rate limited"))
+        );
+        verify(booksClient, never()).markItemActive("zoho-later");
+        verify(productRepository, never()).updateZohoSyncFailure(eq(502L), any(), any());
+    }
+
+    @Test
+    void syncAllProducts_productValidationFailureDoesNotBlockLaterProducts() {
+        Product first = new Product().id(503L).sku("BAD-SYNC").name("Bad Sync").zohoItemId("zoho-bad").active(true);
+        Product later = new Product().id(504L).sku("GOOD-SYNC").name("Good Sync").zohoItemId("zoho-good").active(true);
+        when(productRepository.findAllWithEagerRelationships(any())).thenReturn(new PageImpl<>(List.of(first, later)));
+        when(booksClient.markItemActive("zoho-bad"))
+            .thenThrow(new RestClientResponseException("Invalid item", 400, "Bad Request", null, null, null));
+        when(booksClient.markItemActive("zoho-good")).thenReturn(Map.of());
+        when(booksClient.updateItem(eq("zoho-good"), any()))
+            .thenReturn(Map.of("item", Map.of("item_id", "zoho-good")));
+
+        Map<String, Object> result = service.syncAllProducts();
+
+        assertThat(result.get("success")).isEqualTo(1);
+        assertThat(result.get("failed")).isEqualTo(1);
+        verify(booksClient).updateItem(eq("zoho-good"), any());
+        verify(productRepository).updateZohoSyncSuccess(eq(504L), eq("zoho-good"), eq(ZohoSyncStatus.SYNCED), any());
     }
 
     @Test
@@ -1060,6 +1102,24 @@ class ZohoSyncServiceTest {
                 )
             );
         when(booksClient.listItems(2)).thenReturn(List.of());
+        when(booksClient.getItem("zoho-neg"))
+            .thenReturn(
+                Map.of(
+                    "item",
+                    Map.of(
+                        "sku",
+                        "NEG-STOCK",
+                        "item_id",
+                        "zoho-neg",
+                        "name",
+                        "Negative Stock Item",
+                        "rate",
+                        199,
+                        "stock_on_hand",
+                        -3
+                    )
+                )
+            );
         when(productRepository.findOneBySku("NEG-STOCK")).thenReturn(Optional.empty());
         when(productRepository.findOneByZohoItemId("zoho-neg")).thenReturn(Optional.empty());
         when(productRepository.findMaxSortOrder()).thenReturn(0);
@@ -1083,6 +1143,8 @@ class ZohoSyncServiceTest {
         when(productRepository.findAll()).thenReturn(List.of());
         when(booksClient.listItems(1))
             .thenReturn(List.of(Map.of("sku", "OK-ITEM", "item_id", "zoho-ok", "name", "Ok Item", "rate", 100)));
+        when(booksClient.getItem("zoho-ok"))
+            .thenReturn(Map.of("item", Map.of("sku", "OK-ITEM", "item_id", "zoho-ok", "name", "Ok Item", "rate", 100)));
         when(productRepository.findOneBySku("OK-ITEM")).thenReturn(Optional.empty());
         when(productRepository.findOneByZohoItemId("zoho-ok")).thenReturn(Optional.empty());
         when(productRepository.findMaxSortOrder()).thenReturn(0);
@@ -1779,12 +1841,13 @@ class ZohoSyncServiceTest {
         when(booksClient.listItems(1)).thenReturn(List.of(inactive));
         when(booksClient.listItems(2)).thenReturn(List.of());
         when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.getItem("zoho-dead")).thenReturn(Map.of("item", inactive));
 
         Map<String, Object> result = service.pullProducts();
 
-        verify(booksClient, never()).getItem(any());
+        verify(booksClient).getItem("zoho-dead");
         verify(productRepository, never()).save(any());
-        assertThat(result.get("notices").toString()).contains("inactive");
+        assertThat(result.get("notices").toString()).doesNotContain("inactive");
     }
 
     @Test
@@ -1989,6 +2052,7 @@ class ZohoSyncServiceTest {
         when(booksClient.listAllStatusItems(2)).thenReturn(List.of());
         when(productRepository.findAll()).thenReturn(List.of(parent));
         when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(booksClient.getItem("zoho-stable")).thenReturn(Map.of("item", inactive));
 
         Map<String, Object> result = service.pullProducts(false);
 
@@ -1997,7 +2061,7 @@ class ZohoSyncServiceTest {
         assertThat(realVariantSupport.findByZohoItemId(realVariantSupport.parseProduct(parent), "zoho-stable").orElseThrow().active())
             .isFalse();
         verify(booksClient).listAllStatusItems(1);
-        verify(booksClient, never()).getItem(any());
+        verify(booksClient).getItem("zoho-stable");
         assertThat(setting.getLastProductPullAt()).isAfter(cursor);
     }
 
@@ -2028,12 +2092,235 @@ class ZohoSyncServiceTest {
         when(productRepository.findOneByZohoItemId("zoho-simple")).thenReturn(Optional.of(simple));
         when(variantSupport.isVariants(simple)).thenReturn(false);
         when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(booksClient.getItem("zoho-simple")).thenReturn(Map.of("item", inactive));
 
         Map<String, Object> result = service.pullProducts(false);
 
         assertThat(result.get("failed")).isEqualTo(0);
         assertThat(simple.getActive()).isFalse();
-        verify(booksClient, never()).getItem(any());
+        verify(booksClient).getItem("zoho-simple");
+        assertThat(setting.getLastProductPullAt()).isAfter(cursor);
+    }
+
+    @Test
+    void pullProducts_incremental_staleInactiveWithoutLocalProduct_verifiesBeforeSkipping() {
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
+        Map<String, Object> staleInactive = Map.of(
+            "sku",
+            "GHOST-SKU",
+            "item_id",
+            "zoho-ghost",
+            "status",
+            "inactive",
+            "last_modified_time",
+            "2026-08-26T12:00:00Z"
+        );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
+        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(staleInactive));
+        when(booksClient.listAllStatusItems(2)).thenReturn(List.of());
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.getItem("zoho-ghost")).thenReturn(Map.of("item", staleInactive));
+
+        Map<String, Object> result = service.pullProducts(false);
+
+        assertThat(result.get("failed")).isEqualTo(0);
+        verify(booksClient).getItem("zoho-ghost");
+        verify(productRepository, never()).save(any());
+        assertThat(result.get("notices").toString()).doesNotContain("GHOST-SKU");
+        assertThat(setting.getLastProductPullAt()).isAfter(cursor);
+    }
+
+    @Test
+    void pullProducts_inactiveListWithEmptyDetail_doesNotDeactivateOrAdvanceCursor() {
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
+        Product local = new Product().id(307L).sku("SAFE-SKU").zohoItemId("zoho-safe").active(true);
+        Map<String, Object> inactive = Map.of(
+            "sku",
+            "SAFE-SKU",
+            "item_id",
+            "zoho-safe",
+            "status",
+            "inactive",
+            "last_modified_time",
+            "2026-08-28T12:00:00Z"
+        );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
+        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(inactive));
+        when(booksClient.listAllStatusItems(2)).thenReturn(List.of());
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.getItem("zoho-safe")).thenReturn(Map.of());
+
+        Map<String, Object> result = service.pullProducts(false);
+
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(result.get("failures").toString()).contains("local data was not changed");
+        assertThat(local.getActive()).isTrue();
+        assertThat(setting.getLastProductPullAt()).isEqualTo(cursor);
+        verify(productRepository, never()).save(any());
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullProducts_listInactiveButDetailActive_importsProduct() {
+        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository,
+                s3StorageService
+            );
+        Map<String, Object> listed = new java.util.LinkedHashMap<>();
+        listed.put("item_id", "zoho-live");
+        listed.put("sku", "SWADDLE-AQUA");
+        listed.put("name", "Baby Swaddle Aqua");
+        listed.put("status", "inactive");
+        listed.put("rate", 499);
+        listed.put("stock_on_hand", 5);
+        Map<String, Object> detail = new java.util.LinkedHashMap<>(listed);
+        detail.put("status", "active");
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(booksClient.listItems(1)).thenReturn(List.of(listed));
+        when(booksClient.listItems(2)).thenReturn(List.of());
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(productRepository.findOneByZohoItemId("zoho-live")).thenReturn(Optional.empty());
+        when(productRepository.findOneBySku("SWADDLE-AQUA")).thenReturn(Optional.empty());
+        when(productRepository.findMaxSortOrder()).thenReturn(0);
+        when(productRepository.findOneBySlug(any())).thenReturn(Optional.empty());
+        when(productRepository.save(any())).thenAnswer(invocation -> {
+            Product saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(501L);
+            }
+            return saved;
+        });
+        when(booksClient.getItem("zoho-live")).thenReturn(Map.of("item", detail));
+        when(productFieldMapper.applyPulledItem(any(), any(), anyBoolean())).thenReturn(Optional.empty());
+
+        Map<String, Object> result = service.pullProducts();
+
+        assertThat(result.get("failed")).isEqualTo(0);
+        verify(booksClient, times(1)).getItem("zoho-live");
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository, atLeastOnce()).save(saved.capture());
+        Product recreated = saved.getAllValues().get(saved.getAllValues().size() - 1);
+        assertThat(recreated.getZohoItemId()).isEqualTo("zoho-live");
+        assertThat(recreated.getSku()).isEqualTo("SWADDLE-AQUA");
+        assertThat(recreated.getActive()).isTrue();
+        assertThat(recreated.getZohoSyncError()).isNull();
+        assertThat(result.get("notices").toString()).doesNotContain("inactive");
+    }
+
+    @Test
+    void pullProducts_incremental_adminDeletedProductWithStaleInactiveList_recreatesActiveProduct() {
+        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository,
+                s3StorageService
+            );
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
+        Map<String, Object> listed = new java.util.LinkedHashMap<>();
+        listed.put("item_id", "zoho-deleted-locally");
+        listed.put("sku", "RESTORE-ME");
+        listed.put("name", "Restore Me");
+        listed.put("status", "inactive");
+        listed.put("rate", 699);
+        listed.put("stock_on_hand", 8);
+        listed.put("last_modified_time", "2026-08-26T12:00:00Z");
+        Map<String, Object> detail = new java.util.LinkedHashMap<>(listed);
+        detail.put("status", "active");
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
+        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(listed));
+        when(booksClient.listAllStatusItems(2)).thenReturn(List.of());
+        when(booksClient.getItem("zoho-deleted-locally")).thenReturn(Map.of("item", detail));
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(productRepository.findOneByZohoItemId("zoho-deleted-locally")).thenReturn(Optional.empty());
+        when(productRepository.findOneBySku("RESTORE-ME")).thenReturn(Optional.empty());
+        when(productRepository.findMaxSortOrder()).thenReturn(0);
+        when(productRepository.findOneBySlug(any())).thenReturn(Optional.empty());
+        when(productRepository.save(any())).thenAnswer(invocation -> {
+            Product saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(502L);
+            }
+            return saved;
+        });
+        when(productFieldMapper.applyPulledItem(any(), any(), anyBoolean())).thenReturn(Optional.empty());
+
+        Map<String, Object> result = service.pullProducts(false);
+
+        assertThat(result.get("failed")).isEqualTo(0);
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository, atLeastOnce()).save(saved.capture());
+        Product recreated = saved.getAllValues().get(saved.getAllValues().size() - 1);
+        assertThat(recreated.getSku()).isEqualTo("RESTORE-ME");
+        assertThat(recreated.getZohoItemId()).isEqualTo("zoho-deleted-locally");
+        assertThat(recreated.getActive()).isTrue();
+        assertThat(recreated.getZohoSyncError()).isNull();
+        verify(booksClient, times(1)).getItem("zoho-deleted-locally");
+        assertThat(setting.getLastProductPullAt()).isAfter(cursor);
+    }
+
+    @Test
+    void pullProducts_incremental_staleInactiveListButDetailActive_reimportsProduct() {
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
+        Product simple = new Product()
+            .id(306L)
+            .sku("SWADDLE")
+            .zohoItemId("zoho-simple")
+            .itemStructure("SIMPLE")
+            .active(false)
+            .zohoSyncError("Zoho item marked inactive");
+        Map<String, Object> listed = new java.util.LinkedHashMap<>();
+        listed.put("sku", "SWADDLE");
+        listed.put("item_id", "zoho-simple");
+        listed.put("status", "inactive");
+        listed.put("name", "Baby Swaddle");
+        listed.put("rate", 499);
+        listed.put("last_modified_time", "2026-08-26T12:00:00Z");
+        Map<String, Object> detail = new java.util.LinkedHashMap<>(listed);
+        detail.put("status", "active");
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
+        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(listed));
+        when(booksClient.listAllStatusItems(2)).thenReturn(List.of());
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(productRepository.findOneByZohoItemId("zoho-simple")).thenReturn(Optional.of(simple));
+        when(variantSupport.isVariants(simple)).thenReturn(false);
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(booksClient.getItem("zoho-simple")).thenReturn(Map.of("item", detail));
+        when(productFieldMapper.applyPulledItem(any(), any(), anyBoolean())).thenReturn(Optional.empty());
+
+        Map<String, Object> result = service.pullProducts(false);
+
+        assertThat(result.get("failed")).isEqualTo(0);
+        assertThat(simple.getActive()).isTrue();
+        assertThat(simple.getZohoSyncError()).isNull();
+        verify(booksClient, times(1)).getItem("zoho-simple");
         assertThat(setting.getLastProductPullAt()).isAfter(cursor);
     }
 
@@ -2179,14 +2466,75 @@ class ZohoSyncServiceTest {
     }
 
     @Test
+    void pullProducts_inactiveListDetail404_doesNotDeactivateOrAdvanceCursor() {
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
+        Product local = new Product().id(308L).sku("KEEP-ME").zohoItemId("zoho-gone").active(true);
+        Map<String, Object> inactive = Map.of(
+            "sku",
+            "KEEP-ME",
+            "item_id",
+            "zoho-gone",
+            "status",
+            "inactive",
+            "last_modified_time",
+            "2026-08-26T12:00:00Z"
+        );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
+        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(inactive));
+        when(booksClient.listAllStatusItems(2)).thenReturn(List.of());
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.getItem("zoho-gone"))
+            .thenThrow(new RestClientResponseException("Not found", 404, "Not Found", null, null, null));
+
+        Map<String, Object> result = service.pullProducts(false);
+
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(local.getActive()).isTrue();
+        assertThat(setting.getLastProductPullAt()).isEqualTo(cursor);
+        verify(productRepository, never()).save(any());
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullProducts_inactiveListDetailResourceAccessException_stopsPullWithoutAdvancingCursor() {
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
+        Map<String, Object> inactive = Map.of(
+            "sku",
+            "UNREACHABLE",
+            "item_id",
+            "zoho-down",
+            "status",
+            "inactive",
+            "last_modified_time",
+            "2026-08-28T12:00:00Z"
+        );
+        Map<String, Object> later = Map.of("sku", "DO-NOT-CALL", "item_id", "zoho-later", "status", "inactive");
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(inactive, later));
+        when(booksClient.getItem("zoho-down")).thenThrow(new ResourceAccessException("connection refused"));
+
+        Map<String, Object> result = service.pullProducts(false);
+
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(result.get("failures").toString()).contains("unreachable");
+        assertThat(setting.getLastProductPullAt()).isEqualTo(cursor);
+        verify(booksClient, never()).getItem("zoho-later");
+        verify(booksClient, never()).listAllStatusItems(2);
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
     void pullProducts_detailFailureDoesNotAdvanceIncrementalCursor() {
         Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
         ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
         Map<String, Object> listed = Map.of("sku", "RETRY-ME", "item_id", "zoho-retry", "name", "Retry Me");
+        Map<String, Object> later = Map.of("sku", "DO-NOT-CALL", "item_id", "zoho-later", "name", "Later Item");
         when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
         when(productRepository.findAll()).thenReturn(List.of());
-        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(listed));
-        when(booksClient.listAllStatusItems(2)).thenReturn(List.of());
+        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(listed, later));
         when(booksClient.getItem("zoho-retry"))
             .thenThrow(
                 new RestClientResponseException(
@@ -2205,6 +2553,229 @@ class ZohoSyncServiceTest {
         assertThat(setting.getLastProductPullAt()).isEqualTo(cursor);
         verify(zohoSettingRepository, never()).save(any());
         verify(productRepository, never()).save(any());
+        verify(booksClient, never()).getItem("zoho-later");
+        verify(booksClient, never()).listAllStatusItems(2);
+    }
+
+    @Test
+    void pullProducts_missingItemId_doesNotCreateUnlinkedProductOrAdvanceCursor() {
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
+        Map<String, Object> missingId = Map.of(
+            "sku",
+            "NO-ID",
+            "name",
+            "Missing Identity",
+            "status",
+            "active",
+            "last_modified_time",
+            "2026-08-28T12:00:00Z"
+        );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(missingId));
+        when(booksClient.listAllStatusItems(2)).thenReturn(List.of());
+
+        Map<String, Object> result = service.pullProducts(false);
+
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(result.get("failures").toString()).contains("no item_id");
+        assertThat(setting.getLastProductPullAt()).isEqualTo(cursor);
+        verify(booksClient, never()).getItem(any());
+        verify(productRepository, never()).save(any());
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullProducts_detailIdentityMismatch_doesNotRelinkProductOrAdvanceCursor() {
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
+        Map<String, Object> listed = Map.of(
+            "sku",
+            "IDENTITY-SAFE",
+            "item_id",
+            "zoho-requested",
+            "status",
+            "active",
+            "last_modified_time",
+            "2026-08-28T12:00:00Z"
+        );
+        Map<String, Object> wrongDetail = Map.of(
+            "sku",
+            "IDENTITY-SAFE",
+            "item_id",
+            "zoho-different",
+            "status",
+            "active"
+        );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(listed));
+        when(booksClient.listAllStatusItems(2)).thenReturn(List.of());
+        when(booksClient.getItem("zoho-requested")).thenReturn(Map.of("item", wrongDetail));
+
+        Map<String, Object> result = service.pullProducts(false);
+
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(result.get("failures").toString()).contains("identity mismatch");
+        assertThat(setting.getLastProductPullAt()).isEqualTo(cursor);
+        verify(productRepository, never()).findOneByZohoItemId(any());
+        verify(productRepository, never()).save(any());
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullProducts_duplicateRowInOnePage_fetchesAndSavesOnlyOnce() {
+        Map<String, Object> row = Map.of(
+            "sku",
+            "ONE-COPY",
+            "item_id",
+            "zoho-one-copy",
+            "name",
+            "One Copy",
+            "status",
+            "active",
+            "rate",
+            100
+        );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.listItems(1)).thenReturn(List.of(row, row));
+        when(booksClient.listItems(2)).thenReturn(List.of());
+        when(booksClient.getItem("zoho-one-copy")).thenReturn(Map.of("item", row));
+        when(productRepository.findOneByZohoItemId("zoho-one-copy")).thenReturn(Optional.empty());
+        when(productRepository.findOneBySku("ONE-COPY")).thenReturn(Optional.empty());
+        when(productRepository.findMaxSortOrder()).thenReturn(0);
+        when(productRepository.findAllByZohoItemIdIsNotNull()).thenReturn(List.of());
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = service.pullProducts(true);
+
+        assertThat(result.get("success")).isEqualTo(1);
+        assertThat(result.get("failed")).isEqualTo(0);
+        assertThat(result.get("skipped")).isEqualTo(1);
+        verify(booksClient, times(1)).getItem("zoho-one-copy");
+        verify(productRepository, times(1)).save(any());
+    }
+
+    @Test
+    void pullProducts_sameSkuForDifferentItemIds_rejectsConflictAndKeepsCursor() {
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
+        Map<String, Object> first = Map.of(
+            "sku",
+            "DUPLICATE-SKU",
+            "item_id",
+            "zoho-first-id",
+            "name",
+            "First",
+            "status",
+            "active",
+            "last_modified_time",
+            "2026-08-28T12:00:00Z"
+        );
+        Map<String, Object> conflicting = Map.of(
+            "sku",
+            "DUPLICATE-SKU",
+            "item_id",
+            "zoho-second-id",
+            "name",
+            "Second",
+            "status",
+            "active",
+            "last_modified_time",
+            "2026-08-28T12:00:00Z"
+        );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(first, conflicting));
+        when(booksClient.listAllStatusItems(2)).thenReturn(List.of());
+        when(booksClient.getItem("zoho-first-id")).thenReturn(Map.of("item", first));
+        when(productRepository.findOneByZohoItemId("zoho-first-id")).thenReturn(Optional.empty());
+        when(productRepository.findOneBySku("DUPLICATE-SKU")).thenReturn(Optional.empty());
+        when(productRepository.findMaxSortOrder()).thenReturn(0);
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = service.pullProducts(false);
+
+        assertThat(result.get("success")).isEqualTo(1);
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(result.get("failures").toString()).contains("multiple item IDs");
+        assertThat(setting.getLastProductPullAt()).isEqualTo(cursor);
+        verify(booksClient, never()).getItem("zoho-second-id");
+        verify(productRepository, times(1)).save(any());
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullProducts_repeatedNonEmptyPage_stopsWithoutCleanupOrCursorAdvance() {
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
+        Map<String, Object> row = Map.of(
+            "sku",
+            "REPEATED-PAGE",
+            "item_id",
+            "zoho-repeat",
+            "status",
+            "inactive",
+            "last_modified_time",
+            "2026-08-26T12:00:00Z"
+        );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(row));
+        when(booksClient.listAllStatusItems(2)).thenReturn(List.of(row));
+        when(booksClient.getItem("zoho-repeat")).thenReturn(Map.of("item", row));
+
+        Map<String, Object> result = service.pullProducts(false);
+
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(result.get("failures").toString()).contains("repeated product page");
+        assertThat(setting.getLastProductPullAt()).isEqualTo(cursor);
+        verify(booksClient, times(1)).getItem("zoho-repeat");
+        verify(booksClient, never()).listAllStatusItems(3);
+        verify(productRepository, never()).findAllByZohoItemIdIsNotNull();
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullProducts_detailServerFailure_stopsBeforeLaterItemsAndKeepsCursor() {
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
+        Map<String, Object> first = Map.of(
+            "sku",
+            "SERVER-DOWN",
+            "item_id",
+            "zoho-server-down",
+            "status",
+            "active",
+            "last_modified_time",
+            "2026-08-28T12:00:00Z"
+        );
+        Map<String, Object> later = Map.of(
+            "sku",
+            "DO-NOT-FETCH",
+            "item_id",
+            "zoho-do-not-fetch",
+            "status",
+            "active",
+            "last_modified_time",
+            "2026-08-28T12:00:00Z"
+        );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(first, later));
+        when(booksClient.getItem("zoho-server-down"))
+            .thenThrow(new RestClientResponseException("Unavailable", 503, "Service Unavailable", null, null, null));
+
+        Map<String, Object> result = service.pullProducts(false);
+
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(setting.getLastProductPullAt()).isEqualTo(cursor);
+        verify(booksClient, never()).getItem("zoho-do-not-fetch");
+        verify(booksClient, never()).listAllStatusItems(2);
+        verify(productRepository, never()).save(any());
+        verify(zohoSettingRepository, never()).save(any());
     }
 
     @Test

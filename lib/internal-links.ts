@@ -7,7 +7,13 @@ const UNSAFE_SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
 export function isInternalSitePath(value?: string | null): boolean {
   const v = (value ?? "").trim();
   if (!v) return true;
-  if (UNSAFE_SCHEME_RE.test(v) || v.startsWith("//")) return false;
+  const hasControlCharacter = Array.from(v).some((character) => {
+    const code = character.charCodeAt(0);
+    return code <= 31 || code === 127;
+  });
+  if (UNSAFE_SCHEME_RE.test(v) || v.startsWith("//") || v.includes("\\") || hasControlCharacter) {
+    return false;
+  }
   return v.startsWith("/") && !v.startsWith("//");
 }
 

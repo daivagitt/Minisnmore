@@ -12,6 +12,7 @@ describe("internal-links", () => {
     expect(isInternalSitePath("https://google.com")).toBe(false);
     expect(isInternalSitePath("http://example.com")).toBe(false);
     expect(isInternalSitePath("//evil.com")).toBe(false);
+    expect(isInternalSitePath("/\\evil.com")).toBe(false);
     expect(isInternalSitePath("javascript:alert(1)")).toBe(false);
     expect(isInternalSitePath("shop")).toBe(false);
   });

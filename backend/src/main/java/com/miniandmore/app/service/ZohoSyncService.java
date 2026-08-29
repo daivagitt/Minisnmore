@@ -165,6 +165,7 @@ public class ZohoSyncService {
         ZohoSyncSummary.Builder builder = ZohoSyncSummary.builder();
         int pageNumber = 0;
         Page<Product> page;
+        boolean stopRequested = false;
         do {
             page = productRepository.findAllWithEagerRelationships(PageRequest.of(pageNumber, SYNC_PAGE_SIZE, Sort.by("id")));
             for (Product product : page.getContent()) {
@@ -182,6 +183,26 @@ public class ZohoSyncService {
                     }
                     pushProductToZoho(product);
                     builder.success();
+                } catch (RestClientResponseException e) {
+                    String failure = storedSyncFailure(e);
+                    productRepository.updateZohoSyncFailure(product.getId(), ZohoSyncStatus.FAILED, failure);
+                    builder.failure(product.getId(), product.getName(), failure);
+                    if (isOperationWideHttpFailure(e)) {
+                        LOG.warn(
+                            "Zoho bulk product sync stopped after HTTP {} on product {}",
+                            e.getStatusCode().value(),
+                            product.getId()
+                        );
+                        stopRequested = true;
+                        break;
+                    }
+                } catch (ResourceAccessException e) {
+                    String failure = storedSyncFailure(e);
+                    productRepository.updateZohoSyncFailure(product.getId(), ZohoSyncStatus.FAILED, failure);
+                    builder.failure(product.getId(), product.getName(), failure);
+                    LOG.warn("Zoho bulk product sync stopped after network failure on product {}: {}", product.getId(), failure);
+                    stopRequested = true;
+                    break;
                 } catch (Exception e) {
                     String failure = storedSyncFailure(e);
                     productRepository.updateZohoSyncFailure(product.getId(), ZohoSyncStatus.FAILED, failure);
@@ -189,7 +210,7 @@ public class ZohoSyncService {
                 }
             }
             pageNumber++;
-        } while (page.hasNext());
+        } while (!stopRequested && page.hasNext());
         return builder.build().toMap();
     }
 
@@ -1138,11 +1159,15 @@ public class ZohoSyncService {
         Instant pullStartedAt = Instant.now();
         Set<String> pulledSkus = new HashSet<>();
         Set<String> pulledItemIds = new HashSet<>();
+        Map<String, String> seenSkusByItemId = new LinkedHashMap<>();
+        Map<String, String> seenItemIdsBySku = new LinkedHashMap<>();
         List<Product> variantParents = new ArrayList<>(
             productRepository.findAll().stream().filter(variantSupport::isVariants).toList()
         );
         int page = 1;
         boolean completedAllPages = false;
+        boolean stopRequested = false;
+        String previousPageIdentity = null;
         while (true) {
             List<Map<String, Object>> items;
             try {
@@ -1169,6 +1194,13 @@ public class ZohoSyncService {
                 completedAllPages = true;
                 break;
             }
+            String pageIdentity = zohoItemPageIdentity(items);
+            if (pageIdentity.equals(previousPageIdentity)) {
+                builder.failure("Zoho repeated product page " + page + " — pull stopped to prevent an endless loop");
+                LOG.warn("Zoho product pull returned the same non-empty payload for pages {} and {}", page - 1, page);
+                break;
+            }
+            previousPageIdentity = pageIdentity;
             for (Map<String, Object> item : items) {
                 String sku = item == null ? null : stringValue(item.get("sku"));
                 try {
@@ -1176,7 +1208,7 @@ public class ZohoSyncService {
                         builder.failure("Zoho returned a null item on page " + page);
                         continue;
                     }
-                    if (!shouldProcessIncrementalListRow(item, since, sku)) {
+                    if (!shouldProcessListRow(item, since, sku)) {
                         continue;
                     }
                     if (StringUtils.isBlank(sku)) {
@@ -1185,24 +1217,72 @@ public class ZohoSyncService {
                         builder.failure("missing-sku", "Zoho item has no SKU — skipped");
                         continue;
                     }
-                    if (!ZohoBooksItemAttributes.isActive(item)) {
-                        // Incremental listings include inactive changes; this also defends against a
-                        // stale/mixed-status payload from a nominally active-only full listing.
-                        deactivateExistingForInactiveZohoItem(item, sku.trim(), variantParents, builder);
+                    String itemId = StringUtils.trimToNull(stringValue(item.get("item_id")));
+                    if (itemId == null) {
+                        builder.failure(sku, "Zoho item has no item_id — skipped without changing local data");
                         continue;
                     }
-                    if (upsertPulledProduct(item, autoCreateCategory, builder, variantParents)) {
-                        pulledSkus.add(canonicalSku(sku));
-                        String pulledItemId = canonicalItemId(stringValue(item.get("item_id")));
+                    if (!registerUniqueZohoListRow(itemId, sku, seenSkusByItemId, seenItemIdsBySku, builder)) {
+                        continue;
+                    }
+                    Optional<Map<String, Object>> resolvedDetail = fetchValidatedZohoItemDetail(item, itemId, sku);
+                    if (resolvedDetail.isEmpty()) {
+                        builder.failure(sku, "Zoho item detail was empty — local data was not changed");
+                        continue;
+                    }
+                    Map<String, Object> resolved = resolvedDetail.orElseThrow();
+                    String resolvedSku = stringValue(resolved.get("sku"));
+                    if (!ZohoBooksItemAttributes.isActive(resolved)) {
+                        Optional<Product> local = findLocalProductForZohoItem(resolved, resolvedSku, variantParents);
+                        if (local.isPresent()) {
+                            deactivateExistingForInactiveZohoItem(
+                                resolved,
+                                resolvedSku,
+                                variantParents,
+                                builder,
+                                local
+                            );
+                        }
+                        continue;
+                    }
+                    if (upsertPulledProduct(resolved, autoCreateCategory, builder, variantParents)) {
+                        pulledSkus.add(canonicalSku(resolvedSku));
+                        String pulledItemId = canonicalItemId(stringValue(resolved.get("item_id")));
                         if (pulledItemId != null) {
                             pulledItemIds.add(pulledItemId);
                         }
                     }
+                } catch (RestClientResponseException e) {
+                    String message = exceptionMessage(e);
+                    builder.failure(sku, message);
+                    if (isOperationWideHttpFailure(e)) {
+                        LOG.warn(
+                            "Zoho product pull stopped after HTTP {} while reading {} — cursor will not advance",
+                            e.getStatusCode().value(),
+                            sku
+                        );
+                        stopRequested = true;
+                        break;
+                    }
+                    LOG.warn(
+                        "Zoho pull rejected item {} with HTTP {}: {}",
+                        sku,
+                        e.getStatusCode().value(),
+                        message
+                    );
+                } catch (ResourceAccessException e) {
+                    LOG.warn("Zoho pull could not reach item {}: {}", sku, e.getMessage());
+                    builder.failure(sku, "Zoho unreachable while reading item detail: " + exceptionMessage(e));
+                    stopRequested = true;
+                    break;
                 } catch (Exception e) {
                     String message = exceptionMessage(e);
                     LOG.warn("Zoho pull failed for {}: {}", sku, message, e);
                     builder.failure(sku, message);
                 }
+            }
+            if (stopRequested) {
+                break;
             }
             page++;
         }
@@ -1270,7 +1350,7 @@ public class ZohoSyncService {
         List<Product> variantParents
     ) {
         String sku = stringValue(item.get("sku"));
-        Map<String, Object> zohoItemPreview = resolveZohoItemDetail(item, stringValue(item.get("item_id")));
+        Map<String, Object> zohoItemPreview = item;
         if (!ZohoBooksItemAttributes.isActive(zohoItemPreview)) {
             deactivateExistingForInactiveZohoItem(zohoItemPreview, sku, variantParents, builder);
             return false;
@@ -1297,11 +1377,8 @@ public class ZohoSyncService {
                 builder
             );
         }
+        Product product = findDirectProductForZohoItem(item, sku).orElseGet(Product::new);
         String itemId = stringValue(item.get("item_id"));
-        Optional<Product> linkedByItemId = StringUtils.isNotBlank(itemId)
-            ? productRepository.findOneByZohoItemId(itemId)
-            : Optional.empty();
-        Product product = linkedByItemId.or(() -> productRepository.findOneBySku(sku)).orElseGet(Product::new);
 
         boolean created = product.getId() == null;
         if (created) {
@@ -1442,23 +1519,54 @@ public class ZohoSyncService {
         return true;
     }
 
-    /**
-     * Zoho {@code GET /items} list responses omit {@code custom_fields}; detail fetch is required for sizes/colors/MRP.
-     */
-    private Map<String, Object> resolveZohoItemDetail(Map<String, Object> item, String itemId) {
+    private Optional<Map<String, Object>> fetchZohoItemDetail(String itemId) {
         if (StringUtils.isBlank(itemId)) {
-            return item;
+            return Optional.empty();
         }
         Map<String, Object> detailResponse = booksClient.getItem(itemId);
         if (detailResponse == null || detailResponse.isEmpty()) {
-            return item;
+            return Optional.empty();
         }
         @SuppressWarnings("unchecked")
         Map<String, Object> detailItem = (Map<String, Object>) detailResponse.getOrDefault("item", detailResponse);
         if (detailItem != null && !detailItem.isEmpty()) {
-            return detailItem;
+            return Optional.of(detailItem);
         }
-        return item;
+        return Optional.empty();
+    }
+
+    /**
+     * Detail is authoritative for status and product fields, while the list row supplies identity
+     * fields only when Zoho omits them. Conflicting identities are rejected before merge so a
+     * transient/malformed response can never relink or rename the wrong local product.
+     */
+    private Optional<Map<String, Object>> fetchValidatedZohoItemDetail(
+        Map<String, Object> listRow,
+        String requestedItemId,
+        String listedSku
+    ) {
+        Optional<Map<String, Object>> fetched = fetchZohoItemDetail(requestedItemId);
+        if (fetched.isEmpty()) {
+            return Optional.empty();
+        }
+        Map<String, Object> detail = fetched.orElseThrow();
+        String detailItemId = StringUtils.trimToNull(stringValue(detail.get("item_id")));
+        if (detailItemId != null && !requestedItemId.equals(detailItemId)) {
+            throw new IllegalStateException(
+                "Zoho item detail identity mismatch: requested " + requestedItemId + " but received " + detailItemId
+            );
+        }
+        String detailSku = StringUtils.trimToNull(stringValue(detail.get("sku")));
+        if (detailSku != null && !detailSku.equalsIgnoreCase(listedSku.trim())) {
+            throw new IllegalStateException(
+                "Zoho item detail SKU mismatch: list returned " + listedSku.trim() + " but detail returned " + detailSku
+            );
+        }
+        Map<String, Object> resolved = new LinkedHashMap<>(listRow);
+        resolved.putAll(detail);
+        resolved.put("item_id", requestedItemId);
+        resolved.put("sku", detailSku != null ? detailSku : listedSku.trim());
+        return Optional.of(resolved);
     }
 
     private Optional<Product> findVariantParentForZohoItem(
@@ -1567,19 +1675,19 @@ public class ZohoSyncService {
             }
         }
         if (StringUtils.isNotBlank(displayName)) {
-            Optional<Product> bySlug = productRepository.findOneBySlug(slugify(displayName));
+            Optional<Product> bySlug = productRepository.findOneBySlug(slugify(displayName)).filter(variantSupport::isVariants);
             if (bySlug.isPresent()) {
                 return bySlug;
             }
             String groupSku = slugify(displayName).toUpperCase(java.util.Locale.ROOT);
             if (StringUtils.isNotBlank(groupSku)) {
-                Optional<Product> bySku = productRepository.findOneBySku(groupSku);
+                Optional<Product> bySku = productRepository.findOneBySku(groupSku).filter(variantSupport::isVariants);
                 if (bySku.isPresent()) {
                     return bySku;
                 }
             }
         }
-        return productRepository.findOneBySku(fallbackSku);
+        return productRepository.findOneBySku(fallbackSku).filter(variantSupport::isVariants);
     }
 
     private void attachVariantParent(Product parent, List<Product> variantParents) {
@@ -1853,10 +1961,11 @@ public class ZohoSyncService {
 
     /**
      * Whether an incremental list row should be processed before per-item detail calls.
-     * Unchanged active rows are skipped; inactive rows with a SKU are still processed so local
-     * deactivation can run even when Zoho's {@code last_modified_time} predates the cursor.
+     * Unchanged active rows are skipped. Inactive rows with a SKU are still verified because both
+     * status and {@code last_modified_time} can be stale; this also allows an Admin-deleted local
+     * product to be recreated when Zoho detail still reports it active.
      */
-    private static boolean shouldProcessIncrementalListRow(Map<String, Object> item, Instant since, String sku) {
+    private static boolean shouldProcessListRow(Map<String, Object> item, Instant since, String sku) {
         if (since == null) {
             return true;
         }
@@ -1864,6 +1973,78 @@ public class ZohoSyncService {
             return true;
         }
         return StringUtils.isNotBlank(sku) && !ZohoBooksItemAttributes.isActive(item);
+    }
+
+    private static boolean isOperationWideHttpFailure(RestClientResponseException exception) {
+        int status = exception.getStatusCode().value();
+        return status == 401 || status == 403 || status == 408 || status == 429 || status >= 500;
+    }
+
+    private String zohoItemPageIdentity(List<Map<String, Object>> items) {
+        StringBuilder identity = new StringBuilder();
+        for (Map<String, Object> item : items) {
+            if (item == null) {
+                identity.append("<null>");
+            } else {
+                identity
+                    .append(StringUtils.trimToEmpty(stringValue(item.get("item_id"))))
+                    .append('\u001f')
+                    .append(StringUtils.trimToEmpty(stringValue(item.get("sku"))))
+                    .append('\u001f')
+                    .append(StringUtils.trimToEmpty(stringValue(item.get("status"))))
+                    .append('\u001f')
+                    .append(StringUtils.trimToEmpty(stringValue(item.get("last_modified_time"))));
+            }
+            identity.append('\u001e');
+        }
+        return identity.toString();
+    }
+
+    private static boolean registerUniqueZohoListRow(
+        String itemId,
+        String sku,
+        Map<String, String> seenSkusByItemId,
+        Map<String, String> seenItemIdsBySku,
+        ZohoSyncSummary.Builder builder
+    ) {
+        String canonicalItemId = canonicalItemId(itemId);
+        String canonicalSku = canonicalSku(sku);
+        String priorSku = seenSkusByItemId.putIfAbsent(canonicalItemId, canonicalSku);
+        if (priorSku != null) {
+            if (priorSku.equals(canonicalSku)) {
+                builder.skipped(sku, "Duplicate Zoho list row was ignored");
+            } else {
+                builder.failure(
+                    sku,
+                    "Zoho returned item_id " + itemId + " with conflicting SKUs in one pull — local data was not changed"
+                );
+            }
+            return false;
+        }
+        String priorItemId = seenItemIdsBySku.putIfAbsent(canonicalSku, canonicalItemId);
+        if (priorItemId != null && !priorItemId.equals(canonicalItemId)) {
+            builder.failure(sku, "Zoho returned duplicate SKU " + sku + " for multiple item IDs — local data was not changed");
+            return false;
+        }
+        return true;
+    }
+
+    private Optional<Product> findDirectProductForZohoItem(Map<String, Object> zohoItem, String sku) {
+        String itemId = stringValue(zohoItem.get("item_id"));
+        Optional<Product> product = StringUtils.isNotBlank(itemId)
+            ? productRepository.findOneByZohoItemId(itemId)
+            : Optional.empty();
+        return product.or(() -> StringUtils.isNotBlank(sku) ? productRepository.findOneBySku(sku) : Optional.empty());
+    }
+
+    private Optional<Product> findLocalProductForZohoItem(
+        Map<String, Object> zohoItem,
+        String sku,
+        List<Product> variantParents
+    ) {
+        return findVariantParentForZohoItem(zohoItem, sku, variantParents).or(() ->
+            findDirectProductForZohoItem(zohoItem, sku)
+        );
     }
 
     /**
@@ -1876,11 +2057,21 @@ public class ZohoSyncService {
         List<Product> variantParents,
         ZohoSyncSummary.Builder builder
     ) {
+        deactivateExistingForInactiveZohoItem(zohoItem, sku, variantParents, builder, Optional.empty());
+    }
+
+    private void deactivateExistingForInactiveZohoItem(
+        Map<String, Object> zohoItem,
+        String sku,
+        List<Product> variantParents,
+        ZohoSyncSummary.Builder builder,
+        Optional<Product> knownLocal
+    ) {
         String itemId = stringValue(zohoItem.get("item_id"));
-        Optional<Product> byVariant = StringUtils.isNotBlank(itemId)
-            ? variantSupport.findProductContainingVariantZohoItemId(variantParents, itemId)
-            : Optional.empty();
-        byVariant = byVariant.or(() -> variantSupport.findProductContainingVariantSku(variantParents, sku));
+        Optional<Product> byVariant = knownLocal.filter(variantSupport::isVariants);
+        if (byVariant.isEmpty() && knownLocal.isEmpty()) {
+            byVariant = findVariantParentForZohoItem(zohoItem, sku, variantParents);
+        }
         if (byVariant.isPresent()) {
             Product parent = byVariant.orElseThrow();
             boolean deactivated = StringUtils.isNotBlank(itemId) && variantSupport.deactivateVariantByZohoItemId(parent, itemId);
@@ -1900,10 +2091,10 @@ public class ZohoSyncService {
             }
             return;
         }
-        Optional<Product> product = StringUtils.isNotBlank(itemId)
-            ? productRepository.findOneByZohoItemId(itemId)
-            : Optional.empty();
-        product = product.or(() -> StringUtils.isNotBlank(sku) ? productRepository.findOneBySku(sku) : Optional.empty());
+        Optional<Product> product = knownLocal.filter(local -> !variantSupport.isVariants(local));
+        if (product.isEmpty() && knownLocal.isEmpty()) {
+            product = findDirectProductForZohoItem(zohoItem, sku);
+        }
         if (product.isPresent()) {
             Product p = product.orElseThrow();
             if (variantSupport.isVariants(p)) {
@@ -1915,12 +2106,9 @@ public class ZohoSyncService {
                 p.setZohoSyncError("Zoho item marked inactive");
                 productRepository.save(p);
                 builder.notice(sku, "Deactivated — Zoho item is inactive");
-            } else {
-                builder.notice(sku, "Skipped inactive Zoho item");
             }
             return;
         }
-        builder.notice(sku, "Skipped inactive Zoho item");
     }
 
     public Map<String, Object> pullInventory() {
