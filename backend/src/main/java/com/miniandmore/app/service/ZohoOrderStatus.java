@@ -124,12 +124,14 @@ public final class ZohoOrderStatus {
         // remain accounting states and do not mean that the parcel was delivered. Zoho Books
         // exposes "Completely Fulfilled" as shipped_status=fulfilled while the main sales-order
         // status can remain invoiced, so both fields must be considered.
-        if (
-            "fulfilled".equals(status) ||
-            "delivered".equals(status) ||
-            "fulfilled".equals(shippedStatus) ||
-            "delivered".equals(shippedStatus)
-        ) {
+        //
+        // Zoho can also auto-set shipped_status=fulfilled when an invoice is created, with no
+        // courier or shipment date. Require dispatch evidence before treating that as delivered.
+        if ("fulfilled".equals(status) || "delivered".equals(status)) {
+            order.setStatus(OrderStatus.FULFILLED);
+            return;
+        }
+        if (("fulfilled".equals(shippedStatus) || "delivered".equals(shippedStatus)) && hasDispatchEvidence(salesOrder)) {
             order.setStatus(OrderStatus.FULFILLED);
             return;
         }
@@ -138,12 +140,47 @@ public final class ZohoOrderStatus {
         }
     }
 
+    private static boolean hasDispatchEvidence(Map<String, Object> salesOrder) {
+        if (StringUtils.isNotBlank(stringValue(salesOrder.get("shipment_date")))) {
+            return true;
+        }
+        if (StringUtils.isNotBlank(stringValue(salesOrder.get("tracking_number")))) {
+            return true;
+        }
+        return hasCustomFieldTracking(salesOrder);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static boolean hasCustomFieldTracking(Map<String, Object> salesOrder) {
+        Object raw = salesOrder.get("custom_fields");
+        if (!(raw instanceof List<?> fields)) {
+            return false;
+        }
+        for (Object fieldObj : fields) {
+            if (!(fieldObj instanceof Map<?, ?> field)) {
+                continue;
+            }
+            String label = StringUtils.defaultString(stringValue(field.get("label"))).toLowerCase();
+            String value = stringValue(field.get("value"));
+            if (StringUtils.isNotBlank(value) && (label.contains("tracking") || label.contains("awb"))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean hasShippedSignal(Map<String, Object> salesOrder) {
         if (StringUtils.isNotBlank(stringValue(salesOrder.get("shipment_date")))) {
             return true;
         }
         String shippedStatus = normalize(stringValue(salesOrder.get("shipped_status")));
-        if (shippedStatus != null && !shippedStatus.equals("pending") && !shippedStatus.equals("not_shipped")) {
+        if (
+            shippedStatus != null &&
+            !shippedStatus.equals("pending") &&
+            !shippedStatus.equals("not_shipped") &&
+            !shippedStatus.equals("fulfilled") &&
+            !shippedStatus.equals("delivered")
+        ) {
             return true;
         }
         Object raw = salesOrder.get("sub_statuses");

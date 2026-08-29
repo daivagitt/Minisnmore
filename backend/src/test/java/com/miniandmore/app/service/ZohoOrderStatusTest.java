@@ -103,6 +103,68 @@ class ZohoOrderStatusTest {
     }
 
     @Test
+    void applySalesOrderTracking_invoicedFulfilledWithoutDispatchStaysConfirmed() {
+        CustomerOrder order = paidOrder();
+
+        ZohoOrderStatus.applySalesOrderTracking(
+            order,
+            Map.of("status", "invoiced", "shipped_status", "fulfilled", "date", "2026-08-29")
+        );
+
+        assertThat(order.getZohoOrderStatus()).isEqualTo("invoiced");
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(order.getShipmentDate()).isNull();
+    }
+
+    @Test
+    void applySalesOrderTracking_invoicedFulfilledWithTrackingNumberMarksFulfilled() {
+        CustomerOrder order = paidOrder();
+
+        ZohoOrderStatus.applySalesOrderTracking(
+            order,
+            Map.of("status", "invoiced", "shipped_status", "fulfilled", "tracking_number", "AWB-42")
+        );
+
+        assertThat(order.getZohoOrderStatus()).isEqualTo("invoiced");
+        assertThat(order.getTrackingNumber()).isEqualTo("AWB-42");
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+    }
+
+    @Test
+    void applySalesOrderTracking_invoicedFulfilledIgnoresStaleLocalTracking() {
+        CustomerOrder order = paidOrder().trackingNumber("STALE-AWB");
+
+        ZohoOrderStatus.applySalesOrderTracking(
+            order,
+            Map.of("status", "invoiced", "shipped_status", "fulfilled", "date", "2026-08-29")
+        );
+
+        assertThat(order.getZohoOrderStatus()).isEqualTo("invoiced");
+        assertThat(order.getTrackingNumber()).isEqualTo("STALE-AWB");
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+    }
+
+    @Test
+    void applySalesOrderTracking_invoicedFulfilledWithCustomFieldAwbMarksFulfilled() {
+        CustomerOrder order = paidOrder();
+
+        ZohoOrderStatus.applySalesOrderTracking(
+            order,
+            Map.of(
+                "status",
+                "invoiced",
+                "shipped_status",
+                "fulfilled",
+                "custom_fields",
+                List.of(Map.of("label", "AWB Number", "value", "CF-AWB-7"))
+            )
+        );
+
+        assertThat(order.getTrackingNumber()).isEqualTo("CF-AWB-7");
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+    }
+
+    @Test
     void applySalesOrderTracking_invoicedClosedOrderStaysConfirmed() {
         CustomerOrder order = paidOrder();
         Map<String, Object> salesOrder = Map.of(

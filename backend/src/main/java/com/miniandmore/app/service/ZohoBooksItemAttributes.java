@@ -90,7 +90,7 @@ public final class ZohoBooksItemAttributes {
             return true;
         }
         Instant cursor = since.truncatedTo(ChronoUnit.SECONDS);
-        return !modifiedAt.get().truncatedTo(ChronoUnit.SECONDS).isBefore(cursor);
+        return !modifiedAt.orElseThrow().truncatedTo(ChronoUnit.SECONDS).isBefore(cursor);
     }
 
     public static Optional<Instant> lastModifiedAt(Map<String, Object> item) {
