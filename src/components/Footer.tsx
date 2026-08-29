@@ -16,9 +16,6 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { resolveContactEmail, toDirectDownloadUrl } from "@/lib/utils";
 import footerLogo from "@/assets/logo-footer.png";
 
-const defaultFooterTagline =
-  "Minis today, memories forever. Premium organic clothing for the first 24 months — softly made in India, gently loved everywhere.";
-
 const COLLECTION_LINKS = [
   { to: "/best-sellers" as const, label: "Best sellers" },
   { to: "/new-arrivals" as const, label: "New arrivals" },
@@ -181,7 +178,6 @@ export function Footer() {
   const [shopColLeft, shopColRight] = splitShopColumns(shopLinks);
   const shopRowCount = Math.max(shopColLeft.length, shopColRight.length);
   const logo = settings.logo_url || footerLogo;
-  const tagline = settings.footer_tagline || defaultFooterTagline;
   const contactEmail = settings.contact_email ? resolveContactEmail(settings.contact_email) : null;
   const mailtoHref = contactEmail ? `mailto:${contactEmail}` : null;
 
@@ -213,10 +209,7 @@ export function Footer() {
                 decoding="async"
               />
               <div className="pl-[calc(15%-0.5rem)]">
-            {tagline.trim() ? (
-              <p className="text-sm text-muted-foreground leading-snug">{tagline}</p>
-            ) : null}
-            <div className="mt-2 text-xs text-muted-foreground space-y-0.5">
+            <div className="text-xs text-muted-foreground space-y-0.5">
               {settings.legal_entity_name ? (
                 <div className="text-foreground/80 font-medium">{settings.legal_entity_name}</div>
               ) : null}
