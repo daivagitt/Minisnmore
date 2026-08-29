@@ -2258,7 +2258,11 @@ public class ZohoSyncService {
                         order.setZohoSalesOrderId(salesOrderId);
                         applySalesOrderAddresses(salesOrderId, order);
                     }
-                    if (StringUtils.isBlank(order.getZohoInvoiceId()) && StringUtils.isNotBlank(salesOrderId)) {
+                    if (
+                        shouldCreateInvoice(order) &&
+                        StringUtils.isBlank(order.getZohoInvoiceId()) &&
+                        StringUtils.isNotBlank(salesOrderId)
+                    ) {
                         Map<String, Object> invoiceResponse = booksClient.createInvoiceFromSalesOrder(salesOrderId);
                         @SuppressWarnings("unchecked")
                         Map<String, Object> invoice = (Map<String, Object>) invoiceResponse.getOrDefault("invoice", invoiceResponse);
@@ -2656,6 +2660,16 @@ public class ZohoSyncService {
 
     public static boolean isCodOrder(CustomerOrder order) {
         return "cod".equalsIgnoreCase(StringUtils.trimToEmpty(order.getPaymentMethod()));
+    }
+
+    /**
+     * Converting a Zoho sales order to an invoice marks all its lines as fulfilled. For unpaid
+     * COD orders that is an accounting side effect, not evidence that the parcel was delivered.
+     * Keep the sales order open until cash is collected; mark-cod-collected re-runs this sync and
+     * creates the invoice immediately before recording the cash payment.
+     */
+    private static boolean shouldCreateInvoice(CustomerOrder order) {
+        return !isCodOrder(order) || order.getPaymentStatus() == PaymentStatus.PAID;
     }
 
     private static BigDecimal moneyOrZero(BigDecimal value) {
