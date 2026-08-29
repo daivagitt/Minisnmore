@@ -18,6 +18,7 @@ import {
 import { showApiError } from "@/lib/ui-errors";
 import { ListPagination } from "@/components/ListPagination";
 import { LIST_PAGE_SIZE } from "@/lib/pagination";
+import { isInvoiceAvailable } from "@/lib/invoice-availability";
 
 export const Route = createFileRoute("/admin/orders")({ component: AdminOrdersPage });
 
@@ -487,13 +488,15 @@ function AdminOrdersPage() {
                         {busy === `wrap:${order.order_number}` ? "Updating…" : "Mark hand-wrapped"}
                       </button>
                     )}
-                    <Link
-                      to="/admin/orders/$orderNumber/invoice"
-                      params={{ orderNumber: order.order_number }}
-                      className="mt-2 ml-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium"
-                    >
-                      <FileText className="h-3.5 w-3.5" /> View invoice
-                    </Link>
+                    {isInvoiceAvailable(order) && (
+                      <Link
+                        to="/admin/orders/$orderNumber/invoice"
+                        params={{ orderNumber: order.order_number }}
+                        className="mt-2 ml-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium"
+                      >
+                        <FileText className="h-3.5 w-3.5" /> View invoice
+                      </Link>
+                    )}
                   </div>
                 </div>
 

@@ -12,6 +12,7 @@ import {
   type OrderReturnRow,
 } from "@/lib/orders.functions";
 import { openRazorpayCheckout } from "@/lib/razorpay";
+import { isInvoiceAvailable } from "@/lib/invoice-availability";
 import { formatOrderDate } from "@/lib/dates";
 import { formatOrderStatusSummary, formatPaymentStatusLabel } from "@/lib/order-status";
 import { useOrderTrackingPoll } from "@/hooks/useOrderTrackingPoll";
@@ -645,7 +646,7 @@ function OrderDetail() {
               {order.coupon_code && (
                 <div className="text-xs text-primary mt-1">Coupon: {order.coupon_code}</div>
               )}
-              {order.order_number && (
+              {order.order_number && isInvoiceAvailable(order) && (
                 <Link
                   to="/account/orders/$orderNumber/invoice"
                   params={{ orderNumber: order.order_number }}

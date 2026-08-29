@@ -3,6 +3,7 @@ import { ArrowLeft, Loader2, Printer } from "lucide-react";
 import { PortraitInvoiceDocument } from "@/components/PortraitInvoiceDocument";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import type { InvoiceOrder } from "@/lib/invoice-breakdown";
+import { isInvoiceAvailable } from "@/lib/invoice-availability";
 
 export function InvoiceViewer({
   orderNumber,
@@ -23,7 +24,12 @@ export function InvoiceViewer({
     let active = true;
     void loadOrder(orderNumber)
       .then((loaded) => {
-        if (active) setOrder(loaded);
+        if (!active) return;
+        if (!isInvoiceAvailable(loaded)) {
+          setError("Invoice will be available once the order is confirmed.");
+          return;
+        }
+        setOrder(loaded);
       })
       .catch((reason) => {
         if (active) setError(reason instanceof Error ? reason.message : "Could not load invoice");
