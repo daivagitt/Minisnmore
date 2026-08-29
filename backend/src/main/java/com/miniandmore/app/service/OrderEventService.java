@@ -181,35 +181,68 @@ public class OrderEventService {
 
     private void queueLifecycleEmail(CustomerOrder order, String eventType) {
         AfterCommit.run(() -> {
-            try {
-                switch (eventType) {
-                    case TYPE_ORDER_PLACED:
-                        if (isCod(order)) {
-                            orderMailService.sendOrderConfirmation(order);
-                            orderSmsService.sendOrderConfirmation(order);
-                        }
-                        break;
-                    case TYPE_PAYMENT_RECEIVED:
-                        if (!isCod(order)) {
-                            orderMailService.sendOrderConfirmation(order);
-                            orderSmsService.sendOrderConfirmation(order);
-                        }
-                        break;
-                    case TYPE_SHIPPED:
-                        orderMailService.sendOutForDelivery(order);
-                        orderSmsService.sendOutForDelivery(order);
-                        break;
-                    case TYPE_CANCELLED:
-                        orderMailService.sendOrderCancelled(order);
-                        orderSmsService.sendOrderCancelled(order);
-                        break;
-                    default:
-                        break;
-                }
-            } catch (RuntimeException ex) {
-                LOG.warn("Order email/SMS failed for {} on {}", eventType, order.getOrderNumber(), ex);
+            switch (eventType) {
+                case TYPE_ORDER_PLACED:
+                    if (isCod(order)) {
+                        notifyBothChannels(
+                            eventType,
+                            order,
+                            () -> orderMailService.sendOrderConfirmation(order),
+                            () -> orderSmsService.sendOrderConfirmation(order)
+                        );
+                    }
+                    break;
+                case TYPE_PAYMENT_RECEIVED:
+                    if (!isCod(order)) {
+                        notifyBothChannels(
+                            eventType,
+                            order,
+                            () -> orderMailService.sendOrderConfirmation(order),
+                            () -> orderSmsService.sendOrderConfirmation(order)
+                        );
+                    }
+                    break;
+                case TYPE_SHIPPED:
+                    notifyBothChannels(
+                        eventType,
+                        order,
+                        () -> orderMailService.sendOutForDelivery(order),
+                        () -> orderSmsService.sendOutForDelivery(order)
+                    );
+                    break;
+                case TYPE_DELIVERED:
+                    notifyBothChannels(
+                        eventType,
+                        order,
+                        () -> orderMailService.sendOrderDelivered(order),
+                        () -> orderSmsService.sendOrderDelivered(order)
+                    );
+                    break;
+                case TYPE_CANCELLED:
+                    notifyBothChannels(
+                        eventType,
+                        order,
+                        () -> orderMailService.sendOrderCancelled(order),
+                        () -> orderSmsService.sendOrderCancelled(order)
+                    );
+                    break;
+                default:
+                    break;
             }
         });
+    }
+
+    private void notifyBothChannels(String eventType, CustomerOrder order, Runnable mailSend, Runnable smsSend) {
+        sendNotificationChannel("email", eventType, order, mailSend);
+        sendNotificationChannel("SMS", eventType, order, smsSend);
+    }
+
+    private void sendNotificationChannel(String channel, String eventType, CustomerOrder order, Runnable send) {
+        try {
+            send.run();
+        } catch (RuntimeException ex) {
+            LOG.warn("Order {} notification failed (channel={}, eventType={})", order.getOrderNumber(), channel, eventType, ex);
+        }
     }
 
     private static boolean isCod(CustomerOrder order) {

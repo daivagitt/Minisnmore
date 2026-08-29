@@ -14,6 +14,7 @@ import {
   paymentStatusTone,
 } from "@/lib/order-status";
 import { shouldPollOrderTracking } from "@/lib/order-tracking";
+import { isInvoiceAvailable } from "@/lib/invoice-availability";
 
 export const Route = createFileRoute("/account/orders/")({
   head: () => ({ meta: [{ title: "Your orders · Mini's n More" }] }),
@@ -165,7 +166,7 @@ function OrdersPage() {
                       Track order
                     </Link>
                   )}
-                  {o.order_number && (
+                  {o.order_number && isInvoiceAvailable(o) && (
                     <Link
                       to="/account/orders/$orderNumber/invoice"
                       params={{ orderNumber: o.order_number }}

@@ -234,6 +234,9 @@ public class InternalAccountOrderResource {
             request.shipping_mode(),
             cod
         );
+        if (totals.subtotal().compareTo(BigDecimal.ZERO) <= 0 || totals.total().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart amount must be greater than zero to place an order");
+        }
         AddressRequest shippingAddress = lockShippingEmailToLogin(request.shipping_address(), login);
         String orderNumber = generateOrderNumber();
         CustomerOrder order = new CustomerOrder()
@@ -308,7 +311,7 @@ public class InternalAccountOrderResource {
         }
 
         String razorpayOrderId;
-        if (isDemoMode() || totals.total().compareTo(BigDecimal.ZERO) <= 0) {
+        if (isDemoMode()) {
             razorpayOrderId = "order_demo_" + orderNumber;
         } else {
             razorpayOrderId = createRazorpayOrder(orderNumber, totals.total(), login);

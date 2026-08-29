@@ -314,6 +314,34 @@ class InternalAccountOrderResourceCoverageTest {
     }
 
     @Test
+    void createOrder_zeroCartAmount_isRejectedBeforeOrderIsSaved() throws Exception {
+        Product product = new Product().id(1L).name("Free item").slug("free-item").price(BigDecimal.ZERO).stock(1).active(true);
+        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "items":[{"product_id":"1","product_name":"Free item","qty":1,"price":0}],
+                          "shipping_address":{"full_name":"Jane","email":"j@example.com","phone":"9876543210","line1":"Line 1","city":"City","state":"State","pincode":"560001"},
+                          "payment_method":"online",
+                          "donation":0
+                        }
+                        """
+                    )
+            )
+            .andExpect(status().isBadRequest());
+
+        verify(customerOrderRepository, never()).save(any(CustomerOrder.class));
+    }
+
+    @Test
     void createOrder_mismatchedShippingEmail_overridesWithAccountLogin() throws Exception {
         ReflectionTestUtils.setField(resource, "razorpayKeyId", "DEMO");
         ReflectionTestUtils.setField(resource, "razorpayKeySecret", "");

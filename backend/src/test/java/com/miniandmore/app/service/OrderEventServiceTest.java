@@ -95,6 +95,41 @@ class OrderEventServiceTest {
     }
 
     @Test
+    void syncLifecycleEvents_delivered_sendsEmailAndSmsOnce() {
+        CustomerOrder order = baseOrder().paymentStatus(PaymentStatus.PAID).ledgerlyOrderStatus("delivered");
+        when(orderEventRepository.existsByOrderIdAndEventType(any(), any())).thenReturn(true);
+        when(orderEventRepository.existsByOrderIdAndEventType(42L, OrderEventService.TYPE_DELIVERED)).thenReturn(false);
+
+        service.syncLifecycleEvents(order);
+
+        verify(orderMailService).sendOrderDelivered(order);
+        verify(orderSmsService).sendOrderDelivered(order);
+    }
+
+    @Test
+    void syncLifecycleEvents_delivered_smsStillRunsWhenEmailFails() {
+        CustomerOrder order = baseOrder().paymentStatus(PaymentStatus.PAID).ledgerlyOrderStatus("delivered");
+        when(orderEventRepository.existsByOrderIdAndEventType(any(), any())).thenReturn(true);
+        when(orderEventRepository.existsByOrderIdAndEventType(42L, OrderEventService.TYPE_DELIVERED)).thenReturn(false);
+        org.mockito.Mockito.doThrow(new RuntimeException("smtp down")).when(orderMailService).sendOrderDelivered(order);
+
+        service.syncLifecycleEvents(order);
+
+        verify(orderSmsService).sendOrderDelivered(order);
+    }
+
+    @Test
+    void syncLifecycleEvents_cancelled_smsStillRunsWhenEmailFails() {
+        CustomerOrder order = baseOrder().status(OrderStatus.CANCELLED).paymentStatus(PaymentStatus.PAID);
+        when(orderEventRepository.existsByOrderIdAndEventType(any(), any())).thenReturn(false);
+        org.mockito.Mockito.doThrow(new RuntimeException("smtp down")).when(orderMailService).sendOrderCancelled(order);
+
+        service.syncLifecycleEvents(order);
+
+        verify(orderSmsService).sendOrderCancelled(order);
+    }
+
+    @Test
     void syncLifecycleEvents_handWrapped_recordsCustomerVisibleEvent() {
         CustomerOrder order = baseOrder().status(OrderStatus.HAND_WRAPPED).paymentStatus(PaymentStatus.PAID);
         when(orderEventRepository.existsByOrderIdAndEventType(any(), any())).thenReturn(true);
@@ -128,6 +163,7 @@ class OrderEventServiceTest {
         service.onOrderCreated(order);
 
         verify(orderEventRepository).save(any());
+        verify(orderSmsService).sendOrderConfirmation(order);
     }
 
     @Test

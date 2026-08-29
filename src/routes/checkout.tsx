@@ -424,6 +424,10 @@ function Checkout() {
 
   const place = async () => {
     if (cart.length === 0) return;
+    if (cartTotal <= 0 || grand <= 0) {
+      toast.warning("Your cart amount must be greater than zero to place an order.");
+      return;
+    }
     const detailsError = validateDetailsStep();
     if (detailsError) { setStep(0); return toast.error(detailsError); }
     const shippingError = validateShippingStep();

@@ -9,7 +9,6 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useOrderTrackingPoll } from "@/hooks/useOrderTrackingPoll";
 import { toast } from "sonner";
 import { OrderTrackingCard } from "@/components/OrderTrackingCard";
-import { TrackingRefreshHint } from "@/components/TrackingRefreshHint";
 import { StorefrontPageHeader } from "@/components/StorefrontPageHeader";
 
 export const Route = createFileRoute("/track")({
@@ -27,7 +26,7 @@ function Track() {
     orderFromUrl ? orderFromUrl.toUpperCase() : null,
   );
   const settings = useSiteSettings();
-  const { order: trackedOrder, loading, error, lastUpdated, polling } = useOrderTrackingPoll(
+  const { order: trackedOrder, loading, error } = useOrderTrackingPoll(
     activeOrderNumber,
     "public",
   );
@@ -93,7 +92,6 @@ function Track() {
         {trackedOrder && (
           <>
             <OrderTrackingCard order={trackedOrder} />
-            <TrackingRefreshHint lastUpdated={lastUpdated} polling={polling} />
           </>
         )}
       </div>

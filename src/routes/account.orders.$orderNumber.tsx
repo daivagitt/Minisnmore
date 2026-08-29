@@ -12,6 +12,7 @@ import {
   type OrderReturnRow,
 } from "@/lib/orders.functions";
 import { openRazorpayCheckout } from "@/lib/razorpay";
+import { isInvoiceAvailable } from "@/lib/invoice-availability";
 import { formatOrderDate } from "@/lib/dates";
 import { formatOrderStatusSummary, formatPaymentStatusLabel } from "@/lib/order-status";
 import { useOrderTrackingPoll } from "@/hooks/useOrderTrackingPoll";
@@ -38,7 +39,6 @@ import { toast } from "sonner";
 import { LazyImage } from "@/components/LazyImage";
 import { CopyButton } from "@/components/CopyButton";
 import { OrderTrackingCard } from "@/components/OrderTrackingCard";
-import { TrackingRefreshHint } from "@/components/TrackingRefreshHint";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -90,7 +90,7 @@ function OrderDetail() {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const autoPayStarted = useRef(false);
-  const { order, loading, error, lastUpdated, polling, refresh } = useOrderTrackingPoll(
+  const { order, loading, error, refresh } = useOrderTrackingPoll(
     orderNumber,
     "authenticated",
   );
@@ -472,7 +472,6 @@ function OrderDetail() {
             <Truck className="h-5 w-5 text-primary shrink-0" /> Delivery tracking
           </h2>
           <OrderTrackingCard order={order} showHeader={false} />
-          <TrackingRefreshHint lastUpdated={lastUpdated} polling={polling} />
         </div>
       )}
 
@@ -645,7 +644,7 @@ function OrderDetail() {
               {order.coupon_code && (
                 <div className="text-xs text-primary mt-1">Coupon: {order.coupon_code}</div>
               )}
-              {order.order_number && (
+              {order.order_number && isInvoiceAvailable(order) && (
                 <Link
                   to="/account/orders/$orderNumber/invoice"
                   params={{ orderNumber: order.order_number }}

@@ -81,6 +81,16 @@ class OrderSmsServiceTest {
     }
 
     @Test
+    void sendOrderDelivered_isNoOpUntilDltTemplateRegistered() {
+        service.sendOrderDelivered(
+            new CustomerOrder()
+                .orderNumber("ORD-1")
+                .shippingAddressJson("{\"full_name\":\"Parthee\",\"phone\":\"9740199455\"}")
+        );
+        verify(fastSmsClient, never()).sendSms(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
     void sendOrderConfirmation_skipsWhenNoPhone() {
         when(fastSmsClient.isConfigured()).thenReturn(true);
         CustomerOrder order = new CustomerOrder().orderNumber("ORD-1").shippingAddressJson("{\"full_name\":\"Ada\"}");
