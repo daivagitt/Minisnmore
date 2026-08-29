@@ -2263,7 +2263,13 @@ public class ZohoSyncService {
                         StringUtils.isBlank(order.getZohoInvoiceId()) &&
                         StringUtils.isNotBlank(salesOrderId)
                     ) {
-                        Map<String, Object> invoiceResponse = booksClient.createInvoiceFromSalesOrder(salesOrderId);
+                        Map<String, Object> invoiceResponse;
+                        if (isCodOrder(order)) {
+                            confirmSalesOrder(salesOrderId);
+                            invoiceResponse = booksClient.createInvoice(buildCodInvoicePayload(order, customerId));
+                        } else {
+                            invoiceResponse = booksClient.createInvoiceFromSalesOrder(salesOrderId);
+                        }
                         @SuppressWarnings("unchecked")
                         Map<String, Object> invoice = (Map<String, Object>) invoiceResponse.getOrDefault("invoice", invoiceResponse);
                         String invoiceId = stringValue(invoice.get("invoice_id"));
@@ -2497,6 +2503,36 @@ public class ZohoSyncService {
         return payload;
     }
 
+    /**
+     * Creates the COD invoice independently from the sales order. Zoho's
+     * {@code /invoices/fromsalesorder} operation also marks the order lines fulfilled, even when no
+     * shipment exists. The shared order reference keeps the two records easy to reconcile without
+     * turning cash collection into a delivery event.
+     */
+    private Map<String, Object> buildCodInvoicePayload(CustomerOrder order, String customerId) {
+        Map<String, Object> payload = buildSalesOrderPayload(order, customerId, true, true);
+        payload.put("date", LocalDate.now(INDIA).toString());
+        payload.put("notes", "Payment method: Cash on Delivery (COD). Cash collected.");
+        Map<String, Object> address = buildZohoAddress(parseShippingAddress(order.getShippingAddressJson()));
+        if (address != null && !address.isEmpty()) {
+            payload.put("billing_address", address);
+            payload.put("shipping_address", address);
+        }
+        return payload;
+    }
+
+    private void confirmSalesOrder(String salesOrderId) {
+        Map<String, Object> response = booksClient.getSalesOrder(salesOrderId);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> salesOrder = response == null
+            ? Map.of()
+            : (Map<String, Object>) response.getOrDefault("salesorder", response);
+        String status = StringUtils.lowerCase(StringUtils.trimToEmpty(stringValue(salesOrder.get("status"))));
+        if (status.isEmpty() || "draft".equals(status)) {
+            booksClient.markSalesOrderAsOpen(salesOrderId);
+        }
+    }
+
     private void applySalesOrderAddresses(String salesOrderId, CustomerOrder order) {
         if (StringUtils.isBlank(salesOrderId)) {
             return;
@@ -2662,15 +2698,9 @@ public class ZohoSyncService {
         return "cod".equalsIgnoreCase(StringUtils.trimToEmpty(order.getPaymentMethod()));
     }
 
-    /**
-     * Converting a Zoho sales order to an invoice marks all its lines as fulfilled. For COD orders,
-     * neither placing the order nor recording cash collection proves that the parcel was delivered.
-     * Delay the invoice until the order has independently reached the delivered state; only then can
-     * the cash payment be applied without manufacturing a fulfillment event in Zoho.
-     */
+    /** Cash collection makes a COD order invoiceable; its standalone invoice does not imply delivery. */
     private static boolean shouldCreateInvoice(CustomerOrder order) {
-        return !isCodOrder(order) ||
-            (order.getPaymentStatus() == PaymentStatus.PAID && order.getStatus() == OrderStatus.FULFILLED);
+        return !isCodOrder(order) || order.getPaymentStatus() == PaymentStatus.PAID;
     }
 
     private static BigDecimal moneyOrZero(BigDecimal value) {
@@ -3036,12 +3066,6 @@ public class ZohoSyncService {
                     }
                     order.setZohoTrackingLastPulledAt(Instant.now());
                     customerOrderRepository.save(order);
-                    // COD collection and delivery are separate events. Once Zoho independently
-                    // reports delivery, finish the deferred invoice/payment accounting. Calling
-                    // syncOrder before that point would itself manufacture Zoho's fulfilled flag.
-                    if (shouldCreateInvoice(order) && StringUtils.isBlank(order.getZohoInvoiceId())) {
-                        syncOrder(orderId);
-                    }
                 } catch (Exception e) {
                     LOG.warn("Zoho order tracking pull failed for {}: {}", orderId, e.getMessage());
                 }

@@ -798,7 +798,8 @@ class ZohoSyncServiceTest {
 
         when(customerOrderRepository.findById(112L)).thenReturn(Optional.of(order));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
-        when(booksClient.createInvoiceFromSalesOrder("so-cod-collected"))
+        when(booksClient.getSalesOrder("so-cod-collected")).thenReturn(Map.of("salesorder", Map.of("status", "draft")));
+        when(booksClient.createInvoice(any()))
             .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-cod-collected")));
         when(booksClient.getInvoice("inv-cod-collected"))
             .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-cod-collected", "status", "sent", "balance", 1148)));
@@ -807,7 +808,9 @@ class ZohoSyncServiceTest {
         service.syncOrder(112L);
 
         assertThat(order.getZohoInvoiceId()).isEqualTo("inv-cod-collected");
-        verify(booksClient).createInvoiceFromSalesOrder("so-cod-collected");
+        verify(booksClient).markSalesOrderAsOpen("so-cod-collected");
+        verify(booksClient).createInvoice(argThat(payload -> "MNM-COD-COLLECTED".equals(payload.get("reference_number"))));
+        verify(booksClient, never()).createInvoiceFromSalesOrder(any());
         verify(booksClient).createCustomerPayment(
             argThat(payload -> {
                 Object invoices = payload.get("invoices");
@@ -820,7 +823,7 @@ class ZohoSyncServiceTest {
     }
 
     @Test
-    void syncOrder_codCollectedBeforeDelivery_doesNotCreateInvoiceOrFulfillment() {
+    void syncOrder_codCollectedBeforeDelivery_confirmsSalesOrderAndCreatesStandaloneInvoice() {
         CustomerOrder order = new CustomerOrder()
             .id(113L)
             .orderNumber("MNM-COD-COLLECTED-EARLY")
@@ -833,12 +836,25 @@ class ZohoSyncServiceTest {
 
         when(customerOrderRepository.findById(113L)).thenReturn(Optional.of(order));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(booksClient.getSalesOrder("so-cod-collected-early"))
+            .thenReturn(Map.of("salesorder", Map.of("status", "draft")));
+        when(booksClient.createInvoice(any())).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-cod-collected-early")));
+        when(booksClient.getInvoice("inv-cod-collected-early"))
+            .thenReturn(Map.of("invoice", Map.of("status", "sent", "balance", 1148)));
+        when(booksClient.createCustomerPayment(any())).thenReturn(Map.of("payment", Map.of("payment_id", "pay-cod-collected-early")));
 
         service.syncOrder(113L);
 
-        assertThat(order.getZohoInvoiceId()).isNull();
+        assertThat(order.getZohoInvoiceId()).isEqualTo("inv-cod-collected-early");
+        verify(booksClient).markSalesOrderAsOpen("so-cod-collected-early");
+        verify(booksClient).createInvoice(
+            argThat(payload ->
+                "MNM-COD-COLLECTED-EARLY".equals(payload.get("reference_number")) &&
+                String.valueOf(payload.get("notes")).contains("Cash collected")
+            )
+        );
         verify(booksClient, never()).createInvoiceFromSalesOrder(any());
-        verify(booksClient, never()).createCustomerPayment(any());
+        verify(booksClient).createCustomerPayment(any());
     }
 
     @Test
@@ -1142,7 +1158,7 @@ class ZohoSyncServiceTest {
     }
 
     @Test
-    void pullOrderTracking_deliveredPaidCod_createsDeferredInvoiceAndPayment() {
+    void pullOrderTracking_deliveredPaidCod_doesNotCreateAccountingRecords() {
         CustomerOrder order = new CustomerOrder()
             .id(41303L)
             .orderNumber("MNM-COD-DELIVERED")
@@ -1156,19 +1172,13 @@ class ZohoSyncServiceTest {
         when(booksClient.getSalesOrder("so-cod-delivered"))
             .thenReturn(Map.of("salesorder", Map.of("status", "fulfilled", "shipment_date", "2026-08-29")));
         when(booksClient.listDeliveryChallans("so-cod-delivered")).thenReturn(List.of());
-        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
-        when(booksClient.createInvoiceFromSalesOrder("so-cod-delivered"))
-            .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-cod-delivered")));
-        when(booksClient.getInvoice("inv-cod-delivered"))
-            .thenReturn(Map.of("invoice", Map.of("status", "sent", "balance", 1148)));
-        when(booksClient.createCustomerPayment(any())).thenReturn(Map.of("payment", Map.of("payment_id", "pay-cod-delivered")));
 
         service.pullOrderTracking(41303L);
 
         assertThat(order.getStatus()).isEqualTo(com.miniandmore.app.domain.enumeration.OrderStatus.FULFILLED);
-        assertThat(order.getZohoInvoiceId()).isEqualTo("inv-cod-delivered");
-        verify(booksClient).createInvoiceFromSalesOrder("so-cod-delivered");
-        verify(booksClient).createCustomerPayment(any());
+        assertThat(order.getZohoInvoiceId()).isNull();
+        verify(booksClient, never()).createInvoice(any());
+        verify(booksClient, never()).createCustomerPayment(any());
     }
 
     @Test
