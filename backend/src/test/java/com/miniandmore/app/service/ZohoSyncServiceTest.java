@@ -780,6 +780,7 @@ class ZohoSyncServiceTest {
         List<Map<String, Object>> lines = (List<Map<String, Object>>) payload.get("line_items");
         assertThat(lines).anyMatch(salesLine -> "COD handling fee".equals(salesLine.get("name")));
         assertThat(order.getZohoInvoiceId()).isNull();
+        verify(booksClient).markSalesOrderAsOpen("so-cod");
         verify(booksClient, never()).createInvoiceFromSalesOrder(any());
         verify(booksClient, never()).createCustomerPayment(any());
     }

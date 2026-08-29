@@ -306,6 +306,10 @@ public class ZohoBooksClient {
         return post("/salesorders?" + orgIdParam(), payload);
     }
 
+    public Map<String, Object> markSalesOrderAsOpen(String salesOrderId) {
+        return post("/salesorders/" + salesOrderId + "/status/open?" + orgIdParam(), Map.of());
+    }
+
     public Map<String, Object> createInvoiceFromSalesOrder(String salesOrderId) {
         return post("/invoices/fromsalesorder?" + orgIdParam() + "&salesorder_id=" + salesOrderId, Map.of());
     }

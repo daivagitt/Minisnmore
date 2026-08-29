@@ -2258,6 +2258,9 @@ public class ZohoSyncService {
                         order.setZohoSalesOrderId(salesOrderId);
                         applySalesOrderAddresses(salesOrderId, order);
                     }
+                    if (isUnpaidCodOrder(order) && StringUtils.isNotBlank(salesOrderId)) {
+                        booksClient.markSalesOrderAsOpen(salesOrderId);
+                    }
                     if (
                         shouldCreateInvoice(order) &&
                         StringUtils.isBlank(order.getZohoInvoiceId()) &&
@@ -2670,6 +2673,10 @@ public class ZohoSyncService {
      */
     private static boolean shouldCreateInvoice(CustomerOrder order) {
         return !isCodOrder(order) || order.getPaymentStatus() == PaymentStatus.PAID;
+    }
+
+    private static boolean isUnpaidCodOrder(CustomerOrder order) {
+        return isCodOrder(order) && order.getPaymentStatus() != PaymentStatus.PAID;
     }
 
     private static BigDecimal moneyOrZero(BigDecimal value) {
