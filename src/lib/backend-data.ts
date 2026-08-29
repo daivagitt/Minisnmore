@@ -1045,7 +1045,6 @@ const siteStringMap: Record<string, string> = {
   invoice_dispatch_from_address: "invoiceDispatchFromAddress",
   invoice_registered_office_address: "invoiceRegisteredOfficeAddress",
   invoice_cin: "invoiceCin",
-  invoice_qr_url: "invoiceQrUrl",
   invoice_footer_note: "invoiceFooterNote",
   invoice_seller_state: "invoiceSellerState",
   contact_email: "contactEmail",

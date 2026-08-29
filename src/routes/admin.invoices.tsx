@@ -25,7 +25,6 @@ const DEFAULTS: SiteSettingsRow = {
   invoice_dispatch_from_address: "",
   invoice_registered_office_address: "",
   invoice_cin: "",
-  invoice_qr_url: "",
   invoice_footer_note: "",
   invoice_seller_state: "Karnataka",
   logo_url: "",
@@ -134,7 +133,7 @@ function AdminInvoicesPage() {
     <AdminPage
       eyebrow="Sales"
       title="Invoices"
-      description="Configure the identity and legal details printed on custom invoices. The preview keeps the store's existing tax and round-off calculations."
+      description="Configure the identity and legal details printed on custom invoices. A unique QR code linking to the matching order is generated automatically."
       action={
         <button
           type="button"
@@ -192,20 +191,6 @@ function AdminInvoicesPage() {
                   onChange={(invoice_seller_state) =>
                     setRow((current) => ({ ...current, invoice_seller_state }))
                   }
-                />
-                <ImageUploadField
-                  label="Invoice QR image"
-                  folder="branding"
-                  spec={{
-                    ratio: "1 : 1",
-                    recommendedPx: "400 × 400 px",
-                    notes: "Upload a square QR image. It prints in the invoice header.",
-                  }}
-                  value={String(row.invoice_qr_url ?? "")}
-                  onChange={(invoice_qr_url) =>
-                    setRow((current) => ({ ...current, invoice_qr_url }))
-                  }
-                  previewClassName="h-20 w-20 rounded-lg bg-white object-contain p-1 shrink-0"
                 />
               </div>
 

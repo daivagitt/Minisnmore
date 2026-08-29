@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { PortraitInvoiceDocument } from "@/components/PortraitInvoiceDocument";
 
 describe("PortraitInvoiceDocument", () => {
-  it("renders backend invoice settings and the existing calculation table on one A4 document", () => {
+  it("renders backend invoice settings, an order QR link and the calculation table", () => {
     const { container } = render(
       <PortraitInvoiceDocument
         order={{
@@ -65,5 +65,12 @@ describe("PortraitInvoiceDocument", () => {
     expect(invoice).toHaveTextContent("Total IGST Amount");
     expect(invoice).toHaveTextContent("Grand Total (Inclusive of all taxes)");
     expect(container.querySelectorAll("article.invoice-document")).toHaveLength(1);
+
+    const qrLink = container.querySelector('a[aria-label="View order MNM-1001"]');
+    expect(qrLink).toHaveAttribute(
+      "href",
+      "https://www.minisnmore.example/account/orders/MNM-1001",
+    );
+    expect(qrLink?.querySelector("svg")).toBeTruthy();
   });
 });

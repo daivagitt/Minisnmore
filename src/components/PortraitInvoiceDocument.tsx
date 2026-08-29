@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { InvoiceOrderQr } from "@/components/InvoiceOrderQr";
 import { buildInvoiceBreakdown, type InvoiceOrder } from "@/lib/invoice-breakdown";
 import { DEFAULT_SELLER_STATE, formatPlaceOfSupply } from "@/lib/india-states";
 
@@ -16,7 +17,6 @@ export type InvoiceBrandSettings = {
   invoice_dispatch_from_address?: string | null;
   invoice_registered_office_address?: string | null;
   invoice_cin?: string | null;
-  invoice_qr_url?: string | null;
   invoice_footer_note?: string | null;
   invoice_seller_state?: string | null;
   gst_rate?: number | null;
@@ -105,14 +105,11 @@ export function PortraitInvoiceDocument({
         <h1 className="pt-0.5 text-center text-[15px] font-bold uppercase tracking-wide">
           Tax Invoice
         </h1>
-        <div className="flex min-h-16 justify-end">
-          {settings.invoice_qr_url?.trim() ? (
-            <img
-              src={settings.invoice_qr_url}
-              alt="Invoice QR code"
-              className="h-16 w-16 object-contain"
-            />
-          ) : null}
+        <div className="flex min-h-20 flex-col items-end justify-start">
+          <InvoiceOrderQr
+            orderNumber={order.order_number}
+            invoiceWebsite={settings.invoice_website}
+          />
         </div>
       </header>
 

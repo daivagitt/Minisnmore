@@ -51,7 +51,7 @@ const flatNavItems = navGroups.flatMap((g) => g.items);
 function AccountLayout() {
   const { user, loading, signOut } = useAuth();
   const nav = useNavigate();
-  const { pathname } = useLocation();
+  const { href, pathname } = useLocation();
   const isActivationRedirect = pathname === "/account/activate";
   const isPasswordResetRedirect = pathname === "/account/reset/finish";
   const isOrderDetail =
@@ -59,8 +59,8 @@ function AccountLayout() {
 
   useEffect(() => {
     if (isActivationRedirect || isPasswordResetRedirect) return;
-    if (!loading && !user) nav({ to: "/login", search: { redirect: "/account" } });
-  }, [user, loading, nav, isActivationRedirect, isPasswordResetRedirect]);
+    if (!loading && !user) nav({ to: "/login", search: { redirect: href } });
+  }, [user, loading, nav, href, isActivationRedirect, isPasswordResetRedirect]);
 
   return (
     <AccountDataProvider>

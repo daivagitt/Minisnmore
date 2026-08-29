@@ -4,6 +4,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { oauthCallbackErrorMessage } from "@/lib/auth-errors";
+import { resolveInternalSitePath } from "@/lib/internal-links";
 
 const Search = z.object({
   token: z.string().optional(),
@@ -47,10 +48,10 @@ function AuthCallback() {
         navigate({ to: "/login", search: { error: message }, replace: true });
         return;
       }
-      const redirect =
+      const requestedRedirect =
         search.redirect || window.sessionStorage.getItem("mnm_oauth_redirect") || "/account";
       window.sessionStorage.removeItem("mnm_oauth_redirect");
-      navigate({ to: redirect, replace: true });
+      navigate({ to: resolveInternalSitePath(requestedRedirect, "/account"), replace: true });
     });
   }, [completeOAuthSignIn, navigate, search.error, search.redirect, search.token]);
 

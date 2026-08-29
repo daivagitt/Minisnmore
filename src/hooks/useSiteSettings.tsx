@@ -13,7 +13,6 @@ export type SiteSettings = {
   invoice_dispatch_from_address: string | null;
   invoice_registered_office_address: string | null;
   invoice_cin: string | null;
-  invoice_qr_url: string | null;
   invoice_footer_note: string | null;
   invoice_seller_state: string | null;
   contact_email: string | null;
@@ -69,7 +68,6 @@ const DEFAULTS: SiteSettings = {
   invoice_dispatch_from_address: null,
   invoice_registered_office_address: null,
   invoice_cin: null,
-  invoice_qr_url: null,
   invoice_footer_note: null,
   invoice_seller_state: null,
   contact_email: "care@minisnmore.com",

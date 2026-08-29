@@ -197,6 +197,29 @@ describe("login route", () => {
     await waitFor(() => expect(authMock.signInWithOAuth).toHaveBeenCalledWith("google", "/account"));
   });
 
+  it("starts Google OAuth with the search redirect target", async () => {
+    searchMock.redirect = "/account/orders/MNM-1001?pay=1";
+    authMock.signInWithOAuth.mockResolvedValueOnce({ error: null });
+    renderLogin();
+    await userEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
+    await waitFor(() =>
+      expect(authMock.signInWithOAuth).toHaveBeenCalledWith(
+        "google",
+        "/account/orders/MNM-1001?pay=1",
+      ),
+    );
+  });
+
+  it("falls back to the account page for an external redirect target", async () => {
+    searchMock.redirect = "https://evil.example/steal";
+    authMock.signInWithOAuth.mockResolvedValueOnce({ error: null });
+    renderLogin();
+    await userEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
+    await waitFor(() =>
+      expect(authMock.signInWithOAuth).toHaveBeenCalledWith("google", "/account"),
+    );
+  });
+
   it("starts Apple OAuth with the redirect target", async () => {
     authMock.signInWithOAuth.mockResolvedValueOnce({ error: null });
     renderLogin();

@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { oauthCallbackErrorMessage } from "@/lib/auth-errors";
 import { fullNameFieldError } from "@/lib/orders.functions";
 import { emailFieldError, passwordFieldError } from "@/lib/password-validation";
+import { resolveInternalSitePath } from "@/lib/internal-links";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Eye, EyeOff } from "lucide-react";
@@ -24,6 +25,7 @@ export function LoginPage() {
   const defaultAfterLogin = "/account";
   const nav = useNavigate();
   const search = useSearch({ from: "/login" });
+  const afterLogin = resolveInternalSitePath(search.redirect, defaultAfterLogin);
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
   const [fullName, setFullName] = useState("");
   const [fullNameError, setFullNameError] = useState<string | undefined>();
@@ -46,8 +48,8 @@ export function LoginPage() {
   const oauthErrorShown = useRef(false);
 
   useEffect(() => {
-    if (!loading && user) nav({ to: (search.redirect as any) || defaultAfterLogin });
-  }, [user, loading, nav, search.redirect, defaultAfterLogin]);
+    if (!loading && user) nav({ to: afterLogin as any });
+  }, [user, loading, nav, afterLogin]);
 
   useEffect(() => {
     if (!search.error || oauthErrorShown.current) return;
@@ -98,7 +100,7 @@ export function LoginPage() {
       setMode("signin");
       return;
     }
-    nav({ to: (search.redirect as any) || defaultAfterLogin });
+    nav({ to: afterLogin as any });
   };
 
   const onForgotSubmit = async (e: React.FormEvent) => {
@@ -140,7 +142,7 @@ export function LoginPage() {
 
   const startOAuth = async (provider: "google" | "apple" | "facebook", label: string) => {
     try {
-      const { error } = await signInWithOAuth(provider, "/account");
+      const { error } = await signInWithOAuth(provider, afterLogin);
       if (error) toast.error(error, { id: "oauth-error" });
     } catch (err) {
       if (import.meta.env.DEV) {
