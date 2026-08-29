@@ -365,13 +365,7 @@ export function Navbar() {
                     </button>
                   ) : null}
                 </div>
-              ) : (
-                <div className="px-3 py-3 text-xs text-muted-foreground">
-                  Try: <button type="button" onClick={() => setQ("muslin")} className="underline mx-1">muslin</button>·
-                  <button type="button" onClick={() => setQ("romper")} className="underline mx-1">romper</button>·
-                  <button type="button" onClick={() => setQ("newborn")} className="underline mx-1">newborn</button>
-                </div>
-              )}
+              ) : null}
             </motion.div>
           </motion.div>
         )}
