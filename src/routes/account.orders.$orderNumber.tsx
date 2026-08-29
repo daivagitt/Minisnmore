@@ -39,7 +39,6 @@ import { toast } from "sonner";
 import { LazyImage } from "@/components/LazyImage";
 import { CopyButton } from "@/components/CopyButton";
 import { OrderTrackingCard } from "@/components/OrderTrackingCard";
-import { TrackingRefreshHint } from "@/components/TrackingRefreshHint";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -91,7 +90,7 @@ function OrderDetail() {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const autoPayStarted = useRef(false);
-  const { order, loading, error, lastUpdated, polling, refresh } = useOrderTrackingPoll(
+  const { order, loading, error, refresh } = useOrderTrackingPoll(
     orderNumber,
     "authenticated",
   );
@@ -473,7 +472,6 @@ function OrderDetail() {
             <Truck className="h-5 w-5 text-primary shrink-0" /> Delivery tracking
           </h2>
           <OrderTrackingCard order={order} showHeader={false} />
-          <TrackingRefreshHint lastUpdated={lastUpdated} polling={polling} />
         </div>
       )}
 

@@ -4,7 +4,6 @@ import { Truck, Loader2, Search, Baby, Sparkles } from "lucide-react";
 import { useAccountData } from "@/lib/account";
 import { useOrderTrackingPoll } from "@/hooks/useOrderTrackingPoll";
 import { OrderTrackingCard } from "@/components/OrderTrackingCard";
-import { TrackingRefreshHint } from "@/components/TrackingRefreshHint";
 import heroBaby from "@/assets/hero-smiling-baby.jpg";
 
 export const Route = createFileRoute("/account/track")({
@@ -17,7 +16,7 @@ function TrackPage() {
   const [code, setCode] = useState("");
   const [activeOrderNumber, setActiveOrderNumber] = useState<string | null>(null);
 
-  const { order, loading, error, lastUpdated, polling } = useOrderTrackingPoll(
+  const { order, loading, error } = useOrderTrackingPoll(
     activeOrderNumber,
     "authenticated",
   );
@@ -99,7 +98,6 @@ function TrackPage() {
         {order && (
           <>
             <OrderTrackingCard order={order} />
-            <TrackingRefreshHint lastUpdated={lastUpdated} polling={polling} />
           </>
         )}
       </div>
