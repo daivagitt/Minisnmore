@@ -93,7 +93,7 @@ class OrderMailServiceTest {
     }
 
     @Test
-    void sendOutForDelivery_andCancel_andReturn_processTemplates() {
+    void lifecycleAndReturnEmails_processTheirTemplates() {
         CustomerOrder order = orderWithAddress().paymentMethod("online").trackingNumber("XB123").trackingCarrier("Xpressbees");
         when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
         when(templateEngine.process(anyString(), any(Context.class))).thenReturn("content");
@@ -101,6 +101,7 @@ class OrderMailServiceTest {
         when(orderItemRepository.findAllByOrderId(9L)).thenReturn(List.of());
 
         service.sendOutForDelivery(order);
+        service.sendOrderDelivered(order);
         service.sendOrderCancelled(order);
         OrderReturn requested = new OrderReturn();
         requested.setReturnNumber("RET-1");
@@ -109,6 +110,7 @@ class OrderMailServiceTest {
         service.sendReturnUpdate(order, requested);
 
         verify(templateEngine).process(eq("mail/orderOutForDeliveryEmail"), any(Context.class));
+        verify(templateEngine).process(eq("mail/orderDeliveredEmail"), any(Context.class));
         verify(templateEngine).process(eq("mail/orderCancelledEmail"), any(Context.class));
         verify(templateEngine).process(eq("mail/orderReturnEmail"), any(Context.class));
     }

@@ -63,6 +63,12 @@ public class OrderSmsService {
         LOG.debug("Skipping out-for-delivery SMS for '{}'; no DLT template configured", order != null ? order.getOrderNumber() : null);
     }
 
+    public void sendOrderDelivered(CustomerOrder order) {
+        // No DLT template registered yet (guide §4) — only order confirmation and cancellation
+        // template IDs exist today. Skip until FastSMS provides a delivered templateId.
+        LOG.debug("Skipping delivered SMS for '{}'; no DLT template configured", order != null ? order.getOrderNumber() : null);
+    }
+
     public void sendOrderCancelled(CustomerOrder order) {
         ApplicationProperties.FastSms.Templates templates = config.getTemplates();
         send(

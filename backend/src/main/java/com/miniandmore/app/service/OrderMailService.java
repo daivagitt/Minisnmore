@@ -74,6 +74,10 @@ public class OrderMailService {
         sendOrderTemplate(order, "mail/orderOutForDeliveryEmail", "email.order.shipped.title", Map.of());
     }
 
+    public void sendOrderDelivered(CustomerOrder order) {
+        sendOrderTemplate(order, "mail/orderDeliveredEmail", "email.order.delivered.title", Map.of());
+    }
+
     public void sendOrderCancelled(CustomerOrder order) {
         sendOrderTemplate(order, "mail/orderCancelledEmail", "email.order.cancel.title", Map.of());
     }
