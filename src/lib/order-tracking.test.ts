@@ -46,6 +46,13 @@ describe("order-tracking helpers", () => {
     expect(trackingActivityTitle({ tracking_status: "shipped" })).toBe("On the way");
     expect(trackingActivityTitle({ tracking_status: "delivered" })).toBe("Delivered");
     expect(trackingActivityTitle({ status: "cancelled" })).toBe("Order cancelled");
+    expect(
+      trackingActivityTitle({
+        status: "pending",
+        payment_status: "pending",
+        payment_method: "online",
+      }),
+    ).toBe("Payment pending");
   });
 
   it("shows hand-wrapped as current only after the backend transition", () => {
@@ -69,6 +76,15 @@ describe("order-tracking helpers", () => {
         created_at: "2026-08-01T10:00:00Z",
       }),
     ).toEqual({ prefix: "Ordered", value: "2026-08-01T10:00:00Z" });
+
+    expect(
+      trackingActivityDate({
+        status: "pending",
+        payment_status: "pending",
+        payment_method: "online",
+        created_at: "2026-08-01T10:00:00Z",
+      }),
+    ).toEqual({ prefix: "Payment pending", value: "2026-08-01T10:00:00Z" });
   });
 });
 

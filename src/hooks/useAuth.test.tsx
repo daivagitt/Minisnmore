@@ -314,10 +314,174 @@ describe("useAuth", () => {
         },
       },
     });
-    await expect(result.current.signInWithOAuth("facebook", "/account")).resolves.toEqual({
+    await expect(result.current.signInWithOAuth("google", "/account")).resolves.toEqual({
       error: "redirect blocked",
     });
+    await expect(result.current.signInWithOAuth("facebook", "/account")).resolves.toEqual({
+      error: "This sign-in option is not available right now.",
+    });
     Object.defineProperty(window, "location", { configurable: true, value: prevLocation });
+  });
+
+  it("bootstraps profile from pending signup data when a session loads", async () => {
+    sessionStorage.setItem(
+      "mnm_pending_profile",
+      JSON.stringify({ full_name: "New Parent", email: "parent@example.com" }),
+    );
+    localStorage.setItem("mnm_backend_jwt", "token-1");
+    apiMock.get.mockResolvedValue({
+      id: 1,
+      login: "parent@example.com",
+      email: "parent@example.com",
+      firstName: "Jane",
+      lastName: "Doe",
+      authorities: [],
+    });
+    apiMock.post.mockImplementation(async (path: string, body?: { full_name?: string; email?: string }) => {
+      if (path === "/api/v1/account/profile/bootstrap") return { ok: true };
+      if (path === "/api/authenticate") return { id_token: "token-1" };
+      return null;
+    });
+
+    renderAuth();
+    await waitFor(() =>
+      expect(apiMock.post).toHaveBeenCalledWith(
+        "/api/v1/account/profile/bootstrap",
+        { full_name: "New Parent", email: "parent@example.com" },
+        { auth: true },
+      ),
+    );
+    expect(sessionStorage.getItem("mnm_pending_profile")).toBeNull();
+  });
+
+  it("does not bootstrap administrator accounts as customers", async () => {
+    sessionStorage.setItem(
+      "mnm_pending_profile",
+      JSON.stringify({ full_name: "Store Admin", email: "admin@example.com" }),
+    );
+    localStorage.setItem("mnm_backend_jwt", "admin-token");
+    apiMock.get.mockResolvedValue({
+      id: 7,
+      login: "admin@example.com",
+      email: "admin@example.com",
+      firstName: "Store",
+      lastName: "Admin",
+      authorities: ["ROLE_ADMIN"],
+    });
+
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
+
+    expect(apiMock.post).not.toHaveBeenCalledWith(
+      "/api/v1/account/profile/bootstrap",
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(sessionStorage.getItem("mnm_pending_profile")).not.toBeNull();
+  });
+
+  it("deduplicates profile bootstrap while one request is in flight", async () => {
+    sessionStorage.setItem(
+      "mnm_pending_profile",
+      JSON.stringify({ full_name: "New Parent", email: "parent@example.com" }),
+    );
+    localStorage.setItem("mnm_backend_jwt", "token-1");
+    apiMock.get.mockResolvedValue({
+      id: 1,
+      login: "parent@example.com",
+      email: "parent@example.com",
+      authorities: [],
+    });
+    let finishBootstrap!: (value: { ok: boolean }) => void;
+    const bootstrap = new Promise<{ ok: boolean }>((resolve) => {
+      finishBootstrap = resolve;
+    });
+    apiMock.post.mockImplementation(async (path: string) => {
+      if (path === "/api/v1/account/profile/bootstrap") return bootstrap;
+      return null;
+    });
+
+    renderAuth();
+    await waitFor(() =>
+      expect(apiMock.post).toHaveBeenCalledWith(
+        "/api/v1/account/profile/bootstrap",
+        { full_name: "New Parent", email: "parent@example.com" },
+        { auth: true },
+      ),
+    );
+    await userEvent.click(screen.getByText("refresh"));
+    await waitFor(() => expect(apiMock.get).toHaveBeenCalledTimes(2));
+    expect(apiMock.post).toHaveBeenCalledTimes(1);
+
+    finishBootstrap({ ok: true });
+    await waitFor(() => expect(sessionStorage.getItem("mnm_pending_profile")).toBeNull());
+  });
+
+  it("retries profile bootstrap after a failed attempt on refresh", async () => {
+    sessionStorage.setItem(
+      "mnm_pending_profile",
+      JSON.stringify({ full_name: "New Parent", email: "parent@example.com" }),
+    );
+    localStorage.setItem("mnm_backend_jwt", "token-1");
+    apiMock.get.mockResolvedValue({
+      id: 1,
+      login: "parent@example.com",
+      email: "parent@example.com",
+      authorities: [],
+    });
+    apiMock.post.mockImplementation(async (path: string) => {
+      if (path === "/api/v1/account/profile/bootstrap") throw new Error("network down");
+      return null;
+    });
+
+    renderAuth();
+    await waitFor(() =>
+      expect(apiMock.post).toHaveBeenCalledWith(
+        "/api/v1/account/profile/bootstrap",
+        { full_name: "New Parent", email: "parent@example.com" },
+        { auth: true },
+      ),
+    );
+    expect(sessionStorage.getItem("mnm_pending_profile")).not.toBeNull();
+
+    apiMock.post.mockImplementation(async (path: string) => {
+      if (path === "/api/v1/account/profile/bootstrap") return { ok: true };
+      return null;
+    });
+
+    await userEvent.click(screen.getByText("refresh"));
+    await waitFor(() => expect(sessionStorage.getItem("mnm_pending_profile")).toBeNull());
+    expect(apiMock.post).toHaveBeenCalledTimes(2);
+  });
+
+  it("clears stale pending signup data and falls back to auth user names", async () => {
+    sessionStorage.setItem(
+      "mnm_pending_profile",
+      JSON.stringify({ full_name: "Other Parent", email: "other@example.com" }),
+    );
+    localStorage.setItem("mnm_backend_jwt", "token-1");
+    apiMock.get.mockResolvedValue({
+      id: 1,
+      login: "parent@example.com",
+      email: "parent@example.com",
+      firstName: "Jane",
+      lastName: "Doe",
+      authorities: [],
+    });
+    apiMock.post.mockImplementation(async (path: string) => {
+      if (path === "/api/v1/account/profile/bootstrap") return { ok: true };
+      return null;
+    });
+
+    renderAuth();
+    await waitFor(() =>
+      expect(apiMock.post).toHaveBeenCalledWith(
+        "/api/v1/account/profile/bootstrap",
+        { full_name: "Jane Doe", email: "parent@example.com" },
+        { auth: true },
+      ),
+    );
+    expect(sessionStorage.getItem("mnm_pending_profile")).toBeNull();
   });
 
   it("adds auth headers to server function requests made with Request objects", async () => {

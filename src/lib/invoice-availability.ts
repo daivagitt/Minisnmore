@@ -1,8 +1,8 @@
-export type InvoiceAvailabilityOrder = {
-  status?: string | null;
-};
+import { needsOnlinePayment, type OrderStatusFields } from "./order-status";
 
-/** Pending orders are only payment attempts, so they must not produce a tax invoice yet. */
+export type InvoiceAvailabilityOrder = OrderStatusFields;
+
+/** Unpaid online checkout attempts must not produce a tax invoice yet. */
 export function isInvoiceAvailable(order: InvoiceAvailabilityOrder): boolean {
-  return order.status?.trim().toLowerCase() !== "pending";
+  return !needsOnlinePayment(order);
 }

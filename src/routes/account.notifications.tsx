@@ -14,7 +14,7 @@ import {
   trackingActivityTitle,
   type OrderTrackingFields,
 } from "@/lib/order-tracking";
-import { formatPaymentStatusLabel } from "@/lib/order-status";
+import { formatPaymentStatusLabel, needsOnlinePayment } from "@/lib/order-status";
 
 export const Route = createFileRoute("/account/notifications")({
   head: () => ({ meta: [{ title: "Notifications · Mini's n More" }] }),
@@ -50,6 +50,8 @@ function datePrefixForEventType(eventType: string): string {
   switch (eventType) {
     case "order_placed":
       return "Ordered";
+    case "payment_pending":
+      return "Payment pending";
     case "payment_received":
       return "Paid";
     case "hand_wrapped":
@@ -67,13 +69,25 @@ function datePrefixForEventType(eventType: string): string {
   }
 }
 
-function eventToActivity(event: NotificationEvent): ActivityItem {
+function eventToActivity(
+  event: NotificationEvent,
+  orders?: Array<{
+    order_number?: string;
+    payment_status?: string;
+    payment_method?: string;
+    status?: string;
+  }>,
+): ActivityItem {
+  const order = orders?.find((o) => o.order_number === event.order_number);
+  const awaitingPayment =
+    event.event_type === "order_placed" && order != null && needsOnlinePayment(order);
+
   return {
     key: `${event.id}-${event.event_type}`,
-    icon: iconForEventType(event.event_type),
-    title: event.title,
+    icon: awaitingPayment || event.event_type === "payment_pending" ? CreditCard : iconForEventType(event.event_type),
+    title: awaitingPayment || event.event_type === "payment_pending" ? "Payment pending" : event.title,
     body: event.body,
-    datePrefix: datePrefixForEventType(event.event_type),
+    datePrefix: awaitingPayment ? "Payment pending" : datePrefixForEventType(event.event_type),
     dateValue: event.created_at,
   };
 }
@@ -155,7 +169,7 @@ function NotificationsPage() {
 
   const items = useMemo(() => {
     if (!prefs.orders) return [];
-    if (events && events.length > 0) return events.map(eventToActivity);
+    if (events && events.length > 0) return events.map((event) => eventToActivity(event, orders ?? undefined));
     if (events === null && orders) return buildOrderActivityFallback(orders);
     return [];
   }, [events, orders, prefs.orders]);

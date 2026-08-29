@@ -1,6 +1,7 @@
 package com.miniandmore.app.service;
 
 import com.miniandmore.app.domain.CustomerOrder;
+import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.OrderEvent;
 import com.miniandmore.app.repository.OrderEventRepository;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrderEventService {
 
     public static final String TYPE_ORDER_PLACED = "order_placed";
+    public static final String TYPE_PAYMENT_PENDING = "payment_pending";
     public static final String TYPE_PAYMENT_RECEIVED = "payment_received";
     public static final String TYPE_HAND_WRAPPED = "hand_wrapped";
     public static final String TYPE_SHIPPED = "shipped";
@@ -73,7 +75,22 @@ public class OrderEventService {
         if (order.getId() == null) {
             return;
         }
-        recordIfAbsent(order, TYPE_ORDER_PLACED, titleFor(TYPE_ORDER_PLACED), bodyFor(order, TYPE_ORDER_PLACED), placedAt(order));
+        if (isCod(order) || order.getPaymentStatus() == PaymentStatus.PAID) {
+            recordIfAbsent(order, TYPE_ORDER_PLACED, titleFor(TYPE_ORDER_PLACED), bodyFor(order, TYPE_ORDER_PLACED), placedAt(order));
+        } else if (
+            !isCod(order) &&
+            order.getPaymentStatus() == PaymentStatus.PENDING &&
+            order.getStatus() != OrderStatus.CANCELLED &&
+            !orderEventRepository.existsByOrderIdAndEventType(order.getId(), TYPE_ORDER_PLACED)
+        ) {
+            recordIfAbsent(
+                order,
+                TYPE_PAYMENT_PENDING,
+                titleFor(TYPE_PAYMENT_PENDING),
+                bodyFor(order, TYPE_PAYMENT_PENDING),
+                placedAt(order)
+            );
+        }
 
         if (order.getPaymentStatus() == PaymentStatus.PAID) {
             recordIfAbsent(
@@ -253,6 +270,8 @@ public class OrderEventService {
         switch (eventType) {
             case TYPE_ORDER_PLACED:
                 return "Order placed";
+            case TYPE_PAYMENT_PENDING:
+                return "Payment pending";
             case TYPE_PAYMENT_RECEIVED:
                 return "Payment received";
             case TYPE_HAND_WRAPPED:

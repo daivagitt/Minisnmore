@@ -185,6 +185,22 @@ export async function updateMyProfile(input: {
   );
 }
 
+const ProfileBootstrap = z.object({
+  full_name: FullNameSchema,
+  email: z.string().trim().email().max(160),
+});
+
+export async function bootstrapProfileFromSignup(input: {
+  data: z.infer<typeof ProfileBootstrap>;
+}): Promise<{ ok: boolean }> {
+  const parsed = ProfileBootstrap.parse(input.data);
+  return api.post(
+    "/api/v1/account/profile/bootstrap",
+    { full_name: parsed.full_name, email: parsed.email.toLowerCase() },
+    { auth: true },
+  );
+}
+
 export type OrderReturnRow = {
   id: number;
   return_number: string;

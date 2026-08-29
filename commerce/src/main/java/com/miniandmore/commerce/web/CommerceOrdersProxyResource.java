@@ -35,6 +35,11 @@ public class CommerceOrdersProxyResource {
         return catalog.put("/internal/v1/account/profile", body);
     }
 
+    @PostMapping("/account/profile/bootstrap")
+    public ResponseEntity<String> bootstrapProfile(@RequestBody Object body) {
+        return catalog.post("/internal/v1/account/profile/bootstrap", body);
+    }
+
     @GetMapping("/account/addresses")
     public ResponseEntity<String> listAddresses() {
         return catalog.get("/internal/v1/account/addresses");

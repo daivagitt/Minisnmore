@@ -10,6 +10,7 @@ import { LIST_PAGE_SIZE } from "@/lib/pagination";
 import { formatOrderDate } from "@/lib/dates";
 import {
   formatOrderStatusSummary,
+  needsOnlinePayment,
   PAYMENT_STATUS_TONE_CLASS,
   paymentStatusTone,
 } from "@/lib/order-status";
@@ -26,18 +27,6 @@ const ORDER_FILTERS = [
   { key: "pending", label: "Pending" },
   { key: "completed", label: "Completed" },
 ] as const;
-
-function needsOnlinePayment(order: {
-  payment_status?: string;
-  payment_method?: string;
-  status?: string;
-}) {
-  return (
-    order.payment_status === "pending" &&
-    order.payment_method !== "cod" &&
-    order.status !== "cancelled"
-  );
-}
 
 function OrdersPage() {
   const { orders, loadingOrders, refreshOrders } = useAccountData();

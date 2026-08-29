@@ -64,6 +64,7 @@ class CommerceOrdersProxyResourceTest {
         when(catalog.post(eq("/internal/v1/orders/verify-payment"), any())).thenReturn(ResponseEntity.ok("{}"));
         when(catalog.post(eq("/internal/v1/orders/sync-payment"), any())).thenReturn(ResponseEntity.ok("{}"));
         when(catalog.put(eq("/internal/v1/account/profile"), any())).thenReturn(ResponseEntity.ok("{}"));
+        when(catalog.post(eq("/internal/v1/account/profile/bootstrap"), any())).thenReturn(ResponseEntity.ok("{}"));
 
         mockMvc.perform(get("/api/v1/orders")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/payments")).andExpect(status().isOk());
@@ -82,6 +83,13 @@ class CommerceOrdersProxyResourceTest {
                 org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/account/profile")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{}")
+            )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(
+                post("/api/v1/account/profile/bootstrap")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"full_name\":\"Jane\",\"email\":\"j@example.com\"}")
             )
             .andExpect(status().isOk());
     }

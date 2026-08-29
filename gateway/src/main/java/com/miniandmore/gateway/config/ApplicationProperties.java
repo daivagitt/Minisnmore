@@ -1,5 +1,8 @@
 package com.miniandmore.gateway.config;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -31,6 +34,7 @@ public class ApplicationProperties {
     public static class OAuth2 {
 
         private String frontendCallbackUrl = "http://localhost:5173/auth/callback";
+        private List<String> enabledProviders = new ArrayList<>(List.of("google"));
 
         public String getFrontendCallbackUrl() {
             return frontendCallbackUrl;
@@ -38,6 +42,22 @@ public class ApplicationProperties {
 
         public void setFrontendCallbackUrl(String frontendCallbackUrl) {
             this.frontendCallbackUrl = frontendCallbackUrl;
+        }
+
+        public List<String> getEnabledProviders() {
+            return enabledProviders;
+        }
+
+        public void setEnabledProviders(List<String> enabledProviders) {
+            this.enabledProviders = enabledProviders == null ? new ArrayList<>() : new ArrayList<>(enabledProviders);
+        }
+
+        public boolean isProviderEnabled(String provider) {
+            if (provider == null || provider.isBlank()) {
+                return false;
+            }
+            String normalized = provider.trim().toLowerCase(Locale.ROOT);
+            return enabledProviders.stream().anyMatch(candidate -> candidate != null && candidate.trim().toLowerCase(Locale.ROOT).equals(normalized));
         }
     }
 }
