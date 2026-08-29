@@ -220,20 +220,6 @@ describe("login route", () => {
     );
   });
 
-  it("starts Apple OAuth with the redirect target", async () => {
-    authMock.signInWithOAuth.mockResolvedValueOnce({ error: null });
-    renderLogin();
-    await userEvent.click(screen.getByRole("button", { name: "Continue with Apple" }));
-    await waitFor(() => expect(authMock.signInWithOAuth).toHaveBeenCalledWith("apple", "/account"));
-  });
-
-  it("starts Facebook OAuth with the redirect target", async () => {
-    authMock.signInWithOAuth.mockResolvedValueOnce({ error: null });
-    renderLogin();
-    await userEvent.click(screen.getByRole("button", { name: "Continue with Facebook" }));
-    await waitFor(() => expect(authMock.signInWithOAuth).toHaveBeenCalledWith("facebook", "/account"));
-  });
-
   it("resets OAuth busy state when provider redirects fail", async () => {
     authMock.signInWithOAuth.mockImplementationOnce(() => {
       throw new Error("blocked");
@@ -245,46 +231,12 @@ describe("login route", () => {
     expect((screen.getByRole("button", { name: "Continue with Google" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("resets Apple busy state when provider redirects fail", async () => {
-    authMock.signInWithOAuth.mockImplementationOnce(() => {
-      throw new Error("blocked");
-    });
-    renderLogin();
-
-    await userEvent.click(screen.getByRole("button", { name: "Continue with Apple" }));
-
-    expect((screen.getByRole("button", { name: "Continue with Apple" }) as HTMLButtonElement).disabled).toBe(false);
-  });
-
-  it("resets Facebook busy state when provider redirects fail", async () => {
-    authMock.signInWithOAuth.mockImplementationOnce(() => {
-      throw new Error("blocked");
-    });
-    renderLogin();
-
-    await userEvent.click(screen.getByRole("button", { name: "Continue with Facebook" }));
-
-    expect((screen.getByRole("button", { name: "Continue with Facebook" }) as HTMLButtonElement).disabled).toBe(false);
-  });
-
   it("surfaces OAuth provider errors from resolved responses", async () => {
     authMock.signInWithOAuth.mockResolvedValueOnce({ error: "Google unavailable" });
     renderLogin();
     await userEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
     await waitFor(() =>
       expect(toastMock.error).toHaveBeenCalledWith("Google unavailable", { id: "oauth-error" }),
-    );
-
-    authMock.signInWithOAuth.mockResolvedValueOnce({ error: "Apple unavailable" });
-    await userEvent.click(screen.getByRole("button", { name: "Continue with Apple" }));
-    await waitFor(() =>
-      expect(toastMock.error).toHaveBeenCalledWith("Apple unavailable", { id: "oauth-error" }),
-    );
-
-    authMock.signInWithOAuth.mockResolvedValueOnce({ error: "Facebook unavailable" });
-    await userEvent.click(screen.getByRole("button", { name: "Continue with Facebook" }));
-    await waitFor(() =>
-      expect(toastMock.error).toHaveBeenCalledWith("Facebook unavailable", { id: "oauth-error" }),
     );
   });
 

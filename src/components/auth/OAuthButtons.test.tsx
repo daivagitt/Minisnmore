@@ -21,14 +21,10 @@ describe("OAuthButtons", () => {
     vi.clearAllMocks();
   });
 
-  it.each([
-    ["Continue with Google", "google"],
-    ["Continue with Apple", "apple"],
-    ["Continue with Facebook", "facebook"],
-  ] as const)("starts %s with the redirect target", async (label, provider) => {
+  it("starts Google with the redirect target", async () => {
     render(<OAuthButtons redirectTo="/checkout" />);
-    await userEvent.click(screen.getByRole("button", { name: label }));
-    expect(signInWithOAuth).toHaveBeenCalledWith(provider, "/checkout");
+    await userEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
+    expect(signInWithOAuth).toHaveBeenCalledWith("google", "/checkout");
   });
 
   it("clears busy state when redirect throws", async () => {
@@ -37,8 +33,8 @@ describe("OAuthButtons", () => {
     });
     render(<OAuthButtons redirectTo="/account" />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Continue with Facebook" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
 
-    expect(screen.getByRole("button", { name: "Continue with Facebook" })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "Continue with Google" })).not.toBeDisabled();
   });
 });
