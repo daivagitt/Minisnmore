@@ -2663,13 +2663,14 @@ public class ZohoSyncService {
     }
 
     /**
-     * Converting a Zoho sales order to an invoice marks all its lines as fulfilled. For unpaid
-     * COD orders that is an accounting side effect, not evidence that the parcel was delivered.
-     * Keep the sales order open until cash is collected; mark-cod-collected re-runs this sync and
-     * creates the invoice immediately before recording the cash payment.
+     * Converting a Zoho sales order to an invoice marks all its lines as fulfilled. For COD orders,
+     * neither placing the order nor recording cash collection proves that the parcel was delivered.
+     * Delay the invoice until the order has independently reached the delivered state; only then can
+     * the cash payment be applied without manufacturing a fulfillment event in Zoho.
      */
     private static boolean shouldCreateInvoice(CustomerOrder order) {
-        return !isCodOrder(order) || order.getPaymentStatus() == PaymentStatus.PAID;
+        return !isCodOrder(order) ||
+            (order.getPaymentStatus() == PaymentStatus.PAID && order.getStatus() == OrderStatus.FULFILLED);
     }
 
     private static BigDecimal moneyOrZero(BigDecimal value) {
@@ -3035,6 +3036,12 @@ public class ZohoSyncService {
                     }
                     order.setZohoTrackingLastPulledAt(Instant.now());
                     customerOrderRepository.save(order);
+                    // COD collection and delivery are separate events. Once Zoho independently
+                    // reports delivery, finish the deferred invoice/payment accounting. Calling
+                    // syncOrder before that point would itself manufacture Zoho's fulfilled flag.
+                    if (shouldCreateInvoice(order) && StringUtils.isBlank(order.getZohoInvoiceId())) {
+                        syncOrder(orderId);
+                    }
                 } catch (Exception e) {
                     LOG.warn("Zoho order tracking pull failed for {}: {}", orderId, e.getMessage());
                 }

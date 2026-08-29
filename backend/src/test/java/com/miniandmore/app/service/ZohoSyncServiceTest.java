@@ -820,6 +820,28 @@ class ZohoSyncServiceTest {
     }
 
     @Test
+    void syncOrder_codCollectedBeforeDelivery_doesNotCreateInvoiceOrFulfillment() {
+        CustomerOrder order = new CustomerOrder()
+            .id(113L)
+            .orderNumber("MNM-COD-COLLECTED-EARLY")
+            .userLogin("buyer@example.com")
+            .paymentMethod("cod")
+            .paymentStatus(com.miniandmore.app.domain.enumeration.PaymentStatus.PAID)
+            .status(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED)
+            .total(BigDecimal.valueOf(1148))
+            .zohoSalesOrderId("so-cod-collected-early");
+
+        when(customerOrderRepository.findById(113L)).thenReturn(Optional.of(order));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+
+        service.syncOrder(113L);
+
+        assertThat(order.getZohoInvoiceId()).isNull();
+        verify(booksClient, never()).createInvoiceFromSalesOrder(any());
+        verify(booksClient, never()).createCustomerPayment(any());
+    }
+
+    @Test
     void syncOrder_codCollected_recordsCashPaymentAgainstInvoice() {
         Product product = new Product().id(10L).sku("SKU-10").zohoItemId("zoho-item-10");
         OrderItem line = new OrderItem()
@@ -1117,6 +1139,36 @@ class ZohoSyncServiceTest {
 
         verify(booksClient).getSalesOrder("4063993000000110007");
         verify(customerOrderRepository).save(argThat(saved -> "2026-08-14".equals(saved.getShipmentDate()) && "DTDC".equals(saved.getTrackingCarrier())));
+    }
+
+    @Test
+    void pullOrderTracking_deliveredPaidCod_createsDeferredInvoiceAndPayment() {
+        CustomerOrder order = new CustomerOrder()
+            .id(41303L)
+            .orderNumber("MNM-COD-DELIVERED")
+            .userLogin("buyer@example.com")
+            .paymentMethod("cod")
+            .paymentStatus(com.miniandmore.app.domain.enumeration.PaymentStatus.PAID)
+            .status(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED)
+            .total(BigDecimal.valueOf(1148))
+            .zohoSalesOrderId("so-cod-delivered");
+        when(customerOrderRepository.findById(41303L)).thenReturn(Optional.of(order));
+        when(booksClient.getSalesOrder("so-cod-delivered"))
+            .thenReturn(Map.of("salesorder", Map.of("status", "fulfilled", "shipment_date", "2026-08-29")));
+        when(booksClient.listDeliveryChallans("so-cod-delivered")).thenReturn(List.of());
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(booksClient.createInvoiceFromSalesOrder("so-cod-delivered"))
+            .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-cod-delivered")));
+        when(booksClient.getInvoice("inv-cod-delivered"))
+            .thenReturn(Map.of("invoice", Map.of("status", "sent", "balance", 1148)));
+        when(booksClient.createCustomerPayment(any())).thenReturn(Map.of("payment", Map.of("payment_id", "pay-cod-delivered")));
+
+        service.pullOrderTracking(41303L);
+
+        assertThat(order.getStatus()).isEqualTo(com.miniandmore.app.domain.enumeration.OrderStatus.FULFILLED);
+        assertThat(order.getZohoInvoiceId()).isEqualTo("inv-cod-delivered");
+        verify(booksClient).createInvoiceFromSalesOrder("so-cod-delivered");
+        verify(booksClient).createCustomerPayment(any());
     }
 
     @Test
