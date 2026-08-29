@@ -798,8 +798,7 @@ class ZohoSyncServiceTest {
 
         when(customerOrderRepository.findById(112L)).thenReturn(Optional.of(order));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
-        when(booksClient.getSalesOrder("so-cod-collected")).thenReturn(Map.of("salesorder", Map.of("status", "draft")));
-        when(booksClient.createInvoice(any()))
+        when(booksClient.createInvoiceFromSalesOrder("so-cod-collected"))
             .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-cod-collected")));
         when(booksClient.getInvoice("inv-cod-collected"))
             .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-cod-collected", "status", "sent", "balance", 1148)));
@@ -808,9 +807,7 @@ class ZohoSyncServiceTest {
         service.syncOrder(112L);
 
         assertThat(order.getZohoInvoiceId()).isEqualTo("inv-cod-collected");
-        verify(booksClient).markSalesOrderAsOpen("so-cod-collected");
-        verify(booksClient).createInvoice(argThat(payload -> "MNM-COD-COLLECTED".equals(payload.get("reference_number"))));
-        verify(booksClient, never()).createInvoiceFromSalesOrder(any());
+        verify(booksClient).createInvoiceFromSalesOrder("so-cod-collected");
         verify(booksClient).createCustomerPayment(
             argThat(payload -> {
                 Object invoices = payload.get("invoices");
@@ -823,7 +820,7 @@ class ZohoSyncServiceTest {
     }
 
     @Test
-    void syncOrder_codCollectedBeforeDelivery_confirmsSalesOrderAndCreatesStandaloneInvoice() {
+    void syncOrder_codCollectedBeforeDelivery_convertsSalesOrderToInvoice() {
         CustomerOrder order = new CustomerOrder()
             .id(113L)
             .orderNumber("MNM-COD-COLLECTED-EARLY")
@@ -836,9 +833,8 @@ class ZohoSyncServiceTest {
 
         when(customerOrderRepository.findById(113L)).thenReturn(Optional.of(order));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
-        when(booksClient.getSalesOrder("so-cod-collected-early"))
-            .thenReturn(Map.of("salesorder", Map.of("status", "draft")));
-        when(booksClient.createInvoice(any())).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-cod-collected-early")));
+        when(booksClient.createInvoiceFromSalesOrder("so-cod-collected-early"))
+            .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-cod-collected-early")));
         when(booksClient.getInvoice("inv-cod-collected-early"))
             .thenReturn(Map.of("invoice", Map.of("status", "sent", "balance", 1148)));
         when(booksClient.createCustomerPayment(any())).thenReturn(Map.of("payment", Map.of("payment_id", "pay-cod-collected-early")));
@@ -846,14 +842,7 @@ class ZohoSyncServiceTest {
         service.syncOrder(113L);
 
         assertThat(order.getZohoInvoiceId()).isEqualTo("inv-cod-collected-early");
-        verify(booksClient).markSalesOrderAsOpen("so-cod-collected-early");
-        verify(booksClient).createInvoice(
-            argThat(payload ->
-                "MNM-COD-COLLECTED-EARLY".equals(payload.get("reference_number")) &&
-                String.valueOf(payload.get("notes")).contains("Cash collected")
-            )
-        );
-        verify(booksClient, never()).createInvoiceFromSalesOrder(any());
+        verify(booksClient).createInvoiceFromSalesOrder("so-cod-collected-early");
         verify(booksClient).createCustomerPayment(any());
     }
 
@@ -1177,7 +1166,7 @@ class ZohoSyncServiceTest {
 
         assertThat(order.getStatus()).isEqualTo(com.miniandmore.app.domain.enumeration.OrderStatus.FULFILLED);
         assertThat(order.getZohoInvoiceId()).isNull();
-        verify(booksClient, never()).createInvoice(any());
+        verify(booksClient, never()).createInvoiceFromSalesOrder(any());
         verify(booksClient, never()).createCustomerPayment(any());
     }
 

@@ -2263,13 +2263,7 @@ public class ZohoSyncService {
                         StringUtils.isBlank(order.getZohoInvoiceId()) &&
                         StringUtils.isNotBlank(salesOrderId)
                     ) {
-                        Map<String, Object> invoiceResponse;
-                        if (isCodOrder(order)) {
-                            confirmSalesOrder(salesOrderId);
-                            invoiceResponse = booksClient.createInvoice(buildCodInvoicePayload(order, customerId));
-                        } else {
-                            invoiceResponse = booksClient.createInvoiceFromSalesOrder(salesOrderId);
-                        }
+                        Map<String, Object> invoiceResponse = booksClient.createInvoiceFromSalesOrder(salesOrderId);
                         @SuppressWarnings("unchecked")
                         Map<String, Object> invoice = (Map<String, Object>) invoiceResponse.getOrDefault("invoice", invoiceResponse);
                         String invoiceId = stringValue(invoice.get("invoice_id"));
@@ -2503,36 +2497,6 @@ public class ZohoSyncService {
         return payload;
     }
 
-    /**
-     * Creates the COD invoice independently from the sales order. Zoho's
-     * {@code /invoices/fromsalesorder} operation also marks the order lines fulfilled, even when no
-     * shipment exists. The shared order reference keeps the two records easy to reconcile without
-     * turning cash collection into a delivery event.
-     */
-    private Map<String, Object> buildCodInvoicePayload(CustomerOrder order, String customerId) {
-        Map<String, Object> payload = buildSalesOrderPayload(order, customerId, true, true);
-        payload.put("date", LocalDate.now(INDIA).toString());
-        payload.put("notes", "Payment method: Cash on Delivery (COD). Cash collected.");
-        Map<String, Object> address = buildZohoAddress(parseShippingAddress(order.getShippingAddressJson()));
-        if (address != null && !address.isEmpty()) {
-            payload.put("billing_address", address);
-            payload.put("shipping_address", address);
-        }
-        return payload;
-    }
-
-    private void confirmSalesOrder(String salesOrderId) {
-        Map<String, Object> response = booksClient.getSalesOrder(salesOrderId);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> salesOrder = response == null
-            ? Map.of()
-            : (Map<String, Object>) response.getOrDefault("salesorder", response);
-        String status = StringUtils.lowerCase(StringUtils.trimToEmpty(stringValue(salesOrder.get("status"))));
-        if (status.isEmpty() || "draft".equals(status)) {
-            booksClient.markSalesOrderAsOpen(salesOrderId);
-        }
-    }
-
     private void applySalesOrderAddresses(String salesOrderId, CustomerOrder order) {
         if (StringUtils.isBlank(salesOrderId)) {
             return;
@@ -2698,7 +2662,7 @@ public class ZohoSyncService {
         return "cod".equalsIgnoreCase(StringUtils.trimToEmpty(order.getPaymentMethod()));
     }
 
-    /** Cash collection makes a COD order invoiceable; its standalone invoice does not imply delivery. */
+    /** Cash collection makes a COD order invoiceable through the same sales-order conversion used in production. */
     private static boolean shouldCreateInvoice(CustomerOrder order) {
         return !isCodOrder(order) || order.getPaymentStatus() == PaymentStatus.PAID;
     }
