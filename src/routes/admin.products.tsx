@@ -622,17 +622,13 @@ function ProductsPage() {
                     </div>
                     <div className="grid sm:grid-cols-3 gap-3">
                       <Field label="Units (UOM)">
-                        <select
+                        <input
                           className={inputCls()}
                           value={p.units ?? "ea"}
                           onChange={(e) => update(i, { units: e.target.value })}
-                        >
-                          <option value="ea">ea — each / piece</option>
-                          <option value="pc">pc — piece</option>
-                          <option value="set">set — set</option>
-                          <option value="pair">pair — pair</option>
-                          <option value="pack">pack — pack</option>
-                        </select>
+                          placeholder="e.g. pcs, set, pair, box"
+                          maxLength={20}
+                        />
                       </Field>
                     </div>
                     <div className="grid sm:grid-cols-2 gap-3">

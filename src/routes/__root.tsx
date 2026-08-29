@@ -77,12 +77,14 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isAdmin = pathname.startsWith("/admin");
+  const isCustomerInvoice = /^\/account\/orders\/[^/]+\/invoice$/.test(pathname);
+  const isInvoice = isCustomerInvoice || /^\/admin\/orders\/[^/]+\/invoice$/.test(pathname);
 
   return (
     <AuthProvider>
     <ShopProvider>
       <CatalogSync />
-      {!isAdmin && (
+      {!isAdmin && !isInvoice && (
         <>
           <Watermark />
           <ScrollProgress />
@@ -92,10 +94,10 @@ function RootComponent() {
           <Navbar />
         </>
       )}
-      <main className={isAdmin ? "relative z-10" : "relative z-10 pt-24 md:pt-28"}>
+      <main className={isAdmin || isInvoice ? "relative z-10" : "relative z-10 pt-24 md:pt-28"}>
         <Outlet />
       </main>
-      {!isAdmin && (
+      {!isAdmin && !isInvoice && (
         <>
           <Footer />
           <CartDrawer />

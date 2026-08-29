@@ -168,6 +168,7 @@ class ZohoSyncServiceTest {
             .zohoItemId("zoho-1")
             .stock(10)
             .price(BigDecimal.valueOf(499))
+            .units(" box ")
             .active(true);
         when(productRepository.findOneWithEagerRelationships(1L)).thenReturn(Optional.of(product));
         when(booksClient.updateItem(eq("zoho-1"), any())).thenReturn(Map.of("item", Map.of("item_id", "zoho-1")));
@@ -182,6 +183,7 @@ class ZohoSyncServiceTest {
                 !payload.containsKey("inventory_account_id") &&
                 !payload.containsKey("locations") &&
                 "Body Suit".equals(payload.get("name")) &&
+                "box".equals(payload.get("unit")) &&
                 BigDecimal.valueOf(499).equals(payload.get("rate"))
             )
         );
@@ -1094,6 +1096,8 @@ class ZohoSyncServiceTest {
                         "zoho-neg",
                         "name",
                         "Negative Stock Item",
+                        "unit",
+                        "dozen",
                         "rate",
                         199,
                         "stock_on_hand",
@@ -1113,6 +1117,8 @@ class ZohoSyncServiceTest {
                         "zoho-neg",
                         "name",
                         "Negative Stock Item",
+                        "unit",
+                        "dozen",
                         "rate",
                         199,
                         "stock_on_hand",
@@ -1130,7 +1136,9 @@ class ZohoSyncServiceTest {
 
         Map<String, Object> result = service.pullProducts();
 
-        verify(productRepository).save(argThat(product -> Integer.valueOf(0).equals(product.getStock())));
+        verify(productRepository).save(
+            argThat(product -> Integer.valueOf(0).equals(product.getStock()) && "dozen".equals(product.getUnits()))
+        );
         org.junit.jupiter.api.Assertions.assertEquals(1, result.get("success"));
     }
 
@@ -1338,6 +1346,7 @@ class ZohoSyncServiceTest {
                 {"sku":"HORIZON-M-NAVY","size":"M","color":"Navy","rate":959.20,"mrp":1199,"stock":4,"active":true}]
                 """
             )
+            .units("set")
             .active(true);
         when(productRepository.findOneWithEagerRelationships(20L)).thenReturn(Optional.of(product));
         when(booksClient.findItemBySku("HORIZON-S-NAVY")).thenReturn(null);
@@ -1360,6 +1369,7 @@ class ZohoSyncServiceTest {
                     "S".equals(payload.get("attribute_option_name1")) &&
                     "Color".equals(payload.get("attribute_name2")) &&
                     "Navy".equals(payload.get("attribute_option_name2")) &&
+                    "set".equals(payload.get("unit")) &&
                     !payload.containsKey("group_id")
             )
         );
@@ -1647,6 +1657,8 @@ class ZohoSyncServiceTest {
 
         Map<String, Object> small = groupedZohoItem("zoho-s", "HORIZON-S-NAVY", "S", "Navy", 799.20, 3);
         Map<String, Object> medium = groupedZohoItem("zoho-m", "HORIZON-M-NAVY", "M", "Navy", 959.20, 4);
+        small.put("unit", "bundle");
+        medium.put("unit", "bundle");
         when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
         when(booksClient.listItems(1)).thenReturn(List.of(small, medium));
         when(booksClient.listItems(2)).thenReturn(List.of());
@@ -1693,6 +1705,7 @@ class ZohoSyncServiceTest {
         assertThat(parent.getSku()).isEqualTo("HORIZON-SET-1");
         assertThat(parent.getVariantsJson()).contains("HORIZON-S-NAVY", "HORIZON-M-NAVY", "zoho-s", "zoho-m");
         assertThat(parent.getStock()).isEqualTo(7);
+        assertThat(parent.getUnits()).isEqualTo("bundle");
         assertThat(parent.getItemStructure()).isEqualTo("VARIANTS");
         assertThat(parent.getSizesJson()).contains("S", "M");
         assertThat(parent.getColorsJson()).contains("Navy");

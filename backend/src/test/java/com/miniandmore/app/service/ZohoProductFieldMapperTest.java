@@ -67,6 +67,10 @@ class ZohoProductFieldMapperTest {
             assertThat(entry.get("value")).isEqualTo("0");
         });
         assertThat(customFields).anySatisfy(entry -> {
+            assertThat(entry.get("customfield_id")).isEqualTo("4063993000000072092");
+            assertThat(entry.get("value")).isEqualTo("6");
+        });
+        assertThat(customFields).anySatisfy(entry -> {
             assertThat(entry.get("customfield_id")).isEqualTo("4063993000000072088");
             assertThat(entry.get("value")).isEqualTo("0-3 M, 3-6 M");
         });
@@ -156,6 +160,14 @@ class ZohoProductFieldMapperTest {
                 ),
                 Map.of(
                     "customfield_id",
+                    "4063993000000072092",
+                    "api_name",
+                    "cf__sb_60082852067_age_max",
+                    "value",
+                    "18"
+                ),
+                Map.of(
+                    "customfield_id",
                     "4063993000000072088",
                     "api_name",
                     "cf__sb_60082852067_sizes",
@@ -171,6 +183,7 @@ class ZohoProductFieldMapperTest {
         assertThat(product.getCompareAtPrice()).isEqualByComparingTo("888");
         assertThat(product.getFabricType()).isEqualTo("Fleece");
         assertThat(product.getAgeMinMonths()).isEqualTo(6);
+        assertThat(product.getAgeMaxMonths()).isEqualTo(18);
         assertThat(product.getSizesJson()).contains("S").contains("M");
     }
 

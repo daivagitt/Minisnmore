@@ -388,7 +388,7 @@ public class ZohoSyncService {
         BigDecimal sellingPrice = variantSupport.variantSellingPrice(row);
         payload.put("rate", sellingPrice);
         payload.put("product_type", "goods");
-        payload.put("unit", "pcs");
+        payload.put("unit", productUnit(product));
         putVariantAttributes(payload, product, row);
         if (inventoryAccountId.isPresent()) {
             payload.put("item_type", "inventory");
@@ -649,7 +649,7 @@ public class ZohoSyncService {
             : BigDecimal.ZERO;
         payload.put("rate", sellingPrice);
         payload.put("product_type", "goods");
-        payload.put("unit", "pcs");
+        payload.put("unit", productUnit(product));
         if (inventoryAccountId.isPresent()) {
             payload.put("item_type", "inventory");
             payload.put("inventory_account_id", inventoryAccountId.orElseThrow());
@@ -774,6 +774,10 @@ public class ZohoSyncService {
             : toBigDecimal(currentItem.get("rate"));
         payload.put("rate", rate);
         payload.put("product_type", "goods");
+        String currentUnit = StringUtils.trimToNull(stringValue(currentItem.get("unit")));
+        if (currentUnit != null) {
+            payload.put("unit", currentUnit);
+        }
         payload.put("item_type", "inventory");
         payload.put("inventory_account_id", inventoryAccountId.orElseThrow());
         if (locationId.isPresent()) {
@@ -1405,6 +1409,7 @@ public class ZohoSyncService {
         if (StringUtils.isNotBlank(name)) {
             product.setName(name.trim());
         }
+        applyPulledUnit(product, zohoItemPreview);
         Map<String, Object> zohoItem = zohoItemPreview;
         BigDecimal rate = blankToBigDecimal(zohoItem.get("rate"));
         if (rate != null && !variantSupport.isVariants(product)) {
@@ -1456,6 +1461,7 @@ public class ZohoSyncService {
             : null;
         String size = ZohoBooksItemAttributes.size(zohoItem);
         String color = ZohoBooksItemAttributes.color(zohoItem);
+        applyPulledUnit(product, zohoItem);
         if (
             (StringUtils.isBlank(size) || StringUtils.isBlank(color)) &&
             !variantSupport.variantHasSizeAndColor(product, variantSku)
@@ -1901,6 +1907,24 @@ public class ZohoSyncService {
             product.setDescription(null);
         } else {
             product.setDescription(rawDescription.trim());
+        }
+    }
+
+    private static String productUnit(Product product) {
+        String unit = product != null ? StringUtils.trimToNull(product.getUnits()) : null;
+        return unit != null ? unit : "pcs";
+    }
+
+    private void applyPulledUnit(Product product, Map<String, Object> zohoItem) {
+        if (product == null || zohoItem == null) {
+            return;
+        }
+        String unit = StringUtils.trimToNull(stringValue(zohoItem.get("unit")));
+        if (unit == null) {
+            unit = StringUtils.trimToNull(stringValue(zohoItem.get("units")));
+        }
+        if (unit != null) {
+            product.setUnits(unit);
         }
     }
 
