@@ -56,8 +56,6 @@ export function useOrderTrackingPoll(
   const [order, setOrder] = useState<TrackingOrder | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-
   const orderRef = useRef<TrackingOrder | null>(null);
   const inFlightRef = useRef(false);
   const activeNumberRef = useRef("");
@@ -82,7 +80,6 @@ export function useOrderTrackingPoll(
           setOrder(data);
           orderRef.current = data;
           setError(null);
-          setLastUpdated(new Date());
         } else {
           setOrder(null);
           orderRef.current = null;
@@ -118,7 +115,6 @@ export function useOrderTrackingPoll(
       orderRef.current = null;
       setError(null);
       setLoading(false);
-      setLastUpdated(null);
       return;
     }
 
@@ -183,7 +179,5 @@ export function useOrderTrackingPoll(
     order?.payment_status,
   ]);
 
-  const polling = shouldPollOrderTracking(order);
-
-  return { order, loading, error, lastUpdated, polling, refresh };
+  return { order, loading, error, refresh };
 }

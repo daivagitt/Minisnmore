@@ -26,7 +26,7 @@ export function InvoiceViewer({
       .then((loaded) => {
         if (!active) return;
         if (!isInvoiceAvailable(loaded)) {
-          setError("Invoice will be available once the order is confirmed.");
+          setError("Invoice will be available once the order is confirmed and payment is recorded.");
           return;
         }
         setOrder(loaded);

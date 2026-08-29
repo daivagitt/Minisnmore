@@ -1,8 +1,9 @@
-export type InvoiceAvailabilityOrder = {
-  status?: string | null;
-};
+import { isCodOrder, type OrderStatusFields } from "@/lib/order-status";
 
-/** Pending orders are only payment attempts, so they must not produce a tax invoice yet. */
-export function isInvoiceAvailable(order: InvoiceAvailabilityOrder): boolean {
-  return order.status?.trim().toLowerCase() !== "pending";
+/** Mirrors backend ZohoSyncService.shouldCreateInvoice plus pending-payment guard. */
+export function isInvoiceAvailable(order: OrderStatusFields): boolean {
+  const status = order.status?.trim().toLowerCase();
+  if (status === "pending") return false;
+  if (isCodOrder(order) && order.payment_status?.trim().toLowerCase() !== "paid") return false;
+  return true;
 }
