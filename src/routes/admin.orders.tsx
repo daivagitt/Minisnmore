@@ -23,6 +23,15 @@ export const Route = createFileRoute("/admin/orders")({ component: AdminOrdersPa
 
 type Period = "all" | "day" | "week";
 
+const ORDER_STATUS_FILTERS = [
+  { value: "", label: "All" },
+  { value: "pending", label: "Pending" },
+  { value: "confirmed", label: "Confirmed" },
+  { value: "hand_wrapped", label: "Hand-wrapped" },
+  { value: "fulfilled", label: "Delivered" },
+  { value: "cancelled", label: "Cancelled" },
+] as const;
+
 function localDateValue(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -309,20 +318,28 @@ function AdminOrdersPage() {
         </div>
       </div>
 
-      <div className="mb-5 flex flex-wrap items-end gap-3 rounded-2xl border border-border/70 bg-card/70 p-4">
-        <FilterSelect
-          label="Order status"
-          value={status}
-          onChange={setStatus}
-          options={[
-            { value: "", label: "All statuses" },
-            { value: "pending", label: "Pending" },
-            { value: "confirmed", label: "Confirmed" },
-            { value: "hand_wrapped", label: "Hand-wrapped" },
-            { value: "fulfilled", label: "Delivered" },
-            { value: "cancelled", label: "Cancelled" },
-          ]}
-        />
+      <div className="mb-5 rounded-2xl border border-border/70 bg-card/70 p-4">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Order status
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {ORDER_STATUS_FILTERS.map((option) => (
+            <button
+              key={option.value || "all"}
+              type="button"
+              onClick={() => setStatus(option.value)}
+              className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                status === option.value
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border hover:bg-muted/60"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-end gap-3">
         <FilterSelect
           label="Payment"
           value={paymentStatus}
@@ -376,6 +393,7 @@ function AdminOrdersPage() {
             <X className="h-4 w-4" /> Clear filters
           </button>
         )}
+        </div>
       </div>
 
       {!loading && rows.length > 0 && (

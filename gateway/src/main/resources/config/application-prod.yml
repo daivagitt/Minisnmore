@@ -42,6 +42,14 @@ spring:
         webflux:
           # Production VPS: static localhost routes (same layout as UAT). Replaces lb:// + Consul for edges.
           routes:
+            - id: miniandmore-ledgerly-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/ledgerly/webhooks
+            - id: miniandmore-zoho-stock-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/zoho/stock-webhook
             - id: miniandmore-ledgerly-api
               uri: http://127.0.0.1:8081
               predicates:

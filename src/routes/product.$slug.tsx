@@ -3,7 +3,8 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { Product } from "@/data/products";
 import { useProduct, useProducts, useProductsLoaded } from "@/hooks/useProducts";
 import { useShop } from "@/store/shop";
-import { Heart, Truck, Leaf, ChevronRight, Ruler, Plus, Minus, Share2, X, BadgeCheck, Banknote, RotateCcw } from "lucide-react";
+import { Heart, Truck, Leaf, ChevronRight, Ruler, Plus, Minus, Share2, Banknote, RotateCcw } from "lucide-react";
+import { ProductInfoSections } from "@/components/ProductInfoSections";
 import { toast } from "sonner";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductGallery } from "@/components/ProductGallery";
@@ -415,53 +416,7 @@ function ProductPage() {
         </div>
       </div>
 
-      <div className="glass-strong rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 md:p-5 space-y-3">
-        <details open className="glass rounded-2xl p-4 group">
-          <summary className="flex items-center justify-between cursor-pointer text-sm font-semibold list-none">
-            <span>Product Details</span>
-            <Plus className="h-4 w-4 text-muted-foreground group-open:hidden" />
-            <X className="h-4 w-4 text-muted-foreground hidden group-open:block" />
-          </summary>
-          {product.description ? (
-            <p className="mt-3 text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
-              {product.description}
-            </p>
-          ) : null}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {["100% Organic Cotton", "Pre-Washed", "Breathable"].map((tag) => (
-              <span key={tag} className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-3 py-1.5 text-xs font-medium">
-                <BadgeCheck className="h-3.5 w-3.5" /> {tag}
-              </span>
-            ))}
-          </div>
-        </details>
-
-        <details className="glass rounded-2xl p-4 group">
-          <summary className="flex items-center justify-between cursor-pointer text-sm font-semibold list-none">
-            <span>Key Features</span>
-            <Plus className="h-4 w-4 text-muted-foreground group-open:hidden" />
-            <X className="h-4 w-4 text-muted-foreground hidden group-open:block" />
-          </summary>
-          <ul className="mt-3 space-y-1.5 text-sm text-foreground/80 list-disc pl-5">
-            <li>100% Organic Cotton</li>
-          </ul>
-        </details>
-
-        <details className="glass rounded-2xl p-4 group">
-          <summary className="flex items-center justify-between cursor-pointer text-sm font-semibold list-none">
-            <span>Wash Care</span>
-            <Plus className="h-4 w-4 text-muted-foreground group-open:hidden" />
-            <X className="h-4 w-4 text-muted-foreground hidden group-open:block" />
-          </summary>
-          <ul className="mt-3 space-y-1.5 text-sm text-foreground/80 list-disc pl-5">
-            <li>Use cold or lukewarm water with a mild detergent.</li>
-            <li>Don&apos;t use harsh chemicals to maintain fabric integrity.</li>
-            <li>Opt for a gentle cycle or hand wash.</li>
-            <li>Don&apos;t iron directly on prints.</li>
-            <li>Avoid direct sunlight or high heat.</li>
-          </ul>
-        </details>
-      </div>
+      <ProductInfoSections product={product} />
 
       <section className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4 sm:mb-6">

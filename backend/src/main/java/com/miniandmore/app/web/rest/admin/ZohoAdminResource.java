@@ -192,6 +192,11 @@ public class ZohoAdminResource {
             .orElse(Map.of("id", id, "error", "not found"));
     }
 
+    @PostMapping("/sync-stock/{id}")
+    public Map<String, Object> syncStock(@PathVariable Long id) {
+        return syncService.syncProductStockOnly(id);
+    }
+
     @PostMapping("/pull-products")
     public Map<String, Object> pullProducts(@RequestParam(name = "full", defaultValue = "false") boolean full) {
         try {
@@ -206,6 +211,55 @@ public class ZohoAdminResource {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Could not reach Zoho. Check network access.", ex);
         }
     }
+
+    @PostMapping("/pull-products/{id}")
+    public Map<String, Object> pullProduct(@PathVariable Long id) {
+        try {
+            return syncService.pullProduct(id);
+        } catch (RestClientResponseException ex) {
+            int status = ex.getStatusCode().value();
+            String message = status == 429
+                ? "Zoho API rate limit reached. Retry once the limit resets."
+                : "Zoho product pull failed: HTTP " + status + ".";
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, message, ex);
+        } catch (ResourceAccessException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Could not reach Zoho. Check network access.", ex);
+        }
+    }
+
+    @PostMapping("/pull-products/{id}/variants")
+    public Map<String, Object> pullProductVariant(@PathVariable Long id, @RequestBody ZohoVariantPullRequest request) {
+        try {
+            return syncService.pullProductVariant(id, request == null ? null : request.sku(), request == null ? null : request.zohoItemId());
+        } catch (RestClientResponseException ex) {
+            int status = ex.getStatusCode().value();
+            String message = status == 429
+                ? "Zoho API rate limit reached. Retry once the limit resets."
+                : "Zoho variant pull failed: HTTP " + status + ".";
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, message, ex);
+        } catch (ResourceAccessException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Could not reach Zoho. Check network access.", ex);
+        }
+    }
+
+    public record ZohoVariantPullRequest(String sku, String zohoItemId) {}
+
+    @PostMapping("/pull-product")
+    public Map<String, Object> pullExternalProduct(@RequestBody ZohoItemPullRequest request) {
+        try {
+            return syncService.pullExternalProduct(request == null ? null : request.sku(), request == null ? null : request.zohoItemId());
+        } catch (RestClientResponseException ex) {
+            int status = ex.getStatusCode().value();
+            String message = status == 429
+                ? "Zoho API rate limit reached. Retry once the limit resets."
+                : "Zoho product pull failed: HTTP " + status + ".";
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, message, ex);
+        } catch (ResourceAccessException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Could not reach Zoho. Check network access.", ex);
+        }
+    }
+
+    public record ZohoItemPullRequest(String sku, String zohoItemId) {}
 
     @PostMapping("/pull-inventory")
     public Map<String, Object> pullInventory() {

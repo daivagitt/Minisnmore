@@ -88,9 +88,22 @@ class ZohoSyncServiceTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private ZohoSyncService service;
+    private ZohoBooksAccountResolver accountResolver;
+    private ZohoCatalogStockAdjuster stockAdjuster;
+    private ZohoStockReconcileService stockReconcileService;
 
     @BeforeEach
     void setUpZohoProperties() {
+        accountResolver = new ZohoBooksAccountResolver(booksClient, applicationProperties);
+        stockAdjuster = new ZohoCatalogStockAdjuster(booksClient, accountResolver);
+        stockReconcileService =
+            new ZohoStockReconcileService(
+                productRepository,
+                orderItemRepository,
+                variantSupport,
+                accountResolver,
+                stockAdjuster
+            );
         service =
             new ZohoSyncService(
                 booksClient,
@@ -106,7 +119,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
         ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
         zoho.setSyncProductStock(true);
@@ -268,7 +284,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
 
         Product product = new Product()
@@ -1187,6 +1206,80 @@ class ZohoSyncServiceTest {
     }
 
     @Test
+    void syncProductStockOnly_whenZohoAlreadyMatches_skipsAdjustment() {
+        ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
+        zoho.setSyncProductStock(true);
+        zoho.setInventoryAccountId("inv-acct-1");
+        zoho.setInventoryAdjustmentAccountId("adj-acct-1");
+        when(applicationProperties.getZoho()).thenReturn(zoho);
+
+        Product product = new Product()
+            .id(14L)
+            .sku("SKU-14")
+            .name("Hat")
+            .zohoItemId("zoho-14")
+            .stock(20)
+            .price(BigDecimal.valueOf(199))
+            .active(true);
+        when(productRepository.findOneWithEagerRelationships(14L)).thenReturn(Optional.of(product));
+        when(booksClient.getItem("zoho-14")).thenReturn(
+            Map.of("item", Map.of("item_id", "zoho-14", "item_type", "inventory", "stock_on_hand", 20, "rate", 199))
+        );
+
+        Map<String, Object> result = service.syncProductStockOnly(14L);
+
+        assertThat(result).containsEntry("ok", true);
+        verify(booksClient, never()).createInventoryAdjustment(any());
+    }
+
+    @Test
+    void syncOrder_afterInvoice_reconcilesStoreStockWhenZohoWasDoubleDeducted() {
+        ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
+        zoho.setSyncProductStock(true);
+        zoho.setInventoryAccountId("inv-acct-1");
+        zoho.setInventoryAdjustmentAccountId("adj-acct-1");
+        when(applicationProperties.getZoho()).thenReturn(zoho);
+
+        Product product = new Product().id(10L).sku("SKU-10").zohoItemId("zoho-item-10").stock(98).price(BigDecimal.valueOf(499));
+        OrderItem line = new OrderItem()
+            .productId("10")
+            .productName("Dress")
+            .qty(2)
+            .price(BigDecimal.valueOf(499));
+        CustomerOrder order = new CustomerOrder().id(100L).orderNumber("MNM-TEST-1").userLogin("buyer@example.com");
+        order.addItems(line);
+        line.setOrder(order);
+
+        when(customerOrderRepository.findById(100L)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(100L)).thenReturn(List.of(line));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-1")));
+        when(booksClient.createInvoiceFromSalesOrder("so-1")).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-1")));
+        when(productRepository.findById(10L)).thenReturn(Optional.of(product));
+        when(productRepository.findOneWithEagerRelationships(10L)).thenReturn(Optional.of(product));
+        when(booksClient.getItem("zoho-item-10")).thenReturn(
+            Map.of("item", Map.of("item_id", "zoho-item-10", "item_type", "inventory", "stock_on_hand", 96, "rate", 499))
+        );
+
+        service.syncOrder(100L);
+
+        verify(booksClient).markInvoiceAsSent("inv-1");
+        verify(booksClient).createInventoryAdjustment(
+            argThat(payload -> {
+                Object linesObj = payload.get("line_items");
+                if (!(linesObj instanceof List<?> lines) || lines.isEmpty()) {
+                    return false;
+                }
+                Object lineObj = lines.get(0);
+                if (!(lineObj instanceof Map<?, ?> adjustmentLine)) {
+                    return false;
+                }
+                return "zoho-item-10".equals(adjustmentLine.get("item_id")) && Integer.valueOf(2).equals(adjustmentLine.get("quantity_adjusted"));
+            })
+        );
+    }
+
+    @Test
     void syncProduct_update_enablesInventoryWhenZohoItemWasCreatedWithoutOpeningStock() {
         ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
         zoho.setSyncProductStock(true);
@@ -1556,7 +1649,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
         when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
         when(itemImageSync.isEnabled()).thenReturn(false);
@@ -1632,7 +1728,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
 
         Product product = new Product()
@@ -1698,7 +1797,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
         ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
         zoho.setSyncProductStock(true);
@@ -1751,7 +1853,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
 
         Product product = new Product()
@@ -1807,7 +1912,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
 
         Product parent = new Product()
@@ -1891,7 +1999,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
 
         Product product = new Product()
@@ -1957,7 +2068,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
 
         Map<String, Object> small = groupedZohoItem("zoho-s", "HORIZON-S-NAVY", "S", "Navy", 799.20, 3);
@@ -2034,7 +2148,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
 
         Map<String, Object> pink = groupedZohoItem("zoho-pink", "KEDAR-S-PINK", "S", "Pink", 799.20, 2);
@@ -2091,7 +2208,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
 
         Map<String, Object> small = booksVariantItem("zoho-s", "HORIZON-S-NAVY", "S", "Navy", 799.20, 3);
@@ -2151,7 +2271,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
 
         Map<String, Object> inactive = new java.util.LinkedHashMap<>(
@@ -2189,7 +2312,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
 
         Product parent = new Product()
@@ -2251,7 +2377,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
 
         Map<String, Object> unparseable = new java.util.LinkedHashMap<>();
@@ -2294,7 +2423,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
         Product linkedSimple = new Product().id(301L).sku("GONE").zohoItemId("zoho-gone").active(true);
         Product linkedVariants = new Product()
@@ -2351,7 +2483,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
         Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
         ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
@@ -2505,7 +2640,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
         Map<String, Object> listed = new java.util.LinkedHashMap<>();
         listed.put("item_id", "zoho-live");
@@ -2566,7 +2704,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
         Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
         ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
@@ -2756,7 +2897,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
         Product parent = new Product()
             .id(305L)
@@ -2883,6 +3027,628 @@ class ZohoSyncServiceTest {
         verify(productRepository, never()).save(any());
         verify(booksClient, never()).getItem("zoho-later");
         verify(booksClient, never()).listAllStatusItems(2);
+    }
+
+    @Test
+    void pullProduct_byZohoItemId_allowsRemoteSkuRename() {
+        Product product = new Product().id(700L).sku("OLD-SKU").name("Old Name").zohoItemId("zoho-700").active(true);
+        Map<String, Object> detail = Map.of(
+            "sku",
+            "NEW-SKU",
+            "item_id",
+            "zoho-700",
+            "name",
+            "New Name",
+            "status",
+            "active",
+            "rate",
+            499,
+            "stock_on_hand",
+            7
+        );
+        when(productRepository.findById(700L)).thenReturn(Optional.of(product));
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.getItem("zoho-700")).thenReturn(Map.of("item", detail));
+        when(productRepository.findOneByZohoItemId("zoho-700")).thenReturn(Optional.of(product));
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = service.pullProduct(700L);
+
+        assertThat(result.get("success")).isEqualTo(1);
+        assertThat(result.get("failed")).isEqualTo(0);
+        assertThat(product.getSku()).isEqualTo("NEW-SKU");
+        assertThat(product.getName()).isEqualTo("New Name");
+        assertThat(product.getStock()).isEqualTo(7);
+        verify(booksClient, never()).findItemBySku(any());
+        verify(productRepository, never()).findAllByZohoItemIdIsNotNull();
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullProduct_withoutZohoItemId_fallsBackToSkuLookup() {
+        Product product = new Product().id(701L).sku("SKU-701").name("Local Name").active(true);
+        Map<String, Object> listRow = Map.of("sku", "SKU-701", "item_id", "zoho-701", "name", "Remote Name");
+        Map<String, Object> detail = Map.of(
+            "sku",
+            "SKU-701",
+            "item_id",
+            "zoho-701",
+            "name",
+            "Remote Name",
+            "status",
+            "active",
+            "rate",
+            299,
+            "stock_on_hand",
+            3
+        );
+        when(productRepository.findById(701L)).thenReturn(Optional.of(product));
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.findItemBySku("SKU-701")).thenReturn(listRow);
+        when(booksClient.getItem("zoho-701")).thenReturn(Map.of("item", detail));
+        when(productRepository.findOneByZohoItemId("zoho-701")).thenReturn(Optional.empty());
+        when(productRepository.findOneBySku("SKU-701")).thenReturn(Optional.of(product));
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = service.pullProduct(701L);
+
+        assertThat(result.get("success")).isEqualTo(1);
+        assertThat(result.get("failed")).isEqualTo(0);
+        assertThat(product.getZohoItemId()).isEqualTo("zoho-701");
+        assertThat(product.getName()).isEqualTo("Remote Name");
+        assertThat(product.getStock()).isEqualTo(3);
+        verify(booksClient).findItemBySku("SKU-701");
+        verify(booksClient).getItem("zoho-701");
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullProduct_missingLocalProduct_returnsFailureWithoutCallingZoho() {
+        when(productRepository.findById(702L)).thenReturn(Optional.empty());
+
+        Map<String, Object> result = service.pullProduct(702L);
+
+        assertThat(result.get("success")).isEqualTo(0);
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(result.get("failures").toString()).contains("Product not found");
+        verify(booksClient, never()).getItem(any());
+        verify(booksClient, never()).findItemBySku(any());
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void pullProduct_withoutSkuOrZohoItemId_returnsValidationFailure() {
+        Product product = new Product().id(703L).name("No Identity").active(true);
+        when(productRepository.findById(703L)).thenReturn(Optional.of(product));
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(productRepository.findAll()).thenReturn(List.of());
+
+        Map<String, Object> result = service.pullProduct(703L);
+
+        assertThat(result.get("success")).isEqualTo(0);
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(result.get("failures").toString()).contains("Zoho item id or SKU is required");
+        verify(booksClient, never()).getItem(any());
+        verify(booksClient, never()).findItemBySku(any());
+        verify(productRepository, never()).save(any());
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullProduct_staleZohoItemId_fallsBackToSkuWithoutAdvancingCursor() {
+        ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(Instant.parse("2026-08-27T01:02:03Z"));
+        Product product = new Product().id(704L).sku("SKU-704").name("Local Name").zohoItemId("stale-704").active(true);
+        Map<String, Object> listRow = Map.of("sku", "SKU-704", "item_id", "zoho-704", "name", "Remote Name");
+        Map<String, Object> detail = Map.of(
+            "sku",
+            "SKU-704",
+            "item_id",
+            "zoho-704",
+            "name",
+            "Remote Name",
+            "status",
+            "active",
+            "rate",
+            399,
+            "stock_on_hand",
+            4
+        );
+        when(productRepository.findById(704L)).thenReturn(Optional.of(product));
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.getItem("stale-704"))
+            .thenThrow(new RestClientResponseException("Not found", 404, "Not Found", null, null, null));
+        when(booksClient.findItemBySku("SKU-704")).thenReturn(listRow);
+        when(booksClient.getItem("zoho-704")).thenReturn(Map.of("item", detail));
+        when(productRepository.findOneByZohoItemId("zoho-704")).thenReturn(Optional.empty());
+        when(productRepository.findOneBySku("SKU-704")).thenReturn(Optional.of(product));
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = service.pullProduct(704L);
+
+        assertThat(result.get("success")).isEqualTo(1);
+        assertThat(result.get("failed")).isEqualTo(0);
+        assertThat(result.get("notices").toString()).contains("retried by SKU");
+        assertThat(product.getZohoItemId()).isEqualTo("zoho-704");
+        assertThat(setting.getLastProductPullAt()).isEqualTo(Instant.parse("2026-08-27T01:02:03Z"));
+        verify(booksClient).getItem("stale-704");
+        verify(booksClient).findItemBySku("SKU-704");
+        verify(booksClient).getItem("zoho-704");
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullProduct_detailIdentityMismatch_doesNotSaveOrFallback() {
+        Product product = new Product().id(705L).sku("SKU-705").name("Local Name").zohoItemId("zoho-705").active(true);
+        Map<String, Object> wrongDetail = Map.of("sku", "SKU-705", "item_id", "other-705", "status", "active");
+        when(productRepository.findById(705L)).thenReturn(Optional.of(product));
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.getItem("zoho-705")).thenReturn(Map.of("item", wrongDetail));
+
+        Map<String, Object> result = service.pullProduct(705L);
+
+        assertThat(result.get("success")).isEqualTo(0);
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(result.get("failures").toString()).contains("identity mismatch");
+        verify(booksClient, never()).findItemBySku(any());
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void pullProduct_inactiveRemoteItem_deactivatesSimpleProduct() {
+        Product product = new Product().id(706L).sku("SKU-706").name("Local Name").zohoItemId("zoho-706").active(true);
+        Map<String, Object> inactive = Map.of("sku", "SKU-706", "item_id", "zoho-706", "status", "inactive");
+        when(productRepository.findById(706L)).thenReturn(Optional.of(product));
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.getItem("zoho-706")).thenReturn(Map.of("item", inactive));
+        when(productRepository.findOneByZohoItemId("zoho-706")).thenReturn(Optional.of(product));
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = service.pullProduct(706L);
+
+        assertThat(result.get("success")).isEqualTo(0);
+        assertThat(result.get("failed")).isEqualTo(0);
+        assertThat(result.get("notices").toString()).contains("Deactivated");
+        assertThat(product.getActive()).isFalse();
+        verify(productRepository).save(product);
+        verify(productRepository, never()).findAllByZohoItemIdIsNotNull();
+    }
+
+    @Test
+    void pullProduct_variantRows_recordsBadRowsAndContinuesWithValidRows() {
+        Product parent = new Product().id(707L).sku("PARENT-707").name("Parent").active(true).itemStructure("VARIANTS");
+        ProductVariantSupport.VariantRow missingIdentity = new ProductVariantSupport.VariantRow(
+            "row-1",
+            null,
+            "0-3 M",
+            "Aqua",
+            null,
+            null,
+            null,
+            0,
+            true,
+            null,
+            null,
+            null,
+            List.of()
+        );
+        ProductVariantSupport.VariantRow valid = new ProductVariantSupport.VariantRow(
+            "row-2",
+            "VAR-707-A",
+            "0-3 M",
+            "Aqua",
+            null,
+            null,
+            null,
+            0,
+            true,
+            null,
+            "zoho-var-707-a",
+            null,
+            List.of()
+        );
+        Map<String, Object> detail = Map.of(
+            "sku",
+            "VAR-707-A",
+            "item_id",
+            "zoho-var-707-a",
+            "name",
+            "Parent - Aqua - 0-3 M",
+            "status",
+            "active",
+            "attribute_name1",
+            "Size",
+            "attribute_option_name1",
+            "0-3 M",
+            "attribute_name2",
+            "Color",
+            "attribute_option_name2",
+            "Aqua",
+            "stock_on_hand",
+            5,
+            "rate",
+            499
+        );
+        when(productRepository.findById(707L)).thenReturn(Optional.of(parent));
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(productRepository.findAll()).thenReturn(List.of(parent));
+        when(variantSupport.isVariants(parent)).thenReturn(true);
+        when(variantSupport.parseProduct(parent)).thenReturn(List.of(missingIdentity, valid));
+        when(booksClient.getItem("zoho-var-707-a")).thenReturn(Map.of("item", detail));
+        when(variantSupport.findProductContainingVariantZohoItemId(any(), eq("zoho-var-707-a"))).thenReturn(Optional.of(parent));
+        when(
+            variantSupport.upsertPulledVariantFromZoho(
+                eq(parent),
+                eq("VAR-707-A"),
+                eq("0-3 M"),
+                eq("Aqua"),
+                any(),
+                any(),
+                eq(5),
+                eq("zoho-var-707-a"),
+                eq(true)
+            )
+        )
+            .thenReturn(true);
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = service.pullProduct(707L);
+
+        assertThat(result.get("success")).isEqualTo(1);
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(result.get("failures").toString()).contains("Zoho item id or SKU is required");
+        verify(booksClient).getItem("zoho-var-707-a");
+        verify(productRepository).save(parent);
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullProductVariant_groupsSingleZohoChildIntoSelectedParent() {
+        Product parent = new Product()
+            .id(708L)
+            .sku("PARENT-708")
+            .name("Selected Parent")
+            .active(true)
+            .itemStructure("VARIANTS")
+            .variantsJson("[]");
+        Map<String, Object> detail = Map.ofEntries(
+            Map.entry("sku", "PARENT-708-0-3-AQUA"),
+            Map.entry("item_id", "zoho-child-708"),
+            Map.entry("group_id", "zoho-group-708"),
+            Map.entry("group_name", "Selected Parent"),
+            Map.entry("status", "active"),
+            Map.entry("attribute_name1", "Size"),
+            Map.entry("attribute_option_name1", "0-3 M"),
+            Map.entry("attribute_name2", "Color"),
+            Map.entry("attribute_option_name2", "Aqua"),
+            Map.entry("stock_on_hand", 8),
+            Map.entry("rate", 599)
+        );
+        when(productRepository.findById(708L)).thenReturn(Optional.of(parent));
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(productRepository.findAll()).thenReturn(List.of(parent));
+        when(variantSupport.isVariants(parent)).thenReturn(true);
+        when(booksClient.getItem("zoho-child-708")).thenReturn(Map.of("item", detail));
+        when(variantSupport.findProductContainingVariantZohoItemId(any(), eq("zoho-child-708"))).thenReturn(Optional.empty());
+        when(variantSupport.findProductContainingVariantSku(any(), eq("PARENT-708-0-3-AQUA"))).thenReturn(Optional.empty());
+        when(productRepository.findOneByZohoItemId("zoho-group-708")).thenReturn(Optional.empty());
+        when(
+            variantSupport.upsertPulledVariantFromZoho(
+                eq(parent),
+                eq("PARENT-708-0-3-AQUA"),
+                eq("0-3 M"),
+                eq("Aqua"),
+                any(),
+                any(),
+                eq(8),
+                eq("zoho-child-708"),
+                eq(true)
+            )
+        )
+            .thenReturn(true);
+        when(productRepository.findOneBySku("PARENT-708-0-3-AQUA")).thenReturn(Optional.empty());
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = service.pullProductVariant(708L, "PARENT-708-0-3-AQUA", "zoho-child-708");
+
+        assertThat(result.get("success")).isEqualTo(1);
+        assertThat(result.get("failed")).isEqualTo(0);
+        assertThat(parent.getZohoItemId()).isEqualTo("zoho-group-708");
+        verify(productRepository).save(parent);
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullProductVariant_refusesChildAlreadyLinkedToDifferentParent() {
+        Product selected = new Product().id(709L).sku("SELECTED").name("Selected").active(true).itemStructure("VARIANTS");
+        Product other = new Product().id(710L).sku("OTHER").name("Other").active(true).itemStructure("VARIANTS");
+        Map<String, Object> detail = Map.of(
+            "sku",
+            "OTHER-S",
+            "item_id",
+            "zoho-child-other",
+            "group_id",
+            "zoho-group-other",
+            "status",
+            "active",
+            "attribute_name1",
+            "Size",
+            "attribute_option_name1",
+            "S",
+            "attribute_name2",
+            "Color",
+            "attribute_option_name2",
+            "Blue"
+        );
+        when(productRepository.findById(709L)).thenReturn(Optional.of(selected));
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(productRepository.findAll()).thenReturn(List.of(selected, other));
+        when(variantSupport.isVariants(selected)).thenReturn(true);
+        when(variantSupport.isVariants(other)).thenReturn(true);
+        when(booksClient.getItem("zoho-child-other")).thenReturn(Map.of("item", detail));
+        when(variantSupport.findProductContainingVariantZohoItemId(any(), eq("zoho-child-other"))).thenReturn(Optional.of(other));
+
+        Map<String, Object> result = service.pullProductVariant(709L, "OTHER-S", "zoho-child-other");
+
+        assertThat(result.get("success")).isEqualTo(0);
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(result.get("failures").toString()).contains("already linked to another variant parent");
+        verify(productRepository, never()).save(any());
+        verify(variantSupport, never())
+            .upsertPulledVariantFromZoho(any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean());
+    }
+
+    @Test
+    void pullProductVariant_withoutRemoteOrLocalSizeColorFailsWithoutSaving() {
+        Product parent = new Product().id(711L).sku("PARENT-711").name("Parent").active(true).itemStructure("VARIANTS");
+        Map<String, Object> detail = Map.of("sku", "PLAIN-711", "item_id", "zoho-plain-711", "status", "active", "rate", 199);
+        when(productRepository.findById(711L)).thenReturn(Optional.of(parent));
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(productRepository.findAll()).thenReturn(List.of(parent));
+        when(variantSupport.isVariants(parent)).thenReturn(true);
+        when(booksClient.getItem("zoho-plain-711")).thenReturn(Map.of("item", detail));
+        when(variantSupport.findProductContainingVariantZohoItemId(any(), eq("zoho-plain-711"))).thenReturn(Optional.empty());
+        when(variantSupport.findProductContainingVariantSku(any(), eq("PLAIN-711"))).thenReturn(Optional.empty());
+        when(variantSupport.variantHasSizeAndColor(parent, "PLAIN-711")).thenReturn(false);
+
+        Map<String, Object> result = service.pullProductVariant(711L, "PLAIN-711", "zoho-plain-711");
+
+        assertThat(result.get("success")).isEqualTo(0);
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(result.get("failures").toString()).contains("missing size/color");
+        verify(productRepository, never()).save(any());
+        verify(variantSupport, never())
+            .upsertPulledVariantFromZoho(any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean());
+    }
+
+    @Test
+    void pullExternalProduct_emptyAdminCreatesVariantParentThenAddsNextVariantToSameGroup() {
+        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository,
+                s3StorageService,
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
+            );
+        java.util.List<Product> localProducts = new java.util.ArrayList<>();
+        long[] nextId = { 900L };
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(productRepository.findAll()).thenAnswer(invocation -> List.copyOf(localProducts));
+        when(productRepository.findOneBySku(any()))
+            .thenAnswer(invocation -> {
+                String sku = invocation.getArgument(0);
+                return localProducts.stream().filter(product -> sku.equals(product.getSku())).findFirst();
+            });
+        when(productRepository.findOneBySlug(any()))
+            .thenAnswer(invocation -> {
+                String slug = invocation.getArgument(0);
+                return localProducts.stream().filter(product -> slug.equals(product.getSlug())).findFirst();
+            });
+        when(productRepository.findOneByZohoItemId(any()))
+            .thenAnswer(invocation -> {
+                String zohoItemId = invocation.getArgument(0);
+                return localProducts.stream().filter(product -> zohoItemId.equals(product.getZohoItemId())).findFirst();
+            });
+        when(productRepository.findMaxSortOrder()).thenReturn(0);
+        when(productRepository.save(any()))
+            .thenAnswer(invocation -> {
+                Product product = invocation.getArgument(0);
+                if (product.getId() == null) {
+                    product.setId(nextId[0]++);
+                }
+                if (localProducts.stream().noneMatch(existing -> existing == product)) {
+                    localProducts.add(product);
+                }
+                return product;
+            });
+        Map<String, Object> firstVariant = Map.ofEntries(
+            Map.entry("sku", "EMPTY-GROUP-0-3-AQUA"),
+            Map.entry("item_id", "zoho-empty-child-1"),
+            Map.entry("group_id", "zoho-empty-group"),
+            Map.entry("group_name", "Empty Group"),
+            Map.entry("status", "active"),
+            Map.entry("attribute_name1", "Size"),
+            Map.entry("attribute_option_name1", "0-3 M"),
+            Map.entry("attribute_name2", "Color"),
+            Map.entry("attribute_option_name2", "Aqua"),
+            Map.entry("stock_on_hand", 4),
+            Map.entry("rate", 499)
+        );
+        Map<String, Object> secondVariant = Map.ofEntries(
+            Map.entry("sku", "EMPTY-GROUP-3-6-AQUA"),
+            Map.entry("item_id", "zoho-empty-child-2"),
+            Map.entry("group_id", "zoho-empty-group"),
+            Map.entry("group_name", "Empty Group"),
+            Map.entry("status", "active"),
+            Map.entry("attribute_name1", "Size"),
+            Map.entry("attribute_option_name1", "3-6 M"),
+            Map.entry("attribute_name2", "Color"),
+            Map.entry("attribute_option_name2", "Aqua"),
+            Map.entry("stock_on_hand", 6),
+            Map.entry("rate", 549)
+        );
+        when(booksClient.getItem("zoho-empty-child-1")).thenReturn(Map.of("item", firstVariant));
+        when(booksClient.getItem("zoho-empty-child-2")).thenReturn(Map.of("item", secondVariant));
+
+        Map<String, Object> firstResult = service.pullExternalProduct(null, "zoho-empty-child-1");
+        Map<String, Object> secondResult = service.pullExternalProduct(null, "zoho-empty-child-2");
+
+        assertThat(firstResult.get("success")).isEqualTo(1);
+        assertThat(secondResult.get("success")).isEqualTo(1);
+        assertThat(localProducts).hasSize(1);
+        Product parent = localProducts.get(0);
+        assertThat(parent.getSku()).isEqualTo("EMPTY-GROUP");
+        assertThat(parent.getName()).isEqualTo("Empty Group");
+        assertThat(parent.getZohoItemId()).isEqualTo("zoho-empty-group");
+        assertThat(parent.getItemStructure()).isEqualTo("VARIANTS");
+        assertThat(parent.getVariantsJson()).contains("EMPTY-GROUP-0-3-AQUA", "EMPTY-GROUP-3-6-AQUA");
+        assertThat(parent.getVariantsJson()).contains("zoho-empty-child-1", "zoho-empty-child-2");
+        assertThat(parent.getStock()).isEqualTo(10);
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullExternalProduct_emptyAdminCreatesSimpleProductBySku() {
+        Map<String, Object> listRow = Map.of("sku", "SIMPLE-EXT", "item_id", "zoho-simple-ext", "name", "Simple External");
+        Map<String, Object> detail = Map.of(
+            "sku",
+            "SIMPLE-EXT",
+            "item_id",
+            "zoho-simple-ext",
+            "name",
+            "Simple External",
+            "status",
+            "active",
+            "rate",
+            349,
+            "stock_on_hand",
+            7
+        );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.findItemBySku("SIMPLE-EXT")).thenReturn(listRow);
+        when(booksClient.getItem("zoho-simple-ext")).thenReturn(Map.of("item", detail));
+        when(productRepository.findOneByZohoItemId("zoho-simple-ext")).thenReturn(Optional.empty());
+        when(productRepository.findOneBySku("SIMPLE-EXT")).thenReturn(Optional.empty());
+        when(productRepository.findMaxSortOrder()).thenReturn(4);
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        when(productRepository.save(saved.capture())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = service.pullExternalProduct("SIMPLE-EXT", null);
+
+        assertThat(result.get("success")).isEqualTo(1);
+        Product product = saved.getValue();
+        assertThat(product.getSku()).isEqualTo("SIMPLE-EXT");
+        assertThat(product.getZohoItemId()).isEqualTo("zoho-simple-ext");
+        assertThat(product.getName()).isEqualTo("Simple External");
+        assertThat(product.getPrice()).isEqualByComparingTo("349");
+        assertThat(product.getStock()).isEqualTo(7);
+        assertThat(product.getSortOrder()).isEqualTo(5);
+        assertThat(product.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.SYNCED);
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullExternalProduct_staleItemIdFallsBackToSkuAndDoesNotCreateDuplicate() {
+        Product existing = new Product().id(902L).sku("FALLBACK-SKU").name("Old").active(true).zohoItemId("old-id");
+        Map<String, Object> listRow = Map.of("sku", "FALLBACK-SKU", "item_id", "fresh-id", "name", "Fresh");
+        Map<String, Object> detail = Map.of(
+            "sku",
+            "FALLBACK-SKU",
+            "item_id",
+            "fresh-id",
+            "name",
+            "Fresh",
+            "status",
+            "active",
+            "rate",
+            799,
+            "stock_on_hand",
+            3
+        );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.getItem("old-id"))
+            .thenThrow(new RestClientResponseException("Not found", 404, "Not Found", null, null, null));
+        when(booksClient.findItemBySku("FALLBACK-SKU")).thenReturn(listRow);
+        when(booksClient.getItem("fresh-id")).thenReturn(Map.of("item", detail));
+        when(productRepository.findOneByZohoItemId("fresh-id")).thenReturn(Optional.empty());
+        when(productRepository.findOneBySku("FALLBACK-SKU")).thenReturn(Optional.of(existing));
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = service.pullExternalProduct("FALLBACK-SKU", "old-id");
+
+        assertThat(result.get("success")).isEqualTo(1);
+        assertThat(result.get("failed")).isEqualTo(0);
+        assertThat(result.get("notices").toString()).contains("retried by SKU");
+        assertThat(existing.getZohoItemId()).isEqualTo("fresh-id");
+        assertThat(existing.getName()).isEqualTo("Fresh");
+        verify(productRepository).save(existing);
+        verify(productRepository, never()).findMaxSortOrder();
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullExternalProduct_variantWithoutSizeColorFailsWithoutCreatingParent() {
+        Map<String, Object> detail = Map.of(
+            "sku",
+            "BROKEN-VARIANT",
+            "item_id",
+            "zoho-broken-variant",
+            "group_id",
+            "zoho-broken-group",
+            "group_name",
+            "Broken Group",
+            "status",
+            "active",
+            "rate",
+            499
+        );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(productRepository.findAll()).thenReturn(List.of());
+        when(booksClient.getItem("zoho-broken-variant")).thenReturn(Map.of("item", detail));
+        when(productRepository.findOneByZohoItemId("zoho-broken-group")).thenReturn(Optional.empty());
+        when(productRepository.findOneBySlug("broken-group")).thenReturn(Optional.empty());
+        when(productRepository.findOneBySku("BROKEN-GROUP")).thenReturn(Optional.empty());
+        when(productRepository.findOneBySku("BROKEN-VARIANT")).thenReturn(Optional.empty());
+
+        Map<String, Object> result = service.pullExternalProduct(null, "zoho-broken-variant");
+
+        assertThat(result.get("success")).isEqualTo(0);
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(result.get("failures").toString()).contains("missing size/color");
+        verify(productRepository, never()).save(any());
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullExternalProduct_requiresSkuOrZohoItemId() {
+        Map<String, Object> result = service.pullExternalProduct(" ", null);
+
+        assertThat(result.get("success")).isEqualTo(0);
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(result.get("failures").toString()).contains("Zoho item id or SKU is required");
+        verify(booksClient, never()).getItem(any());
+        verify(booksClient, never()).findItemBySku(any());
+        verify(productRepository, never()).save(any());
     }
 
     @Test
@@ -3138,7 +3904,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
         Product parent = new Product()
             .id(307L)
@@ -3211,7 +3980,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
 
         Product parent = new Product()
@@ -3272,7 +4044,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
 
         Product parent = new Product()
@@ -3335,7 +4110,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
 
         Product parent = new Product()
@@ -3404,7 +4182,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
 
         Product product = new Product()
@@ -3457,7 +4238,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
 
         Product product = new Product()
@@ -3512,7 +4296,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
 
         Product product = new Product()
@@ -3552,7 +4339,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
 
         Product product = new Product()
@@ -3610,7 +4400,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
         Product product = new Product()
             .id(40802L)
@@ -3652,7 +4445,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
         Product product = new Product()
             .id(40803L)
@@ -3698,7 +4494,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
         Product product = new Product()
             .id(40804L)
@@ -3773,7 +4572,10 @@ class ZohoSyncServiceTest {
                 customerProfileRepository,
                 orderItemRepository,
                 s3StorageService,
-                orderEventService
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
             );
         Product product = new Product()
             .id(60L)

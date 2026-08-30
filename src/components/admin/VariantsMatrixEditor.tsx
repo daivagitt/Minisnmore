@@ -1,4 +1,4 @@
-import { Plus, Trash2, X } from "lucide-react";
+import { CloudDownload, Loader2, Plus, Trash2, X } from "lucide-react";
 import { Field, inputCls } from "@/components/admin/AdminPage";
 import {
   aggregateFromVariantRows,
@@ -38,6 +38,8 @@ export function VariantsMatrixEditor({
   colors,
   value,
   onChange,
+  onPullFromZoho,
+  pullingRowKeys,
 }: {
   parentSku: string;
   sizes: string[];
@@ -51,6 +53,8 @@ export function VariantsMatrixEditor({
     price: number | null;
     stock: number;
   }) => void;
+  onPullFromZoho?: (row: VariantEditorRow, index: number) => void;
+  pullingRowKeys?: Set<string>;
 }) {
   const rows = rowsFromVariantsJson(value);
 
@@ -128,6 +132,8 @@ export function VariantsMatrixEditor({
   };
 
   const canRefreshMatrix = sizes.length > 0 && colors.length > 0;
+  const rowKey = (row: VariantEditorRow, index: number) =>
+    row.zohoItemId?.trim() || row.sku?.trim() || row.id || `row-${index}`;
 
   return (
     <Field label="Variants (size × color matrix)">
@@ -145,12 +151,14 @@ export function VariantsMatrixEditor({
               <th className="p-2 font-medium">Photo</th>
               <th className="p-2 font-medium">Active</th>
               <th className="p-2 font-medium">Zoho item</th>
-              <th className="p-2 w-10" />
+              <th className="p-2 w-20" />
             </tr>
           </thead>
           <tbody>
             {rows.map((r, index) => {
               const photos = rowPhotos(r);
+              const key = rowKey(r, index);
+              const pulling = pullingRowKeys?.has(key) ?? false;
               return (
               <tr key={r.id ?? `row-${index}`} className="border-t border-border/40">
                 <td className="p-1.5">
@@ -286,14 +294,28 @@ export function VariantsMatrixEditor({
                   {r.zohoItemId?.trim() ? r.zohoItemId.trim() : "—"}
                 </td>
                 <td className="p-1.5">
-                  <button
-                    type="button"
-                    className="h-8 w-8 grid place-items-center rounded-lg hover:bg-destructive/10 text-destructive"
-                    onClick={() => removeRow(index)}
-                    aria-label="Remove variant"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    {onPullFromZoho && (
+                      <button
+                        type="button"
+                        className="h-8 w-8 grid place-items-center rounded-lg hover:bg-muted text-muted-foreground disabled:opacity-50"
+                        onClick={() => onPullFromZoho(r, index)}
+                        disabled={pulling}
+                        aria-label={`Pull ${r.sku || "variant"} from Zoho`}
+                        title="Pull this variant row from Zoho"
+                      >
+                        {pulling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CloudDownload className="h-3.5 w-3.5" />}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="h-8 w-8 grid place-items-center rounded-lg hover:bg-destructive/10 text-destructive"
+                      onClick={() => removeRow(index)}
+                      aria-label="Remove variant"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             );

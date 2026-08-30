@@ -23,9 +23,9 @@ const nav = [
   { to: "/admin/blog", label: "Blogs", icon: BookOpen },
   { to: "/admin/policies", label: "Policies", icon: FileText },
   { to: "/admin/invoices", label: "Invoices", icon: ReceiptText },
-  { to: "/admin/zoho", label: "Zoho settings", icon: Plug },
   { to: "/admin/orders", label: "Orders", icon: ShoppingCart },
   { to: "/admin/returns", label: "Order returns", icon: RotateCcw },
+  { to: "/admin/zoho", label: "Zoho settings", icon: Plug },
 ];
 
 function AdminLayout() {

@@ -58,7 +58,15 @@ spring:
       server:
         webflux:
           # Dev: direct URIs (no Consul). Store :8081, commerce :8082; core catalog :8084 internal only.
-          routes:
+            routes:
+            - id: miniandmore-ledgerly-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/ledgerly/webhooks
+            - id: miniandmore-zoho-stock-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/zoho/stock-webhook
             - id: miniandmore-ledgerly-api
               uri: http://127.0.0.1:8081
               predicates:

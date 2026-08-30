@@ -1,6 +1,5 @@
 package com.miniandmore.app.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.CustomerOrder;
@@ -11,12 +10,8 @@ import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.LedgerlyWebhookEventRepository;
 import com.miniandmore.app.repository.ProductRepository;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.HexFormat;
 import java.util.Map;
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -186,32 +181,17 @@ public class LedgerlyWebhookHandlerService {
         if (signature == null || signature.isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing X-Ledgerly-Signature");
         }
-        String expected = sign(rawBody, secret);
-        String provided = signature.trim();
-        if (provided.regionMatches(true, 0, "sha256=", 0, 7)) {
-            provided = provided.substring(7);
-        }
-        if (!expected.equalsIgnoreCase(provided)) {
+        if (!WebhookHmacSupport.signaturesMatch(secret, rawBody, signature)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid webhook signature");
         }
     }
 
     private String sign(String payload, String secret) {
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            return HexFormat.of().formatHex(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception e) {
-            throw new IllegalStateException("Unable to verify webhook signature", e);
-        }
+        return WebhookHmacSupport.hmacSha256Hex(secret, payload);
     }
 
     private Map<String, Object> parsePayload(String rawBody) {
-        try {
-            return objectMapper.readValue(rawBody, new TypeReference<>() {});
-        } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid JSON payload");
-        }
+        return WebhookPayloadSupport.parseJsonMap(objectMapper, rawBody);
     }
 
     private String stringValue(Object value) {

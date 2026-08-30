@@ -22,6 +22,12 @@ const COLLECTION_LINKS = [
   { to: "/trending" as const, label: "Trending" },
 ];
 
+const QUICK_LINKS = [
+  { to: "/privacy" as const, label: "Privacy" },
+  { to: "/terms" as const, label: "Terms" },
+  { to: "/shipping" as const, label: "Shipping & returns" },
+];
+
 type FooterShopLink =
   | { key: string; label: string; to: "/shop"; category: string }
   | { key: string; label: string; to: "/gift" };
@@ -35,7 +41,7 @@ function formatShopLabel(label: string) {
 const FOOTER_LINK_ROW = "h-5 flex items-center text-sm leading-none";
 const FOOTER_LINK_STACK = "flex flex-col gap-2";
 const FOOTER_TOP_GRID =
-  "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-y-6 gap-x-4 sm:gap-x-5 lg:gap-x-6 xl:gap-x-8 items-start";
+  "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-y-6 gap-x-4 sm:gap-x-5 lg:gap-x-6 xl:gap-x-8 items-start";
 
 function splitShopColumns(links: FooterShopLink[]) {
   const mid = Math.ceil(links.length / 2);
@@ -174,6 +180,7 @@ export function Footer() {
   const logo = settings.logo_url || footerLogo;
   const contactEmail = settings.contact_email ? resolveContactEmail(settings.contact_email) : null;
   const mailtoHref = contactEmail ? `mailto:${contactEmail}` : null;
+  const copyrightText = settings.footer_copyright?.trim() || null;
 
   return (
     <footer className="relative mt-10">
@@ -302,23 +309,38 @@ export function Footer() {
                 </FooterNavList>
               </FooterColumn>
 
-          <div className="sm:col-span-2 lg:col-span-3 lg:col-start-2 lg:row-start-2 flex flex-wrap items-center w-full max-w-full gap-x-2 gap-y-2">
-              <FooterSubheading>Follow us</FooterSubheading>
-              <div className="flex items-center gap-1.5">
-                <SocialIconLink href={socialHref(settings.instagram_url)} label="Instagram">
-                  <Instagram className="h-4 w-4" />
-                </SocialIconLink>
-                <SocialIconLink href={socialHref(settings.facebook_url)} label="Facebook">
-                  <Facebook className="h-4 w-4" />
-                </SocialIconLink>
-                <SocialIconLink href={socialHref(settings.linkedin_url)} label="LinkedIn">
-                  <Linkedin className="h-4 w-4" />
-                </SocialIconLink>
-                <SocialIconLink href={socialHref(settings.youtube_url)} label="YouTube">
-                  <Youtube className="h-4 w-4" />
-                </SocialIconLink>
+          <FooterColumn className="shrink-0">
+                <FooterHeading>Quick links</FooterHeading>
+                <FooterNavList>
+                  {QUICK_LINKS.map((item) => (
+                    <FooterNavItem key={item.to}>
+                      <Link to={item.to} className="story-link text-muted-foreground hover:text-foreground">
+                        {item.label}
+                      </Link>
+                    </FooterNavItem>
+                  ))}
+                </FooterNavList>
+              </FooterColumn>
+
+          <div className="sm:col-span-2 lg:col-span-5 lg:col-start-1 lg:row-start-2 flex flex-wrap items-center justify-between w-full max-w-full gap-x-4 gap-y-3">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+                <FooterSubheading>Follow us</FooterSubheading>
+                <div className="flex items-center gap-1.5">
+                  <SocialIconLink href={socialHref(settings.instagram_url)} label="Instagram">
+                    <Instagram className="h-4 w-4" />
+                  </SocialIconLink>
+                  <SocialIconLink href={socialHref(settings.facebook_url)} label="Facebook">
+                    <Facebook className="h-4 w-4" />
+                  </SocialIconLink>
+                  <SocialIconLink href={socialHref(settings.linkedin_url)} label="LinkedIn">
+                    <Linkedin className="h-4 w-4" />
+                  </SocialIconLink>
+                  <SocialIconLink href={socialHref(settings.youtube_url)} label="YouTube">
+                    <Youtube className="h-4 w-4" />
+                  </SocialIconLink>
+                </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2 sm:ml-2 sm:pl-2 sm:border-l border-border/40">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
                 <FooterSubheading>Contact us</FooterSubheading>
                 <div className="flex items-center gap-1.5">
                   {mailtoHref ? (
@@ -345,10 +367,10 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="relative mt-3 pt-2.5 border-t border-border/60 space-y-2 text-xs text-muted-foreground">
+        <div className="relative mt-3 pt-2.5 border-t border-border/60 text-xs text-muted-foreground">
           <div className="flex items-center justify-center gap-1.5 text-center">
-            {settings.footer_copyright ? (
-              <span>{settings.footer_copyright}</span>
+            {copyrightText ? (
+              <span>{copyrightText}</span>
             ) : (
               <>
                 <span>

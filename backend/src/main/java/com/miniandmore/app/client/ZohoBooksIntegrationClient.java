@@ -2,6 +2,7 @@ package com.miniandmore.app.client;
 
 import com.miniandmore.app.service.ZohoSyncService;
 import java.math.BigDecimal;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 
@@ -29,6 +30,10 @@ public class ZohoBooksIntegrationClient {
 
     public void syncProduct(Long productId) {
         syncService.syncProduct(productId);
+    }
+
+    public Map<String, Object> syncProductStockOnly(Long productId) {
+        return syncService.syncProductStockOnly(productId);
     }
 
     public void deactivateProductInZoho(Long productId) {

@@ -72,12 +72,9 @@ public class ZohoSyncService {
     private final OrderItemRepository orderItemRepository;
     private final S3StorageService s3StorageService;
     private final OrderEventService orderEventService;
-    private volatile String cachedLocationId;
-    private volatile String cachedInventoryAccountId;
-    private volatile String cachedAdjustmentAccountId;
-    private volatile boolean configuredInventoryAccountRejected;
-    private volatile boolean configuredLocationRejected;
-    private volatile boolean configuredAdjustmentAccountRejected;
+    private final ZohoBooksAccountResolver accountResolver;
+    private final ZohoCatalogStockAdjuster stockAdjuster;
+    private final ZohoStockReconcileService stockReconcileService;
 
     public ZohoSyncService(
         ZohoBooksClient booksClient,
@@ -93,7 +90,10 @@ public class ZohoSyncService {
         CustomerProfileRepository customerProfileRepository,
         OrderItemRepository orderItemRepository,
         S3StorageService s3StorageService,
-        OrderEventService orderEventService
+        OrderEventService orderEventService,
+        ZohoBooksAccountResolver accountResolver,
+        ZohoCatalogStockAdjuster stockAdjuster,
+        ZohoStockReconcileService stockReconcileService
     ) {
         this.booksClient = booksClient;
         this.objectMapper = objectMapper;
@@ -109,6 +109,9 @@ public class ZohoSyncService {
         this.orderItemRepository = orderItemRepository;
         this.s3StorageService = s3StorageService;
         this.orderEventService = orderEventService;
+        this.accountResolver = accountResolver;
+        this.stockAdjuster = stockAdjuster;
+        this.stockReconcileService = stockReconcileService;
     }
 
     public Map<String, Object> testConnection() {
@@ -146,6 +149,19 @@ public class ZohoSyncService {
                     productRepository.updateZohoSyncFailure(productId, ZohoSyncStatus.FAILED, failure);
                 }
             });
+    }
+
+    /**
+     * Reconciles Zoho quantity to the current store stock without pushing names, prices, images, or
+     * descriptions. Safe to call after automatic webhooks or admin retries — adjustments are absolute,
+     * so a second call with the same stock is a no-op.
+     */
+    public Map<String, Object> syncProductStockOnly(Long productId) {
+        return stockReconcileService.syncProductStockOnly(productId);
+    }
+
+    public Map<String, Object> reconcileStockFromWebhook(String sku, Long productId, int stock) {
+        return stockReconcileService.reconcileStockFromWebhook(sku, productId, stock);
     }
 
     public void deactivateProduct(Long productId) {
@@ -243,9 +259,9 @@ public class ZohoSyncService {
         reactivateZohoItemIfNeeded(itemId, "product " + product.getSku());
 
         boolean openingStock = StringUtils.isBlank(itemId);
-        Optional<String> inventoryAccountId = resolveInventoryAccountId();
+        Optional<String> inventoryAccountId = accountResolver.resolveInventoryAccountId();
         boolean trackInventory = applicationProperties.getZoho().isSyncProductStock() && inventoryAccountId.isPresent();
-        Optional<String> locationId = openingStock && trackInventory ? resolveLocationId() : Optional.empty();
+        Optional<String> locationId = openingStock && trackInventory ? accountResolver.resolveLocationId() : Optional.empty();
         Map<String, Object> payload = buildItemPayload(product, openingStock, inventoryAccountId, locationId.orElse(null));
         Map<String, Object> response = persistZohoItem(
             openingStock,
@@ -255,7 +271,7 @@ public class ZohoSyncService {
             trackInventory,
             accountId -> {
                 boolean track = accountId.isPresent();
-                String loc = openingStock && track ? resolveLocationId().orElse(null) : null;
+                String loc = openingStock && track ? accountResolver.resolveLocationId().orElse(null) : null;
                 return buildItemPayload(product, openingStock, accountId, loc);
             }
         );
@@ -343,9 +359,9 @@ public class ZohoSyncService {
         reactivateZohoItemIfNeeded(itemId, "variant " + variantSku);
 
         boolean openingStock = StringUtils.isBlank(itemId);
-        Optional<String> inventoryAccountId = resolveInventoryAccountId();
+        Optional<String> inventoryAccountId = accountResolver.resolveInventoryAccountId();
         boolean trackInventory = applicationProperties.getZoho().isSyncProductStock() && inventoryAccountId.isPresent();
-        Optional<String> locationId = openingStock && trackInventory ? resolveLocationId() : Optional.empty();
+        Optional<String> locationId = openingStock && trackInventory ? accountResolver.resolveLocationId() : Optional.empty();
         Map<String, Object> payload = buildVariantItemPayload(product, row, openingStock, inventoryAccountId, locationId.orElse(null));
         Map<String, Object> response = persistZohoItem(
             openingStock,
@@ -355,7 +371,7 @@ public class ZohoSyncService {
             trackInventory,
             accountId -> {
                 boolean track = accountId.isPresent();
-                String loc = openingStock && track ? resolveLocationId().orElse(null) : null;
+                String loc = openingStock && track ? accountResolver.resolveLocationId().orElse(null) : null;
                 return buildVariantItemPayload(product, row, openingStock, accountId, loc);
             }
         );
@@ -469,9 +485,8 @@ public class ZohoSyncService {
                     "Zoho inventory account {} does not exist in this org; looking up Inventory Asset",
                     inventoryAccountId.orElse("")
                 );
-                configuredInventoryAccountRejected = true;
-                cachedInventoryAccountId = null;
-                Optional<String> replacement = resolveInventoryAccountId();
+                accountResolver.markConfiguredInventoryAccountRejected();
+                Optional<String> replacement = accountResolver.resolveInventoryAccountId();
                 if (replacement.isPresent() && !replacement.orElseThrow().equals(inventoryAccountId.orElse(null))) {
                     return saveZohoItem(openingStock, itemId, rebuildPayload.apply(replacement));
                 }
@@ -591,7 +606,7 @@ public class ZohoSyncService {
     }
 
     private void syncZohoVariantStockAfterPush(Product product, ProductVariantSupport.VariantRow row, String zohoItemId) {
-        syncZohoItemQuantity(
+        stockAdjuster.adjustItemQuantity(
             zohoItemId,
             Math.max(0, row.stock()),
             variantSupport.variantSellingPrice(row),
@@ -692,322 +707,13 @@ public class ZohoSyncService {
         BigDecimal unitPrice = product.getPrice() != null && product.getPrice().compareTo(BigDecimal.ZERO) > 0
             ? product.getPrice()
             : BigDecimal.ZERO;
-        syncZohoItemQuantity(
+        stockAdjuster.adjustItemQuantity(
             zohoItemId,
             Math.max(0, product.getStock()),
             unitPrice,
             "STORE-SYNC-" + product.getId(),
             "product " + product.getId() + " (" + product.getSku() + ")"
         );
-    }
-
-    /**
-     * Zoho ignores stock on item create/update after the item exists. Opening stock is only
-     * accepted on first create (and only with a valid location). Later qty changes must go
-     * through inventory adjustments, and sales items must be converted to inventory first.
-     */
-    private void syncZohoItemQuantity(
-        String zohoItemId,
-        int desiredStock,
-        BigDecimal unitPriceHint,
-        String referencePrefix,
-        String logLabel
-    ) {
-        if (!shouldAdjustZohoInventory() || StringUtils.isBlank(zohoItemId)) {
-            return;
-        }
-        try {
-            Map<String, Object> item = getZohoItemMap(zohoItemId);
-            if (item.isEmpty()) {
-                return;
-            }
-            if (!isInventoryItem(item)) {
-                item = enableInventoryTrackingOnItem(zohoItemId, desiredStock, unitPriceHint, item, logLabel);
-                if (!isInventoryItem(item)) {
-                    LOG.warn("Skipping Zoho stock sync for {}: item is not inventory-tracked", logLabel);
-                    return;
-                }
-            }
-            int currentStock = toInteger(item.get("stock_on_hand"));
-            int delta = desiredStock - currentStock;
-            if (delta == 0) {
-                return;
-            }
-            BigDecimal unitPrice = unitPriceHint != null && unitPriceHint.compareTo(BigDecimal.ZERO) > 0
-                ? unitPriceHint
-                : toBigDecimal(item.get("rate"));
-            createQuantityAdjustment(zohoItemId, delta, unitPrice, referencePrefix, logLabel);
-        } catch (RuntimeException e) {
-            LOG.warn("Zoho stock sync failed for {}: {}", logLabel, e.getMessage());
-        }
-    }
-
-    private Map<String, Object> getZohoItemMap(String zohoItemId) {
-        Map<String, Object> response = booksClient.getItem(zohoItemId);
-        if (response == null || response.isEmpty()) {
-            return Map.of();
-        }
-        Object nested = response.get("item");
-        if (nested instanceof Map<?, ?> itemMap) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> typed = (Map<String, Object>) itemMap;
-            return typed;
-        }
-        return response;
-    }
-
-    private Map<String, Object> enableInventoryTrackingOnItem(
-        String zohoItemId,
-        int desiredStock,
-        BigDecimal unitPriceHint,
-        Map<String, Object> currentItem,
-        String logLabel
-    ) {
-        Optional<String> inventoryAccountId = resolveInventoryAccountId();
-        Optional<String> locationId = resolveLocationId();
-        if (inventoryAccountId.isEmpty()) {
-            return currentItem;
-        }
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("name", currentItem.getOrDefault("name", "Item"));
-        if (currentItem.get("sku") != null) {
-            payload.put("sku", currentItem.get("sku"));
-        }
-        BigDecimal rate = unitPriceHint != null && unitPriceHint.compareTo(BigDecimal.ZERO) > 0
-            ? unitPriceHint
-            : toBigDecimal(currentItem.get("rate"));
-        payload.put("rate", rate);
-        payload.put("product_type", "goods");
-        String currentUnit = StringUtils.trimToNull(stringValue(currentItem.get("unit")));
-        if (currentUnit != null) {
-            payload.put("unit", currentUnit);
-        }
-        payload.put("item_type", "inventory");
-        payload.put("inventory_account_id", inventoryAccountId.orElseThrow());
-        if (locationId.isPresent()) {
-            Map<String, Object> location = new LinkedHashMap<>();
-            location.put("location_id", locationId.orElseThrow());
-            location.put("initial_stock", String.valueOf(Math.max(0, desiredStock)));
-            location.put("initial_stock_rate", formatRate(rate));
-            payload.put("locations", List.of(location));
-        }
-        try {
-            booksClient.updateItem(zohoItemId, payload);
-            Map<String, Object> refreshed = getZohoItemMap(zohoItemId);
-            return refreshed.isEmpty() ? currentItem : refreshed;
-        } catch (RuntimeException e) {
-            LOG.warn("Could not enable Zoho inventory tracking for {}: {}", logLabel, e.getMessage());
-            return currentItem;
-        }
-    }
-
-    private void createQuantityAdjustment(
-        String zohoItemId,
-        int delta,
-        BigDecimal unitPrice,
-        String referencePrefix,
-        String logLabel
-    ) {
-        Optional<String> adjustmentAccountId = resolveAdjustmentAccountId();
-        if (adjustmentAccountId.isEmpty()) {
-            LOG.warn("Skipping Zoho stock sync for {}: no adjustment account. Set ZOHO_INVENTORY_ADJUSTMENT_ACCOUNT_ID.", logLabel);
-            return;
-        }
-        try {
-            booksClient.createInventoryAdjustment(
-                buildQuantityAdjustmentPayload(zohoItemId, delta, unitPrice, adjustmentAccountId.orElseThrow(), referencePrefix)
-            );
-            LOG.debug("Adjusted Zoho stock for {} by {}", logLabel, delta);
-        } catch (RestClientResponseException e) {
-            if (isInvalidAdjustmentAccount(e)) {
-                LOG.warn(
-                    "Zoho adjustment account {} does not exist in this org; looking up Cost of Goods Sold",
-                    adjustmentAccountId.orElse("")
-                );
-                configuredAdjustmentAccountRejected = true;
-                cachedAdjustmentAccountId = null;
-                Optional<String> replacement = resolveAdjustmentAccountId();
-                if (replacement.isPresent() && !replacement.orElseThrow().equals(adjustmentAccountId.orElse(null))) {
-                    booksClient.createInventoryAdjustment(
-                        buildQuantityAdjustmentPayload(zohoItemId, delta, unitPrice, replacement.orElseThrow(), referencePrefix)
-                    );
-                    return;
-                }
-            }
-            if (isInvalidLocation(e)) {
-                LOG.warn("Zoho location for stock adjustment is invalid; looking up org locations");
-                configuredLocationRejected = true;
-                cachedLocationId = null;
-                booksClient.createInventoryAdjustment(
-                    buildQuantityAdjustmentPayload(
-                        zohoItemId,
-                        delta,
-                        unitPrice,
-                        resolveAdjustmentAccountId().orElse(adjustmentAccountId.orElseThrow()),
-                        referencePrefix
-                    )
-                );
-                return;
-            }
-            throw e;
-        }
-    }
-
-    private Map<String, Object> buildQuantityAdjustmentPayload(
-        String zohoItemId,
-        int delta,
-        BigDecimal unitPrice,
-        String adjustmentAccountId,
-        String referencePrefix
-    ) {
-        Map<String, Object> line = new LinkedHashMap<>();
-        line.put("item_id", zohoItemId);
-        line.put("quantity_adjusted", delta);
-        if (unitPrice != null && unitPrice.compareTo(BigDecimal.ZERO) > 0) {
-            line.put("price", unitPrice);
-        }
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("date", java.time.LocalDate.now(java.time.ZoneId.of("Asia/Kolkata")).toString());
-        payload.put("reason", "Store catalog sync");
-        payload.put("adjustment_type", "quantity");
-        payload.put("adjustment_account_id", adjustmentAccountId);
-        payload.put("reference_number", truncatedReferenceNumber(referencePrefix));
-        resolveLocationId().ifPresent(locationId -> payload.put("location_id", locationId));
-        payload.put("line_items", List.of(line));
-        return payload;
-    }
-
-    /**
-     * Zoho rejects {@code reference_number} over 50 characters. Long variant SKUs (e.g.
-     * {@code STORE-VAR-<productId>-<sku>}) can blow past that once the millisecond suffix is
-     * appended, so trim the prefix rather than the timestamp — the timestamp is what keeps
-     * concurrent adjustments unique.
-     */
-    private static String truncatedReferenceNumber(String referencePrefix) {
-        String suffix = "-" + System.currentTimeMillis();
-        int maxPrefixLen = 50 - suffix.length();
-        String safePrefix = StringUtils.defaultString(referencePrefix);
-        if (safePrefix.length() > maxPrefixLen) {
-            safePrefix = safePrefix.substring(0, Math.max(0, maxPrefixLen));
-        }
-        return safePrefix + suffix;
-    }
-
-    private static boolean isInventoryItem(Map<String, Object> item) {
-        if (item == null || item.isEmpty()) {
-            return false;
-        }
-        String itemType = StringUtils.defaultString(stringValueStatic(item.get("item_type"))).toLowerCase();
-        if ("inventory".equals(itemType)) {
-            return true;
-        }
-        Object trackInventory = item.get("track_inventory");
-        return trackInventory instanceof Boolean flag && flag;
-    }
-
-    private static String stringValueStatic(Object value) {
-        return value == null ? null : value.toString();
-    }
-
-    private Optional<String> resolveAdjustmentAccountId() {
-        String configured = StringUtils.trimToNull(applicationProperties.getZoho().getInventoryAdjustmentAccountId());
-        if (configured != null && !configuredAdjustmentAccountRejected) {
-            if (orgContainsId(() -> booksClient.listExpenseAccounts(), "account_id", configured)) {
-                return Optional.of(configured);
-            }
-            LOG.warn("Configured Zoho adjustment account {} is not in this org; looking up Cost of Goods Sold", configured);
-            configuredAdjustmentAccountRejected = true;
-        }
-        if (StringUtils.isNotBlank(cachedAdjustmentAccountId)) {
-            return Optional.of(cachedAdjustmentAccountId);
-        }
-        synchronized (this) {
-            if (StringUtils.isNotBlank(cachedAdjustmentAccountId)) {
-                return Optional.of(cachedAdjustmentAccountId);
-            }
-            try {
-                List<Map<String, Object>> accounts = booksClient.listExpenseAccounts();
-                String cogsMatch = null;
-                String fallback = null;
-                for (Map<String, Object> account : accounts) {
-                    String id = stringValue(account.get("account_id"));
-                    if (StringUtils.isBlank(id)) {
-                        continue;
-                    }
-                    if (fallback == null) {
-                        fallback = id;
-                    }
-                    String name = StringUtils.defaultString(stringValue(account.get("account_name"))).toLowerCase();
-                    if (name.contains("cost of goods") || name.contains("cogs") || name.contains("inventory adjustment")) {
-                        cogsMatch = id;
-                        break;
-                    }
-                }
-                String resolved = cogsMatch != null ? cogsMatch : fallback;
-                if (resolved != null) {
-                    cachedAdjustmentAccountId = resolved;
-                    return Optional.of(resolved);
-                }
-            } catch (RuntimeException e) {
-                LOG.warn("Could not list Zoho Books expense accounts for stock adjustment: {}", e.getMessage());
-            }
-            return Optional.empty();
-        }
-    }
-
-    private Optional<String> resolveInventoryAccountId() {
-        String configured = StringUtils.trimToNull(applicationProperties.getZoho().getInventoryAccountId());
-        if (configured != null && !configuredInventoryAccountRejected) {
-            if (orgContainsId(() -> booksClient.listAssetAccounts(), "account_id", configured)) {
-                return Optional.of(configured);
-            }
-            LOG.warn("Configured Zoho inventory account {} is not in this org; looking up Inventory Asset", configured);
-            configuredInventoryAccountRejected = true;
-        }
-        if (!applicationProperties.getZoho().isSyncProductStock() && configured == null) {
-            return Optional.empty();
-        }
-        return lookupInventoryAccountFromChart();
-    }
-
-    private Optional<String> lookupInventoryAccountFromChart() {
-        if (StringUtils.isNotBlank(cachedInventoryAccountId)) {
-            return Optional.of(cachedInventoryAccountId);
-        }
-        synchronized (this) {
-            if (StringUtils.isNotBlank(cachedInventoryAccountId)) {
-                return Optional.of(cachedInventoryAccountId);
-            }
-            try {
-                List<Map<String, Object>> accounts = booksClient.listAssetAccounts();
-                String inventoryMatch = null;
-                String stockMatch = null;
-                String fallback = null;
-                for (Map<String, Object> account : accounts) {
-                    String id = stringValue(account.get("account_id"));
-                    if (StringUtils.isBlank(id)) {
-                        continue;
-                    }
-                    if (fallback == null) {
-                        fallback = id;
-                    }
-                    String name = StringUtils.defaultString(stringValue(account.get("account_name"))).toLowerCase();
-                    if (name.contains("inventory")) {
-                        inventoryMatch = id;
-                    } else if (name.contains("stock")) {
-                        stockMatch = id;
-                    }
-                }
-                String resolved = inventoryMatch != null ? inventoryMatch : (stockMatch != null ? stockMatch : fallback);
-                if (resolved != null) {
-                    cachedInventoryAccountId = resolved;
-                    return Optional.of(resolved);
-                }
-            } catch (RuntimeException e) {
-                LOG.warn("Could not list Zoho Books chart of accounts for inventory: {}", e.getMessage());
-            }
-            return Optional.empty();
-        }
     }
 
     private static boolean isInventoryTrackingDisabled(RestClientResponseException exception) {
@@ -1024,120 +730,6 @@ public class ZohoSyncService {
             (body.contains("inventory tracking") && body.contains("does not exist"));
     }
 
-    private static boolean isInvalidAdjustmentAccount(RestClientResponseException exception) {
-        String body = StringUtils.defaultString(exception.getResponseBodyAsString()).toLowerCase();
-        if (exception.getStatusCode().value() != 400) {
-            return false;
-        }
-        return (body.contains("account") && body.contains("does not exist")) || body.contains("2035");
-    }
-
-    private static boolean isInvalidLocation(RestClientResponseException exception) {
-        String body = StringUtils.defaultString(exception.getResponseBodyAsString()).toLowerCase();
-        if (exception.getStatusCode().value() != 400) {
-            return false;
-        }
-        return body.contains("location") &&
-            (body.contains("does not exist") ||
-                body.contains("mandatory") ||
-                body.contains("invalid") ||
-                body.contains("select"));
-    }
-
-    private boolean orgContainsId(java.util.function.Supplier<List<Map<String, Object>>> loader, String idKey, String id) {
-        try {
-            List<Map<String, Object>> rows = loader.get();
-            if (rows == null || rows.isEmpty()) {
-                return true;
-            }
-            for (Map<String, Object> row : rows) {
-                if (id.equals(stringValue(row.get(idKey)))) {
-                    return true;
-                }
-            }
-            return false;
-        } catch (RuntimeException e) {
-            LOG.debug("Could not verify Zoho {} {}: {}", idKey, id, e.getMessage());
-            return true;
-        }
-    }
-
-    private Optional<String> resolveLocationId() {
-        if (StringUtils.isNotBlank(cachedLocationId)) {
-            return Optional.of(cachedLocationId);
-        }
-        synchronized (this) {
-            if (StringUtils.isNotBlank(cachedLocationId)) {
-                return Optional.of(cachedLocationId);
-            }
-            String configured = StringUtils.trimToNull(applicationProperties.getZoho().getDefaultLocationId());
-            try {
-                List<Map<String, Object>> locations = booksClient.listLocations();
-                if (configured != null && !configuredLocationRejected) {
-                    if (locations == null || locations.isEmpty() || containsNodeId(locations, "location_id", configured)) {
-                        cachedLocationId = configured;
-                        return Optional.of(configured);
-                    }
-                    LOG.warn("Configured Zoho location {} is not in this org; looking up Head Office / primary location", configured);
-                    configuredLocationRejected = true;
-                }
-                if (locations == null || locations.isEmpty()) {
-                    return Optional.empty();
-                }
-                String preferredName = StringUtils.trimToEmpty(applicationProperties.getZoho().getDefaultLocationName());
-                String nameMatch = null;
-                String primary = null;
-                String fallback = null;
-                for (Map<String, Object> node : locations) {
-                    String id = stringValue(node.get("location_id"));
-                    if (StringUtils.isBlank(id)) {
-                        continue;
-                    }
-                    if (fallback == null) {
-                        fallback = id;
-                    }
-                    if (StringUtils.isNotBlank(preferredName)) {
-                        String locationName = StringUtils.defaultString(stringValue(node.get("location_name")));
-                        if (
-                            locationName.equalsIgnoreCase(preferredName) ||
-                            locationName.toLowerCase().contains(preferredName.toLowerCase())
-                        ) {
-                            nameMatch = id;
-                            break;
-                        }
-                    }
-                    Object isPrimary = node.get("is_primary");
-                    if (isPrimary instanceof Boolean primaryFlag && primaryFlag) {
-                        primary = id;
-                    } else if (isPrimary != null && Boolean.parseBoolean(isPrimary.toString())) {
-                        primary = id;
-                    }
-                }
-                String resolved = nameMatch != null ? nameMatch : (primary != null ? primary : fallback);
-                if (resolved != null) {
-                    cachedLocationId = resolved;
-                    return Optional.of(resolved);
-                }
-            } catch (RuntimeException e) {
-                LOG.warn("Could not list Zoho Books locations: {}", e.getMessage());
-            }
-            if (configured != null && !configuredLocationRejected) {
-                cachedLocationId = configured;
-                return Optional.of(configured);
-            }
-            return Optional.empty();
-        }
-    }
-
-    private boolean containsNodeId(List<Map<String, Object>> rows, String idKey, String id) {
-        for (Map<String, Object> row : rows) {
-            if (id.equals(stringValue(row.get(idKey)))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private static String formatRate(BigDecimal price) {
         if (price == null) {
             return "0";
@@ -1147,6 +739,111 @@ public class ZohoSyncService {
 
     public Map<String, Object> pullProducts() {
         return pullProducts(false);
+    }
+
+    public Map<String, Object> pullProduct(Long productId) {
+        ZohoSyncSummary.Builder builder = ZohoSyncSummary.builder();
+        Optional<Product> product = productRepository.findById(productId);
+        if (product.isEmpty()) {
+            builder.failure(productId, "Product " + productId, "Product not found");
+            return builder.build().toMap();
+        }
+
+        Optional<ZohoSetting> setting = zohoSettingRepository.findActiveOrLatest();
+        boolean autoCreateCategory = setting
+            .map(s -> Boolean.TRUE.equals(s.getPullProductsAutoCreateCategory()))
+            .orElse(applicationProperties.getZoho().isPullProductsAutoCreateCategory());
+        List<Product> variantParents = new ArrayList<>(
+            productRepository.findAll().stream().filter(variantSupport::isVariants).toList()
+        );
+        Product local = product.orElseThrow();
+        if (variantSupport.isVariants(local) && !variantParents.contains(local)) {
+            variantParents.add(local);
+        }
+
+        if (variantSupport.isVariants(local)) {
+            List<ProductVariantSupport.VariantRow> rows = variantSupport.parseProduct(local);
+            if (rows.isEmpty()) {
+                builder.failure(productId, local.getName(), "Variant product has no variant rows to pull");
+                return builder.build().toMap();
+            }
+            for (ProductVariantSupport.VariantRow row : rows) {
+                pullSingleZohoItem(
+                    row.zohoItemId(),
+                    row.sku(),
+                    autoCreateCategory,
+                    builder,
+                    variantParents,
+                    row.sku()
+                );
+            }
+            return builder.build().toMap();
+        }
+
+        pullSingleZohoItem(
+            local.getZohoItemId(),
+            local.getSku(),
+            autoCreateCategory,
+            builder,
+            variantParents,
+            StringUtils.firstNonBlank(local.getSku(), local.getName(), "Product " + productId)
+        );
+        return builder.build().toMap();
+    }
+
+    public Map<String, Object> pullProductVariant(Long productId, String variantSku, String zohoItemId) {
+        ZohoSyncSummary.Builder builder = ZohoSyncSummary.builder();
+        Optional<Product> product = productRepository.findById(productId);
+        if (product.isEmpty()) {
+            builder.failure(productId, "Product " + productId, "Product not found");
+            return builder.build().toMap();
+        }
+
+        Product parent = product.orElseThrow();
+        if (!variantSupport.isVariants(parent)) {
+            builder.failure(productId, parent.getName(), "Product is not a variant parent");
+            return builder.build().toMap();
+        }
+
+        String sku = StringUtils.trimToNull(variantSku);
+        String itemId = StringUtils.trimToNull(zohoItemId);
+        String label = StringUtils.firstNonBlank(sku, itemId, parent.getSku(), parent.getName(), "Variant");
+        if (sku == null && itemId == null) {
+            builder.failure(label, "Zoho item id or SKU is required before pulling from Zoho");
+            return builder.build().toMap();
+        }
+
+        Optional<ZohoSetting> setting = zohoSettingRepository.findActiveOrLatest();
+        boolean autoCreateCategory = setting
+            .map(s -> Boolean.TRUE.equals(s.getPullProductsAutoCreateCategory()))
+            .orElse(applicationProperties.getZoho().isPullProductsAutoCreateCategory());
+        List<Product> variantParents = new ArrayList<>(
+            productRepository.findAll().stream().filter(variantSupport::isVariants).toList()
+        );
+        attachVariantParent(parent, variantParents);
+        pullSingleZohoItem(itemId, sku, autoCreateCategory, builder, variantParents, label, parent);
+        return builder.build().toMap();
+    }
+
+    public Map<String, Object> pullExternalProduct(String sku, String zohoItemId) {
+        ZohoSyncSummary.Builder builder = ZohoSyncSummary.builder();
+        String normalizedSku = StringUtils.trimToNull(sku);
+        String normalizedItemId = StringUtils.trimToNull(zohoItemId);
+        String label = StringUtils.firstNonBlank(normalizedSku, normalizedItemId, "Zoho item");
+        if (normalizedSku == null && normalizedItemId == null) {
+            builder.failure(label, "Zoho item id or SKU is required before pulling from Zoho");
+            return builder.build().toMap();
+        }
+
+        Optional<ZohoSetting> setting = zohoSettingRepository.findActiveOrLatest();
+        boolean autoCreateCategory = setting
+            .map(s -> Boolean.TRUE.equals(s.getPullProductsAutoCreateCategory()))
+            .orElse(applicationProperties.getZoho().isPullProductsAutoCreateCategory());
+        List<Product> variantParents = new ArrayList<>(
+            productRepository.findAll().stream().filter(variantSupport::isVariants).toList()
+        );
+        pullSingleZohoItem(normalizedItemId, normalizedSku, autoCreateCategory, builder, variantParents, label);
+        return builder.build().toMap();
     }
 
     /**
@@ -1317,6 +1014,69 @@ public class ZohoSyncService {
         return builder.build().toMap();
     }
 
+    private void pullSingleZohoItem(
+        String knownItemId,
+        String knownSku,
+        boolean autoCreateCategory,
+        ZohoSyncSummary.Builder builder,
+        List<Product> variantParents,
+        String label
+    ) {
+        pullSingleZohoItem(knownItemId, knownSku, autoCreateCategory, builder, variantParents, label, null);
+    }
+
+    private void pullSingleZohoItem(
+        String knownItemId,
+        String knownSku,
+        boolean autoCreateCategory,
+        ZohoSyncSummary.Builder builder,
+        List<Product> variantParents,
+        String label,
+        Product expectedVariantParent
+    ) {
+        String itemId = StringUtils.trimToNull(knownItemId);
+        String sku = StringUtils.trimToNull(knownSku);
+        String failureLabel = StringUtils.firstNonBlank(label, sku, itemId, "Zoho item");
+        try {
+            Optional<Map<String, Object>> resolved;
+            if (itemId != null) {
+                resolved = fetchZohoItemDetailForSinglePull(itemId);
+                if (resolved.isEmpty() && sku != null) {
+                    builder.notice(failureLabel, "Stored Zoho item id returned no detail; retried by SKU");
+                    resolved = fetchZohoItemDetailBySkuForSinglePull(sku);
+                }
+            } else if (sku != null) {
+                resolved = fetchZohoItemDetailBySkuForSinglePull(sku);
+            } else {
+                builder.failure(failureLabel, "Zoho item id or SKU is required before pulling from Zoho");
+                return;
+            }
+            if (resolved.isEmpty()) {
+                builder.failure(failureLabel, "Zoho item not found");
+                return;
+            }
+            Map<String, Object> item = resolved.orElseThrow();
+            String resolvedSku = StringUtils.trimToNull(stringValue(item.get("sku")));
+            if (resolvedSku == null) {
+                builder.failure(failureLabel, "Zoho item has no SKU — local data was not changed");
+                return;
+            }
+            upsertPulledProduct(item, autoCreateCategory, builder, variantParents, expectedVariantParent, true);
+        } catch (RestClientResponseException e) {
+            if (itemId != null && sku != null && e.getStatusCode().value() == 404) {
+                builder.notice(failureLabel, "Stored Zoho item id was not found; retried by SKU");
+                pullSingleZohoItem(null, sku, autoCreateCategory, builder, variantParents, failureLabel, expectedVariantParent);
+                return;
+            }
+            builder.failure(failureLabel, exceptionMessage(e));
+        } catch (ResourceAccessException e) {
+            builder.failure(failureLabel, "Zoho unreachable while reading item detail: " + exceptionMessage(e));
+        } catch (Exception e) {
+            LOG.warn("Zoho single product pull failed for {}: {}", failureLabel, exceptionMessage(e), e);
+            builder.failure(failureLabel, exceptionMessage(e));
+        }
+    }
+
     private static String exceptionMessage(Throwable e) {
         if (e == null) {
             return "Unknown error";
@@ -1357,21 +1117,54 @@ public class ZohoSyncService {
         ZohoSyncSummary.Builder builder,
         List<Product> variantParents
     ) {
+        return upsertPulledProduct(item, autoCreateCategory, builder, variantParents, null);
+    }
+
+    private boolean upsertPulledProduct(
+        Map<String, Object> item,
+        boolean autoCreateCategory,
+        ZohoSyncSummary.Builder builder,
+        List<Product> variantParents,
+        Product expectedVariantParent
+    ) {
+        return upsertPulledProduct(item, autoCreateCategory, builder, variantParents, expectedVariantParent, false);
+    }
+
+    private boolean upsertPulledProduct(
+        Map<String, Object> item,
+        boolean autoCreateCategory,
+        ZohoSyncSummary.Builder builder,
+        List<Product> variantParents,
+        Product expectedVariantParent,
+        boolean failOnSkippedVariantWithoutParent
+    ) {
         String sku = stringValue(item.get("sku"));
         Map<String, Object> zohoItemPreview = item;
         if (!ZohoBooksItemAttributes.isActive(zohoItemPreview)) {
             deactivateExistingForInactiveZohoItem(zohoItemPreview, sku, variantParents, builder);
             return false;
         }
+        if (expectedVariantParent != null) {
+            return upsertPulledProductIntoExpectedVariantParent(
+                zohoItemPreview,
+                sku,
+                autoCreateCategory,
+                builder,
+                variantParents,
+                expectedVariantParent
+            );
+        }
         Optional<Product> variantParent = findVariantParentForZohoItem(zohoItemPreview, sku, variantParents);
         if (variantParent.isEmpty() && ZohoBooksItemAttributes.isVariantSku(zohoItemPreview)) {
             String previewSize = ZohoBooksItemAttributes.size(zohoItemPreview);
             String previewColor = ZohoBooksItemAttributes.color(zohoItemPreview);
             if (StringUtils.isBlank(previewSize) || StringUtils.isBlank(previewColor)) {
-                builder.notice(
-                    sku,
-                    "Skipped — missing size/color from Zoho (attributes, name, and description all failed to parse)"
-                );
+                String message = "Skipped — missing size/color from Zoho (attributes, name, and description all failed to parse)";
+                if (failOnSkippedVariantWithoutParent) {
+                    builder.failure(sku, message);
+                } else {
+                    builder.notice(sku, message);
+                }
                 return true;
             }
             variantParent = Optional.of(createVariantParentFromZohoGroup(zohoItemPreview, sku, variantParents));
@@ -1446,6 +1239,50 @@ public class ZohoSyncService {
         }
         builder.success();
         return true;
+    }
+
+    private boolean upsertPulledProductIntoExpectedVariantParent(
+        Map<String, Object> item,
+        String sku,
+        boolean autoCreateCategory,
+        ZohoSyncSummary.Builder builder,
+        List<Product> variantParents,
+        Product expectedParent
+    ) {
+        String itemId = stringValue(item.get("item_id"));
+        Optional<Product> linkedByItemId = variantSupport.findProductContainingVariantZohoItemId(variantParents, itemId);
+        if (linkedByItemId.isPresent() && !sameProduct(linkedByItemId.orElseThrow(), expectedParent)) {
+            builder.failure(sku, "Zoho item is already linked to another variant parent");
+            return false;
+        }
+        Optional<Product> linkedBySku = variantSupport.findProductContainingVariantSku(variantParents, sku);
+        if (linkedBySku.isPresent() && !sameProduct(linkedBySku.orElseThrow(), expectedParent)) {
+            builder.failure(sku, "Variant SKU is already linked to another variant parent");
+            return false;
+        }
+        String groupId = ZohoBooksItemAttributes.groupId(item);
+        if (StringUtils.isNotBlank(groupId)) {
+            if (
+                StringUtils.isNotBlank(expectedParent.getZohoItemId()) &&
+                !groupId.equals(StringUtils.trimToNull(expectedParent.getZohoItemId()))
+            ) {
+                builder.failure(sku, "Zoho variant belongs to a different item group");
+                return false;
+            }
+            Optional<Product> groupParent = productRepository.findOneByZohoItemId(groupId).filter(variantSupport::isVariants);
+            if (groupParent.isPresent() && !sameProduct(groupParent.orElseThrow(), expectedParent)) {
+                builder.failure(sku, "Zoho item group is already linked to another variant parent");
+                return false;
+            }
+        }
+        if (
+            (StringUtils.isBlank(ZohoBooksItemAttributes.size(item)) || StringUtils.isBlank(ZohoBooksItemAttributes.color(item))) &&
+            !variantSupport.variantHasSizeAndColor(expectedParent, sku)
+        ) {
+            builder.failure(sku, "Zoho item is missing size/color and no matching local variant row can supply them");
+            return false;
+        }
+        return mergePulledZohoVariantItem(expectedParent, item, sku, autoCreateCategory, builder);
     }
 
     /** @return true when the SKU should remain in the active pulled set */
@@ -1543,6 +1380,42 @@ public class ZohoSyncService {
             return Optional.of(detailItem);
         }
         return Optional.empty();
+    }
+
+    private Optional<Map<String, Object>> fetchZohoItemDetailForSinglePull(String itemId) {
+        Optional<Map<String, Object>> fetched = fetchZohoItemDetail(itemId);
+        if (fetched.isEmpty()) {
+            return Optional.empty();
+        }
+        Map<String, Object> detail = fetched.orElseThrow();
+        String detailItemId = StringUtils.trimToNull(stringValue(detail.get("item_id")));
+        if (detailItemId != null && !itemId.equals(detailItemId)) {
+            throw new IllegalStateException(
+                "Zoho item detail identity mismatch: requested " + itemId + " but received " + detailItemId
+            );
+        }
+        Map<String, Object> resolved = new LinkedHashMap<>(detail);
+        resolved.put("item_id", itemId);
+        return Optional.of(resolved);
+    }
+
+    private Optional<Map<String, Object>> fetchZohoItemDetailBySkuForSinglePull(String sku) {
+        if (StringUtils.isBlank(sku)) {
+            return Optional.empty();
+        }
+        Map<String, Object> listRow = booksClient.findItemBySku(sku);
+        if (listRow == null || listRow.isEmpty()) {
+            return Optional.empty();
+        }
+        String itemId = StringUtils.trimToNull(stringValue(listRow.get("item_id")));
+        String listedSku = StringUtils.trimToNull(stringValue(listRow.get("sku")));
+        if (itemId == null) {
+            throw new IllegalStateException("Zoho item has no item_id — local data was not changed");
+        }
+        if (listedSku == null) {
+            throw new IllegalStateException("Zoho item has no SKU — local data was not changed");
+        }
+        return fetchValidatedZohoItemDetail(listRow, itemId, listedSku);
     }
 
     /**
@@ -1710,6 +1583,16 @@ public class ZohoSyncService {
                 parent.setVariantsJson("[]");
             }
         }
+    }
+
+    private static boolean sameProduct(Product left, Product right) {
+        if (left == right) {
+            return true;
+        }
+        if (left == null || right == null || left.getId() == null || right.getId() == null) {
+            return false;
+        }
+        return left.getId().equals(right.getId());
     }
 
     private String uniqueGroupSku(String displayName, String groupId, String fallbackSku) {
@@ -2286,6 +2169,7 @@ public class ZohoSyncService {
                     order.setZohoLastSyncedAt(Instant.now());
                     order.setZohoSyncError(null);
                     customerOrderRepository.save(order);
+                    stockReconcileService.reconcileOrderProducts(order);
                 } catch (Exception e) {
                     LOG.warn("Zoho order sync failed for {}: {}", orderId, e.getMessage());
                     order.setZohoSyncStatus(ZohoSyncStatus.FAILED);
@@ -2722,7 +2606,7 @@ public class ZohoSyncService {
     }
 
     private void finalizeInvoiceForInventory(String invoiceId) {
-        if (!shouldAdjustZohoInventory() || StringUtils.isBlank(invoiceId)) {
+        if (!accountResolver.isStockAdjustmentEnabled() || StringUtils.isBlank(invoiceId)) {
             return;
         }
         try {
@@ -2731,10 +2615,6 @@ public class ZohoSyncService {
         } catch (RuntimeException e) {
             LOG.warn("Could not mark Zoho invoice {} as sent (stock may not decrement): {}", invoiceId, e.getMessage());
         }
-    }
-
-    private boolean shouldAdjustZohoInventory() {
-        return applicationProperties.getZoho().isSyncProductStock() && resolveInventoryAccountId().isPresent();
     }
 
     /**
@@ -3182,13 +3062,14 @@ public class ZohoSyncService {
         @SuppressWarnings("unchecked")
         Map<String, Object> creditNote = (Map<String, Object>) response.getOrDefault("creditnote", response);
         String creditNoteId = stringValue(creditNote.get("creditnote_id"));
-        if (StringUtils.isNotBlank(creditNoteId) && shouldAdjustZohoInventory()) {
+        if (StringUtils.isNotBlank(creditNoteId) && accountResolver.isStockAdjustmentEnabled()) {
             try {
                 booksClient.markCreditNoteAsOpen(creditNoteId);
                 LOG.debug("Opened Zoho credit note {} for inventory return", creditNoteId);
             } catch (RuntimeException e) {
                 LOG.warn("Could not open Zoho credit note {} (stock may not increment): {}", creditNoteId, e.getMessage());
             }
+            stockReconcileService.reconcileOrderProducts(order);
         }
         return Optional.ofNullable(creditNoteId).filter(StringUtils::isNotBlank);
     }

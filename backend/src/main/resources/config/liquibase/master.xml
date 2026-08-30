@@ -74,4 +74,5 @@
     <include file="config/liquibase/changelog/20260822150000_add_exchange_support_to_order_return.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260826120000_add_custom_invoice_fields.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260828120000_add_invoice_legal_fields.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260830120000_add_zoho_stock_webhook_event.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>

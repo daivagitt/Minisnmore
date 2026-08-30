@@ -1614,6 +1614,31 @@ export const pullZohoProducts = (options?: { full?: boolean }) =>
     { auth: true },
   );
 
+export const pullZohoProduct = (productId: number) =>
+  api.post<ZohoSyncSummary>(`/api/v1/admin/zoho/pull-products/${productId}`, undefined, {
+    auth: true,
+  });
+
+export const pullZohoProductByIdentity = (identity: { sku?: string | null; zohoItemId?: string | null }) =>
+  api.post<ZohoSyncSummary>(
+    "/api/v1/admin/zoho/pull-product",
+    {
+      sku: identity.sku?.trim() || null,
+      zohoItemId: identity.zohoItemId?.trim() || null,
+    },
+    { auth: true },
+  );
+
+export const pullZohoProductVariant = (productId: number, row: { sku?: string | null; zohoItemId?: string | null }) =>
+  api.post<ZohoSyncSummary>(
+    `/api/v1/admin/zoho/pull-products/${productId}/variants`,
+    {
+      sku: row.sku?.trim() || null,
+      zohoItemId: row.zohoItemId?.trim() || null,
+    },
+    { auth: true },
+  );
+
 export const retryZohoOrders = () =>
   api.post<ZohoSyncSummary>("/api/v1/admin/zoho/retry-orders", undefined, { auth: true });
 
