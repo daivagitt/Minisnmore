@@ -467,7 +467,7 @@ function MegaMenu({ categories, products, onClose }: { categories: Category[]; p
             onClick={onClose}
             className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-primary story-link"
           >
-            View all products <ArrowRight className="h-3.5 w-3.5" />
+            View all products
           </Link>
         </div>
 

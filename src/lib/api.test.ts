@@ -8,6 +8,7 @@ async function loadApi(baseUrl = "https://api.example.com/") {
 
 describe("api client", () => {
   beforeEach(() => {
+    vi.unstubAllGlobals();
     localStorage.clear();
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
@@ -126,6 +127,32 @@ describe("api client", () => {
 
     await expect(api.get("/api/account", { unwrap: false })).resolves.toEqual({ login: "admin" });
     expect(fetchMock).toHaveBeenCalledWith("/api/account", expect.objectContaining({ method: "GET" }));
+  });
+
+  it("keeps deployed storefront API calls same-origin when a bundle has the wrong environment URL", async () => {
+    const originalWindow = globalThis.window;
+    vi.stubGlobal("window", {
+      ...originalWindow,
+      location: {
+        ...originalWindow.location,
+        hostname: "minisnmore.com",
+      },
+    });
+    const { api, backendOAuthUrl } = await loadApi("https://uat.minisnmore.com");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await api.get("/api/v1/categories");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/categories",
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(backendOAuthUrl("google")).toBe("/oauth2/authorization/google");
   });
 
   it("builds backend OAuth URLs from the configured API origin", async () => {

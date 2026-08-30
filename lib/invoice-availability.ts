@@ -1,4 +1,4 @@
-import { isCodOrder, needsOnlinePayment, type OrderStatusFields } from "./order-status";
+import { isCodOrder, needsOnlinePayment, type OrderStatusFields } from "@/lib/order-status";
 
 export type InvoiceAvailabilityOrder = OrderStatusFields;
 
