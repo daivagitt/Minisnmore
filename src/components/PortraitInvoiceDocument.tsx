@@ -131,7 +131,7 @@ export function PortraitInvoiceDocument({
         </div>
       </section>
 
-      <section className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5">
+      <section className="mt-2 grid grid-cols-[1.15fr_0.85fr] gap-x-4 gap-y-0.5">
         <MetaLine
           className="col-start-1 row-start-1"
           label="GST NO"

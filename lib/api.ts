@@ -1,5 +1,11 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string | undefined;
 
+const SAME_ORIGIN_STOREFRONT_HOSTS = new Set([
+  "minisnmore.com",
+  "www.minisnmore.com",
+  "uat.minisnmore.com",
+]);
+
 export const AUTH_TOKEN_KEY = "mnm_backend_jwt";
 
 type RequestOptions = RequestInit & {
@@ -20,7 +26,19 @@ export class ApiError extends Error {
 }
 
 function getApiBaseUrl() {
-  return API_BASE_URL?.replace(/\/+$/, "") ?? "";
+  const configuredBaseUrl = API_BASE_URL?.replace(/\/+$/, "") ?? "";
+
+  // Nginx exposes the API on the same public host as the storefront. Keep
+  // browser requests same-origin even if a bundle is accidentally built with
+  // another environment's VITE_API_BASE_URL (for example UAT in a prod build).
+  if (
+    typeof window !== "undefined" &&
+    SAME_ORIGIN_STOREFRONT_HOSTS.has(window.location.hostname.toLowerCase())
+  ) {
+    return "";
+  }
+
+  return configuredBaseUrl;
 }
 
 function networkErrorMessage(path: string, error: unknown) {
