@@ -147,5 +147,10 @@ describe("product fit validators", () => {
     expect(sizeGuideRowsForProduct(["One Size"])).toEqual([
       { size: "One Size", height: "—", chest: "—" },
     ]);
+    expect(sizeGuideRowsForProduct(["0-3", "3-6", "6-12"])).toEqual([
+      { size: "0-3", height: "45–58 cm", chest: "36–43 cm" },
+      { size: "3-6", height: "58–67 cm", chest: "43–45 cm" },
+      { size: "6-12", height: "67–74 cm", chest: "45–48 cm" },
+    ]);
   });
 });

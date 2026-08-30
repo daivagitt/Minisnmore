@@ -521,7 +521,7 @@ function ProductPage() {
       </div>
 
       {sizeChart && (
-        <div className="fixed inset-0 z-70 grid place-items-end sm:place-items-center p-0 sm:p-4 bg-foreground/30 backdrop-blur-sm" onClick={() => setSizeChart(false)}>
+        <div className="fixed inset-0 z-[70] grid place-items-end sm:place-items-center p-0 sm:p-4 bg-foreground/30 backdrop-blur-sm" onClick={() => setSizeChart(false)}>
           <div
             onClick={(e) => e.stopPropagation()}
             className="glass-strong rounded-t-3xl sm:rounded-3xl max-w-md w-full p-5 sm:p-6 max-h-[85vh] overflow-y-auto"

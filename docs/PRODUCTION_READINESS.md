@@ -64,6 +64,19 @@ ENV_FILE=/etc/mini-and-more/prod.env REPO_ROOT=/var/www/blossom-blueprint-craft 
   bash deploy/scripts/prod-microservices-pm2.sh
 ```
 
+### Production frontend
+
+Build and restart the storefront/admin UI from the production checkout:
+
+```bash
+REPO_ROOT=/var/www/uat1/mini_ms_test \
+  bash deploy/scripts/prod-frontend-pm2.sh
+```
+
+The production frontend uses `https://minisnmore.com` by default and runs as
+`mini-prod-frontend` on localhost port `3000`. UAT frontend scripts retain
+their separate `uat.minisnmore.com` defaults.
+
 **Port layout:** Nginx public → gateway **8080** only. Store **8081**, commerce **8082**, integration **8083**, catalog **8084** are localhost-only. Do not expose edge ports publicly.
 
 UAT1 (`/var/www/uat1/mini_and_more`): Jenkins `DEPLOY_UAT` rsyncs all JARs; on the VPS run `deploy/scripts/uat-microservices-pm2.sh` (see `deploy/env/uat.env.example`). Gateway profile `uat` uses localhost routes to edges.
