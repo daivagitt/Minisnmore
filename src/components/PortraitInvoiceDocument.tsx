@@ -89,23 +89,23 @@ export function PortraitInvoiceDocument({
     <article
       className={`invoice-document box-border mx-auto flex flex-col bg-white font-sans text-[8.5px] leading-[1.28] text-black shadow-xl print:shadow-none print:overflow-visible ${compact ? "min-h-[720px] w-full p-4" : "min-h-[297mm] w-[210mm] max-w-full p-[8mm]"}`}
     >
-      <header className="grid grid-cols-[1fr_auto_1fr] items-start gap-3">
+      <header className="grid grid-cols-[minmax(0,1fr)_auto_minmax(72px,1fr)] items-start gap-3">
         <div className="min-w-0">
           {logo ? (
             <img
               src={logo}
               alt={`${brandName} invoice logo`}
-              className="mb-1.5 max-h-12 max-w-[190px] object-contain object-left"
+              className="mb-1.5 h-auto max-h-12 w-full max-w-[190px] object-contain object-left"
             />
           ) : (
             <div className="text-base font-bold leading-tight">{brandName}</div>
           )}
           <p className="break-all text-[8px]">{display(settings.invoice_website)}</p>
         </div>
-        <h1 className="pt-0.5 text-center text-[15px] font-bold uppercase tracking-wide">
+        <h1 className="whitespace-nowrap pt-0.5 text-center text-[15px] font-bold uppercase tracking-wide">
           Tax Invoice
         </h1>
-        <div className="flex min-h-20 flex-col items-end justify-start">
+        <div className="flex min-h-20 min-w-0 flex-col items-end justify-start">
           <InvoiceOrderQr
             orderNumber={order.order_number}
             invoiceWebsite={settings.invoice_website}

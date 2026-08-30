@@ -39,6 +39,7 @@ describe("PortraitInvoiceDocument", () => {
         settings={{
           brand_name: "Mini's n More",
           legal_entity_name: "Stolt Global Private Limited",
+          invoice_logo_url: "https://www.minisnmore.example/invoice-logo.png",
           invoice_website: "https://www.minisnmore.example",
           invoice_gstin: "29ABCDE1234F1Z5",
           invoice_sold_by_address: "Seller address",
@@ -57,6 +58,14 @@ describe("PortraitInvoiceDocument", () => {
     expect(invoice).toBeTruthy();
     expect(invoice).toHaveClass("min-h-[297mm]", "w-[210mm]");
     expect(invoice).toHaveTextContent("Tax Invoice");
+    expect(container.querySelector("article header")).toHaveClass(
+      "grid-cols-[minmax(0,1fr)_auto_minmax(72px,1fr)]",
+    );
+    expect(container.querySelector('img[alt="Mini\'s n More invoice logo"]')).toHaveClass(
+      "w-full",
+      "max-w-[190px]",
+    );
+    expect(container.querySelector("article header h1")).toHaveClass("whitespace-nowrap");
     expect(invoice).toHaveTextContent("29-Karnataka");
     const shipmentLine = Array.from(container.querySelectorAll("p")).find((el) =>
       el.textContent?.includes("Shipment ID"),
