@@ -133,7 +133,11 @@ export function PortraitInvoiceDocument({
 
       <section className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5">
         <MetaLine label="GST NO" value={display(settings.invoice_gstin)} />
-        <MetaLine label="Shipment ID" value={display(order.tracking_number)} />
+        <MetaLine
+          className="hidden"
+          label="Shipment ID"
+          value={display(order.tracking_number)}
+        />
         <MetaLine
           label="Place Of Supply"
           value={formatPlaceOfSupply(order.shipping_address?.state)}
@@ -255,9 +259,17 @@ export function PortraitInvoiceDocument({
   );
 }
 
-function MetaLine({ label, value }: { label: string; value: string }) {
+function MetaLine({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
   return (
-    <p className="min-w-0">
+    <p className={className ? `min-w-0 ${className}` : "min-w-0"}>
       <span className="font-bold">{label} :</span> <span className="break-words">{value}</span>
     </p>
   );
