@@ -132,17 +132,26 @@ export function PortraitInvoiceDocument({
       </section>
 
       <section className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5">
-        <MetaLine label="GST NO" value={display(settings.invoice_gstin)} />
         <MetaLine
-          className="hidden"
+          className="col-start-1 row-start-1"
+          label="GST NO"
+          value={display(settings.invoice_gstin)}
+        />
+        <MetaLine
+          className="col-start-2 row-start-1 hidden"
           label="Shipment ID"
           value={display(order.tracking_number)}
         />
         <MetaLine
+          className="col-start-1 row-start-2"
           label="Place Of Supply"
           value={formatPlaceOfSupply(order.shipping_address?.state)}
         />
-        <MetaLine label="Order No" value={order.order_number} />
+        <MetaLine
+          className="col-start-2 row-start-2"
+          label="Order No"
+          value={order.order_number}
+        />
       </section>
 
       <section className="mt-2 space-y-1 border-t border-black pt-1.5">

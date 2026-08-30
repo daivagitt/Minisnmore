@@ -1,22 +1,19 @@
 {
   "baseUrl": "https://uat.minisnmore.com",
-  "startedAt": "2026-08-10T10:59:38.202513+00:00",
-  "finishedAt": "2026-08-10T10:59:44.808755+00:00",
-  "paymentDemo": true,
-  "refundDemo": true,
+  "startedAt": "2026-08-30T11:35:10.034077+00:00",
+  "finishedAt": "2026-08-30T11:35:10.577839+00:00",
+  "paymentDemo": false,
+  "refundDemo": false,
   "credentials": {
     "customer": "irfanpatan9948@gmail.com",
     "admin": "admin@uat.minisnmore.com"
   },
   "orderContext": {
-    "orderId": 40351,
-    "orderNumber": "MNM-13EBD4C7A001",
-    "total": 8.0,
-    "demoMode": true,
-    "gatewayMode": "demo",
-    "paid": true,
-    "ledgerlySyncTriggered": true,
-    "zohoSalesOrderId": "MNM-13EBD4C7A001"
+    "orderId": 49452,
+    "orderNumber": "MNM-B6463D3B441E",
+    "total": 91.0,
+    "demoMode": false,
+    "gatewayMode": "live"
   },
   "scenarios": [
     {
@@ -50,45 +47,42 @@
         {
           "name": "resolve-product",
           "status": "pass",
-          "note": "basic-shorts id=39351 \u20b98",
+          "note": "basic-shorts id=48005 \u20b9100",
           "ms": 0,
           "detail": {
-            "product_id": "39351",
+            "product_id": "48005",
             "product_slug": "basic-shorts",
             "product_name": "BASIC SHORTS",
             "qty": 1,
             "size": "0-3 M",
-            "color": "Happy Bee",
-            "sku": "BASIC-SHORTS-03-HAPPY-BEE",
-            "price": 8.0
+            "color": "Bee Blue",
+            "sku": "BASIC-SHORTS-03-BEE-BLUE",
+            "price": 100.0
           }
         },
         {
           "name": "validate-coupon",
           "status": "pass",
-          "note": "discount \u20b91 on subtotal \u20b98 (qty=1)",
-          "ms": 82,
+          "note": "discount \u20b910 on subtotal \u20b9100 (qty=1)",
+          "ms": 51,
           "detail": {
-            "discount": 1.0,
-            "subtotal": 8.0,
+            "discount": 10.0,
+            "subtotal": 100.0,
             "qty": 1
           }
         },
         {
           "name": "create-order",
           "status": "pass",
-          "note": "order MNM-13EBD4C7A001 total \u20b98 (demoMode=True)",
-          "ms": 102,
+          "note": "order MNM-B6463D3B441E total \u20b991 (demoMode=False)",
+          "ms": 143,
           "detail": {
-            "orderId": 40351,
-            "orderNumber": "MNM-13EBD4C7A001",
-            "razorpayOrderId": "order_demo_MNM-13EBD4C7A001",
-            "total": 8.0,
-            "demoMode": true,
-            "gatewayMode": "demo",
-            "paid": true,
-            "ledgerlySyncTriggered": true,
-            "zohoSalesOrderId": "MNM-13EBD4C7A001"
+            "orderId": 49452,
+            "orderNumber": "MNM-B6463D3B441E",
+            "razorpayOrderId": "order_TVxzIqWOEj05Zb",
+            "total": 91.0,
+            "demoMode": false,
+            "gatewayMode": "live"
           }
         }
       ]
@@ -97,15 +91,16 @@
       "id": "payment-verify",
       "title": "Payment verify",
       "description": "Demo bypass when RAZORPAY_PAYMENT_DEMO=true; otherwise skipped (live Razorpay required).",
-      "status": "pass",
+      "status": "skip",
       "steps": [
         {
           "name": "verify-payment",
-          "status": "pass",
-          "note": "PAID MNM-13EBD4C7A001",
-          "ms": 4191,
+          "status": "skip",
+          "note": "Catalog uses live Razorpay \u2014 enable RAZORPAY_PAYMENT_DEMO on catalog or set RAZORPAY_KEY_ID=DEMO",
+          "ms": 0,
           "detail": {
-            "zohoSynced": null
+            "gatewayMode": "live",
+            "demoMode": false
           }
         }
       ]
@@ -114,19 +109,14 @@
       "id": "zoho-order-sync",
       "title": "Zoho sales order + invoice sync",
       "description": "Admin sync after payment; verifies Zoho IDs and SYNCED status.",
-      "status": "pass",
+      "status": "skip",
       "steps": [
         {
           "name": "sync-order",
-          "status": "pass",
-          "note": "Ledgerly sync for MNM-13EBD4C7A001 (Zoho admin API not on MS stack)",
-          "ms": 207,
-          "detail": {
-            "orderNumber": "MNM-13EBD4C7A001",
-            "ledgerlySyncStatus": "SYNCED",
-            "ledgerlySyncError": "",
-            "ok": true
-          }
+          "status": "skip",
+          "note": "order not paid (live Razorpay required)",
+          "ms": 0,
+          "detail": {}
         }
       ]
     },
@@ -134,16 +124,14 @@
       "id": "zoho-coupon-pricing",
       "title": "Zoho Books totals match store (\u20b92 paid)",
       "description": "Live Zoho API check: entity discount + shipping \u2192 total \u20b92, not catalog line \u20b9349.",
-      "status": "pass",
+      "status": "skip",
       "steps": [
         {
           "name": "zoho-so-total",
-          "status": "pass",
-          "note": "Checkout total \u20b98.00 (Books SO check skipped \u2014 use Ledgerly on MS UAT)",
+          "status": "skip",
+          "note": "no Zoho sales order id",
           "ms": 0,
-          "detail": {
-            "expected": 8.0
-          }
+          "detail": {}
         }
       ]
     },
@@ -151,35 +139,14 @@
       "id": "shipment-tracking",
       "title": "Shipment + tracking pull",
       "description": "Set shipment on Zoho SO, pull tracking, verify shipped status on storefront API.",
-      "status": "pass",
+      "status": "skip",
       "steps": [
         {
-          "name": "zoho-set-shipment",
-          "status": "pass",
-          "note": "demo delivery anchor on order (Zoho Books API optional on MS UAT)",
+          "name": "shipment-flow",
+          "status": "skip",
+          "note": "requires paid order with sync id",
           "ms": 0,
           "detail": {}
-        },
-        {
-          "name": "pull-tracking",
-          "status": "pass",
-          "note": "demo \u2014 bulk Ledgerly/Zoho tracking pull skipped (storefront track checked next)",
-          "ms": 0,
-          "detail": {}
-        },
-        {
-          "name": "public-track-api",
-          "status": "pass",
-          "note": "public track (shipped)",
-          "ms": 132,
-          "detail": {
-            "order_number": "MNM-13EBD4C7A001",
-            "status": "confirmed",
-            "tracking_status": "shipped",
-            "tracking_number": "",
-            "tracking_carrier": "",
-            "shipment_date": "2026-08-10"
-          }
         }
       ]
     },
@@ -187,48 +154,14 @@
       "id": "return-refund",
       "title": "Return request \u2192 approve \u2192 receive \u2192 refund",
       "description": "Full return when order is paid + shipped; refund uses Razorpay demo only when RAZORPAY_REFUND_DEMO=true.",
-      "status": "pass",
+      "status": "skip",
       "steps": [
         {
-          "name": "return-eligibility",
-          "status": "pass",
-          "note": "eligible",
-          "ms": 43,
+          "name": "return-flow",
+          "status": "skip",
+          "note": "order not paid",
+          "ms": 0,
           "detail": {}
-        },
-        {
-          "name": "request-return",
-          "status": "pass",
-          "note": "RET-MNM-13EBD4C7A001-4ED8F0",
-          "ms": 60,
-          "detail": {}
-        },
-        {
-          "name": "approve",
-          "status": "pass",
-          "note": "approved",
-          "ms": 50,
-          "detail": {
-            "refund_amount": null
-          }
-        },
-        {
-          "name": "mark-received",
-          "status": "pass",
-          "note": "received",
-          "ms": 43,
-          "detail": {
-            "refund_amount": null
-          }
-        },
-        {
-          "name": "refund",
-          "status": "pass",
-          "note": "refunded",
-          "ms": 1255,
-          "detail": {
-            "refund_amount": 8.0
-          }
         }
       ]
     },
@@ -242,7 +175,7 @@
           "name": "shipped-order-track",
           "status": "pass",
           "note": "MNM-2606-A4A0B \u2192 delivered",
-          "ms": 33,
+          "ms": 37,
           "detail": {
             "order_number": "MNM-2606-A4A0B",
             "status": "fulfilled",
@@ -256,11 +189,11 @@
           "name": "returned-order-track",
           "status": "pass",
           "note": "MNM-2606-86EA3 shipment_date=2026-06-06",
-          "ms": 28,
+          "ms": 43,
           "detail": {
             "order_number": "MNM-2606-86EA3",
             "status": "confirmed",
-            "tracking_status": "pending",
+            "tracking_status": "shipped",
             "tracking_number": "",
             "tracking_carrier": "",
             "shipment_date": "2026-06-06"
@@ -271,8 +204,8 @@
   ],
   "summary": {
     "total": 8,
-    "passed": 8,
+    "passed": 3,
     "failed": 0,
-    "skipped": 0
+    "skipped": 5
   }
 }

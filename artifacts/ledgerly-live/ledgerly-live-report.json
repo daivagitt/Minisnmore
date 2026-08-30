@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://uat.minisnmore.com",
-  "startedAt": "2026-08-10T10:46:34.031581+00:00",
-  "finishedAt": "2026-08-10T10:46:36.602059+00:00",
+  "startedAt": "2026-08-30T11:34:53.050180+00:00",
+  "finishedAt": "2026-08-30T11:35:04.039078+00:00",
   "results": [
     {
       "method": "POST",
@@ -16,7 +16,7 @@
       "path": "/api/v1/admin/ledgerly/integration-status",
       "ok": true,
       "code": 200,
-      "ms": 201,
+      "ms": 130,
       "note": "",
       "body": "{\"serverConfigured\": true, \"connected\": true, \"pullProductsAutoCreateCategory\": false}"
     },
@@ -25,7 +25,7 @@
       "path": "/api/v1/admin/ledgerly/settings",
       "ok": true,
       "code": 200,
-      "ms": 47,
+      "ms": 53,
       "note": "",
       "body": "{\"apiBaseUrl\": \"https://uat-lender.qualityoutsidethebox.org/api\", \"orgId\": \"1001\", \"connected\": true, \"pullProductsAutoCreateCategory\": false, \"hasToken\": true, \"hasWebhookSecret\": true}"
     },
@@ -34,34 +34,34 @@
       "path": "/api/v1/admin/ledgerly/test",
       "ok": true,
       "code": 200,
-      "ms": 708,
+      "ms": 3034,
       "note": "",
-      "body": "{\"activeKeys\": 1, \"activeWebhooks\": 0, \"connected\": true, \"message\": \"Integration API ready\", \"organizationId\": null, \"scopes\": [], \"ok\": true}"
+      "body": "{\"activeKeys\": 2, \"activeWebhooks\": 0, \"connected\": true, \"message\": \"Integration API ready\", \"organizationId\": null, \"scopes\": [], \"ok\": true}"
     },
     {
       "method": "POST",
       "path": "/api/v1/admin/ledgerly/pull-inventory",
       "ok": true,
       "code": 200,
-      "ms": 501,
+      "ms": 1447,
       "note": "",
-      "body": "{\"successCount\": 1, \"failureCount\": 0, \"skippedCount\": 3, \"failures\": [], \"notices\": [], \"skipped\": [{\"sku\": \"BABY-FRONT-OPEN-FROCK-HALF-SLEEVE\", \"message\": \"No linked store product for SKU or Ledgerly item id\"}, {\"sku\": \"SKU-60377\", \"message\": \"No linked store product for SKU or Ledgerly item id\"}, {\"sku\": \"CH-WIDGET-1786355171\", \"message\": \"No linked store product for SKU or Ledgerly item id\"}]}"
+      "body": "{\"successCount\": 1, \"failureCount\": 0, \"skippedCount\": 2, \"failures\": [], \"notices\": [], \"skipped\": [{\"sku\": \"SKU-78415\", \"message\": \"No linked store product for SKU or Ledgerly item id\"}, {\"sku\": \"SKU-65893\", \"message\": \"No linked store product for SKU or Ledgerly item id\"}]}"
     },
     {
       "method": "POST",
       "path": "/api/v1/admin/ledgerly/retry-orders",
       "ok": true,
       "code": 200,
-      "ms": 108,
+      "ms": 4997,
       "note": "",
-      "body": "{\"successCount\": 0, \"failureCount\": 0, \"skippedCount\": 0, \"failures\": [], \"notices\": [], \"skipped\": []}"
+      "body": "{\"successCount\": 12, \"failureCount\": 0, \"skippedCount\": 0, \"failures\": [], \"notices\": [], \"skipped\": []}"
     },
     {
       "method": "POST",
       "path": "/api/v1/admin/ledgerly/pull-order-tracking",
       "ok": true,
       "code": 200,
-      "ms": 901,
+      "ms": 878,
       "note": "",
       "body": "{\"successCount\": 3, \"failureCount\": 0, \"skippedCount\": 0, \"failures\": [], \"notices\": [{\"sku\": \"batch\", \"message\": \"Pulled tracking for 3 open paid orders (max 3)\"}], \"skipped\": []}"
     }

@@ -1,23 +1,20 @@
 {
   "baseUrl": "https://uat.minisnmore.com",
-  "startedAt": "2026-08-10T11:05:47.001210+00:00",
-  "finishedAt": "2026-08-10T11:05:53.963967+00:00",
-  "paymentDemo": true,
-  "refundDemo": true,
+  "startedAt": "2026-08-30T11:35:04.270575+00:00",
+  "finishedAt": "2026-08-30T11:35:09.891092+00:00",
+  "paymentDemo": false,
+  "refundDemo": false,
   "credentials": {
     "customer": "irfanpatan9948@gmail.com",
     "admin": "admin@uat.minisnmore.com"
   },
   "orderContext": {
-    "orderId": 40651,
-    "orderNumber": "MNM-0B0F69E301F9",
-    "total": 8.0,
-    "demoMode": true,
-    "gatewayMode": "demo",
-    "paid": true,
-    "ledgerlySyncTriggered": true,
-    "returnNumber": "RET-MNM-0B0F69E301F9-446E18",
-    "ledgerlyCreditNoteId": "cn_demo_MNM-0B0F69E301F9"
+    "orderId": 49451,
+    "orderNumber": "MNM-DE7E60C68CD9",
+    "total": 91.0,
+    "demoMode": false,
+    "gatewayMode": "live",
+    "ledgerlySyncTriggered": true
   },
   "scenarios": [
     {
@@ -51,46 +48,43 @@
         {
           "name": "resolve-product",
           "status": "pass",
-          "note": "basic-shorts id=39351 \u20b98",
+          "note": "basic-shorts id=48005 \u20b9100",
           "ms": 0,
           "detail": {
-            "product_id": "39351",
+            "product_id": "48005",
             "product_slug": "basic-shorts",
             "product_name": "BASIC SHORTS",
             "qty": 1,
             "size": "0-3 M",
-            "color": "Happy Bee",
-            "sku": "BASIC-SHORTS-03-HAPPY-BEE",
-            "price": 8.0
+            "color": "Bee Blue",
+            "sku": "BASIC-SHORTS-03-BEE-BLUE",
+            "price": 100.0
           }
         },
         {
           "name": "validate-coupon",
           "status": "pass",
-          "note": "discount \u20b91 on subtotal \u20b98 (qty=1)",
-          "ms": 283,
+          "note": "discount \u20b910 on subtotal \u20b9100 (qty=1)",
+          "ms": 953,
           "detail": {
-            "discount": 1.0,
-            "subtotal": 8.0,
+            "discount": 10.0,
+            "subtotal": 100.0,
             "qty": 1
           }
         },
         {
           "name": "create-order",
           "status": "pass",
-          "note": "order MNM-0B0F69E301F9 total \u20b98 (demoMode=True)",
-          "ms": 281,
+          "note": "order MNM-DE7E60C68CD9 total \u20b991 (demoMode=False)",
+          "ms": 485,
           "detail": {
-            "orderId": 40651,
-            "orderNumber": "MNM-0B0F69E301F9",
-            "razorpayOrderId": "order_demo_MNM-0B0F69E301F9",
-            "total": 8.0,
-            "demoMode": true,
-            "gatewayMode": "demo",
-            "paid": true,
-            "ledgerlySyncTriggered": true,
-            "returnNumber": "RET-MNM-0B0F69E301F9-446E18",
-            "ledgerlyCreditNoteId": "cn_demo_MNM-0B0F69E301F9"
+            "orderId": 49451,
+            "orderNumber": "MNM-DE7E60C68CD9",
+            "razorpayOrderId": "order_TVxzDxXmitJaOT",
+            "total": 91.0,
+            "demoMode": false,
+            "gatewayMode": "live",
+            "ledgerlySyncTriggered": true
           }
         }
       ]
@@ -99,15 +93,16 @@
       "id": "payment-verify",
       "title": "Payment verify",
       "description": "Demo bypass when RAZORPAY_PAYMENT_DEMO=true; otherwise skipped (live Razorpay required).",
-      "status": "pass",
+      "status": "skip",
       "steps": [
         {
           "name": "verify-payment",
-          "status": "pass",
-          "note": "PAID MNM-0B0F69E301F9",
-          "ms": 1508,
+          "status": "skip",
+          "note": "Catalog uses live Razorpay \u2014 enable RAZORPAY_PAYMENT_DEMO on catalog or set RAZORPAY_KEY_ID=DEMO",
+          "ms": 0,
           "detail": {
-            "zohoSynced": null
+            "gatewayMode": "live",
+            "demoMode": false
           }
         }
       ]
@@ -122,7 +117,7 @@
           "name": "integration-status",
           "status": "pass",
           "note": "connected=true",
-          "ms": 42,
+          "ms": 47,
           "detail": {
             "serverConfigured": true,
             "connected": true,
@@ -133,9 +128,9 @@
           "name": "test-connection",
           "status": "pass",
           "note": "Ledgerly API reachable",
-          "ms": 257,
+          "ms": 255,
           "detail": {
-            "activeKeys": 1,
+            "activeKeys": 2,
             "activeWebhooks": 0,
             "connected": true,
             "message": "Integration API ready",
@@ -154,28 +149,35 @@
       "steps": [
         {
           "name": "sync-order",
+          "status": "skip",
+          "note": "checkout order unpaid \u2014 using reference order MNM-0FB910FDBC4D",
+          "ms": 0,
+          "detail": {}
+        },
+        {
+          "name": "sync-order",
           "status": "pass",
-          "note": "sync OK for MNM-0B0F69E301F9",
-          "ms": 260,
+          "note": "sync exercised on reference MNM-0FB910FDBC4D (status=FAILED)",
+          "ms": 283,
           "detail": {
-            "orderNumber": "MNM-0B0F69E301F9",
-            "ledgerlySyncStatus": "SYNCED",
-            "ledgerlySyncError": "",
-            "ok": true
+            "orderNumber": "MNM-0FB910FDBC4D",
+            "ledgerlySyncStatus": "FAILED",
+            "ledgerlySyncError": "500 Internal Server Error: \"{\"detail\":\"No instances available for sales\",\"instance\":\"/api/integrations/commerce/orders/sync\",\"status\":500,\"title\":\"Internal Server Error\",\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"message\":\"error.http.500\",\"path\":\"/api/integrations/commerce/orders/sync\"}\"",
+            "ok": false
           }
         },
         {
           "name": "verify-sync-status",
           "status": "pass",
-          "note": "paid order MNM-0B0F69E301F9 trackable after sync",
-          "ms": 43,
+          "note": "reference order MNM-0FB910FDBC4D reachable (payment=confirmed)",
+          "ms": 115,
           "detail": {
-            "order_number": "MNM-0B0F69E301F9",
+            "order_number": "MNM-0FB910FDBC4D",
             "status": "confirmed",
-            "tracking_status": "shipped",
+            "tracking_status": "confirmed",
             "tracking_number": "",
             "tracking_carrier": "",
-            "shipment_date": "2026-08-10"
+            "shipment_date": ""
           }
         }
       ]
@@ -190,24 +192,20 @@
           "name": "pull-inventory",
           "status": "pass",
           "note": "ok",
-          "ms": 287,
+          "ms": 293,
           "detail": {
             "successCount": 1,
             "failureCount": 0,
-            "skippedCount": 3,
+            "skippedCount": 2,
             "failures": [],
             "notices": [],
             "skipped": [
               {
-                "sku": "BABY-FRONT-OPEN-FROCK-HALF-SLEEVE",
+                "sku": "SKU-78415",
                 "message": "No linked store product for SKU or Ledgerly item id"
               },
               {
-                "sku": "SKU-60377",
-                "message": "No linked store product for SKU or Ledgerly item id"
-              },
-              {
-                "sku": "CH-WIDGET-1786355171",
+                "sku": "SKU-65893",
                 "message": "No linked store product for SKU or Ledgerly item id"
               }
             ]
@@ -225,7 +223,7 @@
           "name": "pull-tracking",
           "status": "pass",
           "note": "tracking pull completed",
-          "ms": 603,
+          "ms": 481,
           "detail": {
             "successCount": 3,
             "failureCount": 0,
@@ -244,7 +242,7 @@
           "name": "public-track-shipped-ref",
           "status": "pass",
           "note": "MNM-2606-A4A0B \u2192 delivered",
-          "ms": 33,
+          "ms": 41,
           "detail": {
             "order_number": "MNM-2606-A4A0B",
             "status": "fulfilled",
@@ -260,77 +258,14 @@
       "id": "ledgerly-return-credit-note",
       "title": "Return \u2192 refund \u2192 Ledgerly credit note",
       "description": "Full return on demo-paid order synced to Ledgerly; verifies Razorpay demo refund and ledgerly_credit_note_id.",
-      "status": "pass",
+      "status": "skip",
       "steps": [
         {
-          "name": "return-eligibility",
-          "status": "pass",
-          "note": "eligible",
-          "ms": 41,
-          "detail": {}
-        },
-        {
-          "name": "request-return",
-          "status": "pass",
-          "note": "RET-MNM-0B0F69E301F9-446E18",
-          "ms": 59,
-          "detail": {}
-        },
-        {
-          "name": "approve",
-          "status": "pass",
-          "note": "approved",
-          "ms": 48,
-          "detail": {
-            "refund_amount": null,
-            "razorpay_refund_id": null,
-            "ledgerly_credit_note_id": null
-          }
-        },
-        {
-          "name": "mark-received",
-          "status": "pass",
-          "note": "received",
-          "ms": 43,
-          "detail": {
-            "refund_amount": null,
-            "razorpay_refund_id": null,
-            "ledgerly_credit_note_id": null
-          }
-        },
-        {
-          "name": "refund",
-          "status": "pass",
-          "note": "refunded",
-          "ms": 591,
-          "detail": {
-            "refund_amount": 8.0,
-            "razorpay_refund_id": "rfnd_demo_MNM-0B0F69E301F9",
-            "ledgerly_credit_note_id": "cn_demo_MNM-0B0F69E301F9"
-          }
-        },
-        {
-          "name": "ledgerly-credit-note",
-          "status": "pass",
-          "note": "credit note cn_demo_MNM-0B0F69E301F9",
+          "name": "return-flow",
+          "status": "skip",
+          "note": "order not paid",
           "ms": 0,
-          "detail": {
-            "id": 40751,
-            "return_number": "RET-MNM-0B0F69E301F9-446E18",
-            "status": "refunded",
-            "reason": "Ledgerly scenario integration test return",
-            "admin_notes": "Ledgerly scenario test\nLedgerly scenario test\nLedgerly scenario test",
-            "rejection_reason": null,
-            "refund_amount": 8.0,
-            "razorpay_refund_id": "rfnd_demo_MNM-0B0F69E301F9",
-            "ledgerly_credit_note_id": "cn_demo_MNM-0B0F69E301F9",
-            "requested_at": "2026-08-10T11:05:53.072728Z",
-            "resolved_at": "2026-08-10T11:05:53.751132106Z",
-            "order_id": 40651,
-            "order_number": "MNM-0B0F69E301F9",
-            "order_total": 8.0,
-            "customer_login": "dev1"
-          }
+          "detail": {}
         }
       ]
     },
@@ -344,7 +279,7 @@
           "name": "shipped-order",
           "status": "pass",
           "note": "MNM-2606-A4A0B \u2192 delivered",
-          "ms": 29,
+          "ms": 42,
           "detail": {
             "order_number": "MNM-2606-A4A0B",
             "status": "fulfilled",
@@ -358,11 +293,11 @@
           "name": "returned-order",
           "status": "pass",
           "note": "MNM-2606-86EA3 shipment_date=2026-06-06",
-          "ms": 29,
+          "ms": 40,
           "detail": {
             "order_number": "MNM-2606-86EA3",
             "status": "confirmed",
-            "tracking_status": "pending",
+            "tracking_status": "shipped",
             "tracking_number": "",
             "tracking_carrier": "",
             "shipment_date": "2026-06-06"
@@ -371,22 +306,22 @@
         {
           "name": "checkout-order",
           "status": "pass",
-          "note": "MNM-0B0F69E301F9 \u2192 pending (public fields OK)",
-          "ms": 32,
+          "note": "MNM-DE7E60C68CD9 \u2192 pending (public fields OK)",
+          "ms": 41,
           "detail": {
-            "order_number": "MNM-0B0F69E301F9",
-            "status": "confirmed",
+            "order_number": "MNM-DE7E60C68CD9",
+            "status": "pending",
             "tracking_status": "pending",
             "tracking_number": "",
             "tracking_carrier": "",
-            "shipment_date": "2026-08-10"
+            "shipment_date": ""
           }
         },
         {
           "name": "unknown-order",
           "status": "pass",
           "note": "404 for invalid order number",
-          "ms": 42,
+          "ms": 83,
           "detail": {}
         }
       ]
@@ -401,7 +336,7 @@
           "name": "shipped-order-track",
           "status": "pass",
           "note": "MNM-2606-A4A0B \u2192 delivered",
-          "ms": 29,
+          "ms": 42,
           "detail": {
             "order_number": "MNM-2606-A4A0B",
             "status": "fulfilled",
@@ -415,11 +350,11 @@
           "name": "returned-order-track",
           "status": "pass",
           "note": "MNM-2606-86EA3 shipment_date=2026-06-06",
-          "ms": 30,
+          "ms": 37,
           "detail": {
             "order_number": "MNM-2606-86EA3",
             "status": "confirmed",
-            "tracking_status": "pending",
+            "tracking_status": "shipped",
             "tracking_number": "",
             "tracking_carrier": "",
             "shipment_date": "2026-06-06"
@@ -430,8 +365,8 @@
   ],
   "summary": {
     "total": 10,
-    "passed": 10,
+    "passed": 8,
     "failed": 0,
-    "skipped": 0
+    "skipped": 2
   }
 }

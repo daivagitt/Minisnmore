@@ -61,8 +61,16 @@ describe("PortraitInvoiceDocument", () => {
     const shipmentLine = Array.from(container.querySelectorAll("p")).find((el) =>
       el.textContent?.includes("Shipment ID"),
     );
-    expect(shipmentLine).toHaveClass("hidden");
+    expect(shipmentLine).toHaveClass("col-start-2", "row-start-1", "hidden");
     expect(shipmentLine).toHaveTextContent("SHIP-1001");
+    const placeOfSupplyLine = Array.from(container.querySelectorAll("p")).find((el) =>
+      el.textContent?.includes("Place Of Supply"),
+    );
+    expect(placeOfSupplyLine).toHaveClass("col-start-1", "row-start-2");
+    const orderNumberLine = Array.from(container.querySelectorAll("p")).find(
+      (el) => el.textContent === "Order No : MNM-1001",
+    );
+    expect(orderNumberLine).toHaveClass("col-start-2", "row-start-2");
     expect(invoice).toHaveTextContent("Seller address");
     expect(invoice).toHaveTextContent("Dispatch address");
     expect(invoice).toHaveTextContent("Registered office");

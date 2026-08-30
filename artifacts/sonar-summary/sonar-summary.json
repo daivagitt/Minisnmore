@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-11T05:32:48.598275+00:00",
+  "generatedAt": "2026-08-30T11:39:20.707092+00:00",
   "frontend": {
     "key": "frontend",
     "label": "Frontend",
@@ -230,241 +230,241 @@
     "key": "mnm-backend",
     "label": "Backend",
     "missing": false,
-    "coverage": "87.7",
-    "line_coverage": "94.4",
-    "branch_coverage": "69.9",
-    "bugs": "0",
+    "coverage": "11.1",
+    "line_coverage": "12.7",
+    "branch_coverage": "7.6",
+    "bugs": "5",
     "vulnerabilities": "0",
-    "code_smells": "158",
-    "duplication": "8.3",
-    "ncloc": "26555",
-    "reliability": "1.0",
+    "code_smells": "519",
+    "duplication": "6.7",
+    "ncloc": "39547",
+    "reliability": "3.0",
     "security": "1.0",
     "maintainability": "1.0",
-    "gate": "OK",
+    "gate": "ERROR",
     "gate_conditions": [
       {
-        "status": "OK",
+        "status": "ERROR",
         "metricKey": "coverage",
         "comparator": "LT",
         "errorThreshold": "80",
-        "actualValue": "87.7"
+        "actualValue": "11.1"
       },
       {
         "status": "OK",
         "metricKey": "bugs",
         "comparator": "GT",
         "errorThreshold": "50",
-        "actualValue": "0"
+        "actualValue": "5"
       },
       {
-        "status": "OK",
+        "status": "ERROR",
         "metricKey": "line_coverage",
         "comparator": "LT",
         "errorThreshold": "94",
-        "actualValue": "94.4"
+        "actualValue": "12.7"
       }
     ],
     "issues": [
       {
         "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "java:S1854",
-        "file": "backend/src/test/java/com/miniandmore/app/web/rest/internal/InternalAccountOrderResourceCoverageTest.java",
-        "line": 1062,
-        "message": "Remove this useless assignment to local variable \"order\"."
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/config/ApplicationProperties.java",
+        "line": 426,
+        "message": "Define a constant instead of duplicating this literal \"http://localhost:5173\" 3 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S3776",
+        "file": "backend/src/main/java/com/miniandmore/app/service/LedgerlyProductMergeService.java",
+        "line": 116,
+        "message": "Refactor this method to reduce its Cognitive Complexity from 25 to the 15 allowed."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "java:S135",
+        "file": "backend/src/main/java/com/miniandmore/app/service/LedgerlyProductMergeService.java",
+        "line": 141,
+        "message": "Reduce the total number of break and continue statements in this loop to use at most one."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S3776",
+        "file": "backend/src/main/java/com/miniandmore/app/service/LedgerlySyncService.java",
+        "line": 274,
+        "message": "Refactor this method to reduce its Cognitive Complexity from 16 to the 15 allowed."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "java:S135",
+        "file": "backend/src/main/java/com/miniandmore/app/service/LedgerlySyncService.java",
+        "line": 282,
+        "message": "Reduce the total number of break and continue statements in this loop to use at most one."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderReturnService.java",
+        "line": 121,
+        "message": "Define a constant instead of duplicating this literal \"Order not found\" 3 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S3776",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderReturnService.java",
+        "line": 457,
+        "message": "Refactor this method to reduce its Cognitive Complexity from 28 to the 15 allowed."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "INFO",
+        "rule": "java:S6541",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderReturnService.java",
+        "line": 457,
+        "message": "A \"Brain Method\" was detected. Refactor it to reduce at least one of the following metrics: LOC from 94 to 64, Complexity from 15 to 14, Nesting Level from 4 to 2, Number of Variables from 13 to 6."
       },
       {
         "type": "CODE_SMELL",
         "severity": "MAJOR",
-        "rule": "Web:S1827",
-        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
-        "line": 17,
-        "message": "Remove this deprecated \"width\" attribute."
+        "rule": "java:S1141",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderReturnService.java",
+        "line": 504,
+        "message": "Extract this nested try block into a separate method."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderReturnService.java",
+        "line": 559,
+        "message": "Define a constant instead of duplicating this literal \"order_number\" 3 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderReturnService.java",
+        "line": 560,
+        "message": "Define a constant instead of duplicating this literal \"eligible\" 4 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderReturnService.java",
+        "line": 561,
+        "message": "Define a constant instead of duplicating this literal \"message\" 3 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderReturnService.java",
+        "line": 562,
+        "message": "Define a constant instead of duplicating this literal \"enabled\" 4 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderReturnService.java",
+        "line": 563,
+        "message": "Define a constant instead of duplicating this literal \"window_days\" 4 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S3776",
+        "file": "backend/src/main/java/com/miniandmore/app/service/ProductColorImagesSupport.java",
+        "line": 61,
+        "message": "Refactor this method to reduce its Cognitive Complexity from 16 to the 15 allowed."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S3776",
+        "file": "backend/src/main/java/com/miniandmore/app/service/ProductColorImagesSupport.java",
+        "line": 120,
+        "message": "Refactor this method to reduce its Cognitive Complexity from 17 to the 15 allowed."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S3776",
+        "file": "backend/src/main/java/com/miniandmore/app/service/ProductColorImagesSupport.java",
+        "line": 184,
+        "message": "Refactor this method to reduce its Cognitive Complexity from 19 to the 15 allowed."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "java:S135",
+        "file": "backend/src/main/java/com/miniandmore/app/service/ProductColorImagesSupport.java",
+        "line": 203,
+        "message": "Reduce the total number of break and continue statements in this loop to use at most one."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S3776",
+        "file": "backend/src/main/java/com/miniandmore/app/service/ProductVariantSupport.java",
+        "line": 342,
+        "message": "Refactor this method to reduce its Cognitive Complexity from 36 to the 15 allowed."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "java:S135",
+        "file": "backend/src/main/java/com/miniandmore/app/service/ProductVariantSupport.java",
+        "line": 348,
+        "message": "Reduce the total number of break and continue statements in this loop to use at most one."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/ProductVariantSupport.java",
+        "line": 357,
+        "message": "Define a constant instead of duplicating this literal \"imageUrl\" 3 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/ProductVariantSupport.java",
+        "line": 358,
+        "message": "Define a constant instead of duplicating this literal \"swatchUrl\" 3 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/ProductVariantSupport.java",
+        "line": 359,
+        "message": "Define a constant instead of duplicating this literal \"imageUrls\" 6 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "java:S135",
+        "file": "backend/src/main/java/com/miniandmore/app/service/ProductVariantSupport.java",
+        "line": 379,
+        "message": "Reduce the total number of break and continue statements in this loop to use at most one."
       },
       {
         "type": "CODE_SMELL",
         "severity": "MAJOR",
-        "rule": "Web:S5257",
-        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
-        "line": 17,
-        "message": "Replace this layout table with a CSS layout."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S1827",
-        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
-        "line": 17,
-        "message": "Remove this deprecated \"cellspacing\" attribute."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S6819",
-        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
-        "line": 17,
-        "message": "Use <img> instead of the presentation role to ensure accessibility across all devices."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S1827",
-        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
-        "line": 17,
-        "message": "Remove this deprecated \"cellpadding\" attribute."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S1827",
-        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
-        "line": 19,
-        "message": "Remove this deprecated \"align\" attribute."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S1827",
-        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
-        "line": 20,
-        "message": "Remove this deprecated \"cellspacing\" attribute."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S6819",
-        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
-        "line": 20,
-        "message": "Use <img> instead of the presentation role to ensure accessibility across all devices."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S1827",
-        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
-        "line": 20,
-        "message": "Remove this deprecated \"cellpadding\" attribute."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S5257",
-        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
-        "line": 20,
-        "message": "Replace this layout table with a CSS layout."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S1827",
-        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
-        "line": 20,
-        "message": "Remove this deprecated \"width\" attribute."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S1827",
-        "file": "gateway/src/main/resources/templates/mail/activationEmail.html",
-        "line": 47,
-        "message": "Remove this deprecated \"align\" attribute."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S1827",
-        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
-        "line": 17,
-        "message": "Remove this deprecated \"cellpadding\" attribute."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S1827",
-        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
-        "line": 17,
-        "message": "Remove this deprecated \"cellspacing\" attribute."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S5257",
-        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
-        "line": 17,
-        "message": "Replace this layout table with a CSS layout."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S1827",
-        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
-        "line": 17,
-        "message": "Remove this deprecated \"width\" attribute."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S6819",
-        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
-        "line": 17,
-        "message": "Use <img> instead of the presentation role to ensure accessibility across all devices."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S1827",
-        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
-        "line": 19,
-        "message": "Remove this deprecated \"align\" attribute."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S1827",
-        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
-        "line": 20,
-        "message": "Remove this deprecated \"cellspacing\" attribute."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S1827",
-        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
-        "line": 20,
-        "message": "Remove this deprecated \"cellpadding\" attribute."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S5257",
-        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
-        "line": 20,
-        "message": "Replace this layout table with a CSS layout."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S6819",
-        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
-        "line": 20,
-        "message": "Use <img> instead of the presentation role to ensure accessibility across all devices."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S1827",
-        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
-        "line": 20,
-        "message": "Remove this deprecated \"width\" attribute."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "Web:S1827",
-        "file": "gateway/src/main/resources/templates/mail/creationEmail.html",
-        "line": 47,
-        "message": "Remove this deprecated \"align\" attribute."
+        "rule": "java:S107",
+        "file": "backend/src/main/java/com/miniandmore/app/service/ProductVariantSupport.java",
+        "line": 645,
+        "message": "Method has 9 parameters, which is greater than 7 authorized."
       }
     ]
   }
