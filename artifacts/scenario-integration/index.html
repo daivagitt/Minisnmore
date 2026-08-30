@@ -168,21 +168,21 @@
         <p>Coupon · Zoho · shipment · returns</p>
         <div class="meta">
           <span class="meta-chip">Mini&#x27;s n More</span>
-          <span class="meta-chip">Build <code style="background:transparent;color:inherit;padding:0;">local</code></span>
+          <span class="meta-chip">Build <code style="background:transparent;color:inherit;padding:0;">202608301131-uat</code></span>
         </div>
       </header>
       <main class="content">
         
       <section class="panel">
         <h2>Scenario integration summary</h2>
-        <p>Target <code>https://uat.minisnmore.com</code> · 2026-08-10T10:59:44.808755+00:00</p>
-        <p>Status: <span class="status pass">PASS</span> · Payment demo: <code>true</code>
-           · Refund demo: <code>true</code></p>
+        <p>Target <code>https://uat.minisnmore.com</code> · 2026-08-30T11:35:10.577839+00:00</p>
+        <p>Status: <span class="status pass">PASS</span> · Payment demo: <code>false</code>
+           · Refund demo: <code>false</code></p>
         <div class="stats">
           <div class="stat"><strong>8</strong><span>Scenarios</span></div>
-          <div class="stat"><strong>8</strong><span>Passed</span></div>
+          <div class="stat"><strong>3</strong><span>Passed</span></div>
           <div class="stat"><strong></strong><span>Failed</span></div>
-          <div class="stat"><strong></strong><span>Skipped</span></div>
+          <div class="stat"><strong>5</strong><span>Skipped</span></div>
         </div>
       </section>
       
@@ -200,52 +200,52 @@
               <p class="muted">Validate coupon on BASIC SHORTS and create checkout order.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>resolve-product</td><td><span class="status pass">PASS</span></td><td>basic-shorts id=39351 ₹8</td><td>0 ms</td></tr><tr><td>validate-coupon</td><td><span class="status pass">PASS</span></td><td>discount ₹1 on subtotal ₹8 (qty=1)</td><td>82 ms</td></tr><tr><td>create-order</td><td><span class="status pass">PASS</span></td><td>order MNM-13EBD4C7A001 total ₹8 (demoMode=True)</td><td>102 ms</td></tr></tbody>
+                <tbody><tr><td>resolve-product</td><td><span class="status pass">PASS</span></td><td>basic-shorts id=48005 ₹100</td><td>0 ms</td></tr><tr><td>validate-coupon</td><td><span class="status pass">PASS</span></td><td>discount ₹10 on subtotal ₹100 (qty=1)</td><td>51 ms</td></tr><tr><td>create-order</td><td><span class="status pass">PASS</span></td><td>order MNM-B6463D3B441E total ₹91 (demoMode=False)</td><td>143 ms</td></tr></tbody>
               </table>
             </section>
             
             <section class="panel">
-              <h3>Payment verify <span class="status pass">PASS</span></h3>
+              <h3>Payment verify <span class="status fail">SKIP</span></h3>
               <p class="muted">Demo bypass when RAZORPAY_PAYMENT_DEMO=true; otherwise skipped (live Razorpay required).</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>verify-payment</td><td><span class="status pass">PASS</span></td><td>PAID MNM-13EBD4C7A001</td><td>4191 ms</td></tr></tbody>
+                <tbody><tr><td>verify-payment</td><td><span class="status fail">SKIP</span></td><td>Catalog uses live Razorpay — enable RAZORPAY_PAYMENT_DEMO on catalog or set RAZORPAY_KEY_ID=DEMO</td><td>0 ms</td></tr></tbody>
               </table>
             </section>
             
             <section class="panel">
-              <h3>Zoho sales order + invoice sync <span class="status pass">PASS</span></h3>
+              <h3>Zoho sales order + invoice sync <span class="status fail">SKIP</span></h3>
               <p class="muted">Admin sync after payment; verifies Zoho IDs and SYNCED status.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>sync-order</td><td><span class="status pass">PASS</span></td><td>Ledgerly sync for MNM-13EBD4C7A001 (Zoho admin API not on MS stack)</td><td>207 ms</td></tr></tbody>
+                <tbody><tr><td>sync-order</td><td><span class="status fail">SKIP</span></td><td>order not paid (live Razorpay required)</td><td>0 ms</td></tr></tbody>
               </table>
             </section>
             
             <section class="panel">
-              <h3>Zoho Books totals match store (₹2 paid) <span class="status pass">PASS</span></h3>
+              <h3>Zoho Books totals match store (₹2 paid) <span class="status fail">SKIP</span></h3>
               <p class="muted">Live Zoho API check: entity discount + shipping → total ₹2, not catalog line ₹349.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>zoho-so-total</td><td><span class="status pass">PASS</span></td><td>Checkout total ₹8.00 (Books SO check skipped — use Ledgerly on MS UAT)</td><td>0 ms</td></tr></tbody>
+                <tbody><tr><td>zoho-so-total</td><td><span class="status fail">SKIP</span></td><td>no Zoho sales order id</td><td>0 ms</td></tr></tbody>
               </table>
             </section>
             
             <section class="panel">
-              <h3>Shipment + tracking pull <span class="status pass">PASS</span></h3>
+              <h3>Shipment + tracking pull <span class="status fail">SKIP</span></h3>
               <p class="muted">Set shipment on Zoho SO, pull tracking, verify shipped status on storefront API.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>zoho-set-shipment</td><td><span class="status pass">PASS</span></td><td>demo delivery anchor on order (Zoho Books API optional on MS UAT)</td><td>0 ms</td></tr><tr><td>pull-tracking</td><td><span class="status pass">PASS</span></td><td>demo — bulk Ledgerly/Zoho tracking pull skipped (storefront track checked next)</td><td>0 ms</td></tr><tr><td>public-track-api</td><td><span class="status pass">PASS</span></td><td>public track (shipped)</td><td>132 ms</td></tr></tbody>
+                <tbody><tr><td>shipment-flow</td><td><span class="status fail">SKIP</span></td><td>requires paid order with sync id</td><td>0 ms</td></tr></tbody>
               </table>
             </section>
             
             <section class="panel">
-              <h3>Return request → approve → receive → refund <span class="status pass">PASS</span></h3>
+              <h3>Return request → approve → receive → refund <span class="status fail">SKIP</span></h3>
               <p class="muted">Full return when order is paid + shipped; refund uses Razorpay demo only when RAZORPAY_REFUND_DEMO=true.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>return-eligibility</td><td><span class="status pass">PASS</span></td><td>eligible</td><td>43 ms</td></tr><tr><td>request-return</td><td><span class="status pass">PASS</span></td><td>RET-MNM-13EBD4C7A001-4ED8F0</td><td>60 ms</td></tr><tr><td>approve</td><td><span class="status pass">PASS</span></td><td>approved</td><td>50 ms</td></tr><tr><td>mark-received</td><td><span class="status pass">PASS</span></td><td>received</td><td>43 ms</td></tr><tr><td>refund</td><td><span class="status pass">PASS</span></td><td>refunded</td><td>1255 ms</td></tr></tbody>
+                <tbody><tr><td>return-flow</td><td><span class="status fail">SKIP</span></td><td>order not paid</td><td>0 ms</td></tr></tbody>
               </table>
             </section>
             
@@ -254,7 +254,7 @@
               <p class="muted">Regression checks on orders from manual scenario runs — no mutations.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>shipped-order-track</td><td><span class="status pass">PASS</span></td><td>MNM-2606-A4A0B → delivered</td><td>33 ms</td></tr><tr><td>returned-order-track</td><td><span class="status pass">PASS</span></td><td>MNM-2606-86EA3 shipment_date=2026-06-06</td><td>28 ms</td></tr></tbody>
+                <tbody><tr><td>shipped-order-track</td><td><span class="status pass">PASS</span></td><td>MNM-2606-A4A0B → delivered</td><td>37 ms</td></tr><tr><td>returned-order-track</td><td><span class="status pass">PASS</span></td><td>MNM-2606-86EA3 shipment_date=2026-06-06</td><td>43 ms</td></tr></tbody>
               </table>
             </section>
             

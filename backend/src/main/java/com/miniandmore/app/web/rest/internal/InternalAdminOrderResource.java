@@ -39,6 +39,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class InternalAdminOrderResource {
 
     private static final Duration MAX_ORDER_RANGE = Duration.ofDays(31);
+    private static final Duration TRACKING_REFRESH_TTL = Duration.ofMinutes(5);
     private static final int DEFAULT_PAGE_SIZE = 10;
     private static final int MAX_PAGE_SIZE = 50;
 
@@ -147,7 +148,7 @@ public class InternalAdminOrderResource {
             order.getStatus() != OrderStatus.FULFILLED &&
             order.getStatus() != OrderStatus.CANCELLED &&
             StringUtils.isNotBlank(order.getZohoSalesOrderId()) &&
-            (order.getZohoTrackingLastPulledAt() == null || order.getZohoTrackingLastPulledAt().isBefore(Instant.now().minusSeconds(30)))
+            (order.getZohoTrackingLastPulledAt() == null || order.getZohoTrackingLastPulledAt().isBefore(Instant.now().minus(TRACKING_REFRESH_TTL)))
         ) {
             zohoSyncService.pullOrderTracking(order.getId());
             order = dataAccess.customerOrderRepository().findOneByOrderNumber(orderNumber).orElse(order);

@@ -43,6 +43,7 @@ class OrderEventServiceTest {
     @Test
     void onOrderCreated_recordsPaymentPendingForUnpaidOnline() {
         CustomerOrder order = baseOrder().status(OrderStatus.PENDING).paymentStatus(PaymentStatus.PENDING);
+        when(orderEventRepository.existsByOrderIdAndEventType(42L, OrderEventService.TYPE_ORDER_PLACED)).thenReturn(false);
         when(orderEventRepository.existsByOrderIdAndEventType(42L, OrderEventService.TYPE_PAYMENT_PENDING)).thenReturn(false);
 
         service.onOrderCreated(order);

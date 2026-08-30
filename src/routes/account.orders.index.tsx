@@ -33,8 +33,10 @@ function OrdersPage() {
   const [filter, setFilter] = useState<(typeof ORDER_FILTERS)[number]["key"]>("all");
 
   useEffect(() => {
-    if (orders === null && !loadingOrders) void refreshOrders();
-  }, [orders, loadingOrders, refreshOrders]);
+    // Account data is cached across nested account routes. Revalidate whenever the
+    // customer returns here so a payment completed on an order page is visible now.
+    void refreshOrders();
+  }, [refreshOrders]);
 
   const filteredOrders = useMemo(() => {
     if (!orders) return orders;

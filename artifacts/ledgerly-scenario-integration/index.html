@@ -168,21 +168,21 @@
         <p>Coupon · Ledgerly sync · inventory · tracking · returns · credit notes</p>
         <div class="meta">
           <span class="meta-chip">Mini&#x27;s n More</span>
-          <span class="meta-chip">Build <code style="background:transparent;color:inherit;padding:0;">local</code></span>
+          <span class="meta-chip">Build <code style="background:transparent;color:inherit;padding:0;">202608301131-uat</code></span>
         </div>
       </header>
       <main class="content">
         
       <section class="panel">
         <h2>Ledgerly scenario integration summary</h2>
-        <p>Target <code>https://uat.minisnmore.com</code> · 2026-08-10T11:05:53.963967+00:00</p>
-        <p>Status: <span class="status pass">PASS</span> · Payment demo: <code>true</code>
-           · Refund demo: <code>true</code></p>
+        <p>Target <code>https://uat.minisnmore.com</code> · 2026-08-30T11:35:09.891092+00:00</p>
+        <p>Status: <span class="status pass">PASS</span> · Payment demo: <code>false</code>
+           · Refund demo: <code>false</code></p>
         <div class="stats">
           <div class="stat"><strong>10</strong><span>Scenarios</span></div>
-          <div class="stat"><strong>10</strong><span>Passed</span></div>
+          <div class="stat"><strong>8</strong><span>Passed</span></div>
           <div class="stat"><strong></strong><span>Failed</span></div>
-          <div class="stat"><strong></strong><span>Skipped</span></div>
+          <div class="stat"><strong>2</strong><span>Skipped</span></div>
         </div>
       </section>
       
@@ -200,16 +200,16 @@
               <p class="muted">Validate coupon on BASIC SHORTS and create checkout order.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>resolve-product</td><td><span class="status pass">PASS</span></td><td>basic-shorts id=39351 ₹8</td><td>0 ms</td></tr><tr><td>validate-coupon</td><td><span class="status pass">PASS</span></td><td>discount ₹1 on subtotal ₹8 (qty=1)</td><td>283 ms</td></tr><tr><td>create-order</td><td><span class="status pass">PASS</span></td><td>order MNM-0B0F69E301F9 total ₹8 (demoMode=True)</td><td>281 ms</td></tr></tbody>
+                <tbody><tr><td>resolve-product</td><td><span class="status pass">PASS</span></td><td>basic-shorts id=48005 ₹100</td><td>0 ms</td></tr><tr><td>validate-coupon</td><td><span class="status pass">PASS</span></td><td>discount ₹10 on subtotal ₹100 (qty=1)</td><td>953 ms</td></tr><tr><td>create-order</td><td><span class="status pass">PASS</span></td><td>order MNM-DE7E60C68CD9 total ₹91 (demoMode=False)</td><td>485 ms</td></tr></tbody>
               </table>
             </section>
             
             <section class="panel">
-              <h3>Payment verify <span class="status pass">PASS</span></h3>
+              <h3>Payment verify <span class="status fail">SKIP</span></h3>
               <p class="muted">Demo bypass when RAZORPAY_PAYMENT_DEMO=true; otherwise skipped (live Razorpay required).</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>verify-payment</td><td><span class="status pass">PASS</span></td><td>PAID MNM-0B0F69E301F9</td><td>1508 ms</td></tr></tbody>
+                <tbody><tr><td>verify-payment</td><td><span class="status fail">SKIP</span></td><td>Catalog uses live Razorpay — enable RAZORPAY_PAYMENT_DEMO on catalog or set RAZORPAY_KEY_ID=DEMO</td><td>0 ms</td></tr></tbody>
               </table>
             </section>
             
@@ -218,7 +218,7 @@
               <p class="muted">Integration status and live connection test against Ledgerly commerce API.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>integration-status</td><td><span class="status pass">PASS</span></td><td>connected=true</td><td>42 ms</td></tr><tr><td>test-connection</td><td><span class="status pass">PASS</span></td><td>Ledgerly API reachable</td><td>257 ms</td></tr></tbody>
+                <tbody><tr><td>integration-status</td><td><span class="status pass">PASS</span></td><td>connected=true</td><td>47 ms</td></tr><tr><td>test-connection</td><td><span class="status pass">PASS</span></td><td>Ledgerly API reachable</td><td>255 ms</td></tr></tbody>
               </table>
             </section>
             
@@ -227,7 +227,7 @@
               <p class="muted">Admin sync after payment; falls back to a known synced reference order when checkout is unpaid.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>sync-order</td><td><span class="status pass">PASS</span></td><td>sync OK for MNM-0B0F69E301F9</td><td>260 ms</td></tr><tr><td>verify-sync-status</td><td><span class="status pass">PASS</span></td><td>paid order MNM-0B0F69E301F9 trackable after sync</td><td>43 ms</td></tr></tbody>
+                <tbody><tr><td>sync-order</td><td><span class="status fail">SKIP</span></td><td>checkout order unpaid — using reference order MNM-0FB910FDBC4D</td><td>0 ms</td></tr><tr><td>sync-order</td><td><span class="status pass">PASS</span></td><td>sync exercised on reference MNM-0FB910FDBC4D (status=FAILED)</td><td>283 ms</td></tr><tr><td>verify-sync-status</td><td><span class="status pass">PASS</span></td><td>reference order MNM-0FB910FDBC4D reachable (payment=confirmed)</td><td>115 ms</td></tr></tbody>
               </table>
             </section>
             
@@ -236,7 +236,7 @@
               <p class="muted">Live inventory pull updates catalog stock from Ledgerly.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>pull-inventory</td><td><span class="status pass">PASS</span></td><td>ok</td><td>287 ms</td></tr></tbody>
+                <tbody><tr><td>pull-inventory</td><td><span class="status pass">PASS</span></td><td>ok</td><td>293 ms</td></tr></tbody>
               </table>
             </section>
             
@@ -245,16 +245,16 @@
               <p class="muted">Pull order tracking from Ledgerly and verify public track API on a known shipped order.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>pull-tracking</td><td><span class="status pass">PASS</span></td><td>tracking pull completed</td><td>603 ms</td></tr><tr><td>public-track-shipped-ref</td><td><span class="status pass">PASS</span></td><td>MNM-2606-A4A0B → delivered</td><td>33 ms</td></tr></tbody>
+                <tbody><tr><td>pull-tracking</td><td><span class="status pass">PASS</span></td><td>tracking pull completed</td><td>481 ms</td></tr><tr><td>public-track-shipped-ref</td><td><span class="status pass">PASS</span></td><td>MNM-2606-A4A0B → delivered</td><td>41 ms</td></tr></tbody>
               </table>
             </section>
             
             <section class="panel">
-              <h3>Return → refund → Ledgerly credit note <span class="status pass">PASS</span></h3>
+              <h3>Return → refund → Ledgerly credit note <span class="status fail">SKIP</span></h3>
               <p class="muted">Full return on demo-paid order synced to Ledgerly; verifies Razorpay demo refund and ledgerly_credit_note_id.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>return-eligibility</td><td><span class="status pass">PASS</span></td><td>eligible</td><td>41 ms</td></tr><tr><td>request-return</td><td><span class="status pass">PASS</span></td><td>RET-MNM-0B0F69E301F9-446E18</td><td>59 ms</td></tr><tr><td>approve</td><td><span class="status pass">PASS</span></td><td>approved</td><td>48 ms</td></tr><tr><td>mark-received</td><td><span class="status pass">PASS</span></td><td>received</td><td>43 ms</td></tr><tr><td>refund</td><td><span class="status pass">PASS</span></td><td>refunded</td><td>591 ms</td></tr><tr><td>ledgerly-credit-note</td><td><span class="status pass">PASS</span></td><td>credit note cn_demo_MNM-0B0F69E301F9</td><td>0 ms</td></tr></tbody>
+                <tbody><tr><td>return-flow</td><td><span class="status fail">SKIP</span></td><td>order not paid</td><td>0 ms</td></tr></tbody>
               </table>
             </section>
             
@@ -263,7 +263,7 @@
               <p class="muted">GET /api/v1/orders/track/{orderNumber} — delivery timeline only; no JWT required.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>shipped-order</td><td><span class="status pass">PASS</span></td><td>MNM-2606-A4A0B → delivered</td><td>29 ms</td></tr><tr><td>returned-order</td><td><span class="status pass">PASS</span></td><td>MNM-2606-86EA3 shipment_date=2026-06-06</td><td>29 ms</td></tr><tr><td>checkout-order</td><td><span class="status pass">PASS</span></td><td>MNM-0B0F69E301F9 → pending (public fields OK)</td><td>32 ms</td></tr><tr><td>unknown-order</td><td><span class="status pass">PASS</span></td><td>404 for invalid order number</td><td>42 ms</td></tr></tbody>
+                <tbody><tr><td>shipped-order</td><td><span class="status pass">PASS</span></td><td>MNM-2606-A4A0B → delivered</td><td>42 ms</td></tr><tr><td>returned-order</td><td><span class="status pass">PASS</span></td><td>MNM-2606-86EA3 shipment_date=2026-06-06</td><td>40 ms</td></tr><tr><td>checkout-order</td><td><span class="status pass">PASS</span></td><td>MNM-DE7E60C68CD9 → pending (public fields OK)</td><td>41 ms</td></tr><tr><td>unknown-order</td><td><span class="status pass">PASS</span></td><td>404 for invalid order number</td><td>83 ms</td></tr></tbody>
               </table>
             </section>
             
@@ -272,7 +272,7 @@
               <p class="muted">Regression checks on orders from manual scenario runs — no mutations.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>shipped-order-track</td><td><span class="status pass">PASS</span></td><td>MNM-2606-A4A0B → delivered</td><td>29 ms</td></tr><tr><td>returned-order-track</td><td><span class="status pass">PASS</span></td><td>MNM-2606-86EA3 shipment_date=2026-06-06</td><td>30 ms</td></tr></tbody>
+                <tbody><tr><td>shipped-order-track</td><td><span class="status pass">PASS</span></td><td>MNM-2606-A4A0B → delivered</td><td>42 ms</td></tr><tr><td>returned-order-track</td><td><span class="status pass">PASS</span></td><td>MNM-2606-86EA3 shipment_date=2026-06-06</td><td>37 ms</td></tr></tbody>
               </table>
             </section>
             

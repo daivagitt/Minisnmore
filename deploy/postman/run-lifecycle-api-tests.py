@@ -283,7 +283,12 @@ def request(method, path, token, body=None, content_type="application/json"):
     data = None
     if body is not None:
         headers["Content-Type"] = content_type
-        data = json.dumps(body).encode() if isinstance(body, dict) else body
+        if isinstance(body, dict):
+            data = json.dumps(body).encode()
+        elif isinstance(body, str):
+            data = body.encode()
+        else:
+            data = body
     req = urllib.request.Request(BASE + path, data=data, method=method.upper(), headers=headers)
     started = time.perf_counter()
     try:

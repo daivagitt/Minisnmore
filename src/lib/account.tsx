@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { getMyProfile, listMyOrders, listMyPayments } from "@/lib/orders.functions";
 
 type Profile = { full_name?: string | null; phone?: string | null };
@@ -25,7 +33,7 @@ export function AccountDataProvider({ children, enabled = true }: { children: Re
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [loadingPayments, setLoadingPayments] = useState(false);
 
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     setLoadingProfile(true);
     try {
       const result = await getMyProfile();
@@ -35,9 +43,9 @@ export function AccountDataProvider({ children, enabled = true }: { children: Re
     } finally {
       setLoadingProfile(false);
     }
-  };
+  }, []);
 
-  const refreshOrders = async () => {
+  const refreshOrders = useCallback(async () => {
     setLoadingOrders(true);
     try {
       const result = await listMyOrders();
@@ -47,9 +55,9 @@ export function AccountDataProvider({ children, enabled = true }: { children: Re
     } finally {
       setLoadingOrders(false);
     }
-  };
+  }, []);
 
-  const refreshPayments = async () => {
+  const refreshPayments = useCallback(async () => {
     setLoadingPayments(true);
     try {
       const result = await listMyPayments();
@@ -59,12 +67,12 @@ export function AccountDataProvider({ children, enabled = true }: { children: Re
     } finally {
       setLoadingPayments(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!enabled) return;
     void refreshProfile();
-  }, [enabled]);
+  }, [enabled, refreshProfile]);
 
   const value = useMemo(
     () => ({
@@ -79,7 +87,17 @@ export function AccountDataProvider({ children, enabled = true }: { children: Re
       refreshPayments,
       setProfile,
     }),
-    [profile, orders, payments, loadingProfile, loadingOrders, loadingPayments]
+    [
+      profile,
+      orders,
+      payments,
+      loadingProfile,
+      loadingOrders,
+      loadingPayments,
+      refreshProfile,
+      refreshOrders,
+      refreshPayments,
+    ]
   );
 
   return <AccountDataContext.Provider value={value}>{children}</AccountDataContext.Provider>;

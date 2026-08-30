@@ -22,12 +22,6 @@ const COLLECTION_LINKS = [
   { to: "/trending" as const, label: "Trending" },
 ];
 
-const QUICK_LINKS = [
-  { to: "/privacy" as const, label: "Privacy" },
-  { to: "/terms" as const, label: "Terms" },
-  { to: "/shipping" as const, label: "Shipping & returns" },
-];
-
 type FooterShopLink =
   | { key: string; label: string; to: "/shop"; category: string }
   | { key: string; label: string; to: "/gift" };
@@ -41,7 +35,7 @@ function formatShopLabel(label: string) {
 const FOOTER_LINK_ROW = "h-5 flex items-center text-sm leading-none";
 const FOOTER_LINK_STACK = "flex flex-col gap-2";
 const FOOTER_TOP_GRID =
-  "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-y-6 gap-x-4 sm:gap-x-5 lg:gap-x-6 xl:gap-x-8 items-start";
+  "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-y-6 gap-x-4 sm:gap-x-5 lg:gap-x-6 xl:gap-x-8 items-start";
 
 function splitShopColumns(links: FooterShopLink[]) {
   const mid = Math.ceil(links.length / 2);
@@ -308,24 +302,7 @@ export function Footer() {
                 </FooterNavList>
               </FooterColumn>
 
-          <FooterColumn className="shrink-0">
-                <FooterHeading>Quick links</FooterHeading>
-                <FooterNavList>
-                  {QUICK_LINKS.map((item) => {
-                    if ("page" in item && item.page && !isVisible(item.page)) return null;
-                    return (
-                      <FooterNavItem key={item.to}>
-                        <Link to={item.to} className="story-link text-muted-foreground hover:text-foreground">
-                          {item.label}
-                        </Link>
-                      </FooterNavItem>
-                    );
-                  })}
-                </FooterNavList>
-              </FooterColumn>
-
-
-          <div className="sm:col-span-2 lg:col-span-4 lg:col-start-2 lg:row-start-2 flex flex-wrap items-center w-full max-w-full gap-x-2 gap-y-2">
+          <div className="sm:col-span-2 lg:col-span-3 lg:col-start-2 lg:row-start-2 flex flex-wrap items-center w-full max-w-full gap-x-2 gap-y-2">
               <FooterSubheading>Follow us</FooterSubheading>
               <div className="flex items-center gap-1.5">
                 <SocialIconLink href={socialHref(settings.instagram_url)} label="Instagram">
@@ -382,17 +359,6 @@ export function Footer() {
                 <span>in India</span>
               </>
             )}
-          </div>
-          <div className="grid grid-cols-3 items-center gap-2 w-full">
-            <Link to="/privacy" className="story-link hover:text-foreground justify-self-start">
-              Privacy
-            </Link>
-            <Link to="/terms" className="story-link hover:text-foreground justify-self-center text-center">
-              Terms
-            </Link>
-            <Link to="/shipping" className="story-link hover:text-foreground justify-self-end text-right">
-              Shipping &amp; returns
-            </Link>
           </div>
         </div>
       </div>

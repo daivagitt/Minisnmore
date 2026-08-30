@@ -313,7 +313,7 @@ function ProductPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-3 sm:items-end">
+          <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-3 sm:items-start">
             <div>
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Quantity</div>
               <div className="glass rounded-full inline-flex items-center">
@@ -351,12 +351,15 @@ function ProductPage() {
                   {pinLoading ? "…" : "Check"}
                 </button>
               </div>
-              {pinResult && (
-                <p className="mt-1.5 text-[11px] text-primary leading-snug">
-                  {pinResult.city}, {pinResult.state} · <strong>{pinResult.eta}</strong>
-                </p>
-              )}
-              {pinError && <p className="mt-1.5 text-[11px] text-destructive">{pinError}</p>}
+              <div className="mt-1.5 min-h-4 text-[11px] leading-snug" aria-live="polite">
+                {pinResult ? (
+                  <p className="text-primary">
+                    {pinResult.city}, {pinResult.state} · <strong>{pinResult.eta}</strong>
+                  </p>
+                ) : pinError ? (
+                  <p className="text-destructive">{pinError}</p>
+                ) : null}
+              </div>
             </div>
           </div>
 

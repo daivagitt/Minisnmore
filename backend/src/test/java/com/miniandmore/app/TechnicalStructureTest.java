@@ -40,5 +40,13 @@ class TechnicalStructureTest {
         .ignoreDependency(
             belongToAnyOf(com.miniandmore.app.client.LedgerlyIntegrationClient.class),
             belongToAnyOf(com.miniandmore.app.service.LedgerlyCredentialsProvider.class)
+        )
+        .ignoreDependency(
+            belongToAnyOf(com.miniandmore.app.client.ZohoBooksClient.class),
+            belongToAnyOf(com.miniandmore.app.service.ZohoOAuthService.class)
+        )
+        .ignoreDependency(
+            belongToAnyOf(com.miniandmore.app.client.ZohoBooksIntegrationClient.class),
+            belongToAnyOf(com.miniandmore.app.service.ZohoSyncService.class)
         );
 }
