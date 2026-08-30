@@ -82,6 +82,9 @@ class ZohoSyncServiceTest {
     @Mock
     private S3StorageService s3StorageService;
 
+    @Mock
+    private OrderEventService orderEventService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private ZohoSyncService service;
@@ -102,12 +105,14 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
         ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
         zoho.setSyncProductStock(true);
         lenient().when(applicationProperties.getZoho()).thenReturn(zoho);
         lenient().when(productFieldMapper.applyPulledItem(any(), any(), anyBoolean())).thenReturn(Optional.empty());
+        lenient().when(customerOrderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
@@ -262,7 +267,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
 
         Product product = new Product()
@@ -643,6 +649,128 @@ class ZohoSyncServiceTest {
             })
         );
         verify(booksClient).markInvoiceAsSent("inv-1");
+    }
+
+    @Test
+    void syncOrder_missingZohoItem_createsItemBeforeSalesOrder() {
+        Product product = new Product()
+            .id(47450L)
+            .sku("BOOK-STYLE-TYING-JABLA-SHORT-SET")
+            .name("Book Style Tying Jabla Short Set")
+            .stock(0)
+            .price(BigDecimal.valueOf(1890))
+            .active(true);
+        OrderItem line = new OrderItem()
+            .productId("47450")
+            .productName("Book Style Tying Jabla Short Set")
+            .itemSize("0-3m")
+            .color("Aqua")
+            .qty(1)
+            .price(BigDecimal.valueOf(1890));
+        CustomerOrder order = new CustomerOrder().id(49251L).orderNumber("MNM-NEW-SHIPPABLE").userLogin("buyer@example.com");
+        order.addItems(line);
+        line.setOrder(order);
+
+        when(customerOrderRepository.findById(49251L)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(49251L)).thenReturn(List.of(line));
+        when(productRepository.findById(47450L)).thenReturn(Optional.of(product));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(booksClient.findItemBySku("BOOK-STYLE-TYING-JABLA-SHORT-SET")).thenReturn(null);
+        when(booksClient.createItem(any())).thenReturn(Map.of("item", Map.of("item_id", "zoho-jabla")));
+        when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-jabla")));
+        when(booksClient.createInvoiceFromSalesOrder("so-jabla"))
+            .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-jabla")));
+
+        service.syncOrder(49251L);
+
+        verify(booksClient).createItem(argThat(payload -> "BOOK-STYLE-TYING-JABLA-SHORT-SET".equals(payload.get("sku"))));
+        verify(booksClient).createSalesOrder(
+            argThat(payload -> {
+                Object rawLines = payload.get("line_items");
+                return rawLines instanceof List<?> lines &&
+                !lines.isEmpty() &&
+                lines.get(0) instanceof Map<?, ?> salesLine &&
+                "zoho-jabla".equals(salesLine.get("item_id"));
+            })
+        );
+    }
+
+    @Test
+    void syncOrder_existingFreeTextSalesOrder_repairsLineWithZohoItem() {
+        Product product = new Product()
+            .id(47450L)
+            .sku("BOOK-STYLE-TYING-JABLA-SHORT-SET")
+            .name("Book Style Tying Jabla Short Set")
+            .stock(0)
+            .price(BigDecimal.valueOf(1890))
+            .active(true);
+        OrderItem line = new OrderItem()
+            .productId("47450")
+            .productName("Book Style Tying Jabla Short Set")
+            .itemSize("0-3m")
+            .color("Aqua")
+            .qty(1)
+            .price(BigDecimal.valueOf(1890));
+        CustomerOrder order = new CustomerOrder()
+            .id(49251L)
+            .orderNumber("MNM-6F2155AEA0BE")
+            .userLogin("buyer@example.com")
+            .paymentMethod("cod")
+            .paymentStatus(com.miniandmore.app.domain.enumeration.PaymentStatus.PENDING)
+            .status(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED)
+            .zohoSalesOrderId("4066570000000341012");
+        order.addItems(line);
+        line.setOrder(order);
+
+        when(customerOrderRepository.findById(49251L)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(49251L)).thenReturn(List.of(line));
+        when(productRepository.findById(47450L)).thenReturn(Optional.of(product));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(booksClient.getSalesOrder("4066570000000341012"))
+            .thenReturn(Map.of("salesorder", Map.of("line_items", List.of(Map.of("name", "Book Style Tying Jabla Short Set")))));
+        when(booksClient.findItemBySku("BOOK-STYLE-TYING-JABLA-SHORT-SET")).thenReturn(null);
+        when(booksClient.createItem(any())).thenReturn(Map.of("item", Map.of("item_id", "zoho-jabla")));
+        when(booksClient.updateSalesOrder(eq("4066570000000341012"), any())).thenReturn(Map.of());
+
+        service.syncOrder(49251L);
+
+        verify(booksClient).updateSalesOrder(
+            eq("4066570000000341012"),
+            argThat(payload -> {
+                Object rawLines = payload.get("line_items");
+                return rawLines instanceof List<?> lines &&
+                !lines.isEmpty() &&
+                lines.get(0) instanceof Map<?, ?> salesLine &&
+                "zoho-jabla".equals(salesLine.get("item_id"));
+            })
+        );
+        verify(booksClient, never()).createInvoiceFromSalesOrder(any());
+    }
+
+    @Test
+    void syncOrder_closedSalesOrder_doesNotAttemptLegacyLineRepair() {
+        CustomerOrder order = new CustomerOrder()
+            .id(49252L)
+            .orderNumber("MNM-CLOSED")
+            .userLogin("buyer@example.com")
+            .paymentMethod("cod")
+            .paymentStatus(com.miniandmore.app.domain.enumeration.PaymentStatus.PENDING)
+            .status(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED)
+            .zohoSalesOrderId("so-closed");
+        OrderItem line = new OrderItem().productId("47450").productName("Legacy item").qty(1).price(BigDecimal.TEN);
+        order.addItems(line);
+
+        when(customerOrderRepository.findById(49252L)).thenReturn(Optional.of(order));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(booksClient.getSalesOrder("so-closed"))
+            .thenReturn(
+                Map.of("salesorder", Map.of("status", "closed", "line_items", List.of(Map.of("name", "Legacy item"))))
+            );
+
+        service.syncOrder(49252L);
+
+        verify(booksClient, never()).updateSalesOrder(any(), any());
+        verify(booksClient, never()).findItemBySku(any());
     }
 
     @Test
@@ -1147,7 +1275,90 @@ class ZohoSyncServiceTest {
     }
 
     @Test
-    void pullOrderTracking_deliveredPaidCod_doesNotCreateAccountingRecords() {
+    void pullOrderTracking_marksHandWrappedWhenZohoPackageExists() {
+        CustomerOrder order = new CustomerOrder()
+            .id(41304L)
+            .orderNumber("MNM-PACKED")
+            .paymentStatus(com.miniandmore.app.domain.enumeration.PaymentStatus.PAID)
+            .status(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED)
+            .zohoSalesOrderId("so-packed");
+        when(customerOrderRepository.findById(41304L)).thenReturn(Optional.of(order));
+        when(booksClient.getSalesOrder("so-packed"))
+            .thenReturn(Map.of("salesorder", Map.of("status", "invoiced", "salesorder_number", "SO-42")));
+        when(booksClient.listPackagesForSalesOrder("so-packed", "SO-42"))
+            .thenReturn(List.of(Map.of("package_id", "pkg-42", "salesorder_id", "so-packed")));
+        when(booksClient.listDeliveryChallans("so-packed")).thenReturn(List.of());
+
+        service.pullOrderTracking(41304L);
+
+        assertThat(order.getStatus()).isEqualTo(com.miniandmore.app.domain.enumeration.OrderStatus.HAND_WRAPPED);
+        verify(customerOrderRepository).save(order);
+        verify(orderEventService).syncLifecycleEvents(order);
+    }
+
+    @Test
+    void pullOrderTracking_marksDeliveredWhenZohoShipmentIsFulfilled() {
+        CustomerOrder order = new CustomerOrder()
+            .id(41306L)
+            .orderNumber("MNM-SHIPPED")
+            .paymentStatus(com.miniandmore.app.domain.enumeration.PaymentStatus.PAID)
+            .status(com.miniandmore.app.domain.enumeration.OrderStatus.HAND_WRAPPED)
+            .shipmentDate("2026-08-30")
+            .zohoSalesOrderId("so-shipped");
+        when(customerOrderRepository.findById(41306L)).thenReturn(Optional.of(order));
+        when(booksClient.getSalesOrder("so-shipped"))
+            .thenReturn(
+                Map.of(
+                    "salesorder",
+                    Map.of("status", "fulfilled", "shipment_date", "2026-08-30", "salesorder_number", "SO-46")
+                )
+            );
+        when(booksClient.listPackagesForSalesOrder("so-shipped", "SO-46"))
+            .thenReturn(
+                List.of(
+                    Map.of(
+                        "package_id",
+                        "pkg-46",
+                        "salesorder_id",
+                        "so-shipped",
+                        "shipment_id",
+                        "ship-46",
+                        "status",
+                        "fulfilled"
+                    )
+                )
+            );
+        when(booksClient.listDeliveryChallans("so-shipped")).thenReturn(List.of());
+
+        service.pullOrderTracking(41306L);
+
+        assertThat(order.getStatus()).isEqualTo(com.miniandmore.app.domain.enumeration.OrderStatus.FULFILLED);
+        verify(customerOrderRepository).save(order);
+    }
+
+    @Test
+    void pullOrderTracking_packageLookupFailureDoesNotBlockOtherTrackingUpdates() {
+        CustomerOrder order = new CustomerOrder()
+            .id(41305L)
+            .paymentStatus(com.miniandmore.app.domain.enumeration.PaymentStatus.PAID)
+            .status(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED)
+            .zohoSalesOrderId("so-package-error");
+        when(customerOrderRepository.findById(41305L)).thenReturn(Optional.of(order));
+        when(booksClient.getSalesOrder("so-package-error"))
+            .thenReturn(Map.of("salesorder", Map.of("status", "invoiced", "salesorder_number", "SO-45")));
+        when(booksClient.listPackagesForSalesOrder("so-package-error", "SO-45"))
+            .thenThrow(new RestClientResponseException("Missing scope", 401, "Unauthorized", null, null, null));
+        when(booksClient.listDeliveryChallans("so-package-error")).thenReturn(List.of());
+
+        service.pullOrderTracking(41305L);
+
+        assertThat(order.getStatus()).isEqualTo(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED);
+        assertThat(order.getZohoTrackingLastPulledAt()).isNotNull();
+        verify(customerOrderRepository).save(order);
+    }
+
+    @Test
+    void pullOrderTracking_invoiceFulfilledPaidCod_doesNotMarkDeliveredOrCreateAccountingRecords() {
         CustomerOrder order = new CustomerOrder()
             .id(41303L)
             .orderNumber("MNM-COD-DELIVERED")
@@ -1164,7 +1375,7 @@ class ZohoSyncServiceTest {
 
         service.pullOrderTracking(41303L);
 
-        assertThat(order.getStatus()).isEqualTo(com.miniandmore.app.domain.enumeration.OrderStatus.FULFILLED);
+        assertThat(order.getStatus()).isEqualTo(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED);
         assertThat(order.getZohoInvoiceId()).isNull();
         verify(booksClient, never()).createInvoiceFromSalesOrder(any());
         verify(booksClient, never()).createCustomerPayment(any());
@@ -1344,7 +1555,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
         when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
         when(itemImageSync.isEnabled()).thenReturn(false);
@@ -1419,7 +1631,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
 
         Product product = new Product()
@@ -1484,7 +1697,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
         ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
         zoho.setSyncProductStock(true);
@@ -1536,7 +1750,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
 
         Product product = new Product()
@@ -1591,7 +1806,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
 
         Product parent = new Product()
@@ -1674,7 +1890,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
 
         Product product = new Product()
@@ -1739,7 +1956,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
 
         Map<String, Object> small = groupedZohoItem("zoho-s", "HORIZON-S-NAVY", "S", "Navy", 799.20, 3);
@@ -1815,7 +2033,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
 
         Map<String, Object> pink = groupedZohoItem("zoho-pink", "KEDAR-S-PINK", "S", "Pink", 799.20, 2);
@@ -1871,7 +2090,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
 
         Map<String, Object> small = booksVariantItem("zoho-s", "HORIZON-S-NAVY", "S", "Navy", 799.20, 3);
@@ -1930,7 +2150,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
 
         Map<String, Object> inactive = new java.util.LinkedHashMap<>(
@@ -1967,7 +2188,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
 
         Product parent = new Product()
@@ -2028,7 +2250,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
 
         Map<String, Object> unparseable = new java.util.LinkedHashMap<>();
@@ -2070,7 +2293,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
         Product linkedSimple = new Product().id(301L).sku("GONE").zohoItemId("zoho-gone").active(true);
         Product linkedVariants = new Product()
@@ -2126,7 +2350,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
         Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
         ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
@@ -2279,7 +2504,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
         Map<String, Object> listed = new java.util.LinkedHashMap<>();
         listed.put("item_id", "zoho-live");
@@ -2339,7 +2565,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
         Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
         ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
@@ -2528,7 +2755,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
         Product parent = new Product()
             .id(305L)
@@ -2909,7 +3137,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
         Product parent = new Product()
             .id(307L)
@@ -2981,7 +3210,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
 
         Product parent = new Product()
@@ -3041,7 +3271,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
 
         Product parent = new Product()
@@ -3103,7 +3334,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
 
         Product parent = new Product()
@@ -3171,7 +3403,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
 
         Product product = new Product()
@@ -3223,7 +3456,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
 
         Product product = new Product()
@@ -3277,7 +3511,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
 
         Product product = new Product()
@@ -3316,7 +3551,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
 
         Product product = new Product()
@@ -3373,7 +3609,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
         Product product = new Product()
             .id(40802L)
@@ -3414,7 +3651,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
         Product product = new Product()
             .id(40803L)
@@ -3459,7 +3697,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
         Product product = new Product()
             .id(40804L)
@@ -3533,7 +3772,8 @@ class ZohoSyncServiceTest {
                 customerOrderRepository,
                 customerProfileRepository,
                 orderItemRepository,
-                s3StorageService
+                s3StorageService,
+                orderEventService
             );
         Product product = new Product()
             .id(60L)

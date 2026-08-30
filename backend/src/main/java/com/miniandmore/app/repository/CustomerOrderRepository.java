@@ -122,9 +122,11 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     );
 
     @Query(
-        value = "select customerOrder from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
+        value = "select customerOrder from CustomerOrder customerOrder where " +
+        "(customerOrder.paymentStatus = :paymentStatus or customerOrder.paymentMethod = 'cod') and " +
         "customerOrder.zohoSalesOrderId is not null and customerOrder.status in :statuses order by customerOrder.id asc",
-        countQuery = "select count(customerOrder) from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
+        countQuery = "select count(customerOrder) from CustomerOrder customerOrder where " +
+        "(customerOrder.paymentStatus = :paymentStatus or customerOrder.paymentMethod = 'cod') and " +
         "customerOrder.zohoSalesOrderId is not null and customerOrder.status in :statuses"
     )
     Page<CustomerOrder> findOrdersForZohoTrackingPull(

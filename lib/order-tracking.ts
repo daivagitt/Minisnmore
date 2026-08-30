@@ -48,7 +48,7 @@ export const TRACKING_STAGES = [
 ] as const;
 
 /**
- * Confirmed orders stay at stage 0 until operations explicitly marks them hand-wrapped.
+ * Confirmed orders stay at stage 0 until a package is created for the Zoho sales order.
  * The Hand-wrapped phase completes once the order ships.
  */
 const STATUS_INDEX: Record<string, number> = {

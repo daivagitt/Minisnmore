@@ -143,6 +143,15 @@ public class InternalAdminOrderResource {
             .customerOrderRepository()
             .findOneByOrderNumber(orderNumber)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+        if (
+            order.getStatus() != OrderStatus.FULFILLED &&
+            order.getStatus() != OrderStatus.CANCELLED &&
+            StringUtils.isNotBlank(order.getZohoSalesOrderId()) &&
+            (order.getZohoTrackingLastPulledAt() == null || order.getZohoTrackingLastPulledAt().isBefore(Instant.now().minusSeconds(30)))
+        ) {
+            zohoSyncService.pullOrderTracking(order.getId());
+            order = dataAccess.customerOrderRepository().findOneByOrderNumber(orderNumber).orElse(order);
+        }
         return ApiResponse.ok(Map.of("order", accountOrders.orderDetail(order)));
     }
 
@@ -166,48 +175,8 @@ public class InternalAdminOrderResource {
         orderEventService.onOrderPaid(saved);
         ledgerlySyncService.syncOrder(saved.getId());
         zohoSyncService.syncOrder(saved.getId());
+        zohoSyncService.pullOrderTracking(saved.getId());
         return ApiResponse.ok(Map.of("ok", true, "orderNumber", saved.getOrderNumber(), "paymentStatus", "paid"));
-    }
-
-    @PostMapping("/{orderNumber}/mark-hand-wrapped")
-    @Transactional
-    public ApiResponse<Map<String, Object>> markHandWrapped(@PathVariable String orderNumber) {
-        CustomerOrder order = dataAccess
-            .customerOrderRepository()
-            .findOneByOrderNumber(orderNumber)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
-
-        String trackingStatus = OrderTrackingStatusResolver.resolve(order);
-        if ("shipped".equals(trackingStatus) || "delivered".equals(trackingStatus)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "This order has already been dispatched");
-        }
-        if (order.getStatus() == OrderStatus.HAND_WRAPPED) {
-            orderEventService.syncLifecycleEvents(order);
-            return handWrappedResponse(order);
-        }
-        if (order.getStatus() != OrderStatus.CONFIRMED) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only a confirmed order can be marked as hand-wrapped");
-        }
-
-        order.setStatus(OrderStatus.HAND_WRAPPED);
-        CustomerOrder saved = dataAccess.customerOrderRepository().save(order);
-        orderEventService.syncLifecycleEvents(saved);
-        return handWrappedResponse(saved);
-    }
-
-    private static ApiResponse<Map<String, Object>> handWrappedResponse(CustomerOrder order) {
-        return ApiResponse.ok(
-            Map.of(
-                "ok",
-                true,
-                "orderNumber",
-                order.getOrderNumber(),
-                "status",
-                "hand_wrapped",
-                "trackingStatus",
-                "hand_wrapped"
-            )
-        );
     }
 
     private Map<String, Object> summary(CustomerOrder order) {

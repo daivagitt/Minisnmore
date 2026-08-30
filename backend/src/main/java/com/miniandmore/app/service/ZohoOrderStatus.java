@@ -38,6 +38,13 @@ public final class ZohoOrderStatus {
             order.setShipmentDate(StringUtils.isNotBlank(fallbackDate) ? fallbackDate.trim() : LocalDate.now().toString());
         }
         updateOrderStatusFromZoho(order, salesOrder);
+        if (
+            order.getStatus() == OrderStatus.CONFIRMED &&
+            !hasShippedSignal(salesOrder) &&
+            hasPositiveLineQuantity(salesOrder, "quantity_packed")
+        ) {
+            order.setStatus(OrderStatus.HAND_WRAPPED);
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -72,6 +79,54 @@ public final class ZohoOrderStatus {
         }
     }
 
+    /** A Zoho package is the operations-owned proof that wrapping/packing is complete. */
+    public static void applyPackages(CustomerOrder order, List<Map<String, Object>> packages) {
+        if (packages == null || packages.isEmpty() || order.getStatus() == OrderStatus.CANCELLED) {
+            return;
+        }
+        for (Map<String, Object> pkg : packages) {
+            String trackingNumber = firstNonBlank(
+                stringValue(pkg.get("tracking_number")),
+                stringValue(pkg.get("tracking_number_ext"))
+            );
+            if (StringUtils.isNotBlank(trackingNumber)) {
+                order.setTrackingNumber(trackingNumber);
+            }
+            String carrier = firstNonBlank(stringValue(pkg.get("carrier")), stringValue(pkg.get("delivery_method")));
+            if (StringUtils.isNotBlank(carrier)) {
+                order.setTrackingCarrier(carrier);
+            }
+            String packageShipmentDate = stringValue(pkg.get("shipment_date"));
+            if (StringUtils.isNotBlank(packageShipmentDate)) {
+                order.setShipmentDate(packageShipmentDate.trim());
+            }
+        }
+        if (packages.stream().anyMatch(ZohoOrderStatus::isFulfilledShipment)) {
+            order.setStatus(OrderStatus.FULFILLED);
+            return;
+        }
+        if (order.getStatus() != OrderStatus.CONFIRMED) {
+            return;
+        }
+        String trackingStatus = OrderTrackingStatusResolver.resolve(order);
+        if ("shipped".equals(trackingStatus) || "delivered".equals(trackingStatus)) {
+            return;
+        }
+        order.setStatus(OrderStatus.HAND_WRAPPED);
+    }
+
+    private static boolean isFulfilledShipment(Map<String, Object> pkg) {
+        String status = normalize(stringValue(pkg.get("status")));
+        String detailedStatus = normalize(stringValue(pkg.get("detailed_status")));
+        String statusMessage = normalize(stringValue(pkg.get("status_message")));
+        if ("delivered".equals(status) || "delivered".equals(detailedStatus) || "delivered".equals(statusMessage)) {
+            return true;
+        }
+        // A sales order or invoice can become fulfilled during accounting. A package can only
+        // become fulfilled after it has been converted to a shipment, identified by shipment_id.
+        return "fulfilled".equals(status) && StringUtils.isNotBlank(stringValue(pkg.get("shipment_id")));
+    }
+
     public static boolean isShipped(String zohoOrderStatus) {
         String normalized = normalize(zohoOrderStatus);
         return normalized != null
@@ -83,7 +138,9 @@ public final class ZohoOrderStatus {
 
     public static boolean isDelivered(String zohoOrderStatus) {
         String normalized = normalize(zohoOrderStatus);
-        return normalized != null && (normalized.equals("fulfilled") || normalized.equals("delivered"));
+        // Zoho can report a sales order as "fulfilled" as a side effect of invoice/payment
+        // processing. Only its explicit delivery state is safe to expose as delivered.
+        return "delivered".equals(normalized);
     }
 
     @SuppressWarnings("unchecked")
@@ -119,19 +176,11 @@ public final class ZohoOrderStatus {
             return;
         }
         String shippedStatus = normalize(stringValue(salesOrder.get("shipped_status")));
-        // Operations use Zoho "fulfilled" as the explicit final-delivery action. This keeps
-        // storefront delivery tracking independent of delivery challans. "closed" / "invoiced"
-        // remain accounting states and do not mean that the parcel was delivered. Zoho Books
-        // exposes "Completely Fulfilled" as shipped_status=fulfilled while the main sales-order
-        // status can remain invoiced, so both fields must be considered.
-        //
-        // Zoho can also auto-set shipped_status=fulfilled when an invoice is created, with no
-        // courier or shipment date. Require dispatch evidence before treating that as delivered.
-        if ("fulfilled".equals(status) || "delivered".equals(status)) {
-            order.setStatus(OrderStatus.FULFILLED);
-            return;
-        }
-        if (("fulfilled".equals(shippedStatus) || "delivered".equals(shippedStatus)) && hasDispatchEvidence(salesOrder)) {
+        // "fulfilled" is not delivery evidence: Zoho can set both the main sales-order status and
+        // shipped_status to fulfilled while converting an order to an invoice or collecting its
+        // payment. Delivery challans are handled separately by applyDeliveryChallans. Preserve an
+        // explicit "delivered" signal here for Zoho organizations that expose one directly.
+        if ("delivered".equals(status) || "delivered".equals(shippedStatus)) {
             order.setStatus(OrderStatus.FULFILLED);
             return;
         }
@@ -140,37 +189,11 @@ public final class ZohoOrderStatus {
         }
     }
 
-    private static boolean hasDispatchEvidence(Map<String, Object> salesOrder) {
-        if (StringUtils.isNotBlank(stringValue(salesOrder.get("shipment_date")))) {
-            return true;
-        }
-        if (StringUtils.isNotBlank(stringValue(salesOrder.get("tracking_number")))) {
-            return true;
-        }
-        return hasCustomFieldTracking(salesOrder);
-    }
-
-    @SuppressWarnings("unchecked")
-    private static boolean hasCustomFieldTracking(Map<String, Object> salesOrder) {
-        Object raw = salesOrder.get("custom_fields");
-        if (!(raw instanceof List<?> fields)) {
-            return false;
-        }
-        for (Object fieldObj : fields) {
-            if (!(fieldObj instanceof Map<?, ?> field)) {
-                continue;
-            }
-            String label = StringUtils.defaultString(stringValue(field.get("label"))).toLowerCase();
-            String value = stringValue(field.get("value"));
-            if (StringUtils.isNotBlank(value) && (label.contains("tracking") || label.contains("awb"))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private static boolean hasShippedSignal(Map<String, Object> salesOrder) {
         if (StringUtils.isNotBlank(stringValue(salesOrder.get("shipment_date")))) {
+            return true;
+        }
+        if (hasPositiveLineQuantity(salesOrder, "quantity_shipped")) {
             return true;
         }
         String shippedStatus = normalize(stringValue(salesOrder.get("shipped_status")));
@@ -198,6 +221,32 @@ public final class ZohoOrderStatus {
             ).toLowerCase();
             if (label.contains("ship") || label.contains("dispatch") || label.contains("transit")) {
                 return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasPositiveLineQuantity(Map<String, Object> salesOrder, String field) {
+        Object raw = salesOrder.get("line_items");
+        if (!(raw instanceof List<?> lines)) {
+            return false;
+        }
+        for (Object lineObj : lines) {
+            if (!(lineObj instanceof Map<?, ?> line)) {
+                continue;
+            }
+            Object value = line.get(field);
+            if (value instanceof Number number && number.doubleValue() > 0) {
+                return true;
+            }
+            if (value != null) {
+                try {
+                    if (Double.parseDouble(value.toString()) > 0) {
+                        return true;
+                    }
+                } catch (NumberFormatException ignored) {
+                    // Ignore malformed quantities from optional Zoho response fields.
+                }
             }
         }
         return false;

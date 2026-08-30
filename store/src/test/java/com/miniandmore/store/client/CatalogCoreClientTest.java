@@ -137,24 +137,6 @@ class CatalogCoreClientTest {
     }
 
     @Test
-    void forward_markHandWrapped_translatesAdminPostToCatalogCore() throws Exception {
-        server
-            .expect(requestTo("http://catalog.test/internal/v1/admin/orders/MNM-42/mark-hand-wrapped"))
-            .andExpect(method(HttpMethod.POST))
-            .andRespond(withSuccess("{\"status\":\"hand_wrapped\"}", MediaType.APPLICATION_JSON));
-
-        MockHttpServletRequest request = new MockHttpServletRequest(
-            "POST",
-            "/api/v1/admin/orders/MNM-42/mark-hand-wrapped"
-        );
-        ResponseEntity<byte[]> response = client.forward(request);
-
-        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
-        assertThat(new String(response.getBody())).contains("hand_wrapped");
-        server.verify();
-    }
-
-    @Test
     void forward_keepsNonApiPathUnchanged() throws Exception {
         server
             .expect(requestTo("http://catalog.test/health"))

@@ -83,6 +83,58 @@ class ZohoBooksClientTest {
     }
 
     @Test
+    void listPackagesForSalesOrder_usesInventoryApiAndMatchesImmutableSalesOrderId() {
+        server
+            .expect(
+                requestTo(
+                    "https://www.zohoapis.in/inventory/v1/packages?organization_id=org-1&per_page=200&salesorder_number_contains=SO-42"
+                )
+            )
+            .andRespond(
+                withSuccess(
+                    "{\"packages\":[{\"package_id\":\"pkg-wrong\",\"salesorder_id\":\"so-4\"},{\"package_id\":\"pkg-42\",\"salesorder_id\":\"so-42\"}]}",
+                    MediaType.APPLICATION_JSON
+                )
+            );
+
+        assertThat(client.listPackagesForSalesOrder("so-42", "SO-42"))
+            .singleElement()
+            .satisfies(pkg -> assertThat(pkg.get("package_id")).isEqualTo("pkg-42"));
+        server.verify();
+    }
+
+    @Test
+    void listPackagesForSalesOrder_acceptsZohoPublishedPackageaKeyWithoutAnOrderNumber() {
+        server
+            .expect(requestTo("https://www.zohoapis.in/inventory/v1/packages?organization_id=org-1&per_page=200"))
+            .andRespond(
+                withSuccess(
+                    "{\"packagea\":[{\"package_id\":\"pkg-43\",\"salesorder_id\":\"so-43\"}]}",
+                    MediaType.APPLICATION_JSON
+                )
+            );
+
+        assertThat(client.listPackagesForSalesOrder("so-43", null))
+            .singleElement()
+            .satisfies(pkg -> assertThat(pkg.get("package_id")).isEqualTo("pkg-43"));
+        server.verify();
+    }
+
+    @Test
+    void listPackagesForSalesOrder_returnsEmptyForAnUnexpectedResponseShape() {
+        server
+            .expect(
+                requestTo(
+                    "https://www.zohoapis.in/inventory/v1/packages?organization_id=org-1&per_page=200&salesorder_number_contains=SO-44"
+                )
+            )
+            .andRespond(withSuccess("{\"code\":0}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.listPackagesForSalesOrder("so-44", "SO-44")).isEmpty();
+        server.verify();
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void deleteItemImages_deletesFrontImageThenPluralDocuments() throws Exception {
         HttpResponse<String> frontDeleteResponse = mock(HttpResponse.class);

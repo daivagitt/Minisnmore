@@ -1,12 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminPage } from "@/components/admin/AdminPage";
-import { AlertCircle, CheckCircle2, CloudUpload, FileText, Loader2, PackageCheck, RefreshCw, Search, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, CloudUpload, FileText, Loader2, RefreshCw, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   listAdminOrders,
   markCodCollected,
-  markOrderHandWrapped,
   type AdminOrderRow,
 } from "@/lib/orders.functions";
 import {
@@ -182,19 +181,6 @@ function AdminOrdersPage() {
       await load();
     } catch (error) {
       showApiError(error, "Could not mark order as collected");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const markHandWrapped = async (orderNumber: string) => {
-    setBusy(`wrap:${orderNumber}`);
-    try {
-      await markOrderHandWrapped(orderNumber);
-      toast.success(`${orderNumber} marked as hand-wrapped`);
-      await load();
-    } catch (error) {
-      showApiError(error, "Could not mark order as hand-wrapped");
     } finally {
       setBusy(null);
     }
@@ -471,21 +457,6 @@ function AdminOrdersPage() {
                         {busy === `collect:${order.order_number}`
                           ? "Updating…"
                           : "Mark COD collected"}
-                      </button>
-                    )}
-                    {order.status === "confirmed" && (order.tracking_status ?? order.status) === "confirmed" && (
-                      <button
-                        type="button"
-                        disabled={busy !== null}
-                        onClick={() => void markHandWrapped(order.order_number)}
-                        className="mt-2 ml-2 inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-60"
-                      >
-                        {busy === `wrap:${order.order_number}` ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <PackageCheck className="h-3.5 w-3.5" />
-                        )}
-                        {busy === `wrap:${order.order_number}` ? "Updating…" : "Mark hand-wrapped"}
                       </button>
                     )}
                     {isInvoiceAvailable(order) && (

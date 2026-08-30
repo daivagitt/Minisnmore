@@ -56,11 +56,11 @@ export function CouponOffers({
 
       {open && (
         <div
-          className="fixed inset-0 z-50 grid place-items-end sm:place-items-center bg-black/40 p-0 sm:p-4"
+          className="fixed inset-0 z-50 grid place-items-end sm:place-items-center bg-black/80 p-0 sm:p-4"
           onClick={() => setOpen(false)}
         >
           <div
-            className="glass-strong w-full sm:max-w-md sm:rounded-[2rem] rounded-t-[2rem] max-h-[80vh] overflow-y-auto p-6"
+            className="bg-background border shadow-lg w-full sm:max-w-md sm:rounded-[2rem] rounded-t-[2rem] max-h-[80vh] overflow-y-auto p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
@@ -81,7 +81,7 @@ export function CouponOffers({
                 const eligible = subtotal >= c.min_order;
                 const applied = activeCode === c.code;
                 return (
-                  <div key={c.code} className="glass rounded-2xl p-4 flex items-center justify-between gap-3">
+                  <div key={c.code} className="rounded-2xl border border-border bg-muted/40 p-4 flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="font-medium flex items-center gap-2">
                         <Tag className="h-3.5 w-3.5 text-primary" /> {c.code}

@@ -480,11 +480,3 @@ export async function markCodCollected(orderNumber: string) {
     { auth: true },
   );
 }
-
-export async function markOrderHandWrapped(orderNumber: string) {
-  return api.post(
-    `/api/v1/admin/orders/${encodeURIComponent(orderNumber)}/mark-hand-wrapped`,
-    undefined,
-    { auth: true },
-  );
-}

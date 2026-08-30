@@ -167,10 +167,10 @@ Existing Zoho documents with the same `reference_number` could be **linked** ins
 | Shipment date (when available) | `shipment_date` |
 | — | `zoho_tracking_last_pulled_at` |
 
-Storefront progression uses a shipment date or tracking number for **On the way**. A Zoho sales order status of `fulfilled` is treated as **Delivered**, so a delivery challan is optional for customer tracking.
+Storefront progression uses a shipment date or tracking number for **On the way**. A Zoho sales order status of `fulfilled` is not treated as delivery because invoice/payment processing can set it automatically. **Delivered** requires an explicit delivery signal, such as a package converted to a shipment and marked `fulfilled` or a delivered delivery challan.
 
 Scheduled when `application.zoho.order-tracking.enabled=true` (default ~15 min interval). The local
-`HAND_WRAPPED` step is set by store operations and is not dependent on a Zoho field.
+`HAND_WRAPPED` step is set when a package exists for the linked Zoho sales order.
 
 ---
 
