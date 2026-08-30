@@ -393,18 +393,36 @@ function OrderDetail() {
               <StatusIcon className="h-4 w-4 text-primary" />
               <span>{formatOrderStatusSummary(order)}</span>
             </div>
-            {order.can_cancel && (
-              <button
-                type="button"
-                onClick={() => setCancelDialogOpen(true)}
-                className="rounded-full border border-destructive/30 px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition"
-              >
-                Cancel order
-              </button>
-            )}
           </div>
         </div>
       </div>
+
+      {order.can_cancel && (
+        <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-5 md:p-6 border-2 border-destructive/50 bg-destructive/10">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-destructive flex items-center gap-2">
+                <XCircle className="h-4 w-4 shrink-0" />
+                Need to cancel this order?
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                You can cancel while this order has not shipped yet.
+                {order.payment_status === "paid"
+                  ? " A refund will be initiated to your original payment method."
+                  : " No payment will be charged."}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCancelDialogOpen(true)}
+              className="rounded-full bg-destructive text-destructive-foreground px-5 py-2.5 text-sm font-medium inline-flex items-center justify-center gap-2 hover:bg-destructive/90 transition shadow-sm w-full sm:w-auto shrink-0"
+            >
+              <XCircle className="h-4 w-4" />
+              Cancel order
+            </button>
+          </div>
+        </div>
+      )}
 
       {order.status === "cancelled" && (
         <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-5 md:p-6 border border-muted bg-muted/30">
