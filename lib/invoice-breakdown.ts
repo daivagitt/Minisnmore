@@ -15,6 +15,7 @@ export type InvoiceOrderItem = {
 
 export type InvoiceOrder = {
   order_number: string;
+  status?: string | null;
   created_at?: string | null;
   subtotal: number;
   discount: number;

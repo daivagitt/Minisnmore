@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, backendOAuthUrl, getAuthToken, setAuthToken } from "@/lib/api";
 import { authErrorMessage } from "@/lib/auth-errors";
-import { fullNameFieldError } from "@/lib/orders.functions";
+import { isOAuthProviderEnabled } from "@/lib/oauth-providers";
+import { bootstrapProfileFromSignup, fullNameFieldError } from "@/lib/orders.functions";
+import { clearPendingProfile, readPendingProfile, resolveSignupProfileSeed } from "@/lib/pending-profile";
 
 export type AuthUser = {
   id: number;
@@ -38,6 +40,26 @@ type Ctx = {
 
 const AuthCtx = createContext<Ctx | null>(null);
 
+async function seedProfileFromSignup(user: AuthUser): Promise<boolean> {
+  const pending = readPendingProfile();
+  const resolved = resolveSignupProfileSeed(user, pending);
+  if (resolved?.stalePending && pending) clearPendingProfile(pending.email);
+  if (!resolved?.full_name || !resolved.email) return true;
+
+  try {
+    await bootstrapProfileFromSignup({ data: { full_name: resolved.full_name, email: resolved.email } });
+    if (pending && pending.email.trim().toLowerCase() === resolved.email) {
+      clearPendingProfile(pending.email);
+    }
+    return true;
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.warn("profile bootstrap failed", error);
+    }
+    return false;
+  }
+}
+
 async function loadAccountFromToken(token: string): Promise<{ user: AuthUser; isAdmin: boolean } | null> {
   setAuthToken(token);
   try {
@@ -66,18 +88,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const refreshRef = useRef(0);
+  const profileSeedStateRef = useRef<{
+    accountKey: string | null;
+    inFlight: Promise<boolean> | null;
+    done: boolean;
+  }>({ accountKey: null, inFlight: null, done: false });
+
+  const maybeSeedProfile = useCallback((accountUser: AuthUser, accountIsAdmin: boolean) => {
+    const accountKey = `${accountUser.id}:${(accountUser.email ?? accountUser.login).trim().toLowerCase()}`;
+    if (accountIsAdmin) {
+      profileSeedStateRef.current = { accountKey, inFlight: null, done: true };
+      return;
+    }
+
+    const current = profileSeedStateRef.current;
+    if (current.accountKey === accountKey && (current.done || current.inFlight)) return;
+
+    const inFlight = seedProfileFromSignup(accountUser);
+    profileSeedStateRef.current = { accountKey, inFlight, done: false };
+    void inFlight.then((done) => {
+      const latest = profileSeedStateRef.current;
+      if (latest.accountKey === accountKey && latest.inFlight === inFlight) {
+        profileSeedStateRef.current = { accountKey, inFlight: null, done };
+      }
+    });
+  }, []);
 
   const applyAccount = useCallback((account: { user: AuthUser; isAdmin: boolean } | null, token: string | null) => {
     if (!account || !token) {
       setUser(null);
       setSession(null);
       setIsAdmin(false);
+      profileSeedStateRef.current = { accountKey: null, inFlight: null, done: false };
       return;
     }
     setUser(account.user);
     setSession({ access_token: token });
     setIsAdmin(account.isAdmin);
-  }, []);
+    maybeSeedProfile(account.user, account.isAdmin);
+  }, [maybeSeedProfile]);
 
   const refreshSession = useCallback(async () => {
     const token = getAuthToken();
@@ -201,6 +250,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithOAuth: Ctx["signInWithOAuth"] = async (provider, redirectPath = "/account") => {
     if (typeof window === "undefined") return { error: "OAuth is only available in the browser." };
+    if (!isOAuthProviderEnabled(provider)) {
+      return { error: "This sign-in option is not available right now." };
+    }
     try {
       window.sessionStorage.setItem("mnm_oauth_redirect", redirectPath);
       window.location.href = backendOAuthUrl(provider);

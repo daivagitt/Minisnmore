@@ -9,6 +9,7 @@ import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
+import com.miniandmore.app.security.AuthoritiesConstants;
 import com.miniandmore.app.security.SecurityUtils;
 import com.miniandmore.app.service.LedgerlySyncService;
 import com.miniandmore.app.service.OrderEventService;
@@ -186,6 +187,31 @@ public class InternalAccountOrderResource {
             .orElseGet(() -> new CustomerProfile().userLogin(login));
         profile.setFullName(StringUtils.trimToNull(request.full_name()));
         profile.setPhone(StringUtils.trimToNull(request.phone()));
+        dataAccess.customerProfileRepository().save(profile);
+        ledgerlySyncService.syncCustomerProfileAsync(login);
+        return ApiResponse.ok(Map.of("ok", true));
+    }
+
+    /** Seed profile name from signup when the customer has not set one yet (phone optional). */
+    @PostMapping("/account/profile/bootstrap")
+    @Transactional
+    public ApiResponse<Map<String, Boolean>> bootstrapProfile(@Valid @RequestBody ProfileBootstrapRequest request) {
+        String login = requireLogin();
+        if (SecurityUtils.hasCurrentUserAnyOfAuthorities(AuthoritiesConstants.ADMIN)) {
+            return ApiResponse.ok(Map.of("ok", true));
+        }
+        String email = StringUtils.trimToEmpty(request.email()).toLowerCase(Locale.ROOT);
+        if (!login.equalsIgnoreCase(email)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email does not match signed-in account");
+        }
+        CustomerProfile profile = dataAccess
+            .customerProfileRepository()
+            .findOneByUserLogin(login)
+            .orElseGet(() -> new CustomerProfile().userLogin(login));
+        if (StringUtils.isNotBlank(profile.getFullName())) {
+            return ApiResponse.ok(Map.of("ok", true));
+        }
+        profile.setFullName(StringUtils.trimToNull(request.full_name()));
         dataAccess.customerProfileRepository().save(profile);
         ledgerlySyncService.syncCustomerProfileAsync(login);
         return ApiResponse.ok(Map.of("ok", true));
@@ -1425,6 +1451,14 @@ public class InternalAccountOrderResource {
         @Size(max = 20)
         @Pattern(regexp = "^(\\+91[\\s-]?)?[6-9]\\d{4}[\\s-]?\\d{5}$", message = "Enter a valid 10-digit Indian mobile number")
         String phone
+    ) {}
+
+    public record ProfileBootstrapRequest(
+        @NotBlank
+        @Size(min = 2, max = 120)
+        @Pattern(regexp = "^\\p{L}[\\p{L} .'-]*$", message = "Full name may only contain letters, spaces, apostrophes, periods and hyphens")
+        String full_name,
+        @NotBlank @Email @Size(max = 160) String email
     ) {}
 
     public record AddressRequest(

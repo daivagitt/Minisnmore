@@ -42,6 +42,10 @@ public class ZohoBooksClient {
         return oauthService.apiHost(oauthService.dataCenter()) + "/books/v3";
     }
 
+    private String inventoryApiBase() {
+        return oauthService.apiHost(oauthService.dataCenter()) + "/inventory/v1";
+    }
+
     private RestClient client() {
         return restClientBuilder.baseUrl(apiBase()).build();
     }
@@ -306,6 +310,10 @@ public class ZohoBooksClient {
         return post("/salesorders?" + orgIdParam(), payload);
     }
 
+    public Map<String, Object> updateSalesOrder(String salesOrderId, Map<String, Object> payload) {
+        return put("/salesorders/" + salesOrderId + "?" + orgIdParam(), payload);
+    }
+
     public Map<String, Object> createInvoiceFromSalesOrder(String salesOrderId) {
         return post("/invoices/fromsalesorder?" + orgIdParam() + "&salesorder_id=" + salesOrderId, Map.of());
     }
@@ -378,6 +386,37 @@ public class ZohoBooksClient {
     public List<Map<String, Object>> listDeliveryChallans(String salesOrderId) {
         Map<String, Object> response = get("/deliverychallans?" + orgIdParam() + "&salesorder_id=" + encode(salesOrderId));
         return (List<Map<String, Object>>) response.getOrDefault("deliverychallans", List.of());
+    }
+
+    /**
+     * Packages shown from a Books sales order are exposed by Zoho's Inventory API. Search by the
+     * human-readable sales-order number to keep the response bounded, then verify the immutable id
+     * so similarly numbered orders cannot advance the wrong store order.
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> listPackagesForSalesOrder(String salesOrderId, String salesOrderNumber) {
+        StringBuilder url = new StringBuilder(inventoryApiBase())
+            .append("/packages?")
+            .append(orgIdParam())
+            .append("&per_page=200");
+        if (StringUtils.isNotBlank(salesOrderNumber)) {
+            url.append("&salesorder_number_contains=").append(encode(salesOrderNumber.trim()));
+        }
+        Map<String, Object> response = get(url.toString());
+        Object rawPackages = response.get("packages");
+        if (!(rawPackages instanceof List<?>)) {
+            // Zoho's published example currently spells this response key `packagea`.
+            rawPackages = response.get("packagea");
+        }
+        if (!(rawPackages instanceof List<?> packages)) {
+            return List.of();
+        }
+        return packages
+            .stream()
+            .filter(Map.class::isInstance)
+            .map(value -> (Map<String, Object>) value)
+            .filter(value -> salesOrderId.equals(String.valueOf(value.get("salesorder_id"))))
+            .toList();
     }
 
     public Map<String, Object> createCreditNote(Map<String, Object> payload) {

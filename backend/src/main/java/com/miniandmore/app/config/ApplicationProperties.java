@@ -431,7 +431,7 @@ public class ApplicationProperties {
 
             private List<String> javascriptDomains = new ArrayList<>(List.of("http://localhost:5173", "http://127.0.0.1:5173"));
 
-            private String scopes = "ZohoBooks.fullaccess.all";
+            private String scopes = "ZohoBooks.fullaccess.all,ZohoInventory.packages.READ";
 
             private String clientId;
 

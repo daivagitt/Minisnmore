@@ -14,7 +14,7 @@ Canonical fulfillment state on `customer_order.status`.
 |-------|---------|
 | `PENDING` | Order created; waiting for online payment confirmation |
 | `CONFIRMED` | Order accepted and ready for fulfillment |
-| `HAND_WRAPPED` | Operations explicitly confirmed that packing is complete |
+| `HAND_WRAPPED` | A package exists for the linked sales order in Zoho |
 | `FULFILLED` | Delivered / order complete |
 | `CANCELLED` | Order cancelled |
 
@@ -25,7 +25,7 @@ Canonical fulfillment state on `customer_order.status`.
 | **Online (Razorpay)** | `PENDING` | `CONFIRMED` (after verify-payment / sync-payment) | `HAND_WRAPPED` | `FULFILLED` |
 | **COD** | `CONFIRMED` immediately | stays `CONFIRMED` until collected | `HAND_WRAPPED` | `FULFILLED` |
 
-`FULFILLED` is set when delivery is confirmed — including a Zoho Books sales order marked `fulfilled`, a delivery challan marked `delivered`, or an equivalent Ledgerly delivery signal.
+`FULFILLED` is set only from an explicit delivery signal, such as a Zoho package converted to a shipment and marked `fulfilled`, a delivery challan marked `delivered`, or an equivalent Ledgerly delivery signal. Zoho sales-order `fulfilled` is ignored because invoice/payment processing can set it without delivery.
 
 Online orders that never complete payment remain `PENDING` until the 30-minute inventory hold expires and the order is released/cancelled.
 
@@ -56,9 +56,9 @@ COD orders are `CONFIRMED` at placement but `payment_status` stays `PENDING` unt
 |-------|------------------|------|
 | `pending` | Awaiting payment | Payment not `PAID` and order not cancelled |
 | `confirmed` | Order confirmed | Accepted, but wrapping has not yet been marked complete |
-| `hand_wrapped` | Hand-wrapped | Admin explicitly marked wrapping complete |
+| `hand_wrapped` | Hand-wrapped | A package was created for the linked Zoho sales order |
 | `shipped` | On the way | Tracking number, shipment date, or Zoho/Ledgerly shipped signal |
-| `delivered` | Delivered | Order `FULFILLED`, Zoho sales order `fulfilled`, or Zoho/Ledgerly delivered signal |
+| `delivered` | Delivered | Order `FULFILLED` or an explicit Zoho/Ledgerly delivered signal |
 | `cancelled` | Cancelled | Order `CANCELLED` or cancelled in external system |
 
 ### Inputs to tracking status
@@ -122,7 +122,7 @@ Payment confirmed (online) or COD placed
   status: CONFIRMED
   payment_status: PAID (online) or PENDING (COD until collection)
 
-Hand-wrapped (explicit admin action)
+Hand-wrapped (Zoho package created)
   status: HAND_WRAPPED
   tracking_status: hand_wrapped
 
@@ -133,7 +133,7 @@ Shipped
 Delivered
   status: FULFILLED
   tracking_status: delivered
-  (Zoho sales order may be marked fulfilled; a delivery challan is not required)
+  (a Zoho shipment marked fulfilled is sufficient; invoice/payment fulfillment is not)
 
 (Optional, within 7 days)
   return_status: REQUESTED → APPROVED → RECEIVED → REFUNDED
@@ -166,7 +166,6 @@ Integration sync fields (`zoho_sync_status`, `ledgerly_sync_status`, etc.) are *
 | Return eligibility | `GET /api/v1/order-returns/eligibility/{orderNumber}` |
 | Admin returns | `GET/POST /api/v1/admin/order-returns/...` |
 | Mark COD collected | `POST /api/v1/admin/orders/{orderNumber}/mark-cod-collected` |
-| Mark hand-wrapped | `POST /api/v1/admin/orders/{orderNumber}/mark-hand-wrapped` |
 
 Order and return JSON uses **snake_case** keys (`order_number`, `payment_status`, `tracking_status`, etc.). Full payload reference: [order-return-json-contract.md](./order-return-json-contract.md).
 

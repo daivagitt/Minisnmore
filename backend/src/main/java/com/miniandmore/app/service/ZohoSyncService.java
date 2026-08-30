@@ -71,6 +71,7 @@ public class ZohoSyncService {
     private final CustomerProfileRepository customerProfileRepository;
     private final OrderItemRepository orderItemRepository;
     private final S3StorageService s3StorageService;
+    private final OrderEventService orderEventService;
     private volatile String cachedLocationId;
     private volatile String cachedInventoryAccountId;
     private volatile String cachedAdjustmentAccountId;
@@ -91,7 +92,8 @@ public class ZohoSyncService {
         CustomerOrderRepository customerOrderRepository,
         CustomerProfileRepository customerProfileRepository,
         OrderItemRepository orderItemRepository,
-        S3StorageService s3StorageService
+        S3StorageService s3StorageService,
+        OrderEventService orderEventService
     ) {
         this.booksClient = booksClient;
         this.objectMapper = objectMapper;
@@ -106,6 +108,7 @@ public class ZohoSyncService {
         this.customerProfileRepository = customerProfileRepository;
         this.orderItemRepository = orderItemRepository;
         this.s3StorageService = s3StorageService;
+        this.orderEventService = orderEventService;
     }
 
     public Map<String, Object> testConnection() {
@@ -214,7 +217,7 @@ public class ZohoSyncService {
         return builder.build().toMap();
     }
 
-    private void pushProductToZoho(Product product) {
+    private String pushProductToZoho(Product product) {
         if (StringUtils.isBlank(product.getSku())) {
             throw new IllegalStateException("SKU is required for Zoho sync");
         }
@@ -222,11 +225,11 @@ public class ZohoSyncService {
             if (isZohoLinked(product)) {
                 deactivateInZoho(product);
             }
-            return;
+            return null;
         }
         if (variantSupport.isVariants(product)) {
             pushVariantMatrixToZoho(product);
-            return;
+            return null;
         }
         Map<String, Object> existing = StringUtils.isNotBlank(product.getZohoItemId())
             ? null
@@ -268,6 +271,7 @@ public class ZohoSyncService {
         itemImageSync.syncProductImage(newItemId, product);
         syncZohoStockAfterPush(product, newItemId);
         productRepository.updateZohoSyncSuccess(product.getId(), newItemId, ZohoSyncStatus.SYNCED, Instant.now());
+        return newItemId;
     }
 
     /**
@@ -2257,6 +2261,8 @@ public class ZohoSyncService {
                         salesOrderId = stringValue(salesOrder.get("salesorder_id"));
                         order.setZohoSalesOrderId(salesOrderId);
                         applySalesOrderAddresses(salesOrderId, order);
+                    } else if (StringUtils.isBlank(order.getZohoInvoiceId())) {
+                        repairUnshippableSalesOrderLines(order, customerId, salesOrderId);
                     }
                     if (
                         shouldCreateInvoice(order) &&
@@ -2324,6 +2330,47 @@ public class ZohoSyncService {
             repairOrderLineZohoItems(order);
             return createSalesOrderSelfHealing(order, customerId, includeGstTreatment, includePlaceOfSupply, true);
         }
+    }
+
+    /**
+     * Older order syncs allowed a name/rate-only Zoho line when the catalogue item lookup failed.
+     * Zoho can invoice such a line, but cannot package or ship it. Repair those still-uninvoiced
+     * sales orders in place after creating/linking the missing catalogue item.
+     */
+    @SuppressWarnings("unchecked")
+    private void repairUnshippableSalesOrderLines(CustomerOrder order, String customerId, String salesOrderId) {
+        Map<String, Object> response = booksClient.getSalesOrder(salesOrderId);
+        if (response == null || response.isEmpty()) {
+            return;
+        }
+        Map<String, Object> salesOrder = (Map<String, Object>) response.getOrDefault("salesorder", response);
+        String remoteStatus = StringUtils.lowerCase(StringUtils.trimToEmpty(stringValue(salesOrder.get("status"))));
+        if (Set.of("closed", "void", "invoiced", "fulfilled").contains(remoteStatus)) {
+            return;
+        }
+        Object rawLines = salesOrder.get("line_items");
+        if (!(rawLines instanceof List<?> remoteLines)) {
+            return;
+        }
+        int productLineCount = orderItemRepository.findAllByOrderId(order.getId()).size();
+        if (productLineCount == 0) {
+            productLineCount = order.getItemses().size();
+        }
+        boolean missingItem = false;
+        for (int index = 0; index < Math.min(productLineCount, remoteLines.size()); index++) {
+            Object rawLine = remoteLines.get(index);
+            if (rawLine instanceof Map<?, ?> line && StringUtils.isBlank(stringValue(line.get("item_id")))) {
+                missingItem = true;
+                break;
+            }
+        }
+        if (!missingItem) {
+            return;
+        }
+        LOG.warn("Repairing unshippable free-text lines on Zoho sales order {} ({})", salesOrderId, order.getOrderNumber());
+        // This UAT Zoho organisation rejects gst_treatment/place_of_supply on writes. They are not
+        // needed to repair item links, and omitting them preserves the existing order tax treatment.
+        booksClient.updateSalesOrder(salesOrderId, buildSalesOrderPayload(order, customerId, false, false));
     }
 
     private static boolean isInvalidGstTreatment(RestClientResponseException exception) {
@@ -2577,7 +2624,10 @@ public class ZohoSyncService {
             line.put("rate", item.getPrice());
             line.put("quantity", item.getQty());
             Optional<String> zohoItemId = resolveZohoItemId(item);
-            zohoItemId.ifPresent(id -> line.put("item_id", id));
+            String linkedItemId = zohoItemId.orElseThrow(
+                () -> new IllegalStateException("Zoho item is required for order line " + item.getProductName())
+            );
+            line.put("item_id", linkedItemId);
             if (invoiceLinesByItemId != null && zohoItemId.isPresent()) {
                 Map<String, Object> invoiceLine = invoiceLinesByItemId.get(zohoItemId.orElseThrow());
                 if (invoiceLine != null) {
@@ -2774,6 +2824,15 @@ public class ZohoSyncService {
                 } catch (RuntimeException e) {
                     LOG.warn("Zoho item lookup failed for variant SKU {}: {}", lineSku, e.getMessage());
                 }
+                String resolvedLineSku = lineSku;
+                ProductVariantSupport.VariantRow row = variantSupport
+                    .findBySku(variantSupport.parseProduct(product), lineSku)
+                    .filter(ProductVariantSupport.VariantRow::active)
+                    .orElseThrow(() -> new IllegalStateException("Active variant not found for Zoho order line: " + resolvedLineSku));
+                String itemId = pushVariantRowToZoho(product, row);
+                variantSupport.setVariantZohoItemId(product, lineSku, itemId);
+                productRepository.save(product);
+                return Optional.of(itemId);
             }
             LOG.warn(
                 "No Zoho item found for VARIANTS order line (parent={}, variantSku={}, size={}, color={})",
@@ -2791,25 +2850,31 @@ public class ZohoSyncService {
         if (StringUtils.isBlank(sku)) {
             return Optional.empty();
         }
+        Map<String, Object> zohoItem;
         try {
-            Map<String, Object> zohoItem = booksClient.findItemBySku(sku);
-            if (zohoItem == null) {
-                LOG.warn("No Zoho item found for order line SKU {} ({})", sku, item.getProductName());
-                return Optional.empty();
+            zohoItem = booksClient.findItemBySku(sku);
+        } catch (RuntimeException e) {
+            throw new IllegalStateException("Zoho item lookup failed for SKU " + sku + ": " + e.getMessage(), e);
+        }
+        if (zohoItem == null) {
+            if (product == null) {
+                throw new IllegalStateException("No local product available to create Zoho item for SKU " + sku);
             }
-            String itemId = stringValue(zohoItem.get("item_id"));
+            String itemId = pushProductToZoho(product);
             if (StringUtils.isBlank(itemId)) {
-                return Optional.empty();
-            }
-            if (product != null && StringUtils.isBlank(product.getZohoItemId()) && !variantSupport.isVariants(product)) {
-                product.setZohoItemId(itemId);
-                productRepository.save(product);
+                throw new IllegalStateException("Could not create an active Zoho item for SKU " + sku);
             }
             return Optional.of(itemId);
-        } catch (RuntimeException e) {
-            LOG.warn("Zoho item lookup failed for SKU {}: {}", sku, e.getMessage());
-            return Optional.empty();
         }
+        String itemId = stringValue(zohoItem.get("item_id"));
+        if (StringUtils.isBlank(itemId)) {
+            throw new IllegalStateException("Zoho item lookup returned no item_id for SKU " + sku);
+        }
+        if (product != null && StringUtils.isBlank(product.getZohoItemId()) && !variantSupport.isVariants(product)) {
+            product.setZohoItemId(itemId);
+            productRepository.save(product);
+        }
+        return Optional.of(itemId);
     }
 
     private Optional<Product> resolveOrderProduct(OrderItem item) {
@@ -3015,6 +3080,7 @@ public class ZohoSyncService {
                     return;
                 }
                 try {
+                    OrderStatus statusBeforePull = order.getStatus();
                     Map<String, Object> response = booksClient.getSalesOrder(salesOrderId);
                     @SuppressWarnings("unchecked")
                     Map<String, Object> salesOrder = (Map<String, Object>) response.getOrDefault("salesorder", response);
@@ -3023,13 +3089,34 @@ public class ZohoSyncService {
                         return;
                     }
                     ZohoOrderStatus.applySalesOrderTracking(order, salesOrder);
+                    if (order.getStatus() == OrderStatus.CONFIRMED || order.getStatus() == OrderStatus.HAND_WRAPPED) {
+                        try {
+                            ZohoOrderStatus.applyPackages(
+                                order,
+                                booksClient.listPackagesForSalesOrder(salesOrderId, stringValue(salesOrder.get("salesorder_number")))
+                            );
+                        } catch (RuntimeException e) {
+                            if (isZohoAuthFailure(e)) {
+                                LOG.warn(
+                                    "Could not fetch Zoho packages for order {} (check Inventory OAuth scope): {}",
+                                    orderId,
+                                    e.getMessage()
+                                );
+                            } else {
+                                LOG.debug("Could not fetch Zoho packages for order {}: {}", orderId, e.getMessage());
+                            }
+                        }
+                    }
                     try {
                         ZohoOrderStatus.applyDeliveryChallans(order, booksClient.listDeliveryChallans(salesOrderId));
                     } catch (RuntimeException e) {
                         LOG.debug("Could not fetch Zoho delivery challans for order {}: {}", orderId, e.getMessage());
                     }
                     order.setZohoTrackingLastPulledAt(Instant.now());
-                    customerOrderRepository.save(order);
+                    CustomerOrder saved = customerOrderRepository.save(order);
+                    if (saved.getStatus() == OrderStatus.HAND_WRAPPED && statusBeforePull != OrderStatus.HAND_WRAPPED) {
+                        orderEventService.syncLifecycleEvents(saved);
+                    }
                 } catch (Exception e) {
                     LOG.warn("Zoho order tracking pull failed for {}: {}", orderId, e.getMessage());
                 }
@@ -3070,7 +3157,7 @@ public class ZohoSyncService {
                 builder.orderFailure(order.getOrderNumber(), e.getMessage());
             }
         }
-        builder.notice("batch", "Pulled Zoho shipment status for " + page.getNumberOfElements() + " open paid orders (max 50)");
+        builder.notice("batch", "Pulled Zoho fulfillment status for " + page.getNumberOfElements() + " open linked orders (max 50)");
         return builder.build().toMap();
     }
 
@@ -3191,5 +3278,13 @@ public class ZohoSyncService {
 
     private int nonNegativeStock(Object value) {
         return Math.max(0, toInteger(value));
+    }
+
+    private static boolean isZohoAuthFailure(RuntimeException e) {
+        if (e instanceof RestClientResponseException response) {
+            int code = response.getStatusCode().value();
+            return code == 401 || code == 403;
+        }
+        return false;
     }
 }

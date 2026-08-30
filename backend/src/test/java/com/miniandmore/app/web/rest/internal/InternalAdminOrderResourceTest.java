@@ -269,41 +269,6 @@ class InternalAdminOrderResourceTest {
 
     @Test
     @WithMockUser(authorities = "ROLE_ADMIN")
-    void markHandWrapped_persistsExplicitStatusAndLifecycleEvent() throws Exception {
-        CustomerOrder order = codOrder().status(OrderStatus.CONFIRMED);
-        when(customerOrderRepository.findOneByOrderNumber("MNM-COD1")).thenReturn(Optional.of(order));
-        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        mockMvc
-            .perform(post("/internal/v1/admin/orders/MNM-COD1/mark-hand-wrapped"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.status").value("hand_wrapped"))
-            .andExpect(jsonPath("$.data.trackingStatus").value("hand_wrapped"));
-
-        verify(customerOrderRepository).save(any(CustomerOrder.class));
-        verify(orderEventService).syncLifecycleEvents(order);
-    }
-
-    @Test
-    @WithMockUser(authorities = "ROLE_ADMIN")
-    void markHandWrapped_rejectsPendingOrder() throws Exception {
-        CustomerOrder order = codOrder().status(OrderStatus.PENDING);
-        when(customerOrderRepository.findOneByOrderNumber("MNM-COD1")).thenReturn(Optional.of(order));
-
-        mockMvc.perform(post("/internal/v1/admin/orders/MNM-COD1/mark-hand-wrapped")).andExpect(status().isConflict());
-    }
-
-    @Test
-    @WithMockUser(authorities = "ROLE_ADMIN")
-    void markHandWrapped_rejectsAlreadyShippedOrder() throws Exception {
-        CustomerOrder order = codOrder().status(OrderStatus.HAND_WRAPPED).shipmentDate("2026-08-27");
-        when(customerOrderRepository.findOneByOrderNumber("MNM-COD1")).thenReturn(Optional.of(order));
-
-        mockMvc.perform(post("/internal/v1/admin/orders/MNM-COD1/mark-hand-wrapped")).andExpect(status().isConflict());
-    }
-
-    @Test
-    @WithMockUser(authorities = "ROLE_ADMIN")
     void getOrder_returnsInvoicePayloadForExistingOrder() throws Exception {
         CustomerOrder order = codOrder().status(OrderStatus.FULFILLED).paymentStatus(PaymentStatus.PAID);
         when(customerOrderRepository.findOneByOrderNumber("MNM-COD1")).thenReturn(Optional.of(order));

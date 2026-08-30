@@ -862,6 +862,87 @@ class InternalAccountOrderResourceCoverageTest {
     }
 
     @Test
+    void profile_bootstrapFromSignup() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("parent@example.com", "n/a"));
+        when(customerProfileRepository.findOneByUserLogin("parent@example.com")).thenReturn(Optional.empty());
+        when(customerProfileRepository.save(any(CustomerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/account/profile/bootstrap")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"full_name\":\"New Parent\",\"email\":\"parent@example.com\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(true));
+
+        ArgumentCaptor<CustomerProfile> profileCaptor = ArgumentCaptor.forClass(CustomerProfile.class);
+        verify(customerProfileRepository).save(profileCaptor.capture());
+        assertThat(profileCaptor.getValue().getFullName()).isEqualTo("New Parent");
+        verify(ledgerlySyncService).syncCustomerProfileAsync("parent@example.com");
+    }
+
+    @Test
+    void profile_bootstrapSkipsWhenNameAlreadySet() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("parent@example.com", "n/a"));
+        CustomerProfile profile = new CustomerProfile().userLogin("parent@example.com").fullName("Jane");
+        when(customerProfileRepository.findOneByUserLogin("parent@example.com")).thenReturn(Optional.of(profile));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/account/profile/bootstrap")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"full_name\":\"Other Name\",\"email\":\"parent@example.com\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(true));
+
+        verify(customerProfileRepository, never()).save(any());
+        verify(ledgerlySyncService, never()).syncCustomerProfileAsync(any());
+    }
+
+    @Test
+    void profile_bootstrapSkipsAdministratorAccounts() throws Exception {
+        SecurityContextHolder
+            .getContext()
+            .setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                    "admin@example.com",
+                    "n/a",
+                    List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN"))
+                )
+            );
+
+        mockMvc
+            .perform(
+                post("/internal/v1/account/profile/bootstrap")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"full_name\":\"Store Admin\",\"email\":\"admin@example.com\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(true));
+
+        verify(customerProfileRepository, never()).save(any());
+        verify(ledgerlySyncService, never()).syncCustomerProfileAsync(any());
+    }
+
+    @Test
+    void profile_bootstrapRejectsEmailMismatch() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("parent@example.com", "n/a"));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/account/profile/bootstrap")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"full_name\":\"New Parent\",\"email\":\"other@example.com\"}")
+            )
+            .andExpect(status().isBadRequest());
+
+        verify(customerProfileRepository, never()).save(any());
+        verify(ledgerlySyncService, never()).syncCustomerProfileAsync(any());
+    }
+
+    @Test
     void notifications_syncsOrdersAndReturnsEvents() throws Exception {
         CustomerOrder order = new CustomerOrder()
             .id(501L)

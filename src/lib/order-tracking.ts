@@ -1,4 +1,5 @@
 import { CheckCircle2, Home, Package, Truck, type LucideIcon } from "lucide-react";
+import { needsOnlinePayment } from "@/lib/order-status";
 
 export type TrackingStageState = "current" | "done" | "upcoming";
 
@@ -47,7 +48,7 @@ export const TRACKING_STAGES = [
 ] as const;
 
 /**
- * Confirmed orders stay at stage 0 until operations explicitly marks them hand-wrapped.
+ * Confirmed orders stay at stage 0 until a package is created for the Zoho sales order.
  * The Hand-wrapped phase completes once the order ships.
  */
 const STATUS_INDEX: Record<string, number> = {
@@ -68,6 +69,8 @@ export type OrderTrackingFields = {
   tracking_number?: string;
   tracking_carrier?: string;
   shipment_date?: string;
+  payment_status?: string;
+  payment_method?: string;
 };
 
 export function resolveTrackingStage(order: OrderTrackingFields) {
@@ -149,6 +152,7 @@ export function trackingStageIcon(key: string): LucideIcon {
 
 /** Customer-facing headline for order activity feeds (notifications, etc.). */
 export function trackingActivityTitle(order: OrderTrackingFields): string {
+  if (needsOnlinePayment(order)) return "Payment pending";
   const key = normalizedTrackingKey(order);
   if (key === "cancelled" || key === "canceled") return "Order cancelled";
   if (key === "confirmed") return "Order confirmed";
@@ -165,11 +169,16 @@ export function trackingActivityIcon(order: OrderTrackingFields): LucideIcon {
   return trackingStageIcon(key);
 }
 
+export type TrackingActivityDatePrefix = "Ordered" | "Shipped" | "Payment pending";
+
 /** Best available date string for activity UI — shipment date when in transit, else order placed. */
 export function trackingActivityDate(order: OrderTrackingFields & { created_at?: string }): {
-  prefix: "Ordered" | "Shipped";
+  prefix: TrackingActivityDatePrefix;
   value: string;
 } {
+  if (needsOnlinePayment(order)) {
+    return { prefix: "Payment pending", value: order.created_at ?? "" };
+  }
   const key = normalizedTrackingKey(order);
   const shipped = key === "shipped" || key === "delivered";
   if (shipped && order.shipment_date) {

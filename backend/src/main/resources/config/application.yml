@@ -275,7 +275,7 @@ application:
       javascript-domains:
         - ${ZOHO_OAUTH_JAVASCRIPT_DOMAIN:http://localhost:5173}
         - ${ZOHO_OAUTH_JAVASCRIPT_DOMAIN_ALT:http://127.0.0.1:5173}
-      scopes: ${ZOHO_OAUTH_SCOPES:ZohoBooks.fullaccess.all}
+      scopes: ${ZOHO_OAUTH_SCOPES:ZohoBooks.fullaccess.all,ZohoInventory.packages.READ}
       client-id: ${ZOHO_CLIENT_ID:}
       client-secret: ${ZOHO_CLIENT_SECRET:}
       org-id: ${ZOHO_ORG_ID:}

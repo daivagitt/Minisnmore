@@ -41,19 +41,31 @@ class OrderEventServiceTest {
     }
 
     @Test
-    void onOrderCreated_recordsPlacedEvent() {
+    void onOrderCreated_recordsPaymentPendingForUnpaidOnline() {
         CustomerOrder order = baseOrder().status(OrderStatus.PENDING).paymentStatus(PaymentStatus.PENDING);
-        when(orderEventRepository.existsByOrderIdAndEventType(42L, OrderEventService.TYPE_ORDER_PLACED)).thenReturn(false);
+        when(orderEventRepository.existsByOrderIdAndEventType(42L, OrderEventService.TYPE_PAYMENT_PENDING)).thenReturn(false);
 
         service.onOrderCreated(order);
 
         ArgumentCaptor<OrderEvent> captor = ArgumentCaptor.forClass(OrderEvent.class);
         verify(orderEventRepository).save(captor.capture());
         OrderEvent event = captor.getValue();
-        assertThat(event.getEventType()).isEqualTo(OrderEventService.TYPE_ORDER_PLACED);
-        assertThat(event.getTitle()).isEqualTo("Order placed");
+        assertThat(event.getEventType()).isEqualTo(OrderEventService.TYPE_PAYMENT_PENDING);
+        assertThat(event.getTitle()).isEqualTo("Payment pending");
         assertThat(event.getCreatedAt()).isEqualTo(order.getPlacedAt());
         verify(orderMailService, never()).sendOrderConfirmation(any());
+    }
+
+    @Test
+    void syncLifecycleEvents_doesNotDuplicateLegacyPendingOrderPlacedEvent() {
+        CustomerOrder order = baseOrder().status(OrderStatus.PENDING).paymentStatus(PaymentStatus.PENDING);
+        when(orderEventRepository.existsByOrderIdAndEventType(42L, OrderEventService.TYPE_ORDER_PLACED)).thenReturn(true);
+
+        service.syncLifecycleEvents(order);
+
+        verify(orderEventRepository, never()).save(any());
+        verify(orderEventRepository, never())
+            .existsByOrderIdAndEventType(42L, OrderEventService.TYPE_PAYMENT_PENDING);
     }
 
     @Test

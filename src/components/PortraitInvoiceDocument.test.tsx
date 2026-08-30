@@ -58,7 +58,11 @@ describe("PortraitInvoiceDocument", () => {
     expect(invoice).toHaveClass("min-h-[297mm]", "w-[210mm]");
     expect(invoice).toHaveTextContent("Tax Invoice");
     expect(invoice).toHaveTextContent("29-Karnataka");
-    expect(invoice).toHaveTextContent("SHIP-1001");
+    const shipmentLine = Array.from(container.querySelectorAll("p")).find((el) =>
+      el.textContent?.includes("Shipment ID"),
+    );
+    expect(shipmentLine).toHaveClass("hidden");
+    expect(shipmentLine).toHaveTextContent("SHIP-1001");
     expect(invoice).toHaveTextContent("Seller address");
     expect(invoice).toHaveTextContent("Dispatch address");
     expect(invoice).toHaveTextContent("Registered office");

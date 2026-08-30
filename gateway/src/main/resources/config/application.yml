@@ -265,4 +265,6 @@ jhipster:
 application:
   oauth2:
     frontend-callback-url: ${FRONTEND_AUTH_CALLBACK_URL:http://localhost:5173/auth/callback}
+    enabled-providers:
+      - google
   register-auto-activate: ${REGISTER_AUTO_ACTIVATE:false}

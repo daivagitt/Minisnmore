@@ -1,15 +1,24 @@
 export type OrderStatusFields = {
-  payment_status?: string;
-  payment_method?: string;
-  status?: string;
-  tracking_status?: string;
+  payment_status?: string | null;
+  payment_method?: string | null;
+  status?: string | null;
+  tracking_status?: string | null;
 };
 
 export function isCodOrder(order: OrderStatusFields): boolean {
-  return order.payment_method?.toLowerCase() === "cod";
+  return order.payment_method?.trim().toLowerCase() === "cod";
 }
 
-export function formatPaymentStatusLabel(paymentStatus?: string, paymentMethod?: string): string {
+/** Online checkout started but Razorpay (or similar) payment not completed yet. */
+export function needsOnlinePayment(order: OrderStatusFields): boolean {
+  const status = (order.payment_status ?? "").trim().toLowerCase();
+  const orderStatus = (order.status ?? "").trim().toLowerCase();
+  const cancelled = orderStatus === "cancelled" || orderStatus === "canceled";
+  const pendingByLegacyStatus = !status && orderStatus === "pending";
+  return !cancelled && !isCodOrder(order) && (status === "pending" || pendingByLegacyStatus);
+}
+
+export function formatPaymentStatusLabel(paymentStatus?: string | null, paymentMethod?: string | null): string {
   const status = (paymentStatus ?? "").toLowerCase();
   const cod = paymentMethod?.toLowerCase() === "cod";
 
@@ -21,7 +30,7 @@ export function formatPaymentStatusLabel(paymentStatus?: string, paymentMethod?:
   return paymentStatus ?? "";
 }
 
-export function formatOrderStatusLabel(status?: string): string {
+export function formatOrderStatusLabel(status?: string | null): string {
   const normalized = (status ?? "").toLowerCase();
 
   if (normalized === "confirmed") return "Order confirmed";
@@ -58,7 +67,7 @@ export function formatOrderStatusSummary(order: OrderStatusFields): string {
   return `${paymentLabel} · ${statusLabel}`;
 }
 
-export function paymentStatusTone(paymentStatus?: string): "paid" | "pending" | "failed" | "muted" {
+export function paymentStatusTone(paymentStatus?: string | null): "paid" | "pending" | "failed" | "muted" {
   const status = (paymentStatus ?? "").toLowerCase();
   if (status === "paid") return "paid";
   if (status === "pending") return "pending";

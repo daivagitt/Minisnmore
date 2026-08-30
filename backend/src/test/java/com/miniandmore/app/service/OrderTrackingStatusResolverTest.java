@@ -109,4 +109,11 @@ class OrderTrackingStatusResolverTest {
 
         assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("confirmed");
     }
+
+    @Test
+    void resolve_confirmedWhenZohoInvoiceProcessingReportsFulfilled() {
+        CustomerOrder order = paidOrder().zohoOrderStatus("fulfilled");
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("confirmed");
+    }
 }

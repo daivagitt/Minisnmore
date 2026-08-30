@@ -6,6 +6,7 @@ import { fullNameFieldError } from "@/lib/orders.functions";
 import { emailFieldError, passwordFieldError } from "@/lib/password-validation";
 import { resolveInternalSitePath } from "@/lib/internal-links";
 import { isOAuthProviderEnabled } from "@/lib/oauth-providers";
+import { savePendingProfile } from "@/lib/pending-profile";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Eye, EyeOff } from "lucide-react";
@@ -95,6 +96,7 @@ export function LoginPage() {
       return;
     }
     if (mode === "signup") {
+      savePendingProfile({ full_name: fullName.trim(), email: email.trim().toLowerCase() });
       toast.success("Almost there — check your inbox and open the activation link to finish.");
       setMode("signin");
       return;
