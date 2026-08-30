@@ -80,6 +80,7 @@ describe("PortraitInvoiceDocument", () => {
       (el) => el.textContent === "Order No : MNM-1001",
     );
     expect(orderNumberLine).toHaveClass("col-start-2", "row-start-2");
+    expect(orderNumberLine?.parentElement).toHaveClass("grid-cols-[1.15fr_0.85fr]");
     expect(invoice).toHaveTextContent("Seller address");
     expect(invoice).toHaveTextContent("Dispatch address");
     expect(invoice).toHaveTextContent("Registered office");
