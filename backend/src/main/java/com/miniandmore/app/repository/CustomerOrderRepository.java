@@ -82,6 +82,8 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     Optional<CustomerOrder> findOneByOrderNumber(String orderNumber);
 
+    Optional<CustomerOrder> findOneByZohoSalesOrderId(String zohoSalesOrderId);
+
     @Query(
         "select customerOrder from CustomerOrder customerOrder where customerOrder.paymentMethod = 'cod' and " +
         "customerOrder.paymentStatus = :paymentStatus order by customerOrder.id desc"
