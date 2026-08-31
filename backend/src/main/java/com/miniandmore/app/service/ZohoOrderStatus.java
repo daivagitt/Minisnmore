@@ -85,6 +85,14 @@ public final class ZohoOrderStatus {
             return;
         }
         for (Map<String, Object> pkg : packages) {
+            String zohoStatus = firstNonBlank(
+                stringValue(pkg.get("status")),
+                stringValue(pkg.get("detailed_status")),
+                stringValue(pkg.get("status_message"))
+            );
+            if (StringUtils.isNotBlank(zohoStatus)) {
+                order.setZohoOrderStatus(zohoStatus);
+            }
             String trackingNumber = firstNonBlank(
                 stringValue(pkg.get("tracking_number")),
                 stringValue(pkg.get("tracking_number_ext"))

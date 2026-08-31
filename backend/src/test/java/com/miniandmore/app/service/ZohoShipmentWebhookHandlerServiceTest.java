@@ -119,9 +119,10 @@ class ZohoShipmentWebhookHandlerServiceTest {
         handler.handle(body, null, SECRET);
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(order.getZohoOrderStatus()).isEqualTo("shipped");
         assertThat(order.getTrackingNumber()).isEqualTo("AWB-4");
         assertThat(order.getTrackingCarrier()).isEqualTo("DTDC");
-        verify(orderEventService, never()).syncLifecycleEvents(any());
+        verify(orderEventService).syncLifecycleEvents(order);
     }
 
     @Test

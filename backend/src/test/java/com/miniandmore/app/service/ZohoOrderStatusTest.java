@@ -156,6 +156,19 @@ class ZohoOrderStatusTest {
         assertThat(order.getShipmentDate()).isEqualTo("2026-08-30");
         assertThat(order.getTrackingNumber()).isEqualTo("AWB-42");
         assertThat(order.getTrackingCarrier()).isEqualTo("BlueDart");
+        assertThat(order.getZohoOrderStatus()).isEqualTo("shipped");
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("shipped");
+    }
+
+    @Test
+    void applyPackages_inTransitShipmentResolvesOnTheWay() {
+        CustomerOrder order = paidOrder().status(OrderStatus.HAND_WRAPPED);
+
+        ZohoOrderStatus.applyPackages(order, List.of(Map.of("shipment_id", "ship-42", "status", "in_transit")));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.HAND_WRAPPED);
+        assertThat(order.getZohoOrderStatus()).isEqualTo("in_transit");
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("shipped");
     }
 
     @Test

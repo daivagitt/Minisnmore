@@ -78,6 +78,7 @@ public class ZohoShipmentWebhookHandlerService {
 
         CustomerOrder order = findOrder(zohoSalesOrderId, salesorderNumber);
         OrderStatus statusBefore = order.getStatus();
+        String trackingStatusBefore = OrderTrackingStatusResolver.resolve(order);
 
         ZohoShipmentWebhookEvent record = new ZohoShipmentWebhookEvent();
         record.setEventId(eventId);
@@ -97,7 +98,7 @@ public class ZohoShipmentWebhookHandlerService {
             ZohoOrderStatus.applyPackages(order, List.of(packageLike));
             order.setZohoTrackingLastPulledAt(Instant.now());
             CustomerOrder saved = customerOrderRepository.save(order);
-            if (saved.getStatus() != statusBefore) {
+            if (saved.getStatus() != statusBefore || !OrderTrackingStatusResolver.resolve(saved).equals(trackingStatusBefore)) {
                 orderEventService.syncLifecycleEvents(saved);
             }
             return Map.of(
