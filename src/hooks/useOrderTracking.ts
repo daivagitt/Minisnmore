@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getOrder, trackOrderPublic } from "@/lib/orders.functions";
-import { shouldPollOrderTracking, type OrderTrackingFields } from "@/lib/order-tracking";
-
-/** Client poll interval — server still rate-limits Ledgerly pulls to once per hour. */
-export const ORDER_TRACKING_POLL_MS = 60_000;
+import { type OrderTrackingFields } from "@/lib/order-tracking";
 
 export type TrackingOrder = OrderTrackingFields & {
   order_number?: string;
@@ -40,16 +37,14 @@ export type TrackingOrder = OrderTrackingFields & {
 type Mode = "public" | "authenticated";
 
 type Options = {
-  pollIntervalMs?: number;
   enabled?: boolean;
 };
 
-export function useOrderTrackingPoll(
+export function useOrderTracking(
   orderNumber: string | null | undefined,
   mode: Mode,
   options?: Options,
 ) {
-  const pollIntervalMs = options?.pollIntervalMs ?? ORDER_TRACKING_POLL_MS;
   const enabled = options?.enabled ?? true;
   const normalizedNumber = orderNumber?.trim() || null;
 
@@ -124,60 +119,6 @@ export function useOrderTrackingPoll(
     setError(null);
     void fetchTracking(normalizedNumber);
   }, [enabled, normalizedNumber, fetchTracking]);
-
-  useEffect(() => {
-    if (!enabled || !normalizedNumber) return;
-
-    const tick = () => {
-      if (typeof document !== "undefined" && document.hidden) return;
-      if (!shouldPollOrderTracking(orderRef.current)) return;
-      void fetchTracking(normalizedNumber, { silent: true });
-    };
-
-    let timer: ReturnType<typeof setInterval> | null = null;
-
-    const startPolling = () => {
-      if (timer) clearInterval(timer);
-      timer = null;
-      if (!shouldPollOrderTracking(orderRef.current)) return;
-      timer = setInterval(tick, pollIntervalMs);
-    };
-
-    const onVisibility = () => {
-      if (typeof document === "undefined") return;
-      if (document.hidden) {
-        if (timer) {
-          clearInterval(timer);
-          timer = null;
-        }
-        return;
-      }
-      if (shouldPollOrderTracking(orderRef.current)) {
-        void fetchTracking(normalizedNumber, { silent: true });
-        startPolling();
-      }
-    };
-
-    startPolling();
-    if (typeof document !== "undefined") {
-      document.addEventListener("visibilitychange", onVisibility);
-    }
-
-    return () => {
-      if (timer) clearInterval(timer);
-      if (typeof document !== "undefined") {
-        document.removeEventListener("visibilitychange", onVisibility);
-      }
-    };
-  }, [
-    enabled,
-    normalizedNumber,
-    pollIntervalMs,
-    fetchTracking,
-    order?.status,
-    order?.tracking_status,
-    order?.payment_status,
-  ]);
 
   return { order, loading, error, refresh };
 }

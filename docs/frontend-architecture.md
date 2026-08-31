@@ -60,7 +60,7 @@ Every non-trivial `lib/` module has a colocated `*.test.ts` — this is the most
 
 ## Hooks (`src/hooks/`)
 
-Thin React Query wrappers per resource: `useProducts`, `useCategories`, `useBanners`, `useBlogPosts`, `useHomeSections`, `usePageVisibility`, `usePolicy`, `useSiteSettings`, `useOrderTrackingPoll` (polling), plus `useAuth.tsx` — the JWT session provider (login/logout/register, token persistence, current-user state) consumed via `AuthProvider` in `__root.tsx`.
+Thin React Query wrappers per resource: `useProducts`, `useCategories`, `useBanners`, `useBlogPosts`, `useHomeSections`, `usePageVisibility`, `usePolicy`, `useSiteSettings`, `useOrderTracking`, plus `useAuth.tsx` — the JWT session provider (login/logout/register, token persistence, current-user state) consumed via `AuthProvider` in `__root.tsx`.
 
 ## State management
 

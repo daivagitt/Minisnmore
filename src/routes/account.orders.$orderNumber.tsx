@@ -15,8 +15,8 @@ import { openRazorpayCheckout } from "@/lib/razorpay";
 import { isInvoiceAvailable } from "@/lib/invoice-availability";
 import { formatOrderDate } from "@/lib/dates";
 import { formatOrderStatusSummary, formatPaymentStatusLabel } from "@/lib/order-status";
-import { useOrderTrackingPoll } from "@/hooks/useOrderTrackingPoll";
-import { shouldPollOrderTracking } from "@/lib/order-tracking";
+import { useOrderTracking } from "@/hooks/useOrderTracking";
+import { shouldShowOrderTrackingLink } from "@/lib/order-tracking";
 import { useProduct } from "@/hooks/useProducts";
 import { defaultSellableSelection } from "@/lib/product-variants";
 import { ExchangeReplacementPicker } from "@/components/ExchangeReplacementPicker";
@@ -92,7 +92,7 @@ function OrderDetail() {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const autoPayStarted = useRef(false);
-  const { order, loading, error, refresh } = useOrderTrackingPoll(
+  const { order, loading, error, refresh } = useOrderTracking(
     orderNumber,
     "authenticated",
   );
@@ -376,7 +376,7 @@ function OrderDetail() {
                 month: "long",
                 year: "numeric",
               })}
-              {shouldPollOrderTracking(order) && (
+              {shouldShowOrderTrackingLink(order) && (
                 <>
                   {" · "}
                   <Link

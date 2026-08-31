@@ -14,7 +14,7 @@ import {
   PAYMENT_STATUS_TONE_CLASS,
   paymentStatusTone,
 } from "@/lib/order-status";
-import { shouldPollOrderTracking } from "@/lib/order-tracking";
+import { shouldShowOrderTrackingLink } from "@/lib/order-tracking";
 import { isInvoiceAvailable } from "@/lib/invoice-availability";
 
 export const Route = createFileRoute("/account/orders/")({
@@ -148,7 +148,7 @@ function OrdersPage() {
                 <div className="font-medium">₹{Number(o.total).toLocaleString("en-IN")}</div>
                 <StatusPill order={o} />
                 <div className="mt-1 flex flex-wrap sm:flex-col sm:items-end gap-x-3 gap-y-1">
-                  {shouldPollOrderTracking(o) && (
+                  {shouldShowOrderTrackingLink(o) && (
                     <Link
                       to="/track"
                       search={{ order: o.order_number }}

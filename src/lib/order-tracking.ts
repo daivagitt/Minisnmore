@@ -138,7 +138,7 @@ export function isTerminalTrackingState(order: OrderTrackingFields | null | unde
   return TERMINAL_TRACKING_STATUSES.has(tracking) || TERMINAL_TRACKING_STATUSES.has(status);
 }
 
-export function shouldPollOrderTracking(
+export function shouldShowOrderTrackingLink(
   order: (OrderTrackingFields & { payment_status?: string }) | null | undefined,
 ): boolean {
   if (!order) return false;

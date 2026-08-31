@@ -6,7 +6,7 @@ import babyInfant from "@/assets/cat-infant.webp";
 import babyToddler from "@/assets/cat-toddler.webp";
 import lifestyle from "@/assets/lifestyle-mother.webp";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
-import { useOrderTrackingPoll } from "@/hooks/useOrderTrackingPoll";
+import { useOrderTracking } from "@/hooks/useOrderTracking";
 import { toast } from "sonner";
 import { OrderTrackingCard } from "@/components/OrderTrackingCard";
 import { StorefrontPageHeader } from "@/components/StorefrontPageHeader";
@@ -26,7 +26,7 @@ function Track() {
     orderFromUrl ? orderFromUrl.toUpperCase() : null,
   );
   const settings = useSiteSettings();
-  const { order: trackedOrder, loading, error } = useOrderTrackingPoll(
+  const { order: trackedOrder, loading, error } = useOrderTracking(
     activeOrderNumber,
     "public",
   );
