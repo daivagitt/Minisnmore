@@ -256,6 +256,7 @@ application:
     inventory-account-id: ${ZOHO_INVENTORY_ACCOUNT_ID:}
     inventory-adjustment-account-id: ${ZOHO_INVENTORY_ADJUSTMENT_ACCOUNT_ID:}
     stock-webhook-secret: ${ZOHO_STOCK_WEBHOOK_SECRET:}
+    shipment-webhook-secret: ${ZOHO_SHIPMENT_WEBHOOK_SECRET:}
     gst-tax-id: ${ZOHO_GST_TAX_ID:}
     product-fields:
       fabric-type-label: ${ZOHO_FIELD_FABRIC_TYPE:Fabric Type}

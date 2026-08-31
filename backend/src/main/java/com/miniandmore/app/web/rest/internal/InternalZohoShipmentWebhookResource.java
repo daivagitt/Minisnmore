@@ -22,8 +22,9 @@ public class InternalZohoShipmentWebhookResource {
     @PostMapping("/shipment-webhook")
     public ApiResponse<Map<String, Object>> receiveShipmentWebhook(
         @RequestBody String rawBody,
-        @RequestHeader(value = "X-Zoho-Shipment-Signature", required = false) String signature
+        @RequestHeader(value = "X-Zoho-Shipment-Signature", required = false) String signature,
+        @RequestHeader(value = "X-Zoho-Shipment-Secret", required = false) String sharedSecret
     ) {
-        return ApiResponse.ok(webhookHandlerService.handle(rawBody, signature));
+        return ApiResponse.ok(webhookHandlerService.handle(rawBody, signature, sharedSecret));
     }
 }

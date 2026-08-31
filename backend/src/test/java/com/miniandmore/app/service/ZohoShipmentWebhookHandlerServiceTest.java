@@ -63,7 +63,7 @@ class ZohoShipmentWebhookHandlerServiceTest {
         String body = "{\"eventId\":\"evt-ship-1\",\"zohoSalesOrderId\":\"so-1\",\"status\":\"shipped\"}";
         when(webhookEventRepository.existsByEventId("evt-ship-1")).thenReturn(true);
 
-        Map<String, Object> result = handler.handle(body, sign(body));
+        Map<String, Object> result = handler.handle(body, null, SECRET);
 
         assertThat(result).containsEntry("duplicate", true);
         verify(customerOrderRepository, never()).save(any());
@@ -78,7 +78,7 @@ class ZohoShipmentWebhookHandlerServiceTest {
         when(customerOrderRepository.findOneByZohoSalesOrderId("so-2")).thenReturn(Optional.of(order));
         when(customerOrderRepository.save(order)).thenReturn(order);
 
-        Map<String, Object> result = handler.handle(body, sign(body));
+        Map<String, Object> result = handler.handle(body, null, SECRET);
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.HAND_WRAPPED);
         assertThat(result).containsEntry("status", "HAND_WRAPPED");
@@ -96,7 +96,7 @@ class ZohoShipmentWebhookHandlerServiceTest {
         when(customerOrderRepository.findOneByZohoSalesOrderId("so-3")).thenReturn(Optional.of(order));
         when(customerOrderRepository.save(order)).thenReturn(order);
 
-        Map<String, Object> result = handler.handle(body, sign(body));
+        Map<String, Object> result = handler.handle(body, null, SECRET);
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
         assertThat(order.getTrackingNumber()).isEqualTo("AWB-3");
@@ -116,7 +116,7 @@ class ZohoShipmentWebhookHandlerServiceTest {
         when(customerOrderRepository.findOneByOrderNumber("MNM-4")).thenReturn(Optional.of(order));
         when(customerOrderRepository.save(order)).thenReturn(order);
 
-        handler.handle(body, sign(body));
+        handler.handle(body, null, SECRET);
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(order.getTrackingNumber()).isEqualTo("AWB-4");
@@ -134,7 +134,7 @@ class ZohoShipmentWebhookHandlerServiceTest {
         when(customerOrderRepository.findOneByZohoSalesOrderId("so-7")).thenReturn(Optional.of(order));
         when(customerOrderRepository.save(order)).thenReturn(order);
 
-        handler.handle(body, sign(body));
+        handler.handle(body, null, SECRET);
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
         assertThat(order.getTrackingNumber()).isEqualTo("AWB-7");
@@ -151,7 +151,7 @@ class ZohoShipmentWebhookHandlerServiceTest {
         when(customerOrderRepository.findOneByOrderNumber("MNM-8")).thenReturn(Optional.of(order));
         when(customerOrderRepository.save(order)).thenReturn(order);
 
-        handler.handle(body, sign(body));
+        handler.handle(body, null, SECRET);
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.HAND_WRAPPED);
     }
@@ -162,7 +162,38 @@ class ZohoShipmentWebhookHandlerServiceTest {
 
         assertThatThrownBy(() -> handler.handle(body, null))
             .isInstanceOf(ResponseStatusException.class)
-            .hasMessageContaining("Missing X-Zoho-Shipment-Signature");
+            .hasMessageContaining("Missing shipment webhook authentication");
+    }
+
+    @Test
+    void handle_defaultZohoShipmentOrderPayload_derivesEventIdAndUsesSharedSecretHeader() {
+        String body =
+            "{\"shipment_order\":{\"shipment_order_id\":\"ship-default-1\",\"salesorder_id\":\"so-default-1\"," +
+            "\"salesorder_number\":\"MNM-DEFAULT-1\",\"status\":\"delivered\",\"last_modified_time\":\"2026-08-31T10:00:00Z\"}}";
+        CustomerOrder order = order("MNM-DEFAULT-1", "so-default-1", OrderStatus.HAND_WRAPPED);
+        String eventId = "zoho-shipment:ship-default-1:delivered:2026-08-31T10:00:00Z";
+        when(webhookEventRepository.existsByEventId(eventId)).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-default-1")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(result).containsEntry("eventId", eventId).containsEntry("status", "FULFILLED");
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        verifySavedEvent(eventId, "so-default-1", null, "ship-default-1", "delivered");
+    }
+
+    @Test
+    void handle_hmacSignature_stillWorks() {
+        String body = "{\"eventId\":\"evt-ship-hmac\",\"zohoSalesOrderId\":\"so-hmac\",\"package_id\":\"pkg-hmac\"}";
+        CustomerOrder order = order("MNM-HMAC", "so-hmac", OrderStatus.CONFIRMED);
+        when(webhookEventRepository.existsByEventId("evt-ship-hmac")).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-hmac")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        handler.handle(body, sign(body));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.HAND_WRAPPED);
     }
 
     @Test
@@ -170,7 +201,7 @@ class ZohoShipmentWebhookHandlerServiceTest {
         String body = "{\"eventId\":\"evt-ship-6\",\"status\":\"delivered\"}";
         when(webhookEventRepository.existsByEventId("evt-ship-6")).thenReturn(false);
 
-        assertThatThrownBy(() -> handler.handle(body, sign(body)))
+        assertThatThrownBy(() -> handler.handle(body, null, SECRET))
             .isInstanceOf(ResponseStatusException.class)
             .hasMessageContaining("Provide zohoSalesOrderId or salesorder_number");
     }
@@ -180,7 +211,7 @@ class ZohoShipmentWebhookHandlerServiceTest {
         String body = "{\"eventId\":\"evt-ship-9\",\"zohoSalesOrderId\":\"so-9\"}";
         when(webhookEventRepository.existsByEventId("evt-ship-9")).thenReturn(false);
 
-        assertThatThrownBy(() -> handler.handle(body, sign(body)))
+        assertThatThrownBy(() -> handler.handle(body, null, SECRET))
             .isInstanceOf(ResponseStatusException.class)
             .hasMessageContaining("Missing shipment/package fields");
 

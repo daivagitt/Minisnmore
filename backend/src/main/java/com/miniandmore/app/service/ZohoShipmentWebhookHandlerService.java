@@ -42,25 +42,24 @@ public class ZohoShipmentWebhookHandlerService {
     }
 
     public Map<String, Object> handle(String rawBody, String signature) {
-        verifySignature(rawBody, signature);
-        Map<String, Object> payload = WebhookPayloadSupport.parseJsonMap(objectMapper, rawBody);
+        return handle(rawBody, signature, null);
+    }
 
-        String eventId = firstNonBlank(
-            stringValue(payload.get("eventId")),
-            stringValue(payload.get("event_id")),
-            stringValue(payload.get("id"))
-        );
-        if (eventId == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing eventId");
-        }
-        if (webhookEventRepository.existsByEventId(eventId)) {
-            return Map.of("ok", true, "duplicate", true, "eventId", eventId);
-        }
+    public Map<String, Object> handle(String rawBody, String signature, String sharedSecret) {
+        verifySignature(rawBody, signature, sharedSecret);
+        Map<String, Object> payload = WebhookPayloadSupport.parseJsonMap(objectMapper, rawBody);
 
         Map<String, Object> data = eventData(payload);
         Map<String, Object> packageLike = normalizePackagePayload(data);
         if (!hasShipmentSignal(packageLike)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing shipment/package fields");
+        }
+        String eventId = eventId(payload, data, packageLike);
+        if (eventId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing eventId");
+        }
+        if (webhookEventRepository.existsByEventId(eventId)) {
+            return Map.of("ok", true, "duplicate", true, "eventId", eventId);
         }
         String zohoSalesOrderId = firstNonBlank(
             stringValue(packageLike.get("salesorder_id")),
@@ -165,13 +164,16 @@ public class ZohoShipmentWebhookHandlerService {
         return normalized;
     }
 
-    private void verifySignature(String rawBody, String signature) {
+    private void verifySignature(String rawBody, String signature, String sharedSecret) {
         String secret = StringUtils.trimToNull(applicationProperties.getZoho().getShipmentWebhookSecret());
         if (secret == null) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Shipment webhook secret is not configured");
         }
+        if (StringUtils.equals(secret, StringUtils.trimToNull(sharedSecret))) {
+            return;
+        }
         if (StringUtils.isBlank(signature)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing X-Zoho-Shipment-Signature");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing shipment webhook authentication");
         }
         if (!WebhookHmacSupport.signaturesMatch(secret, rawBody, signature)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid shipment webhook signature");
@@ -199,6 +201,35 @@ public class ZohoShipmentWebhookHandlerService {
                 stringValue(packageLike.get("status_message"))
             ) !=
             null;
+    }
+
+    private static String eventId(Map<String, Object> payload, Map<String, Object> data, Map<String, Object> packageLike) {
+        String explicit = firstNonBlank(
+            stringValue(payload.get("eventId")),
+            stringValue(payload.get("event_id")),
+            stringValue(payload.get("id")),
+            stringValue(data.get("eventId")),
+            stringValue(data.get("event_id")),
+            stringValue(data.get("id")),
+            stringValue(packageLike.get("eventId")),
+            stringValue(packageLike.get("event_id")),
+            stringValue(packageLike.get("id"))
+        );
+        if (explicit != null) {
+            return explicit;
+        }
+        String entityId = firstNonBlank(stringValue(packageLike.get("shipment_id")), stringValue(packageLike.get("package_id")));
+        String status = firstNonBlank(stringValue(packageLike.get("status")), stringValue(packageLike.get("detailed_status")));
+        String modified = firstNonBlank(
+            stringValue(packageLike.get("last_modified_time")),
+            stringValue(packageLike.get("updated_time")),
+            stringValue(packageLike.get("created_time")),
+            stringValue(packageLike.get("shipment_date"))
+        );
+        if (entityId == null || (status == null && modified == null)) {
+            return null;
+        }
+        return "zoho-shipment:" + entityId + ":" + firstNonBlank(status, "unknown") + ":" + firstNonBlank(modified, "unknown");
     }
 
     private static void copyFirst(Map<String, Object> target, String targetKey, List<Map<String, Object>> sources, String... sourceKeys) {
