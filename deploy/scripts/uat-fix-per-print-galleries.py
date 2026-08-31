@@ -91,7 +91,7 @@ KNOWN_PRINT_GALLERY_NUMS: dict[str, dict[str, list[int | str]]] = {
         "SNAIL": [2, 4, 12, 13],
     },
     "BASIC-SHORTS": {
-        "SNAIL": [1, 13, 19, 23, 25],
+        "SNAIL & BLUE": [1, 13, 19, 23, 25],
         "BEE & BLUE": [2, 7, 18, 27, 29],
         "HAPPY BEE": [4, 6, 10, 28],
         "BABY BLUE": [5, 7, 8, 18, 21, 22],
