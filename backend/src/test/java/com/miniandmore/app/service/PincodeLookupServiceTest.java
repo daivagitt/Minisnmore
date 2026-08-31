@@ -137,4 +137,21 @@ class PincodeLookupServiceTest {
     void parseIndiaPostResponse_invalidJson_returnsEmpty() {
         assertThat(pincodeLookupService.parseIndiaPostResponse("not-json", "560001")).isEmpty();
     }
+
+    @Test
+    void adjustEtaWithBuffer_blankOrUnparseable_returnsUnchanged() {
+        assertThat(PincodeLookupService.adjustEtaWithBuffer(null)).isNull();
+        assertThat(PincodeLookupService.adjustEtaWithBuffer("  ")).isEqualTo("  ");
+        assertThat(PincodeLookupService.adjustEtaWithBuffer("TBD")).isEqualTo("TBD");
+    }
+
+    @Test
+    void adjustEtaWithBuffer_sameDay_addsBufferDays() {
+        assertThat(PincodeLookupService.adjustEtaWithBuffer("Same day")).isEqualTo("3 days");
+    }
+
+    @Test
+    void parseZippopotamResponse_missingPlaces_returnsEmpty() {
+        assertThat(pincodeLookupService.parseZippopotamResponse("{}", "560001")).isEmpty();
+    }
 }

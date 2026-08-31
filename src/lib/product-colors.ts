@@ -43,6 +43,7 @@ const COLOR_PALETTE: Record<string, string> = {
   mint: "#bcd9c4",
   olive: "#8a8c5a",
   sky: "#bcd5e3",
+  "baby blue": "#bcd5e3",
   blue: "#7aa6c4",
   navy: "#2c3e58",
   grey: "#b8b1a7",

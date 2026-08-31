@@ -2,6 +2,7 @@ package com.miniandmore.app.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -14,6 +15,7 @@ import com.miniandmore.app.repository.OrderEventRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -189,6 +191,127 @@ class OrderEventServiceTest {
 
         verify(orderEventRepository, never()).save(any());
         verify(orderMailService, never()).sendOrderConfirmation(any());
+    }
+
+    @Test
+    void syncLifecycleEvents_nullOrderId_isNoOp() {
+        CustomerOrder order = baseOrder().id(null);
+
+        service.syncLifecycleEvents(order);
+
+        verify(orderEventRepository, never()).save(any());
+    }
+
+    @Test
+    void syncLifecycleEvents_refunded_recordsRefundEvent() {
+        CustomerOrder order = baseOrder().paymentStatus(PaymentStatus.REFUNDED);
+        when(orderEventRepository.existsByOrderIdAndEventType(any(), any())).thenReturn(false);
+
+        service.syncLifecycleEvents(order);
+
+        ArgumentCaptor<OrderEvent> captor = ArgumentCaptor.forClass(OrderEvent.class);
+        verify(orderEventRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
+        assertThat(captor.getAllValues().stream().map(OrderEvent::getEventType))
+            .contains(OrderEventService.TYPE_REFUNDED);
+    }
+
+    @Test
+    void syncLifecycleEvents_shipped_includesTrackingInBody() {
+        CustomerOrder order = baseOrder()
+            .paymentStatus(PaymentStatus.PAID)
+            .shipmentDate("2026-08-14")
+            .trackingNumber(" AWB-123 ");
+        when(orderEventRepository.existsByOrderIdAndEventType(any(), any())).thenReturn(false);
+
+        service.syncLifecycleEvents(order);
+
+        ArgumentCaptor<OrderEvent> captor = ArgumentCaptor.forClass(OrderEvent.class);
+        verify(orderEventRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
+        OrderEvent shipped = captor
+            .getAllValues()
+            .stream()
+            .filter(e -> OrderEventService.TYPE_SHIPPED.equals(e.getEventType()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(shipped.getBody()).contains("Tracking AWB-123");
+    }
+
+    @Test
+    void listForUser_mapsEventsToMaps() {
+        OrderEvent event = new OrderEvent()
+            .id(7L)
+            .eventType(OrderEventService.TYPE_ORDER_PLACED)
+            .title("Order placed")
+            .body("MNM-TEST-001")
+            .orderNumber("MNM-TEST-001")
+            .createdAt(Instant.parse("2026-08-14T10:00:00Z"));
+        when(orderEventRepository.findAllByUserLoginOrderByCreatedAtDesc(eq("buyer@example.com"), any()))
+            .thenReturn(List.of(event));
+
+        List<Map<String, Object>> result = service.listForUser("buyer@example.com");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).get("event_type")).isEqualTo(OrderEventService.TYPE_ORDER_PLACED);
+        assertThat(result.get(0).get("created_at")).isEqualTo("2026-08-14T10:00:00Z");
+    }
+
+    @Test
+    void syncLifecycleEvents_delivered_parsesIsoShipmentInstant() {
+        CustomerOrder order = baseOrder()
+            .paymentStatus(PaymentStatus.PAID)
+            .ledgerlyOrderStatus("delivered")
+            .shipmentDate("2026-08-14T18:30:00Z");
+        when(orderEventRepository.existsByOrderIdAndEventType(any(), any())).thenReturn(false);
+
+        service.syncLifecycleEvents(order);
+
+        ArgumentCaptor<OrderEvent> captor = ArgumentCaptor.forClass(OrderEvent.class);
+        verify(orderEventRepository, org.mockito.Mockito.atLeast(2)).save(captor.capture());
+        OrderEvent delivered = captor
+            .getAllValues()
+            .stream()
+            .filter(e -> OrderEventService.TYPE_DELIVERED.equals(e.getEventType()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(delivered.getCreatedAt()).isEqualTo(Instant.parse("2026-08-14T18:30:00Z"));
+    }
+
+    @Test
+    void syncLifecycleEvents_shipped_unparseableShipmentDate_usesNow() {
+        CustomerOrder order = baseOrder()
+            .paymentStatus(PaymentStatus.PAID)
+            .shipmentDate("not-a-date")
+            .trackingNumber("AWB-1");
+        when(orderEventRepository.existsByOrderIdAndEventType(any(), any())).thenReturn(false);
+
+        service.syncLifecycleEvents(order);
+
+        ArgumentCaptor<OrderEvent> captor = ArgumentCaptor.forClass(OrderEvent.class);
+        verify(orderEventRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
+        OrderEvent shipped = captor
+            .getAllValues()
+            .stream()
+            .filter(e -> OrderEventService.TYPE_SHIPPED.equals(e.getEventType()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(shipped.getCreatedAt()).isNotNull();
+    }
+
+    @Test
+    void listForUser_nullCreatedAt_mapsToEmptyString() {
+        OrderEvent event = new OrderEvent()
+            .id(8L)
+            .eventType(OrderEventService.TYPE_PAYMENT_PENDING)
+            .title("Payment pending")
+            .body("MNM-TEST-001")
+            .orderNumber("MNM-TEST-001")
+            .createdAt(null);
+        when(orderEventRepository.findAllByUserLoginOrderByCreatedAtDesc(eq("buyer@example.com"), any()))
+            .thenReturn(List.of(event));
+
+        List<Map<String, Object>> result = service.listForUser("buyer@example.com");
+
+        assertThat(result.get(0).get("created_at")).isEqualTo("");
     }
 
     private CustomerOrder baseOrder() {

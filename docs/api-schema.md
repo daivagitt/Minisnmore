@@ -13,7 +13,7 @@ Browser → Nginx → Gateway (:8080) → [Store :8081 | Commerce :8082] → Bac
 | `/api/*` (no version) | gateway | JHipster auth/account/user-admin boilerplate |
 | `/api/v1/**` | store / commerce (proxy) → backend | The one public, versioned catalog/commerce API — reached only through the gateway in production |
 | `/internal/v1/**` | backend | Business logic, meant to be reached only via store/commerce; **not proxied by any committed Nginx config or gateway route** — not internet-reachable through anything in this repo |
-| `/api/v1/admin/ledgerly/**` | backend directly | Sole exception living under `/api/v1` on backend itself, routed straight through by store |
+| `/api/v1/admin/ledgerly/**`, `/api/v1/admin/zoho/**`, `/api/v1/admin/zoho-settings/**` | backend directly | Integration admin surfaces living under `/api/v1` on backend itself, routed straight through by store |
 
 There is no single current OpenAPI spec covering the full proxied surface unless **catalog-core** runs with the `api-docs` profile (`/v3/api-docs` on `:9184`, proxied by UAT nginx). springdoc scans `backend` controllers under `/internal/v1/**` and `/api/v1/**`, remapping internal paths to the public `/api/v1/**` contract. Store/commerce proxies are 1:1 with that surface. Gateway auth (`/api/authenticate`, `/api/account`, …) is documented separately when the gateway runs with `api-docs`. Regenerate snapshots with `deploy/scripts/export-openapi.sh`. `openapi-all.zip` at the repo root is Zoho Books' *own* API spec, not this app's. Treat this document plus [FRONTEND_API_CONTRACT.md](./FRONTEND_API_CONTRACT.md) as the semantic source of truth for payloads and behaviour.
 
@@ -78,7 +78,7 @@ Backed by `InternalAdminStoreResource`:
 |---|---|
 | Dashboard | GET `/dashboard` |
 | Categories | GET/POST `/categories`, PUT/DELETE `/categories/{id}` |
-| Products | GET/POST `/products`, PUT/DELETE `/products/{id}` (save triggers async Ledgerly sync) |
+| Products | GET/POST `/products`, PUT/DELETE `/products/{id}`, POST `/products/{id}/clear-variant-photos` (save triggers async Ledgerly + Zoho sync) |
 | Blog | GET/POST `/blog-posts`, PUT/DELETE `/blog-posts/{id}` |
 | Banners | GET/POST `/banners`, PUT/DELETE `/banners/{id}` |
 | Home sections | GET `/home-sections`, PUT `/home-sections/{id}` |
@@ -121,34 +121,133 @@ Backed by `LedgerlyAdminResource`, protected by backend's filter-chain rule for 
 
 `InternalLedgerlyWebhookResource`, `POST /internal/v1/ledgerly/webhooks` — headers `X-Ledgerly-Signature`, `X-Ledgerly-Event`. **Reachability gap**: documented as `https://uat.minisnmore.com/internal/v1/ledgerly/webhooks` but no committed Nginx config or gateway route proxies `/internal/v1/*` — likely relies on an out-of-repo Nginx block. Needs verification/fix.
 
+## Zoho Books admin — `/api/v1/admin/zoho` (backend directly, via store)
+
+Backed by `ZohoAdminResource`, protected by backend's filter-chain rule for `/api/v1/admin/**` (ROLE_ADMIN). Mirrors the Ledgerly admin surface for Zoho Books:
+
+| Path | Method | Purpose |
+|---|---|---|
+| `/oauth-setup` | GET | OAuth console URLs, scopes, redirect URIs |
+| `/integration-status` | GET | Connection/config status |
+| `/connect-url` | GET | OAuth authorization URL |
+| `/oauth/complete` | POST | Exchange authorization code for tokens |
+| `/test` | GET | Test connection to Zoho Books |
+| `/pull-products-auto-create-category` | PUT | Toggle auto-create-category on product pull |
+| `/sync-products` | POST | Push all products to Zoho |
+| `/sync-products/{id}` | POST | Push single product |
+| `/sync-stock/{id}` | POST | Sync stock for one product |
+| `/pull-products` | POST (`?full=`) | Pull products from Zoho |
+| `/pull-products/{id}` | POST | Pull single product by catalog id |
+| `/pull-products/{id}/variants` | POST | Pull one variant (`sku`, `zohoItemId`) |
+| `/pull-product` | POST | Pull external product by SKU / Zoho item id |
+| `/pull-inventory` | POST | Pull inventory from Zoho |
+| `/retry-orders` | POST | Retry failed order syncs |
+| `/sync-orders/by-number/{orderNumber}` | POST | Sync order by order number |
+| `/pull-order-tracking` | POST | Pull tracking updates for all open orders |
+
+Settings (non-secret fields only) live at `/api/v1/admin/zoho-settings` (`ZohoSettingsResource`, GET/PUT).
+
+### Zoho stock webhook (inbound)
+
+`InternalZohoStockWebhookResource`, `POST /internal/v1/zoho/stock-webhook` — header `X-Zoho-Stock-Signature`. Public path in OpenAPI: `/api/v1/zoho/stock-webhook`. Same reachability caveat as Ledgerly webhooks.
+
 ---
 
-## Orders, coupons, account, returns — `/api/v1` (via commerce proxy)
+## Account — addresses, wishlist, cart — `/api/v1/account` (via commerce proxy)
 
-`CommerceOrdersProxyResource`, `OrderReturnsProxyResource`, `AdminOrderReturnsProxyResource` proxy 1:1 to backend's `InternalAccountOrderResource` / `InternalOrderReturnResource` / `InternalAdminOrderReturnResource`.
+Backed by `InternalAccountResource`. All endpoints require authentication. JSON keys are **snake_case**.
+
+| Path | Method | Purpose |
+|---|---|---|
+| `/addresses` | GET | List saved addresses |
+| `/addresses` | POST | Create address |
+| `/addresses/{id}` | PUT | Update address |
+| `/addresses/{id}` | DELETE | Delete address |
+| `/addresses/{id}/default` | PUT | Set default address |
+| `/addresses/sync` | POST | Merge device-local addresses (deduped by line1 + pincode + city) |
+| `/wishlist` | GET | List wishlist product ids |
+| `/wishlist/items` | POST | Add product (`product_id`) |
+| `/wishlist/items/{productId}` | DELETE | Remove product |
+| `/wishlist/sync` | POST | Merge guest wishlist ids into account |
+| `/wishlist` | PUT | Replace entire wishlist |
+| `/cart` | GET | Get persisted cart (`items`, `coupon`) |
+| `/cart` | PUT | Replace cart (max 100 items; coupon optional) |
+
+The server-side cart syncs across devices for signed-in users. Guest carts remain client-only until login, then merge via `PUT /cart` or checkout.
+
+---
+
+## Orders, coupons, profile, returns — `/api/v1` (via commerce proxy)
+
+`CommerceOrdersProxyResource`, `OrderReturnsProxyResource`, `AdminOrderReturnsProxyResource`, `AdminOrdersProxyResource` proxy 1:1 to backend resources.
+
+### Coupons & profile
 
 | Path | Method | Purpose | Auth |
 |---|---|---|---|
 | `/coupons/validate` | POST | Validate coupon against subtotal | permitAll |
-| `/account/profile` | GET/PUT | Customer profile (name, phone) | authenticated |
-| `/orders` | POST | Create order (reserves inventory, computes totals, creates Razorpay order) | authenticated |
-| `/orders/verify-payment` | POST | Verify Razorpay signature, confirm order, trigger Ledgerly sync | authenticated |
+| `/coupons/active` | GET | List currently redeemable coupons | permitAll |
+| `/account/profile` | GET/PUT | Customer profile (`full_name`, `phone`) | authenticated |
+| `/account/profile/bootstrap` | POST | Seed profile name from signup email | authenticated |
+| `/account/notifications` | GET | Order lifecycle notification events | authenticated |
+
+### Orders & payments
+
+| Path | Method | Purpose | Auth |
+|---|---|---|---|
+| `/orders` | POST | Create order (reserves inventory, Razorpay order or COD) | authenticated |
+| `/orders/verify-payment` | POST | Verify Razorpay signature, confirm order | authenticated |
 | `/orders/sync-payment` | POST | Poll Razorpay for async/UPI confirmation | authenticated |
+| `/orders/retry-payment` | POST | Reopen Razorpay checkout for unpaid order | authenticated |
 | `/orders` | GET | List my orders | authenticated |
 | `/orders/track/{orderNumber}` | GET | Public order tracking (limited fields) | permitAll |
 | `/orders/{orderNumber}` | GET | Order detail (ownership enforced) | authenticated |
+| `/orders/{orderNumber}/cancel` | POST | Cancel order before dispatch (`reason`) | authenticated |
 | `/payments` | GET | My payment history | authenticated |
+
+### Customer returns & exchanges
+
+| Path | Method | Purpose | Auth |
+|---|---|---|---|
 | `/order-returns` | GET | List my returns | authenticated |
 | `/order-returns` | POST | Request a return (`order_number`, `reason`) | authenticated |
+| `/order-returns/exchange` | POST | Request exchange (`order_number`, `order_item_id`, `reason`, `replacement_size`, `replacement_color`) | authenticated |
+| `/order-returns/exchange-availability/{orderItemId}` | GET (`?size=&color=`) | Check replacement variant stock | authenticated |
+| `/order-returns/config` | GET | Public return/exchange policy config | permitAll |
 | `/order-returns/{returnNumber}/cancel` | POST | Cancel my return | authenticated |
 | `/order-returns/eligibility/{orderNumber}` | GET | Check return eligibility | authenticated |
-| `/admin/order-returns` | GET (`?status=`) | List all returns (admin) | ROLE_ADMIN |
-| `/admin/order-returns/{returnNumber}/approve` | POST | Approve return | ROLE_ADMIN |
-| `/admin/order-returns/{returnNumber}/reject` | POST | Reject return (`rejection_reason`) | ROLE_ADMIN |
-| `/admin/order-returns/{returnNumber}/mark-received` | POST | Mark item received | ROLE_ADMIN |
-| `/admin/order-returns/{returnNumber}/refund` | POST | Process refund (Razorpay + Ledgerly credit note) | ROLE_ADMIN |
 
-There is **no server-side cart API** — the cart is client-only ([frontend-architecture.md](./frontend-architecture.md#state-management)); checkout submits the full item list directly to `POST /orders`.
+### Admin returns (full workflow)
+
+| Path | Method | Purpose |
+|---|---|---|
+| `/admin/order-returns` | GET (`?status=`) | List all returns |
+| `/admin/order-returns/{returnNumber}/approve` | POST | Approve return |
+| `/admin/order-returns/{returnNumber}/reject` | POST | Reject (`rejection_reason`, optional `admin_notes`) |
+| `/admin/order-returns/{returnNumber}/pickup-requested` | POST | Mark pickup requested |
+| `/admin/order-returns/{returnNumber}/picked-up` | POST | Mark picked up |
+| `/admin/order-returns/{returnNumber}/mark-received` | POST | Mark item received at warehouse |
+| `/admin/order-returns/{returnNumber}/inspect` | POST | Mark inspected |
+| `/admin/order-returns/{returnNumber}/accept` | POST | Accept after inspection |
+| `/admin/order-returns/{returnNumber}/allocate-replacement` | POST | Allocate replacement item (exchange) |
+| `/admin/order-returns/{returnNumber}/convert-to-refund` | POST | Convert exchange to refund |
+| `/admin/order-returns/{returnNumber}/repacking` | POST | Mark repacking |
+| `/admin/order-returns/{returnNumber}/ready-to-ship` | POST | Mark ready to ship |
+| `/admin/order-returns/{returnNumber}/shipped` | POST | Mark shipped |
+| `/admin/order-returns/{returnNumber}/delivered` | POST | Mark delivered |
+| `/admin/order-returns/{returnNumber}/complete` | POST | Complete exchange |
+| `/admin/order-returns/{returnNumber}/refund` | POST | Process refund (Razorpay + Ledgerly credit note) |
+
+### Admin orders
+
+Backed by `InternalAdminOrderResource`:
+
+| Path | Method | Purpose |
+|---|---|---|
+| `/admin/orders` | GET | Paginated order list (`from`, `to`, `q`, `status`, `paymentStatus`, `paymentMethod`, `zohoSyncStatus`, `ledgerlySyncStatus`) |
+| `/admin/orders/cod-pending` | GET | COD orders awaiting collection |
+| `/admin/orders/{orderNumber}` | GET | Full order detail |
+| `/admin/orders/{orderNumber}/mark-cod-collected` | POST | Mark COD payment collected |
 
 ---
 
@@ -161,11 +260,13 @@ There is **no server-side cart API** — the cart is client-only ([frontend-arch
 | Products / categories (read) | backend via store | `/api/v1/products`, `/api/v1/categories` |
 | Products / categories (admin) | backend via store | `/api/v1/admin/products`, `/api/v1/admin/categories` |
 | Orders / checkout / payments | backend (logic), commerce (proxy) | `/api/v1/orders*`, `/api/v1/payments` |
-| Coupons | backend, commerce | `/api/v1/coupons/validate`, `/api/v1/admin/coupons` |
-| Returns | backend, commerce | `/api/v1/order-returns*`, `/api/v1/admin/order-returns*` |
-| Account/profile | backend, commerce | `/api/v1/account/profile` |
+| Coupons | backend, commerce | `/api/v1/coupons/*`, `/api/v1/admin/coupons` |
+| Returns / exchanges | backend, commerce | `/api/v1/order-returns*`, `/api/v1/admin/order-returns*` |
+| Admin orders | backend, commerce | `/api/v1/admin/orders*` |
+| Account (profile, addresses, wishlist, cart) | backend, commerce | `/api/v1/account/*` |
 | CMS (banners/blog/home/pages/policies/settings) | backend via store | `/api/v1/admin/{banners,blog-posts,home-sections,page-visibility,policies,site-settings}` (+ public read equivalents) |
 | Ledgerly integration | backend | `/api/v1/admin/ledgerly/*`, `/internal/v1/ledgerly/webhooks` |
+| Zoho Books integration | backend | `/api/v1/admin/zoho/*`, `/api/v1/admin/zoho-settings`, `/api/v1/zoho/stock-webhook` |
 | Storage/uploads | backend via store | `/api/v1/admin/uploads*` |
 | SKU-wise print import | backend via store | `/api/v1/admin/import/sku-wise-print` |
 | Pincode lookup | backend | `/api/v1/pincode/{pincode}` |

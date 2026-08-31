@@ -479,6 +479,8 @@ class LedgerlyProductMergeServiceTest {
         assertThat(mergeService.storeSellingPrice(withPrice)).isEqualByComparingTo("400");
         assertThat(mergeService.storeUatPrice(BigDecimal.valueOf(500))).isEqualByComparingTo("400.00");
         assertThat(mergeService.storeUatPrice(null)).isEqualByComparingTo("0");
+        Product compareOnly = new Product().compareAtPrice(BigDecimal.valueOf(500));
+        assertThat(mergeService.storeSellingPrice(compareOnly)).isEqualByComparingTo("400.00");
     }
 
     @Test
@@ -523,5 +525,109 @@ class LedgerlyProductMergeServiceTest {
 
         assertThat(payload.get("sizes")).isEqualTo("S, M");
         assertThat(payload.get("colors")).isEqualTo("Red, Blue");
+    }
+
+    @Test
+    void buildPushPayload_includesAgeRange() {
+        when(itemImageSync.firstImageUrl(any())).thenReturn(null);
+        Product product = new Product()
+            .sku("MNM-AGE")
+            .name("Age product")
+            .price(BigDecimal.valueOf(100))
+            .stock(1)
+            .active(true)
+            .ageMinMonths(0)
+            .ageMaxMonths(6);
+
+        Map<String, Object> payload = mergeService.buildPushPayload(product, "Baby");
+
+        assertThat(payload.get("ageMinMonths")).isEqualTo(0);
+        assertThat(payload.get("ageMaxMonths")).isEqualTo(6);
+    }
+
+    @Test
+    void mergeLedgerlyItem_infersVariantsStructureFromJson() {
+        Product product = new Product().sku("SKU-VAR").price(BigDecimal.ZERO).stock(0);
+        Map<String, Object> item = Map.of(
+            "rate",
+            500,
+            "stock",
+            2,
+            "variants_json",
+            "[{\"sku\":\"SKU-VAR-S\",\"size\":\"S\",\"color\":\"Red\",\"rate\":500,\"stock\":2,\"active\":true}]"
+        );
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+
+        assertThat(product.getItemStructure()).isEqualTo(ProductVariantSupport.STRUCTURE_VARIANTS);
+        assertThat(product.getVariantsJson()).contains("SKU-VAR-S");
+        assertThat(product.getPrice()).isEqualByComparingTo("400.00");
+    }
+
+    @Test
+    void mergeLedgerlyItem_badVariantsJson_keepsStructureWithoutWiping() {
+        Product product = new Product().sku("SKU-BAD").price(BigDecimal.TEN).stock(1);
+        Map<String, Object> item = Map.of(
+            "price",
+            100,
+            "stock",
+            1,
+            "itemStructure",
+            ProductVariantSupport.STRUCTURE_VARIANTS,
+            "variantsJson",
+            "not-json"
+        );
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+
+        assertThat(product.getItemStructure()).isEqualTo(ProductVariantSupport.STRUCTURE_VARIANTS);
+        assertThat(product.getPrice()).isEqualByComparingTo("100");
+    }
+
+    @Test
+    void mergeLedgerlyItem_carriesForwardVariantPhotosWhenSkuUnchanged() {
+        Product product = new Product()
+            .sku("SKU-PHOTO")
+            .price(BigDecimal.ZERO)
+            .stock(0)
+            .itemStructure(ProductVariantSupport.STRUCTURE_VARIANTS)
+            .variantsJson(
+                "[{\"sku\":\"TEE-S-NAVY\",\"size\":\"S\",\"color\":\"Navy\",\"rate\":999,\"stock\":1,\"active\":true,\"imageUrl\":\"https://cdn.example.com/tee.jpg\"}]"
+            );
+        Map<String, Object> item = Map.of(
+            "price",
+            999,
+            "stock",
+            2,
+            "itemStructure",
+            ProductVariantSupport.STRUCTURE_VARIANTS,
+            "variantsJson",
+            "[{\"sku\":\"TEE-S-NAVY\",\"size\":\"S\",\"color\":\"Navy\",\"rate\":999,\"stock\":2,\"active\":true}]"
+        );
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+
+        assertThat(product.getVariantsJson()).contains("https://cdn.example.com/tee.jpg");
+    }
+
+    @Test
+    void mergeLedgerlyItem_usesCompareAtPriceField() {
+        Product product = new Product().sku("SKU-COMPARE").price(BigDecimal.ZERO).stock(0);
+        Map<String, Object> item = Map.of("compareAtPrice", 899, "price", 500, "stock", 1);
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+
+        assertThat(product.getCompareAtPrice()).isEqualByComparingTo("899");
+    }
+
+    @Test
+    void mergeLedgerlyItem_appliesDelimitedSizesAndColors() {
+        Product product = new Product().sku("SKU-SC").price(BigDecimal.ZERO).stock(0);
+        Map<String, Object> item = Map.of("price", 100, "stock", 1, "sizes", "S, M", "colors", "Red, Blue");
+
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+
+        assertThat(product.getSizesJson()).contains("S").contains("M");
+        assertThat(product.getColorsJson()).contains("Red").contains("Blue");
     }
 }

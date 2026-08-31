@@ -682,6 +682,212 @@ class ProductVariantSupportTest {
         assertThat(product.getStock()).isEqualTo(7);
     }
 
+    @Test
+    void variantSellingPrice_nullRow_returnsZero() {
+        assertThat(support.variantSellingPrice(null)).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void variantSellingPrice_withoutRateOrMrp_returnsZero() {
+        VariantRow row = new VariantRow("id", "SKU", "M", "Blue", null, null, null, 1, true, null, null, null, List.of());
+        assertThat(support.variantSellingPrice(row)).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void storefrontPrice_nullOrNonPositive_returnsZero() {
+        assertThat(support.storefrontPrice(null)).isEqualByComparingTo("0");
+        assertThat(support.storefrontPrice(BigDecimal.ZERO)).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void applyMatrix_simpleStructure_clearsVariantsJson() {
+        Product product = new Product().sku("SIMPLE").variantsJson("[{\"sku\":\"X\"}]");
+        assertThat(support.applyMatrixToProduct(product, "SIMPLE", null)).isTrue();
+        assertThat(product.getVariantsJson()).isNull();
+    }
+
+    @Test
+    void mergeColorsPreservingGalleries_nullColorNames_returnsPreviousJson() throws Exception {
+        String previous = "[{\"name\":\"Navy\"}]";
+        assertThat(support.mergeColorsPreservingGalleries(previous, List.of())).isEqualTo(previous);
+        assertThat(support.mergeColorsPreservingGalleries(null, null)).isEqualTo("[]");
+    }
+
+    @Test
+    void decrementVariantStock_unknownVariant_returnsFalse() {
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":1,"active":true}]
+            """
+        );
+        assertThat(support.decrementVariantStock(product, "MISSING", "XL", "Green", 1)).isFalse();
+    }
+
+    @Test
+    void incrementVariantStock_unknownVariant_returnsFalse() {
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":1,"active":true}]
+            """
+        );
+        assertThat(support.incrementVariantStock(product, "MISSING", "XL", "Green", 1)).isFalse();
+    }
+
+    @Test
+    void aggregates_skipsInactiveRows() {
+        List<VariantRow> rows = support.parse(
+            """
+            [{"sku":"A","size":"S","color":"Red","rate":10,"stock":5,"active":false},
+             {"sku":"B","size":"M","color":"Blue","rate":20,"stock":2,"active":true}]
+            """
+        );
+        Aggregates agg = support.aggregates(rows);
+        assertThat(agg.stockSum()).isEqualTo(2);
+        assertThat(agg.minSelling()).isEqualByComparingTo("16.00");
+    }
+
+    @Test
+    void coerceVariantsJson_null_returnsNull() {
+        assertThat(support.coerceVariantsJson(null)).isNull();
+    }
+
+    @Test
+    void normalize_trimsWhitespace() {
+        assertThat(ProductVariantSupport.normalize("  Variants  ")).isEqualTo("Variants");
+        assertThat(ProductVariantSupport.normalize(null)).isNull();
+    }
+
+    @Test
+    void setVariantZohoItemId_andLookup() {
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":1,"active":true}]
+            """
+        );
+        assertThat(support.setVariantZohoItemId(product, "HORIZON-S-NAVY", "zoho-1")).isTrue();
+        assertThat(support.zohoItemIdForSku(product, "HORIZON-S-NAVY")).contains("zoho-1");
+    }
+
+    @Test
+    void clearVariantImages_clearsGallery() {
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":1,"active":true,"imageUrl":"https://cdn.example.com/a.jpg"}]
+            """
+        );
+        assertThat(support.clearVariantImages(product, "HORIZON-S-NAVY")).isTrue();
+        assertThat(support.parseProduct(product).get(0).imageUrl()).isNull();
+    }
+
+    @Test
+    void hasZohoLinkedVariants_detectsLinkedRows() {
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":1,"active":true,"zohoItemId":"zoho-1"}]
+            """
+        );
+        assertThat(support.hasZohoLinkedVariants(product)).isTrue();
+    }
+
+    @Test
+    void variantHasSizeAndColor_requiresBothFields() {
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":1,"active":true}]
+            """
+        );
+        assertThat(support.variantHasSizeAndColor(product, "HORIZON-S-NAVY")).isTrue();
+    }
+
+    @Test
+    void findProductContainingVariantSku_returnsMatch() {
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":1,"active":true}]
+            """
+        );
+        assertThat(support.findProductContainingVariantSku(List.of(product), "HORIZON-S-NAVY")).contains(product);
+    }
+
+    @Test
+    void renameVariantColors_updatesMatrix() {
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":1,"active":true}]
+            """
+        );
+        support.renameVariantColors(product, Map.of("Navy", "Midnight"));
+        assertThat(support.parseProduct(product).get(0).color()).isEqualTo("Midnight");
+    }
+
+    @Test
+    void deactivateVariantBySku_marksInactive() {
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":1,"active":true}]
+            """
+        );
+        assertThat(support.deactivateVariantBySku(product, "HORIZON-S-NAVY")).isTrue();
+        assertThat(support.parseProduct(product).get(0).active()).isFalse();
+    }
+
+    @Test
+    void deactivateVariantByZohoItemId_marksInactive() {
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":1,"active":true,"zohoItemId":"zoho-9"}]
+            """
+        );
+        assertThat(support.deactivateVariantByZohoItemId(product, "zoho-9")).isTrue();
+        assertThat(support.parseProduct(product).get(0).active()).isFalse();
+    }
+
+    @Test
+    void findProductContainingVariantZohoItemId_returnsMatch() {
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":1,"active":true,"zohoItemId":"zoho-9"}]
+            """
+        );
+        assertThat(support.findProductContainingVariantZohoItemId(List.of(product), "zoho-9")).contains(product);
+    }
+
+    @Test
+    void setVariantImages_updatesGallery() {
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":1,"active":true}]
+            """
+        );
+        assertThat(
+            support.setVariantImages(product, "HORIZON-S-NAVY", List.of("https://cdn.example.com/a.jpg", "https://cdn.example.com/b.jpg"))
+        ).isTrue();
+        VariantRow row = support.parseProduct(product).get(0);
+        assertThat(row.imageUrl()).isEqualTo("https://cdn.example.com/a.jpg");
+        assertThat(row.imageUrls()).contains("https://cdn.example.com/b.jpg");
+    }
+
+    @Test
+    void anyVariantSkuInSet_detectsMembership() {
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":1,"active":true}]
+            """
+        );
+        assertThat(support.anyVariantSkuInSet(product, Set.of("HORIZON-S-NAVY"))).isTrue();
+        assertThat(support.anyVariantSkuInSet(product, Set.of("OTHER"))).isFalse();
+    }
+
+    @Test
+    void hasActiveVariants_falseWhenAllInactive() {
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":1,"active":false}]
+            """
+        );
+        assertThat(support.hasActiveVariants(product)).isFalse();
+    }
+
     private Product variantProduct(String json) {
         Product product = new Product().sku("HORIZON").price(BigDecimal.ZERO).stock(0);
         support.applyMatrixToProduct(product, "VARIANTS", json);

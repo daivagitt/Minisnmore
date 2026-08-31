@@ -30,7 +30,7 @@ function PrivacyPage() {
 
       <h2>3. How we use your data</h2>
       <ul>
-        <li>To process and fulfil your orders, including shipping, returns and refunds.</li>
+        <li>To process and fulfil your orders, including shipping and customer support.</li>
         <li>To provide customer support and respond to your queries.</li>
         <li>To personalise your shopping experience and recommend products suited to your baby's age.</li>
         <li>To send transactional communications (order confirmations, shipping updates).</li>

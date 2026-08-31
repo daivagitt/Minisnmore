@@ -26,6 +26,12 @@ const toastMock = vi.hoisted(() => ({
   message: vi.fn(),
 }));
 
+const oauthEnabledMock = vi.hoisted(() => vi.fn((provider: string) => provider === "google"));
+
+vi.mock("@/lib/oauth-providers", () => ({
+  isOAuthProviderEnabled: (provider: string) => oauthEnabledMock(provider),
+}));
+
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (config: unknown) => config,
   lazyRouteComponent: (importer: unknown) => importer,
@@ -316,5 +322,83 @@ describe("login route", () => {
     await userEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
     await userEvent.click(screen.getByRole("button", { name: "Back to sign in" }));
     expect(screen.getByRole("heading", { name: "Sign in" })).toBeTruthy();
+  });
+
+  it("validates email and password before sign in", async () => {
+    renderLogin();
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() =>
+      expect(toastMock.error).toHaveBeenCalledWith(expect.stringMatching(/email/i), { id: "login-error" }),
+    );
+    expect(authMock.signIn).not.toHaveBeenCalled();
+  });
+
+  it("shows forgot password API errors", async () => {
+    authMock.requestPasswordReset.mockResolvedValueOnce({ error: "Rate limited" });
+    renderLogin();
+    await userEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+    await userEvent.type(screen.getByPlaceholderText("you@email.com"), "parent@example.com");
+    await userEvent.click(screen.getByRole("button", { name: "Send reset link" }));
+    await waitFor(() =>
+      expect(toastMock.error).toHaveBeenCalledWith("Rate limited", { id: "forgot-password-error" }),
+    );
+  });
+
+  it("resend activation flow handles success, validation, and API errors", async () => {
+    authMock.signIn.mockResolvedValueOnce({ error: "Account is not activated yet" });
+    authMock.resendActivationEmail.mockResolvedValueOnce({ error: null });
+    renderLogin();
+
+    await userEvent.type(screen.getByPlaceholderText("you@email.com"), "parent@example.com");
+    await userEvent.type(screen.getByPlaceholderText("Password (min 6)"), "secret1");
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Resend activation email" })).toBeTruthy(),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Resend activation email" }));
+    await waitFor(() =>
+      expect(authMock.resendActivationEmail).toHaveBeenCalledWith("parent@example.com"),
+    );
+    expect(toastMock.success).toHaveBeenCalledWith(
+      "If your account is not active yet, a new activation link is on its way.",
+    );
+
+    authMock.resendActivationEmail.mockResolvedValueOnce({ error: "Mailbox unavailable" });
+    await userEvent.click(screen.getByRole("button", { name: "Resend activation email" }));
+    await waitFor(() =>
+      expect(toastMock.error).toHaveBeenCalledWith("Mailbox unavailable", { id: "resend-activation-error" }),
+    );
+
+    await userEvent.clear(screen.getByPlaceholderText("you@email.com"));
+    await userEvent.click(screen.getByRole("button", { name: "Resend activation email" }));
+    await waitFor(() =>
+      expect(toastMock.error).toHaveBeenCalledWith(expect.stringMatching(/email/i), {
+        id: "resend-activation-error",
+      }),
+    );
+  });
+
+  it("starts Apple OAuth when enabled", async () => {
+    oauthEnabledMock.mockImplementation((provider: string) => provider === "apple");
+    authMock.signInWithOAuth.mockResolvedValueOnce({ error: null });
+    renderLogin();
+    await userEvent.click(screen.getByRole("button", { name: "Continue with Apple" }));
+    await waitFor(() =>
+      expect(authMock.signInWithOAuth).toHaveBeenCalledWith("apple", "/account"),
+    );
+    oauthEnabledMock.mockImplementation((provider: string) => provider === "google");
+  });
+
+  it("starts Facebook OAuth when enabled", async () => {
+    oauthEnabledMock.mockImplementation((provider: string) => provider === "facebook");
+    authMock.signInWithOAuth.mockResolvedValueOnce({ error: null });
+    renderLogin();
+    await userEvent.click(screen.getByRole("button", { name: "Continue with Facebook" }));
+    await waitFor(() =>
+      expect(authMock.signInWithOAuth).toHaveBeenCalledWith("facebook", "/account"),
+    );
+    oauthEnabledMock.mockImplementation((provider: string) => provider === "google");
   });
 });

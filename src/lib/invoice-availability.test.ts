@@ -34,14 +34,14 @@ describe("invoice availability", () => {
     expect(isInvoiceAvailable({ status: "fulfilled", payment_status: "paid" })).toBe(true);
   });
 
-  it("hides invoices for confirmed unpaid COD orders until collection", () => {
+  it("allows invoices for confirmed COD orders before collection", () => {
     expect(
       isInvoiceAvailable({
         status: "confirmed",
         payment_method: "cod",
         payment_status: "pending",
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("allows invoices after COD cash is collected", () => {

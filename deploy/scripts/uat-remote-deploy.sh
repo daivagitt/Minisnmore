@@ -25,9 +25,20 @@ if [ -f /etc/mini-and-more/uat.env ]; then
   set +a
 fi
 
+ASSET_BACKUP=""
+if [ -d "${CURRENT_LINK}/dist/client/assets" ]; then
+  ASSET_BACKUP="$(mktemp -d "${TMPDIR:-/tmp}/mini-client-assets.XXXXXX")"
+  cp -a "${CURRENT_LINK}/dist/client/assets/." "$ASSET_BACKUP/"
+fi
+
 rm -rf dist node_modules/.vite
 export VITE_API_BASE_URL="${VITE_API_BASE_URL:-https://uat.minisnmore.com}"
 npm run build
+
+if [ -n "$ASSET_BACKUP" ] && [ -d "$ASSET_BACKUP" ] && [ -d dist/client/assets ]; then
+  cp -an "$ASSET_BACKUP/." dist/client/assets/
+  rm -rf "$ASSET_BACKUP"
+fi
 
 printf '%s\n%s\n' "$BUILD_NUM" "$GIT_SHA" > dist/client/RELEASE.txt
 

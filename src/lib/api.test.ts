@@ -578,6 +578,77 @@ describe("api client", () => {
     );
   });
 
+  it("sanitizes Razorpay refund problem details via formatProblemBody", async () => {
+    const { formatProblemBody } = await loadApi();
+
+    expect(
+      formatProblemBody(400, {
+        detail:
+          'Razorpay refund failed: {"error":{"description":"The account does not have enough balance to process this refund"}}',
+      }),
+    ).toBe(
+      "Refund could not be processed because your Razorpay account does not have enough balance. " +
+        "Add funds in the Razorpay Dashboard or wait for recent payments to settle, then try again.",
+    );
+
+    expect(
+      formatProblemBody(400, {
+        detail: '{"error":{"description":"Payment has already been refunded in full"}}',
+      }),
+    ).toBe("This payment has already been refunded.");
+
+    expect(
+      formatProblemBody(400, {
+        detail: '{"error":{"description":"Refund cannot be issued because payment is not captured"}}',
+      }),
+    ).toBe("Refund cannot be issued because the payment has not been captured yet.");
+
+    expect(
+      formatProblemBody(400, {
+        detail: '{"error":{"description":"Refund amount exceeds captured amount"}}',
+      }),
+    ).toBe("Refund amount exceeds captured amount");
+
+    expect(
+      formatProblemBody(400, {
+        detail: 'Razorpay refund failed: {"error":{"description":"not valid json"',
+      }),
+    ).toBe('Razorpay refund failed: {"error":{"description":"not valid json"');
+
+    expect(
+      formatProblemBody(400, {
+        detail:
+          'Razorpay refund failed: HTTP 400 {"error":{"description":"Insufficient balance for refund"}}',
+      }),
+    ).toBe(
+      "Refund could not be processed because your Razorpay account does not have enough balance. " +
+        "Add funds in the Razorpay Dashboard or wait for recent payments to settle, then try again.",
+    );
+  });
+
+  it("merges custom headers into api.post requests", async () => {
+    const { api } = await loadApi("https://api.example.com");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: { ok: true } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await api.post(
+      "/api/account/reset-password/init",
+      JSON.stringify("reset@example.com"),
+      {
+        unwrap: false,
+        headers: { "Content-Type": "application/json", "X-Request-Id": "req-42" },
+      },
+    );
+
+    const headers = fetchMock.mock.calls[0][1]?.headers as Headers;
+    expect(headers.get("Content-Type")).toBe("application/json");
+    expect(headers.get("X-Request-Id")).toBe("req-42");
+  });
+
   it("humanizes additional constraint message patterns", async () => {
     const { api } = await loadApi("https://api.example.com");
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(

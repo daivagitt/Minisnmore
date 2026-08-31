@@ -35,23 +35,43 @@ vi.mock("./coupons.functions", () => ({
 }));
 
 import {
+  acceptOrderReturnAfterInspection,
+  allocateReplacementForOrderReturn,
   approveOrderReturn,
+  bootstrapProfileFromSignup,
   cancelOrder,
   cancelOrderReturn,
+  checkExchangeReplacementAvailability,
   checkReturnEligibility,
+  completeOrderReturnExchange,
+  convertOrderReturnToRefund,
   createOrder,
   getMyProfile,
   getAdminOrder,
   getOrder,
+  getReturnsConfig,
   listAdminOrderReturns,
   listAdminOrders,
+  listCodPendingOrders,
+  listMyNotifications,
   listMyOrderReturns,
   listMyOrders,
   listMyPayments,
+  markCodCollected,
+  markOrderReturnDelivered,
+  markOrderReturnInspected,
+  markOrderReturnPickedUp,
+  markOrderReturnPickupRequested,
+  markOrderReturnReadyToShip,
   markOrderReturnReceived,
+  markOrderReturnRepacking,
+  markOrderReturnShipped,
   refundOrderReturn,
   rejectOrderReturn,
+  requestOrderExchange,
   requestOrderReturn,
+  retryOrderPayment,
+  syncPaymentStatus,
   trackOrderPublic,
   updateMyProfile,
   verifyPayment,
@@ -413,5 +433,196 @@ describe("orders functions", () => {
     expect(fullNameFieldError("Ananya Sharma")).toBeUndefined();
     expect(fullNameFieldError("Name123")).toMatch(/letters/i);
     expect(FullNameSchema.parse("O'Brien")).toBe("O'Brien");
+  });
+
+  it("syncs payment status and retries failed payments", async () => {
+    postMock.mockResolvedValueOnce({ payment_status: "paid" });
+    await expect(syncPaymentStatus({ data: { orderId: 7 } })).resolves.toEqual({
+      payment_status: "paid",
+    });
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/orders/sync-payment",
+      { orderId: 7 },
+      { auth: true },
+    );
+
+    postMock.mockResolvedValueOnce({
+      orderId: 7,
+      orderNumber: "MNM-7",
+      razorpayOrderId: "order_7",
+      keyId: "rzp_test",
+      amount: 49900,
+      currency: "INR",
+      demoMode: false,
+      gatewayMode: "test",
+    });
+    await expect(retryOrderPayment({ data: { orderId: 7 } })).resolves.toMatchObject({
+      orderNumber: "MNM-7",
+      razorpayOrderId: "order_7",
+    });
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/orders/retry-payment",
+      { orderId: 7 },
+      { auth: true },
+    );
+  });
+
+  it("rejects invalid payment sync and retry payloads", async () => {
+    await expect(syncPaymentStatus({ data: { orderId: 0 } })).rejects.toThrow();
+    await expect(retryOrderPayment({ data: { orderId: -1 } })).rejects.toThrow();
+    expect(postMock).not.toHaveBeenCalled();
+  });
+
+  it("lists notifications and defaults missing events to an empty array", async () => {
+    getMock.mockResolvedValueOnce({
+      events: [{ id: 1, event_type: "order_shipped", title: "Shipped", body: "On the way", order_number: "MNM-1", created_at: "2026-08-01" }],
+    });
+    await expect(listMyNotifications()).resolves.toEqual({
+      events: [
+        expect.objectContaining({ event_type: "order_shipped", order_number: "MNM-1" }),
+      ],
+    });
+    expect(getMock).toHaveBeenCalledWith("/api/v1/account/notifications", { auth: true });
+
+    getMock.mockResolvedValueOnce(null);
+    await expect(listMyNotifications()).resolves.toEqual({ events: [] });
+  });
+
+  it("bootstraps profile from signup data", async () => {
+    postMock.mockResolvedValueOnce({ ok: true });
+
+    await expect(
+      bootstrapProfileFromSignup({
+        data: { full_name: "New Parent", email: "Parent@Example.com" },
+      }),
+    ).resolves.toEqual({ ok: true });
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/account/profile/bootstrap",
+      { full_name: "New Parent", email: "parent@example.com" },
+      { auth: true },
+    );
+  });
+
+  it("rejects invalid profile bootstrap payloads", async () => {
+    await expect(
+      bootstrapProfileFromSignup({ data: { full_name: "A", email: "not-an-email" } }),
+    ).rejects.toThrow();
+    expect(postMock).not.toHaveBeenCalled();
+  });
+
+  it("loads returns config and exchange availability", async () => {
+    getMock.mockResolvedValueOnce({ enabled: true, window_days: 14 });
+    await expect(getReturnsConfig()).resolves.toEqual({ enabled: true, window_days: 14 });
+    expect(getMock).toHaveBeenCalledWith("/api/v1/order-returns/config", { auth: true });
+
+    getMock.mockResolvedValueOnce({ sellable: true });
+    await expect(checkExchangeReplacementAvailability(12, "3-6m", "Navy Blue")).resolves.toEqual({
+      sellable: true,
+    });
+    expect(getMock).toHaveBeenCalledWith(
+      "/api/v1/order-returns/exchange-availability/12?size=3-6m&color=Navy%20Blue",
+      { auth: true },
+    );
+  });
+
+  it("requests exchanges with validated payloads", async () => {
+    postMock.mockResolvedValueOnce({ return_number: "EXC-1", status: "requested", request_type: "exchange" });
+
+    await expect(
+      requestOrderExchange({
+        data: {
+          order_number: "MNM-9",
+          order_item_id: 3,
+          reason: "Need a larger size for my baby",
+          replacement_size: "6-9m",
+          replacement_color: "Cream",
+        },
+      }),
+    ).resolves.toMatchObject({ return_number: "EXC-1", request_type: "exchange" });
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/order-returns/exchange",
+      expect.objectContaining({
+        order_number: "MNM-9",
+        order_item_id: 3,
+        replacement_size: "6-9m",
+      }),
+      { auth: true },
+    );
+  });
+
+  it("rejects invalid exchange payloads before calling the API", async () => {
+    await expect(
+      requestOrderExchange({
+        data: {
+          order_number: "MNM-9",
+          order_item_id: 0,
+          reason: "short",
+          replacement_size: "",
+          replacement_color: "Cream",
+        },
+      }),
+    ).rejects.toThrow();
+    expect(postMock).not.toHaveBeenCalled();
+  });
+
+  it("runs admin return workflow transitions", async () => {
+    const cases = [
+      { fn: markOrderReturnPickupRequested, action: "pickup-requested", status: "pickup_requested" },
+      { fn: markOrderReturnPickedUp, action: "picked-up", status: "picked_up" },
+      { fn: markOrderReturnInspected, action: "inspect", status: "inspected" },
+      { fn: acceptOrderReturnAfterInspection, action: "accept", status: "accepted" },
+      { fn: allocateReplacementForOrderReturn, action: "allocate-replacement", status: "allocated" },
+      { fn: convertOrderReturnToRefund, action: "convert-to-refund", status: "refund_pending" },
+      { fn: markOrderReturnRepacking, action: "repacking", status: "repacking" },
+      { fn: markOrderReturnReadyToShip, action: "ready-to-ship", status: "ready_to_ship" },
+      { fn: markOrderReturnShipped, action: "shipped", status: "shipped" },
+      { fn: markOrderReturnDelivered, action: "delivered", status: "delivered" },
+      { fn: completeOrderReturnExchange, action: "complete", status: "completed" },
+    ] as const;
+
+    for (const { fn, action, status } of cases) {
+      postMock.mockResolvedValueOnce({ return_number: "RET-10", status });
+      await expect(fn("RET-10", "handled")).resolves.toEqual({ return_number: "RET-10", status });
+      expect(postMock).toHaveBeenLastCalledWith(
+        `/api/v1/admin/order-returns/RET-10/${action}`,
+        { admin_notes: "handled" },
+        { auth: true },
+      );
+    }
+
+    postMock.mockResolvedValueOnce({ return_number: "RET-11", status: "pickup_requested" });
+    await expect(markOrderReturnPickupRequested("RET-11")).resolves.toEqual({
+      return_number: "RET-11",
+      status: "pickup_requested",
+    });
+    expect(postMock).toHaveBeenLastCalledWith(
+      "/api/v1/admin/order-returns/RET-11/pickup-requested",
+      { admin_notes: "" },
+      { auth: true },
+    );
+  });
+
+  it("lists COD pending orders and marks COD collected", async () => {
+    getMock.mockResolvedValueOnce({
+      orders: [{ id: 1, order_number: "MNM-COD-1", payment_method: "cod", payment_status: "pending" }],
+    });
+    await expect(listCodPendingOrders()).resolves.toEqual({
+      orders: [expect.objectContaining({ order_number: "MNM-COD-1" })],
+    });
+    expect(getMock).toHaveBeenCalledWith("/api/v1/admin/orders/cod-pending", { auth: true });
+
+    getMock.mockResolvedValueOnce({});
+    await expect(listCodPendingOrders()).resolves.toEqual({ orders: [] });
+
+    postMock.mockResolvedValueOnce({ order_number: "MNM-COD-1", payment_status: "paid" });
+    await expect(markCodCollected("MNM-COD-1")).resolves.toEqual({
+      order_number: "MNM-COD-1",
+      payment_status: "paid",
+    });
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/admin/orders/MNM-COD-1/mark-cod-collected",
+      undefined,
+      { auth: true },
+    );
   });
 });

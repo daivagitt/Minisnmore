@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Product } from "@/data/products";
-import { sortBestsellersFirst, sortBySortOrder } from "@/lib/product-sort";
+import { sortBestsellersFirst, sortBySortOrder, sortNewArrivalsFirst } from "@/lib/product-sort";
 
 const p = (slug: string, sortOrder: number, flags: Partial<Product> = {}): Product =>
   ({
@@ -36,5 +36,14 @@ describe("product-sort", () => {
       p("regular-low", 2),
     ]);
     expect(sorted.map((x) => x.slug)).toEqual(["best-low", "regular-high", "regular-low"]);
+  });
+
+  it("puts new arrivals ahead of other products", () => {
+    const sorted = sortNewArrivalsFirst([
+      p("regular-high", 1),
+      p("new-low", 99, { isNew: true }),
+      p("regular-low", 2),
+    ]);
+    expect(sorted.map((x) => x.slug)).toEqual(["new-low", "regular-high", "regular-low"]);
   });
 });

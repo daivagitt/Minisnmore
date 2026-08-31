@@ -67,6 +67,10 @@ function normalizedStatus(value: string | null | undefined) {
   return value?.trim().toLowerCase() || "not_synced";
 }
 
+function displayPaymentStatus(value: string | null | undefined) {
+  return value?.trim().toLowerCase() === "refunded" ? "settled" : value || "pending";
+}
+
 function SyncBadge({ status, eligible }: { status: string; eligible: boolean }) {
   if (!eligible) {
     return (
@@ -349,7 +353,6 @@ function AdminOrdersPage() {
             { value: "pending", label: "Pending" },
             { value: "paid", label: "Paid" },
             { value: "failed", label: "Failed" },
-            { value: "refunded", label: "Refunded" },
           ]}
         />
         <FilterSelect
@@ -441,7 +444,7 @@ function AdminOrdersPage() {
                         {(order.tracking_status || order.status || "pending").replaceAll("_", " ")}
                       </span>
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium uppercase">
-                        {order.payment_status || "pending"}
+                        {displayPaymentStatus(order.payment_status)}
                       </span>
                       <span className="text-[11px] font-medium uppercase text-muted-foreground">
                         {order.payment_method}

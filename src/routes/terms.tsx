@@ -29,13 +29,13 @@ function TermsPage() {
       </ul>
 
       <h2>4. Order acceptance</h2>
-      <p>Your order is an offer to purchase. A binding contract is formed only when we send you an order confirmation email. We reserve the right to refuse or cancel any order at our discretion (e.g. for stock issues, suspected fraud, or pricing errors). In such cases, full refund will be issued.</p>
+      <p>Your order is an offer to purchase. A binding contract is formed only when we send you an order confirmation email. We reserve the right to refuse or cancel any order at our discretion (e.g. for stock issues, suspected fraud, or pricing errors).</p>
 
       <h2>5. Payment</h2>
       <p>Payments are processed through our PCI-DSS compliant payment partner (Razorpay). We accept UPI, debit/credit cards, net banking, and select wallets. Cash on Delivery may be available on selected pin codes and order values.</p>
 
       <h2>6. Cancellation</h2>
-      <p>Orders may be cancelled free of charge before they are dispatched. Once dispatched, the return policy applies — see our <a href="/shipping">Shipping &amp; Returns</a> policy.</p>
+      <p>Orders may be cancelled free of charge before they are dispatched. Once dispatched, please contact support for assistance.</p>
 
       <h2>7. Intellectual property</h2>
       <p>All content on the Services — including text, images, logos, brand names, designs, photographs and product descriptions — is owned by or licensed to Mini's n More and is protected under Indian copyright, trademark and other applicable laws. You may not copy, reproduce, distribute, or create derivative works without our prior written consent.</p>

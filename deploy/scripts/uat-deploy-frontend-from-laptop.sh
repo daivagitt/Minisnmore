@@ -45,7 +45,9 @@ ssh -M -S "$SSH_SOCK" -o ControlPersist=30m -f -N "$REMOTE"
 ssh -S "$SSH_SOCK" "$REMOTE" "mkdir -p ${REMOTE_DIR}/dist ${REMOTE_DIR}/deploy/scripts"
 
 echo "=== Upload dist/ (client + server for TanStack preview) ==="
-rsync -az --delete -e "ssh -S $SSH_SOCK" \
+# Do not delete old hashed client assets during deploy. Browsers may still have
+# cached HTML/route chunks that reference the previous build's /assets files.
+rsync -az -e "ssh -S $SSH_SOCK" \
   "$ROOT/dist/" "${REMOTE}:${REMOTE_DIR}/dist/"
 
 rsync -az -e "ssh -S $SSH_SOCK" \

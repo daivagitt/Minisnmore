@@ -1359,8 +1359,6 @@ class ZohoSyncServiceTest {
                     )
                 )
             );
-        when(booksClient.listDeliveryChallans("4063993000000110007")).thenReturn(List.of());
-
         service.pullOrderTracking(41302L);
 
         verify(booksClient).getSalesOrder("4063993000000110007");
@@ -1380,8 +1378,6 @@ class ZohoSyncServiceTest {
             .thenReturn(Map.of("salesorder", Map.of("status", "invoiced", "salesorder_number", "SO-42")));
         when(booksClient.listPackagesForSalesOrder("so-packed", "SO-42"))
             .thenReturn(List.of(Map.of("package_id", "pkg-42", "salesorder_id", "so-packed")));
-        when(booksClient.listDeliveryChallans("so-packed")).thenReturn(List.of());
-
         service.pullOrderTracking(41304L);
 
         assertThat(order.getStatus()).isEqualTo(com.miniandmore.app.domain.enumeration.OrderStatus.HAND_WRAPPED);
@@ -1421,8 +1417,6 @@ class ZohoSyncServiceTest {
                     )
                 )
             );
-        when(booksClient.listDeliveryChallans("so-shipped")).thenReturn(List.of());
-
         service.pullOrderTracking(41306L);
 
         assertThat(order.getStatus()).isEqualTo(com.miniandmore.app.domain.enumeration.OrderStatus.FULFILLED);
@@ -1441,8 +1435,6 @@ class ZohoSyncServiceTest {
             .thenReturn(Map.of("salesorder", Map.of("status", "invoiced", "salesorder_number", "SO-45")));
         when(booksClient.listPackagesForSalesOrder("so-package-error", "SO-45"))
             .thenThrow(new RestClientResponseException("Missing scope", 401, "Unauthorized", null, null, null));
-        when(booksClient.listDeliveryChallans("so-package-error")).thenReturn(List.of());
-
         service.pullOrderTracking(41305L);
 
         assertThat(order.getStatus()).isEqualTo(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED);
@@ -1464,8 +1456,6 @@ class ZohoSyncServiceTest {
         when(customerOrderRepository.findById(41303L)).thenReturn(Optional.of(order));
         when(booksClient.getSalesOrder("so-cod-delivered"))
             .thenReturn(Map.of("salesorder", Map.of("status", "fulfilled", "shipment_date", "2026-08-29")));
-        when(booksClient.listDeliveryChallans("so-cod-delivered")).thenReturn(List.of());
-
         service.pullOrderTracking(41303L);
 
         assertThat(order.getStatus()).isEqualTo(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED);

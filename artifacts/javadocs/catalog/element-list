@@ -13,6 +13,7 @@ com.miniandmore.app.service.dto
 com.miniandmore.app.service.mapper
 com.miniandmore.app.util
 com.miniandmore.app.web.rest
+com.miniandmore.app.web.rest.admin
 com.miniandmore.app.web.rest.errors
 com.miniandmore.app.web.rest.internal
 com.miniandmore.app.web.rest.v1

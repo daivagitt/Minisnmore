@@ -233,6 +233,28 @@ class OrderMailServiceTest {
         verify(javaMailSender, never()).createMimeMessage();
     }
 
+    @Test
+    void sendOrderConfirmation_includesSecondAddressLineAndOrderDate() {
+        CustomerOrder order = orderWithAddress()
+            .placedAt(java.time.Instant.parse("2026-08-14T10:00:00Z"))
+            .shippingAddressJson(
+                "{\"full_name\":\"Asha\",\"email\":\"asha@example.com\",\"line1\":\"12 Rose Lane\",\"line2\":\"Near Park\",\"city\":\"Pune\",\"state\":\"MH\",\"pincode\":\"411001\"}"
+            );
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(anyString(), any(Context.class))).thenReturn("content");
+        when(messageSource.getMessage(anyString(), any(), any())).thenReturn("title");
+        when(orderItemRepository.findAllByOrderId(9L)).thenReturn(List.of());
+
+        service.sendOrderConfirmation(order);
+
+        ArgumentCaptor<Context> contextCaptor = ArgumentCaptor.forClass(Context.class);
+        verify(templateEngine).process(eq("mail/orderConfirmationEmail"), contextCaptor.capture());
+        @SuppressWarnings("unchecked")
+        List<String> lines = (List<String>) contextCaptor.getValue().getVariable("addressLines");
+        assertThat(lines).contains("Near Park");
+        assertThat(contextCaptor.getValue().getVariable("orderDate")).isNotEqualTo("");
+    }
+
     private CustomerOrder orderWithAddress() {
         return new CustomerOrder()
             .id(9L)

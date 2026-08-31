@@ -25,7 +25,7 @@ const COLLECTION_LINKS = [
 const QUICK_LINKS = [
   { to: "/privacy" as const, label: "Privacy" },
   { to: "/terms" as const, label: "Terms" },
-  { to: "/shipping" as const, label: "Shipping & returns" },
+  { to: "/shipping" as const, label: "Shipping" },
 ];
 
 type FooterShopLink =

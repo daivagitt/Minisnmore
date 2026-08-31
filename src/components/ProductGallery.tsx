@@ -35,7 +35,7 @@ function uniqueImages(...sources: (string | undefined)[]) {
 function useImageContentBounds() {
   const boundsRef = useRef<Map<string, ImageContentBounds>>(new Map());
   const aspectRef = useRef<Map<string, number>>(new Map());
-  const [, bump] = useState(0);
+  const [revision, bump] = useState(0);
 
   const rememberBounds = useCallback((src: string, img: HTMLImageElement) => {
     const nw = img.naturalWidth;
@@ -88,7 +88,7 @@ function useImageContentBounds() {
     [],
   );
 
-  return { boundsFor, aspectFor, rememberBounds };
+  return { boundsFor, aspectFor, rememberBounds, revision };
 }
 
 type FittedImageProps = {
@@ -181,41 +181,23 @@ type Props = {
 export function ProductGallery({ name, image, gallery = [], className }: Props) {
   const rawImages = useMemo(() => uniqueImages(image, ...gallery), [image, gallery]);
   const rawImagesKey = useMemo(() => rawImages.join("\0"), [rawImages]);
-  const naturalAspectRef = useRef<Map<string, number>>(new Map());
-  const [orientationSorted, setOrientationSorted] = useState(false);
   const [active, setActive] = useState(0);
-  const { boundsFor, aspectFor, rememberBounds } = useImageContentBounds();
+  const { boundsFor, aspectFor, rememberBounds, revision } = useImageContentBounds();
 
   useEffect(() => {
-    naturalAspectRef.current = new Map();
-    setOrientationSorted(false);
-    if (!rawImages.length) {
-      setOrientationSorted(true);
-      return;
-    }
+    if (!rawImages.length) return;
 
     let cancelled = false;
-    let loaded = 0;
-    const total = rawImages.length;
-
-    const markLoaded = () => {
-      loaded += 1;
-      if (!cancelled && loaded >= total) setOrientationSorted(true);
-    };
 
     for (const src of rawImages) {
       const img = new Image();
       img.decoding = "async";
       img.onload = () => {
-        const nw = img.naturalWidth;
-        const nh = img.naturalHeight;
-        if (nw && nh) {
-          naturalAspectRef.current.set(src, nw / nh);
+        if (!cancelled) {
           rememberBounds(src, img);
         }
-        markLoaded();
       };
-      img.onerror = () => markLoaded();
+      img.onerror = () => {};
       img.src = src;
     }
 
@@ -225,9 +207,9 @@ export function ProductGallery({ name, image, gallery = [], className }: Props) 
   }, [rawImagesKey, rememberBounds]);
 
   const images = useMemo(() => {
-    if (!orientationSorted || rawImages.length <= 1) return rawImages;
-    return sortGalleryByLeadingOrientation(rawImages, (src) => naturalAspectRef.current.get(src));
-  }, [rawImages, orientationSorted]);
+    if (rawImages.length <= 1) return rawImages;
+    return sortGalleryByLeadingOrientation(rawImages, aspectFor);
+  }, [rawImages, aspectFor, revision]);
 
   const imagesKey = useMemo(() => images.join("\0"), [images]);
 

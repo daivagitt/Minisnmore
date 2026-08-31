@@ -119,4 +119,53 @@ class ProductDescriptionCodecTest {
     void parseDelimitedOrJson_splitsSemicolonSeparatedValues() {
         assertThat(codec.parseDelimitedOrJson("0-3 M; 3-6 M; 6-12 M")).containsExactly("0-3 M", "3-6 M", "6-12 M");
     }
+
+    @Test
+    void encode_includesStoryAndBadge() {
+        Product product = new Product().story("  Handmade  ").badge(" Limited ").description("");
+
+        String encoded = codec.encode(product, null);
+
+        assertThat(encoded).isEqualTo("Story: Handmade\nBadge: Limited");
+    }
+
+    @Test
+    void decode_blankDescription_returnsEmptyDecoded() {
+        ProductDescriptionCodec.Decoded decoded = codec.decode("   ");
+
+        assertThat(decoded.categoryName()).isNull();
+        assertThat(decoded.sizes()).isEmpty();
+        assertThat(decoded.bodyDescription()).isNull();
+    }
+
+    @Test
+    void decode_invalidCompareAt_ignoresValue() {
+        ProductDescriptionCodec.Decoded decoded = codec.decode("CompareAt: not-a-number\nBody");
+
+        assertThat(decoded.compareAtPrice()).isNull();
+        assertThat(decoded.bodyDescription()).isEqualTo("Body");
+    }
+
+    @Test
+    void applyDecoded_nullDecoded_isNoOp() {
+        Product product = new Product().description("keep");
+
+        codec.applyDecoded(product, null);
+
+        assertThat(product.getDescription()).isEqualTo("keep");
+    }
+
+    @Test
+    void parseDelimitedOrJson_blank_returnsEmptyList() {
+        assertThat(codec.parseDelimitedOrJson("  ")).isEmpty();
+    }
+
+    @Test
+    void encode_metadataOnlyWithoutBody_returnsMetadataLines() {
+        Product product = new Product().fabricType("Cotton").description("");
+
+        String encoded = codec.encode(product, "Essentials");
+
+        assertThat(encoded).isEqualTo("Category: Essentials\nFabric: Cotton");
+    }
 }

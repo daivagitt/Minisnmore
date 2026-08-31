@@ -41,6 +41,9 @@ function Harness() {
       <button onClick={() => auth.completeOAuthSignIn("oauth-token")}>complete oauth</button>
       <button onClick={() => auth.refreshSession()}>refresh</button>
       <button onClick={() => auth.requestPasswordReset("reset@example.com")}>reset password</button>
+      <button onClick={() => auth.resendActivationEmail("activate@example.com")}>resend activation</button>
+      <button onClick={() => auth.resendActivationEmail("  ")}>resend activation empty</button>
+      <button onClick={() => auth.completePasswordReset("reset-key", "new-secret")}>finish reset</button>
     </div>
   );
 }
@@ -145,6 +148,68 @@ describe("useAuth", () => {
       JSON.stringify("reset@example.com"),
       expect.objectContaining({ unwrap: false }),
     );
+  });
+
+  it("resends activation email and validates empty input", async () => {
+    apiMock.post.mockResolvedValueOnce(null);
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await expect(result.current.resendActivationEmail("activate@example.com")).resolves.toEqual({
+      error: null,
+    });
+    expect(apiMock.post).toHaveBeenCalledWith(
+      "/api/account/resend-activation",
+      JSON.stringify("activate@example.com"),
+      expect.objectContaining({
+        unwrap: false,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await expect(result.current.resendActivationEmail("   ")).resolves.toEqual({
+      error: "Enter your email address first.",
+    });
+  });
+
+  it("reports resend activation and password reset API failures", async () => {
+    const { ApiError } = await import("@/lib/api");
+    apiMock.post.mockRejectedValueOnce(new ApiError("Activation email could not be sent"));
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await expect(result.current.resendActivationEmail("activate@example.com")).resolves.toEqual({
+      error: "Activation email could not be sent",
+    });
+
+    apiMock.post.mockRejectedValueOnce(new ApiError("Reset request failed"));
+    await expect(result.current.requestPasswordReset("reset@example.com")).resolves.toEqual({
+      error: "Reset request failed",
+    });
+  });
+
+  it("completes password reset through account API", async () => {
+    apiMock.post.mockResolvedValueOnce(null);
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
+
+    await userEvent.click(screen.getByRole("button", { name: "finish reset" }));
+    expect(apiMock.post).toHaveBeenCalledWith(
+      "/api/account/reset-password/finish",
+      { key: "reset-key", newPassword: "new-secret" },
+      { unwrap: false },
+    );
+  });
+
+  it("reports password reset completion failures", async () => {
+    const { ApiError } = await import("@/lib/api");
+    apiMock.post.mockRejectedValueOnce(new ApiError("Reset key expired"));
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await expect(result.current.completePasswordReset("stale-key", "new-secret")).resolves.toEqual({
+      error: "Reset key expired",
+    });
   });
 
   it("throws when useAuth is called outside AuthProvider", () => {

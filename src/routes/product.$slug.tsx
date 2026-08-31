@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { Product } from "@/data/products";
 import { useProduct, useProducts, useProductsLoaded } from "@/hooks/useProducts";
 import { useShop } from "@/store/shop";
-import { Heart, Truck, Leaf, ChevronRight, Ruler, Plus, Minus, Share2, Banknote, RotateCcw } from "lucide-react";
+import { Heart, Truck, Leaf, ChevronRight, Ruler, Plus, Minus, Share2, Banknote, RotateCcw, X } from "lucide-react";
 import { ProductInfoSections } from "@/components/ProductInfoSections";
 import { toast } from "sonner";
 import { ProductCard } from "@/components/ProductCard";

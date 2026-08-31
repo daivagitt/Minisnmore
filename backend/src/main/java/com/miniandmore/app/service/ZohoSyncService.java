@@ -2948,7 +2948,7 @@ public class ZohoSyncService {
 
     /**
      * Pulls shipment date, carrier, tracking number, and fulfillment status from the linked Zoho
-     * Books sales order (and delivery challans when present).
+     * Books sales order and Inventory packages/shipments.
      */
     public void pullOrderTracking(Long orderId) {
         customerOrderRepository
@@ -2986,11 +2986,6 @@ public class ZohoSyncService {
                                 LOG.debug("Could not fetch Zoho packages for order {}: {}", orderId, e.getMessage());
                             }
                         }
-                    }
-                    try {
-                        ZohoOrderStatus.applyDeliveryChallans(order, booksClient.listDeliveryChallans(salesOrderId));
-                    } catch (RuntimeException e) {
-                        LOG.debug("Could not fetch Zoho delivery challans for order {}: {}", orderId, e.getMessage());
                     }
                     order.setZohoTrackingLastPulledAt(Instant.now());
                     CustomerOrder saved = customerOrderRepository.save(order);

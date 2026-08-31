@@ -168,14 +168,14 @@
         <p>Coupon · Ledgerly sync · inventory · tracking · returns · credit notes</p>
         <div class="meta">
           <span class="meta-chip">Mini&#x27;s n More</span>
-          <span class="meta-chip">Build <code style="background:transparent;color:inherit;padding:0;">202608301131-uat</code></span>
+          <span class="meta-chip">Build <code style="background:transparent;color:inherit;padding:0;">202608310048-uat</code></span>
         </div>
       </header>
       <main class="content">
         
       <section class="panel">
         <h2>Ledgerly scenario integration summary</h2>
-        <p>Target <code>https://uat.minisnmore.com</code> · 2026-08-30T11:35:09.891092+00:00</p>
+        <p>Target <code>https://uat.minisnmore.com</code> · 2026-08-31T00:52:50.474413+00:00</p>
         <p>Status: <span class="status pass">PASS</span> · Payment demo: <code>false</code>
            · Refund demo: <code>false</code></p>
         <div class="stats">
@@ -200,7 +200,7 @@
               <p class="muted">Validate coupon on BASIC SHORTS and create checkout order.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>resolve-product</td><td><span class="status pass">PASS</span></td><td>basic-shorts id=48005 ₹100</td><td>0 ms</td></tr><tr><td>validate-coupon</td><td><span class="status pass">PASS</span></td><td>discount ₹10 on subtotal ₹100 (qty=1)</td><td>953 ms</td></tr><tr><td>create-order</td><td><span class="status pass">PASS</span></td><td>order MNM-DE7E60C68CD9 total ₹91 (demoMode=False)</td><td>485 ms</td></tr></tbody>
+                <tbody><tr><td>resolve-product</td><td><span class="status pass">PASS</span></td><td>basic-shorts id=48005 ₹100</td><td>0 ms</td></tr><tr><td>validate-coupon</td><td><span class="status pass">PASS</span></td><td>discount ₹10 on subtotal ₹100 (qty=1)</td><td>1904 ms</td></tr><tr><td>create-order</td><td><span class="status pass">PASS</span></td><td>order MNM-DA99FBC73FEE total ₹91 (demoMode=False)</td><td>818 ms</td></tr></tbody>
               </table>
             </section>
             
@@ -218,7 +218,7 @@
               <p class="muted">Integration status and live connection test against Ledgerly commerce API.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>integration-status</td><td><span class="status pass">PASS</span></td><td>connected=true</td><td>47 ms</td></tr><tr><td>test-connection</td><td><span class="status pass">PASS</span></td><td>Ledgerly API reachable</td><td>255 ms</td></tr></tbody>
+                <tbody><tr><td>integration-status</td><td><span class="status pass">PASS</span></td><td>connected=true</td><td>81 ms</td></tr><tr><td>test-connection</td><td><span class="status pass">PASS</span></td><td>{&#x27;ok&#x27;: False, &#x27;connected&#x27;: False, &#x27;status&#x27;: 401, &#x27;message&#x27;: &#x27;Ledgerly rejected the API token (HTTP 401). Generate a new </td><td>178 ms</td></tr></tbody>
               </table>
             </section>
             
@@ -227,7 +227,7 @@
               <p class="muted">Admin sync after payment; falls back to a known synced reference order when checkout is unpaid.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>sync-order</td><td><span class="status fail">SKIP</span></td><td>checkout order unpaid — using reference order MNM-0FB910FDBC4D</td><td>0 ms</td></tr><tr><td>sync-order</td><td><span class="status pass">PASS</span></td><td>sync exercised on reference MNM-0FB910FDBC4D (status=FAILED)</td><td>283 ms</td></tr><tr><td>verify-sync-status</td><td><span class="status pass">PASS</span></td><td>reference order MNM-0FB910FDBC4D reachable (payment=confirmed)</td><td>115 ms</td></tr></tbody>
+                <tbody><tr><td>sync-order</td><td><span class="status fail">SKIP</span></td><td>checkout order unpaid — using reference order MNM-0FB910FDBC4D</td><td>0 ms</td></tr><tr><td>sync-order</td><td><span class="status pass">PASS</span></td><td>sync exercised on reference MNM-0FB910FDBC4D (status=FAILED)</td><td>138 ms</td></tr><tr><td>verify-sync-status</td><td><span class="status pass">PASS</span></td><td>reference order MNM-0FB910FDBC4D reachable (payment=confirmed)</td><td>112 ms</td></tr></tbody>
               </table>
             </section>
             
@@ -236,7 +236,7 @@
               <p class="muted">Live inventory pull updates catalog stock from Ledgerly.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>pull-inventory</td><td><span class="status pass">PASS</span></td><td>ok</td><td>293 ms</td></tr></tbody>
+                <tbody><tr><td>pull-inventory</td><td><span class="status pass">PASS</span></td><td>ok</td><td>99 ms</td></tr></tbody>
               </table>
             </section>
             
@@ -245,7 +245,7 @@
               <p class="muted">Pull order tracking from Ledgerly and verify public track API on a known shipped order.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>pull-tracking</td><td><span class="status pass">PASS</span></td><td>tracking pull completed</td><td>481 ms</td></tr><tr><td>public-track-shipped-ref</td><td><span class="status pass">PASS</span></td><td>MNM-2606-A4A0B → delivered</td><td>41 ms</td></tr></tbody>
+                <tbody><tr><td>pull-tracking</td><td><span class="status pass">PASS</span></td><td>tracking pull completed</td><td>163 ms</td></tr><tr><td>public-track-shipped-ref</td><td><span class="status pass">PASS</span></td><td>MNM-2606-A4A0B → delivered</td><td>64 ms</td></tr></tbody>
               </table>
             </section>
             
@@ -263,7 +263,7 @@
               <p class="muted">GET /api/v1/orders/track/{orderNumber} — delivery timeline only; no JWT required.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>shipped-order</td><td><span class="status pass">PASS</span></td><td>MNM-2606-A4A0B → delivered</td><td>42 ms</td></tr><tr><td>returned-order</td><td><span class="status pass">PASS</span></td><td>MNM-2606-86EA3 shipment_date=2026-06-06</td><td>40 ms</td></tr><tr><td>checkout-order</td><td><span class="status pass">PASS</span></td><td>MNM-DE7E60C68CD9 → pending (public fields OK)</td><td>41 ms</td></tr><tr><td>unknown-order</td><td><span class="status pass">PASS</span></td><td>404 for invalid order number</td><td>83 ms</td></tr></tbody>
+                <tbody><tr><td>shipped-order</td><td><span class="status pass">PASS</span></td><td>MNM-2606-A4A0B → delivered</td><td>100 ms</td></tr><tr><td>returned-order</td><td><span class="status pass">PASS</span></td><td>MNM-2606-86EA3 shipment_date=2026-06-06</td><td>87 ms</td></tr><tr><td>checkout-order</td><td><span class="status pass">PASS</span></td><td>MNM-DA99FBC73FEE → pending (public fields OK)</td><td>68 ms</td></tr><tr><td>unknown-order</td><td><span class="status pass">PASS</span></td><td>404 for invalid order number</td><td>125 ms</td></tr></tbody>
               </table>
             </section>
             
@@ -272,7 +272,7 @@
               <p class="muted">Regression checks on orders from manual scenario runs — no mutations.</p>
               <table class="data">
                 <thead><tr><th>Step</th><th>Status</th><th>Note</th><th>Time</th></tr></thead>
-                <tbody><tr><td>shipped-order-track</td><td><span class="status pass">PASS</span></td><td>MNM-2606-A4A0B → delivered</td><td>42 ms</td></tr><tr><td>returned-order-track</td><td><span class="status pass">PASS</span></td><td>MNM-2606-86EA3 shipment_date=2026-06-06</td><td>37 ms</td></tr></tbody>
+                <tbody><tr><td>shipped-order-track</td><td><span class="status pass">PASS</span></td><td>MNM-2606-A4A0B → delivered</td><td>84 ms</td></tr><tr><td>returned-order-track</td><td><span class="status pass">PASS</span></td><td>MNM-2606-86EA3 shipment_date=2026-06-06</td><td>49 ms</td></tr></tbody>
               </table>
             </section>
             

@@ -5,7 +5,7 @@ import { AccountDataProvider } from "@/lib/account";
 import newbornBaby from "@/assets/cat-newborn.webp";
 import {
   Loader2, LayoutDashboard, Package, User as UserIcon, CreditCard, LogOut,
-  Heart, ShoppingBag, MapPin, Truck, RotateCcw, Bell,
+  Heart, ShoppingBag, MapPin, Truck, Bell,
 } from "lucide-react";
 
 export const Route = createFileRoute("/account")({
@@ -33,7 +33,6 @@ const navGroups: { label: string; items: { to: string; label: string; icon: any;
     items: [
       { to: "/account/orders", label: "My Orders", icon: Package },
       { to: "/account/track", label: "Track Order", icon: Truck },
-      { to: "/account/returns", label: "Returns & Refunds", icon: RotateCcw },
     ],
   },
   {

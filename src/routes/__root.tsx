@@ -1,4 +1,5 @@
 import { Outlet, createRootRoute, HeadContent, Scripts, Link, useRouterState } from "@tanstack/react-router";
+import { useEffect } from "react";
 import appCss from "../styles.css?url";
 import { ShopProvider } from "@/store/shop";
 import { AuthProvider } from "@/hooks/useAuth";
@@ -79,6 +80,33 @@ function RootComponent() {
   const isAdmin = pathname.startsWith("/admin");
   const isCustomerInvoice = /^\/account\/orders\/[^/]+\/invoice$/.test(pathname);
   const isInvoice = isCustomerInvoice || /^\/admin\/orders\/[^/]+\/invoice$/.test(pathname);
+
+  useEffect(() => {
+    const reloadKey = "mini:chunk-reload-attempted";
+    const clearReloadFlag = window.setTimeout(() => sessionStorage.removeItem(reloadKey), 5000);
+    const isChunkLoadError = (value: unknown) => {
+      const message = value instanceof Error ? value.message : String(value ?? "");
+      return /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(message);
+    };
+    const reloadOnce = () => {
+      if (sessionStorage.getItem(reloadKey) === "1") return;
+      sessionStorage.setItem(reloadKey, "1");
+      window.location.reload();
+    };
+    const onRejection = (event: PromiseRejectionEvent) => {
+      if (isChunkLoadError(event.reason)) reloadOnce();
+    };
+    const onError = (event: ErrorEvent) => {
+      if (isChunkLoadError(event.error ?? event.message)) reloadOnce();
+    };
+    window.addEventListener("unhandledrejection", onRejection);
+    window.addEventListener("error", onError);
+    return () => {
+      window.clearTimeout(clearReloadFlag);
+      window.removeEventListener("unhandledrejection", onRejection);
+      window.removeEventListener("error", onError);
+    };
+  }, []);
 
   return (
     <AuthProvider>

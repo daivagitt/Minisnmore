@@ -73,6 +73,8 @@ const OPEN_RETURN_STATUSES = new Set([
   "failed",
 ]);
 
+const RETURNS_UI_ENABLED = false;
+
 export const Route = createFileRoute("/account/orders/$orderNumber")({
   validateSearch: (search: Record<string, unknown>) => ({
     pay: search.pay === "1" || search.pay === 1 || search.pay === true,
@@ -116,7 +118,7 @@ function OrderDetail() {
   const exchangeProduct = useProduct(exchangeItem?.product_slug);
 
   const loadReturnsInfo = useCallback(async () => {
-    if (!orderNumber) return;
+    if (!RETURNS_UI_ENABLED || !orderNumber) return;
     try {
       const [returnsRes, eligRes] = await Promise.all([
         listMyOrderReturns(),
@@ -299,7 +301,7 @@ function OrderDetail() {
       setCancelDialogOpen(false);
       setCancelReason("");
       toast.success(
-        wasPaid ? "Order cancelled. Your refund has been initiated." : "Order cancelled.",
+        wasPaid ? "Order cancelled." : "Order cancelled.",
       );
       await refresh({ silent: true });
     } catch (e: any) {
@@ -408,7 +410,7 @@ function OrderDetail() {
               <p className="text-sm text-muted-foreground mt-1">
                 You can cancel while this order has not shipped yet.
                 {order.payment_status === "paid"
-                  ? " A refund will be initiated to your original payment method."
+                  ? ""
                   : " No payment will be charged."}
               </p>
             </div>
@@ -432,7 +434,7 @@ function OrderDetail() {
               <div className="text-sm font-medium">This order has been cancelled</div>
               <p className="text-sm text-muted-foreground mt-1">
                 {order.payment_status === "refunded"
-                  ? "Your refund has been initiated to the original payment method."
+                  ? "No payment is due for this order."
                   : "No payment is due for this order."}
               </p>
               {order.cancellation_reason && (
@@ -493,7 +495,7 @@ function OrderDetail() {
         </div>
       )}
 
-      {order.payment_status === "paid" && (
+      {RETURNS_UI_ENABLED && order.payment_status === "paid" && (
         <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 md:p-8">
           <h2 className="font-display text-lg sm:text-xl mb-3 flex items-center gap-2">
             <RotateCcw className="h-5 w-5 text-primary shrink-0" /> Returns &amp; exchange
@@ -543,6 +545,7 @@ function OrderDetail() {
             {order.order_items?.map((it: any) => {
               const openExchange = it.id != null ? openExchangeByItemId.get(it.id) : undefined;
               const canExchange =
+                RETURNS_UI_ENABLED &&
                 order.payment_status === "paid" &&
                 eligibility?.eligible &&
                 !openWholeOrderReturn &&
@@ -732,7 +735,7 @@ function OrderDetail() {
             <AlertDialogDescription>
               This cannot be undone. The items will be released back to stock
               {order.payment_status === "paid" &&
-                " and your payment will be refunded to the original method"}
+                ""}
               .
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -766,6 +769,7 @@ function OrderDetail() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {RETURNS_UI_ENABLED && (
       <Dialog
         open={returnDialogOpen}
         onOpenChange={(open) => {
@@ -802,7 +806,9 @@ function OrderDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      )}
 
+      {RETURNS_UI_ENABLED && (
       <Dialog open={!!exchangeItem} onOpenChange={(open) => !open && setExchangeItem(null)}>
         <DialogContent>
           <DialogHeader>
@@ -842,6 +848,7 @@ function OrderDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      )}
     </div>
   );
 }

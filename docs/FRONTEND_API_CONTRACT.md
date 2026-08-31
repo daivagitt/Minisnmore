@@ -36,6 +36,7 @@ The frontend `api` client unwraps `data` by default.
 | `getPolicy` | GET `/api/v1/policies/{slug}` |
 | `lookupPincode` | GET `/api/v1/pincode/{pincode}` |
 | `validateCoupon` | POST `/api/v1/coupons/validate` |
+| `getActiveCoupons` | GET `/api/v1/coupons/active` |
 | `trackOrderPublic` | GET `/api/v1/orders/track/{orderNumber}` |
 
 ### Site settings JSON (camelCase in `data`)
@@ -49,12 +50,20 @@ Subscribe CMS fields: `subscribeHeroTitle`, … or snake_case on `/subscribe-pag
 | Frontend | Path |
 |----------|------|
 | `getMyProfile` / `updateMyProfile` | GET/PUT `/api/v1/account/profile` → `full_name`, `phone` |
+| `bootstrapProfile` | POST `/api/v1/account/profile/bootstrap` |
+| `getNotifications` | GET `/api/v1/account/notifications` |
+| Addresses | GET/POST `/api/v1/account/addresses`, PUT/DELETE `/api/v1/account/addresses/{id}`, PUT `/api/v1/account/addresses/{id}/default`, POST `/api/v1/account/addresses/sync` |
+| Wishlist | GET `/api/v1/account/wishlist`, POST `/api/v1/account/wishlist/items`, DELETE `/api/v1/account/wishlist/items/{productId}`, POST `/api/v1/account/wishlist/sync`, PUT `/api/v1/account/wishlist` |
+| Cart | GET/PUT `/api/v1/account/cart` → `{ items, coupon }` |
 | `createOrder` | POST `/api/v1/orders` |
 | `verifyPayment` | POST `/api/v1/orders/verify-payment` (`orderId`, `razorpay_*`) |
+| `syncPayment` | POST `/api/v1/orders/sync-payment` |
+| `retryPayment` | POST `/api/v1/orders/retry-payment` |
 | `listMyOrders` | GET `/api/v1/orders` → `{ orders: [...] }` |
 | `getOrder` | GET `/api/v1/orders/{orderNumber}` |
+| `cancelOrder` | POST `/api/v1/orders/{orderNumber}/cancel` |
 | `listMyPayments` | GET `/api/v1/payments` |
-| Order returns | `/api/v1/order-returns/*` |
+| Order returns | GET/POST `/api/v1/order-returns`, POST `/api/v1/order-returns/exchange`, GET `/api/v1/order-returns/config`, GET `/api/v1/order-returns/exchange-availability/{orderItemId}`, POST `/api/v1/order-returns/{returnNumber}/cancel`, GET `/api/v1/order-returns/eligibility/{orderNumber}` |
 
 **Order & return JSON (snake_case payloads, field tables, examples):** [order-return-json-contract.md](./order-return-json-contract.md)
 
@@ -64,9 +73,11 @@ Subscribe CMS fields: `subscribeHeroTitle`, … or snake_case on `/subscribe-pag
 |----------|-------------|
 | `backend-data.ts` CRUD | `/api/v1/admin/{categories,products,...}` |
 | Ledgerly | `/api/v1/admin/ledgerly/*` (settings at `/api/v1/admin/ledgerly/settings`) |
+| Zoho Books | `/api/v1/admin/zoho/*`, settings at `/api/v1/admin/zoho-settings` |
 | Uploads | `/api/v1/admin/uploads`, `/presign` |
 | Dashboard | GET `/api/v1/admin/dashboard` |
-| Returns | `/api/v1/admin/order-returns/*` |
+| Returns | `/api/v1/admin/order-returns/*` (full workflow — see [api-schema.md](./api-schema.md)) |
+| Orders | `/api/v1/admin/orders/*` (list, detail, COD collection) |
 
 ## DTO naming
 
