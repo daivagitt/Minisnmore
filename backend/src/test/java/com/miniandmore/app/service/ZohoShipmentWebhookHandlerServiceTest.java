@@ -210,7 +210,6 @@ class ZohoShipmentWebhookHandlerServiceTest {
     @Test
     void handle_orderReferenceWithoutShipmentSignal_throwsBadRequest() {
         String body = "{\"eventId\":\"evt-ship-9\",\"zohoSalesOrderId\":\"so-9\"}";
-        when(webhookEventRepository.existsByEventId("evt-ship-9")).thenReturn(false);
 
         assertThatThrownBy(() -> handler.handle(body, null, SECRET))
             .isInstanceOf(ResponseStatusException.class)

@@ -12,11 +12,19 @@ spring:
             - id: miniandmore-zoho-stock-webhooks
               uri: http://127.0.0.1:8084
               predicates:
-                - Path=/internal/v1/zoho/stock-webhook
+                - Path=/internal/v1/zoho/stock-webhook,/api/v1/zoho/stock-webhook
             - id: miniandmore-zoho-shipment-webhooks
               uri: http://127.0.0.1:8084
               predicates:
-                - Path=/internal/v1/zoho/shipment-webhook
+                - Path=/internal/v1/zoho/shipment-webhook,/api/v1/zoho/shipment-webhook
+            - id: miniandmore-zoho-item-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/zoho/item-webhook,/api/v1/zoho/item-webhook
+            - id: miniandmore-zoho-order-status-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/zoho/order-status-webhook,/api/v1/zoho/order-status-webhook
             - id: miniandmore-ledgerly-api
               uri: http://127.0.0.1:8081
               predicates:

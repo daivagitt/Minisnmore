@@ -227,6 +227,12 @@ public class ApplicationProperties {
         /** HMAC-SHA256 secret accepted by the shipment/package webhook endpoint. */
         private String shipmentWebhookSecret;
 
+        /** HMAC-SHA256 secret accepted by the catalog item webhook endpoint. */
+        private String itemWebhookSecret;
+
+        /** HMAC-SHA256 secret accepted by the sales-order status webhook endpoint. */
+        private String orderStatusWebhookSecret;
+
         // Zoho tax_id for the org's 5% GST rate (Settings > Taxes in Zoho Books). When set, it is
         // attached to pushed items (so Zoho auto-applies it, splitting CGST+SGST or IGST per
         // place_of_supply) and to the COD handling fee line, which has no item_id to inherit from.
@@ -317,6 +323,22 @@ public class ApplicationProperties {
 
         public void setShipmentWebhookSecret(String shipmentWebhookSecret) {
             this.shipmentWebhookSecret = shipmentWebhookSecret;
+        }
+
+        public String getItemWebhookSecret() {
+            return itemWebhookSecret;
+        }
+
+        public void setItemWebhookSecret(String itemWebhookSecret) {
+            this.itemWebhookSecret = itemWebhookSecret;
+        }
+
+        public String getOrderStatusWebhookSecret() {
+            return orderStatusWebhookSecret;
+        }
+
+        public void setOrderStatusWebhookSecret(String orderStatusWebhookSecret) {
+            this.orderStatusWebhookSecret = orderStatusWebhookSecret;
         }
 
         public String getGstTaxId() {

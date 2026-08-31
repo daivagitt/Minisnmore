@@ -22,6 +22,13 @@ public class SecurityConfiguration {
                 authz
                     .requestMatchers("/internal/v1/**")
                     .permitAll()
+                    .requestMatchers(
+                        "/api/v1/zoho/stock-webhook",
+                        "/api/v1/zoho/shipment-webhook",
+                        "/api/v1/zoho/item-webhook",
+                        "/api/v1/zoho/order-status-webhook"
+                    )
+                    .permitAll()
                     .requestMatchers("/api/v1/admin/**")
                     .hasAuthority(ADMIN)
                     .requestMatchers("/v3/api-docs", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")

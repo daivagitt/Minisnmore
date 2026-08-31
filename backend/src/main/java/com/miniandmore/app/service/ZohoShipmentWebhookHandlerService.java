@@ -154,7 +154,16 @@ public class ZohoShipmentWebhookHandlerService {
         copyFirst(normalized, "salesorder_id", sources, "salesorder_id", "zohoSalesOrderId", "zoho_sales_order_id");
         copyFirst(normalized, "salesorder_number", sources, "salesorder_number", "salesorderNumber", "orderNumber", "order_number");
         copyFirst(normalized, "package_id", sources, "package_id", "packageId");
-        copyFirst(normalized, "shipment_id", sources, "shipment_id", "shipmentId", "shipmentorder_id", "shipmentOrderId");
+        copyFirst(
+            normalized,
+            "shipment_id",
+            sources,
+            "shipment_id",
+            "shipmentId",
+            "shipment_order_id",
+            "shipmentorder_id",
+            "shipmentOrderId"
+        );
         copyFirst(normalized, "tracking_number", sources, "tracking_number", "trackingNumber", "reference_number");
         copyFirst(normalized, "carrier", sources, "carrier", "delivery_method", "deliveryMethod");
         copyFirst(normalized, "delivery_method", sources, "delivery_method", "deliveryMethod", "carrier");

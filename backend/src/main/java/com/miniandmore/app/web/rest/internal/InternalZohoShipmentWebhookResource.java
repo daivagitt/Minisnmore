@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/internal/v1/zoho")
+@RequestMapping({ "/internal/v1/zoho", "/api/v1/zoho" })
 public class InternalZohoShipmentWebhookResource {
 
     private final ZohoShipmentWebhookHandlerService webhookHandlerService;
