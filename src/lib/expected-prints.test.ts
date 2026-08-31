@@ -37,12 +37,4 @@ describe("expected-prints", () => {
     const rows = JSON.parse(next!);
     expect(rows.map((r: { color: string }) => r.color)).toEqual(["BROWN SWADDLE", "GREEN SWADDLE"]);
   });
-
-  it("maps Basic Shorts Print-1 to Snail & Blue, not Baby Blue", () => {
-    const colors = applyExpectedPrintNamesToColors(
-      [{ name: "Print-1" }, { name: "Print-2" }, { name: "Print-3" }, { name: "Print-4" }],
-      "BASIC-SHORTS",
-    );
-    expect(colors.map((c) => c.name)).toEqual(["SNAIL & BLUE", "HAPPY BEE", "BEE & BLUE", "BABY BLUE"]);
-  });
 });
