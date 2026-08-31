@@ -59,6 +59,9 @@ public class ZohoShipmentWebhookHandlerService {
 
         Map<String, Object> data = eventData(payload);
         Map<String, Object> packageLike = normalizePackagePayload(data);
+        if (!hasShipmentSignal(packageLike)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing shipment/package fields");
+        }
         String zohoSalesOrderId = firstNonBlank(
             stringValue(packageLike.get("salesorder_id")),
             stringValue(data.get("zohoSalesOrderId")),
@@ -116,12 +119,11 @@ public class ZohoShipmentWebhookHandlerService {
 
     private CustomerOrder findOrder(String zohoSalesOrderId, String salesorderNumber) {
         if (StringUtils.isNotBlank(zohoSalesOrderId)) {
-            return customerOrderRepository
-                .findOneByZohoSalesOrderId(zohoSalesOrderId.trim())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No order for Zoho sales order " + zohoSalesOrderId));
+            return customerOrderRepository.findOneByZohoSalesOrderId(zohoSalesOrderId.trim()).or(() -> findByOrderNumber(salesorderNumber)).orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No order for Zoho sales order " + zohoSalesOrderId)
+            );
         }
-        return customerOrderRepository
-            .findOneByOrderNumber(salesorderNumber.trim())
+        return findByOrderNumber(salesorderNumber)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No order for " + salesorderNumber));
     }
 
@@ -129,7 +131,9 @@ public class ZohoShipmentWebhookHandlerService {
     private static Map<String, Object> eventData(Map<String, Object> payload) {
         Object data = payload.get("data");
         if (data instanceof Map<?, ?> map) {
-            return (Map<String, Object>) map;
+            Map<String, Object> merged = new LinkedHashMap<>(payload);
+            merged.putAll((Map<String, Object>) map);
+            return merged;
         }
         return payload;
     }
@@ -145,18 +149,19 @@ public class ZohoShipmentWebhookHandlerService {
             }
         }
 
+        List<Map<String, Object>> sources = source == data ? List.of(source) : List.of(source, data);
         Map<String, Object> normalized = new LinkedHashMap<>(source);
-        copyFirst(normalized, "salesorder_id", source, "salesorder_id", "zohoSalesOrderId", "zoho_sales_order_id");
-        copyFirst(normalized, "salesorder_number", source, "salesorder_number", "salesorderNumber", "orderNumber", "order_number");
-        copyFirst(normalized, "package_id", source, "package_id", "packageId");
-        copyFirst(normalized, "shipment_id", source, "shipment_id", "shipmentId", "shipmentorder_id", "shipmentOrderId");
-        copyFirst(normalized, "tracking_number", source, "tracking_number", "trackingNumber", "reference_number");
-        copyFirst(normalized, "carrier", source, "carrier", "delivery_method", "deliveryMethod");
-        copyFirst(normalized, "delivery_method", source, "delivery_method", "deliveryMethod", "carrier");
-        copyFirst(normalized, "shipment_date", source, "shipment_date", "shipmentDate", "date");
-        copyFirst(normalized, "status", source, "status", "shipment_status", "shipmentStatus");
-        copyFirst(normalized, "detailed_status", source, "detailed_status", "detailedStatus");
-        copyFirst(normalized, "status_message", source, "status_message", "statusMessage");
+        copyFirst(normalized, "salesorder_id", sources, "salesorder_id", "zohoSalesOrderId", "zoho_sales_order_id");
+        copyFirst(normalized, "salesorder_number", sources, "salesorder_number", "salesorderNumber", "orderNumber", "order_number");
+        copyFirst(normalized, "package_id", sources, "package_id", "packageId");
+        copyFirst(normalized, "shipment_id", sources, "shipment_id", "shipmentId", "shipmentorder_id", "shipmentOrderId");
+        copyFirst(normalized, "tracking_number", sources, "tracking_number", "trackingNumber", "reference_number");
+        copyFirst(normalized, "carrier", sources, "carrier", "delivery_method", "deliveryMethod");
+        copyFirst(normalized, "delivery_method", sources, "delivery_method", "deliveryMethod", "carrier");
+        copyFirst(normalized, "shipment_date", sources, "shipment_date", "shipmentDate", "date");
+        copyFirst(normalized, "status", sources, "status", "shipment_status", "shipmentStatus");
+        copyFirst(normalized, "detailed_status", sources, "detailed_status", "detailedStatus");
+        copyFirst(normalized, "status_message", sources, "status_message", "statusMessage");
         return normalized;
     }
 
@@ -173,12 +178,37 @@ public class ZohoShipmentWebhookHandlerService {
         }
     }
 
-    private static void copyFirst(Map<String, Object> target, String targetKey, Map<String, Object> source, String... sourceKeys) {
-        for (String sourceKey : sourceKeys) {
-            Object value = source.get(sourceKey);
-            if (StringUtils.isNotBlank(stringValue(value))) {
-                target.put(targetKey, value);
-                return;
+    private java.util.Optional<CustomerOrder> findByOrderNumber(String salesorderNumber) {
+        String trimmed = StringUtils.trimToNull(salesorderNumber);
+        if (trimmed == null) {
+            return java.util.Optional.empty();
+        }
+        return customerOrderRepository.findOneByOrderNumber(trimmed);
+    }
+
+    private static boolean hasShipmentSignal(Map<String, Object> packageLike) {
+        return firstNonBlank(
+                stringValue(packageLike.get("package_id")),
+                stringValue(packageLike.get("shipment_id")),
+                stringValue(packageLike.get("tracking_number")),
+                stringValue(packageLike.get("carrier")),
+                stringValue(packageLike.get("delivery_method")),
+                stringValue(packageLike.get("shipment_date")),
+                stringValue(packageLike.get("status")),
+                stringValue(packageLike.get("detailed_status")),
+                stringValue(packageLike.get("status_message"))
+            ) !=
+            null;
+    }
+
+    private static void copyFirst(Map<String, Object> target, String targetKey, List<Map<String, Object>> sources, String... sourceKeys) {
+        for (Map<String, Object> source : sources) {
+            for (String sourceKey : sourceKeys) {
+                Object value = source.get(sourceKey);
+                if (StringUtils.isNotBlank(stringValue(value))) {
+                    target.put(targetKey, value);
+                    return;
+                }
             }
         }
     }

@@ -125,6 +125,38 @@ class ZohoShipmentWebhookHandlerServiceTest {
     }
 
     @Test
+    void handle_topLevelOrderReferenceWithNestedShipment_preservesTopLevelContext() {
+        String body =
+            "{\"eventId\":\"evt-ship-7\",\"zohoSalesOrderId\":\"so-7\",\"data\":{\"shipment\":{\"shipment_id\":\"ship-7\"," +
+            "\"status\":\"delivered\",\"tracking_number\":\"AWB-7\"}}}";
+        CustomerOrder order = order("MNM-7", "so-7", OrderStatus.HAND_WRAPPED);
+        when(webhookEventRepository.existsByEventId("evt-ship-7")).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-7")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        handler.handle(body, sign(body));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(order.getTrackingNumber()).isEqualTo("AWB-7");
+    }
+
+    @Test
+    void handle_unknownZohoSalesOrderId_fallsBackToSalesOrderNumber() {
+        String body =
+            "{\"eventId\":\"evt-ship-8\",\"zohoSalesOrderId\":\"so-not-yet-stored\",\"salesorder_number\":\"MNM-8\"," +
+            "\"package_id\":\"pkg-8\"}";
+        CustomerOrder order = order("MNM-8", null, OrderStatus.CONFIRMED);
+        when(webhookEventRepository.existsByEventId("evt-ship-8")).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-not-yet-stored")).thenReturn(Optional.empty());
+        when(customerOrderRepository.findOneByOrderNumber("MNM-8")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        handler.handle(body, sign(body));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.HAND_WRAPPED);
+    }
+
+    @Test
     void handle_missingSignature_throwsUnauthorized() {
         String body = "{\"eventId\":\"evt-ship-5\",\"zohoSalesOrderId\":\"so-5\"}";
 
@@ -141,6 +173,18 @@ class ZohoShipmentWebhookHandlerServiceTest {
         assertThatThrownBy(() -> handler.handle(body, sign(body)))
             .isInstanceOf(ResponseStatusException.class)
             .hasMessageContaining("Provide zohoSalesOrderId or salesorder_number");
+    }
+
+    @Test
+    void handle_orderReferenceWithoutShipmentSignal_throwsBadRequest() {
+        String body = "{\"eventId\":\"evt-ship-9\",\"zohoSalesOrderId\":\"so-9\"}";
+        when(webhookEventRepository.existsByEventId("evt-ship-9")).thenReturn(false);
+
+        assertThatThrownBy(() -> handler.handle(body, sign(body)))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Missing shipment/package fields");
+
+        verify(customerOrderRepository, never()).findOneByZohoSalesOrderId(any());
     }
 
     private void verifySavedEvent(String eventId, String zohoSalesOrderId, String packageId, String shipmentId, String status) {
