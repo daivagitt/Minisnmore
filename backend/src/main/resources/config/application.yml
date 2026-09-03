@@ -259,6 +259,7 @@ application:
     shipment-webhook-secret: ${ZOHO_SHIPMENT_WEBHOOK_SECRET:}
     item-webhook-secret: ${ZOHO_ITEM_WEBHOOK_SECRET:}
     order-status-webhook-secret: ${ZOHO_ORDER_STATUS_WEBHOOK_SECRET:}
+    invoice-webhook-secret: ${ZOHO_INVOICE_WEBHOOK_SECRET:}
     gst-tax-id: ${ZOHO_GST_TAX_ID:}
     product-fields:
       fabric-type-label: ${ZOHO_FIELD_FABRIC_TYPE:Fabric Type}
@@ -270,6 +271,7 @@ application:
     order-retry:
       fixed-delay-ms: ${ZOHO_ORDER_RETRY_FIXED_DELAY_MS:600000}
     order-tracking:
+      enabled: ${ZOHO_ORDER_TRACKING_ENABLED:true}
       fixed-delay-ms: ${ZOHO_ORDER_TRACKING_FIXED_DELAY_MS:900000}
     oauth:
       homepage-url: ${ZOHO_OAUTH_HOMEPAGE_URL:http://localhost:5173}

@@ -3,6 +3,8 @@ package com.miniandmore.app.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.client.XpressBeesClient;
+import com.miniandmore.app.domain.SiteSetting;
+import com.miniandmore.app.repository.SiteSettingRepository;
 import com.miniandmore.app.service.dto.PincodeLookupDTO;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -21,7 +23,6 @@ public class PincodeLookupService {
 
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(8);
     private static final String USER_AGENT = "MiniSnMore/1.0 (+https://minisnmore.com)";
-    private static final int DELIVERY_ETA_BUFFER_DAYS = 3;
     private static final Pattern ETA_DAY_PATTERN = Pattern.compile("(\\d+)");
     private static final List<String> METRO_NAMES = List.of(
         "Mumbai",
@@ -37,10 +38,16 @@ public class PincodeLookupService {
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final XpressBeesClient xpressBeesClient;
+    private final SiteSettingRepository siteSettingRepository;
 
-    public PincodeLookupService(ObjectMapper objectMapper, XpressBeesClient xpressBeesClient) {
+    public PincodeLookupService(
+        ObjectMapper objectMapper,
+        XpressBeesClient xpressBeesClient,
+        SiteSettingRepository siteSettingRepository
+    ) {
         this.objectMapper = objectMapper;
         this.xpressBeesClient = xpressBeesClient;
+        this.siteSettingRepository = siteSettingRepository;
         this.httpClient = HttpClient
             .newBuilder()
             .connectTimeout(REQUEST_TIMEOUT)
@@ -64,16 +71,25 @@ public class PincodeLookupService {
     }
 
     private PincodeLookupDTO withDeliveryBuffer(PincodeLookupDTO dto) {
-        return new PincodeLookupDTO(dto.city(), dto.state(), adjustEtaWithBuffer(dto.eta()));
+        return new PincodeLookupDTO(dto.city(), dto.state(), adjustEtaWithBuffer(dto.eta(), resolveBufferDays()));
     }
 
-    static String adjustEtaWithBuffer(String eta) {
+    private int resolveBufferDays() {
+        return siteSettingRepository
+            .findFirstByOrderByIdAsc()
+            .map(SiteSetting::getDeliveryEtaBufferDays)
+            .filter(days -> days != null && days >= 0 && days <= SiteSetting.MAX_DELIVERY_ETA_BUFFER_DAYS)
+            .orElse(SiteSetting.DEFAULT_DELIVERY_ETA_BUFFER_DAYS);
+    }
+
+    static String adjustEtaWithBuffer(String eta, int bufferDays) {
         if (eta == null || eta.isBlank()) {
             return eta;
         }
+        int safeBuffer = Math.min(SiteSetting.MAX_DELIVERY_ETA_BUFFER_DAYS, Math.max(0, bufferDays));
         String trimmed = eta.trim();
         if ("Same day".equalsIgnoreCase(trimmed)) {
-            return formatBufferedDays(DELIVERY_ETA_BUFFER_DAYS);
+            return formatBufferedDays(safeBuffer);
         }
         Matcher matcher = ETA_DAY_PATTERN.matcher(trimmed);
         if (!matcher.find()) {
@@ -82,7 +98,7 @@ public class PincodeLookupService {
         List<Integer> adjusted = new ArrayList<>();
         matcher.reset();
         while (matcher.find()) {
-            adjusted.add(Integer.parseInt(matcher.group(1)) + DELIVERY_ETA_BUFFER_DAYS);
+            adjusted.add(Integer.parseInt(matcher.group(1)) + safeBuffer);
         }
         if (adjusted.size() >= 2) {
             return adjusted.get(0) + "–" + adjusted.get(1) + " days";
@@ -93,6 +109,9 @@ public class PincodeLookupService {
     private static String formatBufferedDays(int days) {
         if (days == 1) {
             return "1 day";
+        }
+        if (days == 0) {
+            return "Same day";
         }
         return days + " days";
     }

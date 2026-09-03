@@ -3,11 +3,13 @@ import type { CartItem } from "@/store/shop";
 import { galleryForSelectedColor } from "@/lib/product-gallery";
 import { resolveStorefrontColorLabel } from "@/lib/expected-prints";
 import { FIT_LIMITS } from "@/lib/product-fit";
+import { roundInr } from "@/lib/money";
 import {
   findVariant,
   isSimpleProductSellable,
   isVariantSellable,
   isVariantsProduct,
+  lineUnitMrp,
   lineUnitPrice,
 } from "@/lib/product-variants";
 
@@ -123,6 +125,35 @@ export function cartsEqual(a: CartItem[], b: CartItem[]): boolean {
     if (!other || other.qty !== item.qty || other.unitPrice !== item.unitPrice) return false;
   }
   return true;
+}
+
+export type CartPricingTotals = {
+  subtotal: number;
+  mrpTotal: number;
+  productDiscount: number;
+};
+
+/** MRP, store discount, and selling subtotal for cart / checkout summaries. */
+export function cartPricingTotals(cart: CartItem[]): CartPricingTotals {
+  let subtotal = 0;
+  let mrpTotal = 0;
+  for (const item of cart) {
+    const unitPrice = item.unitPrice;
+    const unitMrp = lineUnitMrp(item.product, {
+      size: item.size,
+      color: item.color,
+      sku: item.variantSku,
+    });
+    subtotal += roundInr(item.qty * unitPrice);
+    mrpTotal += roundInr(item.qty * unitMrp);
+  }
+  subtotal = roundInr(subtotal);
+  mrpTotal = roundInr(mrpTotal);
+  return {
+    subtotal,
+    mrpTotal,
+    productDiscount: roundInr(Math.max(0, mrpTotal - subtotal)),
+  };
 }
 
 export function formatCartSyncMessage(result: CartSyncResult): string {

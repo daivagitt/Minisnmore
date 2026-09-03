@@ -380,6 +380,15 @@ describe("login route", () => {
     );
   });
 
+  it("validates forgot-password email on blur", async () => {
+    renderLogin();
+    await userEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+    const email = screen.getByPlaceholderText("you@email.com");
+    await userEvent.type(email, "bad");
+    await userEvent.tab();
+    expect(screen.getByText(/valid email/i)).toBeInTheDocument();
+  });
+
   it("starts Apple OAuth when enabled", async () => {
     oauthEnabledMock.mockImplementation((provider: string) => provider === "apple");
     authMock.signInWithOAuth.mockResolvedValueOnce({ error: null });

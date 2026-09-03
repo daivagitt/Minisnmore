@@ -1,5 +1,6 @@
 import { sortSizesAsc } from "@/lib/product-ages";
 import { parseVariantsJson } from "@/lib/product-variants";
+import { DEFAULT_STORE_DISCOUNT_PERCENT, sellingFromMrp } from "@/lib/pricing";
 
 export type VariantEditorRow = {
   id?: string;
@@ -48,7 +49,7 @@ export function isVariantsItemStructure(itemStructure: string | null | undefined
   return (itemStructure ?? "").trim().toUpperCase() === "VARIANTS";
 }
 
-function variantAmount(value: number | string | ""): number {
+export function variantAmount(value: number | string | ""): number {
   if (value === "" || value == null) return NaN;
   const n = Number(value);
   return Number.isFinite(n) ? n : NaN;
@@ -59,12 +60,13 @@ export function variantAmountDisplay(value: number | string | ""): string {
   return String(value);
 }
 
-/** Keep raw string while typing (e.g. "799.", "0.") — parse on blur. */
+/** Keep raw string while typing (e.g. "799.", "2.0", "2.67") — parse on blur. */
 export function variantAmountInput(raw: string): number | string | "" {
   const v = raw.trim();
   if (!v) return "";
   if (!/^\d*\.?\d*$/.test(v)) return "";
-  if (v.endsWith(".") || v === ".") return v;
+  // Preserve drafts with a decimal point so controlled inputs can accept "2.", "2.0", "2.67".
+  if (v.includes(".")) return v;
   const n = Number(v);
   return Number.isFinite(n) ? n : "";
 }
@@ -73,6 +75,27 @@ export function variantAmountBlur(value: number | string | ""): number | "" {
   if (value === "" || value == null) return "";
   const n = Number(value);
   return Number.isFinite(n) ? n : "";
+}
+
+/** Storefront/admin selling price for a variant row — derived from MRP when MRP is set. */
+export function variantRowSelling(
+  row: Pick<VariantEditorRow, "rate" | "mrp">,
+  discountPercent = DEFAULT_STORE_DISCOUNT_PERCENT,
+): number | "" {
+  const mrp = variantAmount(row.mrp);
+  if (Number.isFinite(mrp) && mrp > 0) {
+    return sellingFromMrp(mrp, discountPercent);
+  }
+  const rate = variantAmount(row.rate);
+  return Number.isFinite(rate) && rate > 0 ? rate : "";
+}
+
+export function syncVariantRowSellingFromMrp(
+  row: VariantEditorRow,
+  discountPercent = DEFAULT_STORE_DISCOUNT_PERCENT,
+): VariantEditorRow {
+  const selling = variantRowSelling(row, discountPercent);
+  return selling === "" ? row : { ...row, rate: selling };
 }
 
 export function suggestVariantSku(parentSku: string, size: string, color: string): string {
@@ -150,7 +173,7 @@ export function regenerateVariantSkus(rows: VariantEditorRow[], parentSku: strin
   }));
 }
 
-export function rowsFromVariantsJson(raw: string | null | undefined): VariantEditorRow[] {
+export function rowsFromVariantsJson(raw: string | null | undefined, discountPercent = 20): VariantEditorRow[] {
   if (typeof raw === "string" && raw.trim()) {
     try {
       let parsed: unknown = JSON.parse(raw.trim());
@@ -159,21 +182,24 @@ export function rowsFromVariantsJson(raw: string | null | undefined): VariantEdi
         return parsed.map((row) => {
           const r = (row ?? {}) as Record<string, unknown>;
           const rateRaw = r.rate != null && r.rate !== "" ? Number(r.rate) : NaN;
+          const hasMrpField = Object.prototype.hasOwnProperty.call(r, "mrp") || Object.prototype.hasOwnProperty.call(r, "compareAt");
           const mrpRaw =
             r.mrp != null && r.mrp !== ""
               ? Number(r.mrp)
               : r.compareAt != null && r.compareAt !== ""
                 ? Number(r.compareAt)
-                : NaN;
+                : r.mrp === 0 || r.mrp === "0" || r.compareAt === 0 || r.compareAt === "0"
+                  ? 0
+                  : NaN;
           // Legacy rows often stored MRP in `rate` only — split for the new columns.
+          // If `mrp` was explicitly saved (even 0/null), do not re-interpret rate as MRP.
           const hasExplicitMrp = Number.isFinite(mrpRaw) && mrpRaw > 0;
           const hasRate = Number.isFinite(rateRaw) && rateRaw > 0;
           let rate: number | "" = hasRate ? rateRaw : "";
-          let mrp: number | "" = hasExplicitMrp ? mrpRaw : "";
-          if (hasRate && !hasExplicitMrp) {
-            // Treat legacy rate as MRP; derive selling at 80%.
+          let mrp: number | "" = hasExplicitMrp ? mrpRaw : Number.isFinite(mrpRaw) && mrpRaw === 0 ? 0 : "";
+          if (hasRate && !hasMrpField) {
             mrp = rateRaw;
-            rate = Math.round(rateRaw * 0.8 * 100) / 100;
+            rate = "";
           }
           const zohoRaw = r.zohoItemId ?? r.zoho_item_id;
           const imageRaw = r.imageUrl ?? r.image_url;
@@ -182,43 +208,51 @@ export function rowsFromVariantsJson(raw: string | null | undefined): VariantEdi
             : Array.isArray(r.image_urls)
               ? r.image_urls.map((u) => String(u).trim()).filter(Boolean)
               : [];
-          return {
-            id: r.id != null ? String(r.id) : undefined,
-            sku: String(r.sku ?? "").trim(),
-            size: String(r.size ?? "").trim(),
-            color: String(r.color ?? "").trim(),
-            rate,
-            mrp,
-            cost: r.cost != null && r.cost !== "" ? Number(r.cost) : "",
-            stock: r.stock != null && r.stock !== "" ? Number(r.stock) : 0,
-            active: r.active === false || r.active === "false" || r.active === 0 ? false : true,
-            zohoItemId: zohoRaw != null && String(zohoRaw).trim() ? String(zohoRaw).trim() : undefined,
-            imageUrl: imageRaw != null && String(imageRaw).trim() ? String(imageRaw).trim() : undefined,
-            imageUrls: extraImages.length ? extraImages : undefined,
-          };
+          return syncVariantRowSellingFromMrp(
+            {
+              id: r.id != null ? String(r.id) : undefined,
+              sku: String(r.sku ?? "").trim(),
+              size: String(r.size ?? "").trim(),
+              color: String(r.color ?? "").trim(),
+              rate,
+              mrp,
+              cost: r.cost != null && r.cost !== "" ? Number(r.cost) : "",
+              stock: r.stock != null && r.stock !== "" ? Number(r.stock) : 0,
+              active: r.active === false || r.active === "false" || r.active === 0 ? false : true,
+              zohoItemId: zohoRaw != null && String(zohoRaw).trim() ? String(zohoRaw).trim() : undefined,
+              imageUrl: imageRaw != null && String(imageRaw).trim() ? String(imageRaw).trim() : undefined,
+              imageUrls: extraImages.length ? extraImages : undefined,
+            },
+            discountPercent,
+          );
         });
       }
     } catch {
       // fall through
     }
   }
-  const parsed = parseVariantsJson(raw);
+  const parsed = parseVariantsJson(raw, discountPercent);
   if (!parsed.length) {
     return [{ sku: "", size: "", color: "", rate: "", mrp: "", cost: "", stock: 0, active: true }];
   }
-  return parsed.map((v) => ({
-    id: v.id,
-    sku: v.sku,
-    size: v.size ?? "",
-    color: v.color ?? "",
-    rate: v.price > 0 ? v.price : "",
-    mrp: v.compareAt ?? "",
-    cost: "",
-    stock: v.stock,
-    active: v.active,
-    imageUrl: v.imageUrl,
-    imageUrls: v.imageUrls,
-  }));
+  return parsed.map((v) =>
+    syncVariantRowSellingFromMrp(
+      {
+        id: v.id,
+        sku: v.sku,
+        size: v.size ?? "",
+        color: v.color ?? "",
+        rate: v.price > 0 ? v.price : "",
+        mrp: v.compareAt ?? "",
+        cost: "",
+        stock: v.stock,
+        active: v.active,
+        imageUrl: v.imageUrl,
+        imageUrls: v.imageUrls,
+      },
+      discountPercent,
+    ),
+  );
 }
 
 export function serializeVariantRows(rows: VariantEditorRow[]): string {
@@ -232,7 +266,15 @@ export function serializeVariantRows(rows: VariantEditorRow[]): string {
         stock: Math.max(0, Math.floor(Number(r.stock) || 0)),
         active: !!r.active,
       };
-      if (Number(r.mrp) > 0) out.mrp = Number(r.mrp);
+      // Always persist mrp (0/null when cleared) so reload does not treat rate as legacy MRP.
+      if (r.mrp === "" || r.mrp == null) {
+        out.mrp = null;
+      } else {
+        const mrpNum = Number(r.mrp);
+        if (Number.isFinite(mrpNum) && mrpNum > 0) out.mrp = mrpNum;
+        else if (mrpNum === 0) out.mrp = 0;
+        else out.mrp = null;
+      }
       if (r.id) out.id = r.id;
       if (r.size.trim()) out.size = r.size.trim();
       if (r.color.trim()) out.color = r.color.trim();
@@ -247,6 +289,7 @@ export function serializeVariantRows(rows: VariantEditorRow[]): string {
 export function aggregateFromVariantRows(
   rows: VariantEditorRow[],
   catalogSizes: string[] = [],
+  discountPercent = 20,
 ): {
   sizes: string[];
   colors: string[];
@@ -268,11 +311,11 @@ export function aggregateFromVariantRows(
     if (r.size.trim()) sizeSet.add(r.size.trim());
     if (r.color.trim() && !colors.includes(r.color.trim())) colors.push(r.color.trim());
     if (!r.active) continue;
-    const selling = variantAmount(r.rate);
+    const selling = variantRowSelling(r, discountPercent);
+    const mrp = variantAmount(r.mrp);
     if (Number.isFinite(selling) && selling > 0) {
       minSelling = minSelling == null ? selling : Math.min(minSelling, selling);
     }
-    const mrp = variantAmount(r.mrp);
     if (Number.isFinite(mrp) && mrp > 0) {
       minMrp = minMrp == null ? mrp : Math.min(minMrp, mrp);
     }
@@ -281,10 +324,45 @@ export function aggregateFromVariantRows(
   return {
     sizes: sortSizesAsc([...sizeSet]),
     colors,
-    compare_at_price: minMrp ?? (minSelling != null ? Math.round((minSelling / 0.8) * 100) / 100 : null),
+    // Only surface real MRP — do not invent compare-at from selling when MRP was cleared to 0.
+    compare_at_price: minMrp,
     price: minSelling,
     stock,
   };
+}
+
+type AdminProductPricingLike = {
+  item_structure?: string | null;
+  variants_json?: string | null;
+  sizes?: string[];
+  price?: number | null;
+  compare_at_price?: number | null;
+};
+
+/** Align admin product price fields with MRP + global store discount (storefront parity). */
+export function normalizeAdminProductPricing<T extends AdminProductPricingLike>(
+  product: T,
+  discountPercent = DEFAULT_STORE_DISCOUNT_PERCENT,
+): T {
+  if (isVariantsItemStructure(product.item_structure) && product.variants_json) {
+    const rows = rowsFromVariantsJson(product.variants_json, discountPercent);
+    const agg = aggregateFromVariantRows(rows, product.sizes ?? [], discountPercent);
+    return {
+      ...product,
+      variants_json: serializeVariantRows(rows),
+      price: agg.price,
+      compare_at_price: agg.compare_at_price,
+    };
+  }
+  const mrp = product.compare_at_price;
+  if (mrp != null && Number(mrp) > 0) {
+    return {
+      ...product,
+      price: sellingFromMrp(Number(mrp), discountPercent),
+      compare_at_price: Number(mrp),
+    };
+  }
+  return product;
 }
 
 export function validateVariantRows(raw: string | null | undefined): string[] {

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useShop } from "@/store/shop";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,7 +9,7 @@ import { Check, ChevronLeft, Loader2, Smartphone, CreditCard, Building2, Wallet,
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import { EmptyCartState } from "@/components/EmptyCartState";
-import { cartLineColorLabel, cartLineImage, formatCartSyncMessage } from "@/lib/cart-catalog";
+import { cartLineColorLabel, cartLineImage, cartPricingTotals, formatCartSyncMessage } from "@/lib/cart-catalog";
 import { createOrder, verifyPayment, getMyProfile, updateMyProfile, ProfileUpdate, fullNameFieldError } from "@/lib/orders.functions";
 import {
   clearLegacyLocalAddresses,
@@ -26,7 +26,8 @@ import {
 } from "@/lib/account.functions";
 import { validateCoupon } from "@/lib/coupons.functions";
 import { commerceFromSiteSettings } from "@/lib/commerce";
-import { COD_FEE_INR, orderTotals } from "@/lib/money";
+import { orderTotals } from "@/lib/money";
+import { DEFAULT_STORE_DISCOUNT_PERCENT } from "@/lib/pricing";
 import { lookupPincode, normalizePincode } from "@/lib/pincode";
 import { LazyImage } from "@/components/LazyImage";
 import { CopyButton } from "@/components/CopyButton";
@@ -97,6 +98,7 @@ function Checkout() {
   const [pinLoading, setPinLoading] = useState(false);
   const [pinDeliverable, setPinDeliverable] = useState<boolean | null>(null);
   const [pinError, setPinError] = useState<string | null>(null);
+  const [deliveryEta, setDeliveryEta] = useState<string | null>(null);
   const [donation, setDonation] = useState<number>(0);
   const [couponInput, setCouponInput] = useState(appliedCoupon?.code ?? "");
   const [shipMode, setShipMode] = useState<"std" | "exp">("std");
@@ -110,6 +112,7 @@ function Checkout() {
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [addressErrors, setAddressErrors] = useState<CheckoutAddressFieldErrors>({});
   const [addressTouched, setAddressTouched] = useState<Partial<Record<CheckoutAddressFieldName, boolean>>>({});
+  const pinLookupSeq = useRef(0);
 
   const checkoutAddress = () => ({ line1, line2, city, state, pincode: pin });
 
@@ -242,32 +245,39 @@ function Checkout() {
     if (clean.length !== 6) {
       setPinDeliverable(null);
       setPinError(null);
+      setDeliveryEta(null);
       return;
     }
+    const seq = ++pinLookupSeq.current;
     setPinLoading(true);
     setPinError(null);
     try {
       const result = await lookupPincode(clean);
+      if (seq !== pinLookupSeq.current) return;
       if (result.ok) {
         setCity(result.lookup.city);
         setStateName(result.lookup.state);
+        setDeliveryEta(result.lookup.eta);
         setPinDeliverable(true);
         setPinError(null);
         setAddressErrors((prev) => ({ ...prev, city: undefined, state: undefined, pincode: undefined }));
       } else {
         setCity("");
         setStateName("");
+        setDeliveryEta(null);
         setPinDeliverable(false);
         setPinError(result.error);
         if (opts?.toastOnError !== false) toast.error(result.error);
       }
     } catch {
+      if (seq !== pinLookupSeq.current) return;
       setPinDeliverable(false);
+      setDeliveryEta(null);
       const message = "Couldn't check pincode";
       setPinError(message);
       if (opts?.toastOnError !== false) toast.error(message);
     } finally {
-      setPinLoading(false);
+      if (seq === pinLookupSeq.current) setPinLoading(false);
     }
   };
 
@@ -283,6 +293,7 @@ function Checkout() {
     } else {
       setPinDeliverable(null);
       setPinError(null);
+      setDeliveryEta(null);
     }
   };
 
@@ -294,6 +305,7 @@ function Checkout() {
       setLine1(""); setLine2(""); setPin(""); setCity(""); setStateName("");
       setPinDeliverable(null);
       setPinError(null);
+      setDeliveryEta(null);
       setSaveAddress(true);
       return;
     }
@@ -348,12 +360,16 @@ function Checkout() {
   const couponOff = appliedCoupon?.discount ?? 0;
   const coupon = appliedCoupon?.code ?? "";
 
+  const pricing = useMemo(() => cartPricingTotals(cart), [cart]);
+  const storeDiscountPercent = settings.store_discount_percent ?? DEFAULT_STORE_DISCOUNT_PERCENT;
+
   const commerce = commerceFromSiteSettings(settings);
+  const codFee = commerce.codFeeInr;
   const totals = orderTotals({
     subtotal: cartTotal,
     discount: couponOff,
     donation,
-    codFee: step >= 2 && payMethod === "cod" ? COD_FEE_INR : 0,
+    codFee: step >= 2 && payMethod === "cod" ? codFee : 0,
     shipMode,
     commerce,
   });
@@ -369,8 +385,11 @@ function Checkout() {
     } else {
       setPinDeliverable(null);
       setPinError(null);
+      setDeliveryEta(null);
     }
   };
+
+  const standardDeliveryEta = deliveryEta ?? (pinLoading ? "checking…" : "based on pincode");
 
   const shippingFieldErrors = validateCheckoutAddress(checkoutAddress());
   const shippingHasErrors = Object.values(shippingFieldErrors).some(Boolean);
@@ -591,7 +610,7 @@ function Checkout() {
           <div className="grid grid-cols-3 gap-2 mt-6 text-[11px]">
             <div className="glass rounded-2xl p-3"><div className="text-primary font-medium">Confirmed</div><div className="text-muted-foreground mt-0.5">Right now</div></div>
             <div className="glass rounded-2xl p-3"><div className="text-primary font-medium">Wrapped</div><div className="text-muted-foreground mt-0.5">Within 24h</div></div>
-            <div className="glass rounded-2xl p-3"><div className="text-primary font-medium">Delivered</div><div className="text-muted-foreground mt-0.5">3–5 days</div></div>
+            <div className="glass rounded-2xl p-3"><div className="text-primary font-medium">Delivered</div><div className="text-muted-foreground mt-0.5">{deliveryEta ?? "3–5 days"}</div></div>
           </div>
           <div className="flex gap-3 justify-center mt-7 flex-wrap">
             <Link to="/account/orders/$orderNumber" params={{ orderNumber: done.orderNumber }}
@@ -781,7 +800,7 @@ function Checkout() {
                   <div className="grid md:grid-cols-2 gap-3">
                     <label className="glass rounded-2xl p-4 flex items-center gap-3 cursor-pointer">
                       <input type="radio" name="ship" checked={shipMode === "std"} onChange={() => setShipMode("std")} className="accent-primary" />
-                      <span className="text-sm">Standard · 4–6 days · {cartTotal >= commerce.freeShippingMinInr ? "Free" : `₹${commerce.shippingStandardInr.toLocaleString("en-IN")}`}{cartTotal < commerce.freeShippingMinInr && <span className="text-[11px] text-muted-foreground"> (Free above ₹{commerce.freeShippingMinInr.toLocaleString("en-IN")}/-)</span>}</span>
+                      <span className="text-sm">Standard · {standardDeliveryEta} · {cartTotal >= commerce.freeShippingMinInr ? "Free" : `₹${commerce.shippingStandardInr.toLocaleString("en-IN")}`}{cartTotal < commerce.freeShippingMinInr && <span className="text-[11px] text-muted-foreground"> (Free above ₹{commerce.freeShippingMinInr.toLocaleString("en-IN")}/-)</span>}</span>
                     </label>
                   </div>
                 </div>
@@ -805,7 +824,7 @@ function Checkout() {
                     <PayTile id="wallet" active={payMethod === "wallet"} onClick={() => setPayMethod("wallet")} icon={Wallet}
                       title="Wallets" sub="Paytm · Mobikwik · Freecharge" />
                     <PayTile id="cod" active={payMethod === "cod"} onClick={() => setPayMethod("cod")} icon={Banknote}
-                      title="Cash on Delivery" sub={`Pay in cash · ₹${COD_FEE_INR} handling fee`} />
+                      title="Cash on Delivery" sub={codFee > 0 ? `Pay in cash · ₹${codFee.toLocaleString("en-IN")} handling fee` : "Pay in cash · No handling fee"} />
                   </div>
                 </div>
 
@@ -842,7 +861,7 @@ function Checkout() {
                 )}
                 {payMethod === "cod" && (
                   <div className="glass rounded-2xl p-4 text-sm text-muted-foreground inline-flex items-center gap-2">
-                    <Banknote className="h-4 w-4 text-primary" /> Pay ₹{grand.toLocaleString("en-IN")} in cash (or UPI) when your order arrives. A ₹{COD_FEE_INR} handling fee applies.
+                    <Banknote className="h-4 w-4 text-primary" /> Pay ₹{grand.toLocaleString("en-IN")} in cash (or UPI) when your order arrives. {codFee > 0 ? `A ₹${codFee.toLocaleString("en-IN")} handling fee applies.` : "No COD handling fee applies."}
                   </div>
                 )}
 
@@ -868,7 +887,7 @@ function Checkout() {
                       <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Payment</div>
                       <div className="font-medium">{payMethodLabel(payMethod)}</div>
                       {payMethod === "cod" && (
-                        <div className="text-muted-foreground text-xs mt-0.5">Pay ₹{grand.toLocaleString("en-IN")} on delivery (₹{COD_FEE_INR} handling fee included)</div>
+                        <div className="text-muted-foreground text-xs mt-0.5">Pay ₹{grand.toLocaleString("en-IN")} on delivery{codFee > 0 ? ` (₹${codFee.toLocaleString("en-IN")} handling fee included)` : ""}</div>
                       )}
                     </div>
                   </div>
@@ -984,8 +1003,14 @@ function Checkout() {
           </div>
         </div>
         <div className="border-t border-border/60 mt-4 pt-4 space-y-1.5 text-sm">
+          {pricing.productDiscount > 0 && (
+            <>
+              <div className="flex justify-between text-muted-foreground"><span>MRP</span><span>₹{pricing.mrpTotal.toLocaleString("en-IN")}</span></div>
+              <div className="flex justify-between text-primary"><span>Discount ({storeDiscountPercent}% off MRP)</span><span>− ₹{pricing.productDiscount.toLocaleString("en-IN")}</span></div>
+            </>
+          )}
           <div className="flex justify-between"><span>Subtotal</span><span>₹{cartTotal.toLocaleString("en-IN")}</span></div>
-          {couponOff > 0 && <div className="flex justify-between text-primary"><span>Discount ({coupon})</span><span>− ₹{couponOff.toLocaleString("en-IN")}</span></div>}
+          {couponOff > 0 && <div className="flex justify-between text-primary"><span>Coupon ({coupon})</span><span>− ₹{couponOff.toLocaleString("en-IN")}</span></div>}
           <div className="flex justify-between text-muted-foreground"><span>Shipping</span><span>{shipping === 0 ? "Free" : `₹${shipping}`}</span></div>
           {totals.codFee > 0 && <div className="flex justify-between text-muted-foreground"><span>COD handling fee</span><span>₹{totals.codFee.toLocaleString("en-IN")}</span></div>}
           {donation > 0 && <div className="flex justify-between text-primary"><span>Donation ♥</span><span>₹{donation.toLocaleString("en-IN")}</span></div>}

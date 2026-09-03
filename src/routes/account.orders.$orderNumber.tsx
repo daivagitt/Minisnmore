@@ -73,7 +73,7 @@ const OPEN_RETURN_STATUSES = new Set([
   "failed",
 ]);
 
-const RETURNS_UI_ENABLED = false;
+const RETURNS_UI_ENABLED = true;
 
 export const Route = createFileRoute("/account/orders/$orderNumber")({
   validateSearch: (search: Record<string, unknown>) => ({

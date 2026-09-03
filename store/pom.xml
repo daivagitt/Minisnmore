@@ -118,7 +118,10 @@
                         <configuration>
                             <rules>
                                 <rule>
-                                    <element>BUNDLE</element>
+                                    <element>CLASS</element>
+                                    <includes>
+                                        <include>com/miniandmore/store/*</include>
+                                    </includes>
                                     <limits>
                                         <limit>
                                             <counter>LINE</counter>

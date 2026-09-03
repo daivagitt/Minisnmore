@@ -8,7 +8,8 @@ export function NumberField({
   onChange,
   min,
   max,
-  step,
+  /** Defaults to "any" so price/MRP decimals (e.g. 2.67) are valid HTML5 input. Pass 1 for integers. */
+  step = "any",
   placeholder,
   required,
   readOnly,

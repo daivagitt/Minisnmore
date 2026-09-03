@@ -36,6 +36,7 @@ const DEFAULTS: SiteSettingsRow = {
   shipping_standard_inr: 99,
   shipping_express_inr: 150,
   free_shipping_min_inr: 2500,
+  store_discount_percent: 20,
 };
 
 const PREVIEW_ORDER: InvoiceOrder & { shipping_address: Record<string, unknown> } = {

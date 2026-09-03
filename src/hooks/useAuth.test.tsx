@@ -592,6 +592,102 @@ describe("useAuth", () => {
     vi.unstubAllGlobals();
   });
 
+  it("logs profile bootstrap failures in development", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    sessionStorage.setItem(
+      "mnm_pending_profile",
+      JSON.stringify({ full_name: "New Parent", email: "parent@example.com" }),
+    );
+    localStorage.setItem("mnm_backend_jwt", "token-1");
+    apiMock.get.mockResolvedValue({
+      id: 1,
+      login: "parent@example.com",
+      email: "parent@example.com",
+      authorities: [],
+    });
+    apiMock.post.mockImplementation(async (path: string) => {
+      if (path === "/api/v1/account/profile/bootstrap") throw new Error("network down");
+      return null;
+    });
+
+    renderAuth();
+    await waitFor(() =>
+      expect(apiMock.post).toHaveBeenCalledWith(
+        "/api/v1/account/profile/bootstrap",
+        { full_name: "New Parent", email: "parent@example.com" },
+        { auth: true },
+      ),
+    );
+    expect(warnSpy).toHaveBeenCalledWith("profile bootstrap failed", expect.any(Error));
+    warnSpy.mockRestore();
+  });
+
+  it("clears session when refresh cannot load the account", async () => {
+    localStorage.setItem("mnm_backend_jwt", "stale-token");
+    apiMock.get.mockRejectedValueOnce(new Error("unauthorized"));
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
+
+    apiMock.get.mockRejectedValueOnce(new Error("still bad"));
+    await userEvent.click(screen.getByRole("button", { name: "refresh" }));
+    await waitFor(() => expect(screen.getByTestId("user")).toHaveTextContent("anonymous"));
+    expect(localStorage.getItem("mnm_backend_jwt")).toBeNull();
+  });
+
+  it("uses a single-word sign-up name for both first and last name fields", async () => {
+    apiMock.post.mockResolvedValueOnce(null);
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await expect(result.current.signUp("solo@example.com", "secret", "Madonna")).resolves.toEqual({
+      error: null,
+    });
+    expect(apiMock.post).toHaveBeenCalledWith(
+      "/api/register",
+      expect.objectContaining({ firstName: "Madonna", lastName: "Madonna" }),
+      { unwrap: false },
+    );
+  });
+
+  it("ignores bootstrap results after the provider unmounts", async () => {
+    apiMock.get.mockImplementation(() => new Promise(() => {}));
+    localStorage.setItem("mnm_backend_jwt", "token-1");
+    const { unmount } = renderAuth();
+    unmount();
+    await Promise.resolve();
+  });
+
+  it("validates sign-up full names and empty password-reset email", async () => {
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await expect(result.current.signUp("new@example.com", "secret", "A")).resolves.toEqual({
+      error: expect.stringMatching(/at least 2 characters/i),
+    });
+    await expect(result.current.requestPasswordReset("   ")).resolves.toEqual({
+      error: "Enter your email address first.",
+    });
+  });
+
+  it("injects authorization into server function calls that use plain header objects", async () => {
+    const fetchImpl = vi.fn(async () => new Response("{}"));
+    vi.stubGlobal("fetch", fetchImpl);
+    localStorage.setItem("mnm_backend_jwt", "token-1");
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
+
+    await window.fetch("/_serverFn/validateCoupon", {
+      method: "POST",
+      headers: { "x-test": "1" },
+    });
+
+    const [, init] = fetchImpl.mock.calls.at(-1) ?? [];
+    const headers = new Headers(init?.headers);
+    expect(headers.get("authorization")).toBe("Bearer token-1");
+    expect(headers.get("x-test")).toBe("1");
+    vi.unstubAllGlobals();
+  });
+
   it("leaves fetch untouched for non-server requests and when no token exists", async () => {
     const fetchImpl = vi.fn(async () => new Response("{}"));
     vi.stubGlobal("fetch", fetchImpl);

@@ -344,6 +344,48 @@ class UserServiceTest {
     }
 
     @Test
+    void requestActivationResend_refreshesActivationKeyForInactiveUser() {
+        user.setActivated(false);
+        when(userRepository.findOneByEmailIgnoreCase("pending@localhost")).thenReturn(Mono.just(user));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(userRepository.saveUserAuthority(anyLong(), anyString())).thenReturn(Mono.empty());
+
+        StepVerifier.create(userService.requestActivationResend("pending@localhost").contextWrite(securityContext()))
+            .assertNext(updated -> assertThat(updated.getActivationKey()).isNotBlank())
+            .verifyComplete();
+    }
+
+    @Test
+    void requestActivationResend_emptyWhenUserMissingOrAlreadyActive() {
+        when(userRepository.findOneByEmailIgnoreCase("missing@localhost")).thenReturn(Mono.empty());
+
+        StepVerifier.create(userService.requestActivationResend("missing@localhost")).verifyComplete();
+
+        user.setActivated(true);
+        when(userRepository.findOneByEmailIgnoreCase("user@localhost")).thenReturn(Mono.just(user));
+
+        StepVerifier.create(userService.requestActivationResend("user@localhost")).verifyComplete();
+    }
+
+    @Test
+    void saveUser_persistsAuthoritiesForNewUser() {
+        User newUser = sampleUser();
+        newUser.setId(null);
+        Authority authority = new Authority();
+        authority.setName(AuthoritiesConstants.ADMIN);
+        newUser.setAuthorities(Set.of(authority));
+        when(userRepository.nextUserId()).thenReturn(Mono.just(42L));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(userRepository.saveUserAuthority(42L, AuthoritiesConstants.ADMIN)).thenReturn(Mono.empty());
+
+        StepVerifier.create(userService.saveUser(newUser).contextWrite(securityContext()))
+            .assertNext(saved -> assertThat(saved.getId()).isEqualTo(42L))
+            .verifyComplete();
+
+        verify(userRepository).saveUserAuthority(42L, AuthoritiesConstants.ADMIN);
+    }
+
+    @Test
     void registerUser_emailAlreadyUsedWhenActivated() {
         AdminUserDTO dto = adminDto("other", "user@localhost");
         when(userRepository.findOneByLogin("other")).thenReturn(Mono.empty());

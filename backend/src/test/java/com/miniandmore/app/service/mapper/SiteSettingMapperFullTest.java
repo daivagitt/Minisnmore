@@ -45,7 +45,9 @@ class SiteSettingMapperFullTest {
             .pricesIncludeGst(true)
             .shippingStandardInr(99)
             .shippingExpressInr(150)
-            .freeShippingMinInr(2500);
+            .freeShippingMinInr(2500)
+            .codFeeInr(149)
+            .deliveryEtaBufferDays(3);
         entity.setSubscribeHeroTitle("Subscribe");
         entity.setSubscribeHeroSubtitle("Get updates");
         entity.setSubscribeTestimonial("Love it!");
@@ -69,6 +71,8 @@ class SiteSettingMapperFullTest {
         assertThat(roundTrip.getInvoiceSellerState()).isEqualTo("Karnataka");
         assertThat(dto.getSubscribeHeroTitle()).isEqualTo("Subscribe");
         assertThat(dto.getFreeShippingMinInr()).isEqualTo(2500);
+        assertThat(roundTrip.getCodFeeInr()).isEqualTo(149);
+        assertThat(roundTrip.getDeliveryEtaBufferDays()).isEqualTo(3);
         assertThat(roundTrip.getContactEmail()).isEqualTo("hello@example.com");
         assertThat(copy.getBrandName()).isEqualTo("Updated Brand");
         assertThat(mapper.toDto(List.of(entity))).hasSize(1);

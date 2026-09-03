@@ -55,6 +55,23 @@ describe("api client", () => {
     });
   });
 
+  it("disables browser HTTP caching for GET requests", async () => {
+    const { api } = await loadApi("https://api.example.com");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await api.get("/api/v1/products");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/api/v1/products",
+      expect.objectContaining({ method: "GET", cache: "no-store" }),
+    );
+  });
+
   it("normalizes API errors from problem details", async () => {
     const { ApiError, api } = await loadApi();
     vi.spyOn(globalThis, "fetch").mockResolvedValue(

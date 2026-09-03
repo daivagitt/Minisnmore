@@ -1,5 +1,5 @@
 import { Outlet, createRootRoute, HeadContent, Scripts, Link, useRouterState } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import appCss from "../styles.css?url";
 import { ShopProvider } from "@/store/shop";
 import { AuthProvider } from "@/hooks/useAuth";
@@ -13,6 +13,7 @@ import { Watermark } from "@/components/Watermark";
 import { ScrollProgress } from "@/components/ScrollProgress";
 import { FloatingDecor } from "@/components/FloatingDecor";
 import { Toaster } from "sonner";
+import { initStorefrontCacheSync, invalidateAllStorefrontCaches } from "@/lib/storefront-cache-sync";
 
 const SOCIAL_SHARE_IMAGE = "https://minisnmore.com/og-share.jpg";
 
@@ -78,8 +79,30 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isAdmin = pathname.startsWith("/admin");
+  const wasAdminRef = useRef(isAdmin);
   const isCustomerInvoice = /^\/account\/orders\/[^/]+\/invoice$/.test(pathname);
   const isInvoice = isCustomerInvoice || /^\/admin\/orders\/[^/]+\/invoice$/.test(pathname);
+
+  useEffect(() => {
+    return initStorefrontCacheSync();
+  }, []);
+
+  useEffect(() => {
+    if (wasAdminRef.current && !isAdmin) {
+      invalidateAllStorefrontCaches({ broadcast: false });
+    }
+    wasAdminRef.current = isAdmin;
+  }, [isAdmin]);
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible" && !pathname.startsWith("/admin")) {
+        invalidateAllStorefrontCaches({ broadcast: false });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [pathname]);
 
   useEffect(() => {
     const reloadKey = "mini:chunk-reload-attempted";

@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   LayoutDashboard, Image as ImgIcon, Tag, BookOpen, FileText, Package, Plug, LogOut, Loader2,
-  Folder, Home, EyeOff, Settings as SettingsIcon, ExternalLink, ShoppingCart, ReceiptText,
+  Folder, Home, EyeOff, Settings as SettingsIcon, ExternalLink, ShoppingCart, ReceiptText, Percent, RotateCcw,
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
@@ -20,10 +20,12 @@ const nav = [
   { to: "/admin/home", label: "Home sections", icon: Home },
   { to: "/admin/pages", label: "Page visibility", icon: EyeOff },
   { to: "/admin/coupons", label: "Coupons", icon: Tag },
+  { to: "/admin/discount", label: "Discount", icon: Percent },
   { to: "/admin/blog", label: "Blogs", icon: BookOpen },
   { to: "/admin/policies", label: "Policies", icon: FileText },
   { to: "/admin/invoices", label: "Invoices", icon: ReceiptText },
   { to: "/admin/orders", label: "Orders", icon: ShoppingCart },
+  { to: "/admin/returns", label: "Order returns", icon: RotateCcw },
   { to: "/admin/zoho", label: "Zoho settings", icon: Plug },
 ];
 

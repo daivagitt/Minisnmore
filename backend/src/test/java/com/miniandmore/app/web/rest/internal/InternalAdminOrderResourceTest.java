@@ -1,6 +1,7 @@
 package com.miniandmore.app.web.rest.internal;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -245,7 +246,7 @@ class InternalAdminOrderResourceTest {
 
     @Test
     @WithMockUser(authorities = "ROLE_ADMIN")
-    void markCodCollected_marksPaidAndSyncsLedgerly() throws Exception {
+    void markCodCollected_marksPaidAndSyncsZoho() throws Exception {
         when(customerOrderRepository.findOneByOrderNumber("MNM-COD1")).thenReturn(Optional.of(codOrder()));
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -254,8 +255,9 @@ class InternalAdminOrderResourceTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.paymentStatus").value("paid"));
 
-        verify(ledgerlySyncService).syncOrder(900L);
         verify(zohoSyncService).syncOrder(900L);
+        verify(zohoSyncService).pullOrderTracking(900L);
+        verify(ledgerlySyncService, never()).syncOrder(any());
     }
 
     @Test

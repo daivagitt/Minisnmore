@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/admin/returns")({ component: AdminReturnsPage });
-const RETURNS_UI_ENABLED = false;
+const RETURNS_UI_ENABLED = true;
 
 const STATUS_FILTERS = [
   "",

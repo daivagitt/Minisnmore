@@ -216,6 +216,15 @@ describe("orders functions", () => {
       totalPages: 2,
     });
     expect(getMock).toHaveBeenCalledWith("/api/v1/admin/orders?page=2&size=10", { auth: true });
+
+    getMock.mockResolvedValueOnce({ page: 1, pageSize: 10, totalItems: 0, totalPages: 1 });
+    await expect(listAdminOrders()).resolves.toEqual({
+      orders: [],
+      page: 1,
+      pageSize: 10,
+      totalItems: 0,
+      totalPages: 1,
+    });
   });
 
   it("lists admin orders with search and status filters", async () => {
@@ -233,9 +242,10 @@ describe("orders functions", () => {
       paymentStatus: "paid",
       paymentMethod: "cod",
       zohoSyncStatus: "attention",
+      ledgerlySyncStatus: "synced",
     });
     expect(getMock).toHaveBeenCalledWith(
-      "/api/v1/admin/orders?q=Jane&status=confirmed&paymentStatus=paid&paymentMethod=cod&zohoSyncStatus=attention&page=1&size=10",
+      "/api/v1/admin/orders?q=Jane&status=confirmed&paymentStatus=paid&paymentMethod=cod&zohoSyncStatus=attention&ledgerlySyncStatus=synced&page=1&size=10",
       { auth: true },
     );
   });
@@ -317,6 +327,9 @@ describe("orders functions", () => {
     await expect(listAdminOrderReturns()).resolves.toEqual({
       returns: [{ return_number: "RET-4", status: "open" }],
     });
+
+    getMock.mockResolvedValueOnce(null);
+    await expect(listAdminOrderReturns("closed")).resolves.toEqual({ returns: [] });
 
     postMock.mockResolvedValueOnce({ return_number: "RET-3", status: "approved" });
     await expect(approveOrderReturn("RET-3", "ok")).resolves.toEqual({

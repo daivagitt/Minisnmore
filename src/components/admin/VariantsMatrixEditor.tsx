@@ -1,5 +1,7 @@
 import { CloudDownload, Loader2, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Field, inputCls } from "@/components/admin/AdminPage";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 import {
   aggregateFromVariantRows,
   buildVariantMatrixFromSizesColors,
@@ -7,9 +9,12 @@ import {
   rowsFromVariantsJson,
   serializeVariantRows,
   suggestVariantSku,
+  syncVariantRowSellingFromMrp,
+  variantAmount,
   variantAmountBlur,
   variantAmountDisplay,
   variantAmountInput,
+  variantRowSelling,
   type VariantEditorRow,
 } from "@/lib/admin-variants";
 import { normalizeProductImageUrl } from "@/lib/backend-data";
@@ -30,6 +35,19 @@ function collectRowPhotos(row: VariantEditorRow): string[] {
     out.push(trimmed);
   }
   return out;
+}
+
+function coerceMoneyFields(row: VariantEditorRow): VariantEditorRow {
+  return {
+    ...row,
+    rate: variantAmountBlur(row.rate),
+    mrp: variantAmountBlur(row.mrp),
+    cost: variantAmountBlur(row.cost),
+    stock:
+      row.stock === "" || row.stock == null
+        ? 0
+        : Math.max(0, Math.floor(Number(variantAmountBlur(row.stock)) || 0)),
+  };
 }
 
 export function VariantsMatrixEditor({
@@ -56,11 +74,31 @@ export function VariantsMatrixEditor({
   onPullFromZoho?: (row: VariantEditorRow, index: number) => void;
   pullingRowKeys?: Set<string>;
 }) {
-  const rows = rowsFromVariantsJson(value);
+  const settings = useSiteSettings();
+  const discountPercent = settings.store_discount_percent ?? 20;
+  // Local rows keep decimal drafts ("2.", "2.0") — parent JSON round-trip would coerce via Number().
+  const [rows, setRows] = useState<VariantEditorRow[]>(() => rowsFromVariantsJson(value, discountPercent));
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const skipPropSync = useRef(false);
+
+  useEffect(() => {
+    if (skipPropSync.current) {
+      skipPropSync.current = false;
+      return;
+    }
+    setRows(rowsFromVariantsJson(value, discountPercent));
+  }, [value, discountPercent]);
 
   const commit = (nextRows: VariantEditorRow[]) => {
-    const variants_json = serializeVariantRows(nextRows);
-    const agg = aggregateFromVariantRows(nextRows, sizes);
+    const normalized = nextRows.map((row) => {
+      const coerced = coerceMoneyFields(row);
+      return variantAmount(coerced.mrp) > 0 ? syncVariantRowSellingFromMrp(coerced, discountPercent) : coerced;
+    });
+    skipPropSync.current = true;
+    setRows(normalized);
+    const variants_json = serializeVariantRows(normalized);
+    const agg = aggregateFromVariantRows(normalized, sizes, discountPercent);
     onChange({
       variants_json,
       sizes: agg.sizes,
@@ -71,8 +109,31 @@ export function VariantsMatrixEditor({
     });
   };
 
+  /** Immediate commit for non-money fields (size, sku, active, …). */
   const patchRow = (index: number, patch: Partial<VariantEditorRow>) => {
-    const next = rows.map((r, i) => (i === index ? { ...r, ...patch } : r));
+    const next = rows.map((r, i) => {
+      if (i !== index) return r;
+      const merged = { ...r, ...patch };
+      return variantAmount(merged.mrp) > 0 ? syncVariantRowSellingFromMrp(merged, discountPercent) : merged;
+    });
+    commit(next);
+  };
+
+  /** Local-only updates while typing money amounts — commit on blur. */
+  const patchAmountLocal = (index: number, patch: Partial<VariantEditorRow>) => {
+    setRows((prev) =>
+      prev.map((r, i) => {
+        if (i !== index) return r;
+        const merged = { ...r, ...patch };
+        const mrpDraft = typeof merged.mrp === "string" && merged.mrp.includes(".");
+        if (mrpDraft) return merged;
+        return variantAmount(merged.mrp) > 0 ? syncVariantRowSellingFromMrp(merged, discountPercent) : merged;
+      }),
+    );
+  };
+
+  const commitAmountBlur = (index: number, patch: Partial<VariantEditorRow>) => {
+    const next = rowsRef.current.map((r, i) => (i === index ? { ...r, ...patch } : r));
     commit(next);
   };
 
@@ -196,15 +257,29 @@ export function VariantsMatrixEditor({
                   />
                 </td>
                 <td className="p-1.5">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    className={inputCls() + " !text-xs"}
-                    value={variantAmountDisplay(r.rate)}
-                    aria-label="Selling price"
-                    onChange={(e) => patchRow(index, { rate: variantAmountInput(e.target.value) })}
-                    onBlur={() => patchRow(index, { rate: variantAmountBlur(r.rate) })}
-                  />
+                  {variantAmount(r.mrp) > 0 ? (
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      className={inputCls() + " !text-xs bg-muted/30"}
+                      value={variantAmountDisplay(variantRowSelling(r, discountPercent))}
+                      aria-label="Selling price"
+                      readOnly
+                      title={`Derived from MRP minus ${discountPercent}% store discount`}
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      className={inputCls() + " !text-xs"}
+                      value={variantAmountDisplay(r.rate)}
+                      aria-label="Selling price"
+                      onChange={(e) => patchAmountLocal(index, { rate: variantAmountInput(e.target.value) })}
+                      onBlur={() =>
+                        commitAmountBlur(index, { rate: variantAmountBlur(rowsRef.current[index]?.rate ?? "") })
+                      }
+                    />
+                  )}
                 </td>
                 <td className="p-1.5">
                   <input
@@ -213,16 +288,10 @@ export function VariantsMatrixEditor({
                     className={inputCls() + " !text-xs"}
                     value={variantAmountDisplay(r.mrp)}
                     aria-label="MRP"
-                    onChange={(e) => patchRow(index, { mrp: variantAmountInput(e.target.value) })}
-                    onBlur={() => {
-                      const mrp = variantAmountBlur(r.mrp);
-                      const rate = variantAmountBlur(r.rate);
-                      const patch: Partial<VariantEditorRow> = { mrp };
-                      if (mrp !== "" && rate === "") {
-                        patch.rate = Math.round(mrp * 0.8 * 100) / 100;
-                      }
-                      patchRow(index, patch);
-                    }}
+                    onChange={(e) => patchAmountLocal(index, { mrp: variantAmountInput(e.target.value) })}
+                    onBlur={() =>
+                      commitAmountBlur(index, { mrp: variantAmountBlur(rowsRef.current[index]?.mrp ?? "") })
+                    }
                   />
                 </td>
                 <td className="p-1.5">
@@ -231,8 +300,10 @@ export function VariantsMatrixEditor({
                     inputMode="decimal"
                     className={inputCls() + " !text-xs"}
                     value={variantAmountDisplay(r.cost)}
-                    onChange={(e) => patchRow(index, { cost: variantAmountInput(e.target.value) })}
-                    onBlur={() => patchRow(index, { cost: variantAmountBlur(r.cost) })}
+                    onChange={(e) => patchAmountLocal(index, { cost: variantAmountInput(e.target.value) })}
+                    onBlur={() =>
+                      commitAmountBlur(index, { cost: variantAmountBlur(rowsRef.current[index]?.cost ?? "") })
+                    }
                   />
                 </td>
                 <td className="p-1.5">
@@ -243,10 +314,10 @@ export function VariantsMatrixEditor({
                       className={`${inputCls()} !text-xs ${Number(r.stock) <= 0 && r.active ? "border-destructive/60" : ""}`}
                       value={variantAmountDisplay(r.stock)}
                       aria-label="Stock"
-                      onChange={(e) => patchRow(index, { stock: variantAmountInput(e.target.value) })}
+                      onChange={(e) => patchAmountLocal(index, { stock: variantAmountInput(e.target.value) })}
                       onBlur={() => {
-                        const stock = variantAmountBlur(r.stock);
-                        patchRow(index, { stock: stock === "" ? 0 : Math.max(0, Math.floor(stock)) });
+                        const stock = variantAmountBlur(rowsRef.current[index]?.stock ?? "");
+                        commitAmountBlur(index, { stock: stock === "" ? 0 : Math.max(0, Math.floor(stock)) });
                       }}
                     />
                     {Number(r.stock) <= 0 && r.active && (

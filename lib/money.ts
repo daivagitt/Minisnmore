@@ -50,8 +50,8 @@ export function shippingForOrder(
   return roundInr(commerce.shippingStandardInr);
 }
 
-/** Flat, GST-inclusive COD handling fee used by the workbook scenarios and backend. */
-export const COD_FEE_INR = 99;
+/** @deprecated use DEFAULT_COMMERCE.codFeeInr */
+export const COD_FEE_INR = DEFAULT_COMMERCE.codFeeInr;
 
 export function orderTotals({
   subtotal,

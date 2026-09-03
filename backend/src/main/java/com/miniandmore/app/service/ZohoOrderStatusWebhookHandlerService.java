@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -44,57 +45,58 @@ public class ZohoOrderStatusWebhookHandlerService {
     public Map<String, Object> handle(String rawBody, String signature, String sharedSecret) {
         verifySignature(rawBody, signature, sharedSecret);
         Map<String, Object> payload = WebhookPayloadSupport.parseJsonMap(objectMapper, rawBody);
-        Map<String, Object> salesOrder = normalizeSalesOrderPayload(eventData(payload));
+        Map<String, Object> data = ZohoWebhookSupport.eventData(payload);
+        Map<String, Object> salesOrder = normalizeSalesOrderPayload(data);
 
-        String zohoSalesOrderId = firstNonBlank(
-            stringValue(salesOrder.get("salesorder_id")),
-            stringValue(salesOrder.get("salesOrderId")),
-            stringValue(salesOrder.get("zohoSalesOrderId")),
-            stringValue(salesOrder.get("zoho_sales_order_id"))
-        );
-        String salesorderNumber = firstNonBlank(
-            stringValue(salesOrder.get("salesorder_number")),
-            stringValue(salesOrder.get("salesorderNumber")),
-            stringValue(salesOrder.get("orderNumber")),
-            stringValue(salesOrder.get("order_number"))
-        );
-        if (zohoSalesOrderId == null && salesorderNumber == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Provide zohoSalesOrderId or salesorder_number");
-        }
-
-        String status = firstNonBlank(stringValue(salesOrder.get("status")), stringValue(salesOrder.get("shipped_status")));
-        if (status == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing sales order status");
-        }
-        String eventId = eventId(payload, salesOrder, zohoSalesOrderId, salesorderNumber, status);
+        String eventId = eventId(payload, data, salesOrder);
         if (eventId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing eventId");
         }
-        if (webhookEventRepository.existsByEventId(eventId)) {
-            return Map.of("ok", true, "duplicate", true, "eventId", eventId);
+        String zohoSalesOrderId = ZohoWebhookSupport.firstNonBlank(
+            ZohoWebhookSupport.stringValue(salesOrder.get("salesorder_id")),
+            ZohoWebhookSupport.stringValue(salesOrder.get("salesorderId")),
+            ZohoWebhookSupport.stringValue(data.get("zohoSalesOrderId")),
+            ZohoWebhookSupport.stringValue(data.get("zoho_sales_order_id"))
+        );
+        String salesorderNumber = ZohoWebhookSupport.firstNonBlank(
+            ZohoWebhookSupport.stringValue(salesOrder.get("salesorder_number")),
+            ZohoWebhookSupport.stringValue(salesOrder.get("salesorderNumber"))
+        );
+        String referenceNumber = ZohoWebhookSupport.firstNonBlank(
+            ZohoWebhookSupport.stringValue(salesOrder.get("reference_number")),
+            ZohoWebhookSupport.stringValue(salesOrder.get("referenceNumber"))
+        );
+        if (zohoSalesOrderId == null && salesorderNumber == null && referenceNumber == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Provide salesorder_id, salesorder_number, or reference_number");
         }
 
-        CustomerOrder order = findOrder(zohoSalesOrderId, salesorderNumber);
+        CustomerOrder order = findOrder(zohoSalesOrderId, referenceNumber, salesorderNumber);
         OrderStatus statusBefore = order.getStatus();
         String trackingStatusBefore = OrderTrackingStatusResolver.resolve(order);
+        boolean duplicateEvent = webhookEventRepository.existsByEventId(eventId);
+        if (duplicateEvent && !shouldReapplyDeliveryUpdate(order, salesOrder)) {
+            return ZohoWebhookSupport.duplicateEventResult(eventId);
+        }
 
-        ZohoOrderStatusWebhookEvent record = new ZohoOrderStatusWebhookEvent();
-        record.setEventId(eventId);
-        record.setZohoSalesOrderId(zohoSalesOrderId);
-        record.setSalesorderNumber(salesorderNumber);
-        record.setStatus(status);
-        record.setReceivedAt(Instant.now());
-        try {
-            webhookEventRepository.saveAndFlush(record);
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            return Map.of("ok", true, "duplicate", true, "eventId", eventId);
+        ZohoOrderStatusWebhookEvent record = null;
+        if (!duplicateEvent) {
+            record = new ZohoOrderStatusWebhookEvent();
+            record.setEventId(eventId);
+            record.setZohoSalesOrderId(zohoSalesOrderId);
+            record.setSalesorderNumber(salesorderNumber);
+            record.setStatus(ZohoWebhookSupport.stringValue(salesOrder.get("status")));
+            record.setReceivedAt(Instant.now());
+            try {
+                webhookEventRepository.saveAndFlush(record);
+            } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                if (!shouldReapplyDeliveryUpdate(order, salesOrder)) {
+                    return ZohoWebhookSupport.duplicateEventResult(eventId);
+                }
+            }
         }
 
         try {
             ZohoOrderStatus.applySalesOrderTracking(order, salesOrder);
-            if (order.getStatus() == OrderStatus.CANCELLED && StringUtils.isBlank(order.getCancellationReason())) {
-                order.setCancellationReason(firstNonBlank(stringValue(salesOrder.get("reason")), "Cancelled in Zoho"));
-            }
             order.setZohoTrackingLastPulledAt(Instant.now());
             CustomerOrder saved = customerOrderRepository.save(order);
             if (saved.getStatus() != statusBefore || !OrderTrackingStatusResolver.resolve(saved).equals(trackingStatusBefore)) {
@@ -116,101 +118,77 @@ public class ZohoOrderStatusWebhookHandlerService {
         }
     }
 
-    private CustomerOrder findOrder(String zohoSalesOrderId, String salesorderNumber) {
+    private CustomerOrder findOrder(String zohoSalesOrderId, String referenceNumber, String salesorderNumber) {
         if (StringUtils.isNotBlank(zohoSalesOrderId)) {
-            return customerOrderRepository.findOneByZohoSalesOrderId(zohoSalesOrderId.trim()).or(() -> findByOrderNumber(salesorderNumber)).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No order for Zoho sales order " + zohoSalesOrderId)
-            );
+            return customerOrderRepository
+                .findOneByZohoSalesOrderId(zohoSalesOrderId.trim())
+                .or(() -> findByStoreOrderNumber(referenceNumber))
+                .or(() -> findByStoreOrderNumber(salesorderNumber))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No order for Zoho sales order " + zohoSalesOrderId));
         }
-        return findByOrderNumber(salesorderNumber)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No order for " + salesorderNumber));
+        return findByStoreOrderNumber(referenceNumber)
+            .or(() -> findByStoreOrderNumber(salesorderNumber))
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No order for " + StringUtils.defaultString(referenceNumber, salesorderNumber)));
     }
 
-    private java.util.Optional<CustomerOrder> findByOrderNumber(String salesorderNumber) {
-        String trimmed = StringUtils.trimToNull(salesorderNumber);
-        if (trimmed == null) {
-            return java.util.Optional.empty();
+    private Optional<CustomerOrder> findByStoreOrderNumber(String orderNumber) {
+        String trimmed = StringUtils.trimToNull(orderNumber);
+        if (trimmed == null || !trimmed.startsWith("MNM-")) {
+            return Optional.empty();
         }
         return customerOrderRepository.findOneByOrderNumber(trimmed);
     }
 
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> eventData(Map<String, Object> payload) {
-        Object data = payload.get("data");
-        if (data instanceof Map<?, ?> map) {
-            Map<String, Object> merged = new LinkedHashMap<>(payload);
-            merged.putAll((Map<String, Object>) map);
-            return merged;
+    private static boolean shouldReapplyDeliveryUpdate(CustomerOrder order, Map<String, Object> salesOrder) {
+        if (order.getStatus() == OrderStatus.FULFILLED || order.getStatus() == OrderStatus.CANCELLED) {
+            return false;
         }
-        return payload;
+        return ZohoOrderStatus.indicatesDelivery(salesOrder);
     }
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> normalizeSalesOrderPayload(Map<String, Object> data) {
-        for (String key : List.of("salesorder", "sales_order", "order")) {
+        for (String key : List.of("salesorder", "sales_order")) {
             Object nested = data.get(key);
             if (nested instanceof Map<?, ?> map) {
-                Map<String, Object> merged = new LinkedHashMap<>(data);
-                merged.putAll((Map<String, Object>) map);
-                return merged;
+                Map<String, Object> normalized = new LinkedHashMap<>(data);
+                normalized.putAll((Map<String, Object>) map);
+                return normalized;
             }
         }
         return data;
     }
 
     private void verifySignature(String rawBody, String signature, String sharedSecret) {
-        String secret = StringUtils.trimToNull(applicationProperties.getZoho().getOrderStatusWebhookSecret());
-        if (secret == null) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Order status webhook secret is not configured");
-        }
-        if (StringUtils.equals(secret, StringUtils.trimToNull(sharedSecret))) {
-            return;
-        }
-        if (StringUtils.isBlank(signature)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing order status webhook authentication");
-        }
-        if (!WebhookHmacSupport.signaturesMatch(secret, rawBody, signature)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid order status webhook signature");
-        }
+        ZohoWebhookSupport.verifySecretOrSignature(
+            applicationProperties.getZoho().getOrderStatusWebhookSecret(),
+            rawBody,
+            signature,
+            sharedSecret,
+            "Order status webhook secret is not configured",
+            "Missing order status webhook authentication",
+            "Invalid order status webhook signature"
+        );
     }
 
-    private static String eventId(
-        Map<String, Object> payload,
-        Map<String, Object> salesOrder,
-        String zohoSalesOrderId,
-        String salesorderNumber,
-        String status
-    ) {
-        String explicit = firstNonBlank(
-            stringValue(payload.get("eventId")),
-            stringValue(payload.get("event_id")),
-            stringValue(payload.get("id")),
-            stringValue(salesOrder.get("eventId")),
-            stringValue(salesOrder.get("event_id"))
-        );
+    private static String eventId(Map<String, Object> payload, Map<String, Object> data, Map<String, Object> salesOrder) {
+        String explicit = ZohoWebhookSupport.explicitEventIdIncludingLegacyId(payload, data, salesOrder);
         if (explicit != null) {
             return explicit;
         }
-        String modified = firstNonBlank(
-            stringValue(salesOrder.get("last_modified_time")),
-            stringValue(salesOrder.get("updated_time")),
-            stringValue(salesOrder.get("date"))
+        String salesOrderId = ZohoWebhookSupport.firstNonBlank(
+            ZohoWebhookSupport.stringValue(salesOrder.get("salesorder_id")),
+            ZohoWebhookSupport.stringValue(salesOrder.get("salesorderId"))
         );
-        String identity = firstNonBlank(zohoSalesOrderId, salesorderNumber);
-        return identity == null || modified == null ? null : "zoho-salesorder:" + identity + ":" + status + ":" + modified;
-    }
-
-    private static String firstNonBlank(String... values) {
-        for (String value : values) {
-            String trimmed = StringUtils.trimToNull(value);
-            if (trimmed != null) {
-                return trimmed;
-            }
+        String status = ZohoWebhookSupport.stringValue(salesOrder.get("status"));
+        String modified = ZohoWebhookSupport.firstNonBlank(
+            ZohoWebhookSupport.stringValue(salesOrder.get("last_modified_time")),
+            ZohoWebhookSupport.stringValue(salesOrder.get("updated_time")),
+            ZohoWebhookSupport.stringValue(salesOrder.get("created_time"))
+        );
+        if (salesOrderId == null) {
+            return null;
         }
-        return null;
-    }
-
-    private static String stringValue(Object value) {
-        return value == null ? null : value.toString();
+        return "zoho-salesorder:" + salesOrderId + ":" + ZohoWebhookSupport.firstNonBlank(status, "unknown") + ":" + ZohoWebhookSupport.firstNonBlank(modified, "unknown");
     }
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   aggregateFromVariantRows,
   buildVariantMatrixFromSizesColors,
+  normalizeAdminProductPricing,
   regenerateVariantSkus,
   suggestParentSku,
   suggestVariantSku,
@@ -56,7 +57,9 @@ describe("admin-variants SKU helpers", () => {
     expect(variantAmountInput("799")).toBe(799);
     expect(variantAmountInput("799.")).toBe("799.");
     expect(variantAmountBlur("799.")).toBe(799);
-    expect(variantAmountInput("0.0")).toBe(0);
+    expect(variantAmountInput("0.0")).toBe("0.0");
+    expect(variantAmountInput("2.67")).toBe("2.67");
+    expect(variantAmountBlur("2.67")).toBe(2.67);
     expect(variantAmountBlur("999")).toBe(999);
   });
 
@@ -85,6 +88,59 @@ describe("admin-variants SKU helpers", () => {
       { sku: "A-M", size: "M", color: "Red", rate: 100, stock: 1, active: true },
     ]);
     expect(summarizeZohoVariantLinkage(json).label).toBe("1/2 variant item(s) in Zoho");
+  });
+
+  it("derives variant selling from MRP when loading admin rows", () => {
+    const json = JSON.stringify([
+      { sku: "VEST-S", size: "S", color: "Blue", rate: 999, mrp: 1000, stock: 1, active: true },
+    ]);
+    const rows = rowsFromVariantsJson(json, 20);
+    expect(rows[0]?.mrp).toBe(1000);
+    expect(rows[0]?.rate).toBe(800);
+  });
+
+  it("normalizes simple admin product selling from MRP", () => {
+    const normalized = normalizeAdminProductPricing(
+      { item_structure: "SIMPLE", price: 1000, compare_at_price: 1000 },
+      20,
+    );
+    expect(normalized.compare_at_price).toBe(1000);
+    expect(normalized.price).toBe(800);
+  });
+
+  it("keeps cleared MRP at zero and does not promote rate back to MRP", () => {
+    const cleared = serializeVariantRows([
+      { sku: "VEST-S", size: "S", color: "Blue", rate: 2, mrp: 0, cost: "", stock: 1, active: true },
+    ]);
+    expect(JSON.parse(cleared)[0].mrp).toBe(0);
+    expect(JSON.parse(cleared)[0].rate).toBe(2);
+
+    const rows = rowsFromVariantsJson(cleared, 25);
+    expect(rows[0]?.mrp).toBe(0);
+    expect(rows[0]?.rate).toBe(2);
+
+    const agg = aggregateFromVariantRows(rows, [], 25);
+    expect(agg.compare_at_price).toBeNull();
+    expect(agg.price).toBe(2);
+  });
+
+  it("keeps empty MRP cleared when serialized as null", () => {
+    const cleared = serializeVariantRows([
+      { sku: "VEST-S", size: "S", color: "Blue", rate: 2, mrp: "", cost: "", stock: 1, active: true },
+    ]);
+    expect(JSON.parse(cleared)[0].mrp).toBeNull();
+    const rows = rowsFromVariantsJson(cleared, 25);
+    expect(rows[0]?.mrp).toBe("");
+    expect(rows[0]?.rate).toBe(2);
+  });
+
+  it("still treats legacy rate-only rows as MRP", () => {
+    const rows = rowsFromVariantsJson(
+      JSON.stringify([{ sku: "LEGACY-S", size: "S", color: "Blue", rate: 1000, stock: 1, active: true }]),
+      20,
+    );
+    expect(rows[0]?.mrp).toBe(1000);
+    expect(rows[0]?.rate).toBe(800);
   });
 
   it("round-trips per-size imageUrl on same-colour rows", () => {

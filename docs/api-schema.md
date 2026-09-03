@@ -147,9 +147,21 @@ Backed by `ZohoAdminResource`, protected by backend's filter-chain rule for `/ap
 
 Settings (non-secret fields only) live at `/api/v1/admin/zoho-settings` (`ZohoSettingsResource`, GET/PUT).
 
-### Zoho stock webhook (inbound)
+### Zoho inbound webhooks
 
-`InternalZohoStockWebhookResource`, `POST /internal/v1/zoho/stock-webhook` — header `X-Zoho-Stock-Signature`. Public path in OpenAPI: `/api/v1/zoho/stock-webhook`. Same reachability caveat as Ledgerly webhooks.
+All handlers live under `InternalZoho*WebhookResource` with dual mapping `/internal/v1/zoho/*` and `/api/v1/zoho/*`. Gateway and Nginx proxy the public paths on UAT. Auth is HMAC-SHA256 (`X-Zoho-*-Signature`) or shared secret header (`X-Zoho-*-Secret`). Each handler persists an idempotency row keyed by `eventId`.
+
+| Webhook | Resource | Public path | Auth header(s) | Handler |
+|---|---|---|---|---|
+| Stock | `InternalZohoStockWebhookResource` | `POST /api/v1/zoho/stock-webhook` | `X-Zoho-Stock-Signature` | `ZohoStockWebhookHandlerService` → absolute stock reconcile |
+| Shipment / package | `InternalZohoShipmentWebhookResource` | `POST /api/v1/zoho/shipment-webhook` | `X-Zoho-Shipment-Signature` or `X-Zoho-Shipment-Secret` | `ZohoShipmentWebhookHandlerService` → `ZohoOrderStatus.applyPackages` |
+| Item / catalog | `InternalZohoItemWebhookResource` | `POST /api/v1/zoho/item-webhook` | `X-Zoho-Item-Signature` or `X-Zoho-Item-Secret` | `ZohoItemWebhookHandlerService` → `ZohoSyncService.pullExternalProduct` |
+| Sales-order status / void | `InternalZohoOrderStatusWebhookResource` | `POST /api/v1/zoho/order-status-webhook` | `X-Zoho-Order-Status-Signature` or `X-Zoho-Order-Status-Secret` | `ZohoOrderStatusWebhookHandlerService` → `ZohoOrderStatus.applySalesOrderTracking` |
+| Invoice status / void | `InternalZohoInvoiceWebhookResource` | `POST /api/v1/zoho/invoice-webhook` | `X-Zoho-Invoice-Signature` or `X-Zoho-Invoice-Secret` | `ZohoInvoiceWebhookHandlerService` → `ZohoInvoiceStatus.applyInvoice` |
+
+Env secrets: `ZOHO_STOCK_WEBHOOK_SECRET`, `ZOHO_SHIPMENT_WEBHOOK_SECRET`, `ZOHO_ITEM_WEBHOOK_SECRET`, `ZOHO_ORDER_STATUS_WEBHOOK_SECRET`, `ZOHO_INVOICE_WEBHOOK_SECRET` (`application.zoho.*-webhook-secret`).
+
+Scheduled `pull-order-tracking` and admin batch pulls remain as **fallback** when a Zoho workflow delivery is missed.
 
 ---
 
@@ -266,7 +278,7 @@ Backed by `InternalAdminOrderResource`:
 | Account (profile, addresses, wishlist, cart) | backend, commerce | `/api/v1/account/*` |
 | CMS (banners/blog/home/pages/policies/settings) | backend via store | `/api/v1/admin/{banners,blog-posts,home-sections,page-visibility,policies,site-settings}` (+ public read equivalents) |
 | Ledgerly integration | backend | `/api/v1/admin/ledgerly/*`, `/internal/v1/ledgerly/webhooks` |
-| Zoho Books integration | backend | `/api/v1/admin/zoho/*`, `/api/v1/admin/zoho-settings`, `/api/v1/zoho/stock-webhook` |
+| Zoho Books integration | backend | `/api/v1/admin/zoho/*`, `/api/v1/admin/zoho-settings`, `/api/v1/zoho/{stock,shipment,item,order-status,invoice}-webhook` |
 | Storage/uploads | backend via store | `/api/v1/admin/uploads*` |
 | SKU-wise print import | backend via store | `/api/v1/admin/import/sku-wise-print` |
 | Pincode lookup | backend | `/api/v1/pincode/{pincode}` |

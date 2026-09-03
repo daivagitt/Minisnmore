@@ -4,7 +4,12 @@ import { AdminPage, Field, inputCls } from "@/components/admin/AdminPage";
 import { NumberField } from "@/components/admin/NumberField";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
-import { commerceFromRow } from "@/lib/commerce";
+import {
+  commerceFromRow,
+  DEFAULT_DELIVERY_ETA_BUFFER_DAYS,
+  MAX_DELIVERY_ETA_BUFFER_DAYS,
+  parseDeliveryEtaBufferDays,
+} from "@/lib/commerce";
 import { invalidateSiteSettings, type SiteSettings } from "@/hooks/useSiteSettings";
 import { ImageUploadField } from "@/components/admin/ImageUploadField";
 import { showApiError, showValidationErrors } from "@/lib/ui-errors";
@@ -23,12 +28,19 @@ const FREE_SHIPPING_MIN_INR_MAX = 1_000_000;
 
 type SettingsForm = Omit<
   SiteSettings,
-  "gst_rate" | "shipping_standard_inr" | "shipping_express_inr" | "free_shipping_min_inr"
+  | "gst_rate"
+  | "shipping_standard_inr"
+  | "shipping_express_inr"
+  | "free_shipping_min_inr"
+  | "cod_fee_inr"
+  | "delivery_eta_buffer_days"
 > & {
   gst_rate: number | null;
   shipping_standard_inr: number | null;
   shipping_express_inr: number | null;
   free_shipping_min_inr: number | null;
+  cod_fee_inr: number | null;
+  delivery_eta_buffer_days: number | null;
 };
 
 const empty: SettingsForm = {
@@ -54,6 +66,9 @@ const empty: SettingsForm = {
   shipping_standard_inr: 99,
   shipping_express_inr: 150,
   free_shipping_min_inr: 2500,
+  cod_fee_inr: 99,
+  delivery_eta_buffer_days: DEFAULT_DELIVERY_ETA_BUFFER_DAYS,
+  store_discount_percent: 20,
 };
 
 function SettingsPage() {
@@ -75,6 +90,11 @@ function SettingsPage() {
             shipping_standard_inr: c.shippingStandardInr,
             shipping_express_inr: c.shippingExpressInr,
             free_shipping_min_inr: c.freeShippingMinInr,
+            cod_fee_inr: c.codFeeInr,
+            delivery_eta_buffer_days: parseDeliveryEtaBufferDays(
+              data.delivery_eta_buffer_days,
+              empty.delivery_eta_buffer_days
+            ),
           } as SettingsForm);
         }
       } catch (error) {
@@ -325,7 +345,27 @@ function SettingsPage() {
                 max={FREE_SHIPPING_MIN_INR_MAX}
                 required
               />
+              <NumberField
+                label="Cash on Delivery handling fee (₹)"
+                value={s.cod_fee_inr}
+                onChange={(cod_fee_inr) => up("cod_fee_inr", cod_fee_inr)}
+                min={0}
+                max={SHIPPING_INR_MAX}
+                required
+              />
+              <NumberField
+                label="Extra days added to delivery ETA"
+                value={s.delivery_eta_buffer_days}
+                onChange={(delivery_eta_buffer_days) => up("delivery_eta_buffer_days", delivery_eta_buffer_days)}
+                min={0}
+                max={MAX_DELIVERY_ETA_BUFFER_DAYS}
+                required
+              />
             </div>
+            <p className="text-xs text-muted-foreground">
+              Pincode lookup ETAs (e.g. 2–3 days) get this many extra days before showing on product and checkout.
+              Set 0 for no buffer.
+            </p>
           </div>
 
           <div className="glass-strong rounded-3xl p-5 space-y-3">

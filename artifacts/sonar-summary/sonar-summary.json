@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-08-31T00:56:31.923801+00:00",
+  "generatedAt": "2026-08-31T14:51:24.921800+00:00",
   "frontend": {
     "key": "frontend",
     "label": "Frontend",
     "missing": false,
-    "coverage": "93.5",
-    "line_coverage": "98.2",
-    "branch_coverage": "87.6",
+    "coverage": "94.5",
+    "line_coverage": "98.4",
+    "branch_coverage": "89.6",
     "bugs": "1",
     "vulnerabilities": "0",
     "code_smells": "24",
@@ -29,7 +29,7 @@
         "metricKey": "line_coverage",
         "comparator": "LT",
         "errorThreshold": "94",
-        "actualValue": "98.2"
+        "actualValue": "98.4"
       }
     ],
     "issues": [
@@ -239,9 +239,9 @@
     "key": "mnm-backend",
     "label": "Backend",
     "missing": false,
-    "coverage": "87.8",
-    "line_coverage": "95.3",
-    "branch_coverage": "71.5",
+    "coverage": "88.0",
+    "line_coverage": "95.6",
+    "branch_coverage": "71.7",
     "bugs": "0",
     "vulnerabilities": "0",
     "code_smells": "101",
@@ -264,7 +264,7 @@
         "metricKey": "line_coverage",
         "comparator": "LT",
         "errorThreshold": "94",
-        "actualValue": "95.3"
+        "actualValue": "95.6"
       }
     ],
     "issues": [

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Product } from "@/data/products";
 import type { CartItem } from "@/store/shop";
-import { sanitizeCartWithCatalog, cartLineImage, cartLineColorLabel } from "./cart-catalog";
+import { sanitizeCartWithCatalog, cartLineImage, cartLineColorLabel, cartPricingTotals } from "./cart-catalog";
 
 const base: Product = {
   id: "p1",
@@ -103,5 +103,11 @@ describe("cart-catalog", () => {
     expect(cartLineImage(print2)).toBe("https://cdn.example.com/print2.jpg");
     expect(cartLineColorLabel(print1)).toBe("BROWN SWADDLE");
     expect(cartLineColorLabel(print2)).toBe("GREEN SWADDLE");
+  });
+
+  it("totals MRP and store discount from compare-at prices", () => {
+    const discounted: Product = { ...base, compareAt: 1000, price: 800 };
+    const result = cartPricingTotals([line({ product: discounted, unitPrice: 800, qty: 2 })]);
+    expect(result).toEqual({ subtotal: 1600, mrpTotal: 2000, productDiscount: 400 });
   });
 });

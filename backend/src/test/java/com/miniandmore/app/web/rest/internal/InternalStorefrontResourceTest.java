@@ -13,6 +13,7 @@ import com.miniandmore.app.domain.Product;
 import com.miniandmore.app.domain.SiteSetting;
 import com.miniandmore.app.repository.*;
 import com.miniandmore.app.service.PincodeLookupService;
+import com.miniandmore.app.service.ProductVariantSupport;
 import com.miniandmore.app.service.dto.*;
 import com.miniandmore.app.service.mapper.*;
 import java.util.List;
@@ -81,6 +82,9 @@ class InternalStorefrontResourceTest {
 
     @MockitoBean
     private PincodeLookupService pincodeLookupService;
+
+    @MockitoBean
+    private ProductVariantSupport productVariantSupport;
 
     @Test
     void categories_returns200() throws Exception {

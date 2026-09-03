@@ -67,7 +67,7 @@ class OrderReturnServiceTest {
     private ZohoBooksIntegrationClient zohoBooksIntegrationClient;
 
     @Spy
-    private ProductVariantSupport variantSupport = new ProductVariantSupport(new com.fasterxml.jackson.databind.ObjectMapper());
+    private ProductVariantSupport variantSupport = StorePricingTestSupport.variantSupport(new com.fasterxml.jackson.databind.ObjectMapper());
 
     @Mock
     private OrderMailService orderMailService;

@@ -1,15 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Plus, Minus, X, Tag, ShieldCheck, Truck } from "lucide-react";
 import { useShop } from "@/store/shop";
-import { cartLineColorLabel, cartLineImage } from "@/lib/cart-catalog";
+import { cartLineColorLabel, cartLineImage, cartPricingTotals } from "@/lib/cart-catalog";
 import { FIT_LIMITS } from "@/lib/product-fit";
 import { toast } from "sonner";
 import { validateCoupon } from "@/lib/coupons.functions";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { commerceFromSiteSettings } from "@/lib/commerce";
 import { orderTotals } from "@/lib/money";
+import { DEFAULT_STORE_DISCOUNT_PERCENT } from "@/lib/pricing";
 import { LazyImage } from "@/components/LazyImage";
 import { CouponOffers } from "@/components/CouponOffers";
 import { EmptyCartState } from "@/components/EmptyCartState";
@@ -59,6 +60,8 @@ function CartPage() {
 
   const discount = appliedCoupon?.discount ?? 0;
   const commerce = commerceFromSiteSettings(settings);
+  const pricing = useMemo(() => cartPricingTotals(cart), [cart]);
+  const storeDiscountPercent = settings.store_discount_percent ?? DEFAULT_STORE_DISCOUNT_PERCENT;
   const totals = orderTotals({ subtotal: cartTotal, discount, shipMode: "std", commerce });
   const shipping = totals.shipping;
   const grand = totals.grand;
@@ -130,8 +133,14 @@ function CartPage() {
         </div>
 
         <div className="border-t border-border/60 pt-4 space-y-2 text-sm">
+          {pricing.productDiscount > 0 && (
+            <>
+              <Row label="MRP" val={`₹${pricing.mrpTotal.toLocaleString("en-IN")}`} muted />
+              <Row label={`Discount (${storeDiscountPercent}% off MRP)`} val={`− ₹${pricing.productDiscount.toLocaleString("en-IN")}`} accent />
+            </>
+          )}
           <Row label="Subtotal" val={`₹${cartTotal.toLocaleString("en-IN")}`} />
-          {discount > 0 && <Row label="Discount" val={`− ₹${discount.toLocaleString("en-IN")}`} accent />}
+          {discount > 0 && <Row label="Coupon" val={`− ₹${discount.toLocaleString("en-IN")}`} accent />}
           <Row
             label="Shipping"
             val={shipping === 0 ? "Free" : `₹${shipping}`}

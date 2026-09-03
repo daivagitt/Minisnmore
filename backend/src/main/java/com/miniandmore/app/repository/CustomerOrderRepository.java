@@ -84,6 +84,8 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     Optional<CustomerOrder> findOneByZohoSalesOrderId(String zohoSalesOrderId);
 
+    Optional<CustomerOrder> findOneByZohoInvoiceId(String zohoInvoiceId);
+
     @Query(
         "select customerOrder from CustomerOrder customerOrder where customerOrder.paymentMethod = 'cod' and " +
         "customerOrder.paymentStatus = :paymentStatus order by customerOrder.id desc"
@@ -126,14 +128,22 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     @Query(
         value = "select customerOrder from CustomerOrder customerOrder where " +
         "(customerOrder.paymentStatus = :paymentStatus or customerOrder.paymentMethod = 'cod') and " +
-        "customerOrder.zohoSalesOrderId is not null and customerOrder.status in :statuses order by customerOrder.id asc",
+        "customerOrder.zohoSalesOrderId is not null and " +
+        "(customerOrder.status in :statuses or " +
+        "(customerOrder.status = :fulfilledStatus and " +
+        "(customerOrder.zohoOrderStatus is null or lower(customerOrder.zohoOrderStatus) <> 'delivered'))) " +
+        "order by customerOrder.id asc",
         countQuery = "select count(customerOrder) from CustomerOrder customerOrder where " +
         "(customerOrder.paymentStatus = :paymentStatus or customerOrder.paymentMethod = 'cod') and " +
-        "customerOrder.zohoSalesOrderId is not null and customerOrder.status in :statuses"
+        "customerOrder.zohoSalesOrderId is not null and " +
+        "(customerOrder.status in :statuses or " +
+        "(customerOrder.status = :fulfilledStatus and " +
+        "(customerOrder.zohoOrderStatus is null or lower(customerOrder.zohoOrderStatus) <> 'delivered')))"
     )
     Page<CustomerOrder> findOrdersForZohoTrackingPull(
         @Param("paymentStatus") PaymentStatus paymentStatus,
         @Param("statuses") List<OrderStatus> statuses,
+        @Param("fulfilledStatus") OrderStatus fulfilledStatus,
         Pageable pageable
     );
 

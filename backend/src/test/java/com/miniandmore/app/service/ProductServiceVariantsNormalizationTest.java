@@ -26,7 +26,7 @@ class ProductServiceVariantsNormalizationTest {
     private ProductMapper productMapper;
 
     @Spy
-    private ProductVariantSupport variantSupport = new ProductVariantSupport(new ObjectMapper());
+    private ProductVariantSupport variantSupport = StorePricingTestSupport.variantSupport(new ObjectMapper());
 
     @Spy
     private ProductColorImagesSupport colorImagesSupport = new ProductColorImagesSupport(new ObjectMapper());

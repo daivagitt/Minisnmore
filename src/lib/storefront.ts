@@ -1,9 +1,11 @@
-import { listProducts, listBlogPosts, getPolicy, listCategories } from "@/lib/backend-data";
+import { listProducts, listBlogPosts, getPolicy, listCategories, getSiteSettings } from "@/lib/backend-data";
+import { broadcastStorefrontInvalidation } from "@/lib/storefront-cache-broadcast";
 import { agesFromSizes, sortSizesAsc } from "@/lib/product-ages";
 import { normalizeStorefrontColors, resolveStorefrontProductImages, hasPerColorGalleries } from "@/lib/product-colors";
 import { type Product, type Fabric } from "@/data/products";
 import { posts as seedPosts, type BlogPost } from "@/data/blog";
 import { parseVariantsJson, storefrontListPricing } from "@/lib/product-variants";
+import { DEFAULT_STORE_DISCOUNT_PERCENT, sellingFromMrp } from "@/lib/pricing";
 
 /**
  * Storefront data layer.
@@ -35,6 +37,25 @@ function normalizeColors(raw: unknown) {
 function normalizeSizes(raw: unknown): string[] {
   if (!Array.isArray(raw) || raw.length === 0) return ["One Size"];
   return sortSizesAsc(raw.map((s) => String(s)));
+}
+
+/**
+ * Zoho MN descriptions look like {@code Bibs Special | Age: COMMON SIZE | Print: Snail & Bee}.
+ * Hide the Age segment when it is only a universal size label (not a real age band).
+ */
+export function stripCommonSizeAgeFromDescription(text: string | null | undefined): string {
+  if (text == null) return "";
+  const trimmed = text.trim();
+  if (!trimmed) return "";
+  if (!/\|\s*Age:/i.test(trimmed) && !/^Age:/i.test(trimmed)) return trimmed;
+
+  const parts = trimmed
+    .split("|")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => !/^Age:\s*COMMON\s+SIZE$/i.test(part));
+
+  return parts.join(" | ");
 }
 
 type DbProductRow = {
@@ -79,7 +100,7 @@ function resolveCategoryFields(
   };
 }
 
-function mapProduct(row: DbProductRow): Product {
+function mapProduct(row: DbProductRow, discountPercent = DEFAULT_STORE_DISCOUNT_PERCENT): Product {
   const colors = normalizeColors(row.colors);
   const { image: img, gallery } = resolveStorefrontProductImages(
     Array.isArray(row.images) ? (row.images as string[]) : [],
@@ -88,19 +109,19 @@ function mapProduct(row: DbProductRow): Product {
   const heroImage = img || "";
   const perPrint = hasPerColorGalleries(colors);
   const badge = (row.badge ?? "").toLowerCase();
-  const variants = parseVariantsJson(row.variants ?? row.variants_json);
+  const variants = parseVariantsJson(row.variants ?? row.variants_json, discountPercent);
   const itemStructure = (row.item_structure ?? (variants.length ? "VARIANTS" : "SIMPLE")).toUpperCase();
   const catalogSizes = normalizeSizes(row.sizes);
-  const parentPrice = Number(row.price) || 0;
-  const parentCompareAt =
-    row.compare_at_price && Number(row.compare_at_price) > parentPrice
-      ? Number(row.compare_at_price)
-      : undefined;
+  const parentMrp = row.compare_at_price != null ? Number(row.compare_at_price) : 0;
+  const parentPrice =
+    parentMrp > 0 ? sellingFromMrp(parentMrp, discountPercent) : Number(row.price) || 0;
+  const parentCompareAt = parentMrp > 0 ? parentMrp : undefined;
+  const merchandisingCopy = stripCommonSizeAgeFromDescription(row.description ?? row.story ?? "");
   const mapped: Product = {
     id: row.id,
     slug: row.slug,
     name: row.name,
-    tagline: (row.description ?? row.story ?? "").trim(),
+    tagline: merchandisingCopy,
     price: parentPrice,
     compareAt: parentCompareAt,
     image: heroImage,
@@ -121,7 +142,7 @@ function mapProduct(row: DbProductRow): Product {
     isNew: !!row.new_arrival || badge.includes("new"),
     isBestseller: !!row.best_seller || badge.includes("best"),
     isTrending: !!row.trending,
-    description: row.description ?? row.story ?? "",
+    description: merchandisingCopy,
   };
   // List/card price must match PDP default selection (parent price is min-of-matrix).
   const listPricing = storefrontListPricing(mapped);
@@ -142,7 +163,15 @@ export async function loadProducts(): Promise<Product[]> {
   if (productsInflight) return productsInflight;
   productsInflight = (async () => {
     try {
-      const [rows, categoryRows] = await Promise.all([listProducts(), listCategories()]);
+      const [rows, categoryRows, siteSettings] = await Promise.all([
+        listProducts(),
+        listCategories(),
+        getSiteSettings(),
+      ]);
+      const discountPercent =
+        siteSettings?.store_discount_percent != null
+          ? Number(siteSettings.store_discount_percent)
+          : DEFAULT_STORE_DISCOUNT_PERCENT;
       const categoryLookup = buildCategoryLookup(categoryRows);
       const mapped = rows
         .filter((row) => row.active !== false)
@@ -174,7 +203,7 @@ export async function loadProducts(): Promise<Product[]> {
             item_structure: row.item_structure,
             variants_json: row.variants_json,
             stock: row.stock,
-          });
+          }, discountPercent);
         });
       productsCache = mapped;
       productSubs.forEach((fn) => fn(mapped));
@@ -199,9 +228,10 @@ export function subscribeProducts(fn: (p: Product[]) => void): () => void {
   return () => productSubs.delete(fn);
 }
 
-export function invalidateProducts() {
+export function invalidateProducts(options?: { broadcast?: boolean }) {
   productsCache = null;
   loadProducts();
+  if (options?.broadcast !== false) broadcastStorefrontInvalidation("products");
 }
 
 // ---------- Blog cache ----------
@@ -278,9 +308,10 @@ export function subscribeBlogPosts(fn: (p: BlogPost[]) => void): () => void {
   return () => blogSubs.delete(fn);
 }
 
-export function invalidateBlogPosts() {
+export function invalidateBlogPosts(options?: { broadcast?: boolean }) {
   blogCache = null;
   loadBlogPosts();
+  if (options?.broadcast !== false) broadcastStorefrontInvalidation("blog");
 }
 
 // ---------- Policies cache (keyed by slug) ----------
@@ -329,11 +360,12 @@ export function subscribePolicy(slug: string, fn: (p: PolicyRow | null) => void)
   return () => { set!.delete(fn); };
 }
 
-export function invalidatePolicy(slug?: string) {
+export function invalidatePolicy(slug?: string, options?: { broadcast?: boolean }) {
   if (slug) {
     policyCache.delete(slug);
     loadPolicy(slug);
   } else {
     policyCache.clear();
   }
+  if (options?.broadcast !== false) broadcastStorefrontInvalidation("policies");
 }

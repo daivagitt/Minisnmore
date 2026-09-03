@@ -11,11 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.ZohoStockWebhookEvent;
 import com.miniandmore.app.repository.ZohoStockWebhookEventRepository;
-import java.nio.charset.StandardCharsets;
-import java.util.HexFormat;
 import java.util.Map;
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,7 +50,7 @@ class ZohoStockWebhookHandlerServiceTest {
         String body = "{\"eventId\":\"evt-1\",\"sku\":\"SKU-1\",\"stock\":8}";
         when(webhookEventRepository.existsByEventId("evt-1")).thenReturn(true);
 
-        Map<String, Object> result = handler.handle(body, sign(body));
+        Map<String, Object> result = handler.handle(body, WebhookTestSupport.hmacSha256Hex(SECRET, body));
 
         assertThat(result).containsEntry("duplicate", true);
         verify(stockReconcileService, never()).reconcileStockFromWebhook(any(), any(), any(Integer.class));
@@ -67,7 +63,7 @@ class ZohoStockWebhookHandlerServiceTest {
         when(webhookEventRepository.existsByEventId("evt-2")).thenReturn(false);
         when(stockReconcileService.reconcileStockFromWebhook("SKU-2", null, 15)).thenReturn(Map.of("ok", true, "reconciledItems", 1));
 
-        Map<String, Object> result = handler.handle(body, sign(body));
+        Map<String, Object> result = handler.handle(body, WebhookTestSupport.hmacSha256Hex(SECRET, body));
 
         assertThat(result).containsEntry("ok", true);
         ArgumentCaptor<ZohoStockWebhookEvent> captor = ArgumentCaptor.forClass(ZohoStockWebhookEvent.class);
@@ -83,7 +79,7 @@ class ZohoStockWebhookHandlerServiceTest {
         when(webhookEventRepository.existsByEventId("evt-5")).thenReturn(false);
         when(stockReconcileService.reconcileStockFromWebhook("SKU-5", null, 3)).thenReturn(Map.of("ok", false, "error", "Product not found"));
 
-        assertThatThrownBy(() -> handler.handle(body, sign(body)))
+        assertThatThrownBy(() -> handler.handle(body, WebhookTestSupport.hmacSha256Hex(SECRET, body)))
             .isInstanceOf(ResponseStatusException.class)
             .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
             .isEqualTo(org.springframework.http.HttpStatus.BAD_GATEWAY);
@@ -98,7 +94,7 @@ class ZohoStockWebhookHandlerServiceTest {
         when(webhookEventRepository.existsByEventId("evt-6")).thenReturn(false);
         when(stockReconcileService.reconcileStockFromWebhook("SKU-6", null, 2)).thenReturn(Map.of("ok", true));
 
-        Map<String, Object> result = handler.handle(body, "sha256=" + sign(body));
+        Map<String, Object> result = handler.handle(body, "sha256=" + WebhookTestSupport.hmacSha256Hex(SECRET, body));
 
         assertThat(result).containsEntry("ok", true);
     }
@@ -116,18 +112,8 @@ class ZohoStockWebhookHandlerServiceTest {
     void handle_missingStock_throwsBadRequest() {
         String body = "{\"eventId\":\"evt-4\",\"sku\":\"SKU-4\"}";
 
-        assertThatThrownBy(() -> handler.handle(body, sign(body)))
+        assertThatThrownBy(() -> handler.handle(body, WebhookTestSupport.hmacSha256Hex(SECRET, body)))
             .isInstanceOf(ResponseStatusException.class)
             .hasMessageContaining("Missing or invalid stock");
-    }
-
-    private static String sign(String body) {
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            return HexFormat.of().formatHex(mac.doFinal(body.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 }

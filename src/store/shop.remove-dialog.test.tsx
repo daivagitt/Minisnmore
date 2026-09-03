@@ -53,6 +53,15 @@ vi.mock("@/components/RemoveFromCartDialog", () => ({
     open ? (
       <div data-testid="remove-dialog">
         <button type="button" onClick={onMoveToWishlist}>move-wish</button>
+        <button
+          type="button"
+          onClick={() => {
+            onMoveToWishlist();
+            onMoveToWishlist();
+          }}
+        >
+          double-move-wish
+        </button>
         <button type="button" onClick={onRemoveOnly}>remove-only</button>
         <button type="button" onClick={() => onOpenChange(false)}>close-dialog</button>
       </div>
@@ -190,6 +199,25 @@ describe("ShopProvider remove dialog", () => {
 
     expect(toast.warning).toHaveBeenCalledWith('"Romper" is already in your wishlist.');
     expect(screen.getByTestId("count")).toHaveTextContent("0");
+    expect(screen.getByTestId("wishlist")).toHaveTextContent("p1");
+  });
+
+  it("warns when move-to-wishlist is triggered twice in one dialog action", async () => {
+    const { toast } = await import("sonner");
+
+    render(
+      <ShopProvider>
+        <Harness />
+      </ShopProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+    await userEvent.click(screen.getByRole("button", { name: "add" }));
+    await userEvent.click(screen.getByRole("button", { name: "prompt-remove" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "double-move-wish" }));
+
+    expect(toast.warning).toHaveBeenCalled();
     expect(screen.getByTestId("wishlist")).toHaveTextContent("p1");
   });
 

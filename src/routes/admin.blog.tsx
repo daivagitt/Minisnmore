@@ -15,6 +15,7 @@ import {
   saveBlogPost,
   type BlogPostRow,
 } from "@/lib/backend-data";
+import { invalidateBlogPosts } from "@/lib/storefront";
 
 export const Route = createFileRoute("/admin/blog")({
   head: () => ({ meta: [{ title: "Blogs · Admin · Mini's n More" }] }),
@@ -75,6 +76,7 @@ function BlogPage() {
     }
     try {
       await saveBlogPost(payload);
+      invalidateBlogPosts();
       toast.success("Saved");
       load();
     } catch (error) {
@@ -86,6 +88,7 @@ function BlogPage() {
     if (!confirm("Delete this post?")) return;
     try {
       await deleteBlogPost(id);
+      invalidateBlogPosts();
       toast.success("Deleted");
       load();
     } catch (error) {
@@ -151,7 +154,9 @@ function BlogPage() {
             }}
             persist={async (payloads) => {
               try {
-                return await bulkSave(payloads as Post[], rows, "slug", saveBlogPost);
+                const result = await bulkSave(payloads as Post[], rows, "slug", saveBlogPost);
+                if (result.inserted > 0) invalidateBlogPosts();
+                return result;
               } catch (error) {
                 return {
                   inserted: 0,

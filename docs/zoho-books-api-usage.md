@@ -244,3 +244,23 @@ Illustrative — exact numbers vary with retries and flags.
 Example: a **full** pull of 400 SKUs with images off ≈ **2 list + 400 detail ≈ 402 calls** — enough to blow a Free-plan **1,000**/day limit if you also push products the same day.
 
 ---
+
+## 8. Inbound Zoho webhooks (event-driven sync)
+
+Configured in **Zoho Books / Zoho Inventory workflow rules** (not in the store admin panel). Zoho **pushes** to our backend when something changes; we verify the signature/secret, dedupe by `eventId`, then merge into the catalog or order.
+
+| Public endpoint | Zoho setup | What we do | Idempotency table |
+|-----------------|------------|------------|-------------------|
+| `POST /api/v1/zoho/stock-webhook` | Custom function / stock workflow | Reconcile absolute `stock_on_hand` for a SKU | `zoho_stock_webhook_event` |
+| `POST /api/v1/zoho/shipment-webhook` | Inventory: Package Created; Shipment Updated; Shipment Delivered | Update tracking fields + status via `ZohoOrderStatus.applyPackages` | `zoho_shipment_webhook_event` |
+| `POST /api/v1/zoho/item-webhook` | Item Created / Edited workflow | Single-item pull/merge via `pullExternalProduct` (no full catalog scan) | `zoho_item_webhook_event` |
+| `POST /api/v1/zoho/order-status-webhook` | Sales Order status / void workflow | Apply SO status; void → local `CANCELLED` | `zoho_order_status_webhook_event` |
+| `POST /api/v1/zoho/invoice-webhook` | Invoice sent / paid / void workflow | Update `zoho_order_status` and invoice id; void → local `CANCELLED` | `zoho_invoice_webhook_event` |
+
+**Auth headers:** `X-Zoho-Webhook-Signature` or `X-Zoho-{Stock,Shipment,Item,Order-Status,Invoice}-Signature` (HMAC-SHA256 of raw JSON body), or the matching `X-Zoho-*-Secret` shared-secret header.
+
+**Env:** `ZOHO_STOCK_WEBHOOK_SECRET`, `ZOHO_SHIPMENT_WEBHOOK_SECRET`, `ZOHO_ITEM_WEBHOOK_SECRET`, `ZOHO_ORDER_STATUS_WEBHOOK_SECRET`, `ZOHO_INVOICE_WEBHOOK_SECRET`.
+
+**Fallback:** Admin `POST /pull-order-tracking` and the ~15 min scheduler can recover missed webhook deliveries. On UAT webhook testing, set `ZOHO_ORDER_TRACKING_ENABLED=false` to stop automatic tracking pulls so webhook behavior is visible.
+
+---

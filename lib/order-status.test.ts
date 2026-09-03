@@ -54,7 +54,7 @@ describe("order-status labels", () => {
         payment_method: "online",
         status: "cancelled",
       }),
-    ).toBe("Refunded · Cancelled");
+    ).toBe("Settled · Cancelled");
   });
 
   it("uses tracking_status for fulfillment when present", () => {

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { LegalPage } from "@/components/LegalPage";
 import { PolicyContent } from "@/components/PolicyContent";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export const Route = createFileRoute("/shipping")({
   head: () => ({ meta: [
@@ -11,6 +12,7 @@ export const Route = createFileRoute("/shipping")({
 });
 
 function ShippingPage() {
+  const { cod_fee_inr: codFee } = useSiteSettings();
   const fallback = (
     <LegalPage eyebrow="Care" title="Shipping" lastUpdated="13 May 2026">
       <p>We hand-wrap every order and ship pan-India. Here's what to expect.</p>
@@ -34,7 +36,7 @@ function ShippingPage() {
       <ul>
         <li><strong>Free shipping</strong> on all prepaid orders above <strong>₹999</strong>.</li>
         <li>Orders below ₹999: a flat shipping fee of <strong>₹99</strong> applies.</li>
-        <li><strong>Cash on Delivery</strong> (where available): an additional GST-inclusive handling fee of <strong>₹99</strong> applies.</li>
+        <li><strong>Cash on Delivery</strong> (where available): {codFee > 0 ? <>an additional GST-inclusive handling fee of <strong>₹{codFee.toLocaleString("en-IN")}</strong> applies.</> : <>no additional handling fee applies.</>}</li>
       </ul>
 
       <h2>4. Order tracking</h2>

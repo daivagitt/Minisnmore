@@ -26,7 +26,8 @@ public class SecurityConfiguration {
                         "/api/v1/zoho/stock-webhook",
                         "/api/v1/zoho/shipment-webhook",
                         "/api/v1/zoho/item-webhook",
-                        "/api/v1/zoho/order-status-webhook"
+                        "/api/v1/zoho/order-status-webhook",
+                        "/api/v1/zoho/invoice-webhook"
                     )
                     .permitAll()
                     .requestMatchers("/api/v1/admin/**")

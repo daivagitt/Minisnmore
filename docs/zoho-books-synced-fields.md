@@ -153,7 +153,7 @@ Triggered after **paid** Razorpay checkout (`payment_status = PAID`).
 | `zoho_sync_error` | Last error |
 | `zoho_order_status` | High-level fulfilment status from Zoho |
 
-Existing Zoho documents with the same `reference_number` could be **linked** instead of duplicated.
+Existing Zoho documents with the same `reference_number` are **linked** instead of creating a second sales order. Converting a sales order to an invoice **closes** that sales order in Zoho — that Closed document is the original, not a second order.
 
 ---
 

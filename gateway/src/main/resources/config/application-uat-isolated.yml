@@ -41,6 +41,10 @@ spring:
               uri: http://127.0.0.1:9184
               predicates:
                 - Path=/internal/v1/zoho/order-status-webhook,/api/v1/zoho/order-status-webhook
+            - id: miniandmore-zoho-invoice-webhooks
+              uri: http://127.0.0.1:9184
+              predicates:
+                - Path=/internal/v1/zoho/invoice-webhook,/api/v1/zoho/invoice-webhook
             - id: miniandmore-ledgerly-api
               uri: http://127.0.0.1:9181
               predicates:

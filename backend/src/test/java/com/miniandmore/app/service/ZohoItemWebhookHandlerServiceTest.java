@@ -11,11 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.ZohoItemWebhookEvent;
 import com.miniandmore.app.repository.ZohoItemWebhookEventRepository;
-import java.nio.charset.StandardCharsets;
-import java.util.HexFormat;
 import java.util.Map;
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -90,7 +86,7 @@ class ZohoItemWebhookHandlerServiceTest {
         when(webhookEventRepository.existsByEventId("evt-item-hmac")).thenReturn(false);
         when(syncService.pullExternalProduct("SKU-H", null)).thenReturn(Map.of("success", 1, "failed", 0));
 
-        Map<String, Object> result = handler.handle(body, sign(body), null);
+        Map<String, Object> result = handler.handle(body, WebhookTestSupport.hmacSha256Hex(SECRET, body), null);
 
         assertThat(result).containsEntry("ok", true);
     }
@@ -114,15 +110,5 @@ class ZohoItemWebhookHandlerServiceTest {
         assertThatThrownBy(() -> handler.handle(body, null, SECRET))
             .isInstanceOf(ResponseStatusException.class)
             .hasMessageContaining("Provide item_id or sku");
-    }
-
-    private static String sign(String body) {
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            return HexFormat.of().formatHex(mac.doFinal(body.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 }

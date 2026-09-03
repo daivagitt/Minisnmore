@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.miniandmore.app.client.ZohoBooksClient;
 import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.ZohoShipmentWebhookEvent;
@@ -15,12 +16,8 @@ import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.ZohoShipmentWebhookEventRepository;
-import java.nio.charset.StandardCharsets;
-import java.util.HexFormat;
 import java.util.Map;
 import java.util.Optional;
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,6 +40,9 @@ class ZohoShipmentWebhookHandlerServiceTest {
     @Mock
     private OrderEventService orderEventService;
 
+    @Mock
+    private ZohoBooksClient booksClient;
+
     private ZohoShipmentWebhookHandlerService handler;
 
     @BeforeEach
@@ -54,6 +54,7 @@ class ZohoShipmentWebhookHandlerServiceTest {
             webhookEventRepository,
             customerOrderRepository,
             orderEventService,
+            booksClient,
             new ObjectMapper()
         );
     }
@@ -61,7 +62,9 @@ class ZohoShipmentWebhookHandlerServiceTest {
     @Test
     void handle_duplicateEventId_isNoOp() {
         String body = "{\"eventId\":\"evt-ship-1\",\"zohoSalesOrderId\":\"so-1\",\"status\":\"shipped\"}";
+        CustomerOrder order = order("MNM-1", "so-1", OrderStatus.CONFIRMED);
         when(webhookEventRepository.existsByEventId("evt-ship-1")).thenReturn(true);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-1")).thenReturn(Optional.of(order));
 
         Map<String, Object> result = handler.handle(body, null, SECRET);
 
@@ -192,7 +195,7 @@ class ZohoShipmentWebhookHandlerServiceTest {
         when(customerOrderRepository.findOneByZohoSalesOrderId("so-hmac")).thenReturn(Optional.of(order));
         when(customerOrderRepository.save(order)).thenReturn(order);
 
-        handler.handle(body, sign(body));
+        handler.handle(body, WebhookTestSupport.hmacSha256Hex(SECRET, body));
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.HAND_WRAPPED);
     }
@@ -200,7 +203,6 @@ class ZohoShipmentWebhookHandlerServiceTest {
     @Test
     void handle_missingOrderReference_throwsBadRequest() {
         String body = "{\"eventId\":\"evt-ship-6\",\"status\":\"delivered\"}";
-        when(webhookEventRepository.existsByEventId("evt-ship-6")).thenReturn(false);
 
         assertThatThrownBy(() -> handler.handle(body, null, SECRET))
             .isInstanceOf(ResponseStatusException.class)
@@ -210,12 +212,354 @@ class ZohoShipmentWebhookHandlerServiceTest {
     @Test
     void handle_orderReferenceWithoutShipmentSignal_throwsBadRequest() {
         String body = "{\"eventId\":\"evt-ship-9\",\"zohoSalesOrderId\":\"so-9\"}";
+        CustomerOrder order = order("MNM-9", "so-9", OrderStatus.HAND_WRAPPED);
+        when(webhookEventRepository.existsByEventId("evt-ship-9")).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-9")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
 
-        assertThatThrownBy(() -> handler.handle(body, null, SECRET))
-            .isInstanceOf(ResponseStatusException.class)
-            .hasMessageContaining("Missing shipment/package fields");
+        Map<String, Object> result = handler.handle(body, null, SECRET);
 
-        verify(customerOrderRepository, never()).findOneByZohoSalesOrderId(any());
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(result).containsEntry("status", "FULFILLED");
+        verifySavedEvent("evt-ship-9", "so-9", null, null, "delivered");
+    }
+
+    @Test
+    void handle_minimalShipmentWebhookWithoutEventId_derivesEventIdAndMarksDelivered() {
+        String body = "{\"shipment_order\":{\"salesorder_id\":\"so-minimal\"}}";
+        CustomerOrder order = order("MNM-MINIMAL", "so-minimal", OrderStatus.HAND_WRAPPED);
+        String eventId = "zoho-shipment:so-minimal:delivered:unknown";
+        when(webhookEventRepository.existsByEventId(eventId)).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-minimal")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(result).containsEntry("eventId", eventId).containsEntry("status", "FULFILLED");
+        verifySavedEvent(eventId, "so-minimal", null, null, "delivered");
+    }
+
+    @Test
+    void handle_missingStatus_infersDeliveredFromEventId() {
+        String body =
+            "{\"eventId\":\"4066570000000369183delivered2026-09-01T12:31:00+0530\",\"shipment_order\":{\"shipment_order_id\":\"4066570000000369183\",\"salesorder_id\":\"so-delivered-infer\",\"salesorder_number\":\"MNM-DELIVERED-INFER\",\"shipment_date\":\"2026-09-01\"}}";
+        CustomerOrder order = order("MNM-DELIVERED-INFER", "so-delivered-infer", OrderStatus.HAND_WRAPPED);
+        when(webhookEventRepository.existsByEventId("4066570000000369183delivered2026-09-01T12:31:00+0530")).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-delivered-infer")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(result).containsEntry("status", "FULFILLED");
+    }
+
+    @Test
+    void handle_missingStatus_infersFulfilledFromEventIdAndMarksDeliveredForShipmentOrder() {
+        String body =
+            "{\"eventId\":\"4066570000000369183fulfilled2026-09-01T12:31:00+0530\",\"shipment_order\":{\"shipment_order_id\":\"4066570000000369183\",\"salesorder_id\":\"so-fulfilled-infer\",\"salesorder_number\":\"MNM-FULFILLED-INFER\",\"shipment_date\":\"2026-09-01\"}}";
+        CustomerOrder order = order("MNM-FULFILLED-INFER", "so-fulfilled-infer", OrderStatus.HAND_WRAPPED);
+        when(webhookEventRepository.existsByEventId("4066570000000369183fulfilled2026-09-01T12:31:00+0530")).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-fulfilled-infer")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(order.getZohoOrderStatus()).isEqualTo("fulfilled");
+        assertThat(result).containsEntry("status", "FULFILLED");
+    }
+
+    @Test
+    void handle_fulfilledShipmentOrderWithoutShipmentId_marksDelivered() {
+        String body =
+            "{\"shipment_order\":{\"salesorder_id\":\"so-live-shape\",\"salesorder_number\":\"SO-00069\"," +
+            "\"status\":\"fulfilled\",\"shipment_date\":\"01/09/2026\"}}";
+        CustomerOrder order = order("MNM-F722FB08B10B", "so-live-shape", OrderStatus.HAND_WRAPPED);
+        String eventId = "zoho-shipment:so-live-shape:fulfilled:01/09/2026";
+        when(webhookEventRepository.existsByEventId(eventId)).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-live-shape")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(order.getZohoOrderStatus()).isEqualTo("fulfilled");
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivered");
+        assertThat(result).containsEntry("eventId", eventId).containsEntry("status", "FULFILLED");
+        verifySavedEvent(eventId, "so-live-shape", null, null, "fulfilled");
+    }
+
+    @Test
+    void handle_fulfilledShipmentOrderWithDeliveredDeliveryStatus_marksOrderFulfilled() {
+        String body =
+            "{\"shipment_order\":{\"salesorder_id\":\"so-live-delivered\",\"salesorder_number\":\"SO-00070\"," +
+            "\"status\":\"fulfilled\",\"deliveryStatus\":\"delivered\",\"shipment_date\":\"2026-09-01\"}}";
+        CustomerOrder order = order("MNM-DELIVERED", "so-live-delivered", OrderStatus.HAND_WRAPPED);
+        String eventId = "zoho-shipment:so-live-delivered:fulfilled:2026-09-01";
+        when(webhookEventRepository.existsByEventId(eventId)).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-live-delivered")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivered");
+        assertThat(result).containsEntry("eventId", eventId).containsEntry("status", "FULFILLED");
+        verifySavedEvent(eventId, "so-live-delivered", null, null, "fulfilled");
+    }
+
+    @Test
+    void handle_duplicateEventId_reappliesWhenOrderStillNotDelivered() {
+        String eventId = "zoho-shipment:ship-dup:delivered:2026-09-01T12:31:00Z";
+        String body =
+            "{\"eventId\":\"" +
+            eventId +
+            "\",\"shipment_order\":{\"shipment_order_id\":\"ship-dup\",\"salesorder_id\":\"so-dup\",\"status\":\"delivered\"}}";
+        CustomerOrder order = order("MNM-DUP", "so-dup", OrderStatus.HAND_WRAPPED);
+        when(webhookEventRepository.existsByEventId(eventId)).thenReturn(true);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-dup")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(result).containsEntry("status", "FULFILLED");
+        verify(webhookEventRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void handle_livePayload_packageSlipWithoutShippedStatusMarksHandWrappedWithoutShipmentDate() {
+        String body =
+            "{\"eventId\":\"ship-pkg2026-09-02T10:00:00+0530\",\"shipment_order\":{" +
+            "\"shipment_order_id\":\"ship-pkg\",\"salesorder_id\":\"so-pkg\",\"salesorder_number\":\"SO-00071\"," +
+            "\"tracking_number\":\"\",\"reference_number\":\"SO-00071\",\"carrier\":\"\",\"delivery_method\":\"\"," +
+            "\"shipment_date\":\"\",\"status\":\"\",\"detailed_status\":\"\",\"status_message\":\"\"," +
+            "\"delivery_status\":\"\",\"cf_minims_delivery_status\":\"\",\"last_modified_time\":\"2026-09-02T10:00:00+0530\"}}";
+        CustomerOrder order = order("MNM-PKG", "so-pkg", OrderStatus.CONFIRMED);
+        when(webhookEventRepository.existsByEventId("ship-pkg2026-09-02T10:00:00+0530")).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-pkg")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.HAND_WRAPPED);
+        assertThat(order.getShipmentDate()).isNull();
+        assertThat(order.getTrackingNumber()).isNull();
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("hand_wrapped");
+        assertThat(result).containsEntry("status", "HAND_WRAPPED");
+        verifySavedEvent("ship-pkg2026-09-02T10:00:00+0530", "so-pkg", null, "ship-pkg", null);
+    }
+
+    @Test
+    void handle_livePayload_onTheWayShippedMarksTrackingShippedNotDelivered() {
+        String body =
+            "{\"eventId\":\"ship-way2026-09-02T11:00:00+0530\",\"shipment_order\":{" +
+            "\"shipment_order_id\":\"ship-way\",\"salesorder_id\":\"so-way\",\"salesorder_number\":\"SO-00072\"," +
+            "\"tracking_number\":\"\",\"reference_number\":\"SO-00072\",\"carrier\":\"DTDC\",\"delivery_method\":\"DTDC\"," +
+            "\"shipment_date\":\"2026-09-02\",\"status\":\"Shipped\",\"detailed_status\":\"\",\"status_message\":\"\"," +
+            "\"delivery_status\":\"\",\"cf_minims_delivery_status\":\"\",\"last_modified_time\":\"2026-09-02T11:00:00+0530\"}}";
+        CustomerOrder order = order("MNM-WAY", "so-way", OrderStatus.CONFIRMED);
+        when(webhookEventRepository.existsByEventId("ship-way2026-09-02T11:00:00+0530")).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-way")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(order.getStatus()).isNotEqualTo(OrderStatus.FULFILLED);
+        assertThat(order.getShipmentDate()).isEqualTo("2026-09-02");
+        assertThat(order.getTrackingNumber()).isNull();
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("shipped");
+        assertThat(result).containsEntry("eventId", "ship-way2026-09-02T11:00:00+0530");
+        verifySavedEvent("ship-way2026-09-02T11:00:00+0530", "so-way", null, "ship-way", "Shipped");
+    }
+
+    @Test
+    void handle_livePayload_miniMsDeliveryStatusDeliveredMarksFulfilledWhileStatusStaysShipped() {
+        String body =
+            "{\"eventId\":\"ship-del2026-09-02T12:00:00+0530\",\"shipment_order\":{" +
+            "\"shipment_order_id\":\"ship-del\",\"salesorder_id\":\"so-del\",\"salesorder_number\":\"SO-00073\"," +
+            "\"tracking_number\":\"AWB-73\",\"reference_number\":\"SO-00073\",\"carrier\":\"DTDC\",\"delivery_method\":\"DTDC\"," +
+            "\"shipment_date\":\"2026-09-02\",\"status\":\"Shipped\",\"detailed_status\":\"\",\"status_message\":\"\"," +
+            "\"delivery_status\":\"delivered\",\"cf_minims_delivery_status\":\"delivered\",\"last_modified_time\":\"2026-09-02T12:00:00+0530\"}}";
+        CustomerOrder order = order("MNM-DEL", "so-del", OrderStatus.HAND_WRAPPED);
+        when(webhookEventRepository.existsByEventId("ship-del2026-09-02T12:00:00+0530")).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-del")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(order.getTrackingNumber()).isEqualTo("AWB-73");
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivered");
+        assertThat(result).containsEntry("status", "FULFILLED");
+        verifySavedEvent("ship-del2026-09-02T12:00:00+0530", "so-del", null, "ship-del", "Shipped");
+    }
+
+    @Test
+    void handle_livePayload_nativeDeliveredStatusMarksFulfilledWithoutCustomField() {
+        String body =
+            "{\"eventId\":\"ship-natdel2026-09-02T14:00:00+0530\",\"shipment_order\":{" +
+            "\"shipment_order_id\":\"ship-natdel\",\"salesorder_id\":\"so-natdel\",\"salesorder_number\":\"SO-00075\"," +
+            "\"tracking_number\":\"AWB-75\",\"reference_number\":\"SO-00075\",\"carrier\":\"DTDC\",\"delivery_method\":\"DTDC\"," +
+            "\"shipment_date\":\"2026-09-02\",\"status\":\"Delivered\",\"detailed_status\":\"\",\"status_message\":\"\"," +
+            "\"delivery_status\":\"\",\"cf_minims_delivery_status\":\"\",\"last_modified_time\":\"2026-09-02T14:00:00+0530\"}}";
+        CustomerOrder order = order("MNM-NATDEL", "so-natdel", OrderStatus.HAND_WRAPPED);
+        when(webhookEventRepository.existsByEventId("ship-natdel2026-09-02T14:00:00+0530")).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-natdel")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(order.getTrackingNumber()).isEqualTo("AWB-75");
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivered");
+        assertThat(result).containsEntry("status", "FULFILLED");
+    }
+
+    @Test
+    void handle_livePayload_nativeFulfilledShipmentOrderMarksFulfilledWithoutCustomField() {
+        String body =
+            "{\"eventId\":\"ship-natful2026-09-02T15:00:00+0530\",\"shipment_order\":{" +
+            "\"shipment_order_id\":\"ship-natful\",\"salesorder_id\":\"so-natful\",\"salesorder_number\":\"SO-00076\"," +
+            "\"tracking_number\":\"\",\"reference_number\":\"SO-00076\",\"carrier\":\"\",\"delivery_method\":\"\"," +
+            "\"shipment_date\":\"2026-09-02\",\"status\":\"Fulfilled\",\"detailed_status\":\"\",\"status_message\":\"\"," +
+            "\"delivery_status\":\"\",\"cf_minims_delivery_status\":\"\",\"last_modified_time\":\"2026-09-02T15:00:00+0530\"}}";
+        CustomerOrder order = order("MNM-NATFUL", "so-natful", OrderStatus.HAND_WRAPPED);
+        when(webhookEventRepository.existsByEventId("ship-natful2026-09-02T15:00:00+0530")).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-natful")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        handler.handle(body, null, SECRET);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(order.getTrackingNumber()).isNull();
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivered");
+    }
+
+    @Test
+    void handle_livePayload_onTheWayWithoutStatusStaysShippedNotDelivered() {
+        String body =
+            "{\"shipment_order\":{\"salesorder_id\":\"so-blank-status\",\"salesorder_number\":\"SO-00088\"," +
+            "\"carrier\":\"XpressBees\",\"delivery_method\":\"XpressBees\",\"shipment_date\":\"02/09/2026\"}}";
+        CustomerOrder order = order("MNM-BLANK-STATUS", "so-blank-status", OrderStatus.HAND_WRAPPED);
+        String eventId = "zoho-shipment:so-blank-status:unknown:02/09/2026";
+        when(webhookEventRepository.existsByEventId(eventId)).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-blank-status")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        handler.handle(body, null, SECRET);
+
+        assertThat(order.getStatus()).isNotEqualTo(OrderStatus.FULFILLED);
+        assertThat(order.getShipmentDate()).isEqualTo("02/09/2026");
+        assertThat(order.getTrackingCarrier()).isEqualTo("XpressBees");
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("shipped");
+        verifySavedEvent(eventId, "so-blank-status", null, null, null);
+    }
+
+    @Test
+    void handle_blankWebhookStatus_usesZohoPackageDeliveredStatus() {
+        String body =
+            "{\"eventId\":\"\",\"shipment_order\":{\"shipment_order_id\":\"\",\"salesorder_id\":\"so-live-so89\"," +
+            "\"salesorder_number\":\"SO-00089\",\"carrier\":\"XpressBees\",\"delivery_method\":\"\"," +
+            "\"shipment_date\":\"02/09/2026\",\"status\":\"\",\"last_modified_time\":\"\"}}";
+        CustomerOrder order = order("MNM-41D247A7CCC8", "so-live-so89", OrderStatus.HAND_WRAPPED);
+        order.setShipmentDate("02/09/2026");
+        String eventId = "zoho-shipment:ship-89:delivered:02/09/2026";
+        when(webhookEventRepository.existsByEventId(eventId)).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-live-so89")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+        when(booksClient.getSalesOrder("so-live-so89"))
+            .thenReturn(
+                Map.of(
+                    "salesorder",
+                    Map.of(
+                        "salesorder_id",
+                        "so-live-so89",
+                        "status",
+                        "invoiced",
+                        "shipped_status",
+                        "fulfilled",
+                        "packages",
+                        java.util.List.of(
+                            Map.of(
+                                "package_id",
+                                "pkg-89",
+                                "status",
+                                "delivered",
+                                "shipment_status",
+                                "delivered",
+                                "shipment_id",
+                                "ship-89",
+                                "carrier",
+                                "XpressBees",
+                                "shipment_order",
+                                Map.of("shipment_delivered_date", "2026-09-02 18:00", "shipment_id", "ship-89")
+                            )
+                        )
+                    )
+                )
+            );
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivered");
+        assertThat(result).containsEntry("status", "FULFILLED");
+        verifySavedEvent(eventId, "so-live-so89", "pkg-89", "ship-89", "delivered");
+    }
+
+    @Test
+    void handle_blankWebhookStatus_usesZohoPackageShippedStatusWithoutDelivering() {
+        String body =
+            "{\"shipment_order\":{\"salesorder_id\":\"so-way-api\",\"salesorder_number\":\"SO-00090\"," +
+            "\"carrier\":\"XpressBees\",\"shipment_date\":\"02/09/2026\",\"status\":\"\"}}";
+        CustomerOrder order = order("MNM-WAY-API", "so-way-api", OrderStatus.CONFIRMED);
+        when(webhookEventRepository.existsByEventId("zoho-shipment:ship-way:shipped:02/09/2026")).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-way-api")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+        when(booksClient.getSalesOrder("so-way-api"))
+            .thenReturn(
+                Map.of(
+                    "salesorder",
+                    Map.of(
+                        "packages",
+                        java.util.List.of(Map.of("status", "shipped", "shipment_status", "shipped", "shipment_id", "ship-way"))
+                    )
+                )
+            );
+
+        handler.handle(body, null, SECRET);
+
+        assertThat(order.getStatus()).isNotEqualTo(OrderStatus.FULFILLED);
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("shipped");
+    }
+
+    @Test
+    void handle_unresolvedPlaceholders_areIgnoredAndDoNotInventTracking() {
+        String body =
+            "{\"eventId\":\"ship-ph2026-09-02T13:00:00+0530\",\"shipment_order\":{" +
+            "\"shipment_order_id\":\"ship-ph\",\"salesorder_id\":\"so-ph\",\"salesorder_number\":\"SO-00074\"," +
+            "\"tracking_number\":\"${SHIPMENT_ORDER.TRACKING_NUMBER}\",\"reference_number\":\"${SHIPMENT_ORDER.REFERENCE_NUMBER}\"," +
+            "\"carrier\":\"${SHIPMENT_ORDER.CARRIER}\",\"delivery_method\":\"${SHIPMENT_ORDER.DELIVERY_METHOD}\"," +
+            "\"shipment_date\":\"${SHIPMENT_ORDER.DATE}\",\"status\":\"${SHIPMENT_ORDER.STATUS}\"," +
+            "\"detailed_status\":\"${SHIPMENT_ORDER.DETAILED_STATUS}\",\"status_message\":\"${SHIPMENT_ORDER.STATUS_MESSAGE}\"," +
+            "\"delivery_status\":\"${SHIPMENT_ORDER.CF_MINIMS_DELIVERY_STATUS}\"," +
+            "\"cf_minims_delivery_status\":\"${SHIPMENT_ORDER.CF_MINIMS_DELIVERY_STATUS}\"," +
+            "\"last_modified_time\":\"2026-09-02T13:00:00+0530\"}}";
+        CustomerOrder order = order("MNM-PH", "so-ph", OrderStatus.CONFIRMED);
+        when(webhookEventRepository.existsByEventId("ship-ph2026-09-02T13:00:00+0530")).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-ph")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        handler.handle(body, null, SECRET);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.HAND_WRAPPED);
+        assertThat(order.getShipmentDate()).isNull();
+        assertThat(order.getTrackingNumber()).isNull();
+        assertThat(order.getTrackingCarrier()).isNull();
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("hand_wrapped");
     }
 
     private void verifySavedEvent(String eventId, String zohoSalesOrderId, String packageId, String shipmentId, String status) {
@@ -235,15 +579,5 @@ class ZohoShipmentWebhookHandlerServiceTest {
         order.setStatus(status);
         order.setPaymentStatus(PaymentStatus.PAID);
         return order;
-    }
-
-    private static String sign(String body) {
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            return HexFormat.of().formatHex(mac.doFinal(body.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 }

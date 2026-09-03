@@ -1,6 +1,7 @@
 package com.miniandmore.app.web.rest.internal;
 
 import com.miniandmore.app.service.ZohoItemWebhookHandlerService;
+import com.miniandmore.app.service.ZohoWebhookSupport;
 import com.miniandmore.app.web.rest.v1.ApiResponse;
 import java.util.Map;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,8 +24,9 @@ public class InternalZohoItemWebhookResource {
     public ApiResponse<Map<String, Object>> receiveItemWebhook(
         @RequestBody String rawBody,
         @RequestHeader(value = "X-Zoho-Item-Signature", required = false) String signature,
+        @RequestHeader(value = "X-Zoho-Webhook-Signature", required = false) String genericSignature,
         @RequestHeader(value = "X-Zoho-Item-Secret", required = false) String sharedSecret
     ) {
-        return ApiResponse.ok(webhookHandlerService.handle(rawBody, signature, sharedSecret));
+        return ApiResponse.ok(webhookHandlerService.handle(rawBody, ZohoWebhookSupport.firstNonBlank(signature, genericSignature), sharedSecret));
     }
 }

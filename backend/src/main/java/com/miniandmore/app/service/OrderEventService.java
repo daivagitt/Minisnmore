@@ -181,19 +181,18 @@ public class OrderEventService {
         String body,
         Instant createdAt
     ) {
-        if (orderEventRepository.existsByOrderIdAndEventType(order.getId(), eventType)) {
-            return;
+        int inserted = orderEventRepository.insertIfAbsent(
+            order.getUserLogin(),
+            order.getId(),
+            order.getOrderNumber(),
+            eventType,
+            title,
+            body,
+            createdAt != null ? createdAt : Instant.now()
+        );
+        if (inserted > 0) {
+            queueLifecycleEmail(order, eventType);
         }
-        OrderEvent event = new OrderEvent()
-            .userLogin(order.getUserLogin())
-            .orderId(order.getId())
-            .orderNumber(order.getOrderNumber())
-            .eventType(eventType)
-            .title(title)
-            .body(body)
-            .createdAt(createdAt != null ? createdAt : Instant.now());
-        orderEventRepository.save(event);
-        queueLifecycleEmail(order, eventType);
     }
 
     private void queueLifecycleEmail(CustomerOrder order, String eventType) {

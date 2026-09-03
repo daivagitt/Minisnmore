@@ -6,6 +6,7 @@ import { ImageUploadField } from "@/components/admin/ImageUploadField";
 import { toast } from "sonner";
 import { Plus, Trash2, Save } from "lucide-react";
 import { ADMIN_NAME_MAX_LEN, deleteBanner, getBannerValidationErrors, listBanners, saveBanner, type BannerRow } from "@/lib/backend-data";
+import { invalidateBanners } from "@/hooks/useBanners";
 import { showApiError, showValidationErrors } from "@/lib/ui-errors";
 
 export const Route = createFileRoute("/admin/banners")({ component: BannersPage });
@@ -48,6 +49,7 @@ function BannersPage() {
     }
     try {
       await saveBanner(payload);
+      invalidateBanners();
       toast.success("Saved");
       load();
     } catch (error) {
@@ -59,6 +61,7 @@ function BannersPage() {
     if (!confirm("Delete this banner?")) return;
     try {
       await deleteBanner(id);
+      invalidateBanners();
       toast.success("Deleted");
       load();
     } catch (error) {

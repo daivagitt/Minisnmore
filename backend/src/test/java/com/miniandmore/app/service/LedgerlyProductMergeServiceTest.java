@@ -9,9 +9,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.domain.Category;
 import com.miniandmore.app.domain.Product;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -29,13 +31,34 @@ class LedgerlyProductMergeServiceTest {
     private ProductDescriptionCodec descriptionCodec = new ProductDescriptionCodec(new ObjectMapper());
 
     @Spy
-    private ProductVariantSupport variantSupport = new ProductVariantSupport(new ObjectMapper());
+    private ProductVariantSupport variantSupport = StorePricingTestSupport.variantSupport(new ObjectMapper());
 
     @Spy
     private ProductColorImagesSupport colorImagesSupport = new ProductColorImagesSupport(new ObjectMapper());
 
+    @Mock
+    private StorePricingService storePricingService;
+
     @InjectMocks
     private LedgerlyProductMergeService mergeService;
+
+    @BeforeEach
+    void stubPricing() {
+        lenient().when(storePricingService.sellingFromMrp(any())).thenAnswer(invocation -> {
+            BigDecimal mrp = invocation.getArgument(0);
+            if (mrp == null || mrp.compareTo(BigDecimal.ZERO) <= 0) {
+                return BigDecimal.ZERO;
+            }
+            return mrp.multiply(new BigDecimal("0.80")).setScale(2, RoundingMode.HALF_UP);
+        });
+        lenient().when(storePricingService.mrpFromSelling(any())).thenAnswer(invocation -> {
+            BigDecimal selling = invocation.getArgument(0);
+            if (selling == null || selling.compareTo(BigDecimal.ZERO) <= 0) {
+                return BigDecimal.ZERO;
+            }
+            return selling.divide(new BigDecimal("0.80"), 2, RoundingMode.HALF_UP);
+        });
+    }
 
     @Test
     void buildPushPayload_includesCostUnitTaxAndPlainDescription() {

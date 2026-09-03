@@ -5,7 +5,7 @@ import { AgeRangeField } from "@/components/admin/AgeRangeField";
 import { CommaListField } from "@/components/admin/CommaListField";
 import { NumberField } from "@/components/admin/NumberField";
 import { VariantsMatrixEditor, validateVariantRows } from "@/components/admin/VariantsMatrixEditor";
-import { suggestParentSku, summarizeZohoVariantLinkage, isVariantsItemStructure, type VariantEditorRow } from "@/lib/admin-variants";
+import { suggestParentSku, summarizeZohoVariantLinkage, isVariantsItemStructure, normalizeAdminProductPricing, type VariantEditorRow } from "@/lib/admin-variants";
 import { parseAgeRangeField } from "@/lib/comma-list-field";
 import { ImageSpecHint } from "@/components/admin/ImageSpecHint";
 import { ADMIN_IMAGE_SPECS } from "@/lib/admin-image-specs";
@@ -65,6 +65,8 @@ import { colorNames, ensureColorEntries, mergeColorNames, normalizeColorEntries,
 import { ListPagination } from "@/components/ListPagination";
 import { useListPagination } from "@/hooks/useListPagination";
 import { ADMIN_PAGE_SIZE } from "@/lib/pagination";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { DEFAULT_STORE_DISCOUNT_PERCENT, sellingFromMrp } from "@/lib/pricing";
 
 export const Route = createFileRoute("/admin/products")({ component: ProductsPage });
 
@@ -109,6 +111,8 @@ const slugify = (s: string) =>
 const normalizeImageUrl = (value: string) => normalizeProductImageUrl(value);
 
 function ProductsPage() {
+  const settings = useSiteSettings();
+  const storeDiscountPercent = settings.store_discount_percent ?? DEFAULT_STORE_DISCOUNT_PERCENT;
   const [rows, setRows] = useState<Product[]>([]);
   const [cats, setCats] = useState<{ id: string; name: string; slug: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,7 +132,7 @@ function ProductsPage() {
     setLoading(true);
     try {
       const [p, c] = await Promise.all([listProducts(true), listCategories(true)]);
-      setRows(p);
+      setRows(p.map((product) => normalizeAdminProductPricing(product, storeDiscountPercent)));
       setCats(c.map(({ id, name, slug }) => ({ id: id!, name, slug })));
     } catch (error) {
       showApiError(error, "Could not load products");
@@ -142,6 +146,7 @@ function ProductsPage() {
       const formData = new FormData();
       formData.append("file", file);
       await api.post("/api/v1/admin/import/sku-wise-print", formData, { auth: true });
+      invalidateProducts();
       toast.success("SKU-wise print import completed! Reloading products...");
       await new Promise(r => setTimeout(r, 1000));
       load();
@@ -233,6 +238,7 @@ function ProductsPage() {
             : "Product synced to Zoho",
         );
       }
+      invalidateProducts();
     } catch (error) {
       update(i, {
         zoho_sync_status: "FAILED",
@@ -266,6 +272,7 @@ function ProductsPage() {
       } else {
         toast.success(formatZohoSyncSummary(summary, "Product pull"));
       }
+      invalidateProducts();
       await load();
     } catch (error) {
       showApiError(error, "Zoho product pull failed");
@@ -296,6 +303,7 @@ function ProductsPage() {
         setZohoPullSku("");
         setZohoPullItemId("");
       }
+      invalidateProducts();
       await load();
       paging.setPage(1);
     } catch (error) {
@@ -339,6 +347,7 @@ function ProductsPage() {
       } else {
         toast.success(formatZohoSyncSummary(summary, "Variant pull"));
       }
+      invalidateProducts();
       await load();
       setEditing(productIndex);
     } catch (error) {
@@ -718,10 +727,16 @@ function ProductsPage() {
                         label={
                           (p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS"
                             ? "Selling price (from variants)"
-                            : "Selling price (₹)"
+                            : p.compare_at_price != null && Number(p.compare_at_price) > 0
+                              ? `Selling price (${storeDiscountPercent}% off MRP)`
+                              : "Selling price (₹)"
                         }
                         value={p.price}
-                        readOnly={(p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS"}
+                        step={0.01}
+                        readOnly={
+                          (p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS" ||
+                          (p.compare_at_price != null && Number(p.compare_at_price) > 0)
+                        }
                         onChange={(price) => update(i, { price })}
                         required
                       />
@@ -732,15 +747,15 @@ function ProductsPage() {
                             : "MRP (₹)"
                         }
                         value={p.compare_at_price}
+                        step={0.01}
                         readOnly={(p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS"}
                         onChange={(compare_at_price) => {
-                          update(i, {
-                            compare_at_price,
-                            price:
-                              compare_at_price != null && compare_at_price !== ""
-                                ? Math.round(Number(compare_at_price) * 0.8)
-                                : p.price,
-                          });
+                          const mrp = compare_at_price;
+                          const price =
+                            mrp != null && Number(mrp) > 0
+                              ? sellingFromMrp(Number(mrp), storeDiscountPercent)
+                              : p.price;
+                          update(i, { compare_at_price, price });
                         }}
                       />
                       <NumberField
@@ -750,6 +765,7 @@ function ProductsPage() {
                             : "Stock"
                         }
                         value={p.stock}
+                        step={1}
                         readOnly={(p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS"}
                         onChange={(stock) => update(i, { stock })}
                         min={0}
@@ -758,6 +774,7 @@ function ProductsPage() {
                       <NumberField
                         label="Sort order"
                         value={p.sort_order}
+                        step={1}
                         onChange={(sort_order) => update(i, { sort_order })}
                         min={0}
                         placeholder="0"

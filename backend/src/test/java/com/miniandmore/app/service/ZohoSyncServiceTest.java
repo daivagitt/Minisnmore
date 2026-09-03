@@ -233,6 +233,36 @@ class ZohoSyncServiceTest {
     }
 
     @Test
+    void syncProduct_imageFailureStoresRootCauseDetail() {
+        Product product = new Product()
+            .id(24L)
+            .sku("SKU-24")
+            .name("Nested image failure")
+            .zohoItemId("zoho-24")
+            .price(BigDecimal.valueOf(499))
+            .active(true);
+        when(productRepository.findOneWithEagerRelationships(24L)).thenReturn(Optional.of(product));
+        when(booksClient.updateItem(eq("zoho-24"), any())).thenReturn(Map.of("item", Map.of("item_id", "zoho-24")));
+        doThrow(
+            new IllegalStateException(
+                "Zoho item images delete failed",
+                new java.io.IOException("Zoho item images delete failed: HTTP 400 {\"message\":\"The document id does not exist.\"}")
+            )
+        )
+            .when(itemImageSync)
+            .syncProductImage("zoho-24", product);
+
+        service.syncProduct(24L);
+
+        verify(productRepository)
+            .updateZohoSyncFailure(
+                24L,
+                ZohoSyncStatus.FAILED,
+                "Zoho item images delete failed: HTTP 400 {\"message\":\"The document id does not exist.\"}"
+            );
+    }
+
+    @Test
     void syncProduct_imageFailureRedactsSignedUrlAndFitsDatabaseColumn() {
         Product product = new Product()
             .id(22L)
@@ -268,7 +298,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void syncProduct_variantImageFailureMarksProductFailedInsteadOfReportingSuccess() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -342,6 +372,65 @@ class ZohoSyncServiceTest {
         verify(booksClient).createItem(any());
         verify(productRepository).updateZohoSyncSuccess(eq(11L), eq("zoho-11-new"), eq(ZohoSyncStatus.SYNCED), any());
         verify(productRepository, never()).updateZohoSyncFailure(eq(11L), any(), any());
+    }
+
+    @Test
+    void syncProduct_update_groupedZohoItem_preservesExistingAttributesWhenZohoRequiresThem() {
+        Product product = new Product()
+            .id(13L)
+            .sku("BSJ-0-3-AQUA")
+            .name("Book Style Tying Jabla")
+            .zohoItemId("zoho-jabla-aqua")
+            .stock(1)
+            .price(BigDecimal.valueOf(499))
+            .active(true);
+        when(productRepository.findOneWithEagerRelationships(13L)).thenReturn(Optional.of(product));
+        when(booksClient.updateItem(eq("zoho-jabla-aqua"), any()))
+            .thenThrow(
+                new RestClientResponseException(
+                    "Missing destination group attributes",
+                    400,
+                    "Bad Request",
+                    null,
+                    "{\"code\":700019,\"message\":\"Looks like the item is missing some attributes with respect to the destination group.\"}".getBytes(),
+                    null
+                )
+            )
+            .thenReturn(Map.of("item", Map.of("item_id", "zoho-jabla-aqua")));
+        when(booksClient.getItem("zoho-jabla-aqua"))
+            .thenReturn(
+                Map.of(
+                    "item",
+                    Map.of(
+                        "item_id",
+                        "zoho-jabla-aqua",
+                        "group_id",
+                        "grp-jabla",
+                        "attribute_name1",
+                        "Size",
+                        "attribute_option_name1",
+                        "0-3 M",
+                        "attribute_name2",
+                        "Color",
+                        "attribute_option_name2",
+                        "Aqua"
+                    )
+                )
+            );
+
+        service.syncProduct(13L);
+
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(booksClient, times(2)).updateItem(eq("zoho-jabla-aqua"), payloadCaptor.capture());
+        assertThat(payloadCaptor.getAllValues().get(0)).doesNotContainKey("attribute_name1");
+        assertThat(payloadCaptor.getAllValues().get(1))
+            .containsEntry("group_id", "grp-jabla")
+            .containsEntry("attribute_name1", "Size")
+            .containsEntry("attribute_option_name1", "0-3 M")
+            .containsEntry("attribute_name2", "Color")
+            .containsEntry("attribute_option_name2", "Aqua");
+        verify(productRepository).updateZohoSyncSuccess(eq(13L), eq("zoho-jabla-aqua"), eq(ZohoSyncStatus.SYNCED), any());
+        verify(productRepository, never()).updateZohoSyncFailure(eq(13L), any(), any());
     }
 
     @Test
@@ -624,6 +713,38 @@ class ZohoSyncServiceTest {
     }
 
     @Test
+    void syncOrder_reusesExistingSalesOrderByReferenceInsteadOfCreatingASecond() {
+        Product product = new Product().id(10L).sku("SKU-10").zohoItemId("zoho-item-10");
+        OrderItem line = new OrderItem()
+            .productId("10")
+            .productName("Dress")
+            .qty(1)
+            .price(BigDecimal.valueOf(499));
+        CustomerOrder order = new CustomerOrder()
+            .id(125L)
+            .orderNumber("MNM-DUP-SO")
+            .userLogin("buyer@example.com")
+            .paymentStatus(com.miniandmore.app.domain.enumeration.PaymentStatus.PAID)
+            .status(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED);
+        order.addItems(line);
+        line.setOrder(order);
+
+        when(customerOrderRepository.findById(125L)).thenReturn(Optional.of(order));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(booksClient.findSalesOrderByReferenceNumber("MNM-DUP-SO"))
+            .thenReturn(Map.of("salesorder_id", "so-closed", "reference_number", "MNM-DUP-SO", "status", "closed"));
+        when(booksClient.createInvoiceFromSalesOrder("so-closed"))
+            .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-closed")));
+
+        service.syncOrder(125L);
+
+        assertThat(order.getZohoSalesOrderId()).isEqualTo("so-closed");
+        assertThat(order.getZohoInvoiceId()).isEqualTo("inv-closed");
+        verify(booksClient, never()).createSalesOrder(any());
+        verify(booksClient).createInvoiceFromSalesOrder("so-closed");
+    }
+
+    @Test
     void syncOrder_linksInventoryItemsAndMarksInvoiceSent() {
         ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
         zoho.setSyncProductStock(true);
@@ -668,6 +789,73 @@ class ZohoSyncServiceTest {
             })
         );
         verify(booksClient).markInvoiceAsSent("inv-1");
+    }
+
+    @Test
+    void syncOrder_createSalesOrder_includesOnlineChannelCustomField() {
+        Product product = new Product().id(10L).sku("SKU-10").zohoItemId("zoho-item-10");
+        OrderItem line = new OrderItem()
+            .productId("10")
+            .productName("Dress")
+            .qty(1)
+            .price(BigDecimal.valueOf(499));
+        CustomerOrder order = new CustomerOrder().id(126L).orderNumber("MNM-CHANNEL-CF").userLogin("buyer@example.com");
+        order.addItems(line);
+        line.setOrder(order);
+
+        when(customerOrderRepository.findById(126L)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(126L)).thenReturn(List.of(line));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-cf")));
+        when(booksClient.createInvoiceFromSalesOrder("so-cf")).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-cf")));
+        when(productRepository.findById(10L)).thenReturn(Optional.of(product));
+
+        service.syncOrder(126L);
+
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(booksClient).createSalesOrder(payloadCaptor.capture());
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> customFields = (List<Map<String, Object>>) payloadCaptor.getValue().get("custom_fields");
+        assertThat(customFields).containsExactly(
+            Map.of("customfield_id", "4066570000000458006", "value", "Online")
+        );
+    }
+
+    @Test
+    void syncOrder_codPending_doesNotCreatePostSyncInventoryAdjustment() {
+        Product product = new Product()
+            .id(10L)
+            .sku("SKU-10")
+            .zohoItemId("zoho-item-10")
+            .stock(4)
+            .price(BigDecimal.valueOf(499))
+            .active(true);
+        OrderItem line = new OrderItem()
+            .productId("10")
+            .productName("Dress")
+            .qty(1)
+            .price(BigDecimal.valueOf(499));
+        CustomerOrder order = new CustomerOrder()
+            .id(101L)
+            .orderNumber("MNM-COD-STOCK")
+            .userLogin("buyer@example.com")
+            .paymentMethod("cod")
+            .paymentStatus(com.miniandmore.app.domain.enumeration.PaymentStatus.PENDING)
+            .status(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED);
+        order.addItems(line);
+        line.setOrder(order);
+
+        when(customerOrderRepository.findById(101L)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(101L)).thenReturn(List.of(line));
+        when(productRepository.findById(10L)).thenReturn(Optional.of(product));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-cod-stock")));
+
+        service.syncOrder(101L);
+
+        verify(booksClient).createSalesOrder(any());
+        verify(booksClient, never()).createInventoryAdjustment(any());
+        verify(booksClient, never()).getItem("zoho-item-10");
     }
 
     @Test
@@ -760,7 +948,8 @@ class ZohoSyncServiceTest {
                 return rawLines instanceof List<?> lines &&
                 !lines.isEmpty() &&
                 lines.get(0) instanceof Map<?, ?> salesLine &&
-                "zoho-jabla".equals(salesLine.get("item_id"));
+                "zoho-jabla".equals(salesLine.get("item_id")) &&
+                !payload.containsKey("custom_fields");
             })
         );
         verify(booksClient, never()).createInvoiceFromSalesOrder(any());
@@ -955,6 +1144,7 @@ class ZohoSyncServiceTest {
 
         assertThat(order.getZohoInvoiceId()).isEqualTo("inv-cod-collected");
         verify(booksClient).createInvoiceFromSalesOrder("so-cod-collected");
+        verify(booksClient, never()).markInvoiceAsSent("inv-cod-collected");
         verify(booksClient).createCustomerPayment(
             argThat(payload -> {
                 Object invoices = payload.get("invoices");
@@ -991,6 +1181,39 @@ class ZohoSyncServiceTest {
         assertThat(order.getZohoInvoiceId()).isEqualTo("inv-cod-collected-early");
         verify(booksClient).createInvoiceFromSalesOrder("so-cod-collected-early");
         verify(booksClient).createCustomerPayment(any());
+    }
+
+    @Test
+    void syncOrder_paidOnline_marksInvoiceSentWithoutStockAdjustmentAccount() {
+        Product product = new Product().id(10L).sku("SKU-10").zohoItemId("zoho-item-10");
+        OrderItem line = new OrderItem()
+            .productId("10")
+            .productName("Dress")
+            .qty(1)
+            .price(BigDecimal.valueOf(1000));
+        CustomerOrder order = new CustomerOrder()
+            .id(117L)
+            .orderNumber("MNM-ONLINE-PAID")
+            .userLogin("buyer@example.com")
+            .paymentMethod("online")
+            .paymentStatus(com.miniandmore.app.domain.enumeration.PaymentStatus.PAID)
+            .status(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED)
+            .total(BigDecimal.valueOf(1000));
+        order.addItems(line);
+        line.setOrder(order);
+
+        when(customerOrderRepository.findById(117L)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(117L)).thenReturn(List.of(line));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-online-paid")));
+        when(booksClient.createInvoiceFromSalesOrder("so-online-paid"))
+            .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-online-paid")));
+        when(productRepository.findById(10L)).thenReturn(Optional.of(product));
+
+        service.syncOrder(117L);
+
+        assertThat(order.getZohoInvoiceId()).isEqualTo("inv-online-paid");
+        verify(booksClient).markInvoiceAsSent("inv-online-paid");
     }
 
     @Test
@@ -1031,6 +1254,37 @@ class ZohoSyncServiceTest {
         assertThat(payment.get("customer_id")).isEqualTo("cust-1");
         assertThat(new BigDecimal(String.valueOf(payment.get("amount")))).isEqualByComparingTo("1148");
         assertThat(payment.get("reference_number")).isEqualTo("MNM-COD-PAID");
+    }
+
+    @Test
+    void syncOrder_codCollected_usesInvoiceBalanceWhenLowerThanOrderTotal() {
+        CustomerOrder order = new CustomerOrder()
+            .id(114L)
+            .orderNumber("MNM-COD-BALANCE")
+            .userLogin("buyer@example.com")
+            .paymentMethod("cod")
+            .paymentStatus(com.miniandmore.app.domain.enumeration.PaymentStatus.PAID)
+            .status(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED)
+            .total(BigDecimal.valueOf(419.2))
+            .zohoSalesOrderId("so-cod-balance")
+            .zohoInvoiceId("inv-cod-balance");
+
+        when(customerOrderRepository.findById(114L)).thenReturn(Optional.of(order));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(booksClient.getInvoice("inv-cod-balance")).thenReturn(
+            Map.of("invoice", Map.of("invoice_id", "inv-cod-balance", "status", "sent", "balance", 320.2))
+        );
+        when(booksClient.createCustomerPayment(any())).thenReturn(Map.of("payment", Map.of("payment_id", "pay-balance")));
+
+        service.syncOrder(114L);
+
+        ArgumentCaptor<Map<String, Object>> paymentCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(booksClient).createCustomerPayment(paymentCaptor.capture());
+        Map<String, Object> payment = paymentCaptor.getValue();
+        assertThat(new BigDecimal(String.valueOf(payment.get("amount")))).isEqualByComparingTo("320.2");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> invoicePayment = ((List<Map<String, Object>>) payment.get("invoices")).get(0);
+        assertThat(new BigDecimal(String.valueOf(invoicePayment.get("amount_applied")))).isEqualByComparingTo("320.2");
     }
 
     @Test
@@ -1386,7 +1640,7 @@ class ZohoSyncServiceTest {
     }
 
     @Test
-    void pullOrderTracking_marksDeliveredWhenZohoShipmentIsFulfilled() {
+    void pullOrderTracking_marksDeliveredWhenZohoPackageStatusIsFulfilled() {
         CustomerOrder order = new CustomerOrder()
             .id(41306L)
             .orderNumber("MNM-SHIPPED")
@@ -1440,6 +1694,41 @@ class ZohoSyncServiceTest {
         assertThat(order.getStatus()).isEqualTo(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED);
         assertThat(order.getZohoTrackingLastPulledAt()).isNotNull();
         verify(customerOrderRepository).save(order);
+    }
+
+    @Test
+    void pullOrderTracking_clearsStaleShipmentWhenZohoReportsPendingUnpacked() {
+        CustomerOrder order = new CustomerOrder()
+            .id(41307L)
+            .orderNumber("MNM-26BEB5577791")
+            .paymentStatus(com.miniandmore.app.domain.enumeration.PaymentStatus.PAID)
+            .status(com.miniandmore.app.domain.enumeration.OrderStatus.HAND_WRAPPED)
+            .shipmentDate("2026-09-02")
+            .zohoSalesOrderId("so-stale-ship");
+        when(customerOrderRepository.findById(41307L)).thenReturn(Optional.of(order));
+        when(booksClient.getSalesOrder("so-stale-ship"))
+            .thenReturn(
+                Map.of(
+                    "salesorder",
+                    Map.of(
+                        "status",
+                        "invoiced",
+                        "shipped_status",
+                        "pending",
+                        "salesorder_number",
+                        "SO-STALE",
+                        "line_items",
+                        List.of(Map.of("quantity_packed", 0, "quantity_shipped", 0))
+                    )
+                )
+            );
+        when(booksClient.listPackagesForSalesOrder("so-stale-ship", "SO-STALE")).thenReturn(List.of());
+        service.pullOrderTracking(41307L);
+
+        assertThat(order.getStatus()).isEqualTo(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED);
+        assertThat(order.getShipmentDate()).isNull();
+        verify(customerOrderRepository).save(order);
+        verify(orderEventService).syncLifecycleEvents(order);
     }
 
     @Test
@@ -1702,7 +1991,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void syncProduct_variants_pushesEachActiveVariantSku() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -1771,7 +2060,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void syncProduct_variants_longSkuStockAdjustment_keepsReferenceNumberUnder50Chars() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -1827,7 +2116,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void syncProduct_variants_staleZohoItemId_recreatesRowInsteadOfFailing() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -1886,7 +2175,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void pullProducts_mergesVariantSkuIntoParentMatrix() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -1973,7 +2262,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void syncOrder_variants_usesVariantZohoItemId() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -2042,7 +2331,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void pullProducts_groupsZohoItemGroupIntoOneVariantsParent() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -2122,7 +2411,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void pullProducts_variantGroup_pullsCustomFieldsAndEachColorImage() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -2182,7 +2471,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void pullProducts_booksVariantNames_mergeIntoOneAdminParent() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -2245,7 +2534,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void pullProducts_skipsInactiveZohoItemsAndDoesNotImportThem() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -2286,7 +2575,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void pullProducts_fullPull_deactivatesMatrixRowsMissingFromActiveCatalog() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -2351,7 +2640,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void pullProducts_skipsVariantWhenSizeAndColorCannotBeParsed() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -2397,7 +2686,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void pullProducts_emptyFullCatalogue_deactivatesLinkedProductsButPreservesLocalOnlyVariants() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -2457,7 +2746,7 @@ class ZohoSyncServiceTest {
     @ParameterizedTest
     @ValueSource(booleans = { false, true })
     void pullProducts_incrementalInactiveVariant_deactivatesRowAndParent(boolean staleTimestamp) {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -2614,7 +2903,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void pullProducts_listInactiveButDetailActive_importsProduct() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -2678,7 +2967,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void pullProducts_incremental_adminDeletedProductWithStaleInactiveList_recreatesActiveProduct() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -2871,7 +3160,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void pullProducts_variantSkuRename_updatesExistingRowAndReactivatesParent() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -3417,7 +3706,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void pullExternalProduct_emptyAdminCreatesVariantParentThenAddsNextVariantToSameGroup() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -3878,7 +4167,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void pullInventory_parentLinkedByVariantItemId_updatesMatrixRowNotRawParentStock() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -3954,7 +4243,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void pullProducts_attachesGroupedItemToExistingParentAndDeactivatesSimpleDuplicate() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -4018,7 +4307,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void pullProducts_reusesExistingVariantParentBySlugWhenZohoOmitsGroupId() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -4084,7 +4373,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void pullProducts_doesNotAbsorbSimpleItemThatSharesVariantParentName() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -4156,7 +4445,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void syncProduct_variants_sendsGroupIdWhenParentLinked() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -4211,8 +4500,136 @@ class ZohoSyncServiceTest {
     }
 
     @Test
+    void syncProduct_variants_neverSendsMrpLowerThanSellingPrice() {
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository,
+                s3StorageService,
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
+            );
+
+        Product product = new Product()
+            .id(25L)
+            .sku("BSJ")
+            .name("Book Style Tying Jabla")
+            .zohoItemId("grp-jabla")
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                """
+                [{"sku":"BSJ-0-3-AQUA","size":"0-3 M","color":"Aqua","rate":799.20,"mrp":499,"stock":1,"active":true}]
+                """
+            )
+            .active(true);
+        when(productRepository.findOneWithEagerRelationships(25L)).thenReturn(Optional.of(product));
+        when(booksClient.findItemBySku("BSJ-0-3-AQUA")).thenReturn(null);
+        when(booksClient.createItem(any())).thenReturn(Map.of("item", Map.of("item_id", "zoho-bsj-aqua")));
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.syncProduct(25L);
+
+        // Selling price is derived from MRP (20% store discount); label_rate must stay >= rate.
+        verify(booksClient).createItem(
+            argThat(payload -> {
+                if (!"BSJ-0-3-AQUA".equals(payload.get("sku"))) {
+                    return false;
+                }
+                BigDecimal rate = payload.get("rate") instanceof BigDecimal bd ? bd : null;
+                BigDecimal labelRate = payload.get("label_rate") == null
+                    ? null
+                    : new BigDecimal(String.valueOf(payload.get("label_rate")));
+                return (
+                    rate != null &&
+                    labelRate != null &&
+                    labelRate.compareTo(rate) >= 0 &&
+                    BigDecimal.valueOf(399.20).compareTo(rate) == 0 &&
+                    labelRate.compareTo(BigDecimal.valueOf(499)) == 0 &&
+                    "grp-jabla".equals(payload.get("group_id")) &&
+                    "0-3 M".equals(payload.get("attribute_option_name1")) &&
+                    "Aqua".equals(payload.get("attribute_option_name2"))
+                );
+            })
+        );
+    }
+
+    @Test
+    void syncProduct_variants_priceValidationDoesNotRetryAsPlainItem() {
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
+        service =
+            new ZohoSyncService(
+                booksClient,
+                objectMapper,
+                applicationProperties,
+                itemImageSync,
+                productFieldMapper,
+                descriptionCodec,
+                realVariantSupport,
+                productRepository,
+                zohoSettingRepository,
+                customerOrderRepository,
+                customerProfileRepository,
+                orderItemRepository,
+                s3StorageService,
+                orderEventService,
+                accountResolver,
+                stockAdjuster,
+                stockReconcileService
+            );
+
+        Product product = new Product()
+            .id(26L)
+            .sku("BSJ")
+            .name("Book Style Tying Jabla")
+            .zohoItemId("grp-jabla")
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                """
+                [{"sku":"BSJ-0-3-AQUA","size":"0-3 M","color":"Aqua","rate":799.20,"mrp":499,"stock":1,"active":true}]
+                """
+            )
+            .active(true);
+        when(productRepository.findOneWithEagerRelationships(26L)).thenReturn(Optional.of(product));
+        when(booksClient.findItemBySku("BSJ-0-3-AQUA")).thenReturn(null);
+        when(booksClient.createItem(any()))
+            .thenThrow(
+                new RestClientResponseException(
+                    "Selling Price cannot be greater than MRP.",
+                    400,
+                    "Bad Request",
+                    null,
+                    "{\"code\":6,\"message\":\"Selling Price cannot be greater than MRP.\"}".getBytes(),
+                    null
+                )
+            );
+
+        service.syncProduct(26L);
+
+        verify(booksClient, times(1)).createItem(any());
+        verify(productRepository)
+            .updateZohoSyncFailure(
+                eq(26L),
+                eq(ZohoSyncStatus.FAILED),
+                argThat(message -> message.contains("Selling Price cannot be greater than MRP"))
+            );
+    }
+
+    @Test
     void syncProduct_variants_retriesPlainItemWhenZohoRejectsAttributes() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -4270,7 +4687,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void syncProduct_inactiveVariants_doesNotMarkGroupIdInactive() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -4313,7 +4730,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void syncProduct_inactiveVariants_staleZohoItemId_skipsRatherThanFailingWholeProduct() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -4374,7 +4791,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void syncProduct_activeParent_deactivatesLinkedInactiveVariantRows() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -4419,7 +4836,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void syncProduct_variantValidationRejectsDuplicateActiveSkusBeforeCallingZoho() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -4468,7 +4885,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void syncProduct_inactiveParentWithOnlyRowLinks_stillDeactivatesZohoItems() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -4546,7 +4963,7 @@ class ZohoSyncServiceTest {
 
     @Test
     void syncOrder_inactiveVariantItem_reactivatesMappingAndRetriesSalesOrder() {
-        ProductVariantSupport realVariantSupport = new ProductVariantSupport(objectMapper);
+        ProductVariantSupport realVariantSupport = StorePricingTestSupport.variantSupport(objectMapper);
         service =
             new ZohoSyncService(
                 booksClient,
@@ -4616,6 +5033,116 @@ class ZohoSyncServiceTest {
         verify(booksClient).updateItem(eq("stale-item"), any());
         assertThat(order.getZohoSalesOrderId()).isEqualTo("so-repaired");
         assertThat(order.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.SYNCED);
+    }
+
+    @Test
+    void syncOrder_marksSalesOrderOpenBeforeInvoicing() {
+        CustomerOrder order = new CustomerOrder()
+            .id(114L)
+            .orderNumber("MNM-MARK-OPEN")
+            .userLogin("buyer@example.com")
+            .paymentMethod("cod")
+            .paymentStatus(com.miniandmore.app.domain.enumeration.PaymentStatus.PAID)
+            .status(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED)
+            .total(BigDecimal.valueOf(500))
+            .zohoSalesOrderId("so-mark-open");
+
+        when(customerOrderRepository.findById(114L)).thenReturn(Optional.of(order));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(booksClient.createInvoiceFromSalesOrder("so-mark-open"))
+            .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-mark-open")));
+        when(booksClient.getInvoice("inv-mark-open"))
+            .thenReturn(Map.of("invoice", Map.of("status", "sent", "balance", 500)));
+        when(booksClient.createCustomerPayment(any())).thenReturn(Map.of("payment", Map.of("payment_id", "pay-mark-open")));
+
+        service.syncOrder(114L);
+
+        var inOrder = org.mockito.Mockito.inOrder(booksClient);
+        inOrder.verify(booksClient).markSalesOrderAsOpen("so-mark-open");
+        inOrder.verify(booksClient).createInvoiceFromSalesOrder("so-mark-open");
+        assertThat(order.getZohoInvoiceId()).isEqualTo("inv-mark-open");
+        assertThat(order.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.SYNCED);
+    }
+
+    @Test
+    void syncOrder_alreadyInvoicedSalesOrder_linksExistingInvoice() {
+        CustomerOrder order = new CustomerOrder()
+            .id(115L)
+            .orderNumber("MNM-ALREADY-INV")
+            .userLogin("buyer@example.com")
+            .paymentStatus(com.miniandmore.app.domain.enumeration.PaymentStatus.PAID)
+            .status(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED)
+            .total(BigDecimal.valueOf(419))
+            .zohoSalesOrderId("so-already-inv")
+            .zohoSyncStatus(ZohoSyncStatus.FAILED)
+            .zohoSyncError("36026");
+
+        RestClientResponseException alreadyInvoiced = new RestClientResponseException(
+            "Bad Request",
+            400,
+            "Bad Request",
+            null,
+            "{\"code\":36026,\"message\":\"There are no items in this sales order to be invoiced.\"}".getBytes(),
+            null
+        );
+
+        when(customerOrderRepository.findById(115L)).thenReturn(Optional.of(order));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(booksClient.createInvoiceFromSalesOrder("so-already-inv")).thenThrow(alreadyInvoiced);
+        when(booksClient.getSalesOrder("so-already-inv"))
+            .thenReturn(
+                Map.of(
+                    "salesorder",
+                    Map.of("salesorder_id", "so-already-inv", "invoices", List.of(Map.of("invoice_id", "inv-existing", "status", "sent")))
+                )
+            );
+
+        service.syncOrder(115L);
+
+        assertThat(order.getZohoInvoiceId()).isEqualTo("inv-existing");
+        assertThat(order.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.SYNCED);
+        assertThat(order.getZohoSyncError()).isNull();
+    }
+
+    @Test
+    void syncOrder_alreadyInvoiced_codPaid_recordsPayment() {
+        CustomerOrder order = new CustomerOrder()
+            .id(116L)
+            .orderNumber("MNM-ALREADY-INV-COD")
+            .userLogin("buyer@example.com")
+            .paymentMethod("cod")
+            .paymentStatus(com.miniandmore.app.domain.enumeration.PaymentStatus.PAID)
+            .status(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED)
+            .total(BigDecimal.valueOf(419))
+            .zohoSalesOrderId("so-already-inv-cod");
+
+        RestClientResponseException alreadyInvoiced = new RestClientResponseException(
+            "Bad Request",
+            400,
+            "Bad Request",
+            null,
+            "{\"code\":36026,\"message\":\"There are no items in this sales order to be invoiced.\"}".getBytes(),
+            null
+        );
+
+        when(customerOrderRepository.findById(116L)).thenReturn(Optional.of(order));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(booksClient.createInvoiceFromSalesOrder("so-already-inv-cod")).thenThrow(alreadyInvoiced);
+        when(booksClient.getSalesOrder("so-already-inv-cod"))
+            .thenReturn(
+                Map.of(
+                    "salesorder",
+                    Map.of("salesorder_id", "so-already-inv-cod", "invoices", List.of(Map.of("invoice_id", "inv-cod-existing", "status", "sent")))
+                )
+            );
+        when(booksClient.getInvoice("inv-cod-existing"))
+            .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-cod-existing", "status", "sent", "balance", 419)));
+        when(booksClient.createCustomerPayment(any())).thenReturn(Map.of("payment", Map.of("payment_id", "pay-cod-existing")));
+
+        service.syncOrder(116L);
+
+        assertThat(order.getZohoInvoiceId()).isEqualTo("inv-cod-existing");
+        verify(booksClient).createCustomerPayment(any());
     }
 
     @Test

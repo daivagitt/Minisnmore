@@ -70,6 +70,38 @@ class SiteSettingServiceTest {
     }
 
     @Test
+    void update_preservesExistingCodFeeWhenOlderClientOmitsIt() {
+        SiteSettingDTO input = new SiteSettingDTO();
+        input.setId(ID);
+        SiteSetting existing = new SiteSetting().id(ID).codFeeInr(149);
+        SiteSetting mapped = new SiteSetting().id(ID);
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.of(existing));
+        when(siteSettingMapper.toEntity(input)).thenReturn(mapped);
+        when(siteSettingRepository.save(mapped)).thenReturn(mapped);
+        when(siteSettingMapper.toDto(mapped)).thenReturn(input);
+
+        siteSettingService.update(input);
+
+        assertThat(input.getCodFeeInr()).isEqualTo(149);
+    }
+
+    @Test
+    void update_preservesExistingDeliveryEtaBufferDaysWhenOlderClientOmitsIt() {
+        SiteSettingDTO input = new SiteSettingDTO();
+        input.setId(ID);
+        SiteSetting existing = new SiteSetting().id(ID).deliveryEtaBufferDays(2);
+        SiteSetting mapped = new SiteSetting().id(ID);
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.of(existing));
+        when(siteSettingMapper.toEntity(input)).thenReturn(mapped);
+        when(siteSettingRepository.save(mapped)).thenReturn(mapped);
+        when(siteSettingMapper.toDto(mapped)).thenReturn(input);
+
+        siteSettingService.update(input);
+
+        assertThat(input.getDeliveryEtaBufferDays()).isEqualTo(2);
+    }
+
+    @Test
     void partialUpdate_found() {
         SiteSettingDTO input = new SiteSettingDTO();
         input.setId(ID);

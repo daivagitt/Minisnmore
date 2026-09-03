@@ -38,6 +38,12 @@ public final class ZohoOrderStatus {
             order.setShipmentDate(StringUtils.isNotBlank(fallbackDate) ? fallbackDate.trim() : LocalDate.now().toString());
         }
         updateOrderStatusFromZoho(order, salesOrder);
+        if (order.getStatus() != OrderStatus.FULFILLED && isExplicitlyUnpackedAndUnshipped(salesOrder)) {
+            order.setShipmentDate(null);
+            if (order.getStatus() == OrderStatus.HAND_WRAPPED) {
+                order.setStatus(OrderStatus.CONFIRMED);
+            }
+        }
         if (
             order.getStatus() == OrderStatus.CONFIRMED &&
             !hasShippedSignal(salesOrder) &&
@@ -107,6 +113,8 @@ public final class ZohoOrderStatus {
             String packageShipmentDate = stringValue(pkg.get("shipment_date"));
             if (StringUtils.isNotBlank(packageShipmentDate)) {
                 order.setShipmentDate(packageShipmentDate.trim());
+            } else if (hasPackageShipmentSignal(pkg) && StringUtils.isBlank(order.getShipmentDate())) {
+                order.setShipmentDate(LocalDate.now().toString());
             }
         }
         if (packages.stream().anyMatch(ZohoOrderStatus::isFulfilledShipment)) {
@@ -124,15 +132,112 @@ public final class ZohoOrderStatus {
     }
 
     private static boolean isFulfilledShipment(Map<String, Object> pkg) {
-        String status = normalize(stringValue(pkg.get("status")));
-        String detailedStatus = normalize(stringValue(pkg.get("detailed_status")));
-        String statusMessage = normalize(stringValue(pkg.get("status_message")));
-        if ("delivered".equals(status) || "delivered".equals(detailedStatus) || "delivered".equals(statusMessage)) {
+        return indicatesShipmentDelivery(pkg);
+    }
+
+    private static boolean hasPackageShipmentSignal(Map<String, Object> pkg) {
+        if (pkg == null || pkg.isEmpty()) {
+            return false;
+        }
+        String shipmentId = stringValue(pkg.get("shipment_id"));
+        String shipmentOrderId = stringValue(pkg.get("shipment_order_id"));
+        if (StringUtils.isNotBlank(shipmentId) && !shipmentId.equals(shipmentOrderId)) {
             return true;
         }
-        // A sales order or invoice can become fulfilled during accounting. A package can only
-        // become fulfilled after it has been converted to a shipment, identified by shipment_id.
-        return "fulfilled".equals(status) && StringUtils.isNotBlank(stringValue(pkg.get("shipment_id")));
+        String status = normalize(stringValue(pkg.get("status")));
+        String detailedStatus = normalize(stringValue(pkg.get("detailed_status")));
+        String detailedStatusCamel = normalize(stringValue(pkg.get("detailedStatus")));
+        String shipmentStatus = normalize(stringValue(pkg.get("shipment_status")));
+        String shipmentStatusCamel = normalize(stringValue(pkg.get("shipmentStatus")));
+        return "shipped".equals(status) ||
+        "shipped".equals(detailedStatus) ||
+        "shipped".equals(detailedStatusCamel) ||
+        "shipped".equals(shipmentStatus) ||
+        "shipped".equals(shipmentStatusCamel) ||
+        "in_transit".equals(status) ||
+        "in_transit".equals(detailedStatus) ||
+        "in_transit".equals(detailedStatusCamel) ||
+        "in_transit".equals(shipmentStatus) ||
+        "in_transit".equals(shipmentStatusCamel);
+    }
+
+    public static boolean indicatesShipmentDelivery(Map<String, Object> pkg) {
+        return indicatesDelivery(pkg) || isNativeShipmentOrderCompletion(pkg);
+    }
+
+    /**
+     * Zoho Inventory shipment-order workflows only expose Fulfilled (not Delivered) as the
+     * completion status. Treat Fulfilled/Delivered on a package/shipment payload as delivery.
+     * Sales-order {@code fulfilled} still goes through {@link #indicatesDelivery} / sales-order
+     * mapping and must not use this path — invoicing can set that without physical delivery.
+     */
+    private static boolean isNativeShipmentOrderCompletion(Map<String, Object> pkg) {
+        if (pkg == null || pkg.isEmpty()) {
+            return false;
+        }
+        return isDeliveredOrFulfilledToken(stringValue(pkg.get("status"))) ||
+        isDeliveredOrFulfilledToken(stringValue(pkg.get("detailed_status"))) ||
+        isDeliveredOrFulfilledToken(stringValue(pkg.get("detailedStatus"))) ||
+        isDeliveredOrFulfilledToken(stringValue(pkg.get("shipment_status"))) ||
+        isDeliveredOrFulfilledToken(stringValue(pkg.get("shipmentStatus"))) ||
+        isDeliveredOrFulfilledToken(stringValue(pkg.get("status_message"))) ||
+        isDeliveredOrFulfilledToken(stringValue(pkg.get("statusMessage")));
+    }
+
+    private static boolean isDeliveredOrFulfilledToken(String value) {
+        String normalized = normalize(value);
+        return "delivered".equals(normalized) || "fulfilled".equals(normalized);
+    }
+
+    /** True when a shipment/package payload explicitly reports delivery completion. */
+    public static boolean indicatesDelivery(Map<String, Object> pkg) {
+        if (pkg == null || pkg.isEmpty()) {
+            return false;
+        }
+        String status = normalize(stringValue(pkg.get("status")));
+        String detailedStatus = normalize(stringValue(pkg.get("detailed_status")));
+        String detailedStatusCamel = normalize(stringValue(pkg.get("detailedStatus")));
+        String statusMessage = normalize(stringValue(pkg.get("status_message")));
+        String statusMessageCamel = normalize(stringValue(pkg.get("statusMessage")));
+        String currentStatus = normalize(stringValue(pkg.get("current_status")));
+        String currentStatusCamel = normalize(stringValue(pkg.get("currentStatus")));
+        String deliveryStatus = normalize(stringValue(pkg.get("delivery_status")));
+        String deliveryStatusCamel = normalize(stringValue(pkg.get("deliveryStatus")));
+        String miniMsDeliveryStatus = normalize(stringValue(pkg.get("cf_minims_delivery_status")));
+        String miniMsDeliveryStatusCamel = normalize(stringValue(pkg.get("cfMinimsDeliveryStatus")));
+        String shipmentStatus = normalize(stringValue(pkg.get("shipment_status")));
+        String shipmentStatusCamel = normalize(stringValue(pkg.get("shipmentStatus")));
+        String statusFormatted = normalize(stringValue(pkg.get("status_formatted")));
+        String shipmentStatusFormatted = normalize(stringValue(pkg.get("shipment_status_formatted")));
+        if (
+            "delivered".equals(status) ||
+            "delivered".equals(detailedStatus) ||
+            "delivered".equals(detailedStatusCamel) ||
+            "delivered".equals(statusMessage) ||
+            "delivered".equals(statusMessageCamel) ||
+            "delivered".equals(currentStatus) ||
+            "delivered".equals(currentStatusCamel) ||
+            "delivered".equals(deliveryStatus) ||
+            "delivered".equals(deliveryStatusCamel) ||
+            "delivered".equals(miniMsDeliveryStatus) ||
+            "delivered".equals(miniMsDeliveryStatusCamel) ||
+            "delivered".equals(shipmentStatus) ||
+            "delivered".equals(shipmentStatusCamel) ||
+            "delivered".equals(statusFormatted) ||
+            "delivered".equals(shipmentStatusFormatted)
+        ) {
+            return true;
+        }
+        if (
+            StringUtils.isNotBlank(stringValue(pkg.get("shipment_delivered_date"))) ||
+            StringUtils.isNotBlank(stringValue(pkg.get("shipmentDeliveredDate"))) ||
+            StringUtils.isNotBlank(stringValue(pkg.get("shipment_delivered_date_formatted")))
+        ) {
+            return true;
+        }
+        // "fulfilled" can arrive when Zoho creates/converts a shipment order. It is not proof
+        // of physical delivery, so only explicit delivered states should close the order.
+        return false;
     }
 
     public static boolean isShipped(String zohoOrderStatus) {
@@ -175,7 +280,7 @@ public final class ZohoOrderStatus {
     }
 
     private static void updateOrderStatusFromZoho(CustomerOrder order, Map<String, Object> salesOrder) {
-        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FULFILLED) {
+        if (order.getStatus() == OrderStatus.CANCELLED) {
             return;
         }
         String status = normalize(stringValue(salesOrder.get("status")));
@@ -184,12 +289,18 @@ public final class ZohoOrderStatus {
             return;
         }
         String shippedStatus = normalize(stringValue(salesOrder.get("shipped_status")));
+        String shippedStatusCamel = normalize(stringValue(salesOrder.get("shippedStatus")));
         // "fulfilled" is not delivery evidence: Zoho can set both the main sales-order status and
         // shipped_status to fulfilled while converting an order to an invoice or collecting its
         // payment. Delivery challans are handled separately by applyDeliveryChallans. Preserve an
         // explicit "delivered" signal here for Zoho organizations that expose one directly.
-        if ("delivered".equals(status) || "delivered".equals(shippedStatus)) {
+        if ("delivered".equals(status) || "delivered".equals(shippedStatus) || "delivered".equals(shippedStatusCamel) || indicatesDelivery(salesOrder)) {
             order.setStatus(OrderStatus.FULFILLED);
+            return;
+        }
+        // Sales-order "fulfilled"/invoiced is not physical delivery. Never demote a store
+        // order that a shipment webhook already marked delivered — Zoho SOs stay invoiced.
+        if (order.getStatus() == OrderStatus.FULFILLED) {
             return;
         }
         if (order.getStatus() == OrderStatus.PENDING && order.getPaymentStatus() == PaymentStatus.PAID) {
@@ -234,6 +345,23 @@ public final class ZohoOrderStatus {
         return false;
     }
 
+    private static boolean isExplicitlyUnpackedAndUnshipped(Map<String, Object> salesOrder) {
+        if (salesOrder == null || salesOrder.isEmpty() || indicatesDelivery(salesOrder)) {
+            return false;
+        }
+        String shippedStatus = normalize(stringValue(salesOrder.get("shipped_status")));
+        String shippedStatusCamel = normalize(stringValue(salesOrder.get("shippedStatus")));
+        boolean pendingShipmentStatus = isPendingShipmentStatus(shippedStatus) || isPendingShipmentStatus(shippedStatusCamel);
+        if (!pendingShipmentStatus) {
+            return false;
+        }
+        return !hasPositiveLineQuantity(salesOrder, "quantity_packed") && !hasPositiveLineQuantity(salesOrder, "quantity_shipped");
+    }
+
+    private static boolean isPendingShipmentStatus(String status) {
+        return "pending".equals(status) || "not_shipped".equals(status);
+    }
+
     private static boolean hasPositiveLineQuantity(Map<String, Object> salesOrder, String field) {
         Object raw = salesOrder.get("line_items");
         if (!(raw instanceof List<?> lines)) {
@@ -264,7 +392,7 @@ public final class ZohoOrderStatus {
         if (status == null) {
             return null;
         }
-        String trimmed = status.trim().toLowerCase().replace('-', '_');
+        String trimmed = status.trim().toLowerCase().replace('-', '_').replace(' ', '_');
         return trimmed.isEmpty() ? null : trimmed;
     }
 

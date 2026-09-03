@@ -41,21 +41,25 @@ public class ZohoStockWebhookHandlerService {
     }
 
     public Map<String, Object> handle(String rawBody, String signature) {
-        verifySignature(rawBody, signature);
+        return handle(rawBody, signature, null);
+    }
+
+    public Map<String, Object> handle(String rawBody, String signature, String sharedSecret) {
+        verifySignature(rawBody, signature, sharedSecret);
         Map<String, Object> payload = WebhookPayloadSupport.parseJsonMap(objectMapper, rawBody);
 
-        String eventId = StringUtils.trimToNull(stringValue(payload.get("eventId")));
+        String eventId = StringUtils.trimToNull(ZohoWebhookSupport.stringValue(payload.get("eventId")));
         if (eventId == null) {
-            eventId = StringUtils.trimToNull(stringValue(payload.get("event_id")));
+            eventId = StringUtils.trimToNull(ZohoWebhookSupport.stringValue(payload.get("event_id")));
         }
         if (eventId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing eventId");
         }
         if (webhookEventRepository.existsByEventId(eventId)) {
-            return Map.of("ok", true, "duplicate", true, "eventId", eventId);
+            return ZohoWebhookSupport.duplicateEventResult(eventId);
         }
 
-        String sku = StringUtils.trimToNull(stringValue(payload.get("sku")));
+        String sku = StringUtils.trimToNull(ZohoWebhookSupport.stringValue(payload.get("sku")));
         Long productId = parseProductId(payload.get("productId"), payload.get("product_id"));
         Integer stock = parseStock(payload.get("stock"));
         if (stock == null) {
@@ -73,7 +77,7 @@ public class ZohoStockWebhookHandlerService {
         try {
             webhookEventRepository.saveAndFlush(record);
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            return Map.of("ok", true, "duplicate", true, "eventId", eventId);
+            return ZohoWebhookSupport.duplicateEventResult(eventId);
         }
 
         try {
@@ -90,21 +94,16 @@ public class ZohoStockWebhookHandlerService {
         }
     }
 
-    private void verifySignature(String rawBody, String signature) {
-        String secret = StringUtils.trimToNull(applicationProperties.getZoho().getStockWebhookSecret());
-        if (secret == null) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Stock webhook secret is not configured");
-        }
-        if (StringUtils.isBlank(signature)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing X-Zoho-Stock-Signature");
-        }
-        if (!WebhookHmacSupport.signaturesMatch(secret, rawBody, signature)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid stock webhook signature");
-        }
-    }
-
-    private static String stringValue(Object value) {
-        return value == null ? null : value.toString();
+    private void verifySignature(String rawBody, String signature, String sharedSecret) {
+        ZohoWebhookSupport.verifySecretOrSignature(
+            applicationProperties.getZoho().getStockWebhookSecret(),
+            rawBody,
+            signature,
+            sharedSecret,
+            "Stock webhook secret is not configured",
+            "Missing stock webhook authentication",
+            "Invalid stock webhook signature"
+        );
     }
 
     private static Long parseProductId(Object camel, Object snake) {

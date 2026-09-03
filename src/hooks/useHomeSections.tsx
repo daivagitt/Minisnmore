@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { listHomeSections } from "@/lib/backend-data";
+import { broadcastStorefrontInvalidation } from "@/lib/storefront-cache-broadcast";
 
 export type HomeSection = {
   id: string;
@@ -50,9 +51,10 @@ async function load(): Promise<HomeSection[]> {
 /** Warm home-section config before the homepage mounts. */
 void load();
 
-export function invalidateHomeSections() {
+export function invalidateHomeSections(options?: { broadcast?: boolean }) {
   cache = null;
   void load();
+  if (options?.broadcast !== false) broadcastStorefrontInvalidation("homeSections");
 }
 
 export function useHomeSections() {

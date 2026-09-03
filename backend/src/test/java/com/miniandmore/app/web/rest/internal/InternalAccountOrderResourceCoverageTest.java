@@ -636,18 +636,25 @@ class InternalAccountOrderResourceCoverageTest {
 
     /**
      * Cash on Delivery must place a real, fulfillable order without touching Razorpay: the order
-     * is confirmed immediately (no online payment step to wait on), the ₹99 COD handling fee is
+     * is confirmed immediately (no online payment step to wait on), the configured COD handling fee is
      * added to the total, and the inventory hold never expires (no 30-minute TTL like online
      * orders, since there's no "abandoned checkout" to reap).
      */
     @Test
-    void createOrder_cod_skipsGatewayAndChargesHandlingFee() throws Exception {
+    void createOrder_cod_skipsGatewayAndChargesConfiguredHandlingFee() throws Exception {
         ReflectionTestUtils.setField(resource, "razorpayKeyId", "DEMO");
         ReflectionTestUtils.setField(resource, "razorpayKeySecret", "");
         Product product = new Product().id(1L).name("Dress").slug("dress").price(BigDecimal.valueOf(1000)).stock(5).active(true);
         when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+        SiteSetting settings = new SiteSetting()
+            .gstRate(BigDecimal.valueOf(5))
+            .pricesIncludeGst(true)
+            .shippingStandardInr(99)
+            .shippingExpressInr(150)
+            .freeShippingMinInr(2500)
+            .codFeeInr(149);
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.of(settings));
         CustomerOrder saved = new CustomerOrder().id(403L).orderNumber("MNM-COD").total(BigDecimal.valueOf(1148));
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> {
             CustomerOrder order = inv.getArgument(0);
@@ -675,11 +682,11 @@ class InternalAccountOrderResourceCoverageTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.cod").value(true))
             .andExpect(jsonPath("$.data.paymentMethod").value("cod"))
-            // Subtotal ₹1000 + shipping ₹99 + GST-inclusive ₹99 COD fee = ₹1198.
-            .andExpect(jsonPath("$.data.totals.cod_fee").value(99.0))
-            .andExpect(jsonPath("$.data.totals.tax").value(52.33))
-            .andExpect(jsonPath("$.data.totals.total").value(1198.0))
-            .andExpect(jsonPath("$.data.amount").value(119800))
+            // Subtotal ₹1000 + shipping ₹99 + configured GST-inclusive ₹149 COD fee = ₹1248.
+            .andExpect(jsonPath("$.data.totals.cod_fee").value(149.0))
+            .andExpect(jsonPath("$.data.totals.tax").value(54.72))
+            .andExpect(jsonPath("$.data.totals.total").value(1248.0))
+            .andExpect(jsonPath("$.data.amount").value(124800))
             .andExpect(jsonPath("$.data.razorpayOrderId").doesNotExist())
             .andExpect(jsonPath("$.data.keyId").doesNotExist());
 
@@ -1559,8 +1566,13 @@ class InternalAccountOrderResourceCoverageTest {
         }
 
         @Bean
+        com.miniandmore.app.service.StorePricingService storePricingService() {
+            return com.miniandmore.app.service.StorePricingTestSupport.defaultPricing();
+        }
+
+        @Bean
         com.miniandmore.app.service.ProductVariantSupport productVariantSupport(ObjectMapper objectMapper) {
-            return new com.miniandmore.app.service.ProductVariantSupport(objectMapper);
+            return com.miniandmore.app.service.StorePricingTestSupport.variantSupport(objectMapper);
         }
 
         @Bean

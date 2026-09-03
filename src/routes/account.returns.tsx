@@ -23,7 +23,7 @@ export const Route = createFileRoute("/account/returns")({
 });
 
 const TERMINAL_STATUSES = ["rejected", "cancelled", "refunded", "completed"];
-const RETURNS_UI_ENABLED = false;
+const RETURNS_UI_ENABLED = true;
 
 function ReturnsPage() {
   if (!RETURNS_UI_ENABLED) return null;

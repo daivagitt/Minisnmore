@@ -1,6 +1,7 @@
 import { api, ApiError } from "@/lib/api";
 import { numberFieldOr, requireNumberField } from "@/lib/admin-number-field";
 import { validateVariantRows } from "@/lib/admin-variants";
+import { MAX_DELIVERY_ETA_BUFFER_DAYS } from "@/lib/commerce";
 import { internalSitePathError } from "@/lib/internal-links";
 import {
   isExampleOrPlaceholderUrl,
@@ -393,6 +394,21 @@ export function getSiteSettingsValidationErrors(row: SiteSettingsRow): string[] 
     max: FREE_SHIPPING_MIN_INR_MAX,
   });
   if (freeShippingError) errors.push(freeShippingError);
+  const codFeeError = requireNumberField(row.cod_fee_inr, "COD handling fee", {
+    allowZero: true,
+    max: SHIPPING_INR_MAX,
+  });
+  if (codFeeError) errors.push(codFeeError);
+  const etaBufferError = requireNumberField(row.delivery_eta_buffer_days, "Delivery ETA buffer days", {
+    allowZero: true,
+    max: MAX_DELIVERY_ETA_BUFFER_DAYS,
+  });
+  if (etaBufferError) errors.push(etaBufferError);
+  const discountError = requireNumberField(row.store_discount_percent, "Store discount", {
+    allowZero: true,
+    max: GST_RATE_MAX,
+  });
+  if (discountError) errors.push(discountError);
   return errors;
 }
 
@@ -1031,7 +1047,22 @@ export const saveCoupon = (row: CouponRow) => {
 };
 export const deleteCoupon = (id: Id) => deleteAdmin("coupons", id);
 
-export type SiteSettingsRow = Record<string, string | number | boolean | null | undefined>;
+export type SiteSettingsRow = Record<string, string | number | boolean | null | undefined> & {
+  brand_name?: string | null;
+  contact_email?: string | null;
+  ecatalogue_url?: string | null;
+  invoice_website?: string | null;
+  invoice_gstin?: string | null;
+  invoice_sold_by_address?: string | null;
+  gst_rate?: number | null;
+  prices_include_gst?: boolean | null;
+  shipping_standard_inr?: number | null;
+  shipping_express_inr?: number | null;
+  free_shipping_min_inr?: number | null;
+  cod_fee_inr?: number | null;
+  delivery_eta_buffer_days?: number | null;
+  store_discount_percent?: number | null;
+};
 
 const siteStringMap: Record<string, string> = {
   brand_name: "brandName",
@@ -1077,6 +1108,9 @@ function fromSiteSettingDto(dto: Record<string, unknown> | null): SiteSettingsRo
   row.shipping_standard_inr = dto.shippingStandardInr as number | undefined;
   row.shipping_express_inr = dto.shippingExpressInr as number | undefined;
   row.free_shipping_min_inr = dto.freeShippingMinInr as number | undefined;
+  row.cod_fee_inr = dto.codFeeInr as number | undefined;
+  row.delivery_eta_buffer_days = dto.deliveryEtaBufferDays as number | undefined;
+  row.store_discount_percent = dto.storeDiscountPercent as number | undefined;
   return row;
 }
 
@@ -1089,6 +1123,9 @@ function toSiteSettingDto(row: SiteSettingsRow) {
   payload.shippingStandardInr = row.shipping_standard_inr ?? null;
   payload.shippingExpressInr = row.shipping_express_inr ?? null;
   payload.freeShippingMinInr = row.free_shipping_min_inr ?? null;
+  payload.codFeeInr = row.cod_fee_inr ?? null;
+  payload.deliveryEtaBufferDays = row.delivery_eta_buffer_days ?? null;
+  payload.storeDiscountPercent = row.store_discount_percent ?? null;
   return payload;
 }
 

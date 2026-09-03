@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260903120000-1" author="minisandmore">
+        <addColumn tableName="site_setting">
+            <column name="cod_fee_inr" type="integer" defaultValueNumeric="99">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+        <sql>
+            UPDATE site_setting
+            SET cod_fee_inr = COALESCE(cod_fee_inr, 99);
+        </sql>
+    </changeSet>
+</databaseChangeLog>

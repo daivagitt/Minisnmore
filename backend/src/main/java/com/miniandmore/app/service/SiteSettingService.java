@@ -4,6 +4,7 @@ import com.miniandmore.app.domain.SiteSetting;
 import com.miniandmore.app.repository.SiteSettingRepository;
 import com.miniandmore.app.service.dto.SiteSettingDTO;
 import com.miniandmore.app.service.mapper.SiteSettingMapper;
+import java.math.BigDecimal;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SiteSettingService {
 
     private static final Logger LOG = LoggerFactory.getLogger(SiteSettingService.class);
+    private static final int DEFAULT_COD_FEE_INR = 99;
 
     private final SiteSettingRepository siteSettingRepository;
 
@@ -36,6 +38,9 @@ public class SiteSettingService {
      */
     public SiteSettingDTO save(SiteSettingDTO siteSettingDTO) {
         LOG.debug("Request to save SiteSetting : {}", siteSettingDTO);
+        defaultStoreDiscountPercent(siteSettingDTO);
+        defaultCodFee(siteSettingDTO);
+        defaultDeliveryEtaBufferDays(siteSettingDTO);
         SiteSetting siteSetting = siteSettingMapper.toEntity(siteSettingDTO);
         siteSetting = siteSettingRepository.save(siteSetting);
         return siteSettingMapper.toDto(siteSetting);
@@ -49,6 +54,9 @@ public class SiteSettingService {
      */
     public SiteSettingDTO update(SiteSettingDTO siteSettingDTO) {
         LOG.debug("Request to update SiteSetting : {}", siteSettingDTO);
+        defaultStoreDiscountPercent(siteSettingDTO);
+        defaultCodFee(siteSettingDTO);
+        defaultDeliveryEtaBufferDays(siteSettingDTO);
         SiteSetting siteSetting = siteSettingMapper.toEntity(siteSettingDTO);
         siteSetting = siteSettingRepository.save(siteSetting);
         return siteSettingMapper.toDto(siteSetting);
@@ -94,5 +102,47 @@ public class SiteSettingService {
     public void delete(Long id) {
         LOG.debug("Request to delete SiteSetting : {}", id);
         siteSettingRepository.deleteById(id);
+    }
+
+    private void defaultStoreDiscountPercent(SiteSettingDTO dto) {
+        if (dto.getStoreDiscountPercent() != null) {
+            return;
+        }
+        siteSettingRepository
+            .findFirstByOrderByIdAsc()
+            .map(SiteSetting::getStoreDiscountPercent)
+            .filter(p -> p != null)
+            .ifPresent(dto::setStoreDiscountPercent);
+        if (dto.getStoreDiscountPercent() == null) {
+            dto.setStoreDiscountPercent(new BigDecimal("20"));
+        }
+    }
+
+    private void defaultCodFee(SiteSettingDTO dto) {
+        if (dto.getCodFeeInr() != null) {
+            return;
+        }
+        siteSettingRepository
+            .findFirstByOrderByIdAsc()
+            .map(SiteSetting::getCodFeeInr)
+            .filter(fee -> fee != null)
+            .ifPresent(dto::setCodFeeInr);
+        if (dto.getCodFeeInr() == null) {
+            dto.setCodFeeInr(DEFAULT_COD_FEE_INR);
+        }
+    }
+
+    private void defaultDeliveryEtaBufferDays(SiteSettingDTO dto) {
+        if (dto.getDeliveryEtaBufferDays() != null) {
+            return;
+        }
+        siteSettingRepository
+            .findFirstByOrderByIdAsc()
+            .map(SiteSetting::getDeliveryEtaBufferDays)
+            .filter(days -> days != null)
+            .ifPresent(dto::setDeliveryEtaBufferDays);
+        if (dto.getDeliveryEtaBufferDays() == null) {
+            dto.setDeliveryEtaBufferDays(SiteSetting.DEFAULT_DELIVERY_ETA_BUFFER_DAYS);
+        }
     }
 }

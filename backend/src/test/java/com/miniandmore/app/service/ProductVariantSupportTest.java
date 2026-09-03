@@ -19,7 +19,7 @@ class ProductVariantSupportTest {
 
     @BeforeEach
     void setUp() {
-        support = new ProductVariantSupport(new ObjectMapper());
+        support = StorePricingTestSupport.variantSupport(new ObjectMapper());
     }
 
     @Test
@@ -355,7 +355,7 @@ class ProductVariantSupportTest {
             Map.of("sku", "L", "size", "S", "rate", 100, "stock", 1, "active", true)
         );
         assertThat(legacy.mrp()).isEqualByComparingTo("100");
-        assertThat(legacy.rate()).isEqualByComparingTo("80.00");
+        assertThat(legacy.rate()).isEqualByComparingTo("0");
 
         VariantRow explicit = VariantRow.fromMap(
             Map.of("sku", "E", "size", "S", "rate", 50, "price", 75, "mrp", 90, "stock", 1, "active", true)
@@ -406,6 +406,22 @@ class ProductVariantSupportTest {
     }
 
     @Test
+    void applyRuntimePricing_variantDtoUsesMinVariantMrp() {
+        com.miniandmore.app.service.dto.ProductDTO dto = new com.miniandmore.app.service.dto.ProductDTO();
+        dto.setItemStructure("VARIANTS");
+        dto.setPrice(new BigDecimal("1"));
+        dto.setVariantsJson(
+            """
+            [{"sku":"A","size":"S","color":"Red","rate":0,"mrp":400,"stock":2,"active":true},\
+            {"sku":"B","size":"M","color":"Blue","rate":0,"mrp":500,"stock":3,"active":true}]
+            """
+        );
+        support.applyRuntimePricing(dto);
+        assertThat(dto.getCompareAtPrice()).isEqualByComparingTo("400");
+        assertThat(dto.getPrice()).isEqualByComparingTo("320.00");
+    }
+
+    @Test
     void aggregates_ignoresInactiveRowsAndNegativeStock() {
         List<VariantRow> rows = support.parse(
             """
@@ -417,7 +433,7 @@ class ProductVariantSupportTest {
 
         Aggregates agg = support.aggregates(rows);
 
-        assertThat(agg.minSelling()).isEqualByComparingTo("150");
+        assertThat(agg.minSelling()).isEqualByComparingTo("144.00");
         assertThat(agg.minMrp()).isEqualByComparingTo("180");
         assertThat(agg.minCost()).isEqualByComparingTo("60");
         assertThat(agg.stockSum()).isEqualTo(4);
@@ -589,9 +605,9 @@ class ProductVariantSupportTest {
     }
 
     @Test
-    void variantSellingPrice_prefersRateOverMrp() {
+    void variantSellingPrice_usesMrpAtRuntime() {
         VariantRow row = new VariantRow("id", "SKU", "M", "Blue", new BigDecimal("80"), new BigDecimal("100"), null, 1, true, null, null, null, List.of());
-        assertThat(support.variantSellingPrice(row)).isEqualByComparingTo("80");
+        assertThat(support.variantSellingPrice(row)).isEqualByComparingTo("80.00");
     }
 
     @Test

@@ -458,6 +458,72 @@ After connect, store admins use **`/admin/zoho` → Catalogue & orders** (no Pos
 
 **Typical go-live:** (1) Connect Zoho, (2) Test connection, (3) ensure every product has a **SKU** and **category**, (4) **Sync products to Zoho**, (5) optionally **Pull inventory** after stock changes in Zoho.
 
+### Zoho invoice status webhook
+
+Create one alphanumeric-only secret, 12-50 characters, and set the same value in the server environment and Zoho. Example:
+
+```bash
+ZOHO_INVOICE_WEBHOOK_SECRET=MNMZOHOinvoice2026A8F3K92Q
+```
+
+Restart the catalog/backend service after changing the environment.
+
+In Zoho Books, create a webhook action:
+
+| Field | Value |
+| --- | --- |
+| Path | Settings -> Automation -> Workflow Actions -> Webhooks -> New Webhook |
+| Webhook name | `MNM Invoice Status Webhook` |
+| Module | Invoices |
+| Method | POST |
+| UAT URL | `https://uat.minisnmore.com/api/v1/zoho/invoice-webhook` |
+| Production URL | `https://minisnmore.com/api/v1/zoho/invoice-webhook` |
+| Content type | JSON / `application/json` |
+| Secure this webhook | Yes |
+| Secret token | Same value as `ZOHO_INVOICE_WEBHOOK_SECRET`, alphanumeric only |
+| Custom header | `X-Zoho-Invoice-Secret` |
+| Custom header value | Same value as `ZOHO_INVOICE_WEBHOOK_SECRET` |
+
+Use this user-defined JSON body. Insert the actual Zoho placeholders from the Invoice placeholder picker, but keep these JSON keys unchanged:
+
+```json
+{
+  "eventId": "${INVOICE.INVOICE_ID}${INVOICE.STATUS}${INVOICE.LAST_MODIFIED_TIME}",
+  "invoice": {
+    "invoice_id": "${INVOICE.INVOICE_ID}",
+    "invoice_number": "${INVOICE.INVOICE_NUMBER}",
+    "salesorder_id": "${INVOICE.SALESORDER_ID}",
+    "reference_number": "${INVOICE.REFERENCE_NUMBER}",
+    "status": "${INVOICE.STATUS}",
+    "last_modified_time": "${INVOICE.LAST_MODIFIED_TIME}"
+  }
+}
+```
+
+Create the workflow rule:
+
+| Field | Value |
+| --- | --- |
+| Path | Settings -> Automation -> Workflow Rules -> New Workflow Rule |
+| Workflow rule name | `MNM Send Invoice Status to Website` |
+| Module | Invoices |
+| Workflow type | Event Based |
+| Trigger | Created or Edited |
+| Execute when | Status is changed, or Any field is edited if Status is changed is unavailable |
+| Action type | Webhook |
+| Action | `MNM Invoice Status Webhook` |
+
+Criteria must use **OR**, not AND:
+
+```text
+Status is Paid
+OR Status is Sent
+OR Status is Void
+OR Status is Voided
+```
+
+Do not configure `Paid AND Sent AND Void`; one invoice cannot have multiple statuses at the same time, so that rule will never fire.
+
 ## 13. Firewall
 
 Allow public web traffic.
@@ -653,4 +719,3 @@ Restart with updated environment:
 ```bash
 pm2 restart mini-backend-prod --update-env
 ```
-

@@ -490,7 +490,9 @@ describe("backend data API calls", () => {
       shippingStandardInr: 120,
       shippingExpressInr: 200,
       freeShippingMinInr: 3000,
+      codFeeInr: 149,
       pricesIncludeGst: false,
+      deliveryEtaBufferDays: 2,
     });
     await expect(getAdminSiteSettings()).resolves.toMatchObject({
       brand_name: "Admin",
@@ -498,6 +500,8 @@ describe("backend data API calls", () => {
       shipping_standard_inr: 120,
       shipping_express_inr: 200,
       free_shipping_min_inr: 3000,
+      cod_fee_inr: 149,
+      delivery_eta_buffer_days: 2,
       prices_include_gst: false,
     });
     expect(mockedApi.get).toHaveBeenLastCalledWith("/api/v1/admin/site-settings", { auth: true });
@@ -511,6 +515,9 @@ describe("backend data API calls", () => {
       shipping_standard_inr: 99,
       shipping_express_inr: 150,
       free_shipping_min_inr: 2500,
+      cod_fee_inr: 149,
+      delivery_eta_buffer_days: 2,
+      store_discount_percent: 20,
     });
     expect(mockedApi.put).toHaveBeenCalledWith(
       "/api/v1/admin/site-settings",
@@ -522,6 +529,8 @@ describe("backend data API calls", () => {
         shippingStandardInr: 99,
         shippingExpressInr: 150,
         freeShippingMinInr: 2500,
+        codFeeInr: 149,
+        deliveryEtaBufferDays: 2,
       }),
       { auth: true },
     );

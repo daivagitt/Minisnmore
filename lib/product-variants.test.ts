@@ -7,6 +7,7 @@ import {
   isSimpleProductSellable,
   isVariantSellable,
   isVariantsProduct,
+  lineUnitMrp,
   lineUnitPrice,
   parseVariantsJson,
   sellableColorsForSize,
@@ -79,6 +80,7 @@ describe("product-variants", () => {
 
   it("computes line price and sellable from selected variant", () => {
     expect(lineUnitPrice(matrixProduct, { size: "M", color: "Navy" })).toBe(959.2);
+    expect(lineUnitMrp(matrixProduct, { size: "M", color: "Navy" })).toBe(1199);
     expect(isVariantSellable(findVariant(matrixProduct, { size: "M", color: "Navy" }))).toBe(true);
     expect(isVariantSellable(findVariant(matrixProduct, { size: "L", color: "Ivory" }))).toBe(false);
   });

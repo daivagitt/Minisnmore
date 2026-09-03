@@ -140,4 +140,49 @@ class CommerceOrdersProxyResourceTest {
             )
             .andExpect(status().isOk());
     }
+
+    @Test
+    void accountAddressesAndWishlistItems_delegate() throws Exception {
+        when(catalog.get("/internal/v1/account/addresses")).thenReturn(ResponseEntity.ok("[]"));
+        when(catalog.post(eq("/internal/v1/account/addresses"), any())).thenReturn(ResponseEntity.ok("{}"));
+        when(catalog.put(eq("/internal/v1/account/addresses/7"), any())).thenReturn(ResponseEntity.ok("{}"));
+        when(catalog.delete("/internal/v1/account/addresses/7")).thenReturn(ResponseEntity.ok("{}"));
+        when(catalog.put(eq("/internal/v1/account/addresses/7/default"), any())).thenReturn(ResponseEntity.ok("{}"));
+        when(catalog.post(eq("/internal/v1/account/addresses/sync"), any())).thenReturn(ResponseEntity.ok("{}"));
+        when(catalog.get("/internal/v1/account/wishlist")).thenReturn(ResponseEntity.ok("{\"product_ids\":[]}"));
+        when(catalog.post(eq("/internal/v1/account/wishlist/items"), any())).thenReturn(ResponseEntity.ok("{}"));
+        when(catalog.delete("/internal/v1/account/wishlist/items/prod-9")).thenReturn(ResponseEntity.ok("{}"));
+        when(catalog.post(eq("/internal/v1/account/wishlist/sync"), any())).thenReturn(ResponseEntity.ok("{}"));
+
+        mockMvc.perform(get("/api/v1/account/addresses")).andExpect(status().isOk());
+        mockMvc
+            .perform(post("/api/v1/account/addresses").contentType(MediaType.APPLICATION_JSON).content("{\"line1\":\"A\"}"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/account/addresses/7")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"line1\":\"B\"}")
+            )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/account/addresses/7"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/account/addresses/7/default"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(post("/api/v1/account/addresses/sync").contentType(MediaType.APPLICATION_JSON).content("{\"addresses\":[]}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/account/wishlist")).andExpect(status().isOk());
+        mockMvc
+            .perform(post("/api/v1/account/wishlist/items").contentType(MediaType.APPLICATION_JSON).content("{\"product_id\":9}"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/account/wishlist/items/prod-9"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(post("/api/v1/account/wishlist/sync").contentType(MediaType.APPLICATION_JSON).content("{\"product_ids\":[9]}"))
+            .andExpect(status().isOk());
+    }
 }
