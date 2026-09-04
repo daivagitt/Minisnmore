@@ -104,6 +104,28 @@ class ZohoBooksClientTest {
     }
 
     @Test
+    void findSalesOrderByReferenceNumber_prefersClosedOverConfirmed() {
+        server
+            .expect(
+                requestTo("https://www.zohoapis.in/books/v3/salesorders?organization_id=org-1&reference_number=MNM-DUP-SO")
+            )
+            .andRespond(
+                withSuccess(
+                    "{\"salesorders\":[" +
+                    "{\"salesorder_id\":\"so-confirmed\",\"reference_number\":\"MNM-DUP-SO\",\"status\":\"confirmed\"}," +
+                    "{\"salesorder_id\":\"so-closed\",\"reference_number\":\"MNM-DUP-SO\",\"status\":\"closed\"}" +
+                    "]}",
+                    MediaType.APPLICATION_JSON
+                )
+            );
+
+        assertThat(client.findSalesOrderByReferenceNumber("MNM-DUP-SO"))
+            .containsEntry("salesorder_id", "so-closed")
+            .containsEntry("status", "closed");
+        server.verify();
+    }
+
+    @Test
     void listPackagesForSalesOrder_acceptsZohoPublishedPackageaKeyWithoutAnOrderNumber() {
         server
             .expect(requestTo("https://www.zohoapis.in/inventory/v1/packages?organization_id=org-1&per_page=200"))
@@ -196,6 +218,81 @@ class ZohoBooksClientTest {
             .andRespond(withSuccess("{\"item\":{\"image_document_id\":\"gallery-only-7\"}}", MediaType.APPLICATION_JSON));
 
         client.deleteItemImages("item-2");
+
+        server.verify();
+        verify(httpClient, times(2)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void deleteItemImages_treatsAlreadyGonePluralDocumentsAsCleared() throws Exception {
+        HttpResponse<String> frontDeleteResponse = mock(HttpResponse.class);
+        when(frontDeleteResponse.statusCode()).thenReturn(204);
+        HttpResponse<String> pluralDeleteResponse = mock(HttpResponse.class);
+        when(pluralDeleteResponse.statusCode()).thenReturn(400);
+        when(pluralDeleteResponse.body()).thenReturn("{\"code\":57,\"message\":\"The document id does not exist.\"}");
+
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenAnswer(invocation -> {
+                HttpRequest request = invocation.getArgument(0);
+                String uri = request.uri().toString();
+                if (uri.endsWith("/items/item-4/image?organization_id=org-1")) {
+                    return frontDeleteResponse;
+                }
+                if (uri.contains("/items/item-4/images?organization_id=org-1&document_ids=doc-1%2Cdoc-2")) {
+                    return pluralDeleteResponse;
+                }
+                throw new AssertionError("Unexpected HTTP request: " + uri);
+            });
+
+        server
+            .expect(requestTo("https://www.zohoapis.in/books/v3/items/item-4?organization_id=org-1"))
+            .andRespond(
+                withSuccess(
+                    "{\"item\":{\"documents\":[{\"document_id\":\"doc-1\"},{\"document_id\":\"doc-2\"}]}}",
+                    MediaType.APPLICATION_JSON
+                )
+            );
+
+        client.deleteItemImages("item-4");
+
+        server.verify();
+        verify(httpClient, times(2)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void deleteItemImages_treatsMissingFileResponseAsCleared() throws Exception {
+        HttpResponse<String> frontDeleteResponse = mock(HttpResponse.class);
+        when(frontDeleteResponse.statusCode()).thenReturn(204);
+        HttpResponse<String> pluralDeleteResponse = mock(HttpResponse.class);
+        when(pluralDeleteResponse.statusCode()).thenReturn(400);
+        when(pluralDeleteResponse.body())
+            .thenReturn("{\"code\":33008,\"message\":\"Sorry, this file does not exist.\"}");
+
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenAnswer(invocation -> {
+                HttpRequest request = invocation.getArgument(0);
+                String uri = request.uri().toString();
+                if (uri.endsWith("/items/item-5/image?organization_id=org-1")) {
+                    return frontDeleteResponse;
+                }
+                if (uri.contains("/items/item-5/images?organization_id=org-1&document_ids=stale-doc")) {
+                    return pluralDeleteResponse;
+                }
+                throw new AssertionError("Unexpected HTTP request: " + uri);
+            });
+
+        server
+            .expect(requestTo("https://www.zohoapis.in/books/v3/items/item-5?organization_id=org-1"))
+            .andRespond(
+                withSuccess(
+                    "{\"item\":{\"documents\":[{\"document_id\":\"stale-doc\"}]}}",
+                    MediaType.APPLICATION_JSON
+                )
+            );
+
+        client.deleteItemImages("item-5");
 
         server.verify();
         verify(httpClient, times(2)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));

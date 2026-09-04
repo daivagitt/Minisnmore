@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260903140000-1" author="minisandmore">
+        <addColumn tableName="site_setting">
+            <column name="delivery_eta_buffer_days" type="integer" defaultValueNumeric="3">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+        <sql>
+            UPDATE site_setting
+            SET delivery_eta_buffer_days = COALESCE(delivery_eta_buffer_days, 3);
+        </sql>
+    </changeSet>
+</databaseChangeLog>

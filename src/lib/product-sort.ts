@@ -7,10 +7,28 @@ export function sortOrderValue(product: Product): number {
   return 999_999;
 }
 
-function compareSortOrder(a: Product, b: Product): number {
+export function compareSortOrder(a: Product, b: Product): number {
   const byOrder = sortOrderValue(a) - sortOrderValue(b);
   if (byOrder !== 0) return byOrder;
   return a.name.localeCompare(b.name);
+}
+
+export function compareFlagFirst(
+  a: Product,
+  b: Product,
+  isMatch: (product: Product) => boolean,
+): number {
+  const byFlag = Number(isMatch(b)) - Number(isMatch(a));
+  if (byFlag !== 0) return byFlag;
+  return compareSortOrder(a, b);
+}
+
+export function compareBestsellersFirst(a: Product, b: Product): number {
+  return compareFlagFirst(a, b, (p) => !!p.isBestseller);
+}
+
+export function compareNewArrivalsFirst(a: Product, b: Product): number {
+  return compareFlagFirst(a, b, (p) => !!p.isNew);
 }
 
 /** Within a collection, flagged products first, each group by sort order. */
@@ -27,11 +45,11 @@ export function sortProductsByFlag(
 }
 
 export function sortBestsellersFirst(products: Product[]): Product[] {
-  return sortProductsByFlag(products, (p) => !!p.isBestseller);
+  return [...products].sort(compareBestsellersFirst);
 }
 
 export function sortNewArrivalsFirst(products: Product[]): Product[] {
-  return sortProductsByFlag(products, (p) => !!p.isNew);
+  return [...products].sort(compareNewArrivalsFirst);
 }
 
 export function sortTrendingFirst(products: Product[]): Product[] {

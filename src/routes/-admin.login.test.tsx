@@ -159,4 +159,50 @@ describe("admin login route", () => {
 
     expect(screen.getByRole("button", { name: "Continue with Google" })).not.toBeDisabled();
   });
+
+  it("validates email and password before submit and shows field errors", async () => {
+    renderAdminLogin();
+
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(toastMock.error).toHaveBeenCalled();
+    expect(authMock.signIn).not.toHaveBeenCalled();
+
+    const email = screen.getByPlaceholderText("you@store.in");
+    await userEvent.type(email, "bad");
+    await userEvent.tab();
+    expect(screen.getByText(/valid email/i)).toBeInTheDocument();
+
+    await userEvent.clear(email);
+    await userEvent.type(email, "admin@example.com");
+    const password = screen.getByPlaceholderText("Password (min 6)");
+    await userEvent.type(password, "abc");
+    await userEvent.tab();
+    expect(screen.getByText(/at least 6 characters/i)).toBeInTheDocument();
+  });
+
+  it("toggles password visibility", async () => {
+    renderAdminLogin();
+
+    const password = screen.getByPlaceholderText("Password (min 6)");
+    expect(password).toHaveAttribute("type", "password");
+
+    await userEvent.click(screen.getByRole("button", { name: "Show password" }));
+    expect(password).toHaveAttribute("type", "text");
+
+    await userEvent.click(screen.getByRole("button", { name: "Hide password" }));
+    expect(password).toHaveAttribute("type", "password");
+  });
+
+  it("reports signup errors without navigating", async () => {
+    authMock.signUp.mockResolvedValueOnce({ error: "Email taken" });
+    renderAdminLogin();
+
+    await userEvent.click(screen.getByRole("button", { name: "Need an account? Sign up" }));
+    await userEvent.type(screen.getByPlaceholderText("you@store.in"), "new@example.com");
+    await userEvent.type(screen.getByPlaceholderText("Password (min 6)"), "secret1");
+    await userEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+    await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Email taken"));
+    expect(navMock).not.toHaveBeenCalled();
+  });
 });

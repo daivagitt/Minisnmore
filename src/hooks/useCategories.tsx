@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { listCategories } from "@/lib/backend-data";
+import { broadcastStorefrontInvalidation } from "@/lib/storefront-cache-broadcast";
 
 export type Category = { id: string; slug: string; name: string; image_url: string | null; description: string | null };
 
@@ -38,10 +39,11 @@ async function load(): Promise<Category[]> {
   return inflight;
 }
 
-export function invalidateCategories() {
+export function invalidateCategories(options?: { broadcast?: boolean }) {
   cache = null;
   inflight = null;
   void load();
+  if (options?.broadcast !== false) broadcastStorefrontInvalidation("categories");
 }
 
 export function useCategories() {

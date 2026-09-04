@@ -53,6 +53,8 @@ public class ProductDTO implements Serializable {
 
     private String sizesJson;
 
+    private String sizeChartJson;
+
     private String colorsJson;
 
     private String colorImagesJson;
@@ -217,6 +219,14 @@ public class ProductDTO implements Serializable {
 
     public void setSizesJson(String sizesJson) {
         this.sizesJson = sizesJson;
+    }
+
+    public String getSizeChartJson() {
+        return sizeChartJson;
+    }
+
+    public void setSizeChartJson(String sizeChartJson) {
+        this.sizeChartJson = sizeChartJson;
     }
 
     public String getColorsJson() {
@@ -441,6 +451,7 @@ public class ProductDTO implements Serializable {
             ", ageMinMonths=" + getAgeMinMonths() +
             ", ageMaxMonths=" + getAgeMaxMonths() +
             ", sizesJson='" + getSizesJson() + "'" +
+            ", sizeChartJson='" + getSizeChartJson() + "'" +
             ", colorsJson='" + getColorsJson() + "'" +
             ", itemStructure='" + getItemStructure() + "'" +
             ", variantsJson='" + getVariantsJson() + "'" +

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { listBanners } from "@/lib/backend-data";
+import { broadcastStorefrontInvalidation } from "@/lib/storefront-cache-broadcast";
 
 export type HomeBanner = {
   id: string;
@@ -54,9 +55,10 @@ async function load(): Promise<HomeBanner[]> {
 /** Warm the banner cache as soon as this module loads. */
 void load();
 
-export function invalidateBanners() {
+export function invalidateBanners(options?: { broadcast?: boolean }) {
   cache = null;
   void load();
+  if (options?.broadcast !== false) broadcastStorefrontInvalidation("banners");
 }
 
 export function useBanners(): { banners: HomeBanner[]; loaded: boolean } {

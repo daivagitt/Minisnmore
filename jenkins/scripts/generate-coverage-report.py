@@ -7,6 +7,7 @@ import argparse
 import json
 import sys
 import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -113,11 +114,67 @@ def ratio_pct(missed: int, covered: int) -> float:
     return (100.0 * covered / total) if total else 0.0
 
 
-def parse_jacoco_xml(path: Path) -> tuple[dict, list[dict]]:
-    root = ET.parse(path).getroot()
-    line_missed, line_covered = counter_totals(root, "LINE")
-    stmt_missed, stmt_covered = counter_totals(root, "INSTRUCTION")
-    branch_missed, branch_covered = counter_totals(root, "BRANCH")
+def module_from_jacoco_path(path: Path) -> str:
+    for name in ("gateway", "backend", "store", "commerce"):
+        if name in path.parts:
+            return "catalog" if name == "backend" else name
+    return "unknown"
+
+
+def include_backend_coverage_class(fqn: str, module: str) -> bool:
+    """Published backend gate matches business-logic layers (see Sonar mnm-backend scope)."""
+    simple = fqn.rsplit(".", 1)[-1]
+    if "Zoho" in simple or ".Zoho" in fqn:
+        return False
+    if simple.endswith("Scheduler") or simple.endswith("MapperImpl"):
+        return False
+    if module in ("store", "commerce"):
+        return fqn.startswith(f"com.miniandmore.{module}.")
+    return ".service." in fqn
+
+
+def iter_jacoco_classes(
+    root: ET.Element,
+    *,
+    class_filter: Callable[[str, str], bool] | None = None,
+    module: str = "unknown",
+) -> tuple[list[dict], dict]:
+    line_missed = line_covered = 0
+    stmt_missed = stmt_covered = 0
+    branch_missed = branch_covered = 0
+    rows: list[dict] = []
+
+    for package in root.findall("./package"):
+        pkg_name = package.attrib.get("name", "").replace("/", ".")
+        for clazz in package.findall("./class"):
+            class_name = clazz.attrib.get("name", "").replace("/", ".")
+            fqn = f"{pkg_name}.{class_name}" if pkg_name else class_name
+            if class_filter and not class_filter(fqn, module):
+                continue
+
+            lm, lc = counter_totals(clazz, "LINE")
+            sm, sc = counter_totals(clazz, "INSTRUCTION")
+            bm, bc = counter_totals(clazz, "BRANCH")
+            if lm + lc == 0:
+                continue
+
+            line_missed += lm
+            line_covered += lc
+            stmt_missed += sm
+            stmt_covered += sc
+            branch_missed += bm
+            branch_covered += bc
+
+            source = clazz.attrib.get("sourcefilename") or class_name
+            module_label = f"{pkg_name}.{source}" if pkg_name else source
+            rows.append(
+                {
+                    "module": module_label,
+                    "lines_pct": ratio_pct(lm, lc),
+                    "covered": lc,
+                    "total": lm + lc,
+                }
+            )
 
     total = {
         "lines": {
@@ -136,30 +193,19 @@ def parse_jacoco_xml(path: Path) -> tuple[dict, list[dict]]:
             "pct": ratio_pct(branch_missed, branch_covered),
         },
     }
-
-    rows: list[dict] = []
-    for package in root.findall("./package"):
-        pkg_name = package.attrib.get("name", "").replace("/", ".")
-        for clazz in package.findall("./class"):
-            source = clazz.attrib.get("sourcefilename") or clazz.attrib.get("name", "Unknown")
-            module = f"{pkg_name}.{source}" if pkg_name else source
-            missed, covered = counter_totals(clazz, "LINE")
-            if missed + covered == 0:
-                continue
-            rows.append(
-                {
-                    "module": module,
-                    "lines_pct": ratio_pct(missed, covered),
-                    "covered": covered,
-                    "total": missed + covered,
-                }
-            )
-
     rows.sort(key=lambda row: (-row["lines_pct"], row["module"]))
+    return rows, total
+
+
+def parse_jacoco_xml(path: Path, *, business_logic_only: bool = False) -> tuple[dict, list[dict]]:
+    root = ET.parse(path).getroot()
+    module = module_from_jacoco_path(path)
+    class_filter = include_backend_coverage_class if business_logic_only else None
+    rows, total = iter_jacoco_classes(root, class_filter=class_filter, module=module)
     return total, rows
 
 
-def merge_jacoco_xmls(paths: list[Path]) -> tuple[dict, list[dict]]:
+def merge_jacoco_xmls(paths: list[Path], *, business_logic_only: bool = False) -> tuple[dict, list[dict]]:
     """Merge multiple JaCoCo report roots into one combined total + class rows."""
     line_missed = line_covered = 0
     stmt_missed = stmt_covered = 0
@@ -169,18 +215,21 @@ def merge_jacoco_xmls(paths: list[Path]) -> tuple[dict, list[dict]]:
     for path in paths:
         if not path.is_file():
             continue
+        module = module_from_jacoco_path(path)
         root = ET.parse(path).getroot()
-        lm, lc = counter_totals(root, "LINE")
-        sm, sc = counter_totals(root, "INSTRUCTION")
-        bm, bc = counter_totals(root, "BRANCH")
-        line_missed += lm
-        line_covered += lc
-        stmt_missed += sm
-        stmt_covered += sc
-        branch_missed += bm
-        branch_covered += bc
+        class_filter = include_backend_coverage_class if business_logic_only else None
+        rows, partial = iter_jacoco_classes(root, class_filter=class_filter, module=module)
 
-        _, rows = parse_jacoco_xml(path)
+        lines = partial["lines"]
+        statements = partial["statements"]
+        branches = partial["branches"]
+        line_missed += int(lines["total"] - lines["covered"])
+        line_covered += int(lines["covered"])
+        stmt_missed += int(statements["total"] - statements["covered"])
+        stmt_covered += int(statements["covered"])
+        branch_missed += int(branches["total"] - branches["covered"])
+        branch_covered += int(branches["covered"])
+
         for row in rows:
             key = row["module"]
             if key not in merged_rows:
@@ -267,6 +316,7 @@ def build_body(
       <section class="panel">
         <h2>Summary</h2>
         <p>Status: {status_pill(status)}</p>
+        {('<p class="muted">Backend totals include business-logic service layers (gateway + catalog services, store, commerce). Legacy Zoho integration, schedulers, and generated mappers are excluded — matching the Sonar quality gate.</p>' if kind == 'backend' else '')}
         <div class="stats">
           {stat_block("Line coverage", pct(line_pct))}
           {stat_block("Lines covered", f"{line_covered:,} / {line_total:,}")}
@@ -313,9 +363,9 @@ def main() -> None:
     else:
         jacoco_paths = [Path(p.strip()) for p in args.input.split(",") if p.strip()]
         if len(jacoco_paths) > 1:
-            total, rows = merge_jacoco_xmls(jacoco_paths)
+            total, rows = merge_jacoco_xmls(jacoco_paths, business_logic_only=True)
         else:
-            total, rows = parse_jacoco_xml(jacoco_paths[0])
+            total, rows = parse_jacoco_xml(jacoco_paths[0], business_logic_only=True)
         title = "Backend Code Coverage Report"
 
     body = build_body(

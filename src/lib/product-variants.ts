@@ -1,5 +1,9 @@
 import type { AgeRange } from "@/data/products";
 import { normalizeSizeKey, sizeToAgeBand, sortSizesAsc } from "@/lib/product-ages";
+import {
+  DEFAULT_STORE_DISCOUNT_PERCENT,
+  sellingFromMrp,
+} from "@/lib/pricing";
 
 const STANDARD_FOUR_AGE_BANDS: AgeRange[] = ["0-3m", "3-6m", "6-12m", "12-18m"];
 const UNIVERSAL_SIZE_KEYS = new Set(["common", "commonsize", "freesize", "onesize", "os", "free", "universal"]);
@@ -43,7 +47,10 @@ export function hasSellableVariants(p: VariantProductLike | null | undefined): b
   return isVariantsProduct(p) && (p?.variants?.some(isVariantSellable) ?? false);
 }
 
-export function parseVariantsJson(raw: unknown): ProductVariant[] {
+export function parseVariantsJson(
+  raw: unknown,
+  discountPercent = DEFAULT_STORE_DISCOUNT_PERCENT,
+): ProductVariant[] {
   if (raw == null) return [];
   let parsed: unknown = raw;
   if (typeof raw === "string") {
@@ -64,30 +71,40 @@ export function parseVariantsJson(raw: unknown): ProductVariant[] {
       const sku = String(r.sku ?? "").trim();
       if (!sku) return null;
       const rate = Number(r.rate ?? 0) || 0;
-      const mrpRaw = r.mrp != null ? Number(r.mrp) : r.compareAt != null ? Number(r.compareAt) : NaN;
+      const hasMrpField =
+        Object.prototype.hasOwnProperty.call(r, "mrp") || Object.prototype.hasOwnProperty.call(r, "compareAt");
+      const mrpRaw =
+        r.mrp != null && r.mrp !== ""
+          ? Number(r.mrp)
+          : r.compareAt != null && r.compareAt !== ""
+            ? Number(r.compareAt)
+            : r.mrp === 0 || r.compareAt === 0
+              ? 0
+              : NaN;
       const priceRaw = r.price != null ? Number(r.price) : NaN;
       const hasExplicitMrp = Number.isFinite(mrpRaw) && mrpRaw > 0;
       const hasExplicitPrice = Number.isFinite(priceRaw) && priceRaw > 0;
       /** Legacy rows stored Ledgerly/list rate in `rate` with no separate mrp — treat rate as MRP. */
-      const legacyRateIsMrp =
-        rate > 0 && !hasExplicitMrp && !hasExplicitPrice && r.mrp == null && r.compareAt == null;
+      const legacyRateIsMrp = rate > 0 && !hasExplicitMrp && !hasExplicitPrice && !hasMrpField;
 
       let price: number;
       let compareAt: number | undefined;
       if (legacyRateIsMrp) {
         compareAt = rate;
-        price = Math.round(rate * 0.8 * 100) / 100;
+        price = sellingFromMrp(rate, discountPercent);
+      } else if (hasExplicitMrp) {
+        compareAt = mrpRaw;
+        price = sellingFromMrp(mrpRaw, discountPercent);
+      } else if (hasExplicitPrice) {
+        price = priceRaw;
+        compareAt = undefined;
+      } else if (rate > 0) {
+        // Modern row with mrp cleared (0/null): rate is the selling price.
+        price = rate;
+        compareAt = undefined;
       } else {
-        const hasSelling = rate > 0;
-        price =
-          hasExplicitPrice
-            ? priceRaw
-            : hasSelling
-              ? rate
-              : hasExplicitMrp
-                ? Math.round(mrpRaw * 0.8 * 100) / 100
-                : 0;
-        compareAt = hasExplicitMrp ? mrpRaw : hasSelling ? Math.round(rate / 0.8 * 100) / 100 : undefined;
+        price = 0;
+        compareAt = undefined;
       }
       const imageUrl =
         r.imageUrl != null && String(r.imageUrl).trim()
@@ -255,6 +272,22 @@ export function lineUnitPrice(product: VariantProductLike, opts: { size?: string
     return v?.price ?? product.price;
   }
   return product.price;
+}
+
+/** MRP / compare-at for a cart or order line — falls back to selling price when no MRP is set. */
+export function lineUnitMrp(
+  product: VariantProductLike,
+  opts: { size?: string | null; color?: string | null; sku?: string | null },
+): number {
+  const unitPrice = lineUnitPrice(product, opts);
+  if (isVariantsProduct(product)) {
+    const v = findVariant(product, opts);
+    const compareAt = v?.compareAt ?? product.compareAt;
+    if (compareAt != null && compareAt > unitPrice) return compareAt;
+  } else if (product.compareAt != null && product.compareAt > unitPrice) {
+    return product.compareAt;
+  }
+  return unitPrice;
 }
 
 /**

@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://uat.minisnmore.com",
-  "startedAt": "2026-08-30T11:35:10.034077+00:00",
-  "finishedAt": "2026-08-30T11:35:10.577839+00:00",
+  "startedAt": "2026-08-31T00:52:50.641430+00:00",
+  "finishedAt": "2026-08-31T00:52:51.849090+00:00",
   "paymentDemo": false,
   "refundDemo": false,
   "credentials": {
@@ -9,8 +9,8 @@
     "admin": "admin@uat.minisnmore.com"
   },
   "orderContext": {
-    "orderId": 49452,
-    "orderNumber": "MNM-B6463D3B441E",
+    "orderId": 50302,
+    "orderNumber": "MNM-0A2F937F4E89",
     "total": 91.0,
     "demoMode": false,
     "gatewayMode": "live"
@@ -55,8 +55,8 @@
             "product_name": "BASIC SHORTS",
             "qty": 1,
             "size": "0-3 M",
-            "color": "Bee Blue",
-            "sku": "BASIC-SHORTS-03-BEE-BLUE",
+            "color": "Happy Bee",
+            "sku": "BASIC-SHORTS-03-HAPPY-BEE",
             "price": 100.0
           }
         },
@@ -64,7 +64,7 @@
           "name": "validate-coupon",
           "status": "pass",
           "note": "discount \u20b910 on subtotal \u20b9100 (qty=1)",
-          "ms": 51,
+          "ms": 117,
           "detail": {
             "discount": 10.0,
             "subtotal": 100.0,
@@ -74,12 +74,12 @@
         {
           "name": "create-order",
           "status": "pass",
-          "note": "order MNM-B6463D3B441E total \u20b991 (demoMode=False)",
-          "ms": 143,
+          "note": "order MNM-0A2F937F4E89 total \u20b991 (demoMode=False)",
+          "ms": 587,
           "detail": {
-            "orderId": 49452,
-            "orderNumber": "MNM-B6463D3B441E",
-            "razorpayOrderId": "order_TVxzIqWOEj05Zb",
+            "orderId": 50302,
+            "orderNumber": "MNM-0A2F937F4E89",
+            "razorpayOrderId": "order_TWBZvSh1ZLCPPB",
             "total": 91.0,
             "demoMode": false,
             "gatewayMode": "live"
@@ -175,7 +175,7 @@
           "name": "shipped-order-track",
           "status": "pass",
           "note": "MNM-2606-A4A0B \u2192 delivered",
-          "ms": 37,
+          "ms": 69,
           "detail": {
             "order_number": "MNM-2606-A4A0B",
             "status": "fulfilled",
@@ -189,7 +189,7 @@
           "name": "returned-order-track",
           "status": "pass",
           "note": "MNM-2606-86EA3 shipment_date=2026-06-06",
-          "ms": 43,
+          "ms": 80,
           "detail": {
             "order_number": "MNM-2606-86EA3",
             "status": "confirmed",

@@ -71,7 +71,7 @@ class ZohoItemImageSyncTest {
             applicationProperties,
             booksClient,
             s3StorageService,
-            new ProductVariantSupport(new com.fasterxml.jackson.databind.ObjectMapper())
+            StorePricingTestSupport.variantSupport(new com.fasterxml.jackson.databind.ObjectMapper())
         );
         ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
         zoho.setSyncProductImages(true);

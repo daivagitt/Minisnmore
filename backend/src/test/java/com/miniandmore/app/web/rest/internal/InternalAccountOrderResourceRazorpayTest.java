@@ -15,8 +15,8 @@ import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.repository.*;
 import com.miniandmore.app.service.LedgerlySyncService;
 import com.miniandmore.app.service.OrderEventService;
+import com.miniandmore.app.service.StorePricingTestSupport;
 import com.miniandmore.app.service.ZohoSyncService;
-import com.miniandmore.app.service.ProductVariantSupport;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import java.math.BigDecimal;
 import java.net.http.HttpClient;
@@ -97,9 +97,11 @@ class InternalAccountOrderResourceRazorpayTest {
         resource = new InternalAccountOrderResource(
             dataAccess,
             objectMapper,
+            new com.miniandmore.app.config.ApplicationProperties(),
             ledgerlySyncService,
             zohoSyncService,
-            new ProductVariantSupport(objectMapper),
+            StorePricingTestSupport.variantSupport(objectMapper),
+            StorePricingTestSupport.defaultPricing(),
             orderEventService,
             razorpayRefundService,
             transactionManager

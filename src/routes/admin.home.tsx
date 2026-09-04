@@ -19,6 +19,8 @@ import {
   saveHomeSection,
   type HomeSectionRow,
 } from "@/lib/backend-data";
+import { invalidateHomeSections } from "@/hooks/useHomeSections";
+import { invalidateProducts } from "@/lib/storefront";
 import {
   HOME_SECTION_PRODUCT_KEYS,
   getHomeSectionProductSlugErrors,
@@ -190,6 +192,8 @@ function HomePage() {
     }
     try {
       await saveHomeSection(section);
+      invalidateHomeSections();
+      invalidateProducts();
       toast.success("Saved");
     } catch (error) {
       showApiError(error, "Could not save section");

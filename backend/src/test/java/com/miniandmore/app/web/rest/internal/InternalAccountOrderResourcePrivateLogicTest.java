@@ -16,8 +16,8 @@ import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.repository.*;
 import com.miniandmore.app.service.LedgerlySyncService;
 import com.miniandmore.app.service.OrderEventService;
+import com.miniandmore.app.service.StorePricingTestSupport;
 import com.miniandmore.app.service.ZohoSyncService;
-import com.miniandmore.app.service.ProductVariantSupport;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -91,9 +91,11 @@ class InternalAccountOrderResourcePrivateLogicTest {
         resource = new InternalAccountOrderResource(
             dataAccess,
             new ObjectMapper(),
+            new com.miniandmore.app.config.ApplicationProperties(),
             ledgerlySyncService,
             zohoSyncService,
-            new ProductVariantSupport(new ObjectMapper()),
+            StorePricingTestSupport.variantSupport(new ObjectMapper()),
+            StorePricingTestSupport.defaultPricing(),
             orderEventService,
             razorpayRefundService,
             transactionManager
@@ -179,7 +181,7 @@ class InternalAccountOrderResourcePrivateLogicTest {
         assertThat(missing).isEmpty();
 
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("customer1", "pw"));
-        when(customerOrderRepository.existsByUserLoginAndPaymentStatus("customer1", PaymentStatus.PAID)).thenReturn(true);
+        when(customerOrderRepository.existsByUserLoginAndStatusNot("customer1", OrderStatus.CANCELLED)).thenReturn(true);
 
         Optional<Map<String, Object>> blocked = (Optional<Map<String, Object>>) ReflectionTestUtils.invokeMethod(
             resource,
@@ -189,6 +191,19 @@ class InternalAccountOrderResourcePrivateLogicTest {
             Optional.of("customer1")
         );
         assertThat(blocked.orElseThrow()).containsKey("error");
+    }
+
+    @Test
+    void isFirstOrderEligible_countsConfirmedCodEvenWhenPaymentIsStillPending() {
+        // COD stays payment PENDING until collection. Eligibility must not look at PAID only,
+        // or WELCOME10 can be reused on the 2nd/3rd order.
+        when(customerOrderRepository.existsByUserLoginAndStatusNot("customer1", OrderStatus.CANCELLED)).thenReturn(true);
+
+        Boolean eligible = ReflectionTestUtils.invokeMethod(resource, "isFirstOrderEligible", "customer1");
+
+        assertThat(eligible).isFalse();
+        verify(customerOrderRepository).existsByUserLoginAndStatusNot("customer1", OrderStatus.CANCELLED);
+        verify(customerOrderRepository, never()).existsByUserLoginAndPaymentStatus(any(), any());
     }
 
     @Test

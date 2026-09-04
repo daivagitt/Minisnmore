@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/admin/returns")({ component: AdminReturnsPage });
+const RETURNS_UI_ENABLED = true;
 
 const STATUS_FILTERS = [
   "",
@@ -186,6 +187,8 @@ function nextActions(
 }
 
 function AdminReturnsPage() {
+  if (!RETURNS_UI_ENABLED) return null;
+
   const [status, setStatus] = useState<string>("requested");
   const [rows, setRows] = useState<AdminOrderReturnRow[]>([]);
   const [loading, setLoading] = useState(true);

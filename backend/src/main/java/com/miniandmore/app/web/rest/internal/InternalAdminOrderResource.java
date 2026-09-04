@@ -25,6 +25,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -170,13 +172,27 @@ public class InternalAdminOrderResource {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Already marked as collected");
         }
         order.setPaymentStatus(PaymentStatus.PAID);
-        order.setLedgerlySyncStatus(LedgerlySyncStatus.PENDING);
         order.setZohoSyncStatus(ZohoSyncStatus.PENDING);
         CustomerOrder saved = dataAccess.customerOrderRepository().save(order);
         orderEventService.onOrderPaid(saved);
-        ledgerlySyncService.syncOrder(saved.getId());
-        zohoSyncService.syncOrder(saved.getId());
-        zohoSyncService.pullOrderTracking(saved.getId());
+        Long orderId = saved.getId();
+        Runnable syncZohoAfterCollection = () -> {
+            zohoSyncService.syncOrder(orderId);
+            zohoSyncService.pullOrderTracking(orderId);
+        };
+        // Commit payment_status=PAID before Zoho sync so a Books API failure cannot roll back collection.
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        syncZohoAfterCollection.run();
+                    }
+                }
+            );
+        } else {
+            syncZohoAfterCollection.run();
+        }
         return ApiResponse.ok(Map.of("ok", true, "orderNumber", saved.getOrderNumber(), "paymentStatus", "paid"));
     }
 
@@ -190,6 +206,7 @@ public class InternalAdminOrderResource {
         data.put("tracking_status", OrderTrackingStatusResolver.resolve(order));
         data.put("payment_status", order.getPaymentStatus() == null ? "" : order.getPaymentStatus().name().toLowerCase());
         data.put("payment_method", StringUtils.defaultString(order.getPaymentMethod()).toLowerCase());
+        data.put("coupon_code", StringUtils.defaultString(order.getCouponCode()));
         data.put("placed_at", order.getPlacedAt() == null ? "" : order.getPlacedAt().toString());
         data.put("zoho_sync_status", lower(order.getZohoSyncStatus()));
         data.put("zoho_sync_error", StringUtils.defaultString(order.getZohoSyncError()));

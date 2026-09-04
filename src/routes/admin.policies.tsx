@@ -15,7 +15,7 @@ const empty: Policy = { slug: "", title: "", body: "" };
 const STOREFRONT_POLICY_SLUGS = [
   { slug: "privacy", path: "/privacy", label: "Privacy policy" },
   { slug: "terms", path: "/terms", label: "Terms & conditions" },
-  { slug: "shipping", path: "/shipping", label: "Shipping & returns" },
+  { slug: "shipping", path: "/shipping", label: "Shipping" },
 ] as const;
 
 function PoliciesPage() {
@@ -124,7 +124,7 @@ function PoliciesPage() {
                 <textarea
                   rows={12}
                   placeholder={
-                    "Write naturally — we auto-format on publish.\n\n1. Eligibility\nYou must be 18+ to use the service.\n\nKey terms:\n- Refunds processed in 5–7 days\n- Free shipping above ₹999\n\nContact: hello@brand.com"
+                    "Write naturally — we auto-format on publish.\n\n1. Eligibility\nYou must be 18+ to use the service.\n\nKey terms:\n- Free shipping above ₹999\n- Dispatch in 1–3 business days\n\nContact: hello@brand.com"
                   }
                   className={inputCls() + " font-mono text-[13px] leading-relaxed"}
                   value={p.body ?? ""}

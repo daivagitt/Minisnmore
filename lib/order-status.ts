@@ -26,7 +26,7 @@ export function formatPaymentStatusLabel(paymentStatus?: string | null, paymentM
   if (status === "pending") return "Payment pending";
   if (status === "paid") return "Paid";
   if (status === "failed") return "Payment failed";
-  if (status === "refunded") return "Refunded";
+  if (status === "refunded") return "Settled";
   return paymentStatus ?? "";
 }
 
@@ -61,7 +61,7 @@ export function formatOrderStatusSummary(order: OrderStatusFields): string {
   const orderStatus = (order.status ?? "").toLowerCase();
 
   if (orderStatus === "cancelled" || orderStatus === "canceled") {
-    return paymentStatus === "refunded" ? "Refunded · Cancelled" : "Cancelled";
+    return paymentStatus === "refunded" ? "Settled · Cancelled" : "Cancelled";
   }
   if (paymentStatus === "pending" && orderStatus === "pending") return paymentLabel;
   return `${paymentLabel} · ${statusLabel}`;

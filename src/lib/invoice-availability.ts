@@ -1,10 +1,9 @@
-import { isCodOrder, needsOnlinePayment, type OrderStatusFields } from "@/lib/order-status";
+import { needsOnlinePayment, type OrderStatusFields } from "@/lib/order-status";
 
 export type InvoiceAvailabilityOrder = OrderStatusFields;
 
-/** Mirrors backend ZohoSyncService.shouldCreateInvoice plus pending-payment guard. */
+/** Blocks only orders still waiting for an online payment confirmation. */
 export function isInvoiceAvailable(order: InvoiceAvailabilityOrder): boolean {
   if (needsOnlinePayment(order)) return false;
-  if (isCodOrder(order) && order.payment_status?.trim().toLowerCase() !== "paid") return false;
   return true;
 }

@@ -79,9 +79,9 @@ Frontend snake_case via `src/lib/backend-data.ts` (`compare_at_price`, `item_str
 | Variant `rate` | Selling for size×color | Variant `rate` | Inside `variantsJson` |
 | Variant `mrp` | List for combo | Variant `mrp` | Inside `variantsJson` |
 
-**Default when only MRP is known:** selling = **MRP × 0.80** (`LedgerlyProductMergeService.STORE_UAT_DISCOUNT_MULTIPLIER`).
+**Default when only MRP is known:** selling = **MRP × (1 − store_discount_percent / 100)** from `site_setting.store_discount_percent` (default **20%**). Applied at runtime on storefront, checkout, and Zoho push via `StorePricingService`.
 
-**Do not** map MRP → Ledgerly `rate`. **Do not** apply a second ×0.8 on variant `rate` in the storefront when rates are already selling prices.
+**Do not** map MRP → Ledgerly `rate`. Stored variant `rate` is not used for customer pricing when variant `mrp` is present — runtime derivation from MRP wins.
 
 Implementation: `LedgerlyProductMergeService.buildPushPayload` / `mergeLedgerlyItem`.
 

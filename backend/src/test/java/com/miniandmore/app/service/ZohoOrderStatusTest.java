@@ -156,10 +156,23 @@ class ZohoOrderStatusTest {
         assertThat(order.getShipmentDate()).isEqualTo("2026-08-30");
         assertThat(order.getTrackingNumber()).isEqualTo("AWB-42");
         assertThat(order.getTrackingCarrier()).isEqualTo("BlueDart");
+        assertThat(order.getZohoOrderStatus()).isEqualTo("shipped");
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("shipped");
     }
 
     @Test
-    void applyPackages_fulfilledShipmentMarksOrderFulfilled() {
+    void applyPackages_inTransitShipmentResolvesOnTheWay() {
+        CustomerOrder order = paidOrder().status(OrderStatus.HAND_WRAPPED);
+
+        ZohoOrderStatus.applyPackages(order, List.of(Map.of("shipment_id", "ship-42", "status", "in_transit")));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.HAND_WRAPPED);
+        assertThat(order.getZohoOrderStatus()).isEqualTo("in_transit");
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("shipped");
+    }
+
+    @Test
+    void applyPackages_fulfilledShipmentMarksDelivered() {
         CustomerOrder order = paidOrder().status(OrderStatus.HAND_WRAPPED);
 
         ZohoOrderStatus.applyPackages(
@@ -168,15 +181,101 @@ class ZohoOrderStatusTest {
         );
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(order.getZohoOrderStatus()).isEqualTo("fulfilled");
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivered");
     }
 
     @Test
-    void applyPackages_fulfilledPackageWithoutShipmentStaysHandWrapped() {
+    void applyPackages_shipmentOrderDeliveredStatusMarksFulfilledWithoutCustomField() {
+        CustomerOrder order = paidOrder().status(OrderStatus.HAND_WRAPPED);
+
+        ZohoOrderStatus.applyPackages(
+            order,
+            List.of(Map.of("shipment_order_id", "ship-42", "status", "Delivered", "shipment_date", "2026-09-02"))
+        );
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivered");
+    }
+
+    @Test
+    void applyPackages_shipmentDeliveredDateMarksFulfilled() {
+        CustomerOrder order = paidOrder().status(OrderStatus.HAND_WRAPPED);
+
+        ZohoOrderStatus.applyPackages(
+            order,
+            List.of(Map.of("shipment_id", "ship-42", "status", "shipped", "shipment_delivered_date", "2026-09-02 18:00"))
+        );
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivered");
+    }
+
+    @Test
+    void applyPackages_shipmentOrderFulfilledStatusMarksFulfilledWithoutCustomField() {
+        CustomerOrder order = paidOrder().status(OrderStatus.HAND_WRAPPED);
+
+        ZohoOrderStatus.applyPackages(order, List.of(Map.of("shipment_order_id", "ship-42", "status", "Fulfilled")));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivered");
+    }
+
+    @Test
+    void applyPackages_fulfilledPackageWithoutShipmentIdMarksDelivered() {
         CustomerOrder order = paidOrder().status(OrderStatus.HAND_WRAPPED);
 
         ZohoOrderStatus.applyPackages(order, List.of(Map.of("package_id", "pkg-42", "status", "fulfilled")));
 
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivered");
+    }
+
+    @Test
+    void applyPackages_deliveryStatusDeliveredMarksFulfilledEvenWhenStatusIsFulfilled() {
+        CustomerOrder order = paidOrder().status(OrderStatus.HAND_WRAPPED);
+
+        ZohoOrderStatus.applyPackages(
+            order,
+            List.of(Map.of("package_id", "pkg-42", "status", "fulfilled", "delivery_status", "Delivered"))
+        );
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+    }
+
+    @Test
+    void applyPackages_miniMsDeliveryStatusDeliveredMarksFulfilledWhileShipmentStatusStaysShipped() {
+        CustomerOrder order = paidOrder().status(OrderStatus.HAND_WRAPPED);
+
+        ZohoOrderStatus.applyPackages(
+            order,
+            List.of(Map.of("shipment_order_id", "ship-42", "status", "Shipped", "cf_minims_delivery_status", "delivered"))
+        );
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivered");
+    }
+
+    @Test
+    void applyPackages_shipmentOrderIdWithoutShippedStatusDoesNotInventShipmentDate() {
+        CustomerOrder order = paidOrder();
+
+        ZohoOrderStatus.applyPackages(order, List.of(Map.of("shipment_order_id", "ship-42", "package_id", "pkg-42")));
+
         assertThat(order.getStatus()).isEqualTo(OrderStatus.HAND_WRAPPED);
+        assertThat(order.getShipmentDate()).isNull();
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("hand_wrapped");
+    }
+
+    @Test
+    void applySalesOrderTracking_deliveryStatusDeliveredMarksFulfilledEvenWhenStatusIsFulfilled() {
+        CustomerOrder order = paidOrder().status(OrderStatus.HAND_WRAPPED);
+
+        ZohoOrderStatus.applySalesOrderTracking(order, Map.of("status", "fulfilled", "deliveryStatus", "Delivered"));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(order.getZohoOrderStatus()).isEqualTo("fulfilled");
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivered");
     }
 
     @Test
@@ -208,6 +307,29 @@ class ZohoOrderStatusTest {
 
         assertThat(order.getZohoOrderStatus()).isEqualTo("fulfilled");
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+    }
+
+    @Test
+    void applySalesOrderTracking_shipmentDeliveredIsNotDemotedByInvoicedSalesOrder() {
+        CustomerOrder order = paidOrder().status(OrderStatus.FULFILLED);
+
+        ZohoOrderStatus.applySalesOrderTracking(order, Map.of("status", "invoiced", "shipped_status", "fulfilled"));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivered");
+    }
+
+    @Test
+    void applySalesOrderTracking_shipmentDeliveredKeepsFulfilledWhenSalesOrderIsOnlyFulfilled() {
+        CustomerOrder order = paidOrder().status(OrderStatus.FULFILLED);
+
+        ZohoOrderStatus.applySalesOrderTracking(
+            order,
+            Map.of("status", "fulfilled", "line_items", List.of(Map.of("quantity_packed", 1)))
+        );
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivered");
     }
 
     @Test
@@ -276,6 +398,67 @@ class ZohoOrderStatusTest {
         assertThat(order.getZohoOrderStatus()).isEqualTo("invoiced");
         assertThat(order.getTrackingNumber()).isEqualTo("STALE-AWB");
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+    }
+
+    @Test
+    void applySalesOrderTracking_pendingShipmentClearsStaleShipmentDate() {
+        CustomerOrder order = paidOrder().shipmentDate("2026-09-02");
+
+        ZohoOrderStatus.applySalesOrderTracking(
+            order,
+            Map.of(
+                "status",
+                "invoiced",
+                "shipped_status",
+                "pending",
+                "line_items",
+                List.of(Map.of("quantity_packed", 0, "quantity_shipped", 0))
+            )
+        );
+
+        assertThat(order.getShipmentDate()).isNull();
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("confirmed");
+    }
+
+    @Test
+    void applySalesOrderTracking_pendingShipmentDemotesStaleHandWrapped() {
+        CustomerOrder order = paidOrder().status(OrderStatus.HAND_WRAPPED).shipmentDate("2026-09-02");
+
+        ZohoOrderStatus.applySalesOrderTracking(
+            order,
+            Map.of(
+                "status",
+                "invoiced",
+                "shipped_status",
+                "pending",
+                "line_items",
+                List.of(Map.of("quantity_packed", 0, "quantity_shipped", 0))
+            )
+        );
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(order.getShipmentDate()).isNull();
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("confirmed");
+    }
+
+    @Test
+    void applySalesOrderTracking_notShippedStatusClearsStaleShipmentDate() {
+        CustomerOrder order = paidOrder().status(OrderStatus.HAND_WRAPPED).shipmentDate("2026-09-02");
+
+        ZohoOrderStatus.applySalesOrderTracking(
+            order,
+            Map.of(
+                "status",
+                "invoiced",
+                "shippedStatus",
+                "not_shipped",
+                "line_items",
+                List.of(Map.of("quantity_packed", 0, "quantity_shipped", 0))
+            )
+        );
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(order.getShipmentDate()).isNull();
     }
 
     @Test

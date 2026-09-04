@@ -4,15 +4,15 @@
     "openapiSource": "https://uat.minisnmore.com/v3/api-docs",
     "baseUrl": "https://uat.minisnmore.com",
     "skippedUserInteraction": 2,
-    "totalOpenApiOps": 117,
-    "requestsRun": 120,
+    "totalOpenApiOps": 118,
+    "requestsRun": 121,
     "openapiOpsMarked": 149,
     "adminLogin": 200,
     "customerLogin": 200,
-    "pass2xx": 80,
-    "fail": 36,
+    "pass2xx": 77,
+    "fail": 40,
     "skipped": 4,
-    "passRatePct": 69.0,
+    "passRatePct": 65.8,
     "credentials": {
       "admin": "admin@uat.minisnmore.com",
       "customer": "irfanpatan9948@gmail.com"
@@ -100,8 +100,8 @@
       "skip": 0
     },
     "ledgerly-admin": {
-      "pass": 10,
-      "fail": 0,
+      "pass": 9,
+      "fail": 1,
       "skip": 0
     },
     "ledgerly-admin-resource": {
@@ -140,8 +140,8 @@
       "skip": 0
     },
     "internal-storage-upload": {
-      "pass": 2,
-      "fail": 0,
+      "pass": 0,
+      "fail": 2,
       "skip": 2
     },
     "internal-ledgerly-webhook": {
@@ -167,6 +167,11 @@
     "internal-storefront": {
       "pass": 3,
       "fail": 0,
+      "skip": 0
+    },
+    "internal-zoho-stock-webhook": {
+      "pass": 0,
+      "fail": 1,
       "skip": 0
     }
   },
@@ -199,7 +204,7 @@
       "code": 200,
       "2xx": true,
       "note": "seed product",
-      "responseTimeMs": 114
+      "responseTimeMs": 175
     },
     {
       "module": "storefront",
@@ -209,7 +214,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 108
+      "responseTimeMs": 60
     },
     {
       "module": "storefront",
@@ -219,7 +224,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 92
+      "responseTimeMs": 59
     },
     {
       "module": "storefront",
@@ -229,7 +234,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 88
+      "responseTimeMs": 47
     },
     {
       "module": "storefront",
@@ -239,7 +244,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 92
+      "responseTimeMs": 96
     },
     {
       "module": "storefront",
@@ -249,7 +254,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 69
+      "responseTimeMs": 59
     },
     {
       "module": "storefront",
@@ -259,7 +264,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 79
+      "responseTimeMs": 102
     },
     {
       "module": "storefront",
@@ -269,7 +274,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 75
+      "responseTimeMs": 73
     },
     {
       "module": "storefront",
@@ -279,17 +284,17 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 278
+      "responseTimeMs": 361
     },
     {
       "module": "storefront",
       "method": "GET",
-      "path": "/api/v1/products/book-style-tying-jabla",
+      "path": "/api/v1/products/api-test-seed-1788137572",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 52
+      "responseTimeMs": 75
     },
     {
       "module": "admin-banners",
@@ -299,39 +304,39 @@
       "code": 200,
       "2xx": true,
       "note": "create",
-      "responseTimeMs": 77
-    },
-    {
-      "module": "admin-banners",
-      "method": "GET",
-      "path": "/api/v1/admin/banners",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 82
-    },
-    {
-      "module": "admin-banners",
-      "method": "PUT",
-      "path": "/api/v1/admin/banners/49652",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 110
-    },
-    {
-      "module": "admin-banners",
-      "method": "DELETE",
-      "path": "/api/v1/admin/banners/49652",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
       "responseTimeMs": 76
     },
     {
+      "module": "admin-banners",
+      "method": "GET",
+      "path": "/api/v1/admin/banners",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 68
+    },
+    {
+      "module": "admin-banners",
+      "method": "PUT",
+      "path": "/api/v1/admin/banners/50501",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 86
+    },
+    {
+      "module": "admin-banners",
+      "method": "DELETE",
+      "path": "/api/v1/admin/banners/50501",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 349
+    },
+    {
       "module": "admin-categories",
       "method": "POST",
       "path": "/api/v1/admin/categories",
@@ -339,7 +344,7 @@
       "code": 200,
       "2xx": true,
       "note": "create",
-      "responseTimeMs": 111
+      "responseTimeMs": 97
     },
     {
       "module": "admin-categories",
@@ -349,82 +354,12 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 74
+      "responseTimeMs": 50
     },
     {
       "module": "admin-categories",
       "method": "PUT",
-      "path": "/api/v1/admin/categories/49702",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 109
-    },
-    {
-      "module": "admin-categories",
-      "method": "DELETE",
-      "path": "/api/v1/admin/categories/49702",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 106
-    },
-    {
-      "module": "admin-coupons",
-      "method": "POST",
-      "path": "/api/v1/admin/coupons",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "create",
-      "responseTimeMs": 98
-    },
-    {
-      "module": "admin-coupons",
-      "method": "GET",
-      "path": "/api/v1/admin/coupons",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 88
-    },
-    {
-      "module": "admin-coupons",
-      "method": "PUT",
-      "path": "/api/v1/admin/coupons/49752",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 116
-    },
-    {
-      "module": "admin-coupons",
-      "method": "DELETE",
-      "path": "/api/v1/admin/coupons/49752",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 94
-    },
-    {
-      "module": "admin-policies",
-      "method": "POST",
-      "path": "/api/v1/admin/policies",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "create",
-      "responseTimeMs": 82
-    },
-    {
-      "module": "admin-policies",
-      "method": "GET",
-      "path": "/api/v1/admin/policies",
+      "path": "/api/v1/admin/categories/50551",
       "status": "PASS",
       "code": 200,
       "2xx": true,
@@ -432,24 +367,94 @@
       "responseTimeMs": 80
     },
     {
-      "module": "admin-policies",
-      "method": "PUT",
-      "path": "/api/v1/admin/policies/49802",
+      "module": "admin-categories",
+      "method": "DELETE",
+      "path": "/api/v1/admin/categories/50551",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 102
+      "responseTimeMs": 86
+    },
+    {
+      "module": "admin-coupons",
+      "method": "POST",
+      "path": "/api/v1/admin/coupons",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "create",
+      "responseTimeMs": 69
+    },
+    {
+      "module": "admin-coupons",
+      "method": "GET",
+      "path": "/api/v1/admin/coupons",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 70
+    },
+    {
+      "module": "admin-coupons",
+      "method": "PUT",
+      "path": "/api/v1/admin/coupons/50601",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 97
+    },
+    {
+      "module": "admin-coupons",
+      "method": "DELETE",
+      "path": "/api/v1/admin/coupons/50601",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 58
+    },
+    {
+      "module": "admin-policies",
+      "method": "POST",
+      "path": "/api/v1/admin/policies",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "create",
+      "responseTimeMs": 85
+    },
+    {
+      "module": "admin-policies",
+      "method": "GET",
+      "path": "/api/v1/admin/policies",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 91
+    },
+    {
+      "module": "admin-policies",
+      "method": "PUT",
+      "path": "/api/v1/admin/policies/50651",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 77
     },
     {
       "module": "admin-policies",
       "method": "DELETE",
-      "path": "/api/v1/admin/policies/49802",
+      "path": "/api/v1/admin/policies/50651",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 255
+      "responseTimeMs": 82
     },
     {
       "module": "admin-blog-posts",
@@ -459,7 +464,7 @@
       "code": 200,
       "2xx": true,
       "note": "create",
-      "responseTimeMs": 96
+      "responseTimeMs": 86
     },
     {
       "module": "admin-blog-posts",
@@ -469,27 +474,27 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 108
+      "responseTimeMs": 46
     },
     {
       "module": "admin-blog-posts",
       "method": "PUT",
-      "path": "/api/v1/admin/blog-posts/49852",
+      "path": "/api/v1/admin/blog-posts/50701",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 79
+      "responseTimeMs": 72
     },
     {
       "module": "admin-blog-posts",
       "method": "DELETE",
-      "path": "/api/v1/admin/blog-posts/49852",
+      "path": "/api/v1/admin/blog-posts/50701",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 56
+      "responseTimeMs": 66
     },
     {
       "module": "admin-home-sections",
@@ -499,7 +504,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 63
+      "responseTimeMs": 93
     },
     {
       "module": "admin-home-sections",
@@ -509,7 +514,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 65
+      "responseTimeMs": 125
     },
     {
       "module": "admin-page-visibility",
@@ -519,7 +524,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 66
+      "responseTimeMs": 46
     },
     {
       "module": "admin-page-visibility",
@@ -529,7 +534,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 60
+      "responseTimeMs": 71
     },
     {
       "module": "admin",
@@ -539,7 +544,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 104
+      "responseTimeMs": 78
     },
     {
       "module": "admin",
@@ -549,7 +554,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 29
+      "responseTimeMs": 38
     },
     {
       "module": "admin",
@@ -559,7 +564,7 @@
       "code": 204,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 32
+      "responseTimeMs": 98
     },
     {
       "module": "admin",
@@ -569,7 +574,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 46
+      "responseTimeMs": 1490
     },
     {
       "module": "admin",
@@ -579,7 +584,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 37
+      "responseTimeMs": 313
     },
     {
       "module": "admin",
@@ -589,7 +594,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 72
+      "responseTimeMs": 46
     },
     {
       "module": "admin",
@@ -599,7 +604,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 119
+      "responseTimeMs": 64
     },
     {
       "module": "customer",
@@ -609,7 +614,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 112
+      "responseTimeMs": 35
     },
     {
       "module": "customer",
@@ -619,7 +624,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 99
+      "responseTimeMs": 48
     },
     {
       "module": "customer",
@@ -629,7 +634,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 133
+      "responseTimeMs": 111
     },
     {
       "module": "customer",
@@ -639,7 +644,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 54
+      "responseTimeMs": 64
     },
     {
       "module": "customer",
@@ -649,7 +654,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 109
+      "responseTimeMs": 63
     },
     {
       "module": "customer",
@@ -679,7 +684,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 65
+      "responseTimeMs": 56
     },
     {
       "module": "internal-account",
@@ -689,7 +694,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 78
+      "responseTimeMs": 90
     },
     {
       "module": "internal-account",
@@ -699,7 +704,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 98
+      "responseTimeMs": 52
     },
     {
       "module": "internal-account-resource",
@@ -739,7 +744,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 78
+      "responseTimeMs": 93
     },
     {
       "module": "internal-account",
@@ -749,7 +754,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 112
+      "responseTimeMs": 53
     },
     {
       "module": "internal-account-order",
@@ -759,7 +764,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 139
+      "responseTimeMs": 202
     },
     {
       "module": "internal-account-order",
@@ -769,7 +774,7 @@
       "code": 400,
       "2xx": false,
       "note": "{\"detail\":\"Email does not match signed-in account\",\"instance\":\"/internal/v1/account/profile/bootstrap\",\"status\":400,\"title\":\"Bad Request\"}",
-      "responseTimeMs": 98
+      "responseTimeMs": 116
     },
     {
       "module": "internal-account",
@@ -779,7 +784,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 73
+      "responseTimeMs": 75
     },
     {
       "module": "internal-account",
@@ -789,7 +794,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 101
+      "responseTimeMs": 84
     },
     {
       "module": "internal-account",
@@ -799,7 +804,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 135
+      "responseTimeMs": 88
     },
     {
       "module": "internal-account-resource",
@@ -819,7 +824,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 124
+      "responseTimeMs": 56
     },
     {
       "module": "internal-admin-import",
@@ -828,8 +833,8 @@
       "status": "FAIL",
       "code": 500,
       "2xx": false,
-      "note": "{\"timestamp\":\"2026-08-30T12:09:10.295Z\",\"status\":500,\"error\":\"Internal Server Error\",\"path\":\"/internal/v1/admin/import/sku-wise-print\"}",
-      "responseTimeMs": 70
+      "note": "{\"timestamp\":\"2026-08-31T00:53:01.010Z\",\"status\":500,\"error\":\"Internal Server Error\",\"path\":\"/internal/v1/admin/import/sku-wise-print\"}",
+      "responseTimeMs": 127
     },
     {
       "module": "ledgerly-admin",
@@ -839,7 +844,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 64
+      "responseTimeMs": 53
     },
     {
       "module": "ledgerly-admin",
@@ -849,7 +854,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 1151
+      "responseTimeMs": 113
     },
     {
       "module": "ledgerly-admin",
@@ -859,17 +864,17 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 3055
+      "responseTimeMs": 340
     },
     {
       "module": "ledgerly-admin",
       "method": "POST",
       "path": "/api/v1/admin/ledgerly/pull-products",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 303
+      "status": "FAIL",
+      "code": 500,
+      "2xx": false,
+      "note": "{\"timestamp\":\"2026-08-31T00:53:01.721Z\",\"status\":500,\"error\":\"Internal Server Error\",\"path\":\"/api/v1/admin/ledgerly/pull-products\"}",
+      "responseTimeMs": 194
     },
     {
       "module": "ledgerly-admin",
@@ -879,7 +884,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 79
+      "responseTimeMs": 262
     },
     {
       "module": "ledgerly-admin",
@@ -889,7 +894,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 9807
+      "responseTimeMs": 962
     },
     {
       "module": "ledgerly-admin",
@@ -899,7 +904,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 82
+      "responseTimeMs": 54
     },
     {
       "module": "ledgerly-admin",
@@ -909,7 +914,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 144
+      "responseTimeMs": 47
     },
     {
       "module": "ledgerly-admin-resource",
@@ -929,7 +934,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 2883
+      "responseTimeMs": 505
     },
     {
       "module": "ledgerly-admin-resource",
@@ -949,7 +954,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 317
+      "responseTimeMs": 68
     },
     {
       "module": "internal-admin-order-return",
@@ -959,7 +964,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 60
+      "responseTimeMs": 106
     },
     {
       "module": "internal-admin-order-return-resource",
@@ -1119,7 +1124,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 46
+      "responseTimeMs": 70
     },
     {
       "module": "internal-admin-order",
@@ -1129,7 +1134,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 44
+      "responseTimeMs": 88
     },
     {
       "module": "internal-admin-order-resource",
@@ -1159,7 +1164,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 54
+      "responseTimeMs": 250
     },
     {
       "module": "internal-admin-store-resource",
@@ -1185,21 +1190,21 @@
       "module": "internal-storage-upload",
       "method": "POST",
       "path": "/api/v1/admin/uploads/delete",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 794
+      "status": "FAIL",
+      "code": 500,
+      "2xx": false,
+      "note": "{\"timestamp\":\"2026-08-31T00:53:05.468Z\",\"status\":500,\"error\":\"Internal Server Error\",\"path\":\"/internal/v1/admin/uploads/delete\"}",
+      "responseTimeMs": 862
     },
     {
       "module": "internal-storage-upload",
       "method": "GET",
       "path": "/api/v1/admin/uploads/objects",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 1408
+      "status": "FAIL",
+      "code": 500,
+      "2xx": false,
+      "note": "{\"timestamp\":\"2026-08-31T00:53:05.536Z\",\"status\":500,\"error\":\"Internal Server Error\",\"path\":\"/internal/v1/admin/uploads/objects\"}",
+      "responseTimeMs": 73
     },
     {
       "module": "internal-storage-upload",
@@ -1219,7 +1224,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 45
+      "responseTimeMs": 39
     },
     {
       "module": "internal-ledgerly-webhook",
@@ -1229,7 +1234,7 @@
       "code": 401,
       "2xx": false,
       "note": "{\"detail\":\"Missing X-Ledgerly-Signature\",\"instance\":\"/internal/v1/ledgerly/webhooks\",\"status\":401,\"title\":\"Unauthorized\"}",
-      "responseTimeMs": 48
+      "responseTimeMs": 47
     },
     {
       "module": "internal-order-return",
@@ -1239,7 +1244,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 44
+      "responseTimeMs": 48
     },
     {
       "module": "internal-order-return",
@@ -1259,7 +1264,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 33
+      "responseTimeMs": 43
     },
     {
       "module": "internal-order-return-resource",
@@ -1279,7 +1284,7 @@
       "code": 404,
       "2xx": false,
       "note": "{\"detail\":\"Order not found\",\"instance\":\"/internal/v1/order-returns/exchange\",\"status\":404,\"title\":\"Not Found\"}",
-      "responseTimeMs": 43
+      "responseTimeMs": 58
     },
     {
       "module": "internal-order-return-resource",
@@ -1309,7 +1314,7 @@
       "code": 404,
       "2xx": false,
       "note": "{\"detail\":\"Order not found\",\"instance\":\"/internal/v1/orders/retry-payment\",\"status\":404,\"title\":\"Not Found\"}",
-      "responseTimeMs": 44
+      "responseTimeMs": 59
     },
     {
       "module": "internal-account-order",
@@ -1319,7 +1324,7 @@
       "code": 404,
       "2xx": false,
       "note": "{\"detail\":\"Order not found\",\"instance\":\"/internal/v1/orders/sync-payment\",\"status\":404,\"title\":\"Not Found\"}",
-      "responseTimeMs": 37
+      "responseTimeMs": 63
     },
     {
       "module": "internal-account-order-resource",
@@ -1349,17 +1354,17 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 49
+      "responseTimeMs": 72
     },
     {
       "module": "internal-storefront",
       "method": "GET",
-      "path": "/api/v1/products/api-test-seed-1788091742",
+      "path": "/api/v1/products/api-test-seed-1788137572",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 31
+      "responseTimeMs": 42
     },
     {
       "module": "internal-storefront",
@@ -1369,7 +1374,17 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 39
+      "responseTimeMs": 54
+    },
+    {
+      "module": "internal-zoho-stock-webhook",
+      "method": "POST",
+      "path": "/api/v1/zoho/stock-webhook",
+      "status": "FAIL",
+      "code": 401,
+      "2xx": false,
+      "note": "{\"detail\":\"Missing X-Zoho-Stock-Signature\",\"instance\":\"/internal/v1/zoho/stock-webhook\",\"status\":401,\"title\":\"Unauthorized\"}",
+      "responseTimeMs": 56
     }
   ]
 }

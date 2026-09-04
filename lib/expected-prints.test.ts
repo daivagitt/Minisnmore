@@ -37,4 +37,19 @@ describe("expected-prints", () => {
     const rows = JSON.parse(next!);
     expect(rows.map((r: { color: string }) => r.color)).toEqual(["BROWN SWADDLE", "GREEN SWADDLE"]);
   });
+
+  it("keeps direct Zoho print names unchanged", () => {
+    const colors = applyExpectedPrintNamesToColors(
+      [{ name: "BABY BLUE" }, { name: "SNAIL & BLUE" }, { name: "HAPPY BEE" }],
+      "BASIC-SHORTS",
+    );
+    expect(colors.map((c) => c.name)).toEqual(["BABY BLUE", "SNAIL & BLUE", "HAPPY BEE"]);
+
+    const raw = JSON.stringify([
+      { sku: "BASIC-SHORTS-BABY-BLUE", size: "0-3 M", color: "BABY BLUE", stock: 5, active: true },
+      { sku: "BASIC-SHORTS-SNAIL-BLUE", size: "0-3 M", color: "SNAIL & BLUE", stock: 5, active: true },
+    ]);
+    const next = applyExpectedPrintNamesToVariantsJson(raw, "BASIC-SHORTS");
+    expect(JSON.parse(next!).map((r: { color: string }) => r.color)).toEqual(["BABY BLUE", "SNAIL & BLUE"]);
+  });
 });

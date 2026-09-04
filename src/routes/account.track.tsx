@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Truck, Loader2, Search, Baby, Sparkles } from "lucide-react";
 import { useAccountData } from "@/lib/account";
-import { useOrderTrackingPoll } from "@/hooks/useOrderTrackingPoll";
+import { useOrderTracking } from "@/hooks/useOrderTracking";
 import { OrderTrackingCard } from "@/components/OrderTrackingCard";
 import heroBaby from "@/assets/hero-smiling-baby.jpg";
 
@@ -16,7 +16,7 @@ function TrackPage() {
   const [code, setCode] = useState("");
   const [activeOrderNumber, setActiveOrderNumber] = useState<string | null>(null);
 
-  const { order, loading, error } = useOrderTrackingPoll(
+  const { order, loading, error } = useOrderTracking(
     activeOrderNumber,
     "authenticated",
   );

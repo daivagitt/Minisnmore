@@ -291,6 +291,62 @@ class LedgerlyWebhookHandlerServiceTest {
             .hasMessageContaining("Invalid JSON");
     }
 
+    @Test
+    void handle_missingEventType_throwsBadRequest() {
+        String body = "{\"id\":\"evt-16\",\"data\":{}}";
+
+        assertThatThrownBy(() -> handler.handle(body, sign(body), ""))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Missing event type");
+    }
+
+    @Test
+    void handle_autoSyncDisabled_skipsTrackingUpdate() throws Exception {
+        ApplicationProperties.Ledgerly ledgerly = new ApplicationProperties.Ledgerly();
+        ledgerly.setAutoSyncEnabled(false);
+        when(applicationProperties.getLedgerly()).thenReturn(ledgerly);
+        String body = "{\"id\":\"evt-17\",\"data\":{\"externalRef\":\"MNM-300\"}}";
+        when(webhookEventRepository.existsByEventId("evt-17")).thenReturn(false);
+
+        handler.handle(body, sign(body), "order.fulfilled");
+
+        verify(customerOrderRepository, never()).save(any());
+    }
+
+    @Test
+    void handle_itemUpdated_fallsBackToLedgerlyItemId() throws Exception {
+        String body = "{\"id\":\"evt-18\",\"data\":{\"sku\":\"SKU-4\",\"ledgerlyItemId\":\"ll-4\"}}";
+        Product product = new Product().sku("SKU-4").ledgerlyItemId("ll-4");
+        when(webhookEventRepository.existsByEventId("evt-18")).thenReturn(false);
+        when(productRepository.findOneBySku("SKU-4")).thenReturn(Optional.empty());
+        when(productRepository.findOneByLedgerlyItemId("ll-4")).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+
+        handler.handle(body, sign(body), "item.updated");
+
+        verify(productMergeService).mergeLedgerlyItem(any(), any(), any(), any());
+    }
+
+    @Test
+    void handle_invoicePaid_missingExternalRef_throwsBadRequest() {
+        String body = "{\"id\":\"evt-19\",\"data\":{}}";
+        when(webhookEventRepository.existsByEventId("evt-19")).thenReturn(false);
+
+        assertThatThrownBy(() -> handler.handle(body, sign(body), "invoice.paid"))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("requires externalRef");
+    }
+
+    @Test
+    void handle_trackingWebhook_missingExternalRef_throwsBadRequest() {
+        String body = "{\"id\":\"evt-20\",\"data\":{}}";
+        when(webhookEventRepository.existsByEventId("evt-20")).thenReturn(false);
+
+        assertThatThrownBy(() -> handler.handle(body, sign(body), "order.fulfilled"))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("requires externalRef");
+    }
+
     private static String sign(String payload) throws Exception {
         Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));

@@ -88,5 +88,11 @@ describe("pincode helpers", () => {
       ok: false,
       error: "Delivery isn't available for this pincode yet. Try another pincode or contact us on WhatsApp.",
     });
+
+    const badRequest = vi.fn().mockRejectedValue(new ApiError("invalid pin", 400));
+    await expect(lookupPincode("560001", badRequest)).resolves.toMatchObject({
+      ok: false,
+      error: "Delivery isn't available for this pincode yet. Try another pincode or contact us on WhatsApp.",
+    });
   });
 });

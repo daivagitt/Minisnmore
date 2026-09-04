@@ -24,34 +24,30 @@ export const PRODUCT_GALLERY_HERO_FRAME =
 export const PRODUCT_GALLERY_QUICKVIEW_MAX_H =
   "max-h-[min(72vw,20rem)] md:max-h-[min(50vh,24rem)]";
 
-/** Portrait (taller than wide), square, then landscape. */
+/** Landscape (wider than tall), square/unknown, then portrait. */
 const PORTRAIT_MAX_ASPECT = 0.98;
 const LANDSCAPE_MIN_ASPECT = 1.02;
 
 export function galleryOrientationRank(aspect: number | undefined): number {
   if (!aspect || aspect <= 0) return 1;
-  if (aspect < PORTRAIT_MAX_ASPECT) return 0;
-  if (aspect > LANDSCAPE_MIN_ASPECT) return 2;
+  if (aspect > LANDSCAPE_MIN_ASPECT) return 0;
+  if (aspect < PORTRAIT_MAX_ASPECT) return 2;
   return 1;
 }
 
 /**
- * Keep the first image, then the rest of that orientation, then the other orientation(s).
- * Landscape-first galleries stay landscape then portrait; portrait-first stay portrait then landscape.
+ * Group landscapes first and portraits last while preserving relative order within each orientation.
  */
 export function sortGalleryByLeadingOrientation(
   urls: string[],
   aspectFor: (url: string) => number | undefined,
 ): string[] {
   if (urls.length <= 1) return urls;
-  const lead = galleryOrientationRank(aspectFor(urls[0]));
   const indexed = urls.map((url, order) => ({ url, order }));
   indexed.sort((a, b) => {
     const rankA = galleryOrientationRank(aspectFor(a.url));
     const rankB = galleryOrientationRank(aspectFor(b.url));
-    const groupA = rankA === lead ? 0 : rankA + 1;
-    const groupB = rankB === lead ? 0 : rankB + 1;
-    if (groupA !== groupB) return groupA - groupB;
+    if (rankA !== rankB) return rankA - rankB;
     return a.order - b.order;
   });
   return indexed.map((entry) => entry.url);
@@ -125,6 +121,15 @@ function uniqueSameColorDonorPhotos(variants: ProductVariant[]): string[] {
   return donor ?? [];
 }
 
+function fallbackProductHero(product: ProductGallerySource): string {
+  const swatches = new Set(
+    (product.colors ?? [])
+      .map((color) => color.swatchUrl?.trim())
+      .filter((url): url is string => Boolean(url)),
+  );
+  return uniqueImages(product.image, ...(product.gallery ?? [])).find((url) => !swatches.has(url)) ?? "";
+}
+
 /** Hero + thumbnails for the selected colour (and size, when SKUs have their own photos). */
 export function galleryForSelectedColor(
   product: ProductGallerySource,
@@ -164,7 +169,7 @@ export function galleryForSelectedColor(
     (row) => uniqueImages(row.imageUrl, ...(row.imageUrls ?? [])).length > 0,
   );
   if (variant && colorHasVariantPhotos) {
-    return { image: "", gallery: [] };
+    return { image: fallbackProductHero(product), gallery: [] };
   }
 
   const colorEntry = findColor(product.colors, selectedColor);
@@ -202,14 +207,14 @@ export function galleryForSelectedColor(
     return { image: hero, gallery: rest };
   }
 
-  // Selected print exists but has no photos — don't show other prints' images.
+  // Selected print exists but has no photos. Prefer the product hero over a blank PDP.
   if (selectedColor?.trim() && colorEntry && hasPerColorGalleries(product.colors)) {
-    return { image: "", gallery: [] };
+    return { image: fallbackProductHero(product), gallery: [] };
   }
 
-  // Per-print products never fall back to the mixed product gallery.
+  // Per-print products without selected-color photos still need a stable product hero.
   if (hasPerColorGalleries(product.colors)) {
-    return { image: "", gallery: [] };
+    return { image: fallbackProductHero(product), gallery: [] };
   }
 
   const baseGallery = product.gallery ?? [];

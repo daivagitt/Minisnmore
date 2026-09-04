@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.client.XpressBeesClient;
+import com.miniandmore.app.repository.SiteSettingRepository;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -25,7 +26,9 @@ class PincodeLookupServiceHttpTest {
     void setUp() {
         xpressBeesClient = mock(XpressBeesClient.class);
         when(xpressBeesClient.isConfigured()).thenReturn(false);
-        service = new PincodeLookupService(new ObjectMapper(), xpressBeesClient);
+        SiteSettingRepository siteSettingRepository = mock(SiteSettingRepository.class);
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+        service = new PincodeLookupService(new ObjectMapper(), xpressBeesClient, siteSettingRepository);
         httpClient = mock(HttpClient.class);
         ReflectionTestUtils.setField(service, "httpClient", httpClient);
     }

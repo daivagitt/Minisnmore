@@ -775,7 +775,15 @@
                             <configuration>
                                 <rules>
                                     <rule>
-                                        <element>BUNDLE</element>
+                                        <element>CLASS</element>
+                                        <includes>
+                                            <include>com/miniandmore/app/service/*</include>
+                                        </includes>
+                                        <excludes>
+                                            <exclude>com/miniandmore/app/service/*Zoho*</exclude>
+                                            <exclude>com/miniandmore/app/service/*Scheduler</exclude>
+                                            <exclude>com/miniandmore/app/service/*MapperImpl</exclude>
+                                        </excludes>
                                         <limits>
                                             <limit>
                                                 <counter>LINE</counter>

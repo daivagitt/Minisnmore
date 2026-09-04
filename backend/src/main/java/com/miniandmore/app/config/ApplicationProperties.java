@@ -221,6 +221,21 @@ public class ApplicationProperties {
 
         private String inventoryAdjustmentAccountId;
 
+        /** HMAC-SHA256 secret accepted by the stock-only webhook endpoint. */
+        private String stockWebhookSecret;
+
+        /** HMAC-SHA256 secret accepted by the shipment/package webhook endpoint. */
+        private String shipmentWebhookSecret;
+
+        /** HMAC-SHA256 secret accepted by the catalog item webhook endpoint. */
+        private String itemWebhookSecret;
+
+        /** HMAC-SHA256 secret accepted by the sales-order status webhook endpoint. */
+        private String orderStatusWebhookSecret;
+
+        /** HMAC-SHA256 secret accepted by the invoice status webhook endpoint. */
+        private String invoiceWebhookSecret;
+
         // Zoho tax_id for the org's 5% GST rate (Settings > Taxes in Zoho Books). When set, it is
         // attached to pushed items (so Zoho auto-applies it, splitting CGST+SGST or IGST per
         // place_of_supply) and to the COD handling fee line, which has no item_id to inherit from.
@@ -295,6 +310,46 @@ public class ApplicationProperties {
 
         public void setInventoryAdjustmentAccountId(String inventoryAdjustmentAccountId) {
             this.inventoryAdjustmentAccountId = inventoryAdjustmentAccountId;
+        }
+
+        public String getStockWebhookSecret() {
+            return stockWebhookSecret;
+        }
+
+        public void setStockWebhookSecret(String stockWebhookSecret) {
+            this.stockWebhookSecret = stockWebhookSecret;
+        }
+
+        public String getShipmentWebhookSecret() {
+            return shipmentWebhookSecret;
+        }
+
+        public void setShipmentWebhookSecret(String shipmentWebhookSecret) {
+            this.shipmentWebhookSecret = shipmentWebhookSecret;
+        }
+
+        public String getItemWebhookSecret() {
+            return itemWebhookSecret;
+        }
+
+        public void setItemWebhookSecret(String itemWebhookSecret) {
+            this.itemWebhookSecret = itemWebhookSecret;
+        }
+
+        public String getOrderStatusWebhookSecret() {
+            return orderStatusWebhookSecret;
+        }
+
+        public void setOrderStatusWebhookSecret(String orderStatusWebhookSecret) {
+            this.orderStatusWebhookSecret = orderStatusWebhookSecret;
+        }
+
+        public String getInvoiceWebhookSecret() {
+            return invoiceWebhookSecret;
+        }
+
+        public void setInvoiceWebhookSecret(String invoiceWebhookSecret) {
+            this.invoiceWebhookSecret = invoiceWebhookSecret;
         }
 
         public String getGstTaxId() {
@@ -521,7 +576,17 @@ public class ApplicationProperties {
 
         public static class OrderTracking {
 
+            private boolean enabled = true;
+
             private Long fixedDelayMs = 900_000L;
+
+            public boolean isEnabled() {
+                return enabled;
+            }
+
+            public void setEnabled(boolean enabled) {
+                this.enabled = enabled;
+            }
 
             public Long getFixedDelayMs() {
                 return fixedDelayMs;

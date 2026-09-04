@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { InvoiceOrderQr } from "@/components/InvoiceOrderQr";
 import { buildInvoiceBreakdown, type InvoiceOrder } from "@/lib/invoice-breakdown";
+import { invoiceNumberFromOrder } from "@/lib/invoice-number";
 import { DEFAULT_SELLER_STATE, formatPlaceOfSupply } from "@/lib/india-states";
 
 export type InvoiceBrandSettings = {
@@ -84,10 +85,11 @@ export function PortraitInvoiceDocument({
   const customerAddress = addressLines(order.shipping_address);
   const brandName = settings.brand_name || "Mini's n More";
   const seller = settings.invoice_sold_by_address?.trim();
+  const invoiceNumber = order.invoice_number?.trim() || invoiceNumberFromOrder(order.order_number);
 
   return (
     <article
-      className={`invoice-document box-border mx-auto flex flex-col bg-white font-sans text-[8.5px] leading-[1.28] text-black shadow-xl print:shadow-none print:overflow-visible ${compact ? "min-h-[720px] w-full p-4" : "min-h-[297mm] w-[210mm] max-w-full p-[8mm]"}`}
+      className={`invoice-document box-border mx-auto flex flex-col bg-white font-sans text-[12px] leading-[1.35] text-black shadow-xl print:shadow-none print:overflow-visible ${compact ? "min-h-[720px] w-full p-4" : "min-h-[297mm] w-[210mm] max-w-full p-[8mm] print:w-[210mm] print:min-h-[297mm]"}`}
     >
       <header className="grid grid-cols-[minmax(0,1fr)_auto_minmax(72px,1fr)] items-start gap-3">
         <div className="min-w-0">
@@ -100,9 +102,9 @@ export function PortraitInvoiceDocument({
           ) : (
             <div className="text-base font-bold leading-tight">{brandName}</div>
           )}
-          <p className="break-all text-[8px]">{display(settings.invoice_website)}</p>
+          <p className="break-all text-[10px]">{display(settings.invoice_website)}</p>
         </div>
-        <h1 className="whitespace-nowrap pt-0.5 text-center text-[15px] font-bold uppercase tracking-wide">
+        <h1 className="whitespace-nowrap pt-0.5 text-center text-[22px] font-bold uppercase tracking-wide">
           Tax Invoice
         </h1>
         <div className="flex min-h-20 min-w-0 flex-col items-end justify-start">
@@ -125,7 +127,7 @@ export function PortraitInvoiceDocument({
           </div>
         </div>
         <div className="grid content-end gap-0.5">
-          <MetaLine label="Invoice No" value={order.order_number} />
+          <MetaLine label="Invoice No" value={invoiceNumber} />
           <MetaLine label="Invoice Date" value={invoiceDate(order.created_at)} />
           <MetaLine label="Order Date" value={invoiceDate(order.created_at)} />
         </div>
@@ -159,7 +161,7 @@ export function PortraitInvoiceDocument({
         <LegalLine label="Dispatch From" value={display(settings.invoice_dispatch_from_address)} />
       </section>
 
-      <table className="mt-2 w-full table-fixed border-collapse border border-black text-[7.5px] leading-[1.2]">
+      <table className="mt-2 w-full table-fixed border-collapse border border-black text-[11px] leading-[1.3]">
         <colgroup>
           <col className="w-[35%]" />
           <col className="w-[5%]" />
@@ -196,7 +198,7 @@ export function PortraitInvoiceDocument({
               <td className="border border-black px-1 py-1">
                 <p>{line.itemName}</p>
                 {line.details.map((detail) => (
-                  <p key={detail} className="text-[7px]">
+                  <p key={detail} className="text-[9px]">
                     {detail}
                   </p>
                 ))}
@@ -245,7 +247,7 @@ export function PortraitInvoiceDocument({
         </tbody>
       </table>
 
-      <footer className="mt-auto border-t border-black pt-2 text-[7.5px] leading-[1.35]">
+      <footer className="mt-auto border-t border-black pt-2 text-[10px] leading-[1.4]">
         <p className="font-bold">Not For Resale</p>
         {settings.invoice_footer_note?.trim() ? <p>{settings.invoice_footer_note}</p> : null}
         <p>This is a computer-generated invoice and requires no signature or stamp.</p>

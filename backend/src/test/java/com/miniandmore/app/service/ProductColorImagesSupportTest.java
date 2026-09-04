@@ -334,4 +334,116 @@ class ProductColorImagesSupportTest {
 
         assertThat(product.getImagesJson()).contains("navy.jpg");
     }
+
+    @Test
+    void appendGalleryUrl_nullOrBlankInputs_areNoOp() {
+        Product product = new Product();
+        support.appendGalleryUrl(null, "Navy", "https://cdn.example.com/n.jpg");
+        support.appendGalleryUrl(product, " ", "https://cdn.example.com/n.jpg");
+        support.appendGalleryUrl(product, "Navy", " ");
+
+        assertThat(product.getColorsJson()).isNull();
+    }
+
+    @Test
+    void appendGalleryUrl_trimsGalleryToMaxPerColor() {
+        Product product = new Product();
+        for (int i = 0; i < ProductColorImagesSupport.MAX_IMAGES_PER_COLOR + 2; i++) {
+            support.appendGalleryUrl(product, "Busy", "https://cdn.example.com/img-" + i + ".jpg");
+        }
+
+        assertThat(support.galleryUrlsForColor(product, "Busy")).hasSize(ProductColorImagesSupport.MAX_IMAGES_PER_COLOR);
+    }
+
+    @Test
+    void seedGalleryUrlIfEmpty_nullProduct_isNoOp() {
+        support.seedGalleryUrlIfEmpty(null, "Navy", "https://cdn.example.com/n.jpg");
+    }
+
+    @Test
+    void replaceColorGallery_nullProduct_isNoOp() {
+        support.replaceColorGallery(null, "Navy", List.of("https://cdn.example.com/n.jpg"));
+    }
+
+    @Test
+    void replaceColorGallery_blankColor_isNoOp() {
+        Product product = new Product();
+        support.replaceColorGallery(product, "  ", List.of("https://cdn.example.com/n.jpg"));
+        assertThat(product.getColorsJson()).isNull();
+    }
+
+    @Test
+    void galleryUrlsForColor_nullOrBlank_returnsEmpty() {
+        Product product = new Product().colorsJson("[{\"name\":\"Navy\",\"imageUrls\":[\"https://cdn.example.com/n.jpg\"]}]");
+        assertThat(support.galleryUrlsForColor(null, "Navy")).isEmpty();
+        assertThat(support.galleryUrlsForColor(product, " ")).isEmpty();
+    }
+
+    @Test
+    void galleryUrlsForColor_mergesColorsJsonAndColorImagesMap() {
+        Product product = new Product()
+            .colorsJson("[{\"name\":\"Navy\",\"imageUrls\":[\"https://cdn.example.com/navy.jpg\"]}]")
+            .colorImagesJson("{\"Navy\":[\"https://cdn.example.com/extra.jpg\"]}");
+
+        assertThat(support.galleryUrlsForColor(product, "navy"))
+            .containsExactly("https://cdn.example.com/navy.jpg", "https://cdn.example.com/extra.jpg");
+    }
+
+    @Test
+    void stripUrlsFromImagesJson_removesMatchingUrls() {
+        Product product = new Product()
+            .imagesJson("[\"https://cdn.example.com/keep.jpg\",\"https://cdn.example.com/remove.jpg\"]");
+
+        support.stripUrlsFromImagesJson(product, List.of("https://cdn.example.com/remove.jpg"));
+
+        assertThat(product.getImagesJson()).contains("keep.jpg").doesNotContain("remove.jpg");
+    }
+
+    @Test
+    void stripUrlsFromImagesJson_nullInputs_areNoOp() {
+        Product product = new Product().imagesJson("[\"https://cdn.example.com/a.jpg\"]");
+        support.stripUrlsFromImagesJson(null, List.of("https://cdn.example.com/a.jpg"));
+        support.stripUrlsFromImagesJson(product, null);
+        support.stripUrlsFromImagesJson(product, List.of("  "));
+        assertThat(product.getImagesJson()).contains("a.jpg");
+    }
+
+    @Test
+    void stripUrlsFromImagesJson_invalidJson_isNoOp() {
+        Product product = new Product().imagesJson("not-json");
+        support.stripUrlsFromImagesJson(product, List.of("https://cdn.example.com/a.jpg"));
+        assertThat(product.getImagesJson()).isEqualTo("not-json");
+    }
+
+    @Test
+    void stripUrlsFromImagesJson_nonArrayJson_isNoOp() {
+        Product product = new Product().imagesJson("{\"url\":\"https://cdn.example.com/a.jpg\"}");
+        support.stripUrlsFromImagesJson(product, List.of("https://cdn.example.com/a.jpg"));
+        assertThat(product.getImagesJson()).contains("a.jpg");
+    }
+
+    @Test
+    void seedGalleryUrlIfEmpty_blankInputs_areNoOp() {
+        Product product = new Product();
+        support.seedGalleryUrlIfEmpty(product, " ", "https://cdn.example.com/n.jpg");
+        support.seedGalleryUrlIfEmpty(product, "Navy", " ");
+        assertThat(product.getColorsJson()).isNull();
+    }
+
+    @Test
+    void allSimpleProductGallerySourceUrls_nullProduct_returnsEmpty() {
+        assertThat(support.allSimpleProductGallerySourceUrls(null)).isEmpty();
+    }
+
+    @Test
+    void stripUrlsFromImagesJson_clearingAllUrlsNullsImagesJson() {
+        Product product = new Product().imagesJson("[\"https://cdn.example.com/only.jpg\"]");
+        support.stripUrlsFromImagesJson(product, List.of("https://cdn.example.com/only.jpg"));
+        assertThat(product.getImagesJson()).isNull();
+    }
+
+    @Test
+    void collectSwatchUrlsFromColorsJson_blank_returnsEmpty() {
+        assertThat(support.collectSwatchUrlsFromColorsJson(null)).isEmpty();
+    }
 }

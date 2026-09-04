@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+  <!--
+    One-time backfill: products missing compare_at_price (MRP) get MRP from stored price / variant rate.
+    Assumes legacy catalog rows stored list/MRP in price (or rate on variant rows), not discounted selling.
+    Storefront runtime discount applies from compare_at_price via StorePricingService.
+  -->
+  <changeSet id="20260902120000-1" author="minisandmore">
+    <comment>Backfill compare_at_price on simple products from price</comment>
+    <sql dbms="postgresql">
+      UPDATE product
+      SET compare_at_price = price
+      WHERE (compare_at_price IS NULL OR compare_at_price &lt;= 0)
+        AND price IS NOT NULL
+        AND price &gt; 0
+        AND (
+          variants_json IS NULL
+          OR btrim(variants_json) = ''
+          OR btrim(variants_json) = '[]'
+          OR upper(coalesce(item_structure, 'SIMPLE')) = 'SIMPLE'
+        );
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260902120000-2" author="minisandmore">
+    <comment>Backfill variant mrp in variants_json when missing (legacy rate-only rows)</comment>
+    <sql dbms="postgresql" splitStatements="false">
+      UPDATE product p
+      SET variants_json = (
+        SELECT coalesce(jsonb_agg(
+          CASE
+            WHEN coalesce(nullif(elem->>'mrp', '')::numeric, 0) &gt; 0 THEN elem
+            WHEN coalesce(nullif(elem->>'price', '')::numeric, 0) &gt; 0
+              THEN elem || jsonb_build_object('mrp', (elem->>'price')::numeric)
+            WHEN coalesce(nullif(elem->>'rate', '')::numeric, 0) &gt; 0
+              THEN elem || jsonb_build_object('mrp', (elem->>'rate')::numeric)
+            ELSE elem
+          END
+          ORDER BY ord
+        ), '[]'::jsonb)::text
+        FROM jsonb_array_elements(p.variants_json::jsonb) WITH ORDINALITY AS t(elem, ord)
+      )
+      WHERE variants_json IS NOT NULL
+        AND btrim(variants_json) NOT IN ('', '[]')
+        AND upper(coalesce(item_structure, '')) = 'VARIANTS'
+        AND EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements(p.variants_json::jsonb) elem
+          WHERE coalesce(nullif(elem->>'mrp', '')::numeric, 0) &lt;= 0
+            AND (
+              coalesce(nullif(elem->>'rate', '')::numeric, 0) &gt; 0
+              OR coalesce(nullif(elem->>'price', '')::numeric, 0) &gt; 0
+            )
+        );
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260902120000-3" author="minisandmore">
+    <comment>Set parent compare_at_price from min active variant mrp</comment>
+    <sql dbms="postgresql">
+      UPDATE product p
+      SET compare_at_price = agg.min_mrp
+      FROM (
+        SELECT
+          pr.id,
+          min((elem->>'mrp')::numeric) AS min_mrp
+        FROM product pr
+        CROSS JOIN LATERAL jsonb_array_elements(pr.variants_json::jsonb) AS elem
+        WHERE pr.variants_json IS NOT NULL
+          AND btrim(pr.variants_json) NOT IN ('', '[]')
+          AND upper(coalesce(pr.item_structure, '')) = 'VARIANTS'
+          AND coalesce(elem->>'active', 'true') NOT IN ('false', '0')
+          AND coalesce(nullif(elem->>'mrp', '')::numeric, 0) &gt; 0
+        GROUP BY pr.id
+      ) agg
+      WHERE p.id = agg.id
+        AND (p.compare_at_price IS NULL OR p.compare_at_price &lt;= 0);
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260902120000-4" author="minisandmore">
+    <comment>Fallback parent compare_at_price from price for variant products still missing MRP</comment>
+    <sql dbms="postgresql">
+      UPDATE product
+      SET compare_at_price = price
+      WHERE (compare_at_price IS NULL OR compare_at_price &lt;= 0)
+        AND price IS NOT NULL
+        AND price &gt; 0
+        AND variants_json IS NOT NULL
+        AND btrim(variants_json) NOT IN ('', '[]')
+        AND upper(coalesce(item_structure, '')) = 'VARIANTS';
+    </sql>
+  </changeSet>
+</databaseChangeLog>

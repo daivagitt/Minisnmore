@@ -14,6 +14,7 @@ import {
   saveCoupon,
   type CouponRow,
 } from "@/lib/backend-data";
+import { fromDatetimeLocalValue, toDatetimeLocalValue } from "@/lib/dates";
 
 export const Route = createFileRoute("/admin/coupons")({ component: CouponsPage });
 
@@ -215,16 +216,14 @@ function CouponsPage() {
                 <input
                   type="datetime-local"
                   className={inputCls()}
-                  value={c.expires_at?.slice(0, 16) ?? ""}
+                  value={toDatetimeLocalValue(c.expires_at)}
                   onChange={(e) =>
                     setRows((r) =>
                       r.map((x, j) =>
                         j === i
                           ? {
                               ...x,
-                              expires_at: e.target.value
-                                ? new Date(e.target.value).toISOString()
-                                : null,
+                              expires_at: fromDatetimeLocalValue(e.target.value),
                             }
                           : x,
                       ),

@@ -18,13 +18,16 @@ import { useListPagination } from "@/hooks/useListPagination";
 import { LIST_PAGE_SIZE } from "@/lib/pagination";
 
 export const Route = createFileRoute("/account/returns")({
-  head: () => ({ meta: [{ title: "Returns & Refunds · Mini's n More" }] }),
+  head: () => ({ meta: [{ title: "Your account · Mini's n More" }] }),
   component: ReturnsPage,
 });
 
 const TERMINAL_STATUSES = ["rejected", "cancelled", "refunded", "completed"];
+const RETURNS_UI_ENABLED = true;
 
 function ReturnsPage() {
+  if (!RETURNS_UI_ENABLED) return null;
+
   const { orders: allOrders, loadingOrders } = useAccountData();
   const [config, setConfig] = useState<{ enabled: boolean; window_days: number } | null>(null);
   const [returns, setReturns] = useState<OrderReturnRow[]>([]);

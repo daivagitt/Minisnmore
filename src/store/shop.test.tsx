@@ -330,4 +330,56 @@ describe("ShopProvider", () => {
   it("throws when useShop is called outside ShopProvider", () => {
     expect(() => renderHook(() => useShop())).toThrow("ShopProvider missing");
   });
+
+  it("ignores invalid persisted coupons on hydrate", async () => {
+    localStorage.setItem("mnm_coupon_u_1", JSON.stringify({ code: "", discount: 10 }));
+    localStorage.setItem("mnm_cart_u_1", JSON.stringify([]));
+    localStorage.setItem("mnm_wish_u_1", JSON.stringify([]));
+
+    render(
+      <ShopProvider>
+        <Harness />
+      </ShopProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+    await userEvent.click(screen.getByRole("button", { name: "add" }));
+    expect(screen.getByTestId("total")).toHaveTextContent("500");
+  });
+
+  it("blocks out-of-stock products from being added", async () => {
+    const { toast } = await import("sonner");
+    const outOfStockVariant: Product = {
+      ...pricedVariantProduct,
+      id: "oos-var",
+      variants: [{ sku: "OOS-M", size: "M", color: "Navy", price: 100, stock: 0, active: true }],
+    };
+    const outOfStockSimple: Product = { ...product, id: "oos-simple", stock: 0 };
+
+    function StockHarness() {
+      const shop = useShop();
+      return (
+        <div>
+          <span data-testid="count">{shop.cartCount}</span>
+          <button onClick={() => shop.addToCart(outOfStockVariant, { size: "M", color: "Navy" })}>
+            add-oos-variant
+          </button>
+          <button onClick={() => shop.addToCart(outOfStockSimple)}>add-oos-simple</button>
+        </div>
+      );
+    }
+
+    render(
+      <ShopProvider>
+        <StockHarness />
+      </ShopProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+    await userEvent.click(screen.getByRole("button", { name: "add-oos-variant" }));
+    expect(toast.error).toHaveBeenCalledWith("That size/color is out of stock");
+    await userEvent.click(screen.getByRole("button", { name: "add-oos-simple" }));
+    expect(toast.error).toHaveBeenCalledWith("This item is out of stock");
+    expect(screen.getByTestId("count")).toHaveTextContent("0");
+  });
 });

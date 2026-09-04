@@ -1,6 +1,7 @@
 import { api, ApiError } from "@/lib/api";
 import { numberFieldOr, requireNumberField } from "@/lib/admin-number-field";
 import { validateVariantRows } from "@/lib/admin-variants";
+import { MAX_DELIVERY_ETA_BUFFER_DAYS } from "@/lib/commerce";
 import { internalSitePathError } from "@/lib/internal-links";
 import {
   isExampleOrPlaceholderUrl,
@@ -25,6 +26,11 @@ import {
   applyExpectedPrintNamesToColors,
   applyExpectedPrintNamesToVariantsJson,
 } from "@/lib/expected-prints";
+import {
+  isUsableSizeChart,
+  parseProductSizeChart,
+  type ProductSizeChart,
+} from "@/lib/product-size-charts";
 
 type Id = string | number;
 type JsonRecord = Record<string, unknown>;
@@ -393,6 +399,21 @@ export function getSiteSettingsValidationErrors(row: SiteSettingsRow): string[] 
     max: FREE_SHIPPING_MIN_INR_MAX,
   });
   if (freeShippingError) errors.push(freeShippingError);
+  const codFeeError = requireNumberField(row.cod_fee_inr, "COD handling fee", {
+    allowZero: true,
+    max: SHIPPING_INR_MAX,
+  });
+  if (codFeeError) errors.push(codFeeError);
+  const etaBufferError = requireNumberField(row.delivery_eta_buffer_days, "Delivery ETA buffer days", {
+    allowZero: true,
+    max: MAX_DELIVERY_ETA_BUFFER_DAYS,
+  });
+  if (etaBufferError) errors.push(etaBufferError);
+  const discountError = requireNumberField(row.store_discount_percent, "Store discount", {
+    allowZero: true,
+    max: GST_RATE_MAX,
+  });
+  if (discountError) errors.push(discountError);
   return errors;
 }
 
@@ -506,6 +527,8 @@ export type ProductRow = {
   age_min_months: number | null;
   age_max_months: number | null;
   sizes: string[];
+  /** Per-product measurement chart; null clears / uses SKU fallback on storefront. */
+  size_chart?: ProductSizeChart | null;
   colors: ProductColorEntry[];
   color_images_json?: string | null;
   item_structure: string | null;
@@ -538,6 +561,7 @@ type ProductDto = {
   ageMinMonths?: number | null;
   ageMaxMonths?: number | null;
   sizesJson?: string | null;
+  sizeChartJson?: string | null;
   colorsJson?: string | null;
   colorImagesJson?: string | null;
   itemStructure?: string | null;
@@ -582,6 +606,7 @@ export const fromProductDto = (dto: ProductDto): ProductRow => ({
   age_min_months: dto.ageMinMonths ?? null,
   age_max_months: dto.ageMaxMonths ?? null,
   sizes: parseJson<string[]>(dto.sizesJson, []),
+  size_chart: parseProductSizeChart(dto.sizeChartJson),
   colors: normalizeColorEntries(
     applyExpectedPrintNamesToColors(
       mergeColorImagesIntoColors(
@@ -628,6 +653,7 @@ const toProductDto = (row: ProductRow): ProductDto => ({
   ageMinMonths: row.age_min_months,
   ageMaxMonths: row.age_max_months,
   sizesJson: JSON.stringify(row.sizes ?? []),
+  sizeChartJson: isUsableSizeChart(row.size_chart) ? JSON.stringify(row.size_chart) : null,
   colorsJson: JSON.stringify(serializeProductColors(row.colors ?? [])),
   itemStructure: row.item_structure ?? "SIMPLE",
   variantsJson: row.variants_json ?? null,
@@ -1031,7 +1057,22 @@ export const saveCoupon = (row: CouponRow) => {
 };
 export const deleteCoupon = (id: Id) => deleteAdmin("coupons", id);
 
-export type SiteSettingsRow = Record<string, string | number | boolean | null | undefined>;
+export type SiteSettingsRow = Record<string, string | number | boolean | null | undefined> & {
+  brand_name?: string | null;
+  contact_email?: string | null;
+  ecatalogue_url?: string | null;
+  invoice_website?: string | null;
+  invoice_gstin?: string | null;
+  invoice_sold_by_address?: string | null;
+  gst_rate?: number | null;
+  prices_include_gst?: boolean | null;
+  shipping_standard_inr?: number | null;
+  shipping_express_inr?: number | null;
+  free_shipping_min_inr?: number | null;
+  cod_fee_inr?: number | null;
+  delivery_eta_buffer_days?: number | null;
+  store_discount_percent?: number | null;
+};
 
 const siteStringMap: Record<string, string> = {
   brand_name: "brandName",
@@ -1077,6 +1118,9 @@ function fromSiteSettingDto(dto: Record<string, unknown> | null): SiteSettingsRo
   row.shipping_standard_inr = dto.shippingStandardInr as number | undefined;
   row.shipping_express_inr = dto.shippingExpressInr as number | undefined;
   row.free_shipping_min_inr = dto.freeShippingMinInr as number | undefined;
+  row.cod_fee_inr = dto.codFeeInr as number | undefined;
+  row.delivery_eta_buffer_days = dto.deliveryEtaBufferDays as number | undefined;
+  row.store_discount_percent = dto.storeDiscountPercent as number | undefined;
   return row;
 }
 
@@ -1089,6 +1133,9 @@ function toSiteSettingDto(row: SiteSettingsRow) {
   payload.shippingStandardInr = row.shipping_standard_inr ?? null;
   payload.shippingExpressInr = row.shipping_express_inr ?? null;
   payload.freeShippingMinInr = row.free_shipping_min_inr ?? null;
+  payload.codFeeInr = row.cod_fee_inr ?? null;
+  payload.deliveryEtaBufferDays = row.delivery_eta_buffer_days ?? null;
+  payload.storeDiscountPercent = row.store_discount_percent ?? null;
   return payload;
 }
 
@@ -1611,6 +1658,31 @@ export const pullZohoProducts = (options?: { full?: boolean }) =>
   api.post<ZohoSyncSummary>(
     `/api/v1/admin/zoho/pull-products${options?.full ? "?full=true" : ""}`,
     undefined,
+    { auth: true },
+  );
+
+export const pullZohoProduct = (productId: number) =>
+  api.post<ZohoSyncSummary>(`/api/v1/admin/zoho/pull-products/${productId}`, undefined, {
+    auth: true,
+  });
+
+export const pullZohoProductByIdentity = (identity: { sku?: string | null; zohoItemId?: string | null }) =>
+  api.post<ZohoSyncSummary>(
+    "/api/v1/admin/zoho/pull-product",
+    {
+      sku: identity.sku?.trim() || null,
+      zohoItemId: identity.zohoItemId?.trim() || null,
+    },
+    { auth: true },
+  );
+
+export const pullZohoProductVariant = (productId: number, row: { sku?: string | null; zohoItemId?: string | null }) =>
+  api.post<ZohoSyncSummary>(
+    `/api/v1/admin/zoho/pull-products/${productId}/variants`,
+    {
+      sku: row.sku?.trim() || null,
+      zohoItemId: row.zohoItemId?.trim() || null,
+    },
     { auth: true },
   );
 

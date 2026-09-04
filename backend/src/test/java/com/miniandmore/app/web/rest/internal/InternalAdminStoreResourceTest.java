@@ -242,7 +242,7 @@ class InternalAdminStoreResourceTest {
             .perform(
                 put("/internal/v1/admin/site-settings")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"brandName\":\"Mini & More\"}")
+                    .content("{\"brandName\":\"Mini & More\",\"storeDiscountPercent\":20}")
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.id").value(11));
@@ -493,7 +493,7 @@ class InternalAdminStoreResourceTest {
             .perform(
                 put("/internal/v1/admin/site-settings")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"id\":7,\"brandName\":\"Mini Updated\"}")
+                    .content("{\"id\":7,\"brandName\":\"Mini Updated\",\"storeDiscountPercent\":20}")
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.brandName").value("Mini Updated"));
@@ -510,7 +510,7 @@ class InternalAdminStoreResourceTest {
             .perform(
                 put("/internal/v1/admin/site-settings")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"brandName\":\"Mini Patched\"}")
+                    .content("{\"brandName\":\"Mini Patched\",\"storeDiscountPercent\":20}")
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.brandName").value("Mini Patched"));

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260831120000-1" author="codex">
+        <createTable tableName="zoho_item_webhook_event">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="event_id" type="varchar(160)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="zoho_item_id" type="varchar(120)"/>
+            <column name="sku" type="varchar(120)"/>
+            <column name="status" type="varchar(80)"/>
+            <column name="received_at" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="20260831120000-2" author="codex">
+        <createTable tableName="zoho_order_status_webhook_event">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="event_id" type="varchar(160)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="zoho_sales_order_id" type="varchar(120)"/>
+            <column name="salesorder_number" type="varchar(120)"/>
+            <column name="status" type="varchar(80)"/>
+            <column name="received_at" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+</databaseChangeLog>

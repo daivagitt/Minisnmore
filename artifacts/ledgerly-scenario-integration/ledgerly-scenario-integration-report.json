@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://uat.minisnmore.com",
-  "startedAt": "2026-08-30T11:35:04.270575+00:00",
-  "finishedAt": "2026-08-30T11:35:09.891092+00:00",
+  "startedAt": "2026-08-31T00:52:44.005749+00:00",
+  "finishedAt": "2026-08-31T00:52:50.474413+00:00",
   "paymentDemo": false,
   "refundDemo": false,
   "credentials": {
@@ -9,8 +9,8 @@
     "admin": "admin@uat.minisnmore.com"
   },
   "orderContext": {
-    "orderId": 49451,
-    "orderNumber": "MNM-DE7E60C68CD9",
+    "orderId": 50301,
+    "orderNumber": "MNM-DA99FBC73FEE",
     "total": 91.0,
     "demoMode": false,
     "gatewayMode": "live",
@@ -56,8 +56,8 @@
             "product_name": "BASIC SHORTS",
             "qty": 1,
             "size": "0-3 M",
-            "color": "Bee Blue",
-            "sku": "BASIC-SHORTS-03-BEE-BLUE",
+            "color": "Happy Bee",
+            "sku": "BASIC-SHORTS-03-HAPPY-BEE",
             "price": 100.0
           }
         },
@@ -65,7 +65,7 @@
           "name": "validate-coupon",
           "status": "pass",
           "note": "discount \u20b910 on subtotal \u20b9100 (qty=1)",
-          "ms": 953,
+          "ms": 1904,
           "detail": {
             "discount": 10.0,
             "subtotal": 100.0,
@@ -75,12 +75,12 @@
         {
           "name": "create-order",
           "status": "pass",
-          "note": "order MNM-DE7E60C68CD9 total \u20b991 (demoMode=False)",
-          "ms": 485,
+          "note": "order MNM-DA99FBC73FEE total \u20b991 (demoMode=False)",
+          "ms": 818,
           "detail": {
-            "orderId": 49451,
-            "orderNumber": "MNM-DE7E60C68CD9",
-            "razorpayOrderId": "order_TVxzDxXmitJaOT",
+            "orderId": 50301,
+            "orderNumber": "MNM-DA99FBC73FEE",
+            "razorpayOrderId": "order_TWBZqOPN4rAnDV",
             "total": 91.0,
             "demoMode": false,
             "gatewayMode": "live",
@@ -117,7 +117,7 @@
           "name": "integration-status",
           "status": "pass",
           "note": "connected=true",
-          "ms": 47,
+          "ms": 81,
           "detail": {
             "serverConfigured": true,
             "connected": true,
@@ -127,16 +127,14 @@
         {
           "name": "test-connection",
           "status": "pass",
-          "note": "Ledgerly API reachable",
-          "ms": 255,
+          "note": "{'ok': False, 'connected': False, 'status': 401, 'message': 'Ledgerly rejected the API token (HTTP 401). Generate a new ",
+          "ms": 178,
           "detail": {
-            "activeKeys": 2,
-            "activeWebhooks": 0,
-            "connected": true,
-            "message": "Integration API ready",
-            "organizationId": null,
-            "scopes": [],
-            "ok": true
+            "ok": false,
+            "connected": false,
+            "status": 401,
+            "message": "Ledgerly rejected the API token (HTTP 401). Generate a new developer token in Ledgerly and paste it under API & Webhooks, then save and test again.",
+            "error": "unauthorized"
           }
         }
       ]
@@ -158,11 +156,11 @@
           "name": "sync-order",
           "status": "pass",
           "note": "sync exercised on reference MNM-0FB910FDBC4D (status=FAILED)",
-          "ms": 283,
+          "ms": 138,
           "detail": {
             "orderNumber": "MNM-0FB910FDBC4D",
             "ledgerlySyncStatus": "FAILED",
-            "ledgerlySyncError": "500 Internal Server Error: \"{\"detail\":\"No instances available for sales\",\"instance\":\"/api/integrations/commerce/orders/sync\",\"status\":500,\"title\":\"Internal Server Error\",\"type\":\"https://www.jhipster.tech/problem/problem-with-message\",\"message\":\"error.http.500\",\"path\":\"/api/integrations/commerce/orders/sync\"}\"",
+            "ledgerlySyncError": "401 Unauthorized: [no body]",
             "ok": false
           }
         },
@@ -170,7 +168,7 @@
           "name": "verify-sync-status",
           "status": "pass",
           "note": "reference order MNM-0FB910FDBC4D reachable (payment=confirmed)",
-          "ms": 115,
+          "ms": 112,
           "detail": {
             "order_number": "MNM-0FB910FDBC4D",
             "status": "confirmed",
@@ -192,23 +190,18 @@
           "name": "pull-inventory",
           "status": "pass",
           "note": "ok",
-          "ms": 293,
+          "ms": 99,
           "detail": {
-            "successCount": 1,
-            "failureCount": 0,
-            "skippedCount": 2,
-            "failures": [],
-            "notices": [],
-            "skipped": [
+            "successCount": 0,
+            "failureCount": 1,
+            "skippedCount": 0,
+            "failures": [
               {
-                "sku": "SKU-78415",
-                "message": "No linked store product for SKU or Ledgerly item id"
-              },
-              {
-                "sku": "SKU-65893",
-                "message": "No linked store product for SKU or Ledgerly item id"
+                "message": "Ledgerly inventory pull failed (HTTP 401): Unauthorized"
               }
-            ]
+            ],
+            "notices": [],
+            "skipped": []
           }
         }
       ]
@@ -223,7 +216,7 @@
           "name": "pull-tracking",
           "status": "pass",
           "note": "tracking pull completed",
-          "ms": 481,
+          "ms": 163,
           "detail": {
             "successCount": 3,
             "failureCount": 0,
@@ -242,7 +235,7 @@
           "name": "public-track-shipped-ref",
           "status": "pass",
           "note": "MNM-2606-A4A0B \u2192 delivered",
-          "ms": 41,
+          "ms": 64,
           "detail": {
             "order_number": "MNM-2606-A4A0B",
             "status": "fulfilled",
@@ -279,7 +272,7 @@
           "name": "shipped-order",
           "status": "pass",
           "note": "MNM-2606-A4A0B \u2192 delivered",
-          "ms": 42,
+          "ms": 100,
           "detail": {
             "order_number": "MNM-2606-A4A0B",
             "status": "fulfilled",
@@ -293,7 +286,7 @@
           "name": "returned-order",
           "status": "pass",
           "note": "MNM-2606-86EA3 shipment_date=2026-06-06",
-          "ms": 40,
+          "ms": 87,
           "detail": {
             "order_number": "MNM-2606-86EA3",
             "status": "confirmed",
@@ -306,10 +299,10 @@
         {
           "name": "checkout-order",
           "status": "pass",
-          "note": "MNM-DE7E60C68CD9 \u2192 pending (public fields OK)",
-          "ms": 41,
+          "note": "MNM-DA99FBC73FEE \u2192 pending (public fields OK)",
+          "ms": 68,
           "detail": {
-            "order_number": "MNM-DE7E60C68CD9",
+            "order_number": "MNM-DA99FBC73FEE",
             "status": "pending",
             "tracking_status": "pending",
             "tracking_number": "",
@@ -321,7 +314,7 @@
           "name": "unknown-order",
           "status": "pass",
           "note": "404 for invalid order number",
-          "ms": 83,
+          "ms": 125,
           "detail": {}
         }
       ]
@@ -336,7 +329,7 @@
           "name": "shipped-order-track",
           "status": "pass",
           "note": "MNM-2606-A4A0B \u2192 delivered",
-          "ms": 42,
+          "ms": 84,
           "detail": {
             "order_number": "MNM-2606-A4A0B",
             "status": "fulfilled",
@@ -350,7 +343,7 @@
           "name": "returned-order-track",
           "status": "pass",
           "note": "MNM-2606-86EA3 shipment_date=2026-06-06",
-          "ms": 37,
+          "ms": 49,
           "detail": {
             "order_number": "MNM-2606-86EA3",
             "status": "confirmed",

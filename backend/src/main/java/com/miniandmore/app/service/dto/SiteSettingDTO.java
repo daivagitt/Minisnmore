@@ -1,5 +1,6 @@
 package com.miniandmore.app.service.dto;
 
+import com.miniandmore.app.domain.SiteSetting;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -107,6 +108,20 @@ public class SiteSettingDTO implements Serializable {
 
     @Min(0)
     private Integer freeShippingMinInr;
+
+    @Min(0)
+    @Max(10000)
+    private Integer codFeeInr;
+
+    @Min(0)
+    @Max(SiteSetting.MAX_DELIVERY_ETA_BUFFER_DAYS)
+    private Integer deliveryEtaBufferDays;
+
+    @NotNull
+    @DecimalMin(value = "0")
+    @DecimalMax(value = "100")
+    @Digits(integer = 3, fraction = 2)
+    private BigDecimal storeDiscountPercent;
 
     @Size(max = 260)
     private String subscribeHeroTitle;
@@ -377,6 +392,30 @@ public class SiteSettingDTO implements Serializable {
 
     public void setFreeShippingMinInr(Integer freeShippingMinInr) {
         this.freeShippingMinInr = freeShippingMinInr;
+    }
+
+    public Integer getCodFeeInr() {
+        return codFeeInr;
+    }
+
+    public void setCodFeeInr(Integer codFeeInr) {
+        this.codFeeInr = codFeeInr;
+    }
+
+    public Integer getDeliveryEtaBufferDays() {
+        return deliveryEtaBufferDays;
+    }
+
+    public void setDeliveryEtaBufferDays(Integer deliveryEtaBufferDays) {
+        this.deliveryEtaBufferDays = deliveryEtaBufferDays;
+    }
+
+    public BigDecimal getStoreDiscountPercent() {
+        return storeDiscountPercent;
+    }
+
+    public void setStoreDiscountPercent(BigDecimal storeDiscountPercent) {
+        this.storeDiscountPercent = storeDiscountPercent;
     }
 
     public String getSubscribeHeroTitle() {

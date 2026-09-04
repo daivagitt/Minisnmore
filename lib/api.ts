@@ -430,8 +430,10 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   let response: Response;
   try {
+    const method = (init.method ?? "GET").toUpperCase();
     response = await fetch(buildUrl(path), {
       ...init,
+      cache: init.cache ?? (method === "GET" ? "no-store" : undefined),
       headers,
       body:
         hasBody && !(body instanceof FormData) && typeof body !== "string"

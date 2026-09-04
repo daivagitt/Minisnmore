@@ -6,9 +6,14 @@ import {
   normalizeStorefrontColors,
   resolveStorefrontProductImages,
   swatchImageForColor,
+  hexForColorName,
 } from "@/lib/product-colors";
 
 describe("mergeColorImagesIntoColors", () => {
+  it("uses a blue fallback swatch for Baby Blue", () => {
+    expect(hexForColorName("Baby Blue")).toBe("#bcd5e3");
+  });
+
   it("merges colorImagesJson galleries into string colour names", () => {
     const merged = mergeColorImagesIntoColors(
       ["AQUA & BLUE", "SNAIL & AQUA"],

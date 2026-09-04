@@ -9,7 +9,8 @@ import com.miniandmore.app.repository.*;
 import com.miniandmore.app.service.LedgerlySyncService;
 import com.miniandmore.app.service.OrderEventService;
 import com.miniandmore.app.service.ZohoSyncService;
-import com.miniandmore.app.service.ProductVariantSupport;
+import com.miniandmore.app.service.StorePricingService;
+import com.miniandmore.app.service.StorePricingTestSupport;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import com.miniandmore.app.web.rest.internal.InternalAccountOrderResource.VerifyPaymentRequest;
 import java.nio.charset.StandardCharsets;
@@ -80,9 +81,11 @@ class InternalAccountOrderResourceReflectionTest {
         resource = new InternalAccountOrderResource(
             dataAccess,
             new ObjectMapper(),
+            new com.miniandmore.app.config.ApplicationProperties(),
             ledgerlySyncService,
             zohoSyncService,
-            new ProductVariantSupport(new ObjectMapper()),
+            StorePricingTestSupport.variantSupport(new ObjectMapper()),
+            StorePricingTestSupport.defaultPricing(),
             orderEventService,
             razorpayRefundService,
             transactionManager

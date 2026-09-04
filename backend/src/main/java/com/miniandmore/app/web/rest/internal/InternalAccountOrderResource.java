@@ -3,6 +3,7 @@ package com.miniandmore.app.web.rest.internal;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.*;
 import com.miniandmore.app.domain.enumeration.DiscountType;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
@@ -18,6 +19,7 @@ import com.miniandmore.app.service.OrderTrackingStatusResolver;
 import com.miniandmore.app.service.ProductVariantSupport;
 import com.miniandmore.app.service.ProductVariantSupport.VariantRow;
 import com.miniandmore.app.service.RazorpayRefundService;
+import com.miniandmore.app.service.StorePricingService;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import com.miniandmore.app.web.rest.v1.ApiResponse;
 import jakarta.validation.Valid;
@@ -58,8 +60,8 @@ public class InternalAccountOrderResource {
     private static final Logger LOG = LoggerFactory.getLogger(InternalAccountOrderResource.class);
     private static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
     private static final Duration INVENTORY_RESERVATION_TTL = Duration.ofMinutes(30);
-    /** Flat, GST-inclusive COD handling fee used by the storefront and invoice workbook. */
-    private static final BigDecimal COD_FEE = BigDecimal.valueOf(99);
+    private static final BigDecimal DEFAULT_COD_FEE = BigDecimal.valueOf(99);
+    private static final int MAX_COD_FEE_INR = 10_000;
     private static final Duration TRACKING_REFRESH_TTL = Duration.ofMinutes(5);
     private static final String FIELD_PHONE = "phone";
     private static final String FIELD_ERROR = "error";
@@ -72,9 +74,11 @@ public class InternalAccountOrderResource {
 
     private final AccountOrderDataAccess dataAccess;
     private final ObjectMapper objectMapper;
+    private final ApplicationProperties applicationProperties;
     private final LedgerlySyncService ledgerlySyncService;
     private final ZohoSyncService zohoSyncService;
     private final ProductVariantSupport variantSupport;
+    private final StorePricingService storePricingService;
     private final OrderEventService orderEventService;
     private final RazorpayRefundService razorpayRefundService;
     private final TransactionTemplate inventoryRestoreTransaction;
@@ -91,18 +95,22 @@ public class InternalAccountOrderResource {
     public InternalAccountOrderResource(
         AccountOrderDataAccess dataAccess,
         ObjectMapper objectMapper,
+        ApplicationProperties applicationProperties,
         LedgerlySyncService ledgerlySyncService,
         ZohoSyncService zohoSyncService,
         ProductVariantSupport variantSupport,
+        StorePricingService storePricingService,
         OrderEventService orderEventService,
         RazorpayRefundService razorpayRefundService,
         PlatformTransactionManager transactionManager
     ) {
         this.dataAccess = dataAccess;
         this.objectMapper = objectMapper;
+        this.applicationProperties = applicationProperties;
         this.ledgerlySyncService = ledgerlySyncService;
         this.zohoSyncService = zohoSyncService;
         this.variantSupport = variantSupport;
+        this.storePricingService = storePricingService;
         this.orderEventService = orderEventService;
         this.razorpayRefundService = razorpayRefundService;
         this.inventoryRestoreTransaction = new TransactionTemplate(transactionManager);
@@ -619,7 +627,7 @@ public class InternalAccountOrderResource {
             return;
         }
         ZohoSyncStatus syncStatus = order.getZohoSyncStatus();
-        if (syncStatus != null && syncStatus != ZohoSyncStatus.FAILED && syncStatus != ZohoSyncStatus.PENDING) {
+        if (syncStatus == ZohoSyncStatus.SYNCED || syncStatus == ZohoSyncStatus.PENDING) {
             return;
         }
         order.setZohoSyncStatus(ZohoSyncStatus.PENDING);
@@ -652,8 +660,13 @@ public class InternalAccountOrderResource {
         return WELCOME10_COUPON.equalsIgnoreCase(StringUtils.trimToEmpty(code));
     }
 
+    /**
+     * WELCOME10 is first-order only. Count any non-cancelled order — including COD
+     * (payment stays PENDING until collection) and unpaid online checkouts — so the
+     * coupon cannot be reused on a second confirmed order for the same login.
+     */
     private boolean isFirstOrderEligible(String login) {
-        return !dataAccess.customerOrderRepository().existsByUserLoginAndPaymentStatus(login, PaymentStatus.PAID);
+        return !dataAccess.customerOrderRepository().existsByUserLoginAndStatusNot(login, OrderStatus.CANCELLED);
     }
 
     private Optional<String> welcome10EligibilityError(String code, Optional<String> userLogin) {
@@ -729,7 +742,7 @@ public class InternalAccountOrderResource {
         BigDecimal afterDiscount = roundInr(subtotal.subtract(discount).max(BigDecimal.ZERO));
         CommerceSettings commerce = commerceSettings();
         BigDecimal shipping = calculateShipping(afterDiscount, shippingMode, commerce);
-        BigDecimal codFee = cod ? COD_FEE : BigDecimal.ZERO;
+        BigDecimal codFee = cod ? commerce.codFee() : BigDecimal.ZERO;
         // Keep one aggregate GST amount in the store. The accounting/invoice layer can derive
         // CGST+SGST or IGST from place of supply; the commerce admin does not need tax-type fields.
         // Product GST is calculated after coupon discount. COD is always GST-inclusive and
@@ -765,7 +778,8 @@ public class InternalAccountOrderResource {
                     Boolean.TRUE.equals(settings.getPricesIncludeGst()),
                     BigDecimal.valueOf(Optional.ofNullable(settings.getShippingStandardInr()).orElse(99)),
                     BigDecimal.valueOf(Optional.ofNullable(settings.getShippingExpressInr()).orElse(150)),
-                    BigDecimal.valueOf(Optional.ofNullable(settings.getFreeShippingMinInr()).orElse(2500))
+                    BigDecimal.valueOf(Optional.ofNullable(settings.getFreeShippingMinInr()).orElse(2500)),
+                    resolveCodFee(settings.getCodFeeInr())
                 )
             )
             .orElse(
@@ -774,9 +788,17 @@ public class InternalAccountOrderResource {
                     true,
                     BigDecimal.valueOf(99),
                     BigDecimal.valueOf(150),
-                    BigDecimal.valueOf(2500)
+                    BigDecimal.valueOf(2500),
+                    DEFAULT_COD_FEE
                 )
             );
+    }
+
+    private static BigDecimal resolveCodFee(Integer configuredFee) {
+        if (configuredFee == null || configuredFee < 0 || configuredFee > MAX_COD_FEE_INR) {
+            return DEFAULT_COD_FEE;
+        }
+        return BigDecimal.valueOf(configuredFee);
     }
 
     private BigDecimal calculateShipping(BigDecimal amountAfterDiscount, String shippingMode, CommerceSettings commerce) {
@@ -862,7 +884,7 @@ public class InternalAccountOrderResource {
                 }
                 BigDecimal unitPrice = variantSupport.variantSellingPrice(variant);
                 if (unitPrice.compareTo(BigDecimal.ZERO) <= 0) {
-                    unitPrice = Optional.ofNullable(product.getPrice()).orElse(BigDecimal.ZERO);
+                    unitPrice = storePricingService.simpleProductSellingPrice(product.getCompareAtPrice(), product.getPrice());
                 }
                 reserved.add(new ReservedOrderItem(product, item, variant.sku(), unitPrice, invoiceMrp(variant.mrp(), unitPrice)));
             } else {
@@ -870,7 +892,7 @@ public class InternalAccountOrderResource {
                 if (available < item.qty()) {
                     // Check cumulative later via running stock on product
                 }
-                BigDecimal unitPrice = item.price() != null ? item.price() : Optional.ofNullable(product.getPrice()).orElse(BigDecimal.ZERO);
+                BigDecimal unitPrice = storePricingService.simpleProductSellingPrice(product.getCompareAtPrice(), product.getPrice());
                 reserved.add(
                     new ReservedOrderItem(
                         product,
@@ -1265,7 +1287,10 @@ public class InternalAccountOrderResource {
                 }
             }
         }
-        if (StringUtils.isNotBlank(order.getZohoInvoiceId()) || StringUtils.isNotBlank(order.getZohoSalesOrderId())) {
+        if (
+            applicationProperties.getZoho().getOrderTracking().isEnabled() &&
+            (StringUtils.isNotBlank(order.getZohoInvoiceId()) || StringUtils.isNotBlank(order.getZohoSalesOrderId()))
+        ) {
             Instant lastZohoPull = order.getZohoTrackingLastPulledAt();
             if (lastZohoPull == null || lastZohoPull.isBefore(Instant.now().minus(TRACKING_REFRESH_TTL))) {
                 try {
@@ -1513,7 +1538,8 @@ public class InternalAccountOrderResource {
         boolean pricesIncludeGst,
         BigDecimal shippingStandard,
         BigDecimal shippingExpress,
-        BigDecimal freeShippingMin
+        BigDecimal freeShippingMin,
+        BigDecimal codFee
     ) {}
 
     private record Totals(

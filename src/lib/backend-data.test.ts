@@ -42,6 +42,7 @@ import {
   saveLedgerlySettings,
   uploadAdminImage,
 } from "./backend-data";
+import { emptySizeChart } from "./size-chart-excel";
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
@@ -114,6 +115,21 @@ describe("backend data mappers", () => {
         price: 1299,
         compareAtPrice: "1499" as unknown as number,
         sizesJson: "[\"0-3m\"]",
+        sizeChartJson: JSON.stringify({
+          code: "T-1",
+          title: "Romper chart",
+          tolerance: "±1 cm",
+          sections: [
+            {
+              title: "Body",
+              bands: ["0-3M"],
+              rows: [
+                { label: "Chest width", values: { "0-3M": 22 } },
+                { label: "Body length", values: { "0-3M": 28 } },
+              ],
+            },
+          ],
+        }),
         colorsJson: "not-json",
         imagesJson: "[\"/a.jpg\"]",
         newArrival: true,
@@ -126,6 +142,21 @@ describe("backend data mappers", () => {
       compare_at_price: 1499,
       currency: "INR",
       sizes: ["0-3m"],
+      size_chart: {
+        code: "T-1",
+        title: "Romper chart",
+        tolerance: "±1 cm",
+        sections: [
+          {
+            title: "Body",
+            bands: ["0-3M"],
+            rows: [
+              { label: "Chest width", values: { "0-3M": 22 } },
+              { label: "Body length", values: { "0-3M": 28 } },
+            ],
+          },
+        ],
+      },
       colors: [],
       images: ["/a.jpg"],
       new_arrival: true,
@@ -153,6 +184,42 @@ describe("backend data mappers", () => {
       published: true,
       published_at: "2026-05-23",
     });
+  });
+
+  it("does not persist empty starter size charts", async () => {
+    mockedApi.put.mockResolvedValueOnce({ id: 12, slug: "romper", name: "Romper", price: 10 });
+    await saveProduct({
+      id: "12",
+      slug: "romper",
+      name: "Romper",
+      sku: "ROMPER-12",
+      fabric_type: "Cotton",
+      description: "Soft organic cotton romper for everyday comfort.",
+      story: null,
+      category_id: "3",
+      price: 10,
+      compare_at_price: null,
+      currency: "",
+      age_min_months: 0,
+      age_max_months: 24,
+      sizes: ["0-3m"],
+      size_chart: emptySizeChart({ title: "Romper" }),
+      colors: ["cream"],
+      images: ["/a.jpg"],
+      badge: null,
+      stock: 4,
+      sort_order: 1,
+      featured: false,
+      trending: true,
+      new_arrival: false,
+      best_seller: false,
+      active: true,
+    });
+    expect(mockedApi.put).toHaveBeenCalledWith(
+      "/api/v1/admin/products/12",
+      expect.objectContaining({ sizeChartJson: null }),
+      { auth: true },
+    );
   });
 
   it("trims blog post strings from API", () => {
@@ -490,7 +557,9 @@ describe("backend data API calls", () => {
       shippingStandardInr: 120,
       shippingExpressInr: 200,
       freeShippingMinInr: 3000,
+      codFeeInr: 149,
       pricesIncludeGst: false,
+      deliveryEtaBufferDays: 2,
     });
     await expect(getAdminSiteSettings()).resolves.toMatchObject({
       brand_name: "Admin",
@@ -498,6 +567,8 @@ describe("backend data API calls", () => {
       shipping_standard_inr: 120,
       shipping_express_inr: 200,
       free_shipping_min_inr: 3000,
+      cod_fee_inr: 149,
+      delivery_eta_buffer_days: 2,
       prices_include_gst: false,
     });
     expect(mockedApi.get).toHaveBeenLastCalledWith("/api/v1/admin/site-settings", { auth: true });
@@ -511,6 +582,9 @@ describe("backend data API calls", () => {
       shipping_standard_inr: 99,
       shipping_express_inr: 150,
       free_shipping_min_inr: 2500,
+      cod_fee_inr: 149,
+      delivery_eta_buffer_days: 2,
+      store_discount_percent: 20,
     });
     expect(mockedApi.put).toHaveBeenCalledWith(
       "/api/v1/admin/site-settings",
@@ -522,6 +596,8 @@ describe("backend data API calls", () => {
         shippingStandardInr: 99,
         shippingExpressInr: 150,
         freeShippingMinInr: 2500,
+        codFeeInr: 149,
+        deliveryEtaBufferDays: 2,
       }),
       { auth: true },
     );

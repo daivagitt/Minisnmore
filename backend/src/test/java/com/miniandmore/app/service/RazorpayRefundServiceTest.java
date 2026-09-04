@@ -70,6 +70,31 @@ class RazorpayRefundServiceTest {
             .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isGreaterThanOrEqualTo(400));
     }
 
+    @Test
+    void isDemoMode_whenBlankSecret() {
+        RazorpayRefundService service = new RazorpayRefundService(objectMapper, "rzp_live", "  ", false);
+
+        assertThat(service.isDemoMode()).isTrue();
+    }
+
+    @Test
+    void isDemoMode_whenDemoKeyCaseInsensitive() {
+        RazorpayRefundService service = new RazorpayRefundService(objectMapper, "demo", "secret", false);
+
+        assertThat(service.isDemoMode()).isTrue();
+    }
+
+    @Test
+    void refundPayment_liveMode_blankPaymentId_throwsBadRequest() {
+        RazorpayRefundService service = new RazorpayRefundService(objectMapper, "rzp_live", "secret", false);
+        CustomerOrder order = order("ORD-1003");
+        order.setRazorpayPaymentId("   ");
+
+        assertThatThrownBy(() -> service.refundPayment(order, BigDecimal.TEN))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(400));
+    }
+
     private static CustomerOrder order(String orderNumber) {
         return new CustomerOrder()
             .orderNumber(orderNumber)

@@ -31,13 +31,13 @@ export function InvoiceOrderQr({
     >
       <QRCodeSVG
         value={orderUrl}
-        size={72}
+        size={80}
         level="M"
         marginSize={4}
         title={`Order ${trimmed} QR code`}
-        className="h-[72px] w-[72px]"
+        className="h-[80px] w-[80px]"
       />
-      <span className="mt-0.5 block text-[6.5px] font-semibold leading-none">
+      <span className="mt-0.5 block text-[9px] font-semibold leading-none">
         Scan to view order
       </span>
     </a>

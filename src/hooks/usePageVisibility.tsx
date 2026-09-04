@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { listPageVisibility } from "@/lib/backend-data";
+import { broadcastStorefrontInvalidation } from "@/lib/storefront-cache-broadcast";
 
 let cache: Record<string, boolean> | null = null;
 let inflight: Promise<Record<string, boolean>> | null = null;
@@ -31,9 +32,10 @@ async function load(): Promise<Record<string, boolean>> {
   return inflight;
 }
 
-export function invalidatePageVisibility() {
+export function invalidatePageVisibility(options?: { broadcast?: boolean }) {
   cache = null;
   void load();
+  if (options?.broadcast !== false) broadcastStorefrontInvalidation("pageVisibility");
 }
 
 export function usePageVisibility() {

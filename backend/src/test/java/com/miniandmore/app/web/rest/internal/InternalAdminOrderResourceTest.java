@@ -1,6 +1,7 @@
 package com.miniandmore.app.web.rest.internal;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -106,7 +107,8 @@ class InternalAdminOrderResourceTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.orders[0].order_number").value("MNM-COD1"))
             .andExpect(jsonPath("$.data.orders[0].full_name").value("Jane Doe"))
-            .andExpect(jsonPath("$.data.orders[0].phone").value("9876543210"));
+            .andExpect(jsonPath("$.data.orders[0].phone").value("9876543210"))
+            .andExpect(jsonPath("$.data.orders[0].coupon_code").value(""));
     }
 
     @Test
@@ -115,6 +117,7 @@ class InternalAdminOrderResourceTest {
         CustomerOrder order = codOrder()
             .status(OrderStatus.CONFIRMED)
             .paymentStatus(PaymentStatus.PAID)
+            .couponCode("WELCOME10")
             .zohoSyncStatus(ZohoSyncStatus.FAILED)
             .zohoSyncError("Zoho unavailable")
             .ledgerlySyncStatus(LedgerlySyncStatus.SYNCED)
@@ -130,6 +133,7 @@ class InternalAdminOrderResourceTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.orders[0].order_number").value("MNM-COD1"))
+            .andExpect(jsonPath("$.data.orders[0].coupon_code").value("WELCOME10"))
             .andExpect(jsonPath("$.data.orders[0].tracking_status").value("confirmed"))
             .andExpect(jsonPath("$.data.orders[0].payment_status").value("paid"))
             .andExpect(jsonPath("$.data.orders[0].zoho_sync_status").value("failed"))
@@ -245,7 +249,7 @@ class InternalAdminOrderResourceTest {
 
     @Test
     @WithMockUser(authorities = "ROLE_ADMIN")
-    void markCodCollected_marksPaidAndSyncsLedgerly() throws Exception {
+    void markCodCollected_marksPaidAndSyncsZoho() throws Exception {
         when(customerOrderRepository.findOneByOrderNumber("MNM-COD1")).thenReturn(Optional.of(codOrder()));
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -254,8 +258,9 @@ class InternalAdminOrderResourceTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.paymentStatus").value("paid"));
 
-        verify(ledgerlySyncService).syncOrder(900L);
         verify(zohoSyncService).syncOrder(900L);
+        verify(zohoSyncService).pullOrderTracking(900L);
+        verify(ledgerlySyncService, never()).syncOrder(any());
     }
 
     @Test

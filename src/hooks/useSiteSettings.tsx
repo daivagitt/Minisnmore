@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
 import { getSiteSettings } from "@/lib/backend-data";
+import { broadcastStorefrontInvalidation } from "@/lib/storefront-cache-broadcast";
+import {
+  commerceFromRow,
+  DEFAULT_DELIVERY_ETA_BUFFER_DAYS,
+  parseDeliveryEtaBufferDays,
+} from "@/lib/commerce";
 
 export type SiteSettings = {
   brand_name: string;
@@ -33,6 +39,9 @@ export type SiteSettings = {
   shipping_standard_inr: number;
   shipping_express_inr: number;
   free_shipping_min_inr: number;
+  cod_fee_inr: number;
+  delivery_eta_buffer_days: number;
+  store_discount_percent: number;
 };
 
 const DEFAULT_SOCIAL = {
@@ -49,6 +58,17 @@ function coalesceUrl(value: string | null | undefined, fallback: string | null):
 
 function mergeSiteSettings(data: Partial<SiteSettings> | null | undefined): SiteSettings {
   const merged = { ...DEFAULTS, ...(data ?? {}) } as SiteSettings;
+  const commerce = commerceFromRow(data as Record<string, unknown> | undefined);
+  merged.gst_rate = commerce.gstRate;
+  merged.prices_include_gst = commerce.pricesIncludeGst;
+  merged.shipping_standard_inr = commerce.shippingStandardInr;
+  merged.shipping_express_inr = commerce.shippingExpressInr;
+  merged.free_shipping_min_inr = commerce.freeShippingMinInr;
+  merged.cod_fee_inr = commerce.codFeeInr;
+  merged.delivery_eta_buffer_days = parseDeliveryEtaBufferDays(
+    (data as Record<string, unknown> | undefined)?.delivery_eta_buffer_days,
+    DEFAULTS.delivery_eta_buffer_days
+  );
   merged.instagram_url = coalesceUrl(merged.instagram_url, DEFAULT_SOCIAL.instagram_url);
   merged.facebook_url = coalesceUrl(merged.facebook_url, DEFAULT_SOCIAL.facebook_url);
   merged.youtube_url = coalesceUrl(merged.youtube_url, DEFAULT_SOCIAL.youtube_url);
@@ -89,6 +109,9 @@ const DEFAULTS: SiteSettings = {
   shipping_standard_inr: 99,
   shipping_express_inr: 150,
   free_shipping_min_inr: 2500,
+  cod_fee_inr: 99,
+  delivery_eta_buffer_days: DEFAULT_DELIVERY_ETA_BUFFER_DAYS,
+  store_discount_percent: 20,
 };
 
 let cache: SiteSettings | null = null;
@@ -119,9 +142,10 @@ async function load(): Promise<SiteSettings> {
   return inflight;
 }
 
-export function invalidateSiteSettings() {
+export function invalidateSiteSettings(options?: { broadcast?: boolean }) {
   cache = null;
   void load();
+  if (options?.broadcast !== false) broadcastStorefrontInvalidation("siteSettings");
 }
 
 export function useSiteSettings(): SiteSettings {

@@ -61,7 +61,7 @@ function datePrefixForEventType(eventType: string): string {
     case "delivered":
       return "Delivered";
     case "refunded":
-      return "Refunded";
+      return "Settled";
     case "cancelled":
       return "Cancelled";
     default:

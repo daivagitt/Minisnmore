@@ -5,6 +5,7 @@ export type CommerceConfig = {
   shippingStandardInr: number;
   shippingExpressInr: number;
   freeShippingMinInr: number;
+  codFeeInr: number;
 };
 
 export const DEFAULT_COMMERCE: CommerceConfig = {
@@ -13,7 +14,11 @@ export const DEFAULT_COMMERCE: CommerceConfig = {
   shippingStandardInr: 99,
   shippingExpressInr: 150,
   freeShippingMinInr: 2500,
+  codFeeInr: 99,
 };
+
+export const DEFAULT_DELIVERY_ETA_BUFFER_DAYS = 3;
+export const MAX_DELIVERY_ETA_BUFFER_DAYS = 30;
 
 const GST_RATE_MAX = 100;
 const SHIPPING_INR_MAX = 10_000;
@@ -24,6 +29,14 @@ function parseNum(v: unknown, fallback: number, max?: number): number {
   if (!Number.isFinite(n) || n < 0) return fallback;
   if (max !== undefined && n > max) return fallback;
   return n;
+}
+
+/** Parse admin/site-settings delivery ETA buffer days with the same rules as other commerce numbers. */
+export function parseDeliveryEtaBufferDays(
+  v: unknown,
+  fallback: number = DEFAULT_DELIVERY_ETA_BUFFER_DAYS
+): number {
+  return parseNum(v, fallback, MAX_DELIVERY_ETA_BUFFER_DAYS);
 }
 
 function parseBool(v: unknown, fallback: boolean): boolean {
@@ -40,6 +53,7 @@ export function commerceFromRow(row: Record<string, unknown> | null | undefined)
     shippingStandardInr: parseNum(row.shipping_standard_inr, DEFAULT_COMMERCE.shippingStandardInr, SHIPPING_INR_MAX),
     shippingExpressInr: parseNum(row.shipping_express_inr, DEFAULT_COMMERCE.shippingExpressInr, SHIPPING_INR_MAX),
     freeShippingMinInr: parseNum(row.free_shipping_min_inr, DEFAULT_COMMERCE.freeShippingMinInr, FREE_SHIPPING_MIN_INR_MAX),
+    codFeeInr: parseNum(row.cod_fee_inr, DEFAULT_COMMERCE.codFeeInr, SHIPPING_INR_MAX),
   };
 }
 
@@ -51,6 +65,7 @@ export type CommerceSiteFields = {
   shipping_standard_inr: number;
   shipping_express_inr: number;
   free_shipping_min_inr: number;
+  cod_fee_inr: number;
 };
 
 export function commerceFromSiteSettings(s: CommerceSiteFields): CommerceConfig {
@@ -60,5 +75,6 @@ export function commerceFromSiteSettings(s: CommerceSiteFields): CommerceConfig 
     shippingStandardInr: s.shipping_standard_inr,
     shippingExpressInr: s.shipping_express_inr,
     freeShippingMinInr: s.free_shipping_min_inr,
+    codFeeInr: s.cod_fee_inr,
   };
 }

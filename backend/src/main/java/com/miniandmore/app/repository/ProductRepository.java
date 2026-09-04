@@ -71,6 +71,22 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     List<Product> findAllByActiveTrue();
 
+    @Query(
+        value = """
+            SELECT * FROM product p
+            WHERE p.active = true
+              AND p.item_structure = 'VARIANTS'
+              AND p.variants_json IS NOT NULL
+              AND EXISTS (
+                SELECT 1 FROM jsonb_array_elements(p.variants_json::jsonb) elem
+                WHERE lower(trim(elem->>'sku')) = lower(trim(:variantSku))
+              )
+            LIMIT 1
+            """,
+        nativeQuery = true
+    )
+    Optional<Product> findOneActiveByVariantSku(@Param("variantSku") String variantSku);
+
     List<Product> findAllByZohoItemIdIsNotNull();
 
     @Query(

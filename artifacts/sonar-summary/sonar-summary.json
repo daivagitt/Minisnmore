@@ -1,51 +1,76 @@
 {
-  "generatedAt": "2026-08-30T11:39:20.707092+00:00",
+  "generatedAt": "2026-08-31T14:51:24.921800+00:00",
   "frontend": {
     "key": "frontend",
     "label": "Frontend",
     "missing": false,
-    "coverage": "89.8",
-    "line_coverage": "94.6",
-    "branch_coverage": "83.9",
-    "bugs": "0",
+    "coverage": "94.5",
+    "line_coverage": "98.4",
+    "branch_coverage": "89.6",
+    "bugs": "1",
     "vulnerabilities": "0",
-    "code_smells": "23",
-    "duplication": "3.8",
-    "ncloc": "1917",
-    "reliability": "1.0",
+    "code_smells": "24",
+    "duplication": "3.0",
+    "ncloc": "2459",
+    "reliability": "3.0",
     "security": "1.0",
     "maintainability": "1.0",
     "gate": "OK",
     "gate_conditions": [
       {
         "status": "OK",
-        "metricKey": "coverage",
-        "comparator": "LT",
-        "errorThreshold": "80",
-        "actualValue": "89.8"
-      },
-      {
-        "status": "OK",
         "metricKey": "bugs",
         "comparator": "GT",
         "errorThreshold": "50",
-        "actualValue": "0"
+        "actualValue": "1"
       },
       {
         "status": "OK",
         "metricKey": "line_coverage",
         "comparator": "LT",
         "errorThreshold": "94",
-        "actualValue": "94.6"
+        "actualValue": "98.4"
       }
     ],
     "issues": [
       {
         "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "typescript:S6564",
+        "file": "src/lib/product-fit.ts",
+        "line": 32,
+        "message": "Remove this redundant type alias and replace its occurrences with \"MeasurementLimits\"."
+      },
+      {
+        "type": "BUG",
+        "severity": "MAJOR",
+        "rule": "typescript:S6959",
+        "file": "src/lib/product-fit.ts",
+        "line": 192,
+        "message": "Add an initial value to this \"reduce()\" call."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "typescript:S3776",
+        "file": "src/lib/product-fit.ts",
+        "line": 226,
+        "message": "Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "typescript:S3776",
+        "file": "src/store/shop.tsx",
+        "line": 189,
+        "message": "Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed."
+      },
+      {
+        "type": "CODE_SMELL",
         "severity": "MINOR",
         "rule": "typescript:S6594",
         "file": "src/lib/api.ts",
-        "line": 347,
+        "line": 365,
         "message": "Use the \"RegExp.exec()\" method instead."
       },
       {
@@ -53,7 +78,7 @@
         "severity": "CRITICAL",
         "rule": "typescript:S3776",
         "file": "src/lib/api.ts",
-        "line": 370,
+        "line": 388,
         "message": "Refactor this function to reduce its Cognitive Complexity from 20 to the 15 allowed."
       },
       {
@@ -69,31 +94,15 @@
         "severity": "CRITICAL",
         "rule": "typescript:S3776",
         "file": "src/routes/login.tsx",
-        "line": 22,
-        "message": "Refactor this function to reduce its Cognitive Complexity from 54 to the 15 allowed."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MINOR",
-        "rule": "typescript:S6606",
-        "file": "src/routes/login.tsx",
-        "line": 47,
-        "message": "Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MINOR",
-        "rule": "typescript:S6606",
-        "file": "src/routes/login.tsx",
-        "line": 97,
-        "message": "Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator."
+        "line": 25,
+        "message": "Refactor this function to reduce its Cognitive Complexity from 60 to the 15 allowed."
       },
       {
         "type": "CODE_SMELL",
         "severity": "MINOR",
         "rule": "typescript:S1874",
         "file": "src/routes/login.tsx",
-        "line": 100,
+        "line": 107,
         "message": "'FormEvent' is deprecated."
       },
       {
@@ -101,7 +110,7 @@
         "severity": "MAJOR",
         "rule": "typescript:S3358",
         "file": "src/routes/login.tsx",
-        "line": 166,
+        "line": 173,
         "message": "Extract this nested ternary operation into an independent statement."
       },
       {
@@ -109,7 +118,7 @@
         "severity": "MAJOR",
         "rule": "typescript:S3358",
         "file": "src/routes/login.tsx",
-        "line": 177,
+        "line": 184,
         "message": "Extract this nested ternary operation into an independent statement."
       },
       {
@@ -117,7 +126,7 @@
         "severity": "MINOR",
         "rule": "typescript:S6759",
         "file": "src/hooks/useAuth.tsx",
-        "line": 63,
+        "line": 85,
         "message": "Mark the props of the component as read-only."
       },
       {
@@ -125,7 +134,7 @@
         "severity": "MAJOR",
         "rule": "typescript:S3358",
         "file": "src/hooks/useAuth.tsx",
-        "line": 123,
+        "line": 172,
         "message": "Extract this nested ternary operation into an independent statement."
       },
       {
@@ -133,7 +142,7 @@
         "severity": "MAJOR",
         "rule": "typescript:S6481",
         "file": "src/hooks/useAuth.tsx",
-        "line": 259,
+        "line": 311,
         "message": "The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook."
       },
       {
@@ -141,7 +150,7 @@
         "severity": "MAJOR",
         "rule": "typescript:S3358",
         "file": "src/lib/api.ts",
-        "line": 28,
+        "line": 46,
         "message": "Extract this nested ternary operation into an independent statement."
       },
       {
@@ -149,7 +158,7 @@
         "severity": "MAJOR",
         "rule": "typescript:S4624",
         "file": "src/lib/api.ts",
-        "line": 28,
+        "line": 46,
         "message": "Refactor this code to not use nested template literals."
       },
       {
@@ -157,7 +166,7 @@
         "severity": "MINOR",
         "rule": "typescript:S6594",
         "file": "src/lib/api.ts",
-        "line": 217,
+        "line": 235,
         "message": "Use the \"RegExp.exec()\" method instead."
       },
       {
@@ -165,7 +174,7 @@
         "severity": "MINOR",
         "rule": "typescript:S6594",
         "file": "src/lib/api.ts",
-        "line": 220,
+        "line": 238,
         "message": "Use the \"RegExp.exec()\" method instead."
       },
       {
@@ -173,7 +182,7 @@
         "severity": "MINOR",
         "rule": "typescript:S6594",
         "file": "src/lib/api.ts",
-        "line": 223,
+        "line": 241,
         "message": "Use the \"RegExp.exec()\" method instead."
       },
       {
@@ -197,7 +206,7 @@
         "severity": "MINOR",
         "rule": "typescript:S1874",
         "file": "src/routes/login.tsx",
-        "line": 62,
+        "line": 66,
         "message": "'FormEvent' is deprecated."
       },
       {
@@ -205,7 +214,7 @@
         "severity": "MAJOR",
         "rule": "typescript:S3358",
         "file": "src/routes/login.tsx",
-        "line": 290,
+        "line": 309,
         "message": "Extract this nested ternary operation into an independent statement."
       },
       {
@@ -213,7 +222,7 @@
         "severity": "MINOR",
         "rule": "typescript:S6759",
         "file": "src/store/shop.tsx",
-        "line": 105,
+        "line": 132,
         "message": "Mark the props of the component as read-only."
       },
       {
@@ -221,7 +230,7 @@
         "severity": "MAJOR",
         "rule": "typescript:S6481",
         "file": "src/store/shop.tsx",
-        "line": 281,
+        "line": 428,
         "message": "The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook."
       }
     ]
@@ -230,49 +239,42 @@
     "key": "mnm-backend",
     "label": "Backend",
     "missing": false,
-    "coverage": "11.1",
-    "line_coverage": "12.7",
-    "branch_coverage": "7.6",
-    "bugs": "5",
+    "coverage": "88.0",
+    "line_coverage": "95.6",
+    "branch_coverage": "71.7",
+    "bugs": "0",
     "vulnerabilities": "0",
-    "code_smells": "519",
-    "duplication": "6.7",
-    "ncloc": "39547",
-    "reliability": "3.0",
+    "code_smells": "101",
+    "duplication": "7.1",
+    "ncloc": "14212",
+    "reliability": "1.0",
     "security": "1.0",
     "maintainability": "1.0",
-    "gate": "ERROR",
+    "gate": "OK",
     "gate_conditions": [
-      {
-        "status": "ERROR",
-        "metricKey": "coverage",
-        "comparator": "LT",
-        "errorThreshold": "80",
-        "actualValue": "11.1"
-      },
       {
         "status": "OK",
         "metricKey": "bugs",
         "comparator": "GT",
         "errorThreshold": "50",
-        "actualValue": "5"
+        "actualValue": "0"
       },
       {
-        "status": "ERROR",
+        "status": "OK",
         "metricKey": "line_coverage",
         "comparator": "LT",
         "errorThreshold": "94",
-        "actualValue": "12.7"
+        "actualValue": "95.6"
       }
     ],
     "issues": [
       {
         "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "java:S1192",
-        "file": "backend/src/main/java/com/miniandmore/app/config/ApplicationProperties.java",
-        "line": 426,
-        "message": "Define a constant instead of duplicating this literal \"http://localhost:5173\" 3 times."
+        "severity": "MAJOR",
+        "rule": "java:S1144",
+        "file": "backend/src/main/java/com/miniandmore/app/service/LedgerlyWebhookHandlerService.java",
+        "line": 189,
+        "message": "Remove this unused private \"sign\" method."
       },
       {
         "type": "CODE_SMELL",

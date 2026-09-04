@@ -76,10 +76,15 @@ describe("PortraitInvoiceDocument", () => {
       el.textContent?.includes("Place Of Supply"),
     );
     expect(placeOfSupplyLine).toHaveClass("col-start-1", "row-start-2");
+    const invoiceNumberLine = Array.from(container.querySelectorAll("p")).find(
+      (el) => el.textContent === "Invoice No : INV-1001",
+    );
+    expect(invoiceNumberLine).toBeTruthy();
     const orderNumberLine = Array.from(container.querySelectorAll("p")).find(
       (el) => el.textContent === "Order No : MNM-1001",
     );
     expect(orderNumberLine).toHaveClass("col-start-2", "row-start-2");
+    expect(invoiceNumberLine?.textContent).not.toBe(orderNumberLine?.textContent);
     expect(orderNumberLine?.parentElement).toHaveClass("grid-cols-[1.15fr_0.85fr]");
     expect(invoice).toHaveTextContent("Seller address");
     expect(invoice).toHaveTextContent("Dispatch address");
@@ -94,5 +99,45 @@ describe("PortraitInvoiceDocument", () => {
       "https://www.minisnmore.example/account/orders/MNM-1001",
     );
     expect(qrLink?.querySelector("svg")).toBeTruthy();
+  });
+
+  it("prints a distinct invoice number for COD orders", () => {
+    const { container } = render(
+      <PortraitInvoiceDocument
+        order={{
+          order_number: "MNM-C96E3FC21C76",
+          payment_method: "cod",
+          payment_status: "pending",
+          created_at: "2026-09-03T08:00:00Z",
+          subtotal: 1129.95,
+          discount: 0,
+          shipping: 99,
+          cod_fee: 99,
+          tax: 58.52,
+          total: 1327.95,
+          shipping_address: {
+            full_name: "COD Customer",
+            city: "Bengaluru",
+            state: "Karnataka",
+            pincode: "560100",
+          },
+          order_items: [
+            {
+              id: 1,
+              product_name: "Bibs Special",
+              qty: 5,
+              price: 225.99,
+              mrp: 279,
+            },
+          ],
+        }}
+        settings={{ invoice_seller_state: "Karnataka", gst_rate: 5, prices_include_gst: true }}
+      />,
+    );
+
+    const invoice = container.querySelector(".invoice-document");
+    expect(invoice).toHaveTextContent("Invoice No : INV-C96E3FC21C76");
+    expect(invoice).toHaveTextContent("Order No : MNM-C96E3FC21C76");
+    expect(invoice).toHaveTextContent("Convenience Charges (COD)");
   });
 });

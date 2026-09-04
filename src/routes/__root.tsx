@@ -1,4 +1,5 @@
 import { Outlet, createRootRoute, HeadContent, Scripts, Link, useRouterState } from "@tanstack/react-router";
+import { useEffect, useRef } from "react";
 import appCss from "../styles.css?url";
 import { ShopProvider } from "@/store/shop";
 import { AuthProvider } from "@/hooks/useAuth";
@@ -12,6 +13,7 @@ import { Watermark } from "@/components/Watermark";
 import { ScrollProgress } from "@/components/ScrollProgress";
 import { FloatingDecor } from "@/components/FloatingDecor";
 import { Toaster } from "sonner";
+import { initStorefrontCacheSync, invalidateAllStorefrontCaches } from "@/lib/storefront-cache-sync";
 
 const SOCIAL_SHARE_IMAGE = "https://minisnmore.com/og-share.jpg";
 
@@ -77,8 +79,57 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isAdmin = pathname.startsWith("/admin");
+  const wasAdminRef = useRef(isAdmin);
   const isCustomerInvoice = /^\/account\/orders\/[^/]+\/invoice$/.test(pathname);
   const isInvoice = isCustomerInvoice || /^\/admin\/orders\/[^/]+\/invoice$/.test(pathname);
+
+  useEffect(() => {
+    return initStorefrontCacheSync();
+  }, []);
+
+  useEffect(() => {
+    if (wasAdminRef.current && !isAdmin) {
+      invalidateAllStorefrontCaches({ broadcast: false });
+    }
+    wasAdminRef.current = isAdmin;
+  }, [isAdmin]);
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible" && !pathname.startsWith("/admin")) {
+        invalidateAllStorefrontCaches({ broadcast: false });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [pathname]);
+
+  useEffect(() => {
+    const reloadKey = "mini:chunk-reload-attempted";
+    const clearReloadFlag = window.setTimeout(() => sessionStorage.removeItem(reloadKey), 5000);
+    const isChunkLoadError = (value: unknown) => {
+      const message = value instanceof Error ? value.message : String(value ?? "");
+      return /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(message);
+    };
+    const reloadOnce = () => {
+      if (sessionStorage.getItem(reloadKey) === "1") return;
+      sessionStorage.setItem(reloadKey, "1");
+      window.location.reload();
+    };
+    const onRejection = (event: PromiseRejectionEvent) => {
+      if (isChunkLoadError(event.reason)) reloadOnce();
+    };
+    const onError = (event: ErrorEvent) => {
+      if (isChunkLoadError(event.error ?? event.message)) reloadOnce();
+    };
+    window.addEventListener("unhandledrejection", onRejection);
+    window.addEventListener("error", onError);
+    return () => {
+      window.clearTimeout(clearReloadFlag);
+      window.removeEventListener("unhandledrejection", onRejection);
+      window.removeEventListener("error", onError);
+    };
+  }, []);
 
   return (
     <AuthProvider>

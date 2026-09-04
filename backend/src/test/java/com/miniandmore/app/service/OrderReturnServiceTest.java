@@ -67,7 +67,7 @@ class OrderReturnServiceTest {
     private ZohoBooksIntegrationClient zohoBooksIntegrationClient;
 
     @Spy
-    private ProductVariantSupport variantSupport = new ProductVariantSupport(new com.fasterxml.jackson.databind.ObjectMapper());
+    private ProductVariantSupport variantSupport = StorePricingTestSupport.variantSupport(new com.fasterxml.jackson.databind.ObjectMapper());
 
     @Mock
     private OrderMailService orderMailService;
@@ -936,6 +936,448 @@ class OrderReturnServiceTest {
         assertThat(orderReturnService.markShipped("RET-1", null).getStatus()).isEqualTo(OrderReturnStatus.SHIPPED);
         assertThat(orderReturnService.markDelivered("RET-1", null).getStatus()).isEqualTo(OrderReturnStatus.DELIVERED);
         assertThat(orderReturnService.completeExchange("RET-1", null).getStatus()).isEqualTo(OrderReturnStatus.COMPLETED);
+    }
+
+    @Test
+    void publicConfig_exposesFeatureFlags() {
+        Map<String, Object> config = orderReturnService.publicConfig();
+
+        assertThat(config.get("enabled")).isEqualTo(true);
+        assertThat(config.get("window_days")).isEqualTo(3);
+    }
+
+    @Test
+    void rejectAtCurrentStage_inspectedReturn_delegatesToRejectAfterInspection() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.INSPECTED);
+        OrderItem item = new OrderItem().productId("1").qty(1);
+        Product product = new Product().id(1L).stock(6);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
+        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.rejectAtCurrentStage("RET-1", "Damaged item", "note");
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REJECTED);
+        assertThat(product.getStock()).isEqualTo(5);
+    }
+
+    @Test
+    void isReplacementSellable_wrongUser_returnsFalse() {
+        CustomerOrder order = eligibleOrder();
+        OrderItem item = new OrderItem().id(5L).productId("2");
+        item.setOrder(order);
+        when(orderItemRepository.findById(5L)).thenReturn(Optional.of(item));
+
+        assertThat(orderReturnService.isReplacementSellable("other-user", 5L, "M", "Blue")).isFalse();
+    }
+
+    @Test
+    void isReplacementSellable_nonVariantProduct_returnsFalse() {
+        CustomerOrder order = eligibleOrder();
+        OrderItem item = new OrderItem().id(5L).productId("2");
+        item.setOrder(order);
+        Product product = new Product().id(2L).itemStructure("SIMPLE");
+        when(orderItemRepository.findById(5L)).thenReturn(Optional.of(item));
+        when(productRepository.findById(2L)).thenReturn(Optional.of(product));
+
+        assertThat(orderReturnService.isReplacementSellable(USER, 5L, "M", "Blue")).isFalse();
+    }
+
+    @Test
+    void requestExchange_nonVariantProduct_throwsBadRequest() {
+        CustomerOrder order = eligibleOrder();
+        OrderItem item = new OrderItem().id(5L).productId("2").qty(1);
+        Product product = new Product().id(2L).itemStructure("SIMPLE");
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin(ORDER_NUMBER, USER)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByIdAndOrderId(5L, 10L)).thenReturn(Optional.of(item));
+        when(productRepository.findById(2L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() ->
+            orderReturnService.requestExchange(USER, ORDER_NUMBER, 5L, "Wrong size ordered by mistake", "M", "Blue")
+        )
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("does not support exchanges");
+    }
+
+    @Test
+    void approve_exchangeRestoresItemStock() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.REQUESTED, "TEE-M-BLUE", "M", "Blue");
+        Product product = new Product().id(2L).stock(4);
+        orderReturn.getOrderItem().productId("2").qty(1);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(productRepository.findOneForInventoryUpdate(2L)).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        orderReturnService.approve("RET-1", null);
+
+        assertThat(product.getStock()).isEqualTo(5);
+        verify(orderItemRepository, never()).findAllByOrderId(any());
+    }
+
+    @Test
+    void convertExchangeToRefund_fromFailedStatus_refundsItemAmount() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.FAILED, "TEE-M-BLUE", "M", "Blue");
+        orderReturn.getOrderItem().price(new BigDecimal("150.00")).qty(1);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(razorpayRefundService.refundPayment(any(), eq(new BigDecimal("150.00")))).thenReturn("rfnd_demo");
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.convertExchangeToRefund("RET-1", "Converted");
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REFUNDED);
+    }
+
+    @Test
+    void processRefund_zohoSyncEnabled_createsCreditNote() {
+        ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
+        zoho.setSyncReturns(true);
+        when(applicationProperties.getZoho()).thenReturn(zoho);
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.ACCEPTED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo_ORD-9001");
+        when(zohoBooksIntegrationClient.createCreditNote(10L, "RET-1")).thenReturn(Optional.of("cn-zoho-1"));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderReturn result = orderReturnService.processRefund("RET-1", null);
+
+        assertThat(result.getZohoCreditNoteId()).isEqualTo("cn-zoho-1");
+    }
+
+    @Test
+    void processRefund_zohoFailure_recordsAdminNote() {
+        ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
+        zoho.setSyncReturns(true);
+        when(applicationProperties.getZoho()).thenReturn(zoho);
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.ACCEPTED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_live");
+        when(zohoBooksIntegrationClient.createCreditNote(10L, "RET-1")).thenThrow(new RuntimeException("zoho 500"));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderReturn result = orderReturnService.processRefund("RET-1", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REFUNDED);
+        assertThat(result.getAdminNotes()).contains("Zoho credit note failed");
+    }
+
+    @Test
+    void resolveDeliveryAnchor_deliveredTrackingStatus_usesLedgerlyPullTime() {
+        CustomerOrder order = eligibleOrder()
+            .shipmentDate(null)
+            .status(OrderStatus.CONFIRMED)
+            .ledgerlyOrderStatus("delivered")
+            .ledgerlyTrackingLastPulledAt(Instant.parse("2026-02-01T00:00:00Z"));
+
+        Instant anchor = orderReturnService.resolveDeliveryAnchor(order);
+
+        assertThat(anchor).isEqualTo(Instant.parse("2026-02-01T00:00:00Z"));
+    }
+
+    @Test
+    void resolveDeliveryAnchor_trackingNumberWithoutShipment_usesLedgerlyPullTime() {
+        CustomerOrder order = eligibleOrder()
+            .shipmentDate(null)
+            .status(OrderStatus.CONFIRMED)
+            .trackingNumber("AWB-999")
+            .ledgerlyTrackingLastPulledAt(Instant.parse("2026-02-15T00:00:00Z"));
+
+        Instant anchor = orderReturnService.resolveDeliveryAnchor(order);
+
+        assertThat(anchor).isEqualTo(Instant.parse("2026-02-15T00:00:00Z"));
+    }
+
+    @Test
+    void markReceived_fromPickedUp_movesToReceived() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.PICKED_UP);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.markReceived("RET-1", "At warehouse");
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.RECEIVED);
+    }
+
+    @Test
+    void reject_wrongStatus_throwsBadRequest() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.APPROVED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+
+        assertThatThrownBy(() -> orderReturnService.reject("RET-1", "Not eligible", null))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("not awaiting approval");
+    }
+
+    @Test
+    void rejectAfterInspection_exchangeReversesVariantStock() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.INSPECTED, "TEE-M-BLUE", "M", "Blue");
+        String variantsJson =
+            "[{\"sku\":\"TEE-M-BLUE\",\"size\":\"M\",\"color\":\"Blue\",\"rate\":500,\"stock\":5,\"active\":true}]";
+        OrderItem item = orderReturn.getOrderItem();
+        item.productId("2").qty(1).variantSku("TEE-M-BLUE").itemSize("M").color("Blue");
+        Product product = new Product().id(2L).stock(5).itemStructure("VARIANTS").variantsJson(variantsJson);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(productRepository.findOneForInventoryUpdate(2L)).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.rejectAfterInspection("RET-1", "Customer damaged item", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REJECTED);
+        assertThat(product.getStock()).isEqualTo(4);
+    }
+
+    @Test
+    void allocateReplacementItem_wrongStatus_throwsBadRequest() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.REQUESTED, "TEE-M-BLUE", "M", "Blue");
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+
+        assertThatThrownBy(() -> orderReturnService.allocateReplacementItem("RET-1", null))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("accepted before allocating");
+    }
+
+    @Test
+    void allocateReplacementItem_missingProduct_throwsBadRequest() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ACCEPTED, "TEE-M-BLUE", "M", "Blue");
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(productRepository.findOneForInventoryUpdate(2L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderReturnService.allocateReplacementItem("RET-1", null))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("could not be resolved");
+    }
+
+    @Test
+    void convertExchangeToRefund_wrongStatus_throwsBadRequest() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.REQUESTED, "TEE-M-BLUE", "M", "Blue");
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+
+        assertThatThrownBy(() -> orderReturnService.convertExchangeToRefund("RET-1", null))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("accepted");
+    }
+
+    @Test
+    void processRefund_ledgerlyException_demoOrder_stubsCreditNote() {
+        enableLedgerlyReturnsSync();
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.ACCEPTED);
+        CustomerOrder order = orderReturn.getOrder();
+        order.setRazorpayPaymentId("pay_demo_abc");
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo");
+        when(ledgerlyIntegrationClient.cancelOrder(any(), any(), any())).thenThrow(new RuntimeException("ledgerly down"));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderReturn result = orderReturnService.processRefund("RET-1", null);
+
+        assertThat(result.getLedgerlyCreditNoteId()).isEqualTo("cn_demo_" + ORDER_NUMBER);
+    }
+
+    @Test
+    void processRefund_zohoEmptyResponse_demoOrder_stubsCreditNote() {
+        ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
+        zoho.setSyncReturns(true);
+        when(applicationProperties.getZoho()).thenReturn(zoho);
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.ACCEPTED);
+        orderReturn.getOrder().setRazorpayOrderId("order_demo_ORD-9001");
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(razorpayRefundService.isDemoMode()).thenReturn(true);
+        when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo");
+        when(zohoBooksIntegrationClient.createCreditNote(10L, "RET-1")).thenReturn(Optional.empty());
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderReturn result = orderReturnService.processRefund("RET-1", null);
+
+        assertThat(result.getZohoCreditNoteId()).isEqualTo("cn_zoho_demo_" + ORDER_NUMBER);
+    }
+
+    @Test
+    void processRefund_zohoException_demoOrder_stubsCreditNote() {
+        ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
+        zoho.setSyncReturns(true);
+        when(applicationProperties.getZoho()).thenReturn(zoho);
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.ACCEPTED);
+        orderReturn.getOrder().setRazorpayPaymentId("pay_demo_xyz");
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(razorpayRefundService.refundPayment(any(), any())).thenReturn("rfnd_demo");
+        when(zohoBooksIntegrationClient.createCreditNote(10L, "RET-1")).thenThrow(new RuntimeException("zoho down"));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderReturn result = orderReturnService.processRefund("RET-1", null);
+
+        assertThat(result.getZohoCreditNoteId()).isEqualTo("cn_zoho_demo_" + ORDER_NUMBER);
+    }
+
+    @Test
+    void approve_invalidProductId_skipsInventoryRestore() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.REQUESTED);
+        OrderItem item = new OrderItem().productId("not-a-number").qty(2);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        orderReturnService.approve("RET-1", null);
+
+        verify(productRepository, never()).findOneForInventoryUpdate(any());
+    }
+
+    @Test
+    void approve_zeroQuantityItem_skipsStockChange() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.REQUESTED);
+        OrderItem item = new OrderItem().productId("1").qty(0);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        orderReturnService.approve("RET-1", null);
+
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void approve_variantIncrementFails_fallsBackToProductStock() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.REQUESTED);
+        OrderItem item = new OrderItem().productId("2").qty(1).variantSku("MISSING").itemSize("M").color("Blue");
+        Product product = new Product().id(2L).stock(3).itemStructure("VARIANTS").variantsJson("[]");
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
+        when(productRepository.findOneForInventoryUpdate(2L)).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        orderReturnService.approve("RET-1", null);
+
+        assertThat(product.getStock()).isEqualTo(4);
+    }
+
+    @Test
+    void rejectAfterInspection_nullItem_stillRejects() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.INSPECTED);
+        orderReturn.setRequestType(OrderRequestType.EXCHANGE);
+        orderReturn.setOrderItem(null);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.rejectAfterInspection("RET-1", "Not acceptable", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REJECTED);
+    }
+
+    @Test
+    void requestReturn_longOrderNumber_truncatesReturnNumber() {
+        CustomerOrder order = eligibleOrder().orderNumber("ORD-" + "X".repeat(60));
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin(order.getOrderNumber(), USER)).thenReturn(Optional.of(order));
+        when(orderReturnRepository.existsByOrderIdAndStatusIn(eq(order.getId()), any())).thenReturn(false);
+        when(orderReturnRepository.save(any(OrderReturn.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderReturn result = orderReturnService.requestReturn(USER, order.getOrderNumber(), "Product arrived damaged in transit");
+
+        assertThat(result.getReturnNumber().length()).isLessThanOrEqualTo(48);
+    }
+
+    @Test
+    void resolveDeliveryAnchor_invalidShipmentDate_returnsNull() {
+        CustomerOrder order = eligibleOrder().shipmentDate("31/08/2026").status(OrderStatus.CONFIRMED);
+
+        Instant anchor = orderReturnService.resolveDeliveryAnchor(order);
+
+        assertThat(anchor).isNull();
+    }
+
+    @Test
+    void isReplacementSellable_missingItem_returnsFalse() {
+        when(orderItemRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThat(orderReturnService.isReplacementSellable(USER, 99L, "M", "Blue")).isFalse();
+    }
+
+    @Test
+    void requestExchange_missingOrderItem_throwsNotFound() {
+        CustomerOrder order = eligibleOrder();
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin(ORDER_NUMBER, USER)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByIdAndOrderId(99L, 10L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+            orderReturnService.requestExchange(USER, ORDER_NUMBER, 99L, "Wrong size ordered by mistake", "M", "Blue")
+        )
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Order item not found");
+    }
+
+    @Test
+    void approve_exchangeWithZeroQtyItem_doesNotSaveProduct() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.REQUESTED, "TEE-M-BLUE", "M", "Blue");
+        orderReturn.getOrderItem().productId("2").qty(0);
+        Product product = new Product().id(2L).stock(4);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(productRepository.findOneForInventoryUpdate(2L)).thenReturn(Optional.of(product));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        orderReturnService.approve("RET-1", null);
+
+        verify(productRepository, never()).save(any());
+        assertThat(product.getStock()).isEqualTo(4);
+    }
+
+    @Test
+    void rejectAfterInspection_missingProduct_treatsAsReversed() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.INSPECTED);
+        OrderItem item = new OrderItem().productId("1").qty(2);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
+        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.empty());
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.rejectAfterInspection("RET-1", "Item damaged by customer", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REJECTED);
+        assertThat(result.getAdminNotes()).isNull();
+    }
+
+    @Test
+    void rejectAfterInspection_zeroQuantityItem_skipsStockReverse() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.INSPECTED);
+        OrderItem item = new OrderItem().productId("1").qty(0);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.rejectAfterInspection("RET-1", "Item damaged by customer", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REJECTED);
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectAfterInspection_invalidProductId_skipsStockReverse() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.INSPECTED);
+        OrderItem item = new OrderItem().productId("bad-id").qty(2);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.rejectAfterInspection("RET-1", "Item damaged by customer", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REJECTED);
+    }
+
+    @Test
+    void allocateReplacementItem_invalidProductId_throwsBadRequest() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ACCEPTED, "TEE-M-BLUE", "M", "Blue");
+        orderReturn.getOrderItem().productId("bad-id");
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+
+        assertThatThrownBy(() -> orderReturnService.allocateReplacementItem("RET-1", null))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("could not be resolved");
     }
 
     private OrderReturn exchangeReturnWithStatus(OrderReturnStatus status, String replacementSku, String size, String color) {

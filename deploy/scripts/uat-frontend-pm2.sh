@@ -62,10 +62,20 @@ export NPM_CONFIG_LOGLEVEL=info
 export NPM_CONFIG_PROGRESS=true
 npm ci --no-audit --no-fund
 echo "npm ci done at $(date -u '+%H:%M:%S UTC')"
+ASSET_BACKUP=""
+if [ -d dist/client/assets ]; then
+  ASSET_BACKUP="$(mktemp -d "${TMPDIR:-/tmp}/mini-client-assets.XXXXXX")"
+  cp -a dist/client/assets/. "$ASSET_BACKUP/"
+fi
 rm -rf dist node_modules/.vite
 echo "npm run build..."
 npm run build
 echo "npm run build done at $(date -u '+%H:%M:%S UTC')"
+
+if [ -n "$ASSET_BACKUP" ] && [ -d "$ASSET_BACKUP" ] && [ -d dist/client/assets ]; then
+  cp -an "$ASSET_BACKUP/." dist/client/assets/
+  rm -rf "$ASSET_BACKUP"
+fi
 
 if [ -d dist/client ]; then
   printf '%s\n' "${BUILD_NUM:-local}" "${GIT_SHA:-local}" > dist/client/RELEASE.txt 2>/dev/null || true

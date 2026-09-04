@@ -29,12 +29,12 @@ public class ProductVariantSupport {
     public static final String STRUCTURE_VARIANTS = "VARIANTS";
     public static final String STRUCTURE_SIMPLE = "SIMPLE";
 
-    private static final BigDecimal STORE_UAT_DISCOUNT_MULTIPLIER = new BigDecimal("0.80");
-
     private final ObjectMapper objectMapper;
+    private final StorePricingService storePricingService;
 
-    public ProductVariantSupport(ObjectMapper objectMapper) {
+    public ProductVariantSupport(ObjectMapper objectMapper, StorePricingService storePricingService) {
         this.objectMapper = objectMapper;
+        this.storePricingService = storePricingService;
     }
 
     public boolean isVariants(Product product) {
@@ -209,8 +209,9 @@ public class ProductVariantSupport {
             if (!row.active()) {
                 continue;
             }
-            if (row.rate() != null && row.rate().compareTo(BigDecimal.ZERO) > 0) {
-                minSelling = minSelling == null ? row.rate() : minSelling.min(row.rate());
+            BigDecimal selling = variantSellingPrice(row);
+            if (selling.compareTo(BigDecimal.ZERO) > 0) {
+                minSelling = minSelling == null ? selling : minSelling.min(selling);
             }
             if (row.mrp() != null && row.mrp().compareTo(BigDecimal.ZERO) > 0) {
                 minMrp = minMrp == null ? row.mrp() : minMrp.min(row.mrp());
@@ -223,26 +224,49 @@ public class ProductVariantSupport {
         return new Aggregates(minSelling, minMrp, minCost, stockSum);
     }
 
-    /** Variant selling price for checkout (rate is selling; legacy rows may only have mrp). */
+    /** Variant selling price for checkout — runtime from MRP when MRP is known. */
     public BigDecimal variantSellingPrice(VariantRow row) {
         if (row == null) {
             return BigDecimal.ZERO;
         }
-        if (row.rate() != null && row.rate().compareTo(BigDecimal.ZERO) > 0) {
-            return row.rate();
-        }
         if (row.mrp() != null && row.mrp().compareTo(BigDecimal.ZERO) > 0) {
             return storefrontPrice(row.mrp());
+        }
+        // No MRP: rate is the selling price (do not apply store discount again).
+        if (row.rate() != null && row.rate().compareTo(BigDecimal.ZERO) > 0) {
+            return row.rate();
         }
         return BigDecimal.ZERO;
     }
 
-    /** Storefront selling price after 20% off MRP, matching parent merge rules. */
-    public BigDecimal storefrontPrice(BigDecimal rate) {
-        if (rate == null || rate.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO;
+    /** Storefront selling price after global store discount off MRP. */
+    public BigDecimal storefrontPrice(BigDecimal mrp) {
+        return storePricingService.sellingFromMrp(mrp);
+    }
+
+    /** Apply runtime MRP discount to a product DTO for storefront API responses. */
+    public void applyRuntimePricing(com.miniandmore.app.service.dto.ProductDTO dto) {
+        if (dto == null) {
+            return;
         }
-        return rate.multiply(STORE_UAT_DISCOUNT_MULTIPLIER).setScale(2, RoundingMode.HALF_UP);
+        if (dto.getCompareAtPrice() != null && dto.getCompareAtPrice().compareTo(BigDecimal.ZERO) > 0) {
+            dto.setPrice(storefrontPrice(dto.getCompareAtPrice()));
+            return;
+        }
+        if (!isVariantsStructure(dto.getItemStructure()) || dto.getVariantsJson() == null || dto.getVariantsJson().isBlank()) {
+            return;
+        }
+        Optional<List<VariantRow>> parsed = tryParse(dto.getVariantsJson());
+        if (parsed.isEmpty()) {
+            return;
+        }
+        Aggregates agg = aggregates(parsed.orElseThrow());
+        if (agg.minMrp() != null) {
+            dto.setCompareAtPrice(agg.minMrp());
+        }
+        if (agg.minSelling() != null) {
+            dto.setPrice(agg.minSelling());
+        }
     }
 
     /**
@@ -293,13 +317,8 @@ public class ProductVariantSupport {
         if (agg.minSelling() != null) {
             product.setPrice(agg.minSelling());
         }
-        if (agg.minMrp() != null) {
-            product.setCompareAtPrice(agg.minMrp());
-        } else if (agg.minSelling() != null) {
-            product.setCompareAtPrice(
-                agg.minSelling().divide(STORE_UAT_DISCOUNT_MULTIPLIER, 2, RoundingMode.HALF_UP)
-            );
-        }
+        // Only keep real MRP; do not invent compare-at from selling when MRP was cleared.
+        product.setCompareAtPrice(agg.minMrp());
         product.setStock(agg.stockSum());
         return true;
     }
@@ -961,7 +980,7 @@ public class ProductVariantSupport {
             BigDecimal mrp;
             if (legacyRateIsMrp) {
                 mrp = rateRaw;
-                rate = rateRaw.multiply(STORE_UAT_DISCOUNT_MULTIPLIER).setScale(2, RoundingMode.HALF_UP);
+                rate = BigDecimal.ZERO;
             } else {
                 rate = hasExplicitSelling ? priceRaw : rateRaw;
                 mrp = hasExplicitMrp ? mrpRaw : null;

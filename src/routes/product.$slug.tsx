@@ -3,16 +3,19 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { Product } from "@/data/products";
 import { useProduct, useProducts, useProductsLoaded } from "@/hooks/useProducts";
 import { useShop } from "@/store/shop";
-import { Heart, Truck, Leaf, ChevronRight, Ruler, Plus, Minus, Share2, X, BadgeCheck, Banknote, RotateCcw } from "lucide-react";
+import { Heart, Truck, Leaf, ChevronRight, Ruler, Plus, Minus, Share2, Banknote, RotateCcw, X } from "lucide-react";
+import { ProductInfoSections } from "@/components/ProductInfoSections";
 import { toast } from "sonner";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductGallery } from "@/components/ProductGallery";
 import {
   checkSizeFit,
   clampQuantity,
-  measurementLimitsForSizes,
+  measurementLimitsForProduct,
   sizeGuideRowsForProduct,
 } from "@/lib/product-fit";
+import { sizeChartForProduct } from "@/lib/product-size-charts";
+import { ProductSizeChartTables } from "@/components/ProductSizeChart";
 import { galleryForSelectedColor } from "@/lib/product-gallery";
 import { resolveStorefrontColorLabel } from "@/lib/expected-prints";
 import { lookupPincode, normalizePincode } from "@/lib/pincode";
@@ -30,6 +33,8 @@ import {
 } from "@/lib/product-variants";
 import { StockAvailability, stockAvailabilityState } from "@/components/StockAvailability";
 import { VariantColorButtons, VariantSizeButtons, variantColorsForDisplay } from "@/components/VariantPickers";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { commerceFromSiteSettings } from "@/lib/commerce";
 
 export const Route = createFileRoute("/product/$slug")({
   head: ({ params }) => ({
@@ -52,10 +57,13 @@ function ProductPage() {
   const productsLoaded = useProductsLoaded();
   const product = useProduct(slug) as Product | undefined;
   const { addToCart, toggleWish, wishlist } = useShop();
+  const settings = useSiteSettings();
+  const commerce = commerceFromSiteSettings(settings);
+  const freeShippingMinLabel = commerce.freeShippingMinInr.toLocaleString("en-IN");
   const defaults = product ? defaultSellableSelection(product) : { size: null as string | null, color: null as string | null };
   const [size, setSize] = useState<string | null>(() => defaults.size);
   const [color, setColor] = useState<string | null>(() => defaults.color);
-  const [heightCm, setHeightCm] = useState<string>("");
+  const [lengthCm, setLengthCm] = useState<string>("");
   const [chestCm, setChestCm] = useState<string>("");
   const [sizeChart, setSizeChart] = useState(false);
   const [qty, setQty] = useState(1);
@@ -122,18 +130,63 @@ function ProductPage() {
     [product],
   );
 
-  const fitLimits = useMemo(() => measurementLimitsForSizes(catalogSizes), [catalogSizes]);
+  const fitLimits = useMemo(
+    () =>
+      product
+        ? measurementLimitsForProduct({
+            sku: product.sku,
+            name: product.name,
+            slug: product.slug,
+            sizes: catalogSizes,
+            sizeChart: product.sizeChart,
+          })
+        : null,
+    [product, catalogSizes],
+  );
 
   const sizeFit = useMemo(() => {
-    if (!product || (!heightCm.trim() && !chestCm.trim())) return null;
-    const result = checkSizeFit({ heightCm, chestCm, sizes: catalogSizes });
+    if (!product || (!lengthCm.trim() && !chestCm.trim())) return null;
+    const result = checkSizeFit({
+      lengthCm,
+      chestCm,
+      sku: product.sku,
+      name: product.name,
+      slug: product.slug,
+      sizes: catalogSizes,
+      sizeChart: product.sizeChart,
+    });
     return result.ok ? { size: result.size } : { error: result.error };
-  }, [heightCm, chestCm, product, catalogSizes]);
+  }, [lengthCm, chestCm, product, catalogSizes]);
+
+  useEffect(() => {
+    if (!sizeFit || !("size" in sizeFit)) return;
+    setSize((prev) => (prev === sizeFit.size ? prev : sizeFit.size));
+  }, [sizeFit]);
 
   const sizeGuideRows = useMemo(
-    () => sizeGuideRowsForProduct(catalogSizes),
-    [catalogSizes],
+    () =>
+      product
+        ? sizeGuideRowsForProduct({
+            sku: product.sku,
+            name: product.name,
+            slug: product.slug,
+            sizes: catalogSizes,
+            sizeChart: product.sizeChart,
+          })
+        : [],
+    [product, catalogSizes],
   );
+
+  const sizeGuideTitle = useMemo(() => {
+    if (!product) return null;
+    const chart = sizeChartForProduct({
+      sku: product.sku,
+      name: product.name,
+      slug: product.slug,
+      sizeChart: product.sizeChart,
+    });
+    return chart ? chart.title : null;
+  }, [product]);
 
   const handleAdd = () => {
     if (!product || !canAdd) {
@@ -169,12 +222,16 @@ function ProductPage() {
     .filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i)
     .slice(0, 4);
 
-  const trustBadges = [
+  const trustBadges: { i: typeof Leaf; t: string; title?: string }[] = [
     { i: Leaf, t: "Organic" },
     { i: Banknote, t: "COD" },
-    { i: Truck, t: "Free ₹1499+" },
-    { i: RotateCcw, t: "3 days" },
-  ] as const;
+    {
+      i: Truck,
+      t: `Free ₹${freeShippingMinLabel}+`,
+      title: `Free shipping order above ${freeShippingMinLabel}`,
+    },
+    { i: RotateCcw, t: "3 days", title: "3 days return" },
+  ];
 
   const checkPin = async () => {
     setPinLoading(true);
@@ -258,60 +315,61 @@ function ProductPage() {
             )}
           </div>
 
+          {fitLimits ? (
           <div className="glass rounded-xl p-3 space-y-2">
             <div className="flex items-center gap-2 text-xs font-medium">
               <Ruler className="h-3.5 w-3.5 text-primary shrink-0" />
               Size calculator
             </div>
             {sizeFit && "size" in sizeFit ? (
-              <div className="flex items-center justify-between gap-2 text-xs min-w-0">
-                <span className="text-muted-foreground truncate">
-                  Best fit: <span className="text-primary font-medium">{sizeFit.size}</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setSize(sizeFit.size)}
-                  className="text-primary underline-offset-2 hover:underline shrink-0"
-                >
-                  Use size
-                </button>
-              </div>
+              <p className="text-xs text-muted-foreground leading-snug">
+                Auto-selected <span className="text-primary font-medium">{sizeFit.size}</span> from
+                {lengthCm.trim() && chestCm.trim()
+                  ? " length and chest"
+                  : lengthCm.trim()
+                    ? " length"
+                    : " chest"}
+                .
+              </p>
             ) : sizeFit && "error" in sizeFit ? (
               <p className="text-destructive text-xs leading-snug line-clamp-2">{sizeFit.error}</p>
-            ) : null}
-            <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-2">
-              <input
-                type="number"
-                inputMode="decimal"
-                min={fitLimits?.heightMin}
-                max={fitLimits?.heightMax}
-                value={heightCm}
-                onChange={(e) => setHeightCm(e.target.value)}
-                placeholder={
-                  fitLimits
-                    ? `Height (${fitLimits.heightMin}–${fitLimits.heightMax} cm)`
-                    : "Height (cm)"
-                }
-                aria-label="Height in centimetres"
-                className="h-10 glass rounded-full px-3 sm:px-4 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40 min-w-0 w-full"
-              />
-              <input
-                type="number"
-                inputMode="decimal"
-                min={fitLimits?.chestMin}
-                max={fitLimits?.chestMax}
-                value={chestCm}
-                onChange={(e) => setChestCm(e.target.value)}
-                placeholder={
-                  fitLimits
-                    ? `Chest (${fitLimits.chestMin}–${fitLimits.chestMax} cm)`
-                    : "Chest (cm)"
-                }
-                aria-label="Chest in centimetres"
-                className="h-10 glass rounded-full px-3 sm:px-4 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40 min-w-0 w-full"
-              />
+            ) : (
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                Enter length or chest (cm) from the size guide to pick a size automatically.
+              </p>
+            )}
+            <div className={`grid gap-2 ${fitLimits.hasLength && fitLimits.hasChest ? "grid-cols-1 min-[400px]:grid-cols-2" : "grid-cols-1"}`}>
+              {fitLimits.hasLength ? (
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={fitLimits.lengthMin}
+                  max={fitLimits.lengthMax}
+                  step="0.1"
+                  value={lengthCm}
+                  onChange={(e) => setLengthCm(e.target.value)}
+                  placeholder={`Length (${fitLimits.lengthMin}–${fitLimits.lengthMax} cm)`}
+                  aria-label="Garment length in centimetres"
+                  className="h-10 glass rounded-full px-3 sm:px-4 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40 min-w-0 w-full"
+                />
+              ) : null}
+              {fitLimits.hasChest ? (
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={fitLimits.chestMin}
+                  max={fitLimits.chestMax}
+                  step="0.1"
+                  value={chestCm}
+                  onChange={(e) => setChestCm(e.target.value)}
+                  placeholder={`Chest (${fitLimits.chestMin}–${fitLimits.chestMax} cm)`}
+                  aria-label="Chest width in centimetres"
+                  className="h-10 glass rounded-full px-3 sm:px-4 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40 min-w-0 w-full"
+                />
+              ) : null}
             </div>
           </div>
+          ) : null}
 
           <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-3 sm:items-start">
             <div>
@@ -403,65 +461,24 @@ function ProductPage() {
         <div className="glass rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 w-full min-w-0 shrink-0">
           <div className="grid grid-cols-4 gap-2 sm:gap-3 md:gap-4 w-full">
             {trustBadges.map((b) => (
-              <div key={b.t} className="flex flex-col items-center text-center gap-1 min-w-0 px-0.5">
-                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg border border-primary/35 grid place-items-center bg-white/60 shrink-0">
-                  <b.i className="h-3 w-3 text-primary" />
+              <button
+                type="button"
+                key={b.t}
+                title={b.title}
+                className="pdp-trust-badge flex flex-col items-center text-center gap-1 min-w-0 px-0.5"
+              >
+                <div className="pdp-trust-badge-icon h-8 w-8 sm:h-10 sm:w-10 rounded-lg border border-primary/35 grid place-items-center bg-white/60 shrink-0">
+                  <b.i className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 </div>
-                <div className="text-[8px] min-[360px]:text-[9px] sm:text-[10px] font-medium text-primary leading-tight">{b.t}</div>
-              </div>
+                <div className="pdp-trust-badge-label text-[8px] min-[360px]:text-[9px] sm:text-[10px] font-medium leading-tight">{b.t}</div>
+              </button>
             ))}
           </div>
         </div>
         </div>
       </div>
 
-      <div className="glass-strong rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 md:p-5 space-y-3">
-        <details open className="glass rounded-2xl p-4 group">
-          <summary className="flex items-center justify-between cursor-pointer text-sm font-semibold list-none">
-            <span>Product Details</span>
-            <Plus className="h-4 w-4 text-muted-foreground group-open:hidden" />
-            <X className="h-4 w-4 text-muted-foreground hidden group-open:block" />
-          </summary>
-          {product.description ? (
-            <p className="mt-3 text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
-              {product.description}
-            </p>
-          ) : null}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {["100% Organic Cotton", "Pre-Washed", "Breathable"].map((tag) => (
-              <span key={tag} className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-3 py-1.5 text-xs font-medium">
-                <BadgeCheck className="h-3.5 w-3.5" /> {tag}
-              </span>
-            ))}
-          </div>
-        </details>
-
-        <details className="glass rounded-2xl p-4 group">
-          <summary className="flex items-center justify-between cursor-pointer text-sm font-semibold list-none">
-            <span>Key Features</span>
-            <Plus className="h-4 w-4 text-muted-foreground group-open:hidden" />
-            <X className="h-4 w-4 text-muted-foreground hidden group-open:block" />
-          </summary>
-          <ul className="mt-3 space-y-1.5 text-sm text-foreground/80 list-disc pl-5">
-            <li>100% Organic Cotton</li>
-          </ul>
-        </details>
-
-        <details className="glass rounded-2xl p-4 group">
-          <summary className="flex items-center justify-between cursor-pointer text-sm font-semibold list-none">
-            <span>Wash Care</span>
-            <Plus className="h-4 w-4 text-muted-foreground group-open:hidden" />
-            <X className="h-4 w-4 text-muted-foreground hidden group-open:block" />
-          </summary>
-          <ul className="mt-3 space-y-1.5 text-sm text-foreground/80 list-disc pl-5">
-            <li>Use cold or lukewarm water with a mild detergent.</li>
-            <li>Don&apos;t use harsh chemicals to maintain fabric integrity.</li>
-            <li>Opt for a gentle cycle or hand wash.</li>
-            <li>Don&apos;t iron directly on prints.</li>
-            <li>Avoid direct sunlight or high heat.</li>
-          </ul>
-        </details>
-      </div>
+      <ProductInfoSections product={product} />
 
       <section className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4 sm:mb-6">
@@ -524,27 +541,15 @@ function ProductPage() {
         <div className="fixed inset-0 z-[70] grid place-items-end sm:place-items-center p-0 sm:p-4 bg-foreground/30 backdrop-blur-sm" onClick={() => setSizeChart(false)}>
           <div
             onClick={(e) => e.stopPropagation()}
-            className="glass-strong rounded-t-3xl sm:rounded-3xl max-w-md w-full p-5 sm:p-6 max-h-[85vh] overflow-y-auto"
+            className="glass-strong rounded-t-3xl sm:rounded-3xl max-w-lg w-full p-5 sm:p-6 max-h-[85vh] overflow-y-auto"
           >
-            <div className="flex items-center justify-between mb-4">
-              <div className="font-display text-2xl">Size guide</div>
-              <button onClick={() => setSizeChart(false)} className="h-9 w-9 grid place-items-center rounded-full hover:bg-white/40"><X className="h-4 w-4" /></button>
+            <div className="flex items-center justify-between mb-4 gap-3">
+              <div className="min-w-0">
+                <div className="font-display text-2xl">Size guide</div>
+              </div>
+              <button type="button" onClick={() => setSizeChart(false)} className="h-9 w-9 shrink-0 grid place-items-center rounded-full hover:bg-white/40" aria-label="Close size guide"><X className="h-4 w-4" /></button>
             </div>
-            <div className="overflow-x-auto -mx-1 px-1">
-              <table className="w-full text-sm min-w-[16rem]">
-                <thead><tr className="text-xs uppercase tracking-wider text-muted-foreground"><th className="text-left py-2">Size</th><th>Height</th><th>Chest</th></tr></thead>
-                <tbody className="text-foreground/80">
-                  {sizeGuideRows.map((row) => (
-                    <tr key={row.size} className="border-t border-border/40">
-                      <td className="py-2 font-medium">{row.size}</td>
-                      <td className="text-center">{row.height}</td>
-                      <td className="text-center">{row.chest}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="text-xs text-muted-foreground mt-4">Most pieces have generous seams for grow-into-it comfort.</p>
+            <ProductSizeChartTables rows={sizeGuideRows} title={sizeGuideTitle} />
           </div>
         </div>
       )}

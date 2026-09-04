@@ -1,5 +1,5 @@
 {
-  "id": "f6253a98-a22e-4651-9647-278e07a2e7a4",
+  "id": "9dc96782-2a8d-45aa-9cc3-5af6738c50d0",
   "name": "Minis n More \u2014 API testing (UAT)",
   "values": [
     {
@@ -22,7 +22,7 @@
     },
     {
       "key": "email",
-      "value": "admin@uat.minisnmore.com",
+      "value": "admin@localhost",
       "type": "default",
       "enabled": true
     },
@@ -51,6 +51,12 @@
       "enabled": true
     },
     {
+      "key": "orderItemId",
+      "value": "{{id}}",
+      "type": "default",
+      "enabled": true
+    },
+    {
       "key": "orderNumber",
       "value": "{{id}}",
       "type": "default",
@@ -63,8 +69,26 @@
       "enabled": true
     },
     {
+      "key": "pincode",
+      "value": "{{id}}",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "productId",
+      "value": "{{id}}",
+      "type": "default",
+      "enabled": true
+    },
+    {
       "key": "resetKey",
       "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "returnNumber",
+      "value": "{{id}}",
       "type": "default",
       "enabled": true
     },

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isTerminalTrackingState,
   resolveTrackingStage,
-  shouldPollOrderTracking,
+  shouldShowOrderTrackingLink,
   trackingActivityDate,
   trackingActivityTitle,
   trackingStageDetail,
@@ -18,11 +18,11 @@ describe("order-tracking helpers", () => {
     expect(isTerminalTrackingState({ status: "confirmed" })).toBe(false);
   });
 
-  it("polls only paid, in-transit orders", () => {
-    expect(shouldPollOrderTracking(null)).toBe(false);
-    expect(shouldPollOrderTracking({ payment_status: "pending", status: "confirmed" })).toBe(false);
-    expect(shouldPollOrderTracking({ payment_status: "paid", status: "confirmed" })).toBe(true);
-    expect(shouldPollOrderTracking({ payment_status: "paid", status: "fulfilled" })).toBe(false);
+  it("shows tracking links only for paid, in-transit orders", () => {
+    expect(shouldShowOrderTrackingLink(null)).toBe(false);
+    expect(shouldShowOrderTrackingLink({ payment_status: "pending", status: "confirmed" })).toBe(false);
+    expect(shouldShowOrderTrackingLink({ payment_status: "paid", status: "confirmed" })).toBe(true);
+    expect(shouldShowOrderTrackingLink({ payment_status: "paid", status: "fulfilled" })).toBe(false);
   });
 
   it("keeps confirmed separate from the explicit Hand-wrapped state", () => {

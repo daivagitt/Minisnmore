@@ -154,6 +154,28 @@ public class SiteSetting implements Serializable {
     @Column(name = "free_shipping_min_inr")
     private Integer freeShippingMinInr;
 
+    @NotNull
+    @Min(0)
+    @Max(10000)
+    @Column(name = "cod_fee_inr")
+    private Integer codFeeInr;
+
+    public static final int DEFAULT_DELIVERY_ETA_BUFFER_DAYS = 3;
+    public static final int MAX_DELIVERY_ETA_BUFFER_DAYS = 30;
+
+    @NotNull
+    @Min(0)
+    @Max(MAX_DELIVERY_ETA_BUFFER_DAYS)
+    @Column(name = "delivery_eta_buffer_days")
+    private Integer deliveryEtaBufferDays;
+
+    @NotNull
+    @DecimalMin(value = "0")
+    @DecimalMax(value = "100")
+    @Digits(integer = 3, fraction = 2)
+    @Column(name = "store_discount_percent")
+    private BigDecimal storeDiscountPercent;
+
     @Size(max = 260)
     @Column(name = "subscribe_hero_title", length = 260)
     private String subscribeHeroTitle;
@@ -591,6 +613,45 @@ public class SiteSetting implements Serializable {
 
     public void setFreeShippingMinInr(Integer freeShippingMinInr) {
         this.freeShippingMinInr = freeShippingMinInr;
+    }
+
+    public Integer getCodFeeInr() {
+        return this.codFeeInr;
+    }
+
+    public SiteSetting codFeeInr(Integer codFeeInr) {
+        this.setCodFeeInr(codFeeInr);
+        return this;
+    }
+
+    public void setCodFeeInr(Integer codFeeInr) {
+        this.codFeeInr = codFeeInr;
+    }
+
+    public Integer getDeliveryEtaBufferDays() {
+        return this.deliveryEtaBufferDays;
+    }
+
+    public SiteSetting deliveryEtaBufferDays(Integer deliveryEtaBufferDays) {
+        this.setDeliveryEtaBufferDays(deliveryEtaBufferDays);
+        return this;
+    }
+
+    public void setDeliveryEtaBufferDays(Integer deliveryEtaBufferDays) {
+        this.deliveryEtaBufferDays = deliveryEtaBufferDays;
+    }
+
+    public BigDecimal getStoreDiscountPercent() {
+        return this.storeDiscountPercent;
+    }
+
+    public SiteSetting storeDiscountPercent(BigDecimal storeDiscountPercent) {
+        this.setStoreDiscountPercent(storeDiscountPercent);
+        return this;
+    }
+
+    public void setStoreDiscountPercent(BigDecimal storeDiscountPercent) {
+        this.storeDiscountPercent = storeDiscountPercent;
     }
 
     public String getSubscribeHeroTitle() {

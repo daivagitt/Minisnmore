@@ -10,6 +10,7 @@ async function loadStorefront(mocks: {
   const listProducts = vi.fn(async () => mocks.products ?? []);
   const listCategories = vi.fn(async () => mocks.categories ?? []);
   const listBlogPosts = vi.fn(async () => mocks.blogPosts ?? []);
+  const getSiteSettings = vi.fn(async () => null);
   const getPolicy = vi.fn(async (slug: string) => {
     const row = mocks.policy;
     if (!row || row.slug !== slug) return null;
@@ -20,6 +21,7 @@ async function loadStorefront(mocks: {
     listCategories,
     listBlogPosts,
     getPolicy,
+    getSiteSettings,
   }));
   return import("./storefront");
 }
@@ -246,6 +248,67 @@ describe("storefront cache", () => {
     expect(products[0].sizes).toEqual(["0-3 M", "6-12 M"]);
   });
 
+  it("strips Age: COMMON SIZE from product description and tagline", async () => {
+    const storefront = await loadStorefront({
+      products: [
+        {
+          id: "p-bibs",
+          slug: "bibs-special",
+          name: "Bibs Special",
+          description: "Bibs Special | Age: COMMON SIZE | Print: Snail & Bee",
+          story: null,
+          price: 499,
+          compare_at_price: null,
+          images: [],
+          sizes: ["COMMON SIZE"],
+          colors: ["Snail & Bee"],
+          age_min_months: 0,
+          age_max_months: 24,
+          badge: null,
+          featured: false,
+          best_seller: false,
+          new_arrival: false,
+          trending: false,
+          active: true,
+        },
+      ],
+    });
+
+    const products = await storefront.loadProducts();
+    expect(products[0].description).toBe("Bibs Special | Print: Snail & Bee");
+    expect(products[0].tagline).toBe("Bibs Special | Print: Snail & Bee");
+  });
+
+  it("keeps real age bands in pipe descriptions", async () => {
+    const storefront = await loadStorefront({
+      products: [
+        {
+          id: "p-romper",
+          slug: "romper",
+          name: "Romper",
+          description: "Romper | Age: 0-3m | Print: Stars",
+          story: null,
+          price: 999,
+          compare_at_price: null,
+          images: [],
+          sizes: ["0-3m"],
+          colors: ["Stars"],
+          age_min_months: 0,
+          age_max_months: 3,
+          badge: null,
+          featured: false,
+          best_seller: false,
+          new_arrival: false,
+          trending: false,
+          active: true,
+        },
+      ],
+    });
+
+    const products = await storefront.loadProducts();
+    expect(products[0].description).toBe("Romper | Age: 0-3m | Print: Stars");
+  });
+
   it("does not treat newborn badge text as new arrival", async () => {
     const listProducts = [
       {
@@ -320,6 +383,7 @@ describe("storefront cache", () => {
       listCategories: vi.fn(async () => []),
       listBlogPosts: vi.fn(async () => []),
       getPolicy: vi.fn(async () => null),
+      getSiteSettings: vi.fn(async () => null),
     }));
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const storefront = await import("./storefront");

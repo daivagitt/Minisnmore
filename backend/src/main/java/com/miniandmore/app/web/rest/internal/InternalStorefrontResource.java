@@ -2,6 +2,7 @@ package com.miniandmore.app.web.rest.internal;
 
 import com.miniandmore.app.repository.*;
 import com.miniandmore.app.service.PincodeLookupService;
+import com.miniandmore.app.service.ProductVariantSupport;
 import com.miniandmore.app.service.dto.*;
 import com.miniandmore.app.service.mapper.*;
 import com.miniandmore.app.web.rest.v1.ApiResponse;
@@ -32,6 +33,7 @@ public class InternalStorefrontResource {
     private final SiteSettingMapper siteSettingMapper;
     private final PolicyMapper policyMapper;
     private final PincodeLookupService pincodeLookupService;
+    private final ProductVariantSupport productVariantSupport;
 
     public InternalStorefrontResource(
         CategoryRepository categoryRepository,
@@ -50,7 +52,8 @@ public class InternalStorefrontResource {
         PageVisibilityMapper pageVisibilityMapper,
         SiteSettingMapper siteSettingMapper,
         PolicyMapper policyMapper,
-        PincodeLookupService pincodeLookupService
+        PincodeLookupService pincodeLookupService,
+        ProductVariantSupport productVariantSupport
     ) {
         this.categoryRepository = categoryRepository;
         this.productRepository = productRepository;
@@ -69,6 +72,7 @@ public class InternalStorefrontResource {
         this.siteSettingMapper = siteSettingMapper;
         this.policyMapper = policyMapper;
         this.pincodeLookupService = pincodeLookupService;
+        this.productVariantSupport = productVariantSupport;
     }
 
     @GetMapping("/categories")
@@ -78,7 +82,14 @@ public class InternalStorefrontResource {
 
     @GetMapping("/products")
     public ApiResponse<List<ProductDTO>> products() {
-        return ApiResponse.ok(productRepository.findAllActiveWithCategoryOrderBySortOrder().stream().map(productMapper::toDto).toList());
+        return ApiResponse.ok(
+            productRepository
+                .findAllActiveWithCategoryOrderBySortOrder()
+                .stream()
+                .map(productMapper::toDto)
+                .peek(productVariantSupport::applyRuntimePricing)
+                .toList()
+        );
     }
 
     @GetMapping("/products/{slug}")
@@ -87,6 +98,10 @@ public class InternalStorefrontResource {
             productRepository
                 .findOneActiveBySlugWithCategory(slug)
                 .map(productMapper::toDto)
+                .map(dto -> {
+                    productVariantSupport.applyRuntimePricing(dto);
+                    return dto;
+                })
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"))
         );
     }

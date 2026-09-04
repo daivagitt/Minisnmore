@@ -68,7 +68,7 @@ class LedgerlySyncServiceTest {
     private SiteSettingRepository siteSettingRepository;
 
     @Spy
-    private ProductVariantSupport variantSupport = new ProductVariantSupport(new com.fasterxml.jackson.databind.ObjectMapper());
+    private ProductVariantSupport variantSupport = StorePricingTestSupport.variantSupport(new com.fasterxml.jackson.databind.ObjectMapper());
 
     @Spy
     private ProductColorImagesSupport colorImagesSupport = new ProductColorImagesSupport(new com.fasterxml.jackson.databind.ObjectMapper());

@@ -18,25 +18,25 @@ import org.springframework.stereotype.Component;
 @Component
 public class LedgerlyProductMergeService {
 
-    /** Storefront selling price = MRP × this multiplier (20% off MRP / Ledgerly rate). */
-    private static final BigDecimal STORE_UAT_DISCOUNT_MULTIPLIER = new BigDecimal("0.80");
-
     private static final BigDecimal ESTIMATED_COST_RATIO = new BigDecimal("0.60");
     private final ProductDescriptionCodec descriptionCodec;
     private final LedgerlyItemImageSync itemImageSync;
     private final ProductVariantSupport variantSupport;
     private final ProductColorImagesSupport colorImagesSupport;
+    private final StorePricingService storePricingService;
 
     public LedgerlyProductMergeService(
         ProductDescriptionCodec descriptionCodec,
         LedgerlyItemImageSync itemImageSync,
         ProductVariantSupport variantSupport,
-        ProductColorImagesSupport colorImagesSupport
+        ProductColorImagesSupport colorImagesSupport,
+        StorePricingService storePricingService
     ) {
         this.descriptionCodec = descriptionCodec;
         this.itemImageSync = itemImageSync;
         this.variantSupport = variantSupport;
         this.colorImagesSupport = colorImagesSupport;
+        this.storePricingService = storePricingService;
     }
 
     public void mergeLedgerlyItem(Product product, Map<String, Object> item, CategoryResolver categoryResolver, NoticeCallback notice) {
@@ -361,7 +361,7 @@ public class LedgerlyProductMergeService {
         } else if (selling != null && selling.compareTo(BigDecimal.ZERO) > 0) {
             product.setPrice(selling);
             product.setCompareAtPrice(
-                selling.divide(STORE_UAT_DISCOUNT_MULTIPLIER, 2, RoundingMode.HALF_UP)
+                storePricingService.mrpFromSelling(selling)
             );
         }
     }
@@ -377,11 +377,8 @@ public class LedgerlyProductMergeService {
         return BigDecimal.ZERO;
     }
 
-    /** Storefront selling price = 20% off MRP. */
+    /** Storefront selling price from MRP using global store discount. */
     BigDecimal storeUatPrice(BigDecimal mrp) {
-        if (mrp == null || mrp.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO;
-        }
-        return mrp.multiply(STORE_UAT_DISCOUNT_MULTIPLIER).setScale(2, RoundingMode.HALF_UP);
+        return storePricingService.sellingFromMrp(mrp);
     }
 }

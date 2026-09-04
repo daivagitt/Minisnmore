@@ -20,13 +20,13 @@ describe("sortGalleryByLeadingOrientation", () => {
     expect(sortGalleryByLeadingOrientation(urls, aspect)).toEqual([
       "https://cdn.example.com/landscape-1.jpg",
       "https://cdn.example.com/landscape-2.jpg",
+      "https://cdn.example.com/square-1.jpg",
       "https://cdn.example.com/portrait-1.jpg",
       "https://cdn.example.com/portrait-2.jpg",
-      "https://cdn.example.com/square-1.jpg",
     ]);
   });
 
-  it("keeps portraits together first when the first image is portrait", () => {
+  it("moves portraits together after landscapes even when the first image is portrait", () => {
     const urls = [
       "https://cdn.example.com/portrait-1.jpg",
       "https://cdn.example.com/landscape-1.jpg",
@@ -35,11 +35,11 @@ describe("sortGalleryByLeadingOrientation", () => {
       "https://cdn.example.com/landscape-2.jpg",
     ];
     expect(sortGalleryByLeadingOrientation(urls, aspect)).toEqual([
+      "https://cdn.example.com/landscape-1.jpg",
+      "https://cdn.example.com/landscape-2.jpg",
       "https://cdn.example.com/portrait-1.jpg",
       "https://cdn.example.com/portrait-2.jpg",
       "https://cdn.example.com/portrait-3.jpg",
-      "https://cdn.example.com/landscape-1.jpg",
-      "https://cdn.example.com/landscape-2.jpg",
     ]);
   });
 
@@ -51,10 +51,10 @@ describe("sortGalleryByLeadingOrientation", () => {
       "https://cdn.example.com/landscape-a.jpg",
     ];
     expect(sortGalleryByLeadingOrientation(urls, aspect)).toEqual([
-      "https://cdn.example.com/portrait-b.jpg",
-      "https://cdn.example.com/portrait-a.jpg",
       "https://cdn.example.com/landscape-b.jpg",
       "https://cdn.example.com/landscape-a.jpg",
+      "https://cdn.example.com/portrait-b.jpg",
+      "https://cdn.example.com/portrait-a.jpg",
     ]);
   });
 });
@@ -195,7 +195,7 @@ describe("galleryForSelectedColor", () => {
     expect(result.gallery).toEqual(["https://cdn.example.com/lifestyle.jpg"]);
   });
 
-  it("does not show other prints when the selected print has no photos", () => {
+  it("falls back to the product hero when the selected print has no photos", () => {
     const result = galleryForSelectedColor(
       {
         image: "https://cdn.example.com/default.jpg",
@@ -208,7 +208,7 @@ describe("galleryForSelectedColor", () => {
       "Print 2",
     );
 
-    expect(result.image).toBe("");
+    expect(result.image).toBe("https://cdn.example.com/default.jpg");
     expect(result.gallery).toEqual([]);
   });
 
@@ -524,7 +524,7 @@ describe("galleryForSelectedColor", () => {
     });
   });
 
-  it("does not mix different same-colour photos onto an empty size", () => {
+  it("falls back to the product hero when a selected size has no matching photos", () => {
     const product = {
       image: "https://cdn.example.com/card.jpg",
       gallery: ["https://cdn.example.com/card.jpg"],
@@ -565,7 +565,7 @@ describe("galleryForSelectedColor", () => {
       ],
     };
     expect(galleryForSelectedColor(product, "Blue", "6-12")).toEqual({
-      image: "",
+      image: "https://cdn.example.com/card.jpg",
       gallery: [],
     });
   });

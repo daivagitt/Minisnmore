@@ -333,6 +333,10 @@ public class ZohoBooksClient {
         );
     }
 
+    public Map<String, Object> markSalesOrderAsOpen(String salesOrderId) {
+        return post("/salesorders/" + salesOrderId + "/status/open?" + orgIdParam(), Map.of());
+    }
+
     public Map<String, Object> markCreditNoteAsOpen(String creditNoteId) {
         return post("/creditnotes/" + creditNoteId + "/status/open?" + orgIdParam(), Map.of());
     }
@@ -361,6 +365,45 @@ public class ZohoBooksClient {
 
     public Map<String, Object> getSalesOrder(String salesOrderId) {
         return get("/salesorders/" + salesOrderId + "?" + orgIdParam());
+    }
+
+    /**
+     * Find a sales order MiniMS already created for this store order number. Used so a second
+     * payment-confirm/retry does not open another Confirmed SO after the first was invoiced/closed.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> findSalesOrderByReferenceNumber(String referenceNumber) {
+        String trimmed = StringUtils.trimToNull(referenceNumber);
+        if (trimmed == null) {
+            return null;
+        }
+        Map<String, Object> response = get("/salesorders?" + orgIdParam() + "&reference_number=" + encode(trimmed));
+        List<Map<String, Object>> salesOrders = (List<Map<String, Object>>) response.getOrDefault("salesorders", List.of());
+        Map<String, Object> best = null;
+        int bestRank = -1;
+        for (Map<String, Object> salesOrder : salesOrders) {
+            String reference = stringValue(salesOrder.get("reference_number"));
+            if (!trimmed.equalsIgnoreCase(StringUtils.trimToEmpty(reference))) {
+                continue;
+            }
+            int rank = salesOrderReuseRank(stringValue(salesOrder.get("status")));
+            if (rank > bestRank) {
+                best = salesOrder;
+                bestRank = rank;
+            }
+        }
+        return best;
+    }
+
+    private static int salesOrderReuseRank(String status) {
+        String normalized = StringUtils.lowerCase(StringUtils.trimToEmpty(status));
+        return switch (normalized) {
+            case "void", "voided" -> -1;
+            case "draft" -> 1;
+            case "pending", "open", "confirmed" -> 2;
+            case "invoiced", "closed", "fulfilled" -> 3;
+            default -> 0;
+        };
     }
 
     /**
@@ -570,8 +613,32 @@ public class ZohoBooksClient {
             return;
         }
         if (statusCode < 200 || statusCode >= 300) {
+            if (isBenignItemImagesDeleteFailure(statusCode, response.body())) {
+                return;
+            }
             throw new IOException("Zoho item images delete failed: HTTP " + statusCode + " " + response.body());
         }
+    }
+
+    private static boolean isBenignItemImagesDeleteFailure(int statusCode, String responseBody) {
+        if (statusCode != 400) {
+            return false;
+        }
+        String body = StringUtils.defaultString(responseBody).toLowerCase(Locale.ROOT);
+        if (body.contains("\"code\":33008") || body.contains("\"code\": 33008")) {
+            return true;
+        }
+        boolean referencesMissingAttachment = body.contains("document") || body.contains("file");
+        return (
+            referencesMissingAttachment &&
+            (
+                body.contains("not exist") ||
+                body.contains("does not exist") ||
+                body.contains("not found") ||
+                body.contains("invalid") ||
+                body.contains("already deleted")
+            )
+        );
     }
 
     private void executeImageDelete(String itemId, boolean retriedAfterUnauthorized) throws IOException, InterruptedException {
@@ -592,6 +659,9 @@ public class ZohoBooksClient {
             return;
         }
         if (statusCode < 200 || statusCode >= 300) {
+            if (isBenignItemImagesDeleteFailure(statusCode, response.body())) {
+                return;
+            }
             throw new IOException("Zoho item image delete failed: HTTP " + statusCode + " " + response.body());
         }
     }
