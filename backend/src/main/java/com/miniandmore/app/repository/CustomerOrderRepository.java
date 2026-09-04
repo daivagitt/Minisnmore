@@ -112,6 +112,16 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     boolean existsByUserLoginAndPaymentStatus(String userLogin, PaymentStatus paymentStatus);
 
+    /**
+     * True when the customer already has an order that is not in {@code status}
+     * (used for first-order coupon eligibility, excluding cancelled carts).
+     * Login match is case-insensitive so email-style logins still count.
+     */
+    @Query(
+        "select (count(customerOrder) > 0) from CustomerOrder customerOrder where lower(customerOrder.userLogin) = lower(:login) and customerOrder.status <> :status"
+    )
+    boolean existsByUserLoginAndStatusNot(@Param("login") String login, @Param("status") OrderStatus status);
+
     @Query(
         value = "select customerOrder from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
         "customerOrder.inventoryReserved = true and customerOrder.inventoryReleasedAt is null and " +

@@ -800,7 +800,7 @@ function Checkout() {
                   <div className="grid md:grid-cols-2 gap-3">
                     <label className="glass rounded-2xl p-4 flex items-center gap-3 cursor-pointer">
                       <input type="radio" name="ship" checked={shipMode === "std"} onChange={() => setShipMode("std")} className="accent-primary" />
-                      <span className="text-sm">Standard · {standardDeliveryEta} · {cartTotal >= commerce.freeShippingMinInr ? "Free" : `₹${commerce.shippingStandardInr.toLocaleString("en-IN")}`}{cartTotal < commerce.freeShippingMinInr && <span className="text-[11px] text-muted-foreground"> (Free above ₹{commerce.freeShippingMinInr.toLocaleString("en-IN")}/-)</span>}</span>
+                      <span className="text-sm">Standard · {standardDeliveryEta} · {cartTotal >= commerce.freeShippingMinInr ? "Free" : `₹${commerce.shippingStandardInr.toLocaleString("en-IN")}`}{cartTotal < commerce.freeShippingMinInr && <span className="text-[11px] text-muted-foreground"> (Free above ₹{commerce.freeShippingMinInr.toLocaleString("en-IN")})</span>}</span>
                     </label>
                   </div>
                 </div>

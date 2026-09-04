@@ -5,6 +5,7 @@ import overalls from "@/assets/p-overalls-beige.jpg";
 import cardigan from "@/assets/p-cardigan-cream.jpg";
 import sleepsuit from "@/assets/p-sleepsuit-sage.jpg";
 import type { ProductVariant } from "@/lib/product-variants";
+import type { ProductSizeChart } from "@/lib/product-size-charts";
 
 export type AgeRange = "0-3m" | "3-6m" | "6-12m" | "12-18m" | "18-24m";
 export type Fabric = "Organic Cotton" | "Muslin" | "Linen" | "Knit" | "Bamboo";
@@ -23,6 +24,8 @@ export type Product = {
   variants?: ProductVariant[];
   /** Stock for non-variant ("SIMPLE") products. Null/undefined means untracked. */
   stock?: number | null;
+  /** Per-product measurement chart (admin/Excel). Falls back to SKU map when absent. */
+  sizeChart?: ProductSizeChart | null;
   isNew?: boolean;
   isBestseller?: boolean;
   isTrending?: boolean;

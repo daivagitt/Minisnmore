@@ -368,11 +368,102 @@ export function resolveSizeChartSku(input: {
   return best?.sku ?? null;
 }
 
+function numericCell(value: number | string | undefined): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const digits = value.replace(/[^\d.]/g, "");
+    if (!digits) return null;
+    const n = Number(digits);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+export function isUsableSizeChart(
+  chart: ProductSizeChart | null | undefined,
+): chart is ProductSizeChart {
+  if (!chart || !Array.isArray(chart.sections) || chart.sections.length === 0) return false;
+  return chart.sections.some((s) => {
+    if (!Array.isArray(s?.bands) || s.bands.length === 0) return false;
+    if (!Array.isArray(s?.rows) || s.rows.length === 0) return false;
+    return s.rows.some((row) => s.bands.some((band) => numericCell(row?.values?.[band]) != null));
+  });
+}
+
+/** Parse/normalize size chart JSON from the API; returns null if unusable. */
+export function parseProductSizeChart(raw: unknown): ProductSizeChart | null {
+  if (raw == null) return null;
+  let value: unknown = raw;
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    try {
+      value = JSON.parse(trimmed);
+    } catch {
+      return null;
+    }
+  }
+  if (!value || typeof value !== "object") return null;
+  const obj = value as Record<string, unknown>;
+  const sectionsRaw = Array.isArray(obj.sections) ? obj.sections : [];
+  const sections: SizeChartSection[] = sectionsRaw
+    .map((sec): SizeChartSection | null => {
+      if (!sec || typeof sec !== "object") return null;
+      const s = sec as Record<string, unknown>;
+      const bands = Array.isArray(s.bands)
+        ? s.bands.map((b) => String(b ?? "").trim()).filter(Boolean)
+        : [];
+      const rowsRaw = Array.isArray(s.rows) ? s.rows : [];
+      const rows: SizeChartRow[] = rowsRaw
+        .map((row): SizeChartRow | null => {
+          if (!row || typeof row !== "object") return null;
+          const r = row as Record<string, unknown>;
+          const label = String(r.label ?? "").trim();
+          if (!label) return null;
+          const valuesSrc =
+            r.values && typeof r.values === "object" && !Array.isArray(r.values)
+              ? (r.values as Record<string, unknown>)
+              : {};
+          const values: Record<string, number | string> = {};
+          for (const band of bands) {
+            const cell = valuesSrc[band];
+            if (typeof cell === "number" && Number.isFinite(cell)) values[band] = cell;
+            else if (typeof cell === "string") values[band] = cell;
+            else if (cell != null && cell !== "") {
+              const n = Number(cell);
+              values[band] = Number.isFinite(n) ? n : String(cell);
+            } else {
+              values[band] = "";
+            }
+          }
+          return { label, values };
+        })
+        .filter((r): r is SizeChartRow => r != null);
+      if (bands.length === 0 || rows.length === 0) return null;
+      return {
+        title: String(s.title ?? "").trim() || "Measurements",
+        bands,
+        rows,
+      };
+    })
+    .filter((s): s is SizeChartSection => s != null);
+
+  const chart: ProductSizeChart = {
+    code: String(obj.code ?? "").trim(),
+    title: String(obj.title ?? "").trim(),
+    sections,
+    tolerance: String(obj.tolerance ?? "").trim() || "±1 cm",
+  };
+  return isUsableSizeChart(chart) ? chart : null;
+}
+
 export function sizeChartForProduct(input: {
   sku?: string | null;
   name?: string | null;
   slug?: string | null;
+  sizeChart?: ProductSizeChart | null;
 }): ProductSizeChart | null {
+  if (isUsableSizeChart(input.sizeChart)) return input.sizeChart;
   const key = resolveSizeChartSku(input);
   if (!key) return null;
   return SIZE_CHARTS_BY_SKU[key] ?? null;
@@ -388,15 +479,6 @@ export type ChartFitPoint = {
 const CHEST_LABEL = /^(chest(\s*width|\s*\(½\)|\s*\(1\/2\))?)$/i;
 const LENGTH_LABEL =
   /^(body\s*length.*|length\s*\(hps.*|total\s*length|length)$/i;
-
-function numericCell(value: number | string | undefined): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string") {
-    const n = Number(value.replace(/[^\d.]/g, ""));
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
 
 function findRow(
   section: SizeChartSection,

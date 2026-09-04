@@ -206,6 +206,7 @@ public class InternalAdminOrderResource {
         data.put("tracking_status", OrderTrackingStatusResolver.resolve(order));
         data.put("payment_status", order.getPaymentStatus() == null ? "" : order.getPaymentStatus().name().toLowerCase());
         data.put("payment_method", StringUtils.defaultString(order.getPaymentMethod()).toLowerCase());
+        data.put("coupon_code", StringUtils.defaultString(order.getCouponCode()));
         data.put("placed_at", order.getPlacedAt() == null ? "" : order.getPlacedAt().toString());
         data.put("zoho_sync_status", lower(order.getZohoSyncStatus()));
         data.put("zoho_sync_error", StringUtils.defaultString(order.getZohoSyncError()));

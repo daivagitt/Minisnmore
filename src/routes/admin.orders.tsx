@@ -449,6 +449,11 @@ function AdminOrdersPage() {
                       <span className="text-[11px] font-medium uppercase text-muted-foreground">
                         {order.payment_method}
                       </span>
+                      {order.coupon_code?.trim() && (
+                        <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                          Coupon {order.coupon_code.trim()}
+                        </span>
+                      )}
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {order.full_name || "—"} · {order.phone || "—"} · {order.city || "—"}

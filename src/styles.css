@@ -192,6 +192,49 @@
   }
   .hover-lift:hover { transform: translateY(-5px) translateZ(0); box-shadow: var(--shadow-soft); }
 
+  /* PDP trust badges — explicit CSS so hover is not gated by Tailwind's hover media query */
+  .pdp-trust-badge {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    margin: 0;
+    padding: 0.125rem 0.125rem 0;
+    font: inherit;
+    cursor: pointer;
+    color: var(--primary);
+    transition: transform 200ms ease;
+  }
+  .pdp-trust-badge-icon {
+    color: var(--primary);
+    transition: transform 200ms ease, background-color 200ms ease, border-color 200ms ease,
+      color 200ms ease, box-shadow 200ms ease;
+  }
+  .pdp-trust-badge-label {
+    color: var(--primary);
+    transition: color 200ms ease;
+  }
+  .pdp-trust-badge:hover,
+  .pdp-trust-badge:focus-visible,
+  .pdp-trust-badge:active {
+    transform: translateY(-2px);
+    outline: none;
+  }
+  .pdp-trust-badge:hover .pdp-trust-badge-icon,
+  .pdp-trust-badge:focus-visible .pdp-trust-badge-icon,
+  .pdp-trust-badge:active .pdp-trust-badge-icon {
+    transform: scale(1.12);
+    background-color: var(--primary);
+    border-color: var(--primary);
+    color: var(--primary-foreground);
+    box-shadow: 0 8px 18px -8px oklch(0.45 0.10 35 / 50%);
+  }
+  .pdp-trust-badge:hover .pdp-trust-badge-label,
+  .pdp-trust-badge:focus-visible .pdp-trust-badge-label,
+  .pdp-trust-badge:active .pdp-trust-badge-label {
+    color: var(--primary);
+    font-weight: 600;
+  }
+
   .img-zoom {
     transition: transform 650ms cubic-bezier(0.2, 0.8, 0.2, 1);
     transform: translateZ(0);
@@ -207,6 +250,17 @@
     }
     .img-zoom,
     .group:hover .img-zoom {
+      transition-duration: 0.01ms;
+      transform: none;
+    }
+    .pdp-trust-badge,
+    .pdp-trust-badge:hover,
+    .pdp-trust-badge:focus-visible,
+    .pdp-trust-badge:active,
+    .pdp-trust-badge-icon,
+    .pdp-trust-badge:hover .pdp-trust-badge-icon,
+    .pdp-trust-badge:focus-visible .pdp-trust-badge-icon,
+    .pdp-trust-badge:active .pdp-trust-badge-icon {
       transition-duration: 0.01ms;
       transform: none;
     }

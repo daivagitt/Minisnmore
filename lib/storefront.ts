@@ -6,6 +6,8 @@ import { type Product, type Fabric } from "@/data/products";
 import { posts as seedPosts, type BlogPost } from "@/data/blog";
 import { parseVariantsJson, storefrontListPricing } from "@/lib/product-variants";
 import { DEFAULT_STORE_DISCOUNT_PERCENT, sellingFromMrp } from "@/lib/pricing";
+import type { ProductSizeChart } from "@/lib/product-size-charts";
+import { isUsableSizeChart } from "@/lib/product-size-charts";
 
 /**
  * Storefront data layer.
@@ -75,6 +77,7 @@ type DbProductRow = {
   variants_json?: string | null;
   variants?: unknown;
   stock?: number | null;
+  size_chart?: ProductSizeChart | null;
 };
 
 type CategoryLookup = Map<string, { slug: string; name: string }>;
@@ -139,6 +142,7 @@ function mapProduct(row: DbProductRow, discountPercent = DEFAULT_STORE_DISCOUNT_
     itemStructure,
     variants: variants.length ? variants : undefined,
     stock: row.stock ?? null,
+    sizeChart: isUsableSizeChart(row.size_chart) ? row.size_chart : null,
     isNew: !!row.new_arrival || badge.includes("new"),
     isBestseller: !!row.best_seller || badge.includes("best"),
     isTrending: !!row.trending,
@@ -203,6 +207,7 @@ export async function loadProducts(): Promise<Product[]> {
             item_structure: row.item_structure,
             variants_json: row.variants_json,
             stock: row.stock,
+            size_chart: row.size_chart ?? null,
           }, discountPercent);
         });
       productsCache = mapped;

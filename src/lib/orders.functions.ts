@@ -386,6 +386,7 @@ export type AdminCodOrderRow = {
   cod_fee: number;
   status: string;
   placed_at: string;
+  coupon_code?: string | null;
   full_name?: string;
   phone?: string;
   city?: string;

@@ -70,6 +70,37 @@ describe("product fit from MnM length/chest", () => {
     expect(rows[0]?.chest).toBe("—");
   });
 
+  it("uses product sizeChart for fit when provided", () => {
+    const customChart = {
+      code: "CUSTOM-FIT",
+      title: "Custom",
+      tolerance: "±1 cm",
+      sections: [
+        {
+          title: "Piece",
+          bands: ["0-3M", "3-6M"],
+          rows: [
+            { label: "Chest width", values: { "0-3M": 20, "3-6M": 22 } },
+            { label: "Body length", values: { "0-3M": 25, "3-6M": 28 } },
+          ],
+        },
+      ],
+    };
+    const input = {
+      sku: "UNKNOWN-SKU-NO-MAP",
+      sizes: ["0-3M", "3-6M"],
+      sizeChart: customChart,
+    };
+    const limits = measurementLimitsForProduct(input)!;
+    expect(limits.hasLength).toBe(true);
+    expect(limits.hasChest).toBe(true);
+    expect(recommendSizeByLength(25, input)).toBe("0-3M");
+    expect(recommendSizeByChest(22, input)).toBe("3-6M");
+    expect(
+      checkSizeFit({ lengthCm: "25", chestCm: "", ...input }),
+    ).toEqual({ ok: true, size: "0-3M" });
+  });
+
   it("recommends MnM-4 length bands the way the sheet is read", () => {
     expect(recommendSizeByLength(25, jablaInput)).toBe("0-3M");
     expect(recommendSizeByLength(27, jablaInput)).toBe("0-3M");

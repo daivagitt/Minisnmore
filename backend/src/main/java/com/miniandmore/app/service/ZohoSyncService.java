@@ -2236,11 +2236,7 @@ public class ZohoSyncService {
                     } else if (StringUtils.isBlank(order.getZohoInvoiceId())) {
                         repairUnshippableSalesOrderLines(order, customerId, salesOrderId);
                     }
-                    if (
-                        shouldCreateInvoice(order) &&
-                        StringUtils.isBlank(order.getZohoInvoiceId()) &&
-                        StringUtils.isNotBlank(salesOrderId)
-                    ) {
+                    if (StringUtils.isBlank(order.getZohoInvoiceId()) && StringUtils.isNotBlank(salesOrderId)) {
                         Map<String, Object> invoiceResponse = resolveOrCreateInvoiceFromSalesOrder(salesOrderId, order.getOrderNumber());
                         @SuppressWarnings("unchecked")
                         Map<String, Object> invoice = (Map<String, Object>) invoiceResponse.getOrDefault("invoice", invoiceResponse);
@@ -2772,11 +2768,6 @@ public class ZohoSyncService {
 
     public static boolean isCodOrder(CustomerOrder order) {
         return "cod".equalsIgnoreCase(StringUtils.trimToEmpty(order.getPaymentMethod()));
-    }
-
-    /** Cash collection makes a COD order invoiceable through the same sales-order conversion used in production. */
-    private static boolean shouldCreateInvoice(CustomerOrder order) {
-        return !isCodOrder(order) || order.getPaymentStatus() == PaymentStatus.PAID;
     }
 
     private static BigDecimal moneyOrZero(BigDecimal value) {

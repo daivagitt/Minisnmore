@@ -5,6 +5,7 @@ import {
   fitPointsFromSizeChart,
   sizeChartForProduct,
   type ChartFitPoint,
+  type ProductSizeChart,
 } from "@/lib/product-size-charts";
 
 export const FIT_LIMITS = {
@@ -187,6 +188,7 @@ function chartPointsForProduct(input: {
   name?: string | null;
   slug?: string | null;
   sizes: string[];
+  sizeChart?: ProductSizeChart | null;
 }): ChartFitPoint[] {
   const chart = sizeChartForProduct(input);
   if (!chart) return [];
@@ -229,6 +231,7 @@ export function sizeGuideRowsForProduct(input: {
   name?: string | null;
   slug?: string | null;
   sizes: string[];
+  sizeChart?: ProductSizeChart | null;
 }): SizeGuideRow[] {
   const points = chartPointsForProduct(input);
   if (points.length === 0) {
@@ -274,6 +277,7 @@ export function measurementLimitsForProduct(input: {
   name?: string | null;
   slug?: string | null;
   sizes: string[];
+  sizeChart?: ProductSizeChart | null;
 }): MeasurementLimits | null {
   const points = chartPointsForProduct(input);
   if (points.length === 0) return null;
@@ -342,7 +346,13 @@ function recommendByMetric(
 
 export function recommendSizeByLength(
   length: number,
-  input: { sku?: string | null; name?: string | null; slug?: string | null; sizes: string[] },
+  input: {
+    sku?: string | null;
+    name?: string | null;
+    slug?: string | null;
+    sizes: string[];
+    sizeChart?: ProductSizeChart | null;
+  },
 ): string | null {
   const points = chartPointsForProduct(input);
   if (points.length === 0) return null;
@@ -351,7 +361,13 @@ export function recommendSizeByLength(
 
 export function recommendSizeByChest(
   chest: number,
-  input: { sku?: string | null; name?: string | null; slug?: string | null; sizes: string[] },
+  input: {
+    sku?: string | null;
+    name?: string | null;
+    slug?: string | null;
+    sizes: string[];
+    sizeChart?: ProductSizeChart | null;
+  },
 ): string | null {
   const points = chartPointsForProduct(input);
   if (points.length === 0) return null;
@@ -369,6 +385,7 @@ export function checkSizeFit(input: {
   name?: string | null;
   slug?: string | null;
   sizes: string[];
+  sizeChart?: ProductSizeChart | null;
 }): SizeFitResult {
   const lengthRaw = input.lengthCm?.trim() ?? "";
   const chestRaw = input.chestCm?.trim() ?? "";
@@ -381,6 +398,7 @@ export function checkSizeFit(input: {
     name: input.name,
     slug: input.slug,
     sizes: input.sizes,
+    sizeChart: input.sizeChart,
   };
   const limits = measurementLimitsForProduct(productInput);
   if (!limits) {
@@ -464,6 +482,7 @@ export function resolveRecommendedSize(input: {
   name?: string | null;
   slug?: string | null;
   sizes: string[];
+  sizeChart?: ProductSizeChart | null;
   now?: Date;
 }): string | null {
   const productInput = {
@@ -471,6 +490,7 @@ export function resolveRecommendedSize(input: {
     name: input.name,
     slug: input.slug,
     sizes: input.sizes,
+    sizeChart: input.sizeChart,
   };
   const lengthRaw = input.lengthCm?.trim() ?? "";
   if (lengthRaw) {

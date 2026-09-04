@@ -138,6 +138,7 @@ function ProductPage() {
             name: product.name,
             slug: product.slug,
             sizes: catalogSizes,
+            sizeChart: product.sizeChart,
           })
         : null,
     [product, catalogSizes],
@@ -152,6 +153,7 @@ function ProductPage() {
       name: product.name,
       slug: product.slug,
       sizes: catalogSizes,
+      sizeChart: product.sizeChart,
     });
     return result.ok ? { size: result.size } : { error: result.error };
   }, [lengthCm, chestCm, product, catalogSizes]);
@@ -169,6 +171,7 @@ function ProductPage() {
             name: product.name,
             slug: product.slug,
             sizes: catalogSizes,
+            sizeChart: product.sizeChart,
           })
         : [],
     [product, catalogSizes],
@@ -180,6 +183,7 @@ function ProductPage() {
       sku: product.sku,
       name: product.name,
       slug: product.slug,
+      sizeChart: product.sizeChart,
     });
     return chart ? chart.title : null;
   }, [product]);
@@ -457,16 +461,17 @@ function ProductPage() {
         <div className="glass rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 w-full min-w-0 shrink-0">
           <div className="grid grid-cols-4 gap-2 sm:gap-3 md:gap-4 w-full">
             {trustBadges.map((b) => (
-              <div
+              <button
+                type="button"
                 key={b.t}
                 title={b.title}
-                className="flex flex-col items-center text-center gap-1 min-w-0 px-0.5"
+                className="pdp-trust-badge flex flex-col items-center text-center gap-1 min-w-0 px-0.5"
               >
-                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg border border-primary/35 grid place-items-center bg-white/60 shrink-0">
-                  <b.i className="h-3 w-3 text-primary" />
+                <div className="pdp-trust-badge-icon h-8 w-8 sm:h-10 sm:w-10 rounded-lg border border-primary/35 grid place-items-center bg-white/60 shrink-0">
+                  <b.i className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 </div>
-                <div className="text-[8px] min-[360px]:text-[9px] sm:text-[10px] font-medium text-primary leading-tight">{b.t}</div>
-              </div>
+                <div className="pdp-trust-badge-label text-[8px] min-[360px]:text-[9px] sm:text-[10px] font-medium leading-tight">{b.t}</div>
+              </button>
             ))}
           </div>
         </div>

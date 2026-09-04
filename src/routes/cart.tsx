@@ -146,7 +146,7 @@ function CartPage() {
             val={shipping === 0 ? "Free" : `₹${shipping}`}
             hint={
               cartTotal < commerce.freeShippingMinInr
-                ? `Add ₹${(commerce.freeShippingMinInr - cartTotal).toLocaleString("en-IN")} for Free Delivery Above ₹${commerce.freeShippingMinInr.toLocaleString("en-IN")}/-`
+                ? `Add ₹${(commerce.freeShippingMinInr - cartTotal).toLocaleString("en-IN")} for Free Delivery Above ₹${commerce.freeShippingMinInr.toLocaleString("en-IN")}`
                 : undefined
             }
           />
@@ -160,7 +160,7 @@ function CartPage() {
 
         <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
           <div className="glass rounded-2xl p-2.5 flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5 text-primary" /> Secure pay</div>
-          <div className="glass rounded-2xl p-2.5 flex items-center gap-2"><Truck className="h-3.5 w-3.5 text-primary" /> Free Delivery Above ₹{commerce.freeShippingMinInr.toLocaleString("en-IN")}/-</div>
+          <div className="glass rounded-2xl p-2.5 flex items-center gap-2"><Truck className="h-3.5 w-3.5 text-primary" /> Free Delivery Above ₹{commerce.freeShippingMinInr.toLocaleString("en-IN")}</div>
         </div>
       </aside>
     </div>

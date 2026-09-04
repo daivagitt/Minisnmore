@@ -106,7 +106,7 @@ class InternalAccountOrderResourceCoverageTest {
         ReflectionTestUtils.setField(resource, "razorpayKeySecret", LIVE_SECRET);
         ReflectionTestUtils.setField(resource, "razorpayPaymentDemo", false);
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("customer1", "n/a"));
-        when(customerOrderRepository.existsByUserLoginAndPaymentStatus("customer1", PaymentStatus.PAID)).thenReturn(false);
+        when(customerOrderRepository.existsByUserLoginAndStatusNot("customer1", OrderStatus.CANCELLED)).thenReturn(false);
     }
 
     @Test
@@ -452,7 +452,7 @@ class InternalAccountOrderResourceCoverageTest {
 
     @Test
     void createOrder_welcome10Coupon_rejectsReturningCustomer() throws Exception {
-        when(customerOrderRepository.existsByUserLoginAndPaymentStatus("customer1", PaymentStatus.PAID)).thenReturn(true);
+        when(customerOrderRepository.existsByUserLoginAndStatusNot("customer1", OrderStatus.CANCELLED)).thenReturn(true);
         Product product = new Product().id(1L).name("Dress").slug("dress").price(BigDecimal.valueOf(1000)).stock(5).active(true);
         when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -486,7 +486,38 @@ class InternalAccountOrderResourceCoverageTest {
 
     @Test
     void validateCoupon_welcome10_rejectsReturningCustomer() throws Exception {
-        when(customerOrderRepository.existsByUserLoginAndPaymentStatus("customer1", PaymentStatus.PAID)).thenReturn(true);
+        when(customerOrderRepository.existsByUserLoginAndStatusNot("customer1", OrderStatus.CANCELLED)).thenReturn(true);
+        Coupon coupon = new Coupon()
+            .code("WELCOME10")
+            .active(true)
+            .discountType(com.miniandmore.app.domain.enumeration.DiscountType.PERCENT)
+            .discountValue(BigDecimal.TEN)
+            .minOrder(BigDecimal.ZERO);
+        when(couponRepository.findOneByCodeIgnoreCase("WELCOME10")).thenReturn(Optional.of(coupon));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/coupons/validate")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "code":"WELCOME10",
+                          "subtotal":1000
+                        }
+                        """
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(false))
+            .andExpect(jsonPath("$.data.error").value("WELCOME10 is only valid on your first order"));
+    }
+
+    @Test
+    void validateCoupon_welcome10_rejectsAfterPriorCodOrder() throws Exception {
+        // COD stays payment PENDING until collection; prior confirmed COD must still block WELCOME10.
+        when(customerOrderRepository.existsByUserLoginAndStatusNot("customer1", OrderStatus.CANCELLED)).thenReturn(true);
         Coupon coupon = new Coupon()
             .code("WELCOME10")
             .active(true)
@@ -1169,7 +1200,7 @@ class InternalAccountOrderResourceCoverageTest {
 
     @Test
     void activeCoupons_hidesWelcome10ForReturningCustomer() throws Exception {
-        when(customerOrderRepository.existsByUserLoginAndPaymentStatus("customer1", PaymentStatus.PAID)).thenReturn(true);
+        when(customerOrderRepository.existsByUserLoginAndStatusNot("customer1", OrderStatus.CANCELLED)).thenReturn(true);
         Coupon welcome = new Coupon()
             .code("WELCOME10")
             .active(true)

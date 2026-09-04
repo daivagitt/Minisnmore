@@ -12,6 +12,7 @@ import { ADMIN_IMAGE_SPECS } from "@/lib/admin-image-specs";
 import { BulkImport } from "@/components/admin/BulkImport";
 import { ColorImagesEditor } from "@/components/admin/ColorImagesEditor";
 import { AdminSizeAvailabilityPreview } from "@/components/admin/AdminSizeAvailabilityPreview";
+import { SizeChartEditor } from "@/components/admin/SizeChartEditor";
 import { toast } from "sonner";
 import {
   Plus,
@@ -85,6 +86,7 @@ const empty: Product = {
   age_min_months: null,
   age_max_months: null,
   sizes: [],
+  size_chart: null,
   colors: [],
   item_structure: "SIMPLE",
   variants_json: null,
@@ -907,6 +909,15 @@ function ProductsPage() {
                         onChange={(e) => update(i, { story: e.target.value })}
                       />
                     </Field>
+
+                    <SizeChartEditor
+                      value={p.size_chart ?? null}
+                      onChange={(size_chart) => update(i, { size_chart })}
+                      productSku={p.sku}
+                      productName={p.name}
+                      productSlug={p.slug}
+                      productSizes={p.sizes ?? []}
+                    />
 
                     <Field label="Images">
                       <ImageSpecHint spec={ADMIN_IMAGE_SPECS.productGallery} className="mb-2" />

@@ -75,6 +75,9 @@ public class Product implements Serializable {
     @Column(name = "sizes_json", columnDefinition = "text")
     private String sizesJson;
 
+    @Column(name = "size_chart_json", columnDefinition = "text")
+    private String sizeChartJson;
+
     @Column(name = "colors_json", columnDefinition = "text")
     private String colorsJson;
 
@@ -378,6 +381,19 @@ public class Product implements Serializable {
 
     public void setSizesJson(String sizesJson) {
         this.sizesJson = sizesJson;
+    }
+
+    public String getSizeChartJson() {
+        return this.sizeChartJson;
+    }
+
+    public Product sizeChartJson(String sizeChartJson) {
+        this.setSizeChartJson(sizeChartJson);
+        return this;
+    }
+
+    public void setSizeChartJson(String sizeChartJson) {
+        this.sizeChartJson = sizeChartJson;
     }
 
     public String getColorsJson() {
@@ -702,6 +718,7 @@ public class Product implements Serializable {
             ", ageMinMonths=" + getAgeMinMonths() +
             ", ageMaxMonths=" + getAgeMaxMonths() +
             ", sizesJson='" + getSizesJson() + "'" +
+            ", sizeChartJson='" + getSizeChartJson() + "'" +
             ", colorsJson='" + getColorsJson() + "'" +
             ", itemStructure='" + getItemStructure() + "'" +
             ", variantsJson='" + getVariantsJson() + "'" +

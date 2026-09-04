@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   filterSizeChartToProductSizes,
   fitPointsFromSizeChart,
+  isUsableSizeChart,
   resolveSizeChartSku,
   sizeChartForProduct,
   SIZE_CHARTS_BY_SKU,
 } from "./product-size-charts";
+import { emptySizeChart } from "./size-chart-excel";
 
 describe("product size charts", () => {
   it("resolves every catalog parent SKU to an approved chart", () => {
@@ -85,6 +87,72 @@ describe("product size charts", () => {
     const filtered = filterSizeChartToProductSizes(chart, ["One Size"]);
     expect(filtered.sections[0]?.bands).toEqual(["Single size"]);
     expect(filtered.sections[0]?.rows[0]?.values["Single size"]).toBe(100);
+  });
+
+  it("prefers product sizeChart over SKU map", () => {
+    const custom = {
+      code: "CUSTOM-1",
+      title: "Custom chart",
+      tolerance: "±1 cm",
+      sections: [
+        {
+          title: "Vest",
+          bands: ["0-3M", "3-6M"],
+          rows: [
+            { label: "Chest width", values: { "0-3M": 20, "3-6M": 21 } },
+            { label: "Body length", values: { "0-3M": 26, "3-6M": 28 } },
+          ],
+        },
+      ],
+    };
+    const chart = sizeChartForProduct({
+      sku: "FRONT-OPEN-VEST-SLEVELESS",
+      sizeChart: custom,
+    });
+    expect(chart?.code).toBe("CUSTOM-1");
+    expect(chart?.sections[0]?.rows[0]?.values["0-3M"]).toBe(20);
+  });
+
+  it("falls back to SKU map when product sizeChart is empty", () => {
+    expect(
+      sizeChartForProduct({
+        sku: "BASIC-SHORTS",
+        sizeChart: { code: "", title: "", tolerance: "", sections: [] },
+      })?.code,
+    ).toBe("MnM-8");
+  });
+
+  it("treats empty starter charts as unusable and keeps the SKU fallback", () => {
+    const starter = emptySizeChart({ title: "Draft", code: "" });
+    expect(isUsableSizeChart(starter)).toBe(false);
+    expect(
+      sizeChartForProduct({
+        sku: "BASIC-SHORTS",
+        sizeChart: starter,
+      })?.code,
+    ).toBe("MnM-8");
+  });
+
+  it("reads blank chest/length cells as null, not 0", () => {
+    const points = fitPointsFromSizeChart({
+      code: "BLANK",
+      title: "Blank",
+      tolerance: "±1 cm",
+      sections: [
+        {
+          title: "Piece",
+          bands: ["0-3M", "3-6M"],
+          rows: [
+            { label: "Chest width", values: { "0-3M": "", "3-6M": "—" } },
+            { label: "Body length", values: { "0-3M": "n/a", "3-6M": "" } },
+          ],
+        },
+      ],
+    });
+    expect(points).toEqual([
+      { band: "0-3M", lengthCm: null, chestCm: null },
+      { band: "3-6M", lengthCm: null, chestCm: null },
+    ]);
   });
 
   it("extracts length and chest fit points from MnM garment rows", () => {

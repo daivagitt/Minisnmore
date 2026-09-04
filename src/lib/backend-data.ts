@@ -26,6 +26,11 @@ import {
   applyExpectedPrintNamesToColors,
   applyExpectedPrintNamesToVariantsJson,
 } from "@/lib/expected-prints";
+import {
+  isUsableSizeChart,
+  parseProductSizeChart,
+  type ProductSizeChart,
+} from "@/lib/product-size-charts";
 
 type Id = string | number;
 type JsonRecord = Record<string, unknown>;
@@ -522,6 +527,8 @@ export type ProductRow = {
   age_min_months: number | null;
   age_max_months: number | null;
   sizes: string[];
+  /** Per-product measurement chart; null clears / uses SKU fallback on storefront. */
+  size_chart?: ProductSizeChart | null;
   colors: ProductColorEntry[];
   color_images_json?: string | null;
   item_structure: string | null;
@@ -554,6 +561,7 @@ type ProductDto = {
   ageMinMonths?: number | null;
   ageMaxMonths?: number | null;
   sizesJson?: string | null;
+  sizeChartJson?: string | null;
   colorsJson?: string | null;
   colorImagesJson?: string | null;
   itemStructure?: string | null;
@@ -598,6 +606,7 @@ export const fromProductDto = (dto: ProductDto): ProductRow => ({
   age_min_months: dto.ageMinMonths ?? null,
   age_max_months: dto.ageMaxMonths ?? null,
   sizes: parseJson<string[]>(dto.sizesJson, []),
+  size_chart: parseProductSizeChart(dto.sizeChartJson),
   colors: normalizeColorEntries(
     applyExpectedPrintNamesToColors(
       mergeColorImagesIntoColors(
@@ -644,6 +653,7 @@ const toProductDto = (row: ProductRow): ProductDto => ({
   ageMinMonths: row.age_min_months,
   ageMaxMonths: row.age_max_months,
   sizesJson: JSON.stringify(row.sizes ?? []),
+  sizeChartJson: isUsableSizeChart(row.size_chart) ? JSON.stringify(row.size_chart) : null,
   colorsJson: JSON.stringify(serializeProductColors(row.colors ?? [])),
   itemStructure: row.item_structure ?? "SIMPLE",
   variantsJson: row.variants_json ?? null,

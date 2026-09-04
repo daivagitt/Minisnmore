@@ -660,8 +660,13 @@ public class InternalAccountOrderResource {
         return WELCOME10_COUPON.equalsIgnoreCase(StringUtils.trimToEmpty(code));
     }
 
+    /**
+     * WELCOME10 is first-order only. Count any non-cancelled order — including COD
+     * (payment stays PENDING until collection) and unpaid online checkouts — so the
+     * coupon cannot be reused on a second confirmed order for the same login.
+     */
     private boolean isFirstOrderEligible(String login) {
-        return !dataAccess.customerOrderRepository().existsByUserLoginAndPaymentStatus(login, PaymentStatus.PAID);
+        return !dataAccess.customerOrderRepository().existsByUserLoginAndStatusNot(login, OrderStatus.CANCELLED);
     }
 
     private Optional<String> welcome10EligibilityError(String code, Optional<String> userLogin) {

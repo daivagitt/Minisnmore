@@ -107,7 +107,8 @@ class InternalAdminOrderResourceTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.orders[0].order_number").value("MNM-COD1"))
             .andExpect(jsonPath("$.data.orders[0].full_name").value("Jane Doe"))
-            .andExpect(jsonPath("$.data.orders[0].phone").value("9876543210"));
+            .andExpect(jsonPath("$.data.orders[0].phone").value("9876543210"))
+            .andExpect(jsonPath("$.data.orders[0].coupon_code").value(""));
     }
 
     @Test
@@ -116,6 +117,7 @@ class InternalAdminOrderResourceTest {
         CustomerOrder order = codOrder()
             .status(OrderStatus.CONFIRMED)
             .paymentStatus(PaymentStatus.PAID)
+            .couponCode("WELCOME10")
             .zohoSyncStatus(ZohoSyncStatus.FAILED)
             .zohoSyncError("Zoho unavailable")
             .ledgerlySyncStatus(LedgerlySyncStatus.SYNCED)
@@ -131,6 +133,7 @@ class InternalAdminOrderResourceTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.orders[0].order_number").value("MNM-COD1"))
+            .andExpect(jsonPath("$.data.orders[0].coupon_code").value("WELCOME10"))
             .andExpect(jsonPath("$.data.orders[0].tracking_status").value("confirmed"))
             .andExpect(jsonPath("$.data.orders[0].payment_status").value("paid"))
             .andExpect(jsonPath("$.data.orders[0].zoho_sync_status").value("failed"))
