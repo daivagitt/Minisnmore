@@ -39,16 +39,26 @@ function order(overrides: Partial<InvoiceOrder> = {}): InvoiceOrder {
   };
 }
 
+const shippingGstLine = {
+  kind: "shipping",
+  itemName: "Shipping",
+  taxableAmount: 94.29,
+  taxType: "CGST\nSGST",
+  taxRates: [2.5, 2.5],
+  taxAmounts: [2.35, 2.35],
+  subTotal: 99,
+};
+
 describe("invoice workbook breakdown", () => {
-  it("matches prepaid with shipping, including its +₹0.01 reconciliation", () => {
+  it("splits GST out of prepaid shipping the same way as COD", () => {
     const result = buildInvoiceBreakdown(order());
     expect(result).toMatchObject({
       taxKind: "local",
-      taxableTotal: 338.31,
-      cgst: 5.98,
-      sgst: 5.98,
-      totalAmountIncludingTax: 350.27,
-      roundOff: 0.01,
+      taxableTotal: 333.6,
+      cgst: 8.34,
+      sgst: 8.34,
+      totalAmountIncludingTax: 350.28,
+      roundOff: 0,
       grandTotal: 350.28,
       mrpTotal: 349,
       productDiscount: 69.8,
@@ -56,17 +66,24 @@ describe("invoice workbook breakdown", () => {
       couponDiscount: 27.92,
       amountAfterCoupon: 251.28,
     });
+    expect(result.lines.find((line) => line.kind === "shipping")).toMatchObject(shippingGstLine);
   });
 
   it("matches COD and paid shipping", () => {
     const result = buildInvoiceBreakdown(order({ cod_fee: 99, tax: 16.68, total: 449.28 }));
     expect(result).toMatchObject({
-      taxableTotal: 432.6,
-      cgst: 8.34,
-      sgst: 8.34,
-      totalAmountIncludingTax: 449.28,
-      roundOff: 0,
+      taxableTotal: 427.89,
+      cgst: 10.69,
+      sgst: 10.69,
+      totalAmountIncludingTax: 449.27,
+      roundOff: 0.01,
       grandTotal: 449.28,
+    });
+    expect(result.lines.find((line) => line.kind === "shipping")).toMatchObject(shippingGstLine);
+    expect(result.lines.find((line) => line.kind === "cod")).toMatchObject({
+      kind: "cod",
+      taxableAmount: 94.29,
+      subTotal: 99,
     });
   });
 
@@ -88,6 +105,7 @@ describe("invoice workbook breakdown", () => {
       totalAmountIncludingTax: 1517.04,
       roundOff: 0,
     });
+    expect(result.lines.some((line) => line.kind === "shipping")).toBe(false);
   });
 
   it("matches the workbook's -₹0.01 multi-item COD round-off", () => {
@@ -123,12 +141,18 @@ describe("invoice workbook breakdown", () => {
     );
     expect(result).toMatchObject({
       taxKind: "interstate",
-      taxableTotal: 432.6,
+      taxableTotal: 427.89,
       cgst: 0,
       sgst: 0,
-      igst: 16.68,
+      igst: 21.39,
       totalAmountIncludingTax: 449.28,
       roundOff: 0,
+    });
+    expect(result.lines.find((line) => line.kind === "shipping")).toMatchObject({
+      taxType: "IGST",
+      taxRates: [5],
+      taxAmounts: [4.71],
+      subTotal: 99,
     });
   });
 });
