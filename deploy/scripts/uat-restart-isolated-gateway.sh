@@ -19,7 +19,7 @@ fi
 uat_gateway_sanitize_env
 uat_gateway_verify_env
 
-export FRONTEND_AUTH_CALLBACK_URL="${FRONTEND_AUTH_CALLBACK_URL:-https://uat.minisnmore.com/auth/callback}"
+export FRONTEND_AUTH_CALLBACK_URL="${FRONTEND_AUTH_CALLBACK_URL:-https://minisnmore.com/auth/callback}"
 
 if [ -z "${JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET:-}" ] && command -v pm2 >/dev/null 2>&1; then
   JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET=$(

@@ -1253,13 +1253,13 @@ async function uploadAdminImageViaPresign(folder: AdminImageFolder, file: File) 
     });
   } catch {
     throw new Error(
-      "Upload to storage was blocked (often missing R2 CORS for https://uat.minisnmore.com).",
+      "Upload to storage was blocked (often missing R2 CORS for https://minisnmore.com).",
     );
   }
   if (!storageResponse.ok) {
     if (storageResponse.status === 403) {
       throw new Error(
-        "R2 storage rejected the upload (403). The S3 API token likely lacks Object Read & Write on bucket miniandmore — update S3_ACCESS_KEY and S3_SECRET_KEY in UAT env, then restart catalog.",
+        "R2 storage rejected the upload (403). The S3 API token likely lacks Object Read & Write on bucket miniandmore — update S3_ACCESS_KEY and S3_SECRET_KEY in prod.env, then restart catalog.",
       );
     }
     throw new Error(`Upload to storage failed (${storageResponse.status}).`);

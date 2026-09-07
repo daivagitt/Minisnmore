@@ -571,7 +571,7 @@ function ZohoConnectPanel({
       <p className="text-xs text-muted-foreground">
         Create a <span className="text-foreground">Server-based</span> app. Redirect URI must include{" "}
         <span className="font-mono text-[11px]">
-          {oauthSetup?.primaryRedirectUri ?? "https://uat.minisnmore.com/admin/zoho"}
+          {oauthSetup?.primaryRedirectUri ?? "https://minisnmore.com/admin/zoho"}
         </span>
         .
       </p>

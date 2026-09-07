@@ -176,7 +176,7 @@ jhipster:
     cache:
       timeToLiveInDays: 1461
   cors:
-    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:https://minisnmore.com,https://www.minisnmore.com,https://uat.minisnmore.com}
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:https://minisnmore.com,https://www.minisnmore.com}
     allowed-methods: '*'
     allowed-headers: '*'
     exposed-headers: 'Authorization,Link,X-Total-Count,X-${jhipster.clientApp.name}-alert,X-${jhipster.clientApp.name}-error,X-${jhipster.clientApp.name}-params'
