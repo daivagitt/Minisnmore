@@ -20,7 +20,7 @@ import { galleryForSelectedColor } from "@/lib/product-gallery";
 import { resolveStorefrontColorLabel } from "@/lib/expected-prints";
 import { lookupPincode, normalizePincode } from "@/lib/pincode";
 import {
-  catalogSizesForProduct,
+  availableSizesForFit,
   colorNameInList,
   defaultSellableSelection,
   findVariant,
@@ -125,8 +125,8 @@ function ProductPage() {
     [product, color, size],
   );
 
-  const catalogSizes = useMemo(
-    () => (product ? catalogSizesForProduct(product) : []),
+  const availableFitSizes = useMemo(
+    () => (product ? availableSizesForFit(product) : []),
     [product],
   );
 
@@ -137,11 +137,11 @@ function ProductPage() {
             sku: product.sku,
             name: product.name,
             slug: product.slug,
-            sizes: catalogSizes,
+            sizes: availableFitSizes,
             sizeChart: product.sizeChart,
           })
         : null,
-    [product, catalogSizes],
+    [product, availableFitSizes],
   );
 
   const sizeFit = useMemo(() => {
@@ -152,11 +152,11 @@ function ProductPage() {
       sku: product.sku,
       name: product.name,
       slug: product.slug,
-      sizes: catalogSizes,
+      sizes: availableFitSizes,
       sizeChart: product.sizeChart,
     });
     return result.ok ? { size: result.size } : { error: result.error };
-  }, [lengthCm, chestCm, product, catalogSizes]);
+  }, [lengthCm, chestCm, product, availableFitSizes]);
 
   useEffect(() => {
     if (!sizeFit || !("size" in sizeFit)) return;
@@ -170,11 +170,11 @@ function ProductPage() {
             sku: product.sku,
             name: product.name,
             slug: product.slug,
-            sizes: catalogSizes,
+            sizes: sizesForDisplay(product),
             sizeChart: product.sizeChart,
           })
         : [],
-    [product, catalogSizes],
+    [product],
   );
 
   const sizeGuideTitle = useMemo(() => {

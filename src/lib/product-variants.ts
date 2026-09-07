@@ -186,6 +186,13 @@ export function catalogSizesForProduct(product: VariantProductLike): string[] {
   return sortSizesAsc([...labelByKey.values()]);
 }
 
+/** In-stock catalog sizes for the size calculator (not the size-chart table). */
+export function availableSizesForFit(product: VariantProductLike): string[] {
+  const catalog = catalogSizesForProduct(product);
+  if (!isVariantsProduct(product)) return catalog;
+  return catalog.filter((s) => sizeHasSellableVariants(product, s));
+}
+
 export function findVariant(
   product: VariantProductLike,
   opts: { size?: string | null; color?: string | null; sku?: string | null },

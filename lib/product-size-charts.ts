@@ -368,15 +368,61 @@ export function resolveSizeChartSku(input: {
   return best?.sku ?? null;
 }
 
-function numericCell(value: number | string | undefined): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string") {
-    const digits = value.replace(/[^\d.]/g, "");
-    if (!digits) return null;
-    const n = Number(digits);
-    return Number.isFinite(n) ? n : null;
+export type MeasurementCell = {
+  min: number | null;
+  max: number | null;
+};
+
+const RANGE_CELL =
+  /^(-?\d+(?:\.\d+)?)\s*(?:[-–—]|to)\s*(-?\d+(?:\.\d+)?)(?:\s*cm)?$/i;
+
+function parseLooseNumber(raw: string): number | null {
+  const t = raw.trim();
+  if (!t || !/^-?\d+(?:\.\d+)?$/.test(t)) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Parse a sheet cell: `27`, `"27"`, or a range `"25-27"` / `"25–27 cm"`. */
+export function parseMeasurementCell(value: number | string | undefined | null): MeasurementCell {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return { min: null, max: value };
   }
-  return null;
+  if (typeof value !== "string") return { min: null, max: null };
+  const t = value.trim();
+  if (!t) return { min: null, max: null };
+
+  const range = t.match(RANGE_CELL);
+  if (range) {
+    const a = Number(range[1]);
+    const b = Number(range[2]);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return { min: null, max: null };
+    return { min: Math.min(a, b), max: Math.max(a, b) };
+  }
+
+  const max = parseLooseNumber(t);
+  return { min: null, max };
+}
+
+export function formatMeasurementCell(min: number | null, max: number | null): number | string {
+  if (min != null && max != null && min !== max) return `${min}-${max}`;
+  if (max != null) return max;
+  if (min != null) return min;
+  return "";
+}
+
+/** True for the newborn column that stores an explicit min–max range. */
+export function isZeroToThreeBand(band: string): boolean {
+  const key = band
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .replace(/MONTHS?/, "M")
+    .replace(/MOS?/, "M");
+  return key === "0-3M" || key === "0-3";
+}
+
+function numericCell(value: number | string | undefined): number | null {
+  return parseMeasurementCell(value).max;
 }
 
 export function isUsableSizeChart(
@@ -474,6 +520,9 @@ export type ChartFitPoint = {
   band: string;
   lengthCm: number | null;
   chestCm: number | null;
+  /** Explicit lower bound when the cell is a range (typically 0-3M). */
+  lengthMin?: number | null;
+  chestMin?: number | null;
 };
 
 const CHEST_LABEL = /^(chest(\s*width|\s*\(½\)|\s*\(1\/2\))?)$/i;
@@ -505,11 +554,17 @@ export function fitPointsFromSizeChart(chart: ProductSizeChart): ChartFitPoint[]
     section.rows.find((r) => /body\s*length|length\s*\(hps/i.test(r.label)) ??
     findRow(section, LENGTH_LABEL);
 
-  return section.bands.map((band) => ({
-    band,
-    lengthCm: lengthRow ? numericCell(lengthRow.values[band]) : null,
-    chestCm: chestRow ? numericCell(chestRow.values[band]) : null,
-  }));
+  return section.bands.map((band) => {
+    const length = parseMeasurementCell(lengthRow?.values[band]);
+    const chest = parseMeasurementCell(chestRow?.values[band]);
+    return {
+      band,
+      lengthCm: length.max,
+      chestCm: chest.max,
+      ...(length.min != null ? { lengthMin: length.min } : {}),
+      ...(chest.min != null ? { chestMin: chest.min } : {}),
+    };
+  });
 }
 
 /** Filter chart columns to sizes the product actually sells (when age-banded). */

@@ -72,7 +72,7 @@ function formatCmRange(min: number, max: number): string {
  * Example MnM-4 length 27 / 30 / 33… → 25–27, 28–30, 31–33…
  */
 function rangesFromPoints(
-  points: Array<{ size: string; value: number }>,
+  points: Array<{ size: string; value: number; min?: number | null }>,
 ): Array<{ size: string; min: number; max: number }> {
   if (points.length === 0) return [];
   const tol = FIT_LIMITS.measureToleranceCm;
@@ -81,7 +81,9 @@ function rangesFromPoints(
     const next = points[i + 1];
     const max = p.value;
     let min: number;
-    if (prev) {
+    if (p.min != null && Number.isFinite(p.min)) {
+      min = p.min;
+    } else if (prev) {
       min = prev.value + 1;
     } else if (next) {
       // Same span as the step to the next size: e.g. 27→30 ⇒ first band 25–27
@@ -89,6 +91,7 @@ function rangesFromPoints(
     } else {
       min = Math.max(0, p.value - tol);
     }
+    if (min > max) min = max;
     return { size: p.size, min, max };
   });
 }
@@ -183,6 +186,18 @@ function matchBandToProductSize(band: string, sizes: string[]): string | null {
   return sizes.find((s) => normalizeSizeLabel(s) === norm) ?? null;
 }
 
+function chartPointsFromSheet(input: {
+  sku?: string | null;
+  name?: string | null;
+  slug?: string | null;
+  sizeChart?: ProductSizeChart | null;
+}): ChartFitPoint[] {
+  const chart = sizeChartForProduct(input);
+  if (!chart) return [];
+  return fitPointsFromSizeChart(chart);
+}
+
+/** Fit points for sold sizes only — used by the calculator, not the size-guide table. */
 function chartPointsForProduct(input: {
   sku?: string | null;
   name?: string | null;
@@ -205,10 +220,10 @@ function chartPointsForProduct(input: {
 function buildBandRanges(points: ChartFitPoint[]): BandRange[] {
   const lengthPts = points
     .filter((p) => p.lengthCm != null)
-    .map((p) => ({ size: p.band, value: p.lengthCm! }));
+    .map((p) => ({ size: p.band, value: p.lengthCm!, min: p.lengthMin }));
   const chestPts = points
     .filter((p) => p.chestCm != null)
-    .map((p) => ({ size: p.band, value: p.chestCm! }));
+    .map((p) => ({ size: p.band, value: p.chestCm!, min: p.chestMin }));
   const lengthRanges = rangesFromPoints(lengthPts);
   const chestRanges = rangesFromPoints(chestPts);
 
@@ -225,17 +240,12 @@ function buildBandRanges(points: ChartFitPoint[]): BandRange[] {
   });
 }
 
-/** Size guide rows (Length + Chest) from the approved MnM sheet for this product. */
-export function sizeGuideRowsForProduct(input: {
-  sku?: string | null;
-  name?: string | null;
-  slug?: string | null;
-  sizes: string[];
-  sizeChart?: ProductSizeChart | null;
-}): SizeGuideRow[] {
-  const points = chartPointsForProduct(input);
+function rowsFromFitPoints(
+  points: ChartFitPoint[],
+  sizes: string[],
+): SizeGuideRow[] {
   if (points.length === 0) {
-    return input.sizes.map((size) => ({
+    return sizes.map((size) => ({
       size,
       length: "—",
       chest: "—",
@@ -246,9 +256,10 @@ export function sizeGuideRowsForProduct(input: {
 
   const ranges = buildBandRanges(points);
   return points.map((p) => {
+    const size = matchBandToProductSize(p.band, sizes) ?? p.band;
     const r = ranges.find((x) => x.size === p.band);
     return {
-      size: p.band,
+      size,
       length:
         r?.lengthMin != null && r.lengthMax != null
           ? formatCmRange(roundDisplay(r.lengthMin), roundDisplay(r.lengthMax))
@@ -265,6 +276,22 @@ export function sizeGuideRowsForProduct(input: {
       chestCm: p.chestCm,
     };
   });
+}
+
+/** Size guide rows (Length + Chest) for every chart band, including sizes not currently sold. */
+export function sizeGuideRowsForProduct(input: {
+  sku?: string | null;
+  name?: string | null;
+  slug?: string | null;
+  sizes: string[];
+  sizeChart?: ProductSizeChart | null;
+  /** When true, skip unsold bands so the last size range does not use 3-6 / 6-12 if those are not on the product. */
+  availableOnly?: boolean;
+}): SizeGuideRow[] {
+  const points = input.availableOnly
+    ? chartPointsForProduct(input)
+    : chartPointsFromSheet(input);
+  return rowsFromFitPoints(points, input.sizes);
 }
 
 function roundDisplay(n: number): number {

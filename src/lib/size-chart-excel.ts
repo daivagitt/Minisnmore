@@ -212,6 +212,7 @@ export async function downloadSizeChartTemplate(filename = "product-size-chart-t
     ["Meta sheet: title, code, tolerance"],
     ["Chart sheet: Section | Measurement | one column per size band (e.g. 0-3M)"],
     ["Use Chest width and Body length (or Total length) so the storefront calculator works"],
+    ["0-3M may be a range (e.g. 25-27) for the lower and upper measurement; later sizes are the upper value"],
     ["Import replaces the product size chart on save"],
   ]);
   const wb = XLSX.utils.book_new();

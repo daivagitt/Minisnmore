@@ -83,4 +83,27 @@ describe("size chart excel", () => {
     expect(result.ok).toBe(true);
     expect(result.warnings.length).toBeGreaterThan(0);
   });
+
+  it("keeps 0-3M min–max text in Excel cells", () => {
+    const chart = sizeChartFromExcelSheets({
+      chartRows: [
+        {
+          Section: "Vest",
+          Measurement: "Chest width",
+          "0-3M": "21-22",
+          "3-6M": 24,
+        },
+        {
+          Section: "Vest",
+          Measurement: "Body length",
+          "0-3M": "25-27",
+          "3-6M": 30,
+        },
+      ],
+    });
+    expect(chart.sections[0]?.rows.find((r) => r.label === "Body length")?.values["0-3M"]).toBe(
+      "25-27",
+    );
+    expect(validateSizeChartStructure(chart).ok).toBe(true);
+  });
 });
