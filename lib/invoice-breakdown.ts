@@ -129,8 +129,8 @@ function lineDetails(item: InvoiceOrderItem): string[] {
 }
 
 /**
- * Reproduces the formulas in Roundoff Calculation.xlsx. Product prices are GST-inclusive,
- * shipping is tax-free, COD is GST-inclusive, and local tax is rounded as two independent
+ * Reproduces the formulas in Roundoff Calculation.xlsx. Product prices, shipping, and COD
+ * are GST-inclusive; donation is tax-free; local tax is rounded as two independent
  * CGST/SGST components. The explicit round-off line reconciles those displayed components to
  * the authoritative amount charged by the backend.
  */
@@ -180,7 +180,32 @@ export function buildInvoiceBreakdown(
   });
 
   const extraLines: InvoiceBreakdownLine[] = [];
-  const pushNoTaxLine = (kind: "shipping" | "donation", itemName: string, value: number) => {
+  const pushInclusiveGstLine = (
+    kind: "shipping" | "cod",
+    itemName: string,
+    value: number,
+  ) => {
+    if (value <= 0) return;
+    const taxable = pricesIncludeGst ? roundInr(value / (1 + gstRate / 100)) : value;
+    const taxRaw = pricesIncludeGst ? value - taxable : (value * gstRate) / 100;
+    const tax = taxParts(taxKind, taxRaw);
+    extraLines.push({
+      key: kind,
+      kind,
+      itemName,
+      details: [],
+      qty: 0,
+      mrp: value,
+      totalDiscount: 0,
+      taxableAmount: taxable,
+      taxType: tax.type,
+      taxRates: tax.rates.map((part) => gstRate * part),
+      taxAmounts: tax.amounts,
+      taxAmountRaw: taxRaw,
+      subTotal: pricesIncludeGst ? value : roundInr(value + taxRaw),
+    });
+  };
+  const pushNoTaxLine = (kind: "donation", itemName: string, value: number) => {
     if (value <= 0) return;
     extraLines.push({
       key: kind,
@@ -202,27 +227,8 @@ export function buildInvoiceBreakdown(
   const shipping = roundInr(Math.max(0, amount(order.shipping)));
   const codFee = roundInr(Math.max(0, amount(order.cod_fee)));
   const donation = roundInr(Math.max(0, amount(order.donation)));
-  pushNoTaxLine("shipping", "Shipping", shipping);
-  if (codFee > 0) {
-    const codTaxable = pricesIncludeGst ? roundInr(codFee / (1 + gstRate / 100)) : codFee;
-    const codTaxRaw = pricesIncludeGst ? codFee - codTaxable : (codFee * gstRate) / 100;
-    const tax = taxParts(taxKind, codTaxRaw);
-    extraLines.push({
-      key: "cod",
-      kind: "cod",
-      itemName: "Convenience Charges (COD)",
-      details: [],
-      qty: 0,
-      mrp: codFee,
-      totalDiscount: 0,
-      taxableAmount: codTaxable,
-      taxType: tax.type,
-      taxRates: tax.rates.map((part) => gstRate * part),
-      taxAmounts: tax.amounts,
-      taxAmountRaw: codTaxRaw,
-      subTotal: pricesIncludeGst ? codFee : roundInr(codFee + codTaxRaw),
-    });
-  }
+  pushInclusiveGstLine("shipping", "Shipping", shipping);
+  pushInclusiveGstLine("cod", "Convenience Charges (COD)", codFee);
   pushNoTaxLine("donation", "Donation", donation);
 
   const lines = [...productLines, ...extraLines];
