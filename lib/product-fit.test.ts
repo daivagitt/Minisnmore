@@ -75,20 +75,58 @@ describe("product fit from MnM length/chest", () => {
     expect(checkSizeFit({ lengthCm: "34", chestCm: "", ...vestSizesShort }).ok).toBe(false);
   });
 
-  it("does not use missing sizes when ranging the last available size", () => {
+  it("keeps full-chart boundaries when only some sizes are available", () => {
     const twoSizes = {
       sku: "FRONT-OPEN-VEST-SLEVELESS",
       sizes: ["0-3 M", "6-12 M"],
     };
     const rows = sizeGuideRowsForProduct({ ...twoSizes, availableOnly: true });
     expect(rows.map((r) => r.size)).toEqual(["0-3 M", "6-12 M"]);
-    // Sheet: 28 then 32 (3-6M=30 is not sold). Last size is 29–32, not 31–32 as if 3-6 existed.
+    // The hidden 3-6M chart column still defines the boundary of each visible size.
     expect(rows.map((r) => [r.size, r.length, r.chest])).toEqual([
-      ["0-3 M", "25–28 cm", "22–23 cm"],
-      ["6-12 M", "29–32 cm", "24–25 cm"],
+      ["0-3 M", "27–28 cm", "23 cm"],
+      ["6-12 M", "31–32 cm", "25 cm"],
     ]);
-    expect(recommendSizeByLength(29, twoSizes)).toBe("6-12 M");
+    expect(recommendSizeByLength(29, twoSizes)).toBeNull();
     expect(recommendSizeByLength(31, twoSizes)).toBe("6-12 M");
+  });
+
+  it("uses the preceding chart band for a non-adjacent available size", () => {
+    const input = {
+      sku: "UNKNOWN-SKU-NO-MAP",
+      sizes: ["0-3M", "12-18M"],
+      availableOnly: true,
+      sizeChart: {
+        code: "CUSTOM-GAPPED-SIZES",
+        title: "Side button T-shirt",
+        tolerance: "±1 cm",
+        sections: [
+          {
+            title: "T-shirt",
+            bands: ["0-3M", "3-6M", "6-12M", "12-18M", "18-24M"],
+            rows: [
+              {
+                label: "Chest width",
+                values: { "0-3M": "17-22", "3-6M": 24, "6-12M": 26, "12-18M": 28, "18-24M": 30 },
+              },
+              {
+                label: "Body length",
+                values: { "0-3M": "25-28", "3-6M": 31, "6-12M": 34, "12-18M": 37, "18-24M": 40 },
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    expect(sizeGuideRowsForProduct(input).map((r) => [r.size, r.length, r.chest])).toEqual([
+      ["0-3M", "25–28 cm", "17–22 cm"],
+      ["12-18M", "35–37 cm", "27–28 cm"],
+    ]);
+    expect(recommendSizeByLength(29, input)).toBeNull();
+    expect(recommendSizeByLength(35, input)).toBe("12-18M");
+    expect(recommendSizeByChest(23, input)).toBeNull();
+    expect(recommendSizeByChest(27, input)).toBe("12-18M");
   });
 
   it("uses an explicit 0-3M range from the size chart on the storefront", () => {
@@ -160,9 +198,10 @@ describe("product fit from MnM length/chest", () => {
     expect(limits.hasChest).toBe(true);
     expect(recommendSizeByLength(25, input)).toBe("0-3M");
     expect(recommendSizeByChest(22, input)).toBe("3-6M");
-    expect(
-      checkSizeFit({ lengthCm: "25", chestCm: "", ...input }),
-    ).toEqual({ ok: true, size: "0-3M" });
+    expect(checkSizeFit({ lengthCm: "25", chestCm: "", ...input })).toEqual({
+      ok: true,
+      size: "0-3M",
+    });
   });
 
   it("recommends MnM-4 length bands the way the sheet is read", () => {
