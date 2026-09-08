@@ -24,43 +24,6 @@ export const PRODUCT_GALLERY_HERO_FRAME =
 export const PRODUCT_GALLERY_QUICKVIEW_MAX_H =
   "max-h-[min(72vw,20rem)] md:max-h-[min(50vh,24rem)]";
 
-/** Landscape (wider than tall), square/unknown, then portrait. */
-const PORTRAIT_MAX_ASPECT = 0.98;
-const LANDSCAPE_MIN_ASPECT = 1.02;
-
-export function galleryOrientationRank(aspect: number | undefined): number {
-  if (!aspect || aspect <= 0) return 1;
-  if (aspect > LANDSCAPE_MIN_ASPECT) return 0;
-  if (aspect < PORTRAIT_MAX_ASPECT) return 2;
-  return 1;
-}
-
-/**
- * Group landscapes first and portraits last while preserving relative order within each orientation.
- */
-export function sortGalleryByLeadingOrientation(
-  urls: string[],
-  aspectFor: (url: string) => number | undefined,
-): string[] {
-  if (urls.length <= 1) return urls;
-  const indexed = urls.map((url, order) => ({ url, order }));
-  indexed.sort((a, b) => {
-    const rankA = galleryOrientationRank(aspectFor(a.url));
-    const rankB = galleryOrientationRank(aspectFor(b.url));
-    if (rankA !== rankB) return rankA - rankB;
-    return a.order - b.order;
-  });
-  return indexed.map((entry) => entry.url);
-}
-
-/** @deprecated Use sortGalleryByLeadingOrientation — kept for existing imports/tests. */
-export function sortGalleryPortraitFirst(
-  urls: string[],
-  aspectFor: (url: string) => number | undefined,
-): string[] {
-  return sortGalleryByLeadingOrientation(urls, aspectFor);
-}
-
 function uniqueImages(...sources: (string | undefined | null)[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];

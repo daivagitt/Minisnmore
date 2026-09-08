@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { LazyImage } from "@/components/LazyImage";
 import { cn } from "@/lib/utils";
-import { sortGalleryByLeadingOrientation, PRODUCT_GALLERY_HERO_FRAME, PRODUCT_GALLERY_HERO_MAX_H } from "@/lib/product-gallery";
+import { PRODUCT_GALLERY_HERO_FRAME, PRODUCT_GALLERY_HERO_MAX_H } from "@/lib/product-gallery";
 import {
   contentAspect,
   detectContentBoundsFromImage,
@@ -182,7 +182,7 @@ export function ProductGallery({ name, image, gallery = [], className }: Props) 
   const rawImages = useMemo(() => uniqueImages(image, ...gallery), [image, gallery]);
   const rawImagesKey = useMemo(() => rawImages.join("\0"), [rawImages]);
   const [active, setActive] = useState(0);
-  const { boundsFor, aspectFor, rememberBounds, revision } = useImageContentBounds();
+  const { boundsFor, aspectFor, rememberBounds } = useImageContentBounds();
 
   useEffect(() => {
     if (!rawImages.length) return;
@@ -206,26 +206,19 @@ export function ProductGallery({ name, image, gallery = [], className }: Props) 
     };
   }, [rawImagesKey, rememberBounds]);
 
-  const images = useMemo(() => {
-    if (rawImages.length <= 1) return rawImages;
-    return sortGalleryByLeadingOrientation(rawImages, aspectFor);
-  }, [rawImages, aspectFor, revision]);
-
-  const imagesKey = useMemo(() => images.join("\0"), [images]);
-
   useEffect(() => {
     setActive(0);
-  }, [imagesKey]);
+  }, [rawImagesKey]);
 
-  const safeActive = images.length ? Math.min(active, images.length - 1) : 0;
-  const current = images[safeActive] ?? images[0] ?? "";
+  const safeActive = rawImages.length ? Math.min(active, rawImages.length - 1) : 0;
+  const current = rawImages[safeActive] ?? rawImages[0] ?? "";
   const heroBounds = boundsFor(current);
   /** Frame follows the active slide so each image fills the box without letterboxing. */
   const heroAspect = heroBounds ? contentAspect(heroBounds) : aspectFor(current);
 
   const go = (delta: number) => {
-    if (images.length <= 1) return;
-    setActive((i) => (i + delta + images.length) % images.length);
+    if (rawImages.length <= 1) return;
+    setActive((i) => (i + delta + rawImages.length) % rawImages.length);
   };
 
   return (
@@ -235,17 +228,17 @@ export function ProductGallery({ name, image, gallery = [], className }: Props) 
         className,
       )}
     >
-      {images.length > 1 ? (
+      {rawImages.length > 1 ? (
         <div
           className="order-2 lg:order-1 shrink-0 lg:w-[5rem] xl:w-[5.5rem] lg:self-start flex flex-row lg:flex-col gap-2 sm:gap-2.5 overflow-x-auto lg:overflow-y-auto snap-x snap-mandatory lg:snap-none [scrollbar-width:thin] lg:max-h-[min(92vw,36rem)]"
           aria-label="Product image thumbnails"
         >
-          {images.map((src, i) => (
+          {rawImages.map((src, i) => (
             <GalleryThumb
               key={src}
               src={src}
               index={i}
-              total={images.length}
+              total={rawImages.length}
               active={safeActive === i}
               onSelect={() => setActive(i)}
             />
@@ -300,7 +293,7 @@ export function ProductGallery({ name, image, gallery = [], className }: Props) 
             </motion.div>
           </AnimatePresence>
 
-          {images.length > 1 ? (
+          {rawImages.length > 1 ? (
             <>
               <button
                 type="button"

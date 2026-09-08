@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   catalogSizesForProduct,
+  availableSizesForFit,
   colorsForSize,
   defaultSellableSelection,
   findVariant,
@@ -138,6 +139,7 @@ describe("product-variants", () => {
     expect(sizesForDisplay(partial)).toEqual(["0-3 M", "3-6 M", "6-12 M", "12-18 M"]);
     expect(sizeHasSellableVariants(partial, "3-6 M")).toBe(false);
     expect(sizeHasSellableVariants(partial, "0-3 M")).toBe(true);
+    expect(availableSizesForFit(partial)).toEqual(["0-3 M"]);
   });
 
   it("lists only catalog/variant sizes without standard-band padding", () => {
@@ -153,6 +155,7 @@ describe("product-variants", () => {
     };
     expect(catalogSizesForProduct(vest)).toEqual(["0-3 M", "3-6 M", "6-12 M"]);
     expect(sizesForDisplay(vest)).toEqual(["0-3 M", "3-6 M", "6-12 M", "12-18 M"]);
+    expect(availableSizesForFit(vest)).toEqual(["0-3 M", "3-6 M", "6-12 M"]);
   });
 
   it("infers VARIANTS from variant matrix when itemStructure missing", () => {

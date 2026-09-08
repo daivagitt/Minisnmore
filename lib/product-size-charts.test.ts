@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   filterSizeChartToProductSizes,
   fitPointsFromSizeChart,
+  formatMeasurementCell,
   isUsableSizeChart,
+  isZeroToThreeBand,
+  parseMeasurementCell,
   resolveSizeChartSku,
   sizeChartForProduct,
   SIZE_CHARTS_BY_SKU,
@@ -178,5 +181,41 @@ describe("product size charts", () => {
       lengthCm: 17,
       chestCm: null,
     });
+  });
+
+  it("parses 0-3M min–max cells without concatenating digits", () => {
+    expect(parseMeasurementCell("25-27")).toEqual({ min: 25, max: 27 });
+    expect(parseMeasurementCell("21–22 cm")).toEqual({ min: 21, max: 22 });
+    expect(parseMeasurementCell(28)).toEqual({ min: null, max: 28 });
+    expect(parseMeasurementCell("")).toEqual({ min: null, max: null });
+    expect(parseMeasurementCell("n/a")).toEqual({ min: null, max: null });
+    expect(formatMeasurementCell(25, 27)).toBe("25-27");
+    expect(formatMeasurementCell(null, 28)).toBe(28);
+    expect(isZeroToThreeBand("0-3 M")).toBe(true);
+    expect(isZeroToThreeBand("3-6M")).toBe(false);
+
+    const points = fitPointsFromSizeChart({
+      code: "RANGE",
+      title: "Range",
+      tolerance: "±1 cm",
+      sections: [
+        {
+          title: "Piece",
+          bands: ["0-3M", "3-6M"],
+          rows: [
+            { label: "Chest width", values: { "0-3M": "21-22", "3-6M": 24 } },
+            { label: "Body length", values: { "0-3M": "25-27", "3-6M": 30 } },
+          ],
+        },
+      ],
+    });
+    expect(points[0]).toEqual({
+      band: "0-3M",
+      lengthCm: 27,
+      chestCm: 22,
+      lengthMin: 25,
+      chestMin: 21,
+    });
+    expect(points[1]).toEqual({ band: "3-6M", lengthCm: 30, chestCm: 24 });
   });
 });

@@ -12,6 +12,9 @@ import {
   validateSizeChartStructure,
 } from "@/lib/size-chart-excel";
 import {
+  formatMeasurementCell,
+  isZeroToThreeBand,
+  parseMeasurementCell,
   sizeChartForProduct,
   type ProductSizeChart,
   type SizeChartSection,
@@ -33,6 +36,32 @@ function ensureChart(value: ProductSizeChart | null | undefined): ProductSizeCha
 
 function blankValues(bands: string[]): Record<string, number | string> {
   return Object.fromEntries(bands.map((b) => [b, ""]));
+}
+
+const STANDARD_CHART_BANDS = ["0-3M", "3-6M", "6-12M", "12-18M", "18-24M"];
+
+function bandKey(band: string): string {
+  return band.toUpperCase().replace(/\s+/g, "");
+}
+
+function nextChartBand(existing: string[]): string {
+  const have = new Set(existing.map(bandKey));
+  const next = STANDARD_CHART_BANDS.find((b) => !have.has(bandKey(b)));
+  if (next) return next;
+  return `Size ${existing.length + 1}`;
+}
+
+function remapSectionBands(section: SizeChartSection, bands: string[]): SizeChartSection {
+  return {
+    ...section,
+    bands,
+    rows: section.rows.map((r) => ({
+      label: r.label,
+      values: Object.fromEntries(
+        bands.map((b, i) => [b, r.values[b] ?? r.values[section.bands[i]!] ?? ""]),
+      ),
+    })),
+  };
 }
 
 export function SizeChartEditor({
@@ -61,6 +90,7 @@ export function SizeChartEditor({
       slug: productSlug,
       sizes: sizes.length ? sizes : chart.sections.flatMap((s) => s.bands),
       sizeChart: chart,
+      availableOnly: productSizes.length > 0,
     });
   }, [chart, productSku, productName, productSlug, productSizes]);
 
@@ -147,8 +177,9 @@ export function SizeChartEditor({
         <div>
           <div className="text-sm font-medium">Size chart</div>
           <p className="text-xs text-muted-foreground mt-0.5 leading-snug max-w-xl">
-            Drives the storefront size guide and calculator. Leave empty to use the catalog SKU
-            fallback. Excel uses Meta + Chart sheets.
+            Drives the storefront size guide and calculator. Download the filled example Excel,
+            edit the numbers, then Import Excel. 0-3M is a from–to range; later sizes are upper
+            values. Leave empty to use the catalog SKU fallback.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
@@ -158,7 +189,7 @@ export function SizeChartEditor({
             onClick={() => void downloadSizeChartTemplate()}
           >
             <FileDown className="h-3.5 w-3.5 inline mr-1" />
-            Template
+            Example Excel
           </button>
           {chart ? (
             <button
@@ -286,7 +317,7 @@ export function SizeChartEditor({
           {previewRows.length > 0 ? (
             <div className="rounded-lg glass p-3">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
-                Storefront preview (length / chest)
+                Calculator preview (this product’s sizes only)
               </div>
               <ProductSizeChartTables rows={previewRows} title={chart.title || null} />
             </div>
@@ -308,37 +339,30 @@ function SectionEditor({
   onRemove: () => void;
   canRemove: boolean;
 }) {
-  const bandsJoined = section.bands.join(", ");
-  const [bandsDraft, setBandsDraft] = useState(bandsJoined);
-  const [bandsFocused, setBandsFocused] = useState(false);
-
-  useEffect(() => {
-    if (!bandsFocused) setBandsDraft(bandsJoined);
-  }, [bandsJoined, bandsFocused]);
-
-  const commitBands = (text: string) => {
-    const bands = text
-      .split(",")
-      .map((b) => b.trim())
-      .filter(Boolean);
-    if (!bands.length) return;
-    const unchanged =
-      bands.length === section.bands.length && bands.every((b, i) => b === section.bands[i]);
-    if (unchanged) return;
-    onChange({
-      ...section,
-      bands,
-      rows: section.rows.map((r) => ({
-        label: r.label,
-        values: Object.fromEntries(bands.map((b) => [b, r.values[b] ?? ""])),
-      })),
-    });
+  const renameBand = (index: number, nextName: string) => {
+    const trimmed = nextName.trim();
+    if (!trimmed || trimmed === section.bands[index]) return;
+    if (section.bands.some((b, i) => i !== index && bandKey(b) === bandKey(trimmed))) {
+      toast.error("Size names must be unique");
+      return;
+    }
+    const bands = section.bands.map((b, i) => (i === index ? trimmed : b));
+    onChange(remapSectionBands(section, bands));
   };
 
-  const setCell = (rowIndex: number, band: string, raw: string) => {
-    const trimmed = raw.trim();
-    let value: number | string = trimmed;
-    if (trimmed !== "" && /^-?\d+(\.\d+)?$/.test(trimmed)) value = Number(trimmed);
+  const addBand = () => {
+    onChange(remapSectionBands(section, [...section.bands, nextChartBand(section.bands)]));
+  };
+
+  const removeBand = (index: number) => {
+    if (section.bands.length <= 1) {
+      toast.error("Keep at least one size");
+      return;
+    }
+    onChange(remapSectionBands(section, section.bands.filter((_, i) => i !== index)));
+  };
+
+  const setCell = (rowIndex: number, band: string, value: number | string) => {
     const rows = section.rows.map((r, i) =>
       i === rowIndex ? { ...r, values: { ...r.values, [band]: value } } : r,
     );
@@ -366,7 +390,7 @@ function SectionEditor({
   };
 
   return (
-    <div className="space-y-2 rounded-lg border border-border/40 p-3">
+    <div className="space-y-3 rounded-lg border border-border/40 p-3">
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex-1 min-w-[10rem]">
           <Field label="Section title">
@@ -374,25 +398,6 @@ function SectionEditor({
               className={inputCls()}
               value={section.title}
               onChange={(e) => onChange({ ...section, title: e.target.value })}
-            />
-          </Field>
-        </div>
-        <div className="flex-[2] min-w-[14rem]">
-          <Field label="Size bands (comma-separated)">
-            <input
-              className={inputCls()}
-              value={bandsDraft}
-              onFocus={() => setBandsFocused(true)}
-              onChange={(e) => {
-                const text = e.target.value;
-                setBandsDraft(text);
-                commitBands(text);
-              }}
-              onBlur={() => {
-                commitBands(bandsDraft);
-                setBandsFocused(false);
-              }}
-              placeholder="0-3M, 3-6M, 6-12M"
             />
           </Field>
         </div>
@@ -408,6 +413,35 @@ function SectionEditor({
         ) : null}
       </div>
 
+      <Field
+        label="Sizes"
+        hint="0-3M uses a from–to range. Other sizes are the upper measurement; the next size starts at the previous + 1 cm."
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          {section.bands.map((band, bi) => (
+            <div key={`${bi}-${band}`} className="flex items-center gap-1 rounded-full glass pl-1 pr-0.5 py-0.5">
+              <BandNameInput value={band} onCommit={(next) => renameBand(bi, next)} />
+              <button
+                type="button"
+                className="h-7 w-7 grid place-items-center rounded-full text-destructive hover:bg-destructive/10"
+                onClick={() => removeBand(bi)}
+                aria-label={`Remove ${band}`}
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addBand}
+            className="text-xs rounded-full glass px-2.5 py-1.5 inline-flex items-center gap-1 hover:bg-white/50"
+          >
+            <Plus className="h-3 w-3" />
+            Add size
+          </button>
+        </div>
+      </Field>
+
       <div className="overflow-x-auto">
         <table className="w-full text-xs min-w-[28rem]">
           <thead>
@@ -415,7 +449,7 @@ function SectionEditor({
               <th className="text-left py-1.5 pr-2">Measurement</th>
               {section.bands.map((b) => (
                 <th key={b} className="px-1 py-1.5 text-center whitespace-nowrap">
-                  {b}
+                  {isZeroToThreeBand(b) ? `${b} from–to` : b}
                 </th>
               ))}
               <th className="w-8" />
@@ -434,11 +468,10 @@ function SectionEditor({
                 </td>
                 {section.bands.map((b) => (
                   <td key={b} className="px-0.5 py-1">
-                    <input
-                      className={inputCls() + " text-xs h-8 text-center tabular-nums px-1"}
+                    <MeasurementCellInput
                       value={row.values[b] ?? ""}
-                      onChange={(e) => setCell(ri, b, e.target.value)}
-                      inputMode="decimal"
+                      range={isZeroToThreeBand(b)}
+                      onCommit={(next) => setCell(ri, b, next)}
                     />
                   </td>
                 ))}
@@ -466,5 +499,124 @@ function SectionEditor({
         Add row
       </button>
     </div>
+  );
+}
+
+function BandNameInput({ value, onCommit }: { value: string; onCommit: (next: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) setDraft(value);
+  }, [value, focused]);
+
+  return (
+    <input
+      className="w-[5.5rem] bg-transparent text-xs text-center outline-none px-1 py-1"
+      value={draft}
+      onFocus={() => setFocused(true)}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        onCommit(draft);
+        setFocused(false);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+      aria-label="Size name"
+    />
+  );
+}
+
+function parseCmInput(raw: string): number | null {
+  const t = raw.trim();
+  if (!t || !/^-?\d+(?:\.\d+)?$/.test(t)) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+function MeasurementCellInput({
+  value,
+  range,
+  onCommit,
+}: {
+  value: number | string;
+  range: boolean;
+  onCommit: (next: number | string) => void;
+}) {
+  const parsed = parseMeasurementCell(value);
+  const maxText = parsed.max != null ? String(parsed.max) : value === "" ? "" : String(value);
+  const minText = parsed.min != null ? String(parsed.min) : "";
+  const [minDraft, setMinDraft] = useState<string | null>(null);
+  const [maxDraft, setMaxDraft] = useState<string | null>(null);
+
+  const commitPair = (minRaw: string, maxRaw: string) => {
+    const minT = minRaw.trim();
+    const maxT = maxRaw.trim();
+    const minParsed = parseCmInput(minT);
+    const maxParsed = parseCmInput(maxT);
+    if (minT !== "" && minParsed == null) return;
+    if (maxT !== "" && maxParsed == null) return;
+    onCommit(formatMeasurementCell(minParsed, maxParsed));
+  };
+
+  if (range) {
+    return (
+      <div className="flex items-center gap-0.5 min-w-[7.5rem]">
+        <input
+          className={inputCls() + " text-xs h-8 text-center tabular-nums px-1"}
+          value={minDraft ?? minText}
+          placeholder="from"
+          inputMode="decimal"
+          aria-label="Range from"
+          onChange={(e) => {
+            const next = e.target.value;
+            setMinDraft(next);
+            commitPair(next, maxDraft ?? maxText);
+          }}
+          onBlur={() => setMinDraft(null)}
+        />
+        <span className="text-muted-foreground shrink-0">–</span>
+        <input
+          className={inputCls() + " text-xs h-8 text-center tabular-nums px-1"}
+          value={maxDraft ?? maxText}
+          placeholder="to"
+          inputMode="decimal"
+          aria-label="Range to"
+          onChange={(e) => {
+            const next = e.target.value;
+            setMaxDraft(next);
+            commitPair(minDraft ?? minText, next);
+          }}
+          onBlur={() => setMaxDraft(null)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <input
+      className={inputCls() + " text-xs h-8 text-center tabular-nums px-1"}
+      value={maxDraft ?? maxText}
+      inputMode="decimal"
+      onChange={(e) => {
+        const next = e.target.value;
+        setMaxDraft(next);
+        if (next.trim() === "") onCommit("");
+        else {
+          const n = parseCmInput(next);
+          if (n != null) onCommit(n);
+        }
+      }}
+      onBlur={() => {
+        const raw = (maxDraft ?? maxText).trim();
+        if (raw === "") onCommit("");
+        else {
+          const cell = parseMeasurementCell(raw);
+          onCommit(formatMeasurementCell(cell.min, cell.max));
+        }
+        setMaxDraft(null);
+      }}
+    />
   );
 }

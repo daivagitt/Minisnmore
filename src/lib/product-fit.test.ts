@@ -61,6 +61,70 @@ describe("product fit from MnM length/chest", () => {
     ]);
   });
 
+  it("shows every chart size even when the product sells a subset", () => {
+    const rows = sizeGuideRowsForProduct(vestSizesShort);
+    expect(rows.map((r) => r.size)).toEqual(["0-3 M", "3-6 M", "6-12 M", "12-18M", "18-24M"]);
+    expect(rows[3]?.length).toBe("33–34 cm");
+    expect(rows[4]?.length).toBe("35–36 cm");
+  });
+
+  it("recommends only sizes the product sells", () => {
+    expect(recommendSizeByLength(32, vestSizesShort)).toBe("6-12 M");
+    expect(recommendSizeByLength(34, vestSizesShort)).toBeNull();
+    expect(recommendSizeByLength(36, vestSizesShort)).toBeNull();
+    expect(checkSizeFit({ lengthCm: "34", chestCm: "", ...vestSizesShort }).ok).toBe(false);
+  });
+
+  it("does not use missing sizes when ranging the last available size", () => {
+    const twoSizes = {
+      sku: "FRONT-OPEN-VEST-SLEVELESS",
+      sizes: ["0-3 M", "6-12 M"],
+    };
+    const rows = sizeGuideRowsForProduct({ ...twoSizes, availableOnly: true });
+    expect(rows.map((r) => r.size)).toEqual(["0-3 M", "6-12 M"]);
+    // Sheet: 28 then 32 (3-6M=30 is not sold). Last size is 29–32, not 31–32 as if 3-6 existed.
+    expect(rows.map((r) => [r.size, r.length, r.chest])).toEqual([
+      ["0-3 M", "25–28 cm", "22–23 cm"],
+      ["6-12 M", "29–32 cm", "24–25 cm"],
+    ]);
+    expect(recommendSizeByLength(29, twoSizes)).toBe("6-12 M");
+    expect(recommendSizeByLength(31, twoSizes)).toBe("6-12 M");
+  });
+
+  it("uses an explicit 0-3M range from the size chart on the storefront", () => {
+    const input = {
+      sku: "UNKNOWN-SKU-NO-MAP",
+      sizes: ["0-3M", "3-6M"],
+      sizeChart: {
+        code: "CUSTOM-RANGE",
+        title: "Custom",
+        tolerance: "±1 cm",
+        sections: [
+          {
+            title: "Piece",
+            bands: ["0-3M", "3-6M"],
+            rows: [
+              { label: "Chest width", values: { "0-3M": "20-22", "3-6M": 24 } },
+              { label: "Body length", values: { "0-3M": "22-27", "3-6M": 30 } },
+            ],
+          },
+        ],
+      },
+    };
+    const rows = sizeGuideRowsForProduct(input);
+    expect(rows.map((r) => [r.size, r.length, r.chest])).toEqual([
+      ["0-3M", "22–27 cm", "20–22 cm"],
+      ["3-6M", "28–30 cm", "23–24 cm"],
+    ]);
+    expect(recommendSizeByLength(22, input)).toBe("0-3M");
+    expect(recommendSizeByLength(21, input)).toBeNull();
+    expect(recommendSizeByChest(20, input)).toBe("0-3M");
+    expect(checkSizeFit({ lengthCm: "22", chestCm: "", ...input })).toEqual({
+      ok: true,
+      size: "0-3M",
+    });
+  });
+
   it("shorts chart exposes length only", () => {
     const limits = measurementLimitsForProduct(shortsInput)!;
     expect(limits.hasLength).toBe(true);
