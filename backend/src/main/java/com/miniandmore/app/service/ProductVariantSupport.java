@@ -678,7 +678,29 @@ public class ProductVariantSupport {
         List<VariantRow> rows = new ArrayList<>(parseProduct(product));
         // Zoho item_id is stable when an admin renames a SKU. Prefer it so a rename updates the
         // existing row instead of appending a duplicate and later stale-deactivating the old row.
-        Optional<VariantRow> match = findByZohoItemId(rows, zohoItemId).or(() -> findBySku(rows, variantSku));
+        Optional<VariantRow> byItemId = findByZohoItemId(rows, zohoItemId);
+        Optional<VariantRow> bySku = findBySku(rows, variantSku);
+        if (byItemId.isPresent() && bySku.isPresent() && byItemId.orElseThrow() != bySku.orElseThrow()) {
+            throw new IllegalStateException("Variant identity conflict: Zoho item ID and SKU " + variantSku + " match different local rows");
+        }
+        Optional<VariantRow> match = byItemId.or(() -> bySku);
+        VariantRow matched = match.orElse(null);
+        String incomingSize = normalize(size) != null ? normalize(size) : matched != null ? matched.size() : null;
+        String incomingColor = normalize(color) != null ? normalize(color) : matched != null ? matched.color() : null;
+        if ((matched != null || addIfMissing) && normalize(incomingSize) != null && normalize(incomingColor) != null) {
+            for (VariantRow existing : rows) {
+                // Inactive rows retain their identity too; silently reusing their combination can
+                // create ambiguous selections when they are reactivated later.
+                if (existing != matched && normalizeKey(existing.size()).equals(normalizeKey(incomingSize)) &&
+                    normalizeKey(existing.color()).equals(normalizeKey(incomingColor))) {
+                    throw new IllegalStateException(
+                        "Variant size/color conflict on product " + product.getSku() + ": incoming SKU " + variantSku.trim() +
+                        " uses " + incomingSize + " / " + incomingColor + ", already used by SKU " + existing.sku() +
+                        ". Resolve the variant mapping before pulling; local variants were not changed."
+                    );
+                }
+            }
+        }
         if (match.isEmpty()) {
             if (!addIfMissing) {
                 return false;

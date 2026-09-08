@@ -13,6 +13,10 @@ import {
 import { parseProductSizeChart } from "./product-size-charts";
 
 describe("size chart excel", () => {
+  it.each([true, false, -1, [], {}, "-2-4"])("rejects invalid Excel cell %j without coercion", (cell) => {
+    expect(() => sizeChartFromExcelSheets({ chartRows: [{ Section: "Vest", Measurement: "Chest", "0-3M": cell, "3-6M": 24 }] })).toThrow();
+  });
+
   it("parses Meta + Chart rows into ProductSizeChart", () => {
     const chart = sizeChartFromExcelSheets({
       metaRows: [

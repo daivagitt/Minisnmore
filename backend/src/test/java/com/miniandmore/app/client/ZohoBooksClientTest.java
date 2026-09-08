@@ -20,6 +20,8 @@ import java.net.http.HttpResponse;
 import org.springframework.test.web.client.ExpectedCount;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -60,7 +62,7 @@ class ZohoBooksClientTest {
                     "https://www.zohoapis.in/books/v3/items?organization_id=org-1&page=1&per_page=200&filter_by=Status.Active"
                 )
             )
-            .andRespond(withSuccess("{\"items\":[{\"sku\":\"ACTIVE\"}]}", MediaType.APPLICATION_JSON));
+            .andRespond(withSuccess("{\"items\":[{\"sku\":\"ACTIVE\"}],\"page_context\":{\"has_more_page\":false}}", MediaType.APPLICATION_JSON));
 
         assertThat(client.listItems(1)).extracting(item -> item.get("sku")).containsExactly("ACTIVE");
         server.verify();
@@ -74,12 +76,78 @@ class ZohoBooksClientTest {
                     "https://www.zohoapis.in/books/v3/items?organization_id=org-1&page=2&per_page=200&filter_by=Status.All"
                 )
             )
-            .andRespond(withSuccess("{\"items\":[{\"sku\":\"INACTIVE\",\"status\":\"inactive\"}]}", MediaType.APPLICATION_JSON));
+            .andRespond(withSuccess("{\"items\":[{\"sku\":\"INACTIVE\",\"status\":\"inactive\"}],\"page_context\":{\"has_more_page\":true}}", MediaType.APPLICATION_JSON));
 
         assertThat(client.listAllStatusItems(2))
             .singleElement()
             .satisfies(item -> assertThat(item.get("status")).isEqualTo("inactive"));
         server.verify();
+    }
+
+    @Test
+    void itemListRetainsAuthoritativeLastPage() {
+        server.expect(requestTo("https://www.zohoapis.in/books/v3/items?organization_id=org-1&page=1&per_page=200&filter_by=Status.Active"))
+            .andRespond(withSuccess("{\"code\":0,\"items\":[{\"item_id\":\"1\",\"sku\":\"SKU\"}],\"page_context\":{\"page\":1,\"has_more_page\":false}}", MediaType.APPLICATION_JSON));
+        assertThat(((ZohoBooksClient.ItemPage) client.listItems(1)).hasMorePage()).isFalse();
+        server.verify();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "{}", "{\"code\":0,\"page_context\":{\"has_more_page\":true}}",
+        "{\"items\":null}", "{\"items\":{}}", "{\"items\":[null]}", "{\"items\":[1]}",
+        "{\"items\":[]}", "{\"code\":57,\"items\":[],\"page_context\":{\"has_more_page\":false}}",
+        "{\"items\":[],\"page_context\":{\"has_more_page\":true}}",
+        "{\"items\":[],\"page_context\":{\"has_more_page\":\"false\"}}",
+        "{\"items\":[],\"page_context\":{\"page\":2,\"has_more_page\":false}}"
+    })
+    void malformedItemPagesFailClosed(String body) {
+        server.expect(requestTo("https://www.zohoapis.in/books/v3/items?organization_id=org-1&page=1&per_page=200&filter_by=Status.Active"))
+            .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+        assertThatThrownBy(() -> client.listItems(1)).isInstanceOf(IllegalStateException.class);
+        server.verify();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "{\"items\":[{\"sku\":\"SKU-10\",\"item_id\":\"wrong\"}],\"page_context\":{\"has_more_page\":false}}",
+        "{\"items\":[{\"sku\":\"SKU-1\",\"item_id\":\"1\"},{\"sku\":\"SKU-1\",\"item_id\":\"2\"}],\"page_context\":{\"has_more_page\":false}}",
+        "{\"items\":[{\"sku\":\"SKU-1\"}],\"page_context\":{\"has_more_page\":false}}",
+        "{\"items\":[],\"page_context\":{\"has_more_page\":true}}", "{}"
+    })
+    void skuLookupRejectsUnsafeMatches(String body) {
+        server.expect(requestTo("https://www.zohoapis.in/books/v3/items?organization_id=org-1&sku=SKU-1&filter_by=Status.All"))
+            .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+        assertThatThrownBy(() -> client.findItemBySku("SKU-1")).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void skuLookupSelectsExactMatchInsteadOfFirstRow() {
+        server.expect(requestTo("https://www.zohoapis.in/books/v3/items?organization_id=org-1&sku=SKU-1&filter_by=Status.All"))
+            .andRespond(withSuccess("{\"items\":[{\"sku\":\"SKU-10\",\"item_id\":\"wrong\"},{\"sku\":\"SKU-1\",\"item_id\":\"right\"}],\"page_context\":{\"has_more_page\":false}}", MediaType.APPLICATION_JSON));
+        assertThat(client.findItemBySku("SKU-1")).containsEntry("item_id", "right");
+    }
+
+    @Test
+    void itemUpdateRejectsBusinessErrorEvenWithHttp200() {
+        server.expect(requestTo("https://www.zohoapis.in/books/v3/items/1?organization_id=org-1"))
+            .andRespond(withSuccess("{\"code\":57,\"message\":\"Not authorized\"}", MediaType.APPLICATION_JSON));
+        assertThatThrownBy(() -> client.updateItem("1", java.util.Map.of())).isInstanceOf(IllegalStateException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{\"code\":0}", "{\"item\":null}", "{\"item\":{}}", "{\"item\":{\"item_id\":\"wrong\"}}"})
+    void itemDetailRejectsMalformedOrMismatchedIdentity(String body) {
+        server.expect(requestTo("https://www.zohoapis.in/books/v3/items/1?organization_id=org-1"))
+            .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+        assertThatThrownBy(() -> client.getItem("1")).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void itemDetailAcceptsNumericIdsFromPublishedZohoResponse() {
+        server.expect(requestTo("https://www.zohoapis.in/books/v3/items/45667789900?organization_id=org-1"))
+            .andRespond(withSuccess("{\"code\":0,\"item\":{\"item_id\":45667789900,\"sku\":\"SKU-1\"}}", MediaType.APPLICATION_JSON));
+        assertThat(client.getItem("45667789900")).containsKey("item");
     }
 
     @Test
@@ -181,7 +249,7 @@ class ZohoBooksClientTest {
             .expect(requestTo("https://www.zohoapis.in/books/v3/items/item-1?organization_id=org-1"))
             .andRespond(
                 withSuccess(
-                    "{\"item\":{\"documents\":[{\"document_id\":\"doc-1\"},{\"document_id\":\"doc-2\"}]}}",
+                    "{\"item\":{\"item_id\":\"item-1\",\"documents\":[{\"document_id\":\"doc-1\"},{\"document_id\":\"doc-2\"}]}}",
                     MediaType.APPLICATION_JSON
                 )
             );
@@ -215,7 +283,7 @@ class ZohoBooksClientTest {
 
         server
             .expect(ExpectedCount.times(2), requestTo("https://www.zohoapis.in/books/v3/items/item-2?organization_id=org-1"))
-            .andRespond(withSuccess("{\"item\":{\"image_document_id\":\"gallery-only-7\"}}", MediaType.APPLICATION_JSON));
+            .andRespond(withSuccess("{\"item\":{\"item_id\":\"item-2\",\"image_document_id\":\"gallery-only-7\"}}", MediaType.APPLICATION_JSON));
 
         client.deleteItemImages("item-2");
 
@@ -249,7 +317,7 @@ class ZohoBooksClientTest {
             .expect(requestTo("https://www.zohoapis.in/books/v3/items/item-4?organization_id=org-1"))
             .andRespond(
                 withSuccess(
-                    "{\"item\":{\"documents\":[{\"document_id\":\"doc-1\"},{\"document_id\":\"doc-2\"}]}}",
+                    "{\"item\":{\"item_id\":\"item-4\",\"documents\":[{\"document_id\":\"doc-1\"},{\"document_id\":\"doc-2\"}]}}",
                     MediaType.APPLICATION_JSON
                 )
             );
@@ -287,7 +355,7 @@ class ZohoBooksClientTest {
             .expect(requestTo("https://www.zohoapis.in/books/v3/items/item-5?organization_id=org-1"))
             .andRespond(
                 withSuccess(
-                    "{\"item\":{\"documents\":[{\"document_id\":\"stale-doc\"}]}}",
+                    "{\"item\":{\"item_id\":\"item-5\",\"documents\":[{\"document_id\":\"stale-doc\"}]}}",
                     MediaType.APPLICATION_JSON
                 )
             );

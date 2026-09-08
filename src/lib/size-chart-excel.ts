@@ -1,5 +1,5 @@
 import type { ProductSizeChart, SizeChartSection, SizeChartRow } from "@/lib/product-size-charts";
-import { isUsableSizeChart, parseProductSizeChart } from "@/lib/product-size-charts";
+import { isUsableSizeChart, isValidMeasurementCell, parseProductSizeChart, sizeChartMeasurementErrors } from "@/lib/product-size-charts";
 
 const META_SHEET = "Meta";
 const CHART_SHEET = "Chart";
@@ -159,6 +159,7 @@ export function validateSizeChartStructure(chart: ProductSizeChart | null | unde
 } {
   const errors: string[] = [];
   const warnings: string[] = [];
+  if (chart) errors.push(...sizeChartMeasurementErrors(chart));
   if (!isUsableSizeChart(chart)) {
     errors.push("Add at least one numeric measurement (empty starter charts are not saved)");
     return { ok: false, errors, warnings };
@@ -184,6 +185,7 @@ export function validateSizeChartStructure(chart: ProductSizeChart | null | unde
 }
 
 function cellToValue(raw: unknown): number | string {
+  if (!isValidMeasurementCell(raw)) throw new Error("Invalid measurement: use a non-negative number, range, or blank");
   if (typeof raw === "number" && Number.isFinite(raw)) return raw;
   if (typeof raw === "string") {
     const t = raw.trim();
@@ -193,8 +195,7 @@ function cellToValue(raw: unknown): number | string {
     return t;
   }
   if (raw == null || raw === "") return "";
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : String(raw);
+  return "";
 }
 
 function collectBandsFromRows(rows: Record<string, unknown>[]): string[] {

@@ -6,6 +6,8 @@ import {
   isUsableSizeChart,
   isZeroToThreeBand,
   parseMeasurementCell,
+  parseProductSizeChart,
+  serializeProductSizeChart,
   resolveSizeChartSku,
   sizeChartForProduct,
   SIZE_CHARTS_BY_SKU,
@@ -13,6 +15,33 @@ import {
 import { emptySizeChart } from "./size-chart-excel";
 
 describe("product size charts", () => {
+  it.each([-10, true, false, [], {}, "-3-5", "Infinity", "garbage"])("rejects invalid measurement %j even beside a valid cell", (cell) => {
+    const chart = { code: "", title: "Test", tolerance: "", sections: [{ title: "Vest", bands: ["0-3M", "3-6M"],
+      rows: [{ label: "Chest", values: { "0-3M": cell, "3-6M": 24 } }] }] };
+    expect(parseProductSizeChart(chart)).toBeNull();
+    expect(() => serializeProductSizeChart(chart as never)).toThrow();
+  });
+
+  it("keeps zero, blanks and positive ranges distinct", () => {
+    expect(parseMeasurementCell(0)).toEqual({ min: null, max: 0 });
+    expect(parseMeasurementCell(-1)).toEqual({ min: null, max: null });
+    expect(parseMeasurementCell("-2-5")).toEqual({ min: null, max: null });
+    expect(parseMeasurementCell("N/A")).toEqual({ min: null, max: null });
+    expect(parseMeasurementCell("23–21 cm")).toEqual({ min: 21, max: 23 });
+  });
+
+  it("normalizes both sides of custom chart filtering and rejects duplicate aliases", () => {
+    const chart = { code: "", title: "Test", tolerance: "", sections: [{ title: "Vest", bands: ["0-3 Months", "3-6 Months"],
+      rows: [{ label: "Chest", values: { "0-3 Months": 22, "3-6 Months": 24 } }] }] };
+    expect(filterSizeChartToProductSizes(chart, ["0–3M"]).sections[0]?.bands).toEqual(["0-3 Months"]);
+    chart.sections[0]!.bands = ["0-3 Months", "0-3M"];
+    expect(parseProductSizeChart(chart)).toBeNull();
+  });
+
+  it("all approved charts still pass strict parsing", () => {
+    for (const chart of Object.values(SIZE_CHARTS_BY_SKU)) expect(parseProductSizeChart(chart), chart.code).not.toBeNull();
+  });
+
   it("resolves every catalog parent SKU to an approved chart", () => {
     const skus = [
       "LOOP-BACK-FLEECE-KNIT-FRONT-OPEN-VEST-FULL-SLEEVE",

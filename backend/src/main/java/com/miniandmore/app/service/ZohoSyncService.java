@@ -136,6 +136,7 @@ public class ZohoSyncService {
     }
 
     @Async
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void pullProductsAsync() {
         pullProducts();
     }
@@ -259,13 +260,12 @@ public class ZohoSyncService {
                 ? stringValue(existing.get("item_id"))
                 : null;
 
-        reactivateZohoItemIfNeeded(itemId, "product " + product.getSku());
-
         boolean openingStock = StringUtils.isBlank(itemId);
         Optional<String> inventoryAccountId = accountResolver.resolveInventoryAccountId();
         boolean trackInventory = applicationProperties.getZoho().isSyncProductStock() && inventoryAccountId.isPresent();
         Optional<String> locationId = openingStock && trackInventory ? accountResolver.resolveLocationId() : Optional.empty();
         Map<String, Object> payload = buildItemPayload(product, openingStock, inventoryAccountId, locationId.orElse(null));
+        reactivateZohoItemIfNeeded(itemId, "product " + product.getSku());
         Map<String, Object> response = persistZohoItem(
             openingStock,
             itemId,
@@ -359,13 +359,12 @@ public class ZohoSyncService {
                 ? stringValue(existing.get("item_id"))
                 : null;
 
-        reactivateZohoItemIfNeeded(itemId, "variant " + variantSku);
-
         boolean openingStock = StringUtils.isBlank(itemId);
         Optional<String> inventoryAccountId = accountResolver.resolveInventoryAccountId();
         boolean trackInventory = applicationProperties.getZoho().isSyncProductStock() && inventoryAccountId.isPresent();
         Optional<String> locationId = openingStock && trackInventory ? accountResolver.resolveLocationId() : Optional.empty();
         Map<String, Object> payload = buildVariantItemPayload(product, row, openingStock, inventoryAccountId, locationId.orElse(null));
+        reactivateZohoItemIfNeeded(itemId, "variant " + variantSku);
         Map<String, Object> response = persistZohoItem(
             openingStock,
             itemId,
@@ -818,6 +817,7 @@ public class ZohoSyncService {
         return price.stripTrailingZeros().toPlainString();
     }
 
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Map<String, Object> pullProducts() {
         return pullProducts(false);
     }
@@ -947,13 +947,27 @@ public class ZohoSyncService {
         Set<String> pulledItemIds = new HashSet<>();
         Map<String, String> seenSkusByItemId = new LinkedHashMap<>();
         Map<String, String> seenItemIdsBySku = new LinkedHashMap<>();
-        List<Product> variantParents = new ArrayList<>(
-            productRepository.findAll().stream().filter(variantSupport::isVariants).toList()
-        );
+        List<Product> localProducts = productRepository.findAll();
+        List<Product> variantParents = new ArrayList<>(localProducts.stream().filter(variantSupport::isVariants).toList());
+        Set<String> imageRetryItemIds = new HashSet<>();
+        for (Product product : localProducts) {
+            if (product.getZohoSyncStatus() == ZohoSyncStatus.FAILED &&
+                StringUtils.startsWith(product.getZohoSyncError(), "Image import failed:")) {
+                // Explicit/full pulls can fail on an image older than the existing cursor.
+                // Retry those persisted failures even when the remote timestamp is unchanged.
+                if (variantSupport.isVariants(product)) {
+                    for (ProductVariantSupport.VariantRow row : variantSupport.parseProduct(product)) {
+                        if (StringUtils.isNotBlank(row.zohoItemId())) imageRetryItemIds.add(canonicalItemId(row.zohoItemId()));
+                    }
+                } else if (StringUtils.isNotBlank(product.getZohoItemId())) {
+                    imageRetryItemIds.add(canonicalItemId(product.getZohoItemId()));
+                }
+            }
+        }
         int page = 1;
         boolean completedAllPages = false;
         boolean stopRequested = false;
-        String previousPageIdentity = null;
+        Set<String> seenPageIdentities = new HashSet<>();
         while (true) {
             List<Map<String, Object>> items;
             try {
@@ -971,6 +985,9 @@ public class ZohoSyncService {
                 builder.failure("Zoho unreachable on page " + page + ": " + exceptionMessage(e));
                 LOG.warn("Zoho pullProducts could not reach page {}: {}", page, e.getMessage());
                 break;
+            } catch (RuntimeException e) {
+                builder.failure("Invalid Zoho product response on page " + page + ": " + exceptionMessage(e));
+                break;
             }
             if (items == null) {
                 builder.failure("Zoho returned no item list on page " + page);
@@ -981,12 +998,11 @@ public class ZohoSyncService {
                 break;
             }
             String pageIdentity = zohoItemPageIdentity(items);
-            if (pageIdentity.equals(previousPageIdentity)) {
+            if (!seenPageIdentities.add(pageIdentity)) {
                 builder.failure("Zoho repeated product page " + page + " — pull stopped to prevent an endless loop");
-                LOG.warn("Zoho product pull returned the same non-empty payload for pages {} and {}", page - 1, page);
+                LOG.warn("Zoho product pull repeated a previously seen page at {}", page);
                 break;
             }
-            previousPageIdentity = pageIdentity;
             for (Map<String, Object> item : items) {
                 String sku = item == null ? null : stringValue(item.get("sku"));
                 try {
@@ -994,7 +1010,8 @@ public class ZohoSyncService {
                         builder.failure("Zoho returned a null item on page " + page);
                         continue;
                     }
-                    if (!shouldProcessListRow(item, since, sku)) {
+                    if (!imageRetryItemIds.contains(canonicalItemId(stringValue(item.get("item_id")))) &&
+                        !shouldProcessListRow(item, since, sku)) {
                         continue;
                     }
                     if (StringUtils.isBlank(sku)) {
@@ -1068,6 +1085,10 @@ public class ZohoSyncService {
                 }
             }
             if (stopRequested) {
+                break;
+            }
+            if (items instanceof ZohoBooksClient.ItemPage itemPage && !itemPage.hasMorePage()) {
+                completedAllPages = true;
                 break;
             }
             page++;
@@ -1310,23 +1331,20 @@ public class ZohoSyncService {
             productFieldMapper.applyPulledItem(product, zohoItem, autoCreateCategory)
         ).orElseGet(Optional::empty);
         fieldNotice.ifPresent(notice -> builder.notice(sku, notice));
+        String imageFailure = null;
         if (StringUtils.isNotBlank(itemId) && itemImageSync.isEnabled()) {
             try {
                 itemImageSync.importZohoItemImage(product, itemId, zohoItem);
             } catch (Exception e) {
                 LOG.warn("Zoho image pull failed for {} ({}): {}", sku, itemId, e.getMessage());
-                builder.notice(sku, "Image import failed: " + exceptionMessage(e));
+                imageFailure = "Image import failed: " + storedSyncFailure(e);
             }
         }
-        product.setZohoSyncStatus(ZohoSyncStatus.SYNCED);
-        product.setZohoLastSyncedAt(Instant.now());
-        product.setZohoSyncError(null);
         product.setActive(true);
-        productRepository.save(product);
+        savePulledProductResult(product, sku, imageFailure, builder);
         if (created) {
             builder.notice(sku, "Created from Zoho pull");
         }
-        builder.success();
         return true;
     }
 
@@ -1391,7 +1409,6 @@ public class ZohoSyncService {
             : null;
         String size = ZohoBooksItemAttributes.size(zohoItem);
         String color = ZohoBooksItemAttributes.color(zohoItem);
-        applyPulledUnit(product, zohoItem);
         if (
             (StringUtils.isBlank(size) || StringUtils.isBlank(color)) &&
             !variantSupport.variantHasSizeAndColor(product, variantSku)
@@ -1420,6 +1437,7 @@ public class ZohoSyncService {
             builder.failure(variantSku, "Could not merge Zoho variant into parent " + product.getSku());
             return true;
         }
+        applyPulledUnit(product, zohoItem);
         String groupId = ZohoBooksItemAttributes.groupId(zohoItem);
         if (StringUtils.isNotBlank(groupId) && StringUtils.isBlank(product.getZohoItemId())) {
             product.setZohoItemId(groupId);
@@ -1435,24 +1453,39 @@ public class ZohoSyncService {
             productFieldMapper.applyPulledItem(product, zohoItem, autoCreateCategory)
         ).orElseGet(Optional::empty);
         fieldNotice.ifPresent(notice -> builder.notice(variantSku, notice));
+        String imageFailure = null;
         if (StringUtils.isNotBlank(itemId)) {
-            variantSupport.clearVariantImages(product, variantSku);
             if (itemImageSync.isEnabled()) {
                 try {
                     itemImageSync.importZohoVariantColorImage(product, color, itemId, zohoItem);
                 } catch (Exception e) {
                     LOG.warn("Zoho image pull failed for variant {} ({}): {}", variantSku, itemId, e.getMessage());
-                    builder.notice(variantSku, "Image import failed: " + exceptionMessage(e));
+                    imageFailure = "Image import failed: " + storedSyncFailure(e);
                 }
+            } else {
+                variantSupport.clearVariantImages(product, variantSku);
             }
         }
-        product.setZohoSyncStatus(ZohoSyncStatus.SYNCED);
-        product.setZohoLastSyncedAt(Instant.now());
-        product.setZohoSyncError(null);
         product.setActive(true);
-        productRepository.save(product);
-        builder.success();
+        savePulledProductResult(product, variantSku, imageFailure, builder);
         return true;
+    }
+
+    private void savePulledProductResult(Product product, String sku, String failure, ZohoSyncSummary.Builder builder) {
+        if (failure != null) {
+            builder.failure(product.getId(), sku, failure);
+        }
+        // A later successful sibling must not hide an earlier image failure on this parent.
+        String parentFailure = failure != null ? failure : builder.failureForProduct(product.getId());
+        product.setZohoSyncStatus(parentFailure == null ? ZohoSyncStatus.SYNCED : ZohoSyncStatus.FAILED);
+        product.setZohoSyncError(parentFailure == null ? null : StringUtils.abbreviate(parentFailure, 1000));
+        if (parentFailure == null) {
+            product.setZohoLastSyncedAt(Instant.now());
+        }
+        productRepository.save(product);
+        if (failure == null) {
+            builder.success();
+        }
     }
 
     private Optional<Map<String, Object>> fetchZohoItemDetail(String itemId) {
@@ -1981,23 +2014,22 @@ public class ZohoSyncService {
     }
 
     private String zohoItemPageIdentity(List<Map<String, Object>> items) {
-        StringBuilder identity = new StringBuilder();
+        List<String> identities = new ArrayList<>();
         for (Map<String, Object> item : items) {
+            StringBuilder identity = new StringBuilder();
             if (item == null) {
                 identity.append("<null>");
             } else {
                 identity
                     .append(StringUtils.trimToEmpty(stringValue(item.get("item_id"))))
                     .append('\u001f')
-                    .append(StringUtils.trimToEmpty(stringValue(item.get("sku"))))
-                    .append('\u001f')
-                    .append(StringUtils.trimToEmpty(stringValue(item.get("status"))))
-                    .append('\u001f')
-                    .append(StringUtils.trimToEmpty(stringValue(item.get("last_modified_time"))));
+                    .append(StringUtils.trimToEmpty(stringValue(item.get("sku"))));
             }
-            identity.append('\u001e');
+            identities.add(identity.toString());
         }
-        return identity.toString();
+        // Reordering or changing timestamps does not turn the same item set into a new page.
+        identities.sort(String::compareTo);
+        return String.join("\u001e", identities);
     }
 
     private static boolean registerUniqueZohoListRow(
@@ -2111,6 +2143,7 @@ public class ZohoSyncService {
         }
     }
 
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Map<String, Object> pullInventory() {
         ZohoSyncSummary.Builder builder = ZohoSyncSummary.builder();
         List<Product> variantParents = productRepository
@@ -2119,12 +2152,17 @@ public class ZohoSyncService {
             .filter(variantSupport::isVariants)
             .toList();
         int page = 1;
+        Set<String> seenPageIdentities = new HashSet<>();
         try {
             List<Map<String, Object>> items;
             do {
                 items = booksClient.listItems(page);
                 if (items == null) {
                     builder.failure("Zoho returned no inventory item list on page " + page);
+                    break;
+                }
+                if (!items.isEmpty() && !seenPageIdentities.add(zohoItemPageIdentity(items))) {
+                    builder.failure("Zoho repeated inventory page " + page + " — pull stopped to prevent an endless loop");
                     break;
                 }
                 for (Map<String, Object> item : items) {
@@ -2196,6 +2234,9 @@ public class ZohoSyncService {
                         builder.failure(sku != null ? sku : itemId, exceptionMessage(e));
                     }
                 }
+                if (items instanceof ZohoBooksClient.ItemPage itemPage && !itemPage.hasMorePage()) {
+                    break;
+                }
                 page++;
             } while (!items.isEmpty());
         } catch (RestClientResponseException ex) {
@@ -2212,6 +2253,8 @@ public class ZohoSyncService {
             String message = "Zoho unreachable on inventory page " + page + ": " + exceptionMessage(ex);
             LOG.warn(message);
             builder.failure(message);
+        } catch (RuntimeException ex) {
+            builder.failure("Invalid Zoho inventory response on page " + page + ": " + exceptionMessage(ex));
         }
         return builder.build().toMap();
     }

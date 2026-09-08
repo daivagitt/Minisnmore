@@ -177,7 +177,7 @@ function ProductPage() {
     [product],
   );
 
-  const sizeGuideTitle = useMemo(() => {
+  const sizeGuideChart = useMemo(() => {
     if (!product) return null;
     const chart = sizeChartForProduct({
       sku: product.sku,
@@ -185,7 +185,7 @@ function ProductPage() {
       slug: product.slug,
       sizeChart: product.sizeChart,
     });
-    return chart ? chart.title : null;
+    return chart;
   }, [product]);
 
   const handleAdd = () => {
@@ -549,7 +549,7 @@ function ProductPage() {
               </div>
               <button type="button" onClick={() => setSizeChart(false)} className="h-9 w-9 shrink-0 grid place-items-center rounded-full hover:bg-white/40" aria-label="Close size guide"><X className="h-4 w-4" /></button>
             </div>
-            <ProductSizeChartTables rows={sizeGuideRows} title={sizeGuideTitle} />
+            <ProductSizeChartTables rows={sizeGuideRows} title={sizeGuideChart?.title} chart={sizeGuideChart} />
           </div>
         </div>
       )}

@@ -131,6 +131,148 @@ class ZohoSyncServiceTest {
         lenient().when(customerOrderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
+
+    @Test
+    void pullProducts_duplicateSizeColorReportsConflictWithoutSaveCleanupOrCursorAdvance() {
+        variantSupport = StorePricingTestSupport.variantSupport(objectMapper);
+        setUpZohoProperties();
+        Product parent = new Product().id(780L).sku("HORIZON").zohoItemId("grp-horizon").itemStructure("VARIANTS")
+            .units("bundle").sizeChartJson("local-chart")
+            .variantsJson("[{\"sku\":\"LOCAL-S\",\"size\":\"S\",\"color\":\"Navy\",\"rate\":100,\"stock\":3,\"active\":true,\"zohoItemId\":\"local-id\"}]");
+        String before = parent.getVariantsJson();
+        Map<String, Object> remote = groupedZohoItem("remote-id", "REMOTE-S", "S", "Navy", 200, 99);
+        remote.put("unit", "pcs");
+        when(productRepository.findAll()).thenReturn(List.of(parent));
+        when(booksClient.listItems(1)).thenReturn(new ZohoBooksClient.ItemPage(List.of(remote), false));
+        when(booksClient.getItem("remote-id")).thenReturn(Map.of("item", remote));
+        Map<String, Object> result = service.pullProducts(true);
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(result.get("success")).isEqualTo(0);
+        assertThat(result.get("failures").toString()).contains("size/color conflict").contains("LOCAL-S");
+        assertThat(parent.getVariantsJson()).isEqualTo(before);
+        assertThat(parent.getUnits()).isEqualTo("bundle");
+        assertThat(parent.getSizeChartJson()).isEqualTo("local-chart");
+        verify(productRepository, never()).save(any());
+        verify(productRepository, never()).findAllByZohoItemIdIsNotNull();
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullProducts_malformedListPreservesCatalogAndCursor() {
+        when(booksClient.listItems(1)).thenThrow(new IllegalStateException("missing items list"));
+        Map<String, Object> result = service.pullProducts(true);
+        assertThat(result.get("failed")).isEqualTo(1);
+        verify(productRepository, never()).findAllByZohoItemIdIsNotNull();
+        verify(productRepository, never()).save(any());
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullProducts_stopsOnNonAdjacentReorderedPageCycle() {
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(new ZohoSetting().lastProductPullAt(cursor)));
+        Map<String, Object> a = Map.of("item_id", "a", "sku", "A", "status", "active", "last_modified_time", "2026-01-01T00:00:00Z");
+        Map<String, Object> b = Map.of("item_id", "b", "sku", "B", "status", "active", "last_modified_time", "2026-01-01T00:00:00Z");
+        Map<String, Object> c = Map.of("item_id", "c", "sku", "C", "status", "active", "last_modified_time", "2026-01-01T00:00:00Z");
+        when(booksClient.listAllStatusItems(1)).thenReturn(List.of(a, b));
+        when(booksClient.listAllStatusItems(2)).thenReturn(List.of(c));
+        when(booksClient.listAllStatusItems(3)).thenReturn(List.of(b, a));
+        assertThat(service.pullProducts(false).get("failed")).isEqualTo(1);
+        verify(booksClient, never()).listAllStatusItems(4);
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullInventory_stopsOnPageCycleAndMalformedList() {
+        Map<String, Object> a = Map.of("item_id", "a", "sku", "A");
+        when(booksClient.listItems(1)).thenReturn(List.of(a));
+        when(booksClient.listItems(2)).thenReturn(List.of(Map.of("item_id", "b", "sku", "B")));
+        when(booksClient.listItems(3)).thenReturn(List.of(a));
+        assertThat(service.pullInventory().get("failed")).isEqualTo(1);
+        verify(booksClient, never()).listItems(4);
+        when(booksClient.listItems(1)).thenThrow(new IllegalStateException("invalid items"));
+        assertThat(service.pullInventory().get("failed")).isEqualTo(1);
+    }
+
+    @Test
+    void pullProducts_imageFailureKeepsCursorAndRetriesUnchangedItemPreservingLocalChart() {
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        ZohoSetting setting = new ZohoSetting().connected(true).lastProductPullAt(cursor);
+        Product product = new Product().id(777L).sku("LOCAL-CHART").zohoItemId("zoho-local").active(true)
+            .sizeChartJson("{\"local\":\"must survive\"}");
+        Map<String, Object> row = Map.of("item_id", "zoho-local", "sku", "LOCAL-CHART", "status", "active",
+            "last_modified_time", "2026-08-28T00:00:00Z", "rate", 150);
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
+        when(booksClient.listAllStatusItems(1)).thenReturn(new ZohoBooksClient.ItemPage(List.of(row), false));
+        when(booksClient.getItem("zoho-local")).thenReturn(Map.of("item", row));
+        when(productRepository.findOneByZohoItemId("zoho-local")).thenReturn(Optional.of(product));
+        when(itemImageSync.isEnabled()).thenReturn(true);
+        doThrow(new IllegalStateException("storage temporarily down")).doNothing()
+            .when(itemImageSync).importZohoItemImage(eq(product), eq("zoho-local"), any());
+
+        assertThat(service.pullProducts(false).get("failed")).isEqualTo(1);
+        assertThat(setting.getLastProductPullAt()).isEqualTo(cursor);
+        assertThat(product.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.FAILED);
+        assertThat(product.getPrice()).isEqualByComparingTo("150");
+        verify(zohoSettingRepository, never()).save(any());
+        assertThat(service.pullProducts(false).get("failed")).isEqualTo(0);
+        assertThat(setting.getLastProductPullAt()).isAfter(cursor);
+        assertThat(product.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.SYNCED);
+        assertThat(product.getSizeChartJson()).isEqualTo("{\"local\":\"must survive\"}");
+        verify(booksClient, times(2)).getItem("zoho-local");
+        verify(booksClient, never()).listAllStatusItems(2);
+    }
+
+    @Test
+    void pullEntryPointsDoNotReintroduceOuterTransaction() throws Exception {
+        for (String name : List.of("pullProducts", "pullProductsAsync", "pullInventory")) {
+            var annotation = ZohoSyncService.class.getMethod(name).getAnnotation(org.springframework.transaction.annotation.Transactional.class);
+            assertThat(annotation).isNotNull();
+            assertThat(annotation.propagation()).isEqualTo(org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED);
+        }
+    }
+
+    @Test
+    void pullProducts_retriesPersistedImageFailureOlderThanCursor() {
+        Instant cursor = Instant.parse("2026-08-27T01:02:03Z");
+        Product product = new Product().id(778L).sku("RETRY-OLD").zohoItemId("old-image")
+            .zohoSyncStatus(ZohoSyncStatus.FAILED).zohoSyncError("Image import failed: storage down");
+        Map<String, Object> row = Map.of("item_id", "old-image", "sku", "RETRY-OLD", "status", "active", "last_modified_time", "2026-01-01T00:00:00Z");
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.of(new ZohoSetting().lastProductPullAt(cursor)));
+        when(productRepository.findAll()).thenReturn(List.of(product));
+        when(productRepository.findOneByZohoItemId("old-image")).thenReturn(Optional.of(product));
+        when(booksClient.listAllStatusItems(1)).thenReturn(new ZohoBooksClient.ItemPage(List.of(row), false));
+        when(booksClient.getItem("old-image")).thenReturn(Map.of("item", row));
+        when(itemImageSync.isEnabled()).thenReturn(true);
+        assertThat(service.pullProducts(false).get("failed")).isEqualTo(0);
+        verify(itemImageSync).importZohoItemImage(eq(product), eq("old-image"), any());
+        assertThat(product.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.SYNCED);
+    }
+
+    @Test
+    void pullProducts_variantImageFailureSurvivesSuccessfulSiblingAndPreservesLocalChart() {
+        variantSupport = StorePricingTestSupport.variantSupport(objectMapper);
+        setUpZohoProperties();
+        Product parent = new Product().id(779L).sku("HORIZON").zohoItemId("grp-horizon").itemStructure("VARIANTS")
+            .sizeChartJson("{\"local\":\"chart\"}")
+            .variantsJson("[{\"sku\":\"HORIZON-S-NAVY\",\"size\":\"S\",\"color\":\"Navy\",\"rate\":100,\"stock\":3,\"active\":true,\"zohoItemId\":\"zoho-s\"},{\"sku\":\"HORIZON-M-NAVY\",\"size\":\"M\",\"color\":\"Navy\",\"rate\":100,\"stock\":3,\"active\":true,\"zohoItemId\":\"zoho-m\"}]");
+        Map<String, Object> small = groupedZohoItem("zoho-s", "HORIZON-S-NAVY", "S", "Navy", 100, 3);
+        Map<String, Object> medium = groupedZohoItem("zoho-m", "HORIZON-M-NAVY", "M", "Navy", 100, 3);
+        when(productRepository.findAll()).thenReturn(List.of(parent));
+        when(booksClient.listItems(1)).thenReturn(new ZohoBooksClient.ItemPage(List.of(small, medium), false));
+        when(booksClient.getItem("zoho-s")).thenReturn(Map.of("item", small));
+        when(booksClient.getItem("zoho-m")).thenReturn(Map.of("item", medium));
+        when(itemImageSync.isEnabled()).thenReturn(true);
+        doThrow(new IllegalStateException("image unavailable")).when(itemImageSync)
+            .importZohoVariantColorImage(eq(parent), eq("Navy"), eq("zoho-s"), any());
+
+        assertThat(service.pullProducts(true).get("failed")).isEqualTo(1);
+        verify(itemImageSync).importZohoVariantColorImage(eq(parent), eq("Navy"), eq("zoho-m"), any());
+        assertThat(parent.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.FAILED);
+        assertThat(parent.getSizeChartJson()).isEqualTo("{\"local\":\"chart\"}");
+        verify(zohoSettingRepository, never()).save(any());
+    }
+
     @Test
     void syncProductAsync_whenAutoSyncDisabled_skipsPush() {
         service.syncProductAsync(99L);

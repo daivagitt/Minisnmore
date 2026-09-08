@@ -52,6 +52,7 @@ public class ProductService {
      * @return the persisted entity.
      */
     public ProductDTO save(ProductDTO productDTO) {
+        ProductSizeChartValidation.validate(productDTO.getSizeChartJson());
         LOG.debug("Request to save Product : {}", productDTO);
         Product product = productMapper.toEntity(productDTO);
         normalizeVariants(product);
@@ -66,6 +67,7 @@ public class ProductService {
      * @return the persisted entity.
      */
     public ProductDTO update(ProductDTO productDTO) {
+        ProductSizeChartValidation.validate(productDTO.getSizeChartJson());
         LOG.debug("Request to update Product : {}", productDTO);
         Product product = productMapper.toEntity(productDTO);
         normalizeVariants(product);
@@ -80,6 +82,7 @@ public class ProductService {
      * @return the persisted entity.
      */
     public Optional<ProductDTO> partialUpdate(ProductDTO productDTO) {
+        ProductSizeChartValidation.validate(productDTO.getSizeChartJson());
         LOG.debug("Request to partially update Product : {}", productDTO);
 
         return productRepository

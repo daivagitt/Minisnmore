@@ -277,7 +277,10 @@ public class ZohoItemImageSync {
         int index = 0;
         for (String documentId : ZohoItemDocuments.documentIdsForImport(item)) {
             Optional<BinaryDownload> downloaded = booksClient.downloadDocument(documentId, maxBytes);
-            if (downloaded.isEmpty() || !isImageDownload(downloaded.orElseThrow())) {
+            if (downloaded.isEmpty()) {
+                throw new IllegalStateException("Zoho returned no bytes for declared document " + documentId);
+            }
+            if (!isImageDownload(downloaded.orElseThrow())) {
                 continue;
             }
             String stored = storeBinary(product, zohoItemId, item, downloaded.orElseThrow(), documentId + "-" + index);
@@ -294,6 +297,9 @@ public class ZohoItemImageSync {
                     urls.add(stored.trim());
                 }
             }
+            if (urls.isEmpty()) {
+                throw new IllegalStateException("Zoho declared an item image but returned no usable image bytes");
+            }
         }
         if (urls.isEmpty()) {
             LOG.debug("No Zoho image bytes for item {} (sku={})", zohoItemId, textOf(item, "sku"));
@@ -308,15 +314,11 @@ public class ZohoItemImageSync {
         BinaryDownload image,
         String suffix
     ) {
-        try {
-            String publicUrl = storeHashedImage(image.bytes(), image.contentType());
-            if (publicUrl != null && !publicUrl.isBlank()) {
-                return publicUrl.trim();
-            }
-        } catch (RuntimeException e) {
-            LOG.warn("Could not import Zoho image for item {}: {}", zohoItemId, e.getMessage());
+        String publicUrl = storeHashedImage(image.bytes(), image.contentType());
+        if (publicUrl != null && !publicUrl.isBlank()) {
+            return publicUrl.trim();
         }
-        return null;
+        throw new IllegalStateException("Image storage returned no URL for Zoho item " + zohoItemId);
     }
 
     private String importHttpImageUrl(Product product, String sourceUrl) {
@@ -330,10 +332,10 @@ public class ZohoItemImageSync {
             if (publicUrl != null && !publicUrl.isBlank()) {
                 return publicUrl.trim();
             }
-            return trimmed;
+            throw new IllegalStateException("Image storage returned no URL");
         } catch (RuntimeException e) {
             LOG.warn("Zoho HTTP image import failed for product {} ({}): {}", product.getId(), product.getSku(), e.getMessage());
-            return null;
+            throw new IllegalStateException("Zoho HTTP image import failed: " + safeFailureDetail(e), e);
         }
     }
 

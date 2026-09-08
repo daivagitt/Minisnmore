@@ -374,18 +374,19 @@ export type MeasurementCell = {
 };
 
 const RANGE_CELL =
-  /^(-?\d+(?:\.\d+)?)\s*(?:[-–—]|to)\s*(-?\d+(?:\.\d+)?)(?:\s*cm)?$/i;
+  /^(-?\d+(?:\.\d+)?)\s*(?:[-–—]|to)\s*(-?\d+(?:\.\d+)?)\s*(cm|in(?:ch(?:es)?)?|["″])?$/i;
 
 function parseLooseNumber(raw: string): number | null {
   const t = raw.trim();
-  if (!t || !/^-?\d+(?:\.\d+)?$/.test(t)) return null;
-  const n = Number(t);
-  return Number.isFinite(n) ? n : null;
+  const match = t.match(/^(-?\d+(?:\.\d+)?)\s*(cm|in(?:ch(?:es)?)?|["″])?$/i);
+  if (!match) return null;
+  const n = Number(match[1]) * (match[2] && match[2].toLowerCase() !== "cm" ? 2.54 : 1);
+  return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
 /** Parse a sheet cell: `27`, `"27"`, or a range `"25-27"` / `"25–27 cm"`. */
 export function parseMeasurementCell(value: number | string | undefined | null): MeasurementCell {
-  if (typeof value === "number" && Number.isFinite(value)) {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
     return { min: null, max: value };
   }
   if (typeof value !== "string") return { min: null, max: null };
@@ -394,9 +395,10 @@ export function parseMeasurementCell(value: number | string | undefined | null):
 
   const range = t.match(RANGE_CELL);
   if (range) {
-    const a = Number(range[1]);
-    const b = Number(range[2]);
-    if (!Number.isFinite(a) || !Number.isFinite(b)) return { min: null, max: null };
+    const factor = range[3] && range[3].toLowerCase() !== "cm" ? 2.54 : 1;
+    const a = Number(range[1]) * factor;
+    const b = Number(range[2]) * factor;
+    if (!Number.isFinite(a) || !Number.isFinite(b) || a < 0 || b < 0) return { min: null, max: null };
     return { min: Math.min(a, b), max: Math.max(a, b) };
   }
 
@@ -425,10 +427,54 @@ function numericCell(value: number | string | undefined): number | null {
   return parseMeasurementCell(value).max;
 }
 
+/** Zero is allowed for garment construction measurements; blanks/N/A are not numeric zero. */
+export function isValidMeasurementCell(value: unknown): boolean {
+  if (value == null) return true;
+  if (typeof value === "string" && /^(?:\s*|[-–—]|n\/?a)$/i.test(value.trim())) return true;
+  if (typeof value !== "number" && typeof value !== "string") return false;
+  return parseMeasurementCell(value).max != null;
+}
+
+export function normalizeSizeChartBand(band: string): string {
+  const key = band.trim().toUpperCase().replace(/[–—]/g, "-").replace(/\s+/g, "")
+    .replace(/MONTHS?/g, "M").replace(/MOS?/g, "M");
+  return /^(ONE(?:SIZE)?|COMMON(?:SIZE)?|SINGLE(?:SIZE)?|OS)$/.test(key) ? "__COMMON__" : key;
+}
+
+export function sizeChartMeasurementErrors(chart: ProductSizeChart): string[] {
+  const errors: string[] = [];
+  for (const section of chart.sections) {
+    const keys = section.bands.map(normalizeSizeChartBand);
+    if (keys.some((key) => !key) || new Set(keys).size !== keys.length) {
+      errors.push(`Section "${section.title}" has empty or duplicate size bands`);
+    }
+    const labels = section.rows.map((row) => row.label.trim().toLowerCase());
+    if (new Set(labels).size !== labels.length) errors.push(`Section "${section.title}" has duplicate measurement rows`);
+    for (const row of section.rows) {
+      for (const band of section.bands) {
+        if (!isValidMeasurementCell(row.values[band])) {
+          errors.push(`${section.title} / ${row.label} / ${band}: use a non-negative number, range, or blank`);
+        }
+      }
+    }
+  }
+  return errors;
+}
+
+export function serializeProductSizeChart(chart: ProductSizeChart | null | undefined): string | null {
+  if (!chart) return null;
+  const errors = sizeChartMeasurementErrors(chart);
+  if (errors.length) throw new Error(errors.join("; "));
+  return isUsableSizeChart(chart) ? JSON.stringify(chart) : null;
+}
+
 export function isUsableSizeChart(
   chart: ProductSizeChart | null | undefined,
 ): chart is ProductSizeChart {
   if (!chart || !Array.isArray(chart.sections) || chart.sections.length === 0) return false;
+  if (!chart.sections.every((s) => s && Array.isArray(s.bands) && s.bands.every((b) => typeof b === "string") &&
+    Array.isArray(s.rows) && s.rows.every((row) => row && typeof row.label === "string" && row.values && typeof row.values === "object"))) return false;
+  if (sizeChartMeasurementErrors(chart).length > 0) return false;
   return chart.sections.some((s) => {
     if (!Array.isArray(s?.bands) || s.bands.length === 0) return false;
     if (!Array.isArray(s?.rows) || s.rows.length === 0) return false;
@@ -452,12 +498,13 @@ export function parseProductSizeChart(raw: unknown): ProductSizeChart | null {
   if (!value || typeof value !== "object") return null;
   const obj = value as Record<string, unknown>;
   const sectionsRaw = Array.isArray(obj.sections) ? obj.sections : [];
+  let invalid = false;
   const sections: SizeChartSection[] = sectionsRaw
     .map((sec): SizeChartSection | null => {
       if (!sec || typeof sec !== "object") return null;
       const s = sec as Record<string, unknown>;
       const bands = Array.isArray(s.bands)
-        ? s.bands.map((b) => String(b ?? "").trim()).filter(Boolean)
+        ? s.bands.map((b) => typeof b === "string" ? b.trim() : "")
         : [];
       const rowsRaw = Array.isArray(s.rows) ? s.rows : [];
       const rows: SizeChartRow[] = rowsRaw
@@ -473,11 +520,12 @@ export function parseProductSizeChart(raw: unknown): ProductSizeChart | null {
           const values: Record<string, number | string> = {};
           for (const band of bands) {
             const cell = valuesSrc[band];
+            if (!isValidMeasurementCell(cell)) invalid = true;
             if (typeof cell === "number" && Number.isFinite(cell)) values[band] = cell;
             else if (typeof cell === "string") values[band] = cell;
             else if (cell != null && cell !== "") {
-              const n = Number(cell);
-              values[band] = Number.isFinite(n) ? n : String(cell);
+              invalid = true;
+              values[band] = "";
             } else {
               values[band] = "";
             }
@@ -500,7 +548,7 @@ export function parseProductSizeChart(raw: unknown): ProductSizeChart | null {
     sections,
     tolerance: String(obj.tolerance ?? "").trim() || "±1 cm",
   };
-  return isUsableSizeChart(chart) ? chart : null;
+  return !invalid && isUsableSizeChart(chart) ? chart : null;
 }
 
 export function sizeChartForProduct(input: {
@@ -572,18 +620,7 @@ export function filterSizeChartToProductSizes(
   chart: ProductSizeChart,
   productSizes: string[],
 ): ProductSizeChart {
-  const wanted = new Set(
-    productSizes
-      .map((s) => s.trim().toUpperCase().replace(/\s+/g, "").replace(/MONTHS?/, "M").replace(/MOS?/, "M"))
-      .map((s) => {
-        const m = s.match(/^(\d+)-(\d+)M$/);
-        if (m) return `${m[1]}-${m[2]}M`;
-        if (/^(ONE|COMMON|SINGLE|OS)$/.test(s) || s.includes("COMMON") || s.includes("SINGLE")) {
-          return "__COMMON__";
-        }
-        return s;
-      }),
-  );
+  const wanted = new Set(productSizes.map(normalizeSizeChartBand).filter(Boolean));
 
   if (wanted.size === 0) return chart;
 
@@ -594,7 +631,7 @@ export function filterSizeChartToProductSizes(
     if (isCommonOnly) return sec;
 
     const bands = sec.bands.filter((b) => {
-      const key = b.toUpperCase().replace(/\s+/g, "");
+      const key = normalizeSizeChartBand(b);
       if (wanted.has(key)) return true;
       if (wanted.has("__COMMON__") && /common|single/i.test(b)) return true;
       return false;
