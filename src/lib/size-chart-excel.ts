@@ -32,6 +32,126 @@ export function cloneSizeChart(chart: ProductSizeChart): ProductSizeChart {
   return JSON.parse(JSON.stringify(chart)) as ProductSizeChart;
 }
 
+const EXAMPLE_BANDS = ["0-3M", "3-6M", "6-12M", "12-18M", "18-24M"] as const;
+
+function exampleRow(
+  label: string,
+  values: [number | string, number, number, number, number],
+): SizeChartRow {
+  return {
+    label,
+    values: {
+      "0-3M": values[0],
+      "3-6M": values[1],
+      "6-12M": values[2],
+      "12-18M": values[3],
+      "18-24M": values[4],
+    },
+  };
+}
+
+/**
+ * Filled vest + shorts workbook used by “Example Excel”.
+ * 0-3M uses from–to ranges; later sizes are the upper measurement in cm.
+ */
+export function exampleSizeChartForImport(): ProductSizeChart {
+  return {
+    code: "MnM-EXAMPLE",
+    title: "Front-open vest & shorts set (example)",
+    tolerance: "±1 cm",
+    sections: [
+      {
+        title: "Vest",
+        bands: [...EXAMPLE_BANDS],
+        rows: [
+          exampleRow("Chest width", ["22-23", 24, 25, 26, 27]),
+          exampleRow("Body length", ["26-28", 30, 32, 34, 36]),
+          exampleRow("Front neck drop", [5.5, 6, 6.5, 7, 7.5]),
+          exampleRow("Back neck width", [8, 8.5, 9, 9.5, 10]),
+          exampleRow("Shoulder width", [18, 19, 20, 21, 22]),
+          exampleRow("Armhole straight", [11, 12, 13, 14, 15]),
+          exampleRow("Bottom width", [23, 24, 25, 26, 27]),
+        ],
+      },
+      {
+        title: "Shorts",
+        bands: [...EXAMPLE_BANDS],
+        rows: [
+          exampleRow("Waistband width", [16, 17, 18, 19, 20]),
+          exampleRow("Hip / body width", [22, 23, 25, 27, 29]),
+          exampleRow("Total length", ["16-17", 18, 20, 22, 24]),
+          exampleRow("Front rise", [16, 17, 18, 19, 20]),
+          exampleRow("Inseam", [5, 6, 7, 8, 9]),
+        ],
+      },
+    ],
+  };
+}
+
+export function sizeChartMetaAoA(chart: ProductSizeChart): (string | number)[][] {
+  return [
+    ["Field", "Value"],
+    ["title", chart.title],
+    ["code", chart.code],
+    ["tolerance", chart.tolerance],
+  ];
+}
+
+export function sizeChartDataAoA(chart: ProductSizeChart): (string | number)[][] {
+  const allBands: string[] = [];
+  const seen = new Set<string>();
+  for (const sec of chart.sections) {
+    for (const b of sec.bands) {
+      if (seen.has(b)) continue;
+      seen.add(b);
+      allBands.push(b);
+    }
+  }
+  const rows: (string | number)[][] = [[SECTION_COL, MEASUREMENT_COL, ...allBands]];
+  for (const sec of chart.sections) {
+    for (const row of sec.rows) {
+      rows.push([
+        sec.title,
+        row.label,
+        ...allBands.map((b) => {
+          const v = row.values[b];
+          if (typeof v === "number") return v;
+          return v == null ? "" : String(v);
+        }),
+      ]);
+    }
+  }
+  return rows;
+}
+
+export function sizeChartGuideAoA(): (string | number)[][] {
+  return [
+    ["Topic", "How to fill this file"],
+    ["Import", "Admin → product → Size chart → Example Excel → edit → Import Excel → Save"],
+    ["Sheets", "Keep sheet names Meta and Chart. This Guide sheet is ignored on import."],
+    ["Meta", "One row per field: title, code, tolerance"],
+    [
+      "Chart header",
+      "Section | Measurement | 0-3M | 3-6M | 6-12M | 12-18M | 18-24M (add or remove size columns as needed)",
+    ],
+    ["0-3M", "Use a from–to range in cm, e.g. 26-28. Leave only the upper value if you want auto range."],
+    ["Later sizes", "Single number = the upper measurement in cm. Next size starts at previous + 1 cm."],
+    [
+      "Calculator",
+      "Vest/garment section must include Chest width and Body length (or Total length / Length HPS)",
+    ],
+    ["Sets", "Repeat Section name per garment. This example has Vest then Shorts."],
+    ["Units", "Centimetres. Tolerance on Meta applies to the storefront copy."],
+    ["Replace", "Import replaces the product size chart. Save the product to keep it."],
+    ["", ""],
+    ["Example Meta", "See the Meta sheet"],
+    ["Example Chart", "See the Chart sheet — vest + shorts, all five sizes filled"],
+    ["0-3M vest chest", "22-23"],
+    ["0-3M vest length", "26-28"],
+    ["3-6M vest chest / length", "24 / 30"],
+  ];
+}
+
 export function validateSizeChartStructure(chart: ProductSizeChart | null | undefined): {
   ok: boolean;
   errors: string[];
@@ -179,46 +299,50 @@ export function sizeChartFromExcelSheets(input: {
   return parsed;
 }
 
-export async function downloadSizeChartTemplate(filename = "product-size-chart-template.xlsx") {
+async function workbookFromSizeChart(
+  chart: ProductSizeChart,
+  includeGuide: boolean,
+) {
   const XLSX = await import("xlsx");
-  const sample = emptySizeChart({
-    code: "MnM-4",
-    title: "Example vest",
-    tolerance: "±1 cm",
-  });
-  const metaSheet = XLSX.utils.aoa_to_sheet([
-    ["Field", "Value"],
-    ["title", sample.title],
-    ["code", sample.code],
-    ["tolerance", sample.tolerance],
-  ]);
-  const bands = sample.sections[0]!.bands;
-  const chartAoA: (string | number)[][] = [[SECTION_COL, MEASUREMENT_COL, ...bands]];
-  for (const sec of sample.sections) {
-    for (const row of sec.rows) {
-      chartAoA.push([
-        sec.title,
-        row.label,
-        ...sec.bands.map((b) => {
-          const v = row.values[b];
-          return typeof v === "number" ? v : String(v ?? "");
-        }),
-      ]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, aoaToSheetKeepingRanges(XLSX, sizeChartMetaAoA(chart)), META_SHEET);
+  XLSX.utils.book_append_sheet(wb, aoaToSheetKeepingRanges(XLSX, sizeChartDataAoA(chart)), CHART_SHEET);
+  if (includeGuide) {
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sizeChartGuideAoA()), "Guide");
+  }
+  return { XLSX, wb };
+}
+
+/** Keep "26-28" as text so Excel does not turn 0-3M ranges into dates. */
+function aoaToSheetKeepingRanges(
+  XLSX: typeof import("xlsx"),
+  aoa: (string | number)[][],
+) {
+  const sheet = XLSX.utils.aoa_to_sheet(aoa);
+  for (let r = 0; r < aoa.length; r++) {
+    const row = aoa[r] ?? [];
+    for (let c = 0; c < row.length; c++) {
+      const val = row[c];
+      if (typeof val !== "string" || !/^-?\d+(?:\.\d+)?\s*-\s*-?\d+(?:\.\d+)?$/.test(val.trim())) {
+        continue;
+      }
+      const addr = XLSX.utils.encode_cell({ r, c });
+      sheet[addr] = { t: "s", v: val, z: "@" };
     }
   }
-  const chartSheet = XLSX.utils.aoa_to_sheet(chartAoA);
-  const guide = XLSX.utils.aoa_to_sheet([
-    ["Notes"],
-    ["Meta sheet: title, code, tolerance"],
-    ["Chart sheet: Section | Measurement | one column per size band (e.g. 0-3M)"],
-    ["Use Chest width and Body length (or Total length) so the storefront calculator works"],
-    ["0-3M may be a range (e.g. 25-27) for the lower and upper measurement; later sizes are the upper value"],
-    ["Import replaces the product size chart on save"],
-  ]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, metaSheet, META_SHEET);
-  XLSX.utils.book_append_sheet(wb, chartSheet, CHART_SHEET);
-  XLSX.utils.book_append_sheet(wb, guide, "Guide");
+  return sheet;
+}
+
+export async function sizeChartToXlsxBuffer(
+  chart: ProductSizeChart,
+  includeGuide = false,
+): Promise<ArrayBuffer> {
+  const { XLSX, wb } = await workbookFromSizeChart(chart, includeGuide);
+  return XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+}
+
+export async function downloadSizeChartTemplate(filename = "product-size-chart-example.xlsx") {
+  const { XLSX, wb } = await workbookFromSizeChart(exampleSizeChartForImport(), true);
   XLSX.writeFile(wb, filename);
 }
 
@@ -226,40 +350,7 @@ export async function downloadSizeChartExcel(
   chart: ProductSizeChart,
   filename = "product-size-chart.xlsx",
 ) {
-  const XLSX = await import("xlsx");
-  const metaSheet = XLSX.utils.aoa_to_sheet([
-    ["Field", "Value"],
-    ["title", chart.title],
-    ["code", chart.code],
-    ["tolerance", chart.tolerance],
-  ]);
-  const allBands: string[] = [];
-  const seen = new Set<string>();
-  for (const sec of chart.sections) {
-    for (const b of sec.bands) {
-      if (seen.has(b)) continue;
-      seen.add(b);
-      allBands.push(b);
-    }
-  }
-  const chartAoA: (string | number)[][] = [[SECTION_COL, MEASUREMENT_COL, ...allBands]];
-  for (const sec of chart.sections) {
-    for (const row of sec.rows) {
-      chartAoA.push([
-        sec.title,
-        row.label,
-        ...allBands.map((b) => {
-          const v = row.values[b];
-          if (typeof v === "number") return v;
-          return v == null ? "" : String(v);
-        }),
-      ]);
-    }
-  }
-  const chartSheet = XLSX.utils.aoa_to_sheet(chartAoA);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, metaSheet, META_SHEET);
-  XLSX.utils.book_append_sheet(wb, chartSheet, CHART_SHEET);
+  const { XLSX, wb } = await workbookFromSizeChart(chart, false);
   XLSX.writeFile(wb, filename);
 }
 

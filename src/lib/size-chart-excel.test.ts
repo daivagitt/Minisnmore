@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   emptySizeChart,
+  exampleSizeChartForImport,
+  parseSizeChartExcelFile,
+  sizeChartDataAoA,
   sizeChartFromExcelSheets,
+  sizeChartGuideAoA,
+  sizeChartMetaAoA,
+  sizeChartToXlsxBuffer,
   validateSizeChartStructure,
 } from "./size-chart-excel";
 import { parseProductSizeChart } from "./product-size-charts";
@@ -105,5 +111,35 @@ describe("size chart excel", () => {
       "25-27",
     );
     expect(validateSizeChartStructure(chart).ok).toBe(true);
+  });
+
+  it("ships a complete vest + shorts Excel example that imports cleanly", async () => {
+    const sample = exampleSizeChartForImport();
+    expect(validateSizeChartStructure(sample)).toEqual({ ok: true, errors: [], warnings: [] });
+    expect(sample.sections.map((s) => s.title)).toEqual(["Vest", "Shorts"]);
+    expect(sample.sections[0]?.rows.find((r) => r.label === "Chest width")?.values["0-3M"]).toBe(
+      "22-23",
+    );
+    expect(sample.sections[0]?.rows.find((r) => r.label === "Body length")?.values["0-3M"]).toBe(
+      "26-28",
+    );
+
+    const chartAoA = sizeChartDataAoA(sample);
+    expect(chartAoA[0]).toEqual(["Section", "Measurement", "0-3M", "3-6M", "6-12M", "12-18M", "18-24M"]);
+    expect(sizeChartMetaAoA(sample)[1]).toEqual(["title", sample.title]);
+    expect(sizeChartGuideAoA().some((row) => String(row[0]) === "0-3M")).toBe(true);
+
+    const buf = await sizeChartToXlsxBuffer(sample, true);
+    const parsed = await parseSizeChartExcelFile(new File([buf], "product-size-chart-example.xlsx"));
+
+    expect(parsed.title).toBe(sample.title);
+    expect(parsed.code).toBe("MnM-EXAMPLE");
+    expect(parsed.sections).toHaveLength(2);
+    expect(parsed.sections[0]?.rows.find((r) => r.label === "Body length")?.values["0-3M"]).toBe(
+      "26-28",
+    );
+    expect(parsed.sections[0]?.rows.find((r) => r.label === "Chest width")?.values["3-6M"]).toBe(24);
+    expect(parsed.sections[1]?.title).toBe("Shorts");
+    expect(validateSizeChartStructure(parsed).warnings).toEqual([]);
   });
 });

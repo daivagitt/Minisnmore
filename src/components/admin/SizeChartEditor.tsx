@@ -177,8 +177,9 @@ export function SizeChartEditor({
         <div>
           <div className="text-sm font-medium">Size chart</div>
           <p className="text-xs text-muted-foreground mt-0.5 leading-snug max-w-xl">
-            Drives the storefront size guide and calculator. 0-3M is a from–to range; later sizes
-            are upper values. Leave empty to use the catalog SKU fallback.
+            Drives the storefront size guide and calculator. Download the filled example Excel,
+            edit the numbers, then Import Excel. 0-3M is a from–to range; later sizes are upper
+            values. Leave empty to use the catalog SKU fallback.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
@@ -188,7 +189,7 @@ export function SizeChartEditor({
             onClick={() => void downloadSizeChartTemplate()}
           >
             <FileDown className="h-3.5 w-3.5 inline mr-1" />
-            Template
+            Example Excel
           </button>
           {chart ? (
             <button
