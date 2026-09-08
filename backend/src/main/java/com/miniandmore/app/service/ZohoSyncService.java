@@ -57,9 +57,9 @@ public class ZohoSyncService {
     private static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
     private static final String COD_PAYMENT_TERMS_LABEL = "Cash on Delivery";
     private static final String COD_FEE_LINE_NAME = "COD handling fee";
-    /** Zoho sales-order custom field: channel = Online (org-specific field id). */
-    private static final String SALES_ORDER_CHANNEL_CUSTOM_FIELD_ID = "4066570000000458006";
-    private static final String SALES_ORDER_CHANNEL_CUSTOM_FIELD_VALUE = "Online";
+    /** Zoho sales-order custom field: channel = Retail (org-specific field id). */
+    private static final String SALES_ORDER_CHANNEL_CUSTOM_FIELD_ID = "3624052000000835002";
+    private static final String SALES_ORDER_CHANNEL_CUSTOM_FIELD_VALUE = "Retail";
 
     private final ZohoBooksClient booksClient;
     private final ObjectMapper objectMapper;

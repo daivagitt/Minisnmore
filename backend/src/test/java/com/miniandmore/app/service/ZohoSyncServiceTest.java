@@ -792,7 +792,7 @@ class ZohoSyncServiceTest {
     }
 
     @Test
-    void syncOrder_createSalesOrder_includesOnlineChannelCustomField() {
+    void syncOrder_createSalesOrder_includesRetailChannelCustomField() {
         Product product = new Product().id(10L).sku("SKU-10").zohoItemId("zoho-item-10");
         OrderItem line = new OrderItem()
             .productId("10")
@@ -817,7 +817,7 @@ class ZohoSyncServiceTest {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> customFields = (List<Map<String, Object>>) payloadCaptor.getValue().get("custom_fields");
         assertThat(customFields).containsExactly(
-            Map.of("customfield_id", "4066570000000458006", "value", "Online")
+            Map.of("customfield_id", "3624052000000835002", "value", "Retail")
         );
     }
 
