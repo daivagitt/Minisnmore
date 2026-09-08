@@ -1,7 +1,6 @@
 import type { AgeRange } from "@/data/products";
 import { normalizeSizeKey, sizeToAgeBand } from "@/lib/product-ages";
 import {
-  filterSizeChartToProductSizes,
   fitPointsFromSizeChart,
   sizeChartForProduct,
   type ChartFitPoint,
@@ -22,13 +21,9 @@ export const FIT_LIMITS = {
   measureToleranceCm: 1,
 } as const;
 
-export type FieldValidation =
-  | { ok: true; value: number }
-  | { ok: false; error: string };
+export type FieldValidation = { ok: true; value: number } | { ok: false; error: string };
 
-export type BirthDateValidation =
-  | { ok: true; value: string }
-  | { ok: false; error: string };
+export type BirthDateValidation = { ok: true; value: string } | { ok: false; error: string };
 
 export type FileValidation = { ok: true } | { ok: false; error: string };
 
@@ -116,7 +111,8 @@ export function validateBirthDate(dob: string, now = new Date()): BirthDateValid
   const birth = new Date(`${trimmed}T00:00:00`);
   if (Number.isNaN(birth.getTime())) return { ok: false, error: "Use a valid date" };
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (birth.getTime() > today.getTime()) return { ok: false, error: "Birth date cannot be in the future" };
+  if (birth.getTime() > today.getTime())
+    return { ok: false, error: "Birth date cannot be in the future" };
   let months = (now.getFullYear() - birth.getFullYear()) * 12 + (now.getMonth() - birth.getMonth());
   if (now.getDate() < birth.getDate()) months -= 1;
   if (months < 0) return { ok: false, error: "Use a valid date" };
@@ -165,7 +161,10 @@ export function clampQuantity(qty: number): number {
 export function validateQuantity(qty: number): FieldValidation {
   if (!Number.isInteger(qty)) return { ok: false, error: "Quantity must be a whole number" };
   if (qty < FIT_LIMITS.qtyMin || qty > FIT_LIMITS.qtyMax) {
-    return { ok: false, error: `Quantity must be between ${FIT_LIMITS.qtyMin} and ${FIT_LIMITS.qtyMax}` };
+    return {
+      ok: false,
+      error: `Quantity must be between ${FIT_LIMITS.qtyMin} and ${FIT_LIMITS.qtyMax}`,
+    };
   }
   return { ok: true, value: qty };
 }
@@ -173,7 +172,8 @@ export function validateQuantity(qty: number): FieldValidation {
 export function validateVirtualFitFile(file: File | null | undefined): FileValidation {
   if (!file) return { ok: false, error: "Choose a photo to upload" };
   if (!file.type.startsWith("image/")) return { ok: false, error: "Upload a JPG or PNG photo" };
-  if (file.size > FIT_LIMITS.virtualFitMaxBytes) return { ok: false, error: "Photo must be 5 MB or smaller" };
+  if (file.size > FIT_LIMITS.virtualFitMaxBytes)
+    return { ok: false, error: "Photo must be 5 MB or smaller" };
   return { ok: true };
 }
 
@@ -197,24 +197,24 @@ function chartPointsFromSheet(input: {
   return fitPointsFromSizeChart(chart);
 }
 
-/** Fit points for sold sizes only — used by the calculator, not the size-guide table. */
-function chartPointsForProduct(input: {
+/**
+ * Ranges are derived from the complete chart before unavailable product sizes
+ * are removed. Otherwise a gap in the sold sizes makes the next available
+ * size incorrectly inherit its lower bound from a much smaller band.
+ */
+function chartRangesForProduct(input: {
   sku?: string | null;
   name?: string | null;
   slug?: string | null;
   sizes: string[];
   sizeChart?: ProductSizeChart | null;
-}): ChartFitPoint[] {
-  const chart = sizeChartForProduct(input);
-  if (!chart) return [];
-  const filtered = filterSizeChartToProductSizes(chart, input.sizes);
-  return fitPointsFromSizeChart(filtered)
-    .map((p) => {
-      const size = matchBandToProductSize(p.band, input.sizes);
-      if (!size) return null;
-      return { ...p, band: size };
+}): BandRange[] {
+  return buildBandRanges(chartPointsFromSheet(input))
+    .map((range) => {
+      const size = matchBandToProductSize(range.size, input.sizes);
+      return size ? { ...range, size } : null;
     })
-    .filter((p): p is ChartFitPoint => p != null);
+    .filter((range): range is BandRange => range != null);
 }
 
 function buildBandRanges(points: ChartFitPoint[]): BandRange[] {
@@ -240,10 +240,7 @@ function buildBandRanges(points: ChartFitPoint[]): BandRange[] {
   });
 }
 
-function rowsFromFitPoints(
-  points: ChartFitPoint[],
-  sizes: string[],
-): SizeGuideRow[] {
+function rowsFromFitPoints(points: ChartFitPoint[], sizes: string[]): SizeGuideRow[] {
   if (points.length === 0) {
     return sizes.map((size) => ({
       size,
@@ -285,13 +282,12 @@ export function sizeGuideRowsForProduct(input: {
   slug?: string | null;
   sizes: string[];
   sizeChart?: ProductSizeChart | null;
-  /** When true, skip unsold bands so the last size range does not use 3-6 / 6-12 if those are not on the product. */
+  /** When true, hide unsold bands after calculating ranges from the complete chart. */
   availableOnly?: boolean;
 }): SizeGuideRow[] {
-  const points = input.availableOnly
-    ? chartPointsForProduct(input)
-    : chartPointsFromSheet(input);
-  return rowsFromFitPoints(points, input.sizes);
+  const rows = rowsFromFitPoints(chartPointsFromSheet(input), input.sizes);
+  if (!input.availableOnly) return rows;
+  return rows.filter((row) => matchBandToProductSize(row.size, input.sizes) != null);
 }
 
 function roundDisplay(n: number): number {
@@ -306,26 +302,23 @@ export function measurementLimitsForProduct(input: {
   sizes: string[];
   sizeChart?: ProductSizeChart | null;
 }): MeasurementLimits | null {
-  const points = chartPointsForProduct(input);
-  if (points.length === 0) return null;
+  const ranges = chartRangesForProduct(input);
+  if (ranges.length === 0) return null;
 
-  const lengths = points.map((p) => p.lengthCm).filter((n): n is number => n != null);
-  const chests = points.map((p) => p.chestCm).filter((n): n is number => n != null);
-  if (lengths.length === 0 && chests.length === 0) return null;
-
-  const ranges = buildBandRanges(points);
   const lengthMins = ranges.map((r) => r.lengthMin).filter((n): n is number => n != null);
   const lengthMaxs = ranges.map((r) => r.lengthMax).filter((n): n is number => n != null);
   const chestMins = ranges.map((r) => r.chestMin).filter((n): n is number => n != null);
   const chestMaxs = ranges.map((r) => r.chestMax).filter((n): n is number => n != null);
+
+  if (lengthMaxs.length === 0 && chestMaxs.length === 0) return null;
 
   return {
     lengthMin: lengthMins.length ? roundDisplay(Math.min(...lengthMins)) : FIT_LIMITS.lengthMin,
     lengthMax: lengthMaxs.length ? roundDisplay(Math.max(...lengthMaxs)) : FIT_LIMITS.lengthMax,
     chestMin: chestMins.length ? roundDisplay(Math.min(...chestMins)) : FIT_LIMITS.chestMin,
     chestMax: chestMaxs.length ? roundDisplay(Math.max(...chestMaxs)) : FIT_LIMITS.chestMax,
-    hasLength: lengths.length > 0,
-    hasChest: chests.length > 0,
+    hasLength: lengthMaxs.length > 0,
+    hasChest: chestMaxs.length > 0,
   };
 }
 
@@ -381,9 +374,9 @@ export function recommendSizeByLength(
     sizeChart?: ProductSizeChart | null;
   },
 ): string | null {
-  const points = chartPointsForProduct(input);
-  if (points.length === 0) return null;
-  return recommendByMetric(length, buildBandRanges(points), input.sizes, "length");
+  const ranges = chartRangesForProduct(input);
+  if (ranges.length === 0) return null;
+  return recommendByMetric(length, ranges, input.sizes, "length");
 }
 
 export function recommendSizeByChest(
@@ -396,14 +389,12 @@ export function recommendSizeByChest(
     sizeChart?: ProductSizeChart | null;
   },
 ): string | null {
-  const points = chartPointsForProduct(input);
-  if (points.length === 0) return null;
-  return recommendByMetric(chest, buildBandRanges(points), input.sizes, "chest");
+  const ranges = chartRangesForProduct(input);
+  if (ranges.length === 0) return null;
+  return recommendByMetric(chest, ranges, input.sizes, "chest");
 }
 
-export type SizeFitResult =
-  | { ok: true; size: string }
-  | { ok: false; error: string };
+export type SizeFitResult = { ok: true; size: string } | { ok: false; error: string };
 
 export function checkSizeFit(input: {
   lengthCm?: string;
@@ -494,7 +485,10 @@ export function recommendSizeByAgeMonths(months: number, sizes: string[]): strin
     const band = sizeToAgeBand(size)!;
     const idx = sizeBandIndex(band, ["0-3m", "3-6m", "6-12m", "12-18m", "18-24m"]);
     const dist = Math.abs(idx - targetIdx);
-    if (dist < bestDist || (dist === bestDist && best != null && pickLargerSize(best, size, sizes) === size)) {
+    if (
+      dist < bestDist ||
+      (dist === bestDist && best != null && pickLargerSize(best, size, sizes) === size)
+    ) {
       best = size;
       bestDist = dist;
     }
