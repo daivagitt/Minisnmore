@@ -44,6 +44,17 @@ class ProductServiceTest {
     private ProductService productService;
 
     @Test
+    void invalidLocalChartIsRejectedBeforeAnyProductMutation() {
+        ProductDTO input = new ProductDTO();
+        input.setId(ID);
+        input.setSizeChartJson("{\"sections\":false}");
+        assertThatThrownBy(() -> productService.save(input)).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> productService.update(input)).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> productService.partialUpdate(input)).isInstanceOf(ResponseStatusException.class);
+        org.mockito.Mockito.verifyNoInteractions(productMapper, productRepository);
+    }
+
+    @Test
     void save() {
         ProductDTO input = new ProductDTO();
         Product entity = new Product().id(ID);

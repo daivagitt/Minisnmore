@@ -27,7 +27,7 @@ import {
   applyExpectedPrintNamesToVariantsJson,
 } from "@/lib/expected-prints";
 import {
-  isUsableSizeChart,
+  serializeProductSizeChart,
   parseProductSizeChart,
   type ProductSizeChart,
 } from "@/lib/product-size-charts";
@@ -653,7 +653,7 @@ const toProductDto = (row: ProductRow): ProductDto => ({
   ageMinMonths: row.age_min_months,
   ageMaxMonths: row.age_max_months,
   sizesJson: JSON.stringify(row.sizes ?? []),
-  sizeChartJson: isUsableSizeChart(row.size_chart) ? JSON.stringify(row.size_chart) : null,
+  sizeChartJson: serializeProductSizeChart(row.size_chart),
   colorsJson: JSON.stringify(serializeProductColors(row.colors ?? [])),
   itemStructure: row.item_structure ?? "SIMPLE",
   variantsJson: row.variants_json ?? null,

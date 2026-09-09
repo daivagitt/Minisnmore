@@ -10,6 +10,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.AbstractList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -62,9 +63,26 @@ public class ZohoBooksClient {
 
     @SuppressWarnings("unchecked")
     public Map<String, Object> findItemBySku(String sku) {
-        Map<String, Object> response = get("/items?" + orgIdParam() + "&sku=" + encode(sku));
-        List<Map<String, Object>> items = (List<Map<String, Object>>) response.getOrDefault("items", List.of());
-        return items.isEmpty() ? null : items.get(0);
+        Map<String, Object> response = get("/items?" + orgIdParam() + "&sku=" + encode(sku) + "&filter_by=Status.All");
+        List<Map<String, Object>> items = requireList(response, "items");
+        if (!(response.get("page_context") instanceof Map<?, ?> context) || !Boolean.FALSE.equals(context.get("has_more_page"))) {
+            throw new IllegalStateException("Zoho SKU lookup was incomplete; refusing to create or overwrite an item");
+        }
+        List<Map<String, Object>> matches = items.stream()
+            .filter(item -> sku.trim().equalsIgnoreCase(String.valueOf(item.get("sku")).trim()))
+            .toList();
+        if (matches.size() > 1 || (!items.isEmpty() && matches.isEmpty())) {
+            throw new IllegalStateException("Zoho SKU lookup returned ambiguous or mismatched items for " + sku);
+        }
+        if (!matches.isEmpty() && itemIdentifier(matches.getFirst().get("item_id")) == null) {
+            throw new IllegalStateException("Zoho SKU lookup returned an item without an item_id");
+        }
+        return matches.isEmpty() ? null : matches.getFirst();
+    }
+
+    /** Non-secret cache scope: field ids are specific to an organization and data center. */
+    public String itemFieldCacheScope() {
+        return apiBase() + "/" + oauthService.orgId();
     }
 
     private String orgIdParam() {
@@ -72,23 +90,23 @@ public class ZohoBooksClient {
     }
 
     public Map<String, Object> getItem(String itemId) {
-        return get("/items/" + itemId + "?" + orgIdParam());
+        return requireItem(get("/items/" + itemId + "?" + orgIdParam()), itemId, null);
     }
 
     public Map<String, Object> createItem(Map<String, Object> payload) {
-        return post("/items?" + orgIdParam(), payload);
+        return requireItem(post("/items?" + orgIdParam(), payload), null, payload.get("sku"));
     }
 
     public Map<String, Object> updateItem(String itemId, Map<String, Object> payload) {
-        return put("/items/" + itemId + "?" + orgIdParam(), payload);
+        return requireItem(put("/items/" + itemId + "?" + orgIdParam(), payload), itemId, payload.get("sku"));
     }
 
     public Map<String, Object> markItemActive(String itemId) {
-        return post("/items/" + itemId + "/active?" + orgIdParam(), Map.of());
+        return requireSuccess(post("/items/" + itemId + "/active?" + orgIdParam(), Map.of()));
     }
 
     public Map<String, Object> markItemInactive(String itemId) {
-        return post("/items/" + itemId + "/inactive?" + orgIdParam(), Map.of());
+        return requireSuccess(post("/items/" + itemId + "/inactive?" + orgIdParam(), Map.of()));
     }
 
     @SuppressWarnings("unchecked")
@@ -115,7 +133,83 @@ public class ZohoBooksClient {
     private List<Map<String, Object>> listItemsByStatus(int page, String statusFilter) {
         String url = "/items?" + orgIdParam() + "&page=" + page + "&per_page=200&filter_by=" + statusFilter;
         Map<String, Object> response = get(url);
-        return (List<Map<String, Object>>) response.getOrDefault("items", List.of());
+        List<Map<String, Object>> items = requireList(response, "items");
+        if (!(response.get("page_context") instanceof Map<?, ?> context) ||
+            !(context.get("has_more_page") instanceof Boolean hasMore)) {
+            throw new IllegalStateException("Zoho returned missing or invalid item pagination metadata on page " + page);
+        }
+        if (context.containsKey("page") && !String.valueOf(page).equals(String.valueOf(context.get("page")))) {
+            throw new IllegalStateException("Zoho returned the wrong item page for request " + page);
+        }
+        if (items.isEmpty() && hasMore) {
+            throw new IllegalStateException("Zoho returned an empty item page with more pages pending");
+        }
+        return new ItemPage(items, hasMore);
+    }
+
+    /** List-compatible page so existing item consumers can retain authoritative pagination. */
+    public static final class ItemPage extends AbstractList<Map<String, Object>> {
+        private final List<Map<String, Object>> items;
+        private final boolean hasMorePage;
+
+        public ItemPage(List<Map<String, Object>> items, boolean hasMorePage) {
+            this.items = List.copyOf(items);
+            this.hasMorePage = hasMorePage;
+        }
+
+        @Override
+        public Map<String, Object> get(int index) { return items.get(index); }
+
+        @Override
+        public int size() { return items.size(); }
+
+        public boolean hasMorePage() { return hasMorePage; }
+    }
+
+    private static Map<String, Object> requireSuccess(Map<String, Object> response) {
+        if (response == null || response.isEmpty()) {
+            throw new IllegalStateException("Zoho returned an empty response");
+        }
+        if (response.containsKey("code") && !"0".equals(String.valueOf(response.get("code")))) {
+            throw new IllegalStateException("Zoho rejected the request (code " + response.get("code") + "): " + response.get("message"));
+        }
+        return response;
+    }
+
+    private static Map<String, Object> requireItem(Map<String, Object> response, String requestedId, Object requestedSku) {
+        requireSuccess(response);
+        if (!(response.get("item") instanceof Map<?, ?> item)) {
+            throw new IllegalStateException("Zoho returned missing or invalid item detail");
+        }
+        String id = itemIdentifier(item.get("item_id"));
+        if (id == null) throw new IllegalStateException("Zoho returned an item without a valid item_id");
+        if (requestedId != null && !requestedId.equals(id)) {
+            throw new IllegalStateException("Zoho returned an item identity mismatch");
+        }
+        if (requestedSku != null && item.containsKey("sku") &&
+            !String.valueOf(requestedSku).trim().equalsIgnoreCase(String.valueOf(item.get("sku")).trim())) {
+            throw new IllegalStateException("Zoho returned an item SKU mismatch");
+        }
+        return response;
+    }
+
+    private static String itemIdentifier(Object value) {
+        // Zoho describes IDs as strings, but its published examples also use JSON integers.
+        if (value instanceof String || value instanceof Byte || value instanceof Short ||
+            value instanceof Integer || value instanceof Long || value instanceof java.math.BigInteger) {
+            String id = StringUtils.trimToNull(value.toString());
+            return "null".equalsIgnoreCase(id) || "0".equals(id) ? null : id;
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> requireList(Map<String, Object> response, String key) {
+        requireSuccess(response);
+        if (!(response.get(key) instanceof List<?> values) || values.stream().anyMatch(value -> !(value instanceof Map))) {
+            throw new IllegalStateException("Zoho returned missing or invalid " + key + " list");
+        }
+        return (List<Map<String, Object>>) response.get(key);
     }
 
     @SuppressWarnings("unchecked")
@@ -139,7 +233,7 @@ public class ZohoBooksClient {
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> listItemFields() {
         Map<String, Object> response = get("/settings/fields?" + orgIdParam() + "&entity=item");
-        return (List<Map<String, Object>>) response.getOrDefault("fields", List.of());
+        return requireList(response, "fields");
     }
 
     public void uploadItemImage(String itemId, byte[] imageBytes, String filename, String contentType) {

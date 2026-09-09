@@ -1,6 +1,7 @@
 package com.miniandmore.app.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.domain.Product;
@@ -497,6 +498,44 @@ class ProductVariantSupportTest {
 
         assertThat(support.updateVariantStockBySku(product, "HORIZON-S-NAVY", 9)).isTrue();
         assertThat(support.parseProduct(product).get(0).stock()).isEqualTo(9);
+    }
+
+    @Test
+    void pulledVariantRejectsSameSizeColorForDifferentIdentityWithoutChangingParent() {
+        Product product = variantProduct("[{\"sku\":\"LOCAL-S\",\"size\":\"S\",\"color\":\"Navy\",\"rate\":100,\"stock\":3,\"active\":true,\"zohoItemId\":\"local-id\"}]");
+        String before = product.getVariantsJson();
+        Integer stock = product.getStock();
+        assertThatThrownBy(() -> support.upsertPulledVariantFromZoho(product, "REMOTE-S", " s ", " navy ", BigDecimal.TEN, null, 99, "remote-id", true))
+            .isInstanceOf(IllegalStateException.class).hasMessageContaining("size/color conflict").hasMessageContaining("LOCAL-S");
+        assertThat(product.getVariantsJson()).isEqualTo(before);
+        assertThat(product.getStock()).isEqualTo(stock);
+    }
+
+    @Test
+    void pulledVariantRejectsMovingExistingIdentityIntoAnotherRowsCombination() {
+        Product product = variantProduct("[{\"sku\":\"LOCAL-S\",\"size\":\"S\",\"color\":\"Navy\",\"rate\":100,\"stock\":3,\"active\":true,\"zohoItemId\":\"id-s\"},{\"sku\":\"LOCAL-M\",\"size\":\"M\",\"color\":\"Navy\",\"rate\":100,\"stock\":3,\"active\":true,\"zohoItemId\":\"id-m\"}]");
+        String before = product.getVariantsJson();
+        assertThatThrownBy(() -> support.upsertPulledVariantFromZoho(product, "LOCAL-M", "S", "Navy", BigDecimal.TEN, null, 99, "id-m", true))
+            .isInstanceOf(IllegalStateException.class).hasMessageContaining("size/color conflict");
+        assertThat(product.getVariantsJson()).isEqualTo(before);
+        assertThatThrownBy(() -> support.upsertPulledVariantFromZoho(product, "LOCAL-S", "M", "Navy", BigDecimal.TEN, null, 99, "id-m", true))
+            .isInstanceOf(IllegalStateException.class).hasMessageContaining("identity conflict");
+        assertThat(product.getVariantsJson()).isEqualTo(before);
+    }
+
+    @Test
+    void pulledVariantDoesNotReuseInactiveRowsCombination() {
+        Product product = variantProduct("[{\"sku\":\"OLD-S\",\"size\":\"S\",\"color\":\"Navy\",\"rate\":100,\"stock\":0,\"active\":false}]");
+        assertThatThrownBy(() -> support.upsertPulledVariantFromZoho(product, "NEW-S", "S", "Navy", BigDecimal.TEN, null, 1, "new-id", true))
+            .isInstanceOf(IllegalStateException.class).hasMessageContaining("size/color conflict");
+    }
+
+    @Test
+    void pulledVariantSameCombinationOnAnotherParentIsIndependent() {
+        Product product = variantProduct("[{\"sku\":\"LOCAL-S\",\"size\":\"S\",\"color\":\"Navy\",\"rate\":100,\"stock\":3,\"active\":true}]");
+        Product other = variantProduct("[]");
+        assertThat(support.upsertPulledVariantFromZoho(other, "OTHER-S", "S", "Navy", BigDecimal.TEN, null, 1, "other-id", true)).isTrue();
+        assertThat(support.parseProduct(product)).hasSize(1);
     }
 
     @Test

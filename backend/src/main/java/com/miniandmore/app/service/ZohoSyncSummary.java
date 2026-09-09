@@ -50,6 +50,7 @@ public record ZohoSyncSummary(
         private final List<Map<String, Object>> failures = new ArrayList<>();
         private final List<Map<String, Object>> notices = new ArrayList<>();
         private final List<Map<String, Object>> skipped = new ArrayList<>();
+        private final Map<Long, String> productFailures = new LinkedHashMap<>();
 
         public Builder success() {
             successCount++;
@@ -77,7 +78,12 @@ public record ZohoSyncSummary(
         public Builder failure(Long id, String name, String message) {
             failureCount++;
             failures.add(entry(id, name, null, message));
+            if (id != null) productFailures.putIfAbsent(id, message);
             return this;
+        }
+
+        public String failureForProduct(Long id) {
+            return productFailures.get(id);
         }
 
         public Builder skipped(String sku, String message) {

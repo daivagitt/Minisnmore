@@ -43,6 +43,34 @@ class ZohoProductFieldMapperTest {
     }
 
     @Test
+    void discoveryFailureIsRetriedAndNeverReportedAsFieldlessSuccess() {
+        when(booksClient.listItemFields()).thenThrow(new IllegalStateException("temporary outage")).thenReturn(sampleFields());
+        Product product = new Product().fabricType("Cotton");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> mapper.enrichPushPayload(product, new LinkedHashMap<>()))
+            .isInstanceOf(IllegalStateException.class);
+        Map<String, Object> payload = new LinkedHashMap<>();
+        mapper.enrichPushPayload(product, payload);
+        assertThat(payload).containsKey("custom_fields");
+        org.mockito.Mockito.verify(booksClient, org.mockito.Mockito.times(2)).listItemFields();
+    }
+
+    @Test
+    void changingOrganizationInvalidatesFieldCache() {
+        when(booksClient.itemFieldCacheScope()).thenReturn("in/org-a", "in/org-b");
+        mapper.enrichPushPayload(new Product(), new LinkedHashMap<>());
+        mapper.enrichPushPayload(new Product(), new LinkedHashMap<>());
+        org.mockito.Mockito.verify(booksClient, org.mockito.Mockito.times(2)).listItemFields();
+    }
+
+    @Test
+    void expiredFieldDefinitionsAreRefreshed() {
+        mapper.enrichPushPayload(new Product(), new LinkedHashMap<>());
+        org.springframework.test.util.ReflectionTestUtils.setField(mapper, "cacheExpiresAt", java.time.Instant.MIN);
+        mapper.enrichPushPayload(new Product(), new LinkedHashMap<>());
+        org.mockito.Mockito.verify(booksClient, org.mockito.Mockito.times(2)).listItemFields();
+    }
+
+    @Test
     void enrichPushPayload_mapsMrpFabricSizesAndMandatoryAge() {
         Product product = new Product()
             .fabricType("Cotton")

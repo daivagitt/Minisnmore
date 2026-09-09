@@ -319,7 +319,7 @@ export function SizeChartEditor({
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
                 Calculator preview (this product’s sizes only)
               </div>
-              <ProductSizeChartTables rows={previewRows} title={chart.title || null} />
+              <ProductSizeChartTables rows={previewRows} title={chart.title || null} chart={chart} />
             </div>
           ) : null}
         </>

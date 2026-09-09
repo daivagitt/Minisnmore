@@ -82,6 +82,25 @@ class ZohoItemImageSyncTest {
         lenient().when(applicationProperties.getStorage()).thenReturn(storage);
     }
 
+
+    @Test
+    void importZohoItemImage_storageFailureIsVisibleAndPreservesOldGallery() {
+        Product product = new Product().id(99L).sku("SAFE").imagesJson("[\"old.jpg\"]");
+        when(booksClient.downloadItemImage(eq("zoho-99"), any(Long.class)))
+            .thenReturn(Optional.of(new BinaryDownload("bytes".getBytes(), "image/jpeg")));
+        when(s3StorageService.uploadObject(eq("products"), any(), any(), eq("image/jpeg")))
+            .thenThrow(new IllegalStateException("storage unavailable"));
+        assertThatThrownBy(() -> itemImageSync.importZohoItemImage(product, "zoho-99", Map.of("image_name", "photo.jpg")))
+            .isInstanceOf(IllegalStateException.class);
+        assertThat(product.getImagesJson()).isEqualTo("[\"old.jpg\"]");
+    }
+
+    @Test
+    void importZohoItemImage_declaredButUnavailableImageIsNotSuccess() {
+        assertThatThrownBy(() -> itemImageSync.importZohoItemImage(new Product().sku("SAFE"), "missing", Map.of("image_name", "photo.jpg")))
+            .isInstanceOf(IllegalStateException.class).hasMessageContaining("no usable image bytes");
+    }
+
     @Test
     void importZohoItemImage_downloadsBinaryAndStoresOnProduct() {
         Product product = new Product().id(1L).sku("SKU-1");

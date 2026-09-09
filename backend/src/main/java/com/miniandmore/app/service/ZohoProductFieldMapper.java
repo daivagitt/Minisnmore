@@ -5,6 +5,7 @@ import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.Category;
 import com.miniandmore.app.domain.Product;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -12,8 +13,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -23,13 +22,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class ZohoProductFieldMapper {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ZohoProductFieldMapper.class);
-
     private final ZohoBooksClient booksClient;
     private final ApplicationProperties applicationProperties;
     private final ProductDescriptionCodec descriptionCodec;
     private final LedgerlyCategoryResolver categoryResolver;
-    private volatile FieldIndex cachedIndex;
+    private FieldIndex cachedIndex;
+    private String cachedScope;
+    private Instant cacheExpiresAt = Instant.MIN;
 
     public ZohoProductFieldMapper(
         ZohoBooksClient booksClient,
@@ -143,23 +142,17 @@ public class ZohoProductFieldMapper {
         return category.getName().trim();
     }
 
-    private FieldIndex resolveFields() {
-        FieldIndex existing = cachedIndex;
-        if (existing != null) {
-            return existing;
-        }
-        synchronized (this) {
-            if (cachedIndex != null) {
-                return cachedIndex;
-            }
-            try {
-                cachedIndex = buildIndex(booksClient.listItemFields());
-            } catch (RuntimeException e) {
-                LOG.warn("Could not load Zoho item field definitions: {}", e.getMessage());
-                cachedIndex = FieldIndex.empty(applicationProperties.getZoho().getProductFields().getMrpApiName());
-            }
+    private synchronized FieldIndex resolveFields() {
+        String scope = booksClient.itemFieldCacheScope();
+        if (cachedIndex != null && java.util.Objects.equals(scope, cachedScope) && Instant.now().isBefore(cacheExpiresAt)) {
             return cachedIndex;
         }
+        // Never treat discovery failure as a successful, field-less sync. Leave expired/other-org
+        // data unused and propagate the failure so pull cursors and push status remain retryable.
+        cachedIndex = buildIndex(booksClient.listItemFields());
+        cachedScope = scope;
+        cacheExpiresAt = Instant.now().plusSeconds(300);
+        return cachedIndex;
     }
 
     FieldIndex buildIndex(List<Map<String, Object>> rawFields) {
