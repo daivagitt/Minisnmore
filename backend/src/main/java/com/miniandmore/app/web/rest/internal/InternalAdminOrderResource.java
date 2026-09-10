@@ -6,13 +6,20 @@ import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
+import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
+import com.miniandmore.app.security.SecurityUtils;
 import com.miniandmore.app.service.LedgerlySyncService;
+import com.miniandmore.app.service.OrderCancellationService;
 import com.miniandmore.app.service.OrderEventService;
+import com.miniandmore.app.service.OrderShipmentService;
 import com.miniandmore.app.service.OrderTrackingStatusResolver;
 import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import com.miniandmore.app.web.rest.v1.ApiResponse;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -51,6 +58,8 @@ public class InternalAdminOrderResource {
     private final ObjectMapper objectMapper;
     private final OrderEventService orderEventService;
     private final InternalAccountOrderResource accountOrders;
+    private final OrderShipmentService orderShipmentService;
+    private final OrderCancellationService orderCancellationService;
 
     public InternalAdminOrderResource(
         AccountOrderDataAccess dataAccess,
@@ -58,7 +67,9 @@ public class InternalAdminOrderResource {
         ZohoSyncService zohoSyncService,
         ObjectMapper objectMapper,
         OrderEventService orderEventService,
-        InternalAccountOrderResource accountOrders
+        InternalAccountOrderResource accountOrders,
+        OrderShipmentService orderShipmentService,
+        OrderCancellationService orderCancellationService
     ) {
         this.dataAccess = dataAccess;
         this.ledgerlySyncService = ledgerlySyncService;
@@ -66,6 +77,8 @@ public class InternalAdminOrderResource {
         this.objectMapper = objectMapper;
         this.orderEventService = orderEventService;
         this.accountOrders = accountOrders;
+        this.orderShipmentService = orderShipmentService;
+        this.orderCancellationService = orderCancellationService;
     }
 
     @GetMapping
@@ -196,6 +209,39 @@ public class InternalAdminOrderResource {
         return ApiResponse.ok(Map.of("ok", true, "orderNumber", saved.getOrderNumber(), "paymentStatus", "paid"));
     }
 
+    @PostMapping("/{orderNumber}/book-shipment")
+    public ApiResponse<Map<String, Object>> bookShipment(
+        @PathVariable String orderNumber,
+        @Valid @RequestBody BookShipmentRequest body
+    ) {
+        ReturnLogisticsMode mode = parseLogisticsMode(body.mode());
+        CustomerOrder saved = orderShipmentService.bookShipment(
+            orderNumber,
+            mode,
+            body.carrier_name(),
+            body.awb(),
+            body.tracking_url(),
+            body.label_url(),
+            Boolean.TRUE.equals(body.override_fulfillment_hold()),
+            body.override_reason()
+        );
+        return ApiResponse.ok(Map.of("order", summary(saved)));
+    }
+
+    @PostMapping("/{orderNumber}/cancel-shipment")
+    public ApiResponse<Map<String, Object>> cancelShipment(
+        @PathVariable String orderNumber,
+        @Valid @RequestBody CancelShipmentRequest body
+    ) {
+        CustomerOrder saved = orderShipmentService.cancelShipment(
+            orderNumber,
+            parseLogisticsMode(body.mode()),
+            body.reason(),
+            SecurityUtils.getCurrentUserLogin().orElse("system")
+        );
+        return ApiResponse.ok(Map.of("order", summary(saved)));
+    }
+
     private Map<String, Object> summary(CustomerOrder order) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("id", order.getId());
@@ -224,6 +270,24 @@ public class InternalAdminOrderResource {
         data.put("full_name", address.path("full_name").asText(""));
         data.put("phone", address.path("phone").asText(""));
         data.put("city", address.path("city").asText(""));
+        data.put("tracking_number", StringUtils.defaultString(order.getTrackingNumber()));
+        data.put("tracking_carrier", StringUtils.defaultString(order.getTrackingCarrier()));
+        data.put("tracking_url", StringUtils.defaultString(order.getTrackingUrl()));
+        data.put("shipment_date", StringUtils.defaultString(order.getShipmentDate()));
+        data.put("shipment_label_url", StringUtils.defaultString(order.getShipmentLabelUrl()));
+        data.put("shipment_carrier_status", StringUtils.defaultString(order.getShipmentCarrierStatus()));
+        data.put("shipment_delivered_at", instant(order.getShipmentDeliveredAt()));
+        data.put("shipment_cancelled_at", instant(order.getShipmentCancelledAt()));
+        data.put("shipment_cancelled_by", StringUtils.defaultString(order.getShipmentCancelledBy()));
+        data.put("shipment_cancellation_reason", StringUtils.defaultString(order.getShipmentCancellationReason()));
+        data.put(
+            "shipment_logistics_mode",
+            order.getShipmentLogisticsMode() == null ? "" : order.getShipmentLogisticsMode().name().toLowerCase()
+        );
+        boolean pendingCancellation = order.getId() != null && orderCancellationService.hasPendingRequest(order.getId());
+        data.put("pending_cancellation", pendingCancellation);
+        data.put("can_book_shipment", orderShipmentService.canBook(order));
+        data.put("can_book_shipment_with_override", orderShipmentService.canBookWithOverride(order));
         return data;
     }
 
@@ -251,4 +315,30 @@ public class InternalAdminOrderResource {
             return objectMapper.createObjectNode();
         }
     }
+
+    private static ReturnLogisticsMode parseLogisticsMode(String mode) {
+        if (StringUtils.isBlank(mode)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Logistics mode is required");
+        }
+        try {
+            return ReturnLogisticsMode.valueOf(mode.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid logistics mode: " + mode);
+        }
+    }
+
+    public record BookShipmentRequest(
+        @NotBlank String mode,
+        @Size(max = 80) String carrier_name,
+        @Size(max = 120) String awb,
+        @Size(max = 500) String tracking_url,
+        @Size(max = 500) String label_url,
+        Boolean override_fulfillment_hold,
+        @Size(max = 500) String override_reason
+    ) {}
+
+    public record CancelShipmentRequest(
+        @NotBlank String mode,
+        @NotBlank @Size(min = 5, max = 500) String reason
+    ) {}
 }

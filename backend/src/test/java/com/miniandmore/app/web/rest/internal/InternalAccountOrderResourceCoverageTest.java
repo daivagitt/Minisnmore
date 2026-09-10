@@ -23,6 +23,7 @@ import com.miniandmore.app.domain.*;
 import com.miniandmore.app.domain.enumeration.DiscountType;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
+import com.miniandmore.app.domain.enumeration.CancellationRequestStatus;
 import com.miniandmore.app.repository.*;
 import com.miniandmore.app.service.LedgerlySyncService;
 import com.miniandmore.app.service.OrderEventService;
@@ -99,6 +100,9 @@ class InternalAccountOrderResourceCoverageTest {
 
     @MockitoBean
     private com.miniandmore.app.service.RazorpayRefundService razorpayRefundService;
+
+    @MockitoBean
+    private com.miniandmore.app.service.OrderCancellationService orderCancellationService;
 
     @BeforeEach
     void setUp() {
@@ -1392,7 +1396,7 @@ class InternalAccountOrderResourceCoverageTest {
     }
 
     @Test
-    void cancelOrder_codBeforeDispatch_restoresInventoryAndCancels() throws Exception {
+    void cancelOrder_codBeforeDispatch_createsCancellationRequest() throws Exception {
         CustomerOrder order = new CustomerOrder()
             .id(80L)
             .userLogin("customer1")
@@ -1401,14 +1405,20 @@ class InternalAccountOrderResourceCoverageTest {
             .paymentStatus(PaymentStatus.PENDING)
             .paymentMethod("cod")
             .inventoryReserved(true)
-            .zohoSalesOrderId("zoho-so-80")
             .total(BigDecimal.valueOf(549));
-        OrderItem item = new OrderItem().productId("1").qty(2).order(order);
-        Product product = new Product().id(1L).stock(3);
+        OrderCancellationRequest request = new OrderCancellationRequest();
+        request.setRequestNumber("CAN-COD-001");
+        request.setStatus(CancellationRequestStatus.REQUESTED);
+        request.setReason("Ordered by mistake");
+        request.setOrder(order);
+        request.setUserLogin("customer1");
         when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-COD-CANCEL", "customer1")).thenReturn(Optional.of(order));
-        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(orderItemRepository.findAllByOrderId(80L)).thenReturn(List.of(item));
-        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
+        when(orderCancellationService.submitRequest("customer1", "MNM-COD-CANCEL", "Ordered by mistake")).thenReturn(request);
+        when(orderCancellationService.getOpenForUser("customer1", "MNM-COD-CANCEL")).thenReturn(request);
+        when(orderCancellationService.hasPendingRequest(80L)).thenReturn(true);
+        when(orderCancellationService.toDto(request)).thenReturn(
+            Map.of("request_number", "CAN-COD-001", "status", "requested", "reason", "Ordered by mistake")
+        );
 
         mockMvc
             .perform(
@@ -1418,18 +1428,15 @@ class InternalAccountOrderResourceCoverageTest {
                     .content("{\"reason\":\"Ordered by mistake\"}")
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.order.status").value("cancelled"))
-            .andExpect(jsonPath("$.data.order.can_cancel").value(false));
+            .andExpect(jsonPath("$.data.order.status").value("confirmed"))
+            .andExpect(jsonPath("$.data.cancellation_request.status").value("requested"));
 
-        assertThat(product.getStock()).isEqualTo(5);
-        assertThat(order.getInventoryReleasedAt()).isNotNull();
         verify(razorpayRefundService, never()).refundPayment(any(), any());
-        verify(zohoSyncService).cancelOrder(80L);
-        verify(orderEventService).syncLifecycleEvents(order);
+        verify(zohoSyncService, never()).cancelOrder(anyLong());
     }
 
     @Test
-    void cancelOrder_paidBeforeDispatch_refundsAndRestoresInventory() throws Exception {
+    void cancelOrder_paidBeforeDispatch_createsCancellationRequest() throws Exception {
         CustomerOrder order = new CustomerOrder()
             .id(81L)
             .userLogin("customer1")
@@ -1438,15 +1445,20 @@ class InternalAccountOrderResourceCoverageTest {
             .paymentStatus(PaymentStatus.PAID)
             .paymentMethod("online")
             .razorpayPaymentId("pay_81")
-            .inventoryReserved(false)
             .total(BigDecimal.valueOf(999));
-        OrderItem item = new OrderItem().productId("1").qty(1).order(order);
-        Product product = new Product().id(1L).stock(4);
+        OrderCancellationRequest request = new OrderCancellationRequest();
+        request.setRequestNumber("CAN-PAID-001");
+        request.setStatus(CancellationRequestStatus.REQUESTED);
+        request.setReason("Found a better price elsewhere");
+        request.setOrder(order);
+        request.setUserLogin("customer1");
         when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-PAID-CANCEL", "customer1")).thenReturn(Optional.of(order));
-        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(orderItemRepository.findAllByOrderId(81L)).thenReturn(List.of(item));
-        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
-        when(razorpayRefundService.refundPayment(order, BigDecimal.valueOf(999))).thenReturn("rfnd_81");
+        when(orderCancellationService.submitRequest("customer1", "MNM-PAID-CANCEL", "Found a better price elsewhere")).thenReturn(request);
+        when(orderCancellationService.getOpenForUser("customer1", "MNM-PAID-CANCEL")).thenReturn(request);
+        when(orderCancellationService.hasPendingRequest(81L)).thenReturn(true);
+        when(orderCancellationService.toDto(request)).thenReturn(
+            Map.of("request_number", "CAN-PAID-001", "status", "requested", "reason", "Found a better price elsewhere")
+        );
 
         mockMvc
             .perform(
@@ -1456,17 +1468,14 @@ class InternalAccountOrderResourceCoverageTest {
                     .content("{\"reason\":\"Found a better price elsewhere\"}")
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.order.status").value("cancelled"))
-            .andExpect(jsonPath("$.data.order.payment_status").value("refunded"));
+            .andExpect(jsonPath("$.data.order.status").value("confirmed"))
+            .andExpect(jsonPath("$.data.cancellation_request.status").value("requested"));
 
-        assertThat(product.getStock()).isEqualTo(5);
-        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUNDED);
-        verify(razorpayRefundService).refundPayment(order, BigDecimal.valueOf(999));
-        verify(ledgerlyIntegrationClient).cancelOrder("MNM-PAID-CANCEL", null, "rfnd_81");
+        verify(razorpayRefundService, never()).refundPayment(any(), any());
     }
 
     @Test
-    void cancelOrder_whenRefundFails_keepsOrderAndInventoryUnchanged() throws Exception {
+    void cancelOrder_whenDuplicateRequest_propagatesConflict() throws Exception {
         CustomerOrder order = new CustomerOrder()
             .id(83L)
             .userLogin("customer1")
@@ -1475,11 +1484,10 @@ class InternalAccountOrderResourceCoverageTest {
             .paymentStatus(PaymentStatus.PAID)
             .paymentMethod("online")
             .razorpayPaymentId("pay_83")
-            .inventoryReserved(false)
             .total(BigDecimal.valueOf(750));
         when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-REFUND-FAIL", "customer1")).thenReturn(Optional.of(order));
-        when(razorpayRefundService.refundPayment(order, BigDecimal.valueOf(750))).thenThrow(
-            new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_GATEWAY, "gateway down")
+        when(orderCancellationService.submitRequest(eq("customer1"), eq("MNM-REFUND-FAIL"), any())).thenThrow(
+            new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "A cancellation request is already pending for this order")
         );
 
         mockMvc
@@ -1489,11 +1497,10 @@ class InternalAccountOrderResourceCoverageTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"reason\":\"Changed my mind\"}")
             )
-            .andExpect(status().isBadGateway());
+            .andExpect(status().isConflict());
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
-        verify(orderItemRepository, never()).findAllByOrderId(83L);
         verify(orderEventService, never()).syncLifecycleEvents(order);
     }
 

@@ -73,6 +73,9 @@ class InternalAccountOrderResourcePrivateLogicTest {
     private com.miniandmore.app.service.RazorpayRefundService razorpayRefundService;
 
     @Mock
+    private com.miniandmore.app.service.OrderCancellationService orderCancellationService;
+
+    @Mock
     private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     private InternalAccountOrderResource resource;
@@ -98,6 +101,7 @@ class InternalAccountOrderResourcePrivateLogicTest {
             StorePricingTestSupport.defaultPricing(),
             orderEventService,
             razorpayRefundService,
+            orderCancellationService,
             transactionManager
         );
         ReflectionTestUtils.setField(resource, "razorpayKeyId", "rzp_test");

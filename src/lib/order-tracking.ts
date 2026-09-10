@@ -68,6 +68,7 @@ export type OrderTrackingFields = {
   tracking_status?: string;
   tracking_number?: string;
   tracking_carrier?: string;
+  tracking_url?: string;
   shipment_date?: string;
   payment_status?: string;
   payment_method?: string;

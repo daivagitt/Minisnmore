@@ -150,6 +150,27 @@ public class CommerceOrdersProxyResource {
         return catalog.post(CatalogInternalClient.encodedPath("/internal/v1/orders/{orderNumber}/cancel", orderNumber), body);
     }
 
+    @PostMapping("/orders/{orderNumber}/cancel-request")
+    public ResponseEntity<String> submitCancelRequest(@PathVariable String orderNumber, @RequestBody Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/orders/{orderNumber}/cancel-request", orderNumber),
+            body
+        );
+    }
+
+    @GetMapping("/orders/{orderNumber}/cancel-request")
+    public ResponseEntity<String> getCancelRequest(@PathVariable String orderNumber) {
+        return catalog.get(CatalogInternalClient.encodedPath("/internal/v1/orders/{orderNumber}/cancel-request", orderNumber));
+    }
+
+    @PostMapping("/orders/{orderNumber}/cancel-request/withdraw")
+    public ResponseEntity<String> withdrawCancelRequest(@PathVariable String orderNumber) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/orders/{orderNumber}/cancel-request/withdraw", orderNumber),
+            Map.of()
+        );
+    }
+
     @GetMapping("/payments")
     public ResponseEntity<String> listPayments() {
         return catalog.get("/internal/v1/payments");

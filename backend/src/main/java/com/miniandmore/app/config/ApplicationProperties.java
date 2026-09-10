@@ -610,6 +610,45 @@ public class ApplicationProperties {
 
         private String paymentType = "prepaid";
 
+        /** XB access key for legacy reverse-manifest APIs. */
+        private String xbKey;
+
+        /** Business account name validated by XpressBees on manifest requests. */
+        private String businessAccountName;
+
+        /** Relative path or absolute URL for reverse pickup booking. */
+        private String reverseManifestPath = "/api/courier/reverse/order";
+
+        /** Relative path or absolute URL for forward outbound shipment booking. */
+        private String forwardManifestPath = "/api/courier/order";
+
+        /** Relative path or absolute URL for cancelling a booked forward shipment. */
+        private String cancelShipmentPath = "/api/shipments2/cancel";
+
+        /** Shared secret for inbound return webhooks (header or HMAC). */
+        private String webhookSecret;
+
+        /** token (Bearer login) or legacy (XBkey in JSON body). */
+        private String authType = "token";
+
+        private String warehouseName = "Mini's n More";
+
+        private String warehousePhone;
+
+        private String warehouseLine1;
+
+        private String warehouseLine2;
+
+        private String warehouseCity = "Bengaluru";
+
+        private String warehouseState = "Karnataka";
+
+        private String trackingUrlTemplate = "https://www.xpressbees.com/track/?awb={awb}";
+
+        private int defaultWeightGrams = 500;
+
+        private String pickupVendorCode;
+
         public String getBaseUrl() {
             return baseUrl;
         }
@@ -648,6 +687,138 @@ public class ApplicationProperties {
 
         public void setPaymentType(String paymentType) {
             this.paymentType = paymentType;
+        }
+
+        public String getXbKey() {
+            return xbKey;
+        }
+
+        public void setXbKey(String xbKey) {
+            this.xbKey = xbKey;
+        }
+
+        public String getBusinessAccountName() {
+            return businessAccountName;
+        }
+
+        public void setBusinessAccountName(String businessAccountName) {
+            this.businessAccountName = businessAccountName;
+        }
+
+        public String getReverseManifestPath() {
+            return reverseManifestPath;
+        }
+
+        public void setReverseManifestPath(String reverseManifestPath) {
+            this.reverseManifestPath = reverseManifestPath;
+        }
+
+        public String getForwardManifestPath() {
+            return forwardManifestPath;
+        }
+
+        public void setForwardManifestPath(String forwardManifestPath) {
+            this.forwardManifestPath = forwardManifestPath;
+        }
+
+        public String getCancelShipmentPath() {
+            return cancelShipmentPath;
+        }
+
+        public void setCancelShipmentPath(String cancelShipmentPath) {
+            this.cancelShipmentPath = cancelShipmentPath;
+        }
+
+        public String getWebhookSecret() {
+            return webhookSecret;
+        }
+
+        public void setWebhookSecret(String webhookSecret) {
+            this.webhookSecret = webhookSecret;
+        }
+
+        public String getAuthType() {
+            return authType;
+        }
+
+        public void setAuthType(String authType) {
+            this.authType = authType;
+        }
+
+        public String getWarehouseName() {
+            return warehouseName;
+        }
+
+        public void setWarehouseName(String warehouseName) {
+            this.warehouseName = warehouseName;
+        }
+
+        public String getWarehousePhone() {
+            return warehousePhone;
+        }
+
+        public void setWarehousePhone(String warehousePhone) {
+            this.warehousePhone = warehousePhone;
+        }
+
+        public String getWarehouseLine1() {
+            return warehouseLine1;
+        }
+
+        public void setWarehouseLine1(String warehouseLine1) {
+            this.warehouseLine1 = warehouseLine1;
+        }
+
+        public String getWarehouseLine2() {
+            return warehouseLine2;
+        }
+
+        public void setWarehouseLine2(String warehouseLine2) {
+            this.warehouseLine2 = warehouseLine2;
+        }
+
+        public String getWarehouseCity() {
+            return warehouseCity;
+        }
+
+        public void setWarehouseCity(String warehouseCity) {
+            this.warehouseCity = warehouseCity;
+        }
+
+        public String getWarehouseState() {
+            return warehouseState;
+        }
+
+        public void setWarehouseState(String warehouseState) {
+            this.warehouseState = warehouseState;
+        }
+
+        public String getTrackingUrlTemplate() {
+            return trackingUrlTemplate;
+        }
+
+        public void setTrackingUrlTemplate(String trackingUrlTemplate) {
+            this.trackingUrlTemplate = trackingUrlTemplate;
+        }
+
+        public int getDefaultWeightGrams() {
+            return defaultWeightGrams;
+        }
+
+        public void setDefaultWeightGrams(int defaultWeightGrams) {
+            this.defaultWeightGrams = defaultWeightGrams;
+        }
+
+        public String getPickupVendorCode() {
+            return pickupVendorCode;
+        }
+
+        public void setPickupVendorCode(String pickupVendorCode) {
+            this.pickupVendorCode = pickupVendorCode;
+        }
+
+        public boolean usesLegacyAuth() {
+            return authType != null && "legacy".equalsIgnoreCase(authType.trim());
         }
     }
 

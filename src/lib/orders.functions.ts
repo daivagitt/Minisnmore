@@ -102,11 +102,20 @@ export async function getAdminOrder(orderNumber: string): Promise<{ order: any }
   return api.get(`/api/v1/admin/orders/${encodeURIComponent(parsed.orderNumber)}`, { auth: true });
 }
 
-export async function cancelOrder(orderNumber: string, reason: string): Promise<{ order: any }> {
+export async function cancelOrder(orderNumber: string, reason: string): Promise<{ order: any; cancellation_request?: any }> {
   const parsed = OrderNumberInput.parse({ orderNumber });
   return api.post(
-    `/api/v1/orders/${encodeURIComponent(parsed.orderNumber)}/cancel`,
+    `/api/v1/orders/${encodeURIComponent(parsed.orderNumber)}/cancel-request`,
     { reason },
+    { auth: true },
+  );
+}
+
+export async function withdrawCancelRequest(orderNumber: string): Promise<{ order: any; cancellation_request?: any }> {
+  const parsed = OrderNumberInput.parse({ orderNumber });
+  return api.post(
+    `/api/v1/orders/${encodeURIComponent(parsed.orderNumber)}/cancel-request/withdraw`,
+    {},
     { auth: true },
   );
 }
@@ -220,6 +229,27 @@ export type OrderReturnRow = {
   original_color?: string | null;
   replacement_size?: string | null;
   replacement_color?: string | null;
+  original_item_amount?: number | null;
+  replacement_item_amount?: number | null;
+  price_difference?: number | null;
+  settlement_status?: string | null;
+  items?: OrderReturnLine[];
+};
+
+export type OrderReturnLine = {
+  id: number;
+  order_item_id: number;
+  product_name: string;
+  size?: string | null;
+  color?: string | null;
+  requested_qty: number;
+  received_qty?: number | null;
+  accepted_qty?: number | null;
+  unit_amount: number;
+  gross_amount: number;
+  discount_allocation: number;
+  refund_amount: number;
+  disposition?: string | null;
 };
 
 export async function listMyOrderReturns(): Promise<{ returns: OrderReturnRow[] }> {
@@ -242,6 +272,15 @@ export async function getReturnsConfig(): Promise<{ enabled: boolean; window_day
 const CreateReturnInput = z.object({
   order_number: z.string().min(3).max(40),
   reason: z.string().min(10).max(4000),
+  items: z
+    .array(
+      z.object({
+        order_item_id: z.number().int().positive(),
+        quantity: z.number().int().positive(),
+      }),
+    )
+    .min(1)
+    .optional(),
 });
 
 export async function requestOrderReturn(input: {
@@ -291,6 +330,25 @@ export type AdminOrderReturnRow = OrderReturnRow & {
   ledgerly_credit_note_id?: string | null;
   customer_login?: string | null;
   order_id?: number;
+  disposition?: string | null;
+  logistics_mode?: string | null;
+  carrier_name?: string | null;
+  reverse_awb?: string | null;
+  tracking_url?: string | null;
+  pickup_window?: string | null;
+  pickup_failure_reason?: string | null;
+  outbound_logistics_mode?: string | null;
+  outbound_carrier_name?: string | null;
+  outbound_awb?: string | null;
+  outbound_tracking_url?: string | null;
+  outbound_label_url?: string | null;
+  outbound_provider_request_id?: string | null;
+  settlement_method?: string | null;
+  settlement_reference?: string | null;
+  settlement_amount?: number | null;
+  settled_at?: string | null;
+  settled_by?: string | null;
+  replacement_reserved_at?: string | null;
 };
 
 export async function listAdminOrderReturns(
@@ -343,10 +401,6 @@ export async function markOrderReturnInspected(returnNumber: string, adminNotes?
   return adminReturnAction(returnNumber, "inspect", adminNotes);
 }
 
-export async function acceptOrderReturnAfterInspection(returnNumber: string, adminNotes?: string) {
-  return adminReturnAction(returnNumber, "accept", adminNotes);
-}
-
 export async function allocateReplacementForOrderReturn(returnNumber: string, adminNotes?: string) {
   return adminReturnAction(returnNumber, "allocate-replacement", adminNotes);
 }
@@ -379,6 +433,141 @@ export async function refundOrderReturn(returnNumber: string, adminNotes?: strin
   return adminReturnAction(returnNumber, "refund", adminNotes);
 }
 
+export async function bookOrderReturnPickup(
+  returnNumber: string,
+  payload: {
+    mode: "manual" | "self_ship" | "xpressbees";
+    carrier_name?: string;
+    reverse_awb?: string;
+    tracking_url?: string;
+    pickup_window?: string;
+    admin_notes?: string;
+  },
+) {
+  return api.post(
+    `/api/v1/admin/order-returns/${encodeURIComponent(returnNumber)}/book-pickup`,
+    payload,
+    { auth: true },
+  );
+}
+
+export async function bookOrderReturnOutbound(
+  returnNumber: string,
+  payload: {
+    mode: "manual" | "xpressbees";
+    carrier_name?: string;
+    outbound_awb?: string;
+    tracking_url?: string;
+    label_url?: string;
+    admin_notes?: string;
+  },
+) {
+  return api.post(
+    `/api/v1/admin/order-returns/${encodeURIComponent(returnNumber)}/book-outbound`,
+    payload,
+    { auth: true },
+  );
+}
+
+export async function markOrderReturnPickupFailed(
+  returnNumber: string,
+  failureReason: string,
+  adminNotes?: string,
+) {
+  return api.post(
+    `/api/v1/admin/order-returns/${encodeURIComponent(returnNumber)}/pickup-failed`,
+    { failure_reason: failureReason, admin_notes: adminNotes ?? "" },
+    { auth: true },
+  );
+}
+
+export async function rescheduleOrderReturnPickup(returnNumber: string, adminNotes?: string) {
+  return api.post(
+    `/api/v1/admin/order-returns/${encodeURIComponent(returnNumber)}/reschedule-pickup`,
+    { admin_notes: adminNotes ?? "" },
+    { auth: true },
+  );
+}
+
+export async function closeFailedOrderReturnPickup(returnNumber: string, adminNotes?: string) {
+  return adminReturnAction(returnNumber, "close-pickup-failed", adminNotes);
+}
+
+export async function acceptOrderReturnAfterInspection(
+  returnNumber: string,
+  disposition: string,
+  adminNotes?: string,
+  items?: Array<{ return_item_id: number; accepted_quantity: number; disposition: string }>,
+) {
+  return api.post(
+    `/api/v1/admin/order-returns/${encodeURIComponent(returnNumber)}/accept`,
+    { disposition, admin_notes: adminNotes ?? "", items: items ?? [] },
+    { auth: true },
+  );
+}
+
+export async function settleOrderReturnPriceDifference(
+  returnNumber: string,
+  payload: {
+    status: "collected" | "refunded" | "waived";
+    amount: number;
+    method?: string;
+    reference?: string;
+    admin_notes?: string;
+  },
+) {
+  return api.post(
+    `/api/v1/admin/order-returns/${encodeURIComponent(returnNumber)}/settle-price-difference`,
+    payload,
+    { auth: true },
+  );
+}
+
+export type AdminCancellationRequestRow = {
+  id: number;
+  request_number: string;
+  status: string;
+  reason: string;
+  rejection_reason?: string | null;
+  admin_notes?: string | null;
+  requested_at: string;
+  resolved_at?: string | null;
+  order_number?: string;
+  order_total?: number;
+  customer_login?: string | null;
+};
+
+export async function listAdminCancellationRequests(
+  status?: string,
+): Promise<{ requests: AdminCancellationRequestRow[] }> {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  const requests = await api.get<AdminCancellationRequestRow[]>(
+    `/api/v1/admin/cancellation-requests${query}`,
+    { auth: true },
+  );
+  return { requests: requests ?? [] };
+}
+
+export async function approveCancellationRequest(requestNumber: string, adminNotes?: string) {
+  return api.post(
+    `/api/v1/admin/cancellation-requests/${encodeURIComponent(requestNumber)}/approve`,
+    { admin_notes: adminNotes ?? "" },
+    { auth: true },
+  );
+}
+
+export async function rejectCancellationRequest(
+  requestNumber: string,
+  rejectionReason: string,
+  adminNotes?: string,
+) {
+  return api.post(
+    `/api/v1/admin/cancellation-requests/${encodeURIComponent(requestNumber)}/reject`,
+    { rejection_reason: rejectionReason, admin_notes: adminNotes ?? "" },
+    { auth: true },
+  );
+}
+
 export type AdminCodOrderRow = {
   id: number;
   order_number: string;
@@ -394,6 +583,17 @@ export type AdminCodOrderRow = {
 
 export type AdminOrderRow = AdminCodOrderRow & {
   tracking_status?: string;
+  tracking_number?: string;
+  tracking_carrier?: string;
+  tracking_url?: string;
+  shipment_date?: string;
+  shipment_label_url?: string;
+  shipment_logistics_mode?: string;
+  shipment_carrier_status?: string;
+  shipment_delivered_at?: string;
+  pending_cancellation?: boolean;
+  can_book_shipment?: boolean;
+  can_book_shipment_with_override?: boolean;
   payment_status: string;
   payment_method: string;
   zoho_sync_status: string;
@@ -478,6 +678,36 @@ export async function markCodCollected(orderNumber: string) {
   return api.post(
     `/api/v1/admin/orders/${encodeURIComponent(orderNumber)}/mark-cod-collected`,
     undefined,
+    { auth: true },
+  );
+}
+
+export async function bookAdminOrderShipment(
+  orderNumber: string,
+  payload: {
+    mode: "manual" | "xpressbees";
+    carrier_name?: string;
+    awb?: string;
+    tracking_url?: string;
+    label_url?: string;
+    override_fulfillment_hold?: boolean;
+    override_reason?: string;
+  },
+) {
+  return api.post(
+    `/api/v1/admin/orders/${encodeURIComponent(orderNumber)}/book-shipment`,
+    payload,
+    { auth: true },
+  );
+}
+
+export async function cancelAdminOrderShipment(
+  orderNumber: string,
+  payload: { mode: "manual" | "xpressbees"; reason: string },
+) {
+  return api.post(
+    `/api/v1/admin/orders/${encodeURIComponent(orderNumber)}/cancel-shipment`,
+    payload,
     { auth: true },
   );
 }

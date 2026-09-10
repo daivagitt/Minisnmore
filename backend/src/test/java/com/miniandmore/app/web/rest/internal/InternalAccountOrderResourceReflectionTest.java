@@ -63,6 +63,9 @@ class InternalAccountOrderResourceReflectionTest {
     private com.miniandmore.app.service.RazorpayRefundService razorpayRefundService;
 
     @Mock
+    private com.miniandmore.app.service.OrderCancellationService orderCancellationService;
+
+    @Mock
     private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     private InternalAccountOrderResource resource;
@@ -88,6 +91,7 @@ class InternalAccountOrderResourceReflectionTest {
             StorePricingTestSupport.defaultPricing(),
             orderEventService,
             razorpayRefundService,
+            orderCancellationService,
             transactionManager
         );
         ReflectionTestUtils.setField(resource, "razorpayKeyId", "rzp_live_abc");

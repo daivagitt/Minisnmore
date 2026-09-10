@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   cancelOrder,
+  withdrawCancelRequest,
   syncPaymentStatus,
   retryOrderPayment,
   verifyPayment,
@@ -61,6 +62,8 @@ const OPEN_RETURN_STATUSES = new Set([
   "requested",
   "approved",
   "pickup_requested",
+  "pickup_scheduled",
+  "pickup_failed",
   "picked_up",
   "received",
   "inspected",
@@ -102,6 +105,7 @@ function OrderDetail() {
 
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [returnReason, setReturnReason] = useState("");
+  const [returnQuantities, setReturnQuantities] = useState<Record<number, number>>({});
   const [submittingReturn, setSubmittingReturn] = useState(false);
 
   const [exchangeItem, setExchangeItem] = useState<{
@@ -171,9 +175,18 @@ function OrderDetail() {
       toast.error("Please describe the issue in at least 10 characters");
       return;
     }
+    const items = (order.order_items ?? [])
+      .map((item) => ({ order_item_id: item.id, quantity: returnQuantities[item.id] ?? 0 }))
+      .filter((item) => item.quantity > 0);
+    if (items.length === 0) {
+      toast.error("Select at least one item to return");
+      return;
+    }
     setSubmittingReturn(true);
     try {
-      await requestOrderReturn({ data: { order_number: order.order_number, reason: returnReason.trim() } });
+      await requestOrderReturn({
+        data: { order_number: order.order_number, reason: returnReason.trim(), items },
+      });
       toast.success("Return request submitted");
       setReturnDialogOpen(false);
       setReturnReason("");
@@ -294,15 +307,12 @@ function OrderDetail() {
       toast.error("Please tell us why you're cancelling");
       return;
     }
-    const wasPaid = order.payment_status === "paid";
     setCancelling(true);
     try {
       await cancelOrder(order.order_number, reason);
       setCancelDialogOpen(false);
       setCancelReason("");
-      toast.success(
-        wasPaid ? "Order cancelled." : "Order cancelled.",
-      );
+      toast.success("Cancellation request submitted. We'll review it shortly.");
       await refresh({ silent: true });
     } catch (e: any) {
       toast.error(e?.message || "Could not cancel this order");
@@ -408,10 +418,7 @@ function OrderDetail() {
                 Need to cancel this order?
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                You can cancel while this order has not shipped yet.
-                {order.payment_status === "paid"
-                  ? ""
-                  : " No payment will be charged."}
+                Submit a cancellation request while this order has not shipped yet. Our team will review it before processing any refund.
               </p>
             </div>
             <button
@@ -420,9 +427,53 @@ function OrderDetail() {
               className="rounded-full bg-destructive text-destructive-foreground px-5 py-2.5 text-sm font-medium inline-flex items-center justify-center gap-2 hover:bg-destructive/90 transition shadow-sm w-full sm:w-auto shrink-0"
             >
               <XCircle className="h-4 w-4" />
-              Cancel order
+              Request cancellation
             </button>
           </div>
+        </div>
+      )}
+
+      {order.pending_cancellation && order.cancellation_request?.status === "requested" && (
+        <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-5 md:p-6 border border-amber-500/30 bg-amber-500/10">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-amber-900">Cancellation requested</div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Your request is pending admin review. Fulfillment is on hold until we approve or reject it.
+              </p>
+              {order.cancellation_request?.reason ? (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Reason: {order.cancellation_request.reason}
+                </p>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await withdrawCancelRequest(order.order_number);
+                  toast.success("Cancellation request withdrawn");
+                  await refresh({ silent: true });
+                } catch (e: any) {
+                  toast.error(e?.message || "Could not withdraw request");
+                }
+              }}
+              className="rounded-full border border-border px-5 py-2.5 text-sm w-full sm:w-auto shrink-0"
+            >
+              Withdraw request
+            </button>
+          </div>
+        </div>
+      )}
+
+      {order.cancellation_request?.status === "rejected" && order.status !== "cancelled" && (
+        <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-5 md:p-6 border border-muted bg-muted/30">
+          <div className="text-sm font-medium">Cancellation request declined</div>
+          {order.cancellation_request.rejection_reason ? (
+            <p className="text-sm text-muted-foreground mt-1">
+              {order.cancellation_request.rejection_reason}
+            </p>
+          ) : null}
         </div>
       )}
 
@@ -521,7 +572,12 @@ function OrderDetail() {
           ) : eligibility?.eligible ? (
             <button
               type="button"
-              onClick={() => setReturnDialogOpen(true)}
+              onClick={() => {
+                setReturnQuantities(
+                  Object.fromEntries((order.order_items ?? []).map((item) => [item.id, Number(item.qty ?? 1)])),
+                );
+                setReturnDialogOpen(true);
+              }}
               className="text-xs rounded-full bg-primary text-primary-foreground px-4 py-2"
             >
               Start a return
@@ -731,12 +787,10 @@ function OrderDetail() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancel this order?</AlertDialogTitle>
+            <AlertDialogTitle>Request cancellation?</AlertDialogTitle>
             <AlertDialogDescription>
-              This cannot be undone. The items will be released back to stock
-              {order.payment_status === "paid" &&
-                ""}
-              .
+              Your request will be reviewed by our team before the order is cancelled
+              {order.payment_status === "paid" ? " and any refund is processed" : ""}.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-1.5">
@@ -763,7 +817,7 @@ function OrderDetail() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {cancelling && <Loader2 className="h-4 w-4 animate-spin" />}
-              {cancelling ? "Cancelling…" : "Yes, cancel order"}
+              {cancelling ? "Submitting…" : "Submit request"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -781,6 +835,43 @@ function OrderDetail() {
           <DialogHeader>
             <DialogTitle>Request a return</DialogTitle>
           </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Items and quantities</p>
+            {(order.order_items ?? []).map((item) => {
+              const max = Number(item.qty ?? 1);
+              return (
+                <label
+                  key={item.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-border p-3 text-sm"
+                >
+                  <span>
+                    {item.product_name}
+                    {item.size || item.color
+                      ? ` · ${[item.size, item.color].filter(Boolean).join(" / ")}`
+                      : ""}
+                  </span>
+                  <select
+                    value={returnQuantities[item.id] ?? 0}
+                    onChange={(event) =>
+                      setReturnQuantities((current) => ({
+                        ...current,
+                        [item.id]: Number(event.target.value),
+                      }))
+                    }
+                    className="rounded-lg border border-border bg-background px-2 py-1"
+                    disabled={submittingReturn}
+                    aria-label={`Return quantity for ${item.product_name}`}
+                  >
+                    {Array.from({ length: max + 1 }, (_, quantity) => (
+                      <option key={quantity} value={quantity}>
+                        {quantity}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              );
+            })}
+          </div>
           <div className="space-y-1.5">
             <label htmlFor="return-reason" className="text-sm font-medium">
               Why are you returning this order?

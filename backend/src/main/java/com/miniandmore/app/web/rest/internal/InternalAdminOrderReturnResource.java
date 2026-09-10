@@ -2,12 +2,20 @@ package com.miniandmore.app.web.rest.internal;
 
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.OrderReturn;
+import com.miniandmore.app.domain.OrderReturnItem;
+import com.miniandmore.app.domain.enumeration.ExchangeSettlementStatus;
 import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
+import com.miniandmore.app.domain.enumeration.ReturnDisposition;
+import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.service.OrderReturnService;
+import com.miniandmore.app.security.SecurityUtils;
 import com.miniandmore.app.web.rest.v1.ApiResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +64,53 @@ public class InternalAdminOrderReturnResource {
         );
     }
 
+    @PostMapping("/{returnNumber}/book-pickup")
+    public ApiResponse<Map<String, Object>> bookPickup(
+        @PathVariable String returnNumber,
+        @Valid @RequestBody BookPickupRequest body
+    ) {
+        ReturnLogisticsMode mode = parseLogisticsMode(body.mode());
+        return ApiResponse.ok(
+            toDto(
+                orderReturnService.bookPickup(
+                    returnNumber,
+                    mode,
+                    body.carrier_name(),
+                    body.reverse_awb(),
+                    body.tracking_url(),
+                    body.pickup_window(),
+                    body.admin_notes()
+                )
+            )
+        );
+    }
+
+    @PostMapping("/{returnNumber}/pickup-failed")
+    public ApiResponse<Map<String, Object>> pickupFailed(
+        @PathVariable String returnNumber,
+        @Valid @RequestBody PickupFailedRequest body
+    ) {
+        return ApiResponse.ok(
+            toDto(orderReturnService.markPickupFailed(returnNumber, body.failure_reason(), body.admin_notes()))
+        );
+    }
+
+    @PostMapping("/{returnNumber}/reschedule-pickup")
+    public ApiResponse<Map<String, Object>> reschedulePickup(
+        @PathVariable String returnNumber,
+        @RequestBody(required = false) AdminNotesRequest body
+    ) {
+        return ApiResponse.ok(toDto(orderReturnService.reschedulePickup(returnNumber, notes(body))));
+    }
+
+    @PostMapping("/{returnNumber}/close-pickup-failed")
+    public ApiResponse<Map<String, Object>> closePickupFailed(
+        @PathVariable String returnNumber,
+        @RequestBody(required = false) AdminNotesRequest body
+    ) {
+        return ApiResponse.ok(toDto(orderReturnService.closePickupFailed(returnNumber, notes(body))));
+    }
+
     @PostMapping("/{returnNumber}/pickup-requested")
     public ApiResponse<Map<String, Object>> pickupRequested(
         @PathVariable String returnNumber,
@@ -91,9 +146,52 @@ public class InternalAdminOrderReturnResource {
     @PostMapping("/{returnNumber}/accept")
     public ApiResponse<Map<String, Object>> accept(
         @PathVariable String returnNumber,
-        @RequestBody(required = false) AdminNotesRequest body
+        @Valid @RequestBody AcceptReturnRequest body
     ) {
-        return ApiResponse.ok(toDto(orderReturnService.acceptAfterInspection(returnNumber, notes(body))));
+        ReturnDisposition disposition = parseDisposition(body.disposition());
+        List<OrderReturnService.InspectionLineDecision> decisions = body.items() == null
+            ? List.of()
+            : body
+                .items()
+                .stream()
+                .map(item ->
+                    new OrderReturnService.InspectionLineDecision(
+                        item.return_item_id(),
+                        item.accepted_quantity(),
+                        item.disposition() == null ? null : parseDisposition(item.disposition())
+                    )
+                )
+                .toList();
+        OrderReturn accepted = decisions.isEmpty()
+            ? orderReturnService.acceptAfterInspection(returnNumber, disposition, body.admin_notes())
+            : orderReturnService.acceptAfterInspection(returnNumber, disposition, decisions, body.admin_notes());
+        return ApiResponse.ok(toDto(accepted));
+    }
+
+    @PostMapping("/{returnNumber}/settle-price-difference")
+    public ApiResponse<Map<String, Object>> settlePriceDifference(
+        @PathVariable String returnNumber,
+        @Valid @RequestBody SettlePriceDifferenceRequest body
+    ) {
+        ExchangeSettlementStatus status;
+        try {
+            status = ExchangeSettlementStatus.valueOf(body.status().trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid settlement status");
+        }
+        return ApiResponse.ok(
+            toDto(
+                orderReturnService.settlePriceDifference(
+                    returnNumber,
+                    status,
+                    body.amount(),
+                    body.method(),
+                    body.reference(),
+                    SecurityUtils.getCurrentUserLogin().orElse("system"),
+                    body.admin_notes()
+                )
+            )
+        );
     }
 
     @PostMapping("/{returnNumber}/allocate-replacement")
@@ -126,6 +224,27 @@ public class InternalAdminOrderReturnResource {
         @RequestBody(required = false) AdminNotesRequest body
     ) {
         return ApiResponse.ok(toDto(orderReturnService.markReadyToShip(returnNumber, notes(body))));
+    }
+
+    @PostMapping("/{returnNumber}/book-outbound")
+    public ApiResponse<Map<String, Object>> bookOutbound(
+        @PathVariable String returnNumber,
+        @Valid @RequestBody BookOutboundRequest body
+    ) {
+        ReturnLogisticsMode mode = parseLogisticsMode(body.mode());
+        return ApiResponse.ok(
+            toDto(
+                orderReturnService.bookOutbound(
+                    returnNumber,
+                    mode,
+                    body.carrier_name(),
+                    body.outbound_awb(),
+                    body.tracking_url(),
+                    body.label_url(),
+                    body.admin_notes()
+                )
+            )
+        );
     }
 
     @PostMapping("/{returnNumber}/shipped")
@@ -194,13 +313,131 @@ public class InternalAdminOrderReturnResource {
         }
         data.put("replacement_size", orderReturn.getReplacementSize());
         data.put("replacement_color", orderReturn.getReplacementColor());
+        data.put("disposition", orderReturn.getDisposition() != null ? orderReturn.getDisposition().name().toLowerCase() : null);
+        data.put("logistics_mode", orderReturn.getLogisticsMode() != null ? orderReturn.getLogisticsMode().name().toLowerCase() : null);
+        data.put("carrier_name", orderReturn.getCarrierName());
+        data.put("reverse_awb", orderReturn.getReverseAwb());
+        data.put("tracking_url", orderReturn.getTrackingUrl());
+        data.put("pickup_window", orderReturn.getPickupWindow());
+        data.put("provider_request_id", orderReturn.getProviderRequestId());
+        data.put("pickup_failure_reason", orderReturn.getPickupFailureReason());
+        data.put(
+            "outbound_logistics_mode",
+            orderReturn.getOutboundLogisticsMode() != null ? orderReturn.getOutboundLogisticsMode().name().toLowerCase() : null
+        );
+        data.put("outbound_carrier_name", orderReturn.getOutboundCarrierName());
+        data.put("outbound_awb", orderReturn.getOutboundAwb());
+        data.put("outbound_tracking_url", orderReturn.getOutboundTrackingUrl());
+        data.put("outbound_label_url", orderReturn.getOutboundLabelUrl());
+        data.put("outbound_provider_request_id", orderReturn.getOutboundProviderRequestId());
+        data.put("original_item_amount", orderReturn.getOriginalItemAmount());
+        data.put("replacement_item_amount", orderReturn.getReplacementItemAmount());
+        data.put("price_difference", orderReturn.getPriceDifference());
+        data.put(
+            "settlement_status",
+            orderReturn.getSettlementStatus() == null ? null : orderReturn.getSettlementStatus().name().toLowerCase()
+        );
+        data.put("settlement_method", orderReturn.getSettlementMethod());
+        data.put("settlement_reference", orderReturn.getSettlementReference());
+        data.put("settlement_amount", orderReturn.getSettlementAmount());
+        data.put("settled_at", orderReturn.getSettledAt());
+        data.put("settled_by", orderReturn.getSettledBy());
+        data.put("replacement_reserved_at", orderReturn.getReplacementReservedAt());
+        data.put("items", orderReturnService.returnLineBreakdown(orderReturn).stream().map(this::toLineDto).toList());
         return data;
+    }
+
+    private Map<String, Object> toLineDto(OrderReturnItem line) {
+        var data = new LinkedHashMap<String, Object>();
+        data.put("id", line.getId());
+        data.put("order_item_id", line.getOrderItem().getId());
+        data.put("product_name", line.getOrderItem().getProductName());
+        data.put("size", line.getOrderItem().getItemSize());
+        data.put("color", line.getOrderItem().getColor());
+        data.put("requested_qty", line.getRequestedQty());
+        data.put("received_qty", line.getReceivedQty());
+        data.put("accepted_qty", line.getAcceptedQty());
+        data.put("unit_amount", line.getUnitAmount());
+        data.put("gross_amount", line.getGrossAmount());
+        data.put("discount_allocation", line.getDiscountAllocation());
+        data.put("refund_amount", line.getRefundAmount());
+        data.put("disposition", line.getDisposition() == null ? null : line.getDisposition().name().toLowerCase());
+        return data;
+    }
+
+    private static ReturnLogisticsMode parseLogisticsMode(String mode) {
+        if (StringUtils.isBlank(mode)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Logistics mode is required");
+        }
+        try {
+            return ReturnLogisticsMode.valueOf(mode.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid logistics mode: " + mode);
+        }
+    }
+
+    private static ReturnDisposition parseDisposition(String disposition) {
+        if (StringUtils.isBlank(disposition)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Disposition is required");
+        }
+        try {
+            return ReturnDisposition.valueOf(disposition.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid disposition: " + disposition);
+        }
     }
 
     public record AdminNotesRequest(@Size(max = 2000) String admin_notes) {}
 
     public record RejectReturnRequest(
         @NotBlank @Size(min = 5, max = 1000) String rejection_reason,
+        @Size(max = 2000) String admin_notes
+    ) {}
+
+    public record BookPickupRequest(
+        @NotBlank String mode,
+        @Size(max = 80) String carrier_name,
+        @Size(max = 80) String reverse_awb,
+        @Size(max = 500) String tracking_url,
+        @Size(max = 200) String pickup_window,
+        @Size(max = 2000) String admin_notes
+    ) {}
+
+    public record BookOutboundRequest(
+        @NotBlank String mode,
+        @Size(max = 80) String carrier_name,
+        @Size(max = 80) String outbound_awb,
+        @Size(max = 500) String tracking_url,
+        @Size(max = 500) String label_url,
+        @Size(max = 2000) String admin_notes
+    ) {}
+
+    public record PickupFailedRequest(
+        @NotBlank @Size(min = 5, max = 500) String failure_reason,
+        @Size(max = 2000) String admin_notes
+    ) {}
+
+    public record AcceptReturnRequest(
+        @NotBlank String disposition,
+        @Size(max = 2000) String admin_notes,
+        @Valid List<InspectionLineRequest> items
+    ) {
+        public AcceptReturnRequest(String disposition, String admin_notes) {
+            this(disposition, admin_notes, List.of());
+        }
+    }
+
+    public record InspectionLineRequest(
+        @NotNull Long return_item_id,
+        @NotNull @Min(0) Integer accepted_quantity,
+        String disposition
+    ) {}
+
+    public record SettlePriceDifferenceRequest(
+        @NotBlank String status,
+        BigDecimal amount,
+        @Size(max = 40) String method,
+        @Size(max = 160) String reference,
         @Size(max = 2000) String admin_notes
     ) {}
 }

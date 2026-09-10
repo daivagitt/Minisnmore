@@ -1,27 +1,37 @@
 package com.miniandmore.app.service;
 
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
+import com.miniandmore.app.client.XpressBeesClient;
 import com.miniandmore.app.client.ZohoBooksIntegrationClient;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.OrderReturn;
+import com.miniandmore.app.domain.OrderReturnItem;
 import com.miniandmore.app.domain.Product;
+import com.miniandmore.app.domain.enumeration.ExchangeSettlementStatus;
 import com.miniandmore.app.domain.enumeration.OrderRequestType;
 import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
+import com.miniandmore.app.domain.enumeration.ReturnDisposition;
+import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.OrderItemRepository;
+import com.miniandmore.app.repository.OrderReturnItemRepository;
 import com.miniandmore.app.repository.OrderReturnRepository;
 import com.miniandmore.app.repository.ProductRepository;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -61,6 +71,7 @@ public class OrderReturnService {
     private static final Set<OrderReturnStatus> OPEN_RETURN_STATUSES = EnumSet.complementOf(TERMINAL_RETURN_STATUSES);
 
     private final OrderReturnRepository orderReturnRepository;
+    private final OrderReturnItemRepository orderReturnItemRepository;
     private final CustomerOrderRepository customerOrderRepository;
     private final OrderItemRepository orderItemRepository;
     private final ProductRepository productRepository;
@@ -71,9 +82,12 @@ public class OrderReturnService {
     private final OrderMailService orderMailService;
     private final OrderSmsService orderSmsService;
     private final ApplicationProperties applicationProperties;
+    private final XpressBeesClient xpressBeesClient;
+    private final ObjectMapper objectMapper;
 
     public OrderReturnService(
         OrderReturnRepository orderReturnRepository,
+        OrderReturnItemRepository orderReturnItemRepository,
         CustomerOrderRepository customerOrderRepository,
         OrderItemRepository orderItemRepository,
         ProductRepository productRepository,
@@ -83,9 +97,12 @@ public class OrderReturnService {
         ProductVariantSupport variantSupport,
         OrderMailService orderMailService,
         OrderSmsService orderSmsService,
-        ApplicationProperties applicationProperties
+        ApplicationProperties applicationProperties,
+        XpressBeesClient xpressBeesClient,
+        ObjectMapper objectMapper
     ) {
         this.orderReturnRepository = orderReturnRepository;
+        this.orderReturnItemRepository = orderReturnItemRepository;
         this.customerOrderRepository = customerOrderRepository;
         this.orderItemRepository = orderItemRepository;
         this.productRepository = productRepository;
@@ -96,6 +113,8 @@ public class OrderReturnService {
         this.orderMailService = orderMailService;
         this.orderSmsService = orderSmsService;
         this.applicationProperties = applicationProperties;
+        this.xpressBeesClient = xpressBeesClient;
+        this.objectMapper = objectMapper;
     }
 
     public List<OrderReturn> listForUser(String login) {
@@ -109,11 +128,22 @@ public class OrderReturnService {
         return orderReturnRepository.findAllByStatusInOrderByRequestedAtDesc(List.of(statusFilter));
     }
 
+    @Transactional(readOnly = true)
+    public List<OrderReturnItem> returnLineBreakdown(OrderReturn orderReturn) {
+        return orderReturn == null || orderReturn.getId() == null
+            ? List.of()
+            : orderReturnItemRepository.findAllByOrderReturnIdOrderById(orderReturn.getId());
+    }
+
     // ---------------------------------------------------------------------
     // Request creation (Return / Exchange)
     // ---------------------------------------------------------------------
 
     public OrderReturn requestReturn(String userLogin, String orderNumber, String reason) {
+        return requestReturn(userLogin, orderNumber, reason, List.of());
+    }
+
+    public OrderReturn requestReturn(String userLogin, String orderNumber, String reason, List<ReturnLineSelection> requestedLines) {
         assertFeatureEnabled();
         String normalizedReason = normalizeReason(reason, "return");
         CustomerOrder order = customerOrderRepository
@@ -132,8 +162,64 @@ public class OrderReturnService {
         orderReturn.setOrder(order);
         orderReturn.setUserLogin(userLogin);
         OrderReturn saved = orderReturnRepository.save(orderReturn);
+        createReturnLineSnapshots(saved, order, requestedLines);
         queueReturnEmail(order, saved);
         return saved;
+    }
+
+    private void createReturnLineSnapshots(OrderReturn orderReturn, CustomerOrder order, List<ReturnLineSelection> requestedLines) {
+        List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
+        if (orderItems.isEmpty()) {
+            orderReturn.setRefundAmount(money(order.getTotal()));
+            return;
+        }
+        Map<Long, Integer> requestedByItem = new LinkedHashMap<>();
+        if (requestedLines == null || requestedLines.isEmpty()) {
+            orderItems.forEach(item -> requestedByItem.put(item.getId(), Math.max(1, Optional.ofNullable(item.getQty()).orElse(1))));
+        } else {
+            for (ReturnLineSelection line : requestedLines) {
+                if (line == null || line.orderItemId() == null || line.quantity() == null || line.quantity() < 1) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Each return line needs an order item and positive quantity");
+                }
+                if (requestedByItem.putIfAbsent(line.orderItemId(), line.quantity()) != null) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A return line was selected more than once");
+                }
+            }
+        }
+
+        BigDecimal subtotal = positiveOrFallback(order.getSubtotal(), orderItems
+            .stream()
+            .map(item -> money(item.getPrice()).multiply(BigDecimal.valueOf(Optional.ofNullable(item.getQty()).orElse(0))))
+            .reduce(BigDecimal.ZERO, BigDecimal::add));
+        BigDecimal discount = money(order.getDiscount());
+        BigDecimal totalRefund = BigDecimal.ZERO;
+        for (Map.Entry<Long, Integer> selected : requestedByItem.entrySet()) {
+            OrderItem item = orderItems
+                .stream()
+                .filter(candidate -> candidate.getId().equals(selected.getKey()))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selected return item is not part of this order"));
+            int orderedQty = Math.max(1, Optional.ofNullable(item.getQty()).orElse(1));
+            if (selected.getValue() > orderedQty) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return quantity exceeds the ordered quantity");
+            }
+            BigDecimal gross = money(item.getPrice()).multiply(BigDecimal.valueOf(selected.getValue())).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal discountAllocation = subtotal.signum() == 0
+                ? BigDecimal.ZERO
+                : discount.multiply(gross).divide(subtotal, 2, RoundingMode.HALF_UP).min(gross);
+            BigDecimal refund = gross.subtract(discountAllocation).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+            OrderReturnItem returnItem = new OrderReturnItem();
+            returnItem.setOrderReturn(orderReturn);
+            returnItem.setOrderItem(item);
+            returnItem.setRequestedQty(selected.getValue());
+            returnItem.setUnitAmount(money(item.getPrice()));
+            returnItem.setGrossAmount(gross);
+            returnItem.setDiscountAllocation(discountAllocation);
+            returnItem.setRefundAmount(refund);
+            orderReturnItemRepository.save(returnItem);
+            totalRefund = totalRefund.add(refund);
+        }
+        orderReturn.setRefundAmount(totalRefund.setScale(2, RoundingMode.HALF_UP));
     }
 
     public OrderReturn requestExchange(
@@ -220,15 +306,45 @@ public class OrderReturnService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return is not awaiting approval");
         }
         if (orderReturn.getRequestType() == OrderRequestType.EXCHANGE) {
-            restoreItemStock(orderReturn.getOrderItem());
-        } else {
-            restoreInventoryForOrder(orderReturn.getOrder());
+            reserveExchangeReplacement(orderReturn);
         }
         orderReturn.setStatus(OrderReturnStatus.APPROVED);
         orderReturn.setAdminNotes(trimNotes(adminNotes));
         OrderReturn saved = orderReturnRepository.save(orderReturn);
         queueReturnEmail(saved.getOrder(), saved);
         return saved;
+    }
+
+    private void reserveExchangeReplacement(OrderReturn orderReturn) {
+        OrderItem item = orderReturn.getOrderItem();
+        Product product = resolveProductForUpdate(item.getProductId()).orElseThrow(() ->
+            new ResponseStatusException(HttpStatus.BAD_REQUEST, "Original product could not be resolved")
+        );
+        ProductVariantSupport.VariantRow replacement = variantSupport
+            .resolveSellable(product, orderReturn.getReplacementVariantSku(), orderReturn.getReplacementSize(), orderReturn.getReplacementColor())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Replacement is no longer available"));
+        int qty = Math.max(1, Optional.ofNullable(item.getQty()).orElse(1));
+        if (!variantSupport.decrementVariantStock(product, replacement.sku(), replacement.size(), replacement.color(), qty)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Replacement is no longer in stock");
+        }
+        productRepository.save(product);
+        BigDecimal originalGross = money(item.getPrice()).multiply(BigDecimal.valueOf(qty)).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal orderSubtotal = positiveOrFallback(orderReturn.getOrder().getSubtotal(), originalGross);
+        BigDecimal allocatedDiscount = money(orderReturn.getOrder().getDiscount())
+            .multiply(originalGross)
+            .divide(orderSubtotal, 2, RoundingMode.HALF_UP)
+            .min(originalGross);
+        BigDecimal originalAmount = originalGross.subtract(allocatedDiscount).max(BigDecimal.ZERO);
+        BigDecimal replacementAmount = money(variantSupport.variantSellingPrice(replacement))
+            .multiply(BigDecimal.valueOf(qty))
+            .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal difference = replacementAmount.subtract(originalAmount).setScale(2, RoundingMode.HALF_UP);
+        orderReturn.setOriginalItemAmount(originalAmount);
+        orderReturn.setReplacementItemAmount(replacementAmount);
+        orderReturn.setPriceDifference(difference);
+        orderReturn.setSettlementStatus(difference.signum() == 0 ? ExchangeSettlementStatus.NOT_REQUIRED : ExchangeSettlementStatus.PENDING);
+        orderReturn.setReplacementReservedAt(Instant.now());
+        orderReturn.setReplacementReservationReleasedAt(null);
     }
 
     public OrderReturn reject(String returnNumber, String rejectionReason, String adminNotes) {
@@ -264,17 +380,255 @@ public class OrderReturnService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return must be inspected before it can be rejected");
         }
         String reason = validateRejectionReason(rejectionReason);
-        boolean reversed = orderReturn.getRequestType() == OrderRequestType.EXCHANGE
-            ? reverseItemStock(orderReturn.getOrderItem())
-            : reverseInventoryForOrder(orderReturn.getOrder());
         orderReturn.setStatus(OrderReturnStatus.REJECTED);
         orderReturn.setRejectionReason(reason);
-        String notes = mergeNotes(orderReturn.getAdminNotes(), adminNotes);
-        if (!reversed) {
-            notes = mergeNotes(notes, "Note: inventory could not be fully reversed (item may have already been resold).");
-        }
-        orderReturn.setAdminNotes(notes);
+        orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
         orderReturn.setResolvedAt(Instant.now());
+        releaseExchangeReservation(orderReturn);
+        OrderReturn saved = orderReturnRepository.save(orderReturn);
+        queueReturnEmail(saved.getOrder(), saved);
+        return saved;
+    }
+
+    public OrderReturn bookPickup(
+        String returnNumber,
+        ReturnLogisticsMode mode,
+        String carrierName,
+        String reverseAwb,
+        String trackingUrl,
+        String pickupWindow,
+        String adminNotes
+    ) {
+        assertFeatureEnabled();
+        OrderReturn orderReturn = loadReturn(returnNumber);
+        if (orderReturn.getStatus() != OrderReturnStatus.APPROVED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return must be approved before booking pickup");
+        }
+        if (mode == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Logistics mode is required");
+        }
+        if (mode == ReturnLogisticsMode.XPRESSBEES) {
+            return bookExpressBeesPickup(orderReturn, reverseAwb, adminNotes);
+        }
+        if (StringUtils.isBlank(reverseAwb)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reverse AWB or tracking reference is required");
+        }
+        orderReturn.setLogisticsMode(mode);
+        orderReturn.setCarrierName(StringUtils.left(StringUtils.trimToNull(carrierName), 80));
+        orderReturn.setReverseAwb(StringUtils.left(StringUtils.trimToNull(reverseAwb), 80));
+        orderReturn.setTrackingUrl(StringUtils.left(StringUtils.trimToNull(trackingUrl), 500));
+        orderReturn.setPickupWindow(StringUtils.left(StringUtils.trimToNull(pickupWindow), 200));
+        orderReturn.setPickupFailureReason(null);
+        orderReturn.setStatus(OrderReturnStatus.PICKUP_SCHEDULED);
+        orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
+        OrderReturn saved = orderReturnRepository.save(orderReturn);
+        queueReturnEmail(saved.getOrder(), saved);
+        return saved;
+    }
+
+    public OrderReturn ensurePickupScheduled(String returnNumber, String adminNotes) {
+        OrderReturn orderReturn = loadReturn(returnNumber);
+        if (orderReturn.getStatus() == OrderReturnStatus.PICKUP_SCHEDULED) {
+            return orderReturn;
+        }
+        if (orderReturn.getStatus() != OrderReturnStatus.APPROVED && orderReturn.getStatus() != OrderReturnStatus.PICKUP_FAILED) {
+            return orderReturn;
+        }
+        orderReturn.setStatus(OrderReturnStatus.PICKUP_SCHEDULED);
+        orderReturn.setPickupFailureReason(null);
+        orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
+        OrderReturn saved = orderReturnRepository.save(orderReturn);
+        queueReturnEmail(saved.getOrder(), saved);
+        return saved;
+    }
+
+    private OrderReturn bookExpressBeesPickup(OrderReturn orderReturn, String preAssignedAwb, String adminNotes) {
+        if (!xpressBeesClient.isReversePickupConfigured()) {
+            throw new ResponseStatusException(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "ExpressBees reverse pickup is not configured. Set XPRESSBEES credentials, business account, warehouse address and reverse manifest path, or book pickup using manual/self-ship mode."
+            );
+        }
+        try {
+            XpressBeesClient.ReversePickupResult result = xpressBeesClient.createReversePickup(buildReversePickupRequest(orderReturn, preAssignedAwb));
+            orderReturn.setLogisticsMode(ReturnLogisticsMode.XPRESSBEES);
+            orderReturn.setCarrierName("XpressBees");
+            orderReturn.setReverseAwb(StringUtils.left(result.awb(), 80));
+            String tracking = StringUtils.defaultIfBlank(result.trackingUrl(), xpressBeesClient.buildTrackingUrl(result.awb()));
+            orderReturn.setTrackingUrl(StringUtils.left(StringUtils.trimToNull(tracking), 500));
+            orderReturn.setPickupWindow(StringUtils.left(StringUtils.trimToNull(result.pickupWindow()), 200));
+            orderReturn.setProviderRequestId(StringUtils.left(StringUtils.trimToNull(result.providerRequestId()), 120));
+            orderReturn.setPickupFailureReason(null);
+            orderReturn.setStatus(OrderReturnStatus.PICKUP_SCHEDULED);
+            orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
+            OrderReturn saved = orderReturnRepository.save(orderReturn);
+            queueReturnEmail(saved.getOrder(), saved);
+            return saved;
+        } catch (XpressBeesClient.XpressBeesApiException ex) {
+            LOG.warn("ExpressBees reverse pickup failed for {}: {}", orderReturn.getReturnNumber(), ex.getMessage());
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, ex.getMessage());
+        }
+    }
+
+    private XpressBeesClient.ReversePickupRequest buildReversePickupRequest(OrderReturn orderReturn, String preAssignedAwb) {
+        CustomerOrder order = orderReturn.getOrder();
+        JsonNode shipping = parseShippingAddress(order.getShippingAddressJson());
+        ApplicationProperties.XpressBees xpressBees = applicationProperties.getXpressbees();
+        XpressBeesClient.ReversePickupAddress pickupFrom = new XpressBeesClient.ReversePickupAddress(
+            firstAddressField(shipping, "full_name", "name"),
+            firstAddressField(shipping, "phone", "mobile"),
+            firstAddressField(shipping, "email"),
+            firstAddressField(shipping, "line1", "address_line1", "address"),
+            firstAddressField(shipping, "line2", "address_line2"),
+            firstAddressField(shipping, "city"),
+            firstAddressField(shipping, "state"),
+            firstAddressField(shipping, "pincode", "postal_code", "zip")
+        );
+        XpressBeesClient.ReversePickupAddress deliverTo = new XpressBeesClient.ReversePickupAddress(
+            StringUtils.defaultIfBlank(xpressBees.getWarehouseName(), "Mini's n More"),
+            StringUtils.defaultIfBlank(xpressBees.getWarehousePhone(), pickupFrom.phone()),
+            null,
+            xpressBees.getWarehouseLine1(),
+            xpressBees.getWarehouseLine2(),
+            xpressBees.getWarehouseCity(),
+            xpressBees.getWarehouseState(),
+            xpressBees.getOriginPincode()
+        );
+        List<XpressBeesClient.ReversePickupLine> lines = buildReversePickupLines(orderReturn, order);
+        return new XpressBeesClient.ReversePickupRequest(
+            orderReturn.getReturnNumber(),
+            order.getOrderNumber(),
+            pickupFrom,
+            deliverTo,
+            lines,
+            StringUtils.trimToNull(preAssignedAwb)
+        );
+    }
+
+    private List<XpressBeesClient.ReversePickupLine> buildReversePickupLines(OrderReturn orderReturn, CustomerOrder order) {
+        List<XpressBeesClient.ReversePickupLine> lines = new ArrayList<>();
+        if (orderReturn.getRequestType() == OrderRequestType.RETURN && orderReturn.getId() != null) {
+            for (OrderReturnItem returnItem : orderReturnItemRepository.findAllByOrderReturnIdOrderById(orderReturn.getId())) {
+                OrderItem selected = returnItem.getOrderItem();
+                lines.add(
+                    new XpressBeesClient.ReversePickupLine(
+                        StringUtils.defaultIfBlank(selected.getProductName(), "Return item"),
+                        StringUtils.defaultIfBlank(selected.getVariantSku(), selected.getProductSlug()),
+                        returnItem.getRequestedQty(),
+                        returnItem.getUnitAmount(),
+                        Math.max(1, applicationProperties.getXpressbees().getDefaultWeightGrams())
+                    )
+                );
+            }
+            if (!lines.isEmpty()) {
+                return lines;
+            }
+        }
+        OrderItem item = orderReturn.getOrderItem();
+        if (item != null) {
+            lines.add(
+                new XpressBeesClient.ReversePickupLine(
+                    StringUtils.defaultIfBlank(item.getProductName(), "Return item"),
+                    StringUtils.defaultIfBlank(item.getVariantSku(), item.getProductSlug()),
+                    Math.max(1, item.getQty() == null ? 1 : item.getQty()),
+                    item.getPrice(),
+                    Math.max(1, applicationProperties.getXpressbees().getDefaultWeightGrams())
+                )
+            );
+            return lines;
+        }
+        for (OrderItem orderItem : order.getItemses()) {
+            lines.add(
+                new XpressBeesClient.ReversePickupLine(
+                    StringUtils.defaultIfBlank(orderItem.getProductName(), "Return item"),
+                    StringUtils.defaultIfBlank(orderItem.getVariantSku(), orderItem.getProductSlug()),
+                    Math.max(1, orderItem.getQty() == null ? 1 : orderItem.getQty()),
+                    orderItem.getPrice(),
+                    Math.max(1, applicationProperties.getXpressbees().getDefaultWeightGrams())
+                )
+            );
+        }
+        if (lines.isEmpty()) {
+            lines.add(
+                new XpressBeesClient.ReversePickupLine(
+                    "Return item",
+                    orderReturn.getReturnNumber(),
+                    1,
+                    order.getTotal(),
+                    Math.max(1, applicationProperties.getXpressbees().getDefaultWeightGrams())
+                )
+            );
+        }
+        return lines;
+    }
+
+    private JsonNode parseShippingAddress(String shippingAddressJson) {
+        if (StringUtils.isBlank(shippingAddressJson)) {
+            return objectMapper.createObjectNode();
+        }
+        try {
+            return objectMapper.readTree(shippingAddressJson);
+        } catch (Exception ex) {
+            LOG.debug("Could not parse shipping address JSON for reverse pickup: {}", ex.getMessage());
+            return objectMapper.createObjectNode();
+        }
+    }
+
+    private static String firstAddressField(JsonNode address, String... fields) {
+        if (address == null || address.isMissingNode()) {
+            return null;
+        }
+        for (String field : fields) {
+            JsonNode value = address.path(field);
+            if (!value.isMissingNode() && !value.isNull()) {
+                String text = value.asText("").trim();
+                if (StringUtils.isNotBlank(text)) {
+                    return text;
+                }
+            }
+        }
+        return null;
+    }
+
+    public OrderReturn markPickupFailed(String returnNumber, String failureReason, String adminNotes) {
+        assertFeatureEnabled();
+        OrderReturn orderReturn = loadReturn(returnNumber);
+        if (
+            orderReturn.getStatus() != OrderReturnStatus.PICKUP_SCHEDULED &&
+            orderReturn.getStatus() != OrderReturnStatus.PICKUP_REQUESTED
+        ) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Pickup must be scheduled before marking a failure");
+        }
+        orderReturn.setStatus(OrderReturnStatus.PICKUP_FAILED);
+        orderReturn.setPickupFailureReason(StringUtils.left(StringUtils.normalizeSpace(StringUtils.trimToEmpty(failureReason)), 500));
+        orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
+        OrderReturn saved = orderReturnRepository.save(orderReturn);
+        queueReturnEmail(saved.getOrder(), saved);
+        return saved;
+    }
+
+    public OrderReturn reschedulePickup(String returnNumber, String adminNotes) {
+        assertFeatureEnabled();
+        OrderReturn orderReturn = loadReturn(returnNumber);
+        if (orderReturn.getStatus() != OrderReturnStatus.PICKUP_FAILED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return is not in pickup failed state");
+        }
+        orderReturn.setStatus(OrderReturnStatus.APPROVED);
+        orderReturn.setPickupFailureReason(null);
+        orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
+        return orderReturnRepository.save(orderReturn);
+    }
+
+    public OrderReturn closePickupFailed(String returnNumber, String adminNotes) {
+        assertFeatureEnabled();
+        OrderReturn orderReturn = loadReturn(returnNumber);
+        if (orderReturn.getStatus() != OrderReturnStatus.PICKUP_FAILED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only a failed pickup can be closed");
+        }
+        releaseExchangeReservation(orderReturn);
+        orderReturn.setStatus(OrderReturnStatus.CANCELLED);
+        orderReturn.setResolvedAt(Instant.now());
+        orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
         OrderReturn saved = orderReturnRepository.save(orderReturn);
         queueReturnEmail(saved.getOrder(), saved);
         return saved;
@@ -295,17 +649,22 @@ public class OrderReturnService {
     public OrderReturn markPickedUp(String returnNumber, String adminNotes) {
         return transition(
             returnNumber,
-            OrderReturnStatus.PICKUP_REQUESTED,
+            EnumSet.of(OrderReturnStatus.PICKUP_REQUESTED, OrderReturnStatus.PICKUP_SCHEDULED),
             OrderReturnStatus.PICKED_UP,
             adminNotes,
-            "Pickup must be requested before marking picked up"
+            "Pickup must be scheduled before marking picked up"
         );
     }
 
     public OrderReturn markReceived(String returnNumber, String adminNotes) {
         OrderReturn saved = transition(
             returnNumber,
-            EnumSet.of(OrderReturnStatus.APPROVED, OrderReturnStatus.PICKUP_REQUESTED, OrderReturnStatus.PICKED_UP),
+            EnumSet.of(
+                OrderReturnStatus.APPROVED,
+                OrderReturnStatus.PICKUP_REQUESTED,
+                OrderReturnStatus.PICKUP_SCHEDULED,
+                OrderReturnStatus.PICKED_UP
+            ),
             OrderReturnStatus.RECEIVED,
             adminNotes,
             "Return must be approved (or already picked up) before marking received"
@@ -324,19 +683,134 @@ public class OrderReturnService {
         );
     }
 
-    public OrderReturn acceptAfterInspection(String returnNumber, String adminNotes) {
-        return transition(
-            returnNumber,
-            OrderReturnStatus.INSPECTED,
-            OrderReturnStatus.ACCEPTED,
-            adminNotes,
-            "Return must be inspected before accepting"
-        );
+    public OrderReturn acceptAfterInspection(String returnNumber, ReturnDisposition disposition, String adminNotes) {
+        return acceptAfterInspection(returnNumber, disposition, List.of(), adminNotes);
+    }
+
+    public OrderReturn acceptAfterInspection(
+        String returnNumber,
+        ReturnDisposition disposition,
+        List<InspectionLineDecision> lineDecisions,
+        String adminNotes
+    ) {
+        assertFeatureEnabled();
+        OrderReturn orderReturn = loadReturn(returnNumber);
+        if (orderReturn.getStatus() != OrderReturnStatus.INSPECTED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return must be inspected before accepting");
+        }
+        if (disposition == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Disposition is required when accepting a return");
+        }
+        orderReturn.setDisposition(disposition);
+        if (orderReturn.getRequestType() == OrderRequestType.EXCHANGE) {
+            if (disposition == ReturnDisposition.RESTOCKABLE) {
+                restoreItemStock(orderReturn.getOrderItem());
+            }
+        } else {
+            applyReturnLineInspection(orderReturn, disposition, lineDecisions);
+        }
+        orderReturn.setStatus(OrderReturnStatus.ACCEPTED);
+        orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
+        return orderReturnRepository.save(orderReturn);
+    }
+
+    private void applyReturnLineInspection(
+        OrderReturn orderReturn,
+        ReturnDisposition defaultDisposition,
+        List<InspectionLineDecision> decisions
+    ) {
+        List<OrderReturnItem> lines = orderReturnItemRepository.findAllByOrderReturnIdOrderById(orderReturn.getId());
+        if (lines.isEmpty()) {
+            if (defaultDisposition == ReturnDisposition.RESTOCKABLE) {
+                restoreInventoryForOrder(orderReturn.getOrder());
+            }
+            return;
+        }
+        Map<Long, InspectionLineDecision> decisionsById = new LinkedHashMap<>();
+        if (decisions != null) {
+            decisions.forEach(decision -> {
+                if (decision != null && decision.returnItemId() != null) {
+                    decisionsById.put(decision.returnItemId(), decision);
+                }
+            });
+        }
+        BigDecimal acceptedRefund = BigDecimal.ZERO;
+        for (OrderReturnItem line : lines) {
+            InspectionLineDecision decision = decisionsById.get(line.getId());
+            int acceptedQty = decision == null || decision.acceptedQuantity() == null
+                ? line.getRequestedQty()
+                : decision.acceptedQuantity();
+            if (acceptedQty < 0 || acceptedQty > line.getRequestedQty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Accepted quantity must be within the requested quantity");
+            }
+            ReturnDisposition lineDisposition = decision != null && decision.disposition() != null
+                ? decision.disposition()
+                : defaultDisposition;
+            if (acceptedQty > 0 && lineDisposition == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Disposition is required for every accepted line");
+            }
+            line.setReceivedQty(line.getRequestedQty());
+            line.setAcceptedQty(acceptedQty);
+            line.setDisposition(acceptedQty == 0 ? null : lineDisposition);
+            BigDecimal lineRefund = line.getRefundAmount()
+                .multiply(BigDecimal.valueOf(acceptedQty))
+                .divide(BigDecimal.valueOf(line.getRequestedQty()), 2, RoundingMode.HALF_UP);
+            line.setRefundAmount(lineRefund);
+            if (acceptedQty > 0 && lineDisposition == ReturnDisposition.RESTOCKABLE) {
+                restoreItemStock(line.getOrderItem(), acceptedQty);
+            }
+            acceptedRefund = acceptedRefund.add(lineRefund);
+        }
+        if (acceptedRefund.signum() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one returned unit must be accepted");
+        }
+        orderReturnItemRepository.saveAll(lines);
+        orderReturn.setRefundAmount(acceptedRefund.setScale(2, RoundingMode.HALF_UP));
     }
 
     // ---------------------------------------------------------------------
     // Exchange-only fulfilment
     // ---------------------------------------------------------------------
+
+    public OrderReturn settlePriceDifference(
+        String returnNumber,
+        ExchangeSettlementStatus settlementStatus,
+        BigDecimal amount,
+        String method,
+        String reference,
+        String settledBy,
+        String adminNotes
+    ) {
+        assertFeatureEnabled();
+        OrderReturn orderReturn = loadReturn(returnNumber);
+        assertIsExchange(orderReturn);
+        if (orderReturn.getStatus() != OrderReturnStatus.APPROVED && orderReturn.getStatus() != OrderReturnStatus.ACCEPTED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Price difference can only be settled for an approved exchange");
+        }
+        BigDecimal difference = money(orderReturn.getPriceDifference());
+        ExchangeSettlementStatus expected = difference.signum() > 0
+            ? ExchangeSettlementStatus.COLLECTED
+            : difference.signum() < 0 ? ExchangeSettlementStatus.REFUNDED : ExchangeSettlementStatus.NOT_REQUIRED;
+        if (settlementStatus == null || (settlementStatus != expected && settlementStatus != ExchangeSettlementStatus.WAIVED)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Settlement action does not match the exchange price difference");
+        }
+        BigDecimal expectedAmount = difference.abs().setScale(2, RoundingMode.HALF_UP);
+        BigDecimal recordedAmount = settlementStatus == ExchangeSettlementStatus.WAIVED ? BigDecimal.ZERO : money(amount);
+        if (settlementStatus != ExchangeSettlementStatus.WAIVED && recordedAmount.compareTo(expectedAmount) != 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Settlement amount must equal the price difference");
+        }
+        if (settlementStatus != ExchangeSettlementStatus.WAIVED && StringUtils.isAnyBlank(method, reference)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Settlement method and transaction reference are required");
+        }
+        orderReturn.setSettlementStatus(settlementStatus);
+        orderReturn.setSettlementAmount(recordedAmount);
+        orderReturn.setSettlementMethod(StringUtils.left(StringUtils.trimToNull(method), 40));
+        orderReturn.setSettlementReference(StringUtils.left(StringUtils.trimToNull(reference), 160));
+        orderReturn.setSettledAt(Instant.now());
+        orderReturn.setSettledBy(StringUtils.left(StringUtils.defaultIfBlank(settledBy, "system"), 50));
+        orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
+        return orderReturnRepository.save(orderReturn);
+    }
 
     public OrderReturn allocateReplacementItem(String returnNumber, String adminNotes) {
         assertFeatureEnabled();
@@ -345,28 +819,65 @@ public class OrderReturnService {
         if (orderReturn.getStatus() != OrderReturnStatus.ACCEPTED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Exchange must be accepted before allocating the replacement");
         }
-        OrderItem item = orderReturn.getOrderItem();
-        Product product = resolveProductForUpdate(item.getProductId()).orElseThrow(() ->
-            new ResponseStatusException(HttpStatus.BAD_REQUEST, "Original product could not be resolved")
-        );
-        int qty = Optional.ofNullable(item.getQty()).orElse(1);
-        boolean allocated = variantSupport.decrementVariantStock(
-            product,
-            orderReturn.getReplacementVariantSku(),
-            orderReturn.getReplacementSize(),
-            orderReturn.getReplacementColor(),
-            qty
-        );
-        if (!allocated) {
-            throw new ResponseStatusException(
-                HttpStatus.CONFLICT,
-                "Replacement is no longer in stock; convert this exchange to a refund instead."
+        // Compatibility for exchanges accepted before approval-time reservations were introduced.
+        if (orderReturn.getReplacementReservedAt() == null) {
+            OrderItem item = orderReturn.getOrderItem();
+            Product product = resolveProductForUpdate(item.getProductId()).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.BAD_REQUEST, "Original product could not be resolved")
             );
+            int qty = Optional.ofNullable(item.getQty()).orElse(1);
+            if (
+                !variantSupport.decrementVariantStock(
+                    product,
+                    orderReturn.getReplacementVariantSku(),
+                    orderReturn.getReplacementSize(),
+                    orderReturn.getReplacementColor(),
+                    qty
+                )
+            ) {
+                throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Replacement is no longer in stock; convert this exchange to a refund instead."
+                );
+            }
+            productRepository.save(product);
+            orderReturn.setReplacementReservedAt(Instant.now());
+        } else if (orderReturn.getReplacementReservationReleasedAt() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Replacement stock reservation was released");
         }
-        productRepository.save(product);
+        if (orderReturn.getSettlementStatus() == ExchangeSettlementStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Settle the exchange price difference before allocation");
+        }
         orderReturn.setStatus(OrderReturnStatus.ITEM_ALLOCATED);
         orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
         return orderReturnRepository.save(orderReturn);
+    }
+
+    private void releaseExchangeReservation(OrderReturn orderReturn) {
+        if (
+            orderReturn.getRequestType() != OrderRequestType.EXCHANGE ||
+            orderReturn.getReplacementReservedAt() == null ||
+            orderReturn.getReplacementReservationReleasedAt() != null
+        ) {
+            return;
+        }
+        OrderItem item = orderReturn.getOrderItem();
+        Product product = item == null ? null : resolveProductForUpdate(item.getProductId()).orElse(null);
+        if (product != null) {
+            int qty = Math.max(1, Optional.ofNullable(item.getQty()).orElse(1));
+            boolean restored = variantSupport.incrementVariantStock(
+                product,
+                orderReturn.getReplacementVariantSku(),
+                orderReturn.getReplacementSize(),
+                orderReturn.getReplacementColor(),
+                qty
+            );
+            if (!restored) {
+                product.setStock(Optional.ofNullable(product.getStock()).orElse(0) + qty);
+            }
+            productRepository.save(product);
+        }
+        orderReturn.setReplacementReservationReleasedAt(Instant.now());
     }
 
     public OrderReturn convertExchangeToRefund(String returnNumber, String adminNotes) {
@@ -379,8 +890,14 @@ public class OrderReturnService {
                 "Exchange must be accepted (or retried after a failed refund) before converting to a refund"
             );
         }
+        releaseExchangeReservation(orderReturn);
         OrderItem item = orderReturn.getOrderItem();
-        BigDecimal itemAmount = item.getPrice().multiply(BigDecimal.valueOf(Optional.ofNullable(item.getQty()).orElse(1)));
+        BigDecimal itemAmount = orderReturn.getOriginalItemAmount() == null
+            ? item.getPrice().multiply(BigDecimal.valueOf(Optional.ofNullable(item.getQty()).orElse(1)))
+            : orderReturn.getOriginalItemAmount();
+        if (orderReturn.getSettlementStatus() == ExchangeSettlementStatus.COLLECTED) {
+            itemAmount = itemAmount.add(money(orderReturn.getSettlementAmount()));
+        }
         return executeRefund(orderReturn, itemAmount, adminNotes);
     }
 
@@ -401,6 +918,125 @@ public class OrderReturnService {
             OrderReturnStatus.READY_TO_SHIP,
             adminNotes,
             "Item must be repacked before it is ready to ship"
+        );
+    }
+
+    public OrderReturn bookOutbound(
+        String returnNumber,
+        ReturnLogisticsMode mode,
+        String carrierName,
+        String outboundAwb,
+        String trackingUrl,
+        String labelUrl,
+        String adminNotes
+    ) {
+        assertFeatureEnabled();
+        OrderReturn orderReturn = loadReturn(returnNumber);
+        assertIsExchange(orderReturn);
+        if (orderReturn.getStatus() != OrderReturnStatus.READY_TO_SHIP) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Exchange replacement must be ready to ship before booking outbound");
+        }
+        if (orderReturn.getSettlementStatus() == ExchangeSettlementStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Settle the exchange price difference before booking outbound");
+        }
+        if (mode == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Logistics mode is required");
+        }
+        if (mode == ReturnLogisticsMode.XPRESSBEES) {
+            return bookExpressBeesOutbound(orderReturn, outboundAwb, adminNotes);
+        }
+        if (StringUtils.isBlank(outboundAwb)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Outbound AWB or tracking reference is required");
+        }
+        orderReturn.setOutboundLogisticsMode(mode);
+        orderReturn.setOutboundCarrierName(StringUtils.left(StringUtils.trimToNull(carrierName), 80));
+        orderReturn.setOutboundAwb(StringUtils.left(StringUtils.trimToNull(outboundAwb), 80));
+        orderReturn.setOutboundTrackingUrl(StringUtils.left(StringUtils.trimToNull(trackingUrl), 500));
+        orderReturn.setOutboundLabelUrl(StringUtils.left(StringUtils.trimToNull(labelUrl), 500));
+        orderReturn.setStatus(OrderReturnStatus.SHIPPED);
+        orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
+        return orderReturnRepository.save(orderReturn);
+    }
+
+    private OrderReturn bookExpressBeesOutbound(OrderReturn orderReturn, String preAssignedAwb, String adminNotes) {
+        if (!xpressBeesClient.isForwardShipmentConfigured()) {
+            throw new ResponseStatusException(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "ExpressBees forward shipment is not configured. Set XPRESSBEES credentials, business account, warehouse address and forward manifest path, or book outbound using manual mode."
+            );
+        }
+        try {
+            XpressBeesClient.ForwardShipmentResult result = xpressBeesClient.createForwardShipment(
+                buildForwardShipmentRequest(orderReturn, preAssignedAwb)
+            );
+            orderReturn.setOutboundLogisticsMode(ReturnLogisticsMode.XPRESSBEES);
+            orderReturn.setOutboundCarrierName("XpressBees");
+            orderReturn.setOutboundAwb(StringUtils.left(result.awb(), 80));
+            String tracking = StringUtils.defaultIfBlank(result.trackingUrl(), xpressBeesClient.buildTrackingUrl(result.awb()));
+            orderReturn.setOutboundTrackingUrl(StringUtils.left(StringUtils.trimToNull(tracking), 500));
+            orderReturn.setOutboundLabelUrl(StringUtils.left(StringUtils.trimToNull(result.labelUrl()), 500));
+            orderReturn.setOutboundProviderRequestId(StringUtils.left(StringUtils.trimToNull(result.providerRequestId()), 120));
+            orderReturn.setStatus(OrderReturnStatus.SHIPPED);
+            orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
+            return orderReturnRepository.save(orderReturn);
+        } catch (XpressBeesClient.XpressBeesApiException ex) {
+            LOG.warn("ExpressBees forward shipment failed for {}: {}", orderReturn.getReturnNumber(), ex.getMessage());
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, ex.getMessage());
+        }
+    }
+
+    private XpressBeesClient.ForwardShipmentRequest buildForwardShipmentRequest(OrderReturn orderReturn, String preAssignedAwb) {
+        CustomerOrder order = orderReturn.getOrder();
+        JsonNode shipping = parseShippingAddress(order.getShippingAddressJson());
+        ApplicationProperties.XpressBees xpressBees = applicationProperties.getXpressbees();
+        XpressBeesClient.ReversePickupAddress shipFrom = new XpressBeesClient.ReversePickupAddress(
+            StringUtils.defaultIfBlank(xpressBees.getWarehouseName(), "Mini's n More"),
+            StringUtils.defaultIfBlank(xpressBees.getWarehousePhone(), firstAddressField(shipping, "phone", "mobile")),
+            null,
+            xpressBees.getWarehouseLine1(),
+            xpressBees.getWarehouseLine2(),
+            xpressBees.getWarehouseCity(),
+            xpressBees.getWarehouseState(),
+            xpressBees.getOriginPincode()
+        );
+        XpressBeesClient.ReversePickupAddress deliverTo = new XpressBeesClient.ReversePickupAddress(
+            firstAddressField(shipping, "full_name", "name"),
+            firstAddressField(shipping, "phone", "mobile"),
+            firstAddressField(shipping, "email"),
+            firstAddressField(shipping, "line1", "address_line1", "address"),
+            firstAddressField(shipping, "line2", "address_line2"),
+            firstAddressField(shipping, "city"),
+            firstAddressField(shipping, "state"),
+            firstAddressField(shipping, "pincode", "postal_code", "zip")
+        );
+        List<XpressBeesClient.ReversePickupLine> lines = buildReplacementShipmentLines(orderReturn);
+        return new XpressBeesClient.ForwardShipmentRequest(
+            orderReturn.getReturnNumber() + "-OUT",
+            order.getOrderNumber(),
+            shipFrom,
+            deliverTo,
+            lines,
+            StringUtils.trimToNull(preAssignedAwb)
+        );
+    }
+
+    private List<XpressBeesClient.ReversePickupLine> buildReplacementShipmentLines(OrderReturn orderReturn) {
+        OrderItem item = orderReturn.getOrderItem();
+        String productName = item != null ? StringUtils.defaultIfBlank(item.getProductName(), "Replacement item") : "Replacement item";
+        String sku = StringUtils.defaultIfBlank(
+            orderReturn.getReplacementVariantSku(),
+            item != null ? StringUtils.defaultIfBlank(item.getVariantSku(), item.getProductSlug()) : orderReturn.getReturnNumber()
+        );
+        int qty = item != null ? Math.max(1, item.getQty() == null ? 1 : item.getQty()) : 1;
+        BigDecimal price = item != null ? item.getPrice() : orderReturn.getOrder().getTotal();
+        return List.of(
+            new XpressBeesClient.ReversePickupLine(
+                productName,
+                sku,
+                qty,
+                price,
+                Math.max(1, applicationProperties.getXpressbees().getDefaultWeightGrams())
+            )
         );
     }
 
@@ -450,8 +1086,22 @@ public class OrderReturnService {
                 "Return must be accepted (or retry after a failed refund) before processing refund"
             );
         }
-        CustomerOrder order = orderReturn.getOrder();
-        return executeRefund(orderReturn, order.getTotal(), adminNotes);
+        BigDecimal refundAmount = orderReturnItemRepository
+            .findAllByOrderReturnIdOrderById(orderReturn.getId())
+            .stream()
+            .map(OrderReturnItem::getRefundAmount)
+            .filter(java.util.Objects::nonNull)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (refundAmount.signum() <= 0) {
+            refundAmount = money(orderReturn.getRefundAmount());
+        }
+        if (refundAmount.signum() <= 0 && orderReturnItemRepository.findAllByOrderReturnIdOrderById(orderReturn.getId()).isEmpty()) {
+            refundAmount = money(orderReturn.getOrder().getTotal());
+        }
+        if (refundAmount.signum() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return has no refundable accepted lines");
+        }
+        return executeRefund(orderReturn, refundAmount.setScale(2, RoundingMode.HALF_UP), adminNotes);
     }
 
     private OrderReturn executeRefund(OrderReturn orderReturn, BigDecimal refundAmount, String adminNotes) {
@@ -464,7 +1114,9 @@ public class OrderReturnService {
             }
             orderReturn.setRefundAmount(refundAmount);
             if (orderReturn.getRequestType() == OrderRequestType.RETURN && order.getPaymentStatus() != PaymentStatus.REFUNDED) {
-                order.setPaymentStatus(PaymentStatus.REFUNDED);
+                order.setPaymentStatus(
+                    refundAmount.compareTo(money(order.getTotal())) >= 0 ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED
+                );
                 customerOrderRepository.save(order);
             }
             if (applicationProperties.getLedgerly().isSyncReturns() && StringUtils.isBlank(orderReturn.getLedgerlyCreditNoteId())) {
@@ -680,6 +1332,10 @@ public class OrderReturnService {
     // ---------------------------------------------------------------------
 
     private void restoreItemStock(OrderItem item) {
+        restoreItemStock(item, item == null ? 0 : Optional.ofNullable(item.getQty()).orElse(0));
+    }
+
+    private void restoreItemStock(OrderItem item, int quantity) {
         if (item == null || StringUtils.isBlank(item.getProductId())) {
             return;
         }
@@ -688,7 +1344,7 @@ public class OrderReturnService {
             productRepository
                 .findOneForInventoryUpdate(productId)
                 .ifPresent(product -> {
-                    int qty = Optional.ofNullable(item.getQty()).orElse(0);
+                    int qty = quantity;
                     if (qty <= 0) {
                         return;
                     }
@@ -891,6 +1547,19 @@ public class OrderReturnService {
         String merged = existing + "\n" + extra;
         return merged.length() <= 2000 ? merged : merged.substring(0, 2000);
     }
+
+    private static BigDecimal money(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO.setScale(2) : value.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal positiveOrFallback(BigDecimal preferred, BigDecimal fallback) {
+        BigDecimal value = money(preferred);
+        return value.signum() > 0 ? value : money(fallback);
+    }
+
+    public record ReturnLineSelection(Long orderItemId, Integer quantity) {}
+
+    public record InspectionLineDecision(Long returnItemId, Integer acceptedQuantity, ReturnDisposition disposition) {}
 
     /** UAT/demo: when Ledgerly has no invoice or cancel fails, still complete return flow for scenario tests. */
     private boolean shouldStubDemoCreditNote(CustomerOrder order, RuntimeException error) {

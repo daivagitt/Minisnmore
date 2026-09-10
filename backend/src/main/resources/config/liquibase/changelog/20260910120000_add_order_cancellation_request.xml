@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260910120000-1" author="miniandmore">
+        <createTable tableName="order_cancellation_request">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="request_number" type="varchar(48)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="ux_order_cancellation_request__request_number"/>
+            </column>
+            <column name="status" type="varchar(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="reason" type="${clobType}">
+                <constraints nullable="false"/>
+            </column>
+            <column name="admin_notes" type="varchar(2000)"/>
+            <column name="rejection_reason" type="varchar(1000)"/>
+            <column name="razorpay_refund_id" type="varchar(120)"/>
+            <column name="requested_at" type="${datetimeType}">
+                <constraints nullable="false"/>
+            </column>
+            <column name="resolved_at" type="${datetimeType}"/>
+            <column name="customer_order_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="user_login" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="20260910120000-2" author="miniandmore">
+        <addForeignKeyConstraint
+            baseTableName="order_cancellation_request"
+            baseColumnNames="customer_order_id"
+            constraintName="fk_order_cancellation_request__customer_order_id"
+            referencedTableName="customer_order"
+            referencedColumnNames="id"/>
+        <createIndex indexName="idx_order_cancellation_request__customer_order_id" tableName="order_cancellation_request">
+            <column name="customer_order_id"/>
+        </createIndex>
+        <createIndex indexName="idx_order_cancellation_request__status_requested_at" tableName="order_cancellation_request">
+            <column name="status"/>
+            <column name="requested_at"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

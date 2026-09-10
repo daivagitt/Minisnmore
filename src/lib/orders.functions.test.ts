@@ -40,10 +40,12 @@ import {
   approveOrderReturn,
   bootstrapProfileFromSignup,
   cancelOrder,
+  cancelAdminOrderShipment,
   cancelOrderReturn,
   checkExchangeReplacementAvailability,
   checkReturnEligibility,
   completeOrderReturnExchange,
+  closeFailedOrderReturnPickup,
   convertOrderReturnToRefund,
   createOrder,
   getMyProfile,
@@ -58,6 +60,7 @@ import {
   listMyOrders,
   listMyPayments,
   markCodCollected,
+  bookAdminOrderShipment,
   markOrderReturnDelivered,
   markOrderReturnInspected,
   markOrderReturnPickedUp,
@@ -72,6 +75,7 @@ import {
   requestOrderReturn,
   retryOrderPayment,
   syncPaymentStatus,
+  settleOrderReturnPriceDifference,
   trackOrderPublic,
   updateMyProfile,
   verifyPayment,
@@ -283,7 +287,7 @@ describe("orders functions", () => {
       order: { order_number: "MNM-1", status: "cancelled" },
     });
     expect(postMock).toHaveBeenCalledWith(
-      "/api/v1/orders/MNM-1/cancel",
+      "/api/v1/orders/MNM-1/cancel-request",
       { reason: "Ordered by mistake" },
       { auth: true },
     );
@@ -583,7 +587,6 @@ describe("orders functions", () => {
       { fn: markOrderReturnPickupRequested, action: "pickup-requested", status: "pickup_requested" },
       { fn: markOrderReturnPickedUp, action: "picked-up", status: "picked_up" },
       { fn: markOrderReturnInspected, action: "inspect", status: "inspected" },
-      { fn: acceptOrderReturnAfterInspection, action: "accept", status: "accepted" },
       { fn: allocateReplacementForOrderReturn, action: "allocate-replacement", status: "allocated" },
       { fn: convertOrderReturnToRefund, action: "convert-to-refund", status: "refund_pending" },
       { fn: markOrderReturnRepacking, action: "repacking", status: "repacking" },
@@ -603,6 +606,41 @@ describe("orders functions", () => {
       );
     }
 
+    postMock.mockResolvedValueOnce({ return_number: "RET-10", status: "accepted" });
+    await acceptOrderReturnAfterInspection("RET-10", "restockable", "handled", [
+      { return_item_id: 9, accepted_quantity: 1, disposition: "restockable" },
+    ]);
+    expect(postMock).toHaveBeenLastCalledWith(
+      "/api/v1/admin/order-returns/RET-10/accept",
+      {
+        disposition: "restockable",
+        admin_notes: "handled",
+        items: [{ return_item_id: 9, accepted_quantity: 1, disposition: "restockable" }],
+      },
+      { auth: true },
+    );
+
+    postMock.mockResolvedValueOnce({ return_number: "RET-10", status: "cancelled" });
+    await closeFailedOrderReturnPickup("RET-10", "Customer declined");
+    expect(postMock).toHaveBeenLastCalledWith(
+      "/api/v1/admin/order-returns/RET-10/close-pickup-failed",
+      { admin_notes: "Customer declined" },
+      { auth: true },
+    );
+
+    postMock.mockResolvedValueOnce({ return_number: "RET-10", settlement_status: "collected" });
+    await settleOrderReturnPriceDifference("RET-10", {
+      status: "collected",
+      amount: 150,
+      method: "UPI",
+      reference: "UTR-1",
+    });
+    expect(postMock).toHaveBeenLastCalledWith(
+      "/api/v1/admin/order-returns/RET-10/settle-price-difference",
+      { status: "collected", amount: 150, method: "UPI", reference: "UTR-1" },
+      { auth: true },
+    );
+
     postMock.mockResolvedValueOnce({ return_number: "RET-11", status: "pickup_requested" });
     await expect(markOrderReturnPickupRequested("RET-11")).resolves.toEqual({
       return_number: "RET-11",
@@ -611,6 +649,16 @@ describe("orders functions", () => {
     expect(postMock).toHaveBeenLastCalledWith(
       "/api/v1/admin/order-returns/RET-11/pickup-requested",
       { admin_notes: "" },
+      { auth: true },
+    );
+  });
+
+  it("cancels a booked admin shipment with manual fallback", async () => {
+    postMock.mockResolvedValueOnce({ order: { order_number: "MNM-9" } });
+    await cancelAdminOrderShipment("MNM-9", { mode: "manual", reason: "Carrier confirmed cancellation" });
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/admin/orders/MNM-9/cancel-shipment",
+      { mode: "manual", reason: "Carrier confirmed cancellation" },
       { auth: true },
     );
   });
@@ -635,6 +683,38 @@ describe("orders functions", () => {
     expect(postMock).toHaveBeenCalledWith(
       "/api/v1/admin/orders/MNM-COD-1/mark-cod-collected",
       undefined,
+      { auth: true },
+    );
+  });
+
+  it("books an admin forward shipment", async () => {
+    postMock.mockResolvedValueOnce({ order: { order_number: "MNM-1", tracking_number: "XB-1" } });
+    await expect(
+      bookAdminOrderShipment("MNM-1", { mode: "xpressbees" }),
+    ).resolves.toEqual({ order: { order_number: "MNM-1", tracking_number: "XB-1" } });
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/admin/orders/MNM-1/book-shipment",
+      { mode: "xpressbees" },
+      { auth: true },
+    );
+  });
+
+  it("books shipment with cancellation hold override", async () => {
+    postMock.mockResolvedValueOnce({ order: { order_number: "MNM-1", tracking_number: "XB-2" } });
+    await bookAdminOrderShipment("MNM-1", {
+      mode: "manual",
+      awb: "AWB-2",
+      override_fulfillment_hold: true,
+      override_reason: "Customer confirmed they want delivery",
+    });
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/admin/orders/MNM-1/book-shipment",
+      {
+        mode: "manual",
+        awb: "AWB-2",
+        override_fulfillment_hold: true,
+        override_reason: "Customer confirmed they want delivery",
+      },
       { auth: true },
     );
   });

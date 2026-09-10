@@ -308,6 +308,22 @@ application:
     password: ${XPRESSBEES_PASSWORD:}
     origin-pincode: ${XPRESSBEES_ORIGIN_PINCODE:560074}
     payment-type: ${XPRESSBEES_PAYMENT_TYPE:prepaid}
+    xb-key: ${XPRESSBEES_XB_KEY:}
+    business-account-name: ${XPRESSBEES_BUSINESS_ACCOUNT_NAME:}
+    reverse-manifest-path: ${XPRESSBEES_REVERSE_MANIFEST_PATH:/api/courier/reverse/order}
+    forward-manifest-path: ${XPRESSBEES_FORWARD_MANIFEST_PATH:/api/courier/order}
+    cancel-shipment-path: ${XPRESSBEES_CANCEL_SHIPMENT_PATH:/api/shipments2/cancel}
+    webhook-secret: ${XPRESSBEES_WEBHOOK_SECRET:}
+    auth-type: ${XPRESSBEES_AUTH_TYPE:token}
+    warehouse-name: ${XPRESSBEES_WAREHOUSE_NAME:Mini's n More}
+    warehouse-phone: ${XPRESSBEES_WAREHOUSE_PHONE:}
+    warehouse-line1: ${XPRESSBEES_WAREHOUSE_LINE1:}
+    warehouse-line2: ${XPRESSBEES_WAREHOUSE_LINE2:}
+    warehouse-city: ${XPRESSBEES_WAREHOUSE_CITY:Bengaluru}
+    warehouse-state: ${XPRESSBEES_WAREHOUSE_STATE:Karnataka}
+    tracking-url-template: ${XPRESSBEES_TRACKING_URL_TEMPLATE:https://www.xpressbees.com/track/?awb={awb}}
+    default-weight-grams: ${XPRESSBEES_DEFAULT_WEIGHT_GRAMS:500}
+    pickup-vendor-code: ${XPRESSBEES_PICKUP_VENDOR_CODE:}
   fastsms:
     enabled: ${FASTSMS_ENABLED:false}
     base-url: ${FASTSMS_BASE_URL:https://s.fastsmsindia.com/api/sms/v1.0}

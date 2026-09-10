@@ -15,6 +15,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -328,6 +329,107 @@ class XpressBeesClientTest {
         assertThat(client.checkServiceability("411001")).isPresent();
 
         verify(httpClient, times(3)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
+    void parseReversePickupResponse_tokenSuccess_returnsAwb() throws Exception {
+        String body =
+            """
+            {"status":true,"data":{"awb":"1234567890","tracking_url":"https://track/123","pickup_window":"Tomorrow","request_id":"req-9"}}
+            """;
+        XpressBeesClient.ReversePickupRequest request = new XpressBeesClient.ReversePickupRequest(
+            "RET-1",
+            "ORD-1",
+            new XpressBeesClient.ReversePickupAddress("Jane", "9876543210", null, "Line 1", null, "City", "State", "560001"),
+            new XpressBeesClient.ReversePickupAddress("WH", "9876500000", null, "WH Line", null, "City", "State", "560074"),
+            List.of(new XpressBeesClient.ReversePickupLine("Tee", "SKU", 1, null, 500)),
+            null
+        );
+
+        XpressBeesClient.ReversePickupResult result = client.parseReversePickupResponse(body, request);
+
+        assertThat(result.awb()).isEqualTo("1234567890");
+        assertThat(result.trackingUrl()).isEqualTo("https://track/123");
+        assertThat(result.pickupWindow()).isEqualTo("Tomorrow");
+        assertThat(result.providerRequestId()).isEqualTo("req-9");
+    }
+
+    @Test
+    void parseReversePickupResponse_legacySuccess_returnsAwb() throws Exception {
+        String body =
+            """
+            {"ReverseManifestDetails":[{"ReturnCode":"100","ReturnMessage":"Success","AWBNumber":"9988776655","PickupDate":"2026-09-11"}]}
+            """;
+        XpressBeesClient.ReversePickupRequest request = new XpressBeesClient.ReversePickupRequest(
+            "RET-1",
+            "ORD-1",
+            new XpressBeesClient.ReversePickupAddress("Jane", "9876543210", null, "Line 1", null, "City", "State", "560001"),
+            new XpressBeesClient.ReversePickupAddress("WH", "9876500000", null, "WH Line", null, "City", "State", "560074"),
+            List.of(new XpressBeesClient.ReversePickupLine("Tee", "SKU", 1, null, 500)),
+            null
+        );
+
+        XpressBeesClient.ReversePickupResult result = client.parseReversePickupResponse(body, request);
+
+        assertThat(result.awb()).isEqualTo("9988776655");
+        assertThat(result.pickupWindow()).isEqualTo("2026-09-11");
+    }
+
+    @Test
+    void parseForwardShipmentResponse_tokenSuccess_returnsAwbAndLabel() throws Exception {
+        String body =
+            """
+            {"status":true,"data":{"awb":"5544332211","tracking_url":"https://track/out","label_url":"https://label/out","request_id":"out-req-1"}}
+            """;
+        XpressBeesClient.ForwardShipmentRequest request = new XpressBeesClient.ForwardShipmentRequest(
+            "RET-1-OUT",
+            "ORD-1",
+            new XpressBeesClient.ReversePickupAddress("WH", "9876500000", null, "WH Line", null, "City", "State", "560074"),
+            new XpressBeesClient.ReversePickupAddress("Jane", "9876543210", null, "Line 1", null, "City", "State", "560001"),
+            List.of(new XpressBeesClient.ReversePickupLine("Tee", "SKU", 1, null, 500)),
+            null
+        );
+
+        XpressBeesClient.ForwardShipmentResult result = client.parseForwardShipmentResponse(body, request);
+
+        assertThat(result.awb()).isEqualTo("5544332211");
+        assertThat(result.trackingUrl()).isEqualTo("https://track/out");
+        assertThat(result.labelUrl()).isEqualTo("https://label/out");
+        assertThat(result.providerRequestId()).isEqualTo("out-req-1");
+    }
+
+    @Test
+    void isForwardShipmentConfigured_requiresBusinessAccountWarehouseAndCredentials() {
+        ApplicationProperties properties = new ApplicationProperties();
+        ApplicationProperties.XpressBees config = properties.getXpressbees();
+        config.setEmail("info@example.com");
+        config.setPassword("secret");
+        config.setOriginPincode("560074");
+        config.setBusinessAccountName("MiniSnMore");
+        config.setWarehouseLine1("Warehouse 1");
+        XpressBeesClient configured = new XpressBeesClient(properties, new ObjectMapper());
+        assertThat(configured.isForwardShipmentConfigured()).isTrue();
+
+        ApplicationProperties empty = new ApplicationProperties();
+        XpressBeesClient disabled = new XpressBeesClient(empty, new ObjectMapper());
+        assertThat(disabled.isForwardShipmentConfigured()).isFalse();
+    }
+
+    @Test
+    void isReversePickupConfigured_requiresBusinessAccountWarehouseAndCredentials() {
+        ApplicationProperties properties = new ApplicationProperties();
+        ApplicationProperties.XpressBees config = properties.getXpressbees();
+        config.setEmail("info@example.com");
+        config.setPassword("secret");
+        config.setOriginPincode("560074");
+        config.setBusinessAccountName("MiniSnMore");
+        config.setWarehouseLine1("Warehouse 1");
+        XpressBeesClient configured = new XpressBeesClient(properties, new ObjectMapper());
+        assertThat(configured.isReversePickupConfigured()).isTrue();
+
+        ApplicationProperties empty = new ApplicationProperties();
+        XpressBeesClient disabled = new XpressBeesClient(empty, new ObjectMapper());
+        assertThat(disabled.isReversePickupConfigured()).isFalse();
     }
 
     private static String jwtWithExpiry(Instant expiresAt) {

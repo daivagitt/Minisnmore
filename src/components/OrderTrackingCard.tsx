@@ -52,7 +52,7 @@ export function OrderTrackingCard({ order, showHeader = true }: Props) {
         </>
       )}
 
-      {(order.tracking_number || order.tracking_carrier || order.shipment_date) && (
+      {(order.tracking_number || order.tracking_carrier || order.shipment_date || order.tracking_url) && (
         <div className={`glass rounded-2xl p-4 text-sm space-y-1 ${showHeader ? "mt-4" : ""}`}>
           {order.tracking_carrier && (
             <div>
@@ -76,6 +76,13 @@ export function OrderTrackingCard({ order, showHeader = true }: Props) {
           {order.shipment_date && (
             <div>
               <span className="text-muted-foreground">Shipped on:</span> {order.shipment_date}
+            </div>
+          )}
+          {order.tracking_url && (
+            <div>
+              <a href={order.tracking_url} target="_blank" rel="noreferrer" className="underline">
+                Track shipment
+              </a>
             </div>
           )}
         </div>

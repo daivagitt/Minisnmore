@@ -18,6 +18,12 @@ public interface OrderReturnRepository extends JpaRepository<OrderReturn, Long> 
     Optional<OrderReturn> findOneByReturnNumber(String returnNumber);
 
     @EntityGraph(attributePaths = { "order", "orderItem" })
+    Optional<OrderReturn> findFirstByReverseAwbOrderByRequestedAtDesc(String reverseAwb);
+
+    @EntityGraph(attributePaths = { "order", "orderItem" })
+    Optional<OrderReturn> findFirstByOutboundAwbOrderByRequestedAtDesc(String outboundAwb);
+
+    @EntityGraph(attributePaths = { "order", "orderItem" })
     @Query("select r from OrderReturn r where r.userLogin = :login order by r.requestedAt desc")
     List<OrderReturn> findAllByUserLoginOrderByRequestedAtDesc(@Param("login") String login);
 

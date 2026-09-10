@@ -44,4 +44,20 @@ public class AdminOrdersProxyResource {
             null
         );
     }
+
+    @PostMapping("/{orderNumber}/book-shipment")
+    public ResponseEntity<String> bookShipment(@PathVariable String orderNumber, @RequestBody Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/admin/orders/{orderNumber}/book-shipment", orderNumber),
+            body
+        );
+    }
+
+    @PostMapping("/{orderNumber}/cancel-shipment")
+    public ResponseEntity<String> cancelShipment(@PathVariable String orderNumber, @RequestBody Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/admin/orders/{orderNumber}/cancel-shipment", orderNumber),
+            body
+        );
+    }
 }

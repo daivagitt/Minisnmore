@@ -1,5 +1,6 @@
 package com.miniandmore.commerce.web;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -115,5 +116,22 @@ class AdminOrdersProxyResourceTest {
             .andExpect(content().string("{\"order\":{}}"));
 
         verify(catalog).get("/internal/v1/admin/orders/MNM-42");
+    }
+
+    @Test
+    void bookShipment_delegatesToCatalog() throws Exception {
+        when(catalog.post(eq("/internal/v1/admin/orders/MNM-42/book-shipment"), any()))
+            .thenReturn(ResponseEntity.ok("{\"order\":{}}"));
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/orders/MNM-42/book-shipment")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content("{\"mode\":\"xpressbees\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(content().string("{\"order\":{}}"));
+
+        verify(catalog).post(eq("/internal/v1/admin/orders/MNM-42/book-shipment"), any());
     }
 }

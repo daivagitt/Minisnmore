@@ -50,6 +50,7 @@ import { Route as AdminHomeRouteImport } from './routes/admin.home'
 import { Route as AdminDiscountRouteImport } from './routes/admin.discount'
 import { Route as AdminCouponsRouteImport } from './routes/admin.coupons'
 import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
+import { Route as AdminCancellationsRouteImport } from './routes/admin.cancellations'
 import { Route as AdminBlogRouteImport } from './routes/admin.blog'
 import { Route as AdminBannersRouteImport } from './routes/admin.banners'
 import { Route as AccountWishlistRouteImport } from './routes/account.wishlist'
@@ -274,6 +275,11 @@ const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
   path: '/categories',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminCancellationsRoute = AdminCancellationsRouteImport.update({
+  id: '/cancellations',
+  path: '/cancellations',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminBlogRoute = AdminBlogRouteImport.update({
   id: '/blog',
   path: '/blog',
@@ -403,6 +409,7 @@ export interface FileRoutesByFullPath {
   '/account/wishlist': typeof AccountWishlistRoute
   '/admin/banners': typeof AdminBannersRoute
   '/admin/blog': typeof AdminBlogRoute
+  '/admin/cancellations': typeof AdminCancellationsRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/discount': typeof AdminDiscountRoute
@@ -460,6 +467,7 @@ export interface FileRoutesByTo {
   '/account/wishlist': typeof AccountWishlistRoute
   '/admin/banners': typeof AdminBannersRoute
   '/admin/blog': typeof AdminBlogRoute
+  '/admin/cancellations': typeof AdminCancellationsRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/discount': typeof AdminDiscountRoute
@@ -522,6 +530,7 @@ export interface FileRoutesById {
   '/account/wishlist': typeof AccountWishlistRoute
   '/admin/banners': typeof AdminBannersRoute
   '/admin/blog': typeof AdminBlogRoute
+  '/admin/cancellations': typeof AdminCancellationsRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/discount': typeof AdminDiscountRoute
@@ -585,6 +594,7 @@ export interface FileRouteTypes {
     | '/account/wishlist'
     | '/admin/banners'
     | '/admin/blog'
+    | '/admin/cancellations'
     | '/admin/categories'
     | '/admin/coupons'
     | '/admin/discount'
@@ -642,6 +652,7 @@ export interface FileRouteTypes {
     | '/account/wishlist'
     | '/admin/banners'
     | '/admin/blog'
+    | '/admin/cancellations'
     | '/admin/categories'
     | '/admin/coupons'
     | '/admin/discount'
@@ -703,6 +714,7 @@ export interface FileRouteTypes {
     | '/account/wishlist'
     | '/admin/banners'
     | '/admin/blog'
+    | '/admin/cancellations'
     | '/admin/categories'
     | '/admin/coupons'
     | '/admin/discount'
@@ -1046,6 +1058,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCategoriesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/cancellations': {
+      id: '/admin/cancellations'
+      path: '/cancellations'
+      fullPath: '/admin/cancellations'
+      preLoaderRoute: typeof AdminCancellationsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/blog': {
       id: '/admin/blog'
       path: '/blog'
@@ -1227,6 +1246,7 @@ const AccountRouteWithChildren =
 interface AdminRouteChildren {
   AdminBannersRoute: typeof AdminBannersRoute
   AdminBlogRoute: typeof AdminBlogRoute
+  AdminCancellationsRoute: typeof AdminCancellationsRoute
   AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminCouponsRoute: typeof AdminCouponsRoute
   AdminDiscountRoute: typeof AdminDiscountRoute
@@ -1249,6 +1269,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminBannersRoute: AdminBannersRoute,
   AdminBlogRoute: AdminBlogRoute,
+  AdminCancellationsRoute: AdminCancellationsRoute,
   AdminCategoriesRoute: AdminCategoriesRoute,
   AdminCouponsRoute: AdminCouponsRoute,
   AdminDiscountRoute: AdminDiscountRoute,
