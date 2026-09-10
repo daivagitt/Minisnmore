@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   approveCancellationRequest,
   listAdminCancellationRequests,
+  recordCancellationCodRefund,
   rejectCancellationRequest,
   type AdminCancellationRequestRow,
 } from "@/lib/orders.functions";
@@ -25,6 +26,16 @@ export const Route = createFileRoute("/admin/cancellations")({ component: AdminC
 
 const STATUS_FILTERS = ["", "requested", "approved", "rejected", "withdrawn"] as const;
 
+function formatCaseAge(row: AdminCancellationRequestRow) {
+  const age = row.case_age_hours ?? 0;
+  const ageLabel = age < 24 ? `${age}h old` : `${Math.floor(age / 24)}d old`;
+  if (!row.sla_due_at) {
+    return ageLabel;
+  }
+  const due = new Date(row.sla_due_at).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" });
+  return row.sla_overdue ? `${ageLabel} · overdue (due ${due})` : `${ageLabel} · due ${due}`;
+}
+
 function AdminCancellationsPage() {
   const [status, setStatus] = useState<string>("requested");
   const [rows, setRows] = useState<AdminCancellationRequestRow[]>([]);
@@ -32,6 +43,9 @@ function AdminCancellationsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [rejectTarget, setRejectTarget] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [codRefundTarget, setCodRefundTarget] = useState<string | null>(null);
+  const [codRefundMethod, setCodRefundMethod] = useState<"upi" | "bank_transfer" | "cash" | "other">("upi");
+  const [codRefundReference, setCodRefundReference] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,6 +92,24 @@ function AdminCancellationsPage() {
     setRejectReason("");
   };
 
+  const submitCodRefund = async () => {
+    if (!codRefundTarget || codRefundReference.trim().length < 4) {
+      toast.error("Refund reference must be at least 4 characters");
+      return;
+    }
+    await run(
+      codRefundTarget,
+      () =>
+        recordCancellationCodRefund(codRefundTarget, {
+          refund_method: codRefundMethod,
+          refund_reference: codRefundReference.trim(),
+        }),
+      "COD refund recorded",
+    );
+    setCodRefundTarget(null);
+    setCodRefundReference("");
+  };
+
   return (
     <AdminPage
       eyebrow="Fulfilment"
@@ -116,15 +148,45 @@ function AdminCancellationsPage() {
                   </p>
                   <p className="text-xs mt-1">
                     Status: <span className="uppercase tracking-wide">{r.status}</span>
+                    {r.cod_refund_pending ? (
+                      <span className="ml-2 text-amber-700">· COD refund pending</span>
+                    ) : null}
                   </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(r.requested_at).toLocaleString("en-IN")}
-                </p>
+                <div className="text-xs text-right">
+                  <p className={r.sla_overdue ? "text-amber-700 font-medium" : "text-muted-foreground"}>
+                    {formatCaseAge(r)}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {new Date(r.requested_at).toLocaleString("en-IN")}
+                  </p>
+                </div>
               </div>
               <p className="text-sm">{r.reason}</p>
+              {r.manual_refund_reference ? (
+                <p className="text-xs text-muted-foreground">
+                  COD refund: {r.manual_refund_method?.replace(/_/g, " ")} · {r.manual_refund_reference}
+                  {r.manual_refund_recorded_by ? ` · by ${r.manual_refund_recorded_by}` : ""}
+                </p>
+              ) : null}
               {r.rejection_reason ? (
                 <p className="text-xs text-amber-700">{r.rejection_reason}</p>
+              ) : null}
+              {r.cod_refund_pending ? (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={busy === r.request_number}
+                    className="text-xs rounded-full bg-primary text-primary-foreground px-3 py-1.5"
+                    onClick={() => {
+                      setCodRefundTarget(r.request_number);
+                      setCodRefundMethod("upi");
+                      setCodRefundReference("");
+                    }}
+                  >
+                    Record COD refund
+                  </button>
+                </div>
               ) : null}
               {r.status === "requested" ? (
                 <div className="flex flex-wrap gap-2">
@@ -169,6 +231,51 @@ function AdminCancellationsPage() {
           onPageChange={paging.setPage}
         />
       )}
+
+      <Dialog open={!!codRefundTarget} onOpenChange={(open) => !open && setCodRefundTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record collected COD refund</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            The order was cancelled after COD collection. Record the refund channel and payment reference for finance audit.
+          </p>
+          <div className="grid gap-3">
+            <label className="text-sm font-medium block">
+              Refund method
+              <select
+                className="mt-1 w-full rounded-xl border border-border bg-background/60 px-3 py-2 text-sm"
+                value={codRefundMethod}
+                onChange={(e) => setCodRefundMethod(e.target.value as "upi" | "bank_transfer" | "cash" | "other")}
+              >
+                <option value="upi">UPI</option>
+                <option value="bank_transfer">Bank transfer</option>
+                <option value="cash">Cash</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label className="text-sm font-medium block">
+              Payment reference
+              <input
+                className="mt-1 w-full rounded-xl border border-border bg-background/60 px-3 py-2 text-sm"
+                value={codRefundReference}
+                onChange={(e) => setCodRefundReference(e.target.value)}
+                placeholder="UPI txn id, bank UTR, etc."
+              />
+            </label>
+          </div>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => void submitCodRefund()}
+              disabled={busy === codRefundTarget || codRefundReference.trim().length < 4}
+              className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm disabled:opacity-50"
+            >
+              Record refund
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!rejectTarget} onOpenChange={(open) => !open && setRejectTarget(null)}>
         <DialogContent>

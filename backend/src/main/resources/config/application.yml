@@ -344,6 +344,15 @@ application:
       return-pickup-scheduled-template-id: ${FASTSMS_TMPL_RETURN_PICKUP_ID:}
       return-refunded-template-id: ${FASTSMS_TMPL_RETURN_REFUNDED_ID:}
       return-failed-template-id: ${FASTSMS_TMPL_RETURN_FAILED_ID:}
+  post-order:
+    sla:
+      cancellation-requested-hours: ${POST_ORDER_SLA_CANCEL_HOURS:24}
+      return-requested-hours: ${POST_ORDER_SLA_RETURN_REQUEST_HOURS:48}
+      return-pickup-hours: ${POST_ORDER_SLA_RETURN_PICKUP_HOURS:72}
+      return-pickup-failed-hours: ${POST_ORDER_SLA_RETURN_PICKUP_FAILED_HOURS:48}
+      return-inspection-hours: ${POST_ORDER_SLA_RETURN_INSPECTION_HOURS:48}
+      return-default-hours: ${POST_ORDER_SLA_RETURN_DEFAULT_HOURS:72}
+      collected-cod-refund-hours: ${POST_ORDER_SLA_COD_REFUND_HOURS:72}
 
 razorpay:
   key-id: ${RAZORPAY_KEY_ID:}

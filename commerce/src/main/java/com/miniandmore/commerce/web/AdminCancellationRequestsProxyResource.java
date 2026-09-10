@@ -39,4 +39,15 @@ public class AdminCancellationRequestsProxyResource {
             body
         );
     }
+
+    @PostMapping("/{requestNumber}/record-cod-refund")
+    public ResponseEntity<String> recordCodRefund(@PathVariable String requestNumber, @RequestBody Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath(
+                "/internal/v1/admin/cancellation-requests/{requestNumber}/record-cod-refund",
+                requestNumber
+            ),
+            body
+        );
+    }
 }

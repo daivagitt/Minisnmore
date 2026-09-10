@@ -5,8 +5,10 @@ import com.miniandmore.app.domain.OrderReturn;
 import com.miniandmore.app.domain.OrderReturnItem;
 import com.miniandmore.app.domain.enumeration.ExchangeSettlementStatus;
 import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
+import com.miniandmore.app.domain.enumeration.ManualRefundMethod;
 import com.miniandmore.app.domain.enumeration.ReturnDisposition;
 import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
+import com.miniandmore.app.service.CaseSlaSupport;
 import com.miniandmore.app.service.OrderReturnService;
 import com.miniandmore.app.security.SecurityUtils;
 import com.miniandmore.app.web.rest.v1.ApiResponse;
@@ -31,9 +33,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class InternalAdminOrderReturnResource {
 
     private final OrderReturnService orderReturnService;
+    private final CaseSlaSupport caseSlaSupport;
 
-    public InternalAdminOrderReturnResource(OrderReturnService orderReturnService) {
+    public InternalAdminOrderReturnResource(OrderReturnService orderReturnService, CaseSlaSupport caseSlaSupport) {
         this.orderReturnService = orderReturnService;
+        this.caseSlaSupport = caseSlaSupport;
     }
 
     @GetMapping
@@ -279,6 +283,24 @@ public class InternalAdminOrderReturnResource {
         return ApiResponse.ok(toDto(orderReturnService.processRefund(returnNumber, notes(body))));
     }
 
+    @PostMapping("/{returnNumber}/record-cod-refund")
+    public ApiResponse<Map<String, Object>> recordCodRefund(
+        @PathVariable String returnNumber,
+        @Valid @RequestBody RecordCodRefundRequest body
+    ) {
+        return ApiResponse.ok(
+            toDto(
+                orderReturnService.recordManualCodRefund(
+                    returnNumber,
+                    parseManualRefundMethod(body.refund_method()),
+                    body.refund_reference(),
+                    body.admin_notes(),
+                    SecurityUtils.getCurrentUserLogin().orElse("system")
+                )
+            )
+        );
+    }
+
     private static String notes(AdminNotesRequest body) {
         return body != null ? body.admin_notes() : null;
     }
@@ -298,11 +320,27 @@ public class InternalAdminOrderReturnResource {
         data.put("requested_at", orderReturn.getRequestedAt());
         data.put("resolved_at", orderReturn.getResolvedAt());
         if (orderReturn.getOrder() != null) {
-            data.put("order_id", orderReturn.getOrder().getId());
-            data.put("order_number", orderReturn.getOrder().getOrderNumber());
-            data.put("order_total", orderReturn.getOrder().getTotal());
+            var order = orderReturn.getOrder();
+            data.put("order_id", order.getId());
+            data.put("order_number", order.getOrderNumber());
+            data.put("order_total", order.getTotal());
             data.put("customer_login", orderReturn.getUserLogin());
+            data.put("payment_method", order.getPaymentMethod());
+            data.put("payment_status", order.getPaymentStatus() != null ? order.getPaymentStatus().name().toLowerCase() : null);
+            data.put(
+                "cod_refund_pending",
+                OrderReturnService.isCollectedCod(order) &&
+                orderReturn.getManualRefundRecordedAt() == null &&
+                (orderReturn.getStatus() == OrderReturnStatus.ACCEPTED || orderReturn.getStatus() == OrderReturnStatus.FAILED)
+            );
         }
+        data.put(
+            "manual_refund_method",
+            orderReturn.getManualRefundMethod() != null ? orderReturn.getManualRefundMethod().name().toLowerCase() : null
+        );
+        data.put("manual_refund_reference", orderReturn.getManualRefundReference());
+        data.put("manual_refund_recorded_at", orderReturn.getManualRefundRecordedAt());
+        data.put("manual_refund_recorded_by", orderReturn.getManualRefundRecordedBy());
         OrderItem item = orderReturn.getOrderItem();
         if (item != null) {
             data.put("order_item_id", item.getId());
@@ -344,6 +382,7 @@ public class InternalAdminOrderReturnResource {
         data.put("settled_by", orderReturn.getSettledBy());
         data.put("replacement_reserved_at", orderReturn.getReplacementReservedAt());
         data.put("items", orderReturnService.returnLineBreakdown(orderReturn).stream().map(this::toLineDto).toList());
+        caseSlaSupport.enrichReturnCase(data);
         return data;
     }
 
@@ -363,6 +402,17 @@ public class InternalAdminOrderReturnResource {
         data.put("refund_amount", line.getRefundAmount());
         data.put("disposition", line.getDisposition() == null ? null : line.getDisposition().name().toLowerCase());
         return data;
+    }
+
+    private static ManualRefundMethod parseManualRefundMethod(String method) {
+        if (StringUtils.isBlank(method)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refund method is required");
+        }
+        try {
+            return ManualRefundMethod.valueOf(method.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid refund method: " + method);
+        }
     }
 
     private static ReturnLogisticsMode parseLogisticsMode(String mode) {
@@ -388,6 +438,12 @@ public class InternalAdminOrderReturnResource {
     }
 
     public record AdminNotesRequest(@Size(max = 2000) String admin_notes) {}
+
+    public record RecordCodRefundRequest(
+        @NotBlank String refund_method,
+        @NotBlank @Size(min = 4, max = 160) String refund_reference,
+        @Size(max = 2000) String admin_notes
+    ) {}
 
     public record RejectReturnRequest(
         @NotBlank @Size(min = 5, max = 1000) String rejection_reason,

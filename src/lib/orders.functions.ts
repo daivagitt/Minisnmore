@@ -349,6 +349,17 @@ export type AdminOrderReturnRow = OrderReturnRow & {
   settled_at?: string | null;
   settled_by?: string | null;
   replacement_reserved_at?: string | null;
+  payment_method?: string | null;
+  payment_status?: string | null;
+  cod_refund_pending?: boolean;
+  manual_refund_method?: string | null;
+  manual_refund_reference?: string | null;
+  manual_refund_recorded_at?: string | null;
+  manual_refund_recorded_by?: string | null;
+  case_age_hours?: number;
+  sla_due_at?: string | null;
+  sla_overdue?: boolean;
+  sla_limit_hours?: number;
 };
 
 export async function listAdminOrderReturns(
@@ -431,6 +442,21 @@ export async function completeOrderReturnExchange(returnNumber: string, adminNot
 
 export async function refundOrderReturn(returnNumber: string, adminNotes?: string) {
   return adminReturnAction(returnNumber, "refund", adminNotes);
+}
+
+export async function recordOrderReturnCodRefund(
+  returnNumber: string,
+  payload: {
+    refund_method: "upi" | "bank_transfer" | "cash" | "other";
+    refund_reference: string;
+    admin_notes?: string;
+  },
+) {
+  return api.post(
+    `/api/v1/admin/order-returns/${encodeURIComponent(returnNumber)}/record-cod-refund`,
+    payload,
+    { auth: true },
+  );
 }
 
 export async function bookOrderReturnPickup(
@@ -535,6 +561,18 @@ export type AdminCancellationRequestRow = {
   order_number?: string;
   order_total?: number;
   customer_login?: string | null;
+  payment_method?: string | null;
+  payment_status?: string | null;
+  cod_refund_pending?: boolean;
+  refund_amount?: number | null;
+  manual_refund_method?: string | null;
+  manual_refund_reference?: string | null;
+  manual_refund_recorded_at?: string | null;
+  manual_refund_recorded_by?: string | null;
+  case_age_hours?: number;
+  sla_due_at?: string | null;
+  sla_overdue?: boolean;
+  sla_limit_hours?: number;
 };
 
 export async function listAdminCancellationRequests(
@@ -564,6 +602,21 @@ export async function rejectCancellationRequest(
   return api.post(
     `/api/v1/admin/cancellation-requests/${encodeURIComponent(requestNumber)}/reject`,
     { rejection_reason: rejectionReason, admin_notes: adminNotes ?? "" },
+    { auth: true },
+  );
+}
+
+export async function recordCancellationCodRefund(
+  requestNumber: string,
+  payload: {
+    refund_method: "upi" | "bank_transfer" | "cash" | "other";
+    refund_reference: string;
+    admin_notes?: string;
+  },
+) {
+  return api.post(
+    `/api/v1/admin/cancellation-requests/${encodeURIComponent(requestNumber)}/record-cod-refund`,
+    payload,
     { auth: true },
   );
 }

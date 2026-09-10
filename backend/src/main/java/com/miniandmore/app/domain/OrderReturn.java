@@ -195,6 +195,21 @@ public class OrderReturn implements Serializable {
     @Column(name = "replacement_reservation_released_at")
     private Instant replacementReservationReleasedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "manual_refund_method", length = 32)
+    private com.miniandmore.app.domain.enumeration.ManualRefundMethod manualRefundMethod;
+
+    @Size(max = 160)
+    @Column(name = "manual_refund_reference", length = 160)
+    private String manualRefundReference;
+
+    @Column(name = "manual_refund_recorded_at")
+    private Instant manualRefundRecordedAt;
+
+    @Size(max = 50)
+    @Column(name = "manual_refund_recorded_by", length = 50)
+    private String manualRefundRecordedBy;
+
     public Long getId() {
         return id;
     }
@@ -545,5 +560,37 @@ public class OrderReturn implements Serializable {
 
     public void setReplacementReservationReleasedAt(Instant replacementReservationReleasedAt) {
         this.replacementReservationReleasedAt = replacementReservationReleasedAt;
+    }
+
+    public com.miniandmore.app.domain.enumeration.ManualRefundMethod getManualRefundMethod() {
+        return manualRefundMethod;
+    }
+
+    public void setManualRefundMethod(com.miniandmore.app.domain.enumeration.ManualRefundMethod manualRefundMethod) {
+        this.manualRefundMethod = manualRefundMethod;
+    }
+
+    public String getManualRefundReference() {
+        return manualRefundReference;
+    }
+
+    public void setManualRefundReference(String manualRefundReference) {
+        this.manualRefundReference = manualRefundReference;
+    }
+
+    public Instant getManualRefundRecordedAt() {
+        return manualRefundRecordedAt;
+    }
+
+    public void setManualRefundRecordedAt(Instant manualRefundRecordedAt) {
+        this.manualRefundRecordedAt = manualRefundRecordedAt;
+    }
+
+    public String getManualRefundRecordedBy() {
+        return manualRefundRecordedBy;
+    }
+
+    public void setManualRefundRecordedBy(String manualRefundRecordedBy) {
+        this.manualRefundRecordedBy = manualRefundRecordedBy;
     }
 }

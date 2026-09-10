@@ -123,6 +123,14 @@ public class AdminOrderReturnsProxyResource {
         return catalog.post(CatalogInternalClient.encodedPath("/internal/v1/admin/order-returns/{returnNumber}/refund", returnNumber), body);
     }
 
+    @PostMapping("/{returnNumber}/record-cod-refund")
+    public ResponseEntity<String> recordCodRefund(@PathVariable String returnNumber, @RequestBody Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/admin/order-returns/{returnNumber}/record-cod-refund", returnNumber),
+            body
+        );
+    }
+
     @PostMapping("/{returnNumber}/book-pickup")
     public ResponseEntity<String> bookPickup(@PathVariable String returnNumber, @RequestBody Object body) {
         return catalog.post(

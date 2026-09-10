@@ -3,8 +3,11 @@ package com.miniandmore.app.service;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderCancellationRequest;
 import com.miniandmore.app.domain.enumeration.CancellationRequestStatus;
+import com.miniandmore.app.domain.enumeration.ManualRefundMethod;
+import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.OrderCancellationRequestRepository;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -80,7 +83,42 @@ public class OrderCancellationService {
         request.setStatus(CancellationRequestStatus.APPROVED);
         request.setAdminNotes(trimNotes(adminNotes));
         request.setRazorpayRefundId(refundId);
+        if (OrderReturnService.isCollectedCod(order)) {
+            request.setRefundAmount(money(order.getTotal()));
+        }
         request.setResolvedAt(Instant.now());
+        return cancellationRequestRepository.save(request);
+    }
+
+    public OrderCancellationRequest recordManualCodRefund(
+        String requestNumber,
+        ManualRefundMethod method,
+        String reference,
+        String adminNotes,
+        String recordedBy
+    ) {
+        OrderCancellationRequest request = loadRequest(requestNumber);
+        if (request.getStatus() != CancellationRequestStatus.APPROVED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only approved cancellations can record COD refunds");
+        }
+        CustomerOrder order = request.getOrder();
+        if (!OrderReturnService.isCollectedCod(order)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Manual COD refund recording applies only to collected COD orders");
+        }
+        if (request.getManualRefundRecordedAt() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "COD refund already recorded for this cancellation");
+        }
+        if (method == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refund method is required");
+        }
+        request.setManualRefundMethod(method);
+        request.setManualRefundReference(validateManualRefundReference(reference));
+        request.setManualRefundRecordedAt(Instant.now());
+        request.setManualRefundRecordedBy(StringUtils.left(StringUtils.trimToEmpty(recordedBy), 50));
+        request.setRefundAmount(money(order.getTotal()));
+        request.setAdminNotes(trimNotes(adminNotes));
+        order.setPaymentStatus(PaymentStatus.REFUNDED);
+        customerOrderRepository.save(order);
         return cancellationRequestRepository.save(request);
     }
 
@@ -127,11 +165,28 @@ public class OrderCancellationService {
         data.put("requested_at", request.getRequestedAt());
         data.put("resolved_at", request.getResolvedAt());
         if (request.getOrder() != null) {
-            data.put("order_id", request.getOrder().getId());
-            data.put("order_number", request.getOrder().getOrderNumber());
-            data.put("order_total", request.getOrder().getTotal());
+            CustomerOrder order = request.getOrder();
+            data.put("order_id", order.getId());
+            data.put("order_number", order.getOrderNumber());
+            data.put("order_total", order.getTotal());
             data.put("customer_login", request.getUserLogin());
+            data.put("payment_method", order.getPaymentMethod());
+            data.put("payment_status", order.getPaymentStatus() != null ? order.getPaymentStatus().name().toLowerCase() : null);
+            data.put(
+                "cod_refund_pending",
+                request.getStatus() == CancellationRequestStatus.APPROVED &&
+                OrderReturnService.isCollectedCod(order) &&
+                request.getManualRefundRecordedAt() == null
+            );
         }
+        data.put("refund_amount", request.getRefundAmount());
+        data.put(
+            "manual_refund_method",
+            request.getManualRefundMethod() != null ? request.getManualRefundMethod().name().toLowerCase() : null
+        );
+        data.put("manual_refund_reference", request.getManualRefundReference());
+        data.put("manual_refund_recorded_at", request.getManualRefundRecordedAt());
+        data.put("manual_refund_recorded_by", request.getManualRefundRecordedBy());
         return data;
     }
 
@@ -171,5 +226,17 @@ public class OrderCancellationService {
     private static String generateRequestNumber(String orderNumber) {
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
         return "CAN-" + StringUtils.defaultIfBlank(orderNumber, "ORD").replaceAll("[^A-Za-z0-9]", "") + "-" + suffix;
+    }
+
+    private static BigDecimal money(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private static String validateManualRefundReference(String reference) {
+        String normalized = StringUtils.normalizeSpace(StringUtils.trimToEmpty(reference));
+        if (normalized.length() < 4) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refund reference must be at least 4 characters");
+        }
+        return StringUtils.left(normalized, 160);
     }
 }

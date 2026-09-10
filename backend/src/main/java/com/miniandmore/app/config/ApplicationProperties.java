@@ -27,6 +27,8 @@ public class ApplicationProperties {
 
     private final FastSms fastsms = new FastSms();
 
+    private final PostOrder postOrder = new PostOrder();
+
     private String internalApiKey = "";
 
     // jhipster-needle-application-properties-property
@@ -57,6 +59,10 @@ public class ApplicationProperties {
 
     public FastSms getFastsms() {
         return fastsms;
+    }
+
+    public PostOrder getPostOrder() {
+        return postOrder;
     }
 
     public String getInternalApiKey() {
@@ -1203,6 +1209,83 @@ public class ApplicationProperties {
             public void setPullInventoryMs(Long pullInventoryMs) {
                 this.pullInventoryMs = pullInventoryMs;
             }
+        }
+    }
+
+    /** Configurable SLA limits (hours) for post-order admin queues. */
+    public static class PostOrder {
+
+        private final PostOrderSla sla = new PostOrderSla();
+
+        public PostOrderSla getSla() {
+            return sla;
+        }
+    }
+
+    public static class PostOrderSla {
+
+        private int cancellationRequestedHours = 24;
+        private int returnRequestedHours = 48;
+        private int returnPickupHours = 72;
+        private int returnPickupFailedHours = 48;
+        private int returnInspectionHours = 48;
+        private int returnDefaultHours = 72;
+        private int collectedCodRefundHours = 72;
+
+        public int getCancellationRequestedHours() {
+            return cancellationRequestedHours;
+        }
+
+        public void setCancellationRequestedHours(int cancellationRequestedHours) {
+            this.cancellationRequestedHours = cancellationRequestedHours;
+        }
+
+        public int getReturnRequestedHours() {
+            return returnRequestedHours;
+        }
+
+        public void setReturnRequestedHours(int returnRequestedHours) {
+            this.returnRequestedHours = returnRequestedHours;
+        }
+
+        public int getReturnPickupHours() {
+            return returnPickupHours;
+        }
+
+        public void setReturnPickupHours(int returnPickupHours) {
+            this.returnPickupHours = returnPickupHours;
+        }
+
+        public int getReturnPickupFailedHours() {
+            return returnPickupFailedHours;
+        }
+
+        public void setReturnPickupFailedHours(int returnPickupFailedHours) {
+            this.returnPickupFailedHours = returnPickupFailedHours;
+        }
+
+        public int getReturnInspectionHours() {
+            return returnInspectionHours;
+        }
+
+        public void setReturnInspectionHours(int returnInspectionHours) {
+            this.returnInspectionHours = returnInspectionHours;
+        }
+
+        public int getReturnDefaultHours() {
+            return returnDefaultHours;
+        }
+
+        public void setReturnDefaultHours(int returnDefaultHours) {
+            this.returnDefaultHours = returnDefaultHours;
+        }
+
+        public int getCollectedCodRefundHours() {
+            return collectedCodRefundHours;
+        }
+
+        public void setCollectedCodRefundHours(int collectedCodRefundHours) {
+            this.collectedCodRefundHours = collectedCodRefundHours;
         }
     }
 }

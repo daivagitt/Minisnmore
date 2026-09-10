@@ -12,6 +12,7 @@ import com.miniandmore.app.domain.OrderReturn;
 import com.miniandmore.app.domain.OrderReturnItem;
 import com.miniandmore.app.domain.Product;
 import com.miniandmore.app.domain.enumeration.ExchangeSettlementStatus;
+import com.miniandmore.app.domain.enumeration.ManualRefundMethod;
 import com.miniandmore.app.domain.enumeration.OrderRequestType;
 import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
@@ -1104,27 +1105,86 @@ public class OrderReturnService {
         return executeRefund(orderReturn, refundAmount.setScale(2, RoundingMode.HALF_UP), adminNotes);
     }
 
+    public OrderReturn recordManualCodRefund(
+        String returnNumber,
+        ManualRefundMethod method,
+        String reference,
+        String adminNotes,
+        String recordedBy
+    ) {
+        assertFeatureEnabled();
+        if (method == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refund method is required");
+        }
+        OrderReturn orderReturn = loadReturn(returnNumber);
+        CustomerOrder order = orderReturn.getOrder();
+        if (!isCollectedCod(order)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Manual COD refund recording applies only to collected COD orders");
+        }
+        if (orderReturn.getManualRefundRecordedAt() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "COD refund already recorded for this case");
+        }
+        if (orderReturn.getStatus() != OrderReturnStatus.ACCEPTED && orderReturn.getStatus() != OrderReturnStatus.FAILED) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Return must be accepted (or retry after a failed refund) before recording COD refund"
+            );
+        }
+        BigDecimal refundAmount = resolveRefundAmount(orderReturn);
+        orderReturn.setManualRefundMethod(method);
+        orderReturn.setManualRefundReference(validateManualRefundReference(reference));
+        orderReturn.setManualRefundRecordedAt(Instant.now());
+        orderReturn.setManualRefundRecordedBy(StringUtils.left(StringUtils.trimToEmpty(recordedBy), 50));
+        return finalizeRefund(orderReturn, refundAmount, adminNotes);
+    }
+
     private OrderReturn executeRefund(OrderReturn orderReturn, BigDecimal refundAmount, String adminNotes) {
         CustomerOrder order = orderReturn.getOrder();
+        if (isUncollectedCod(order)) {
+            return finalizeRefund(orderReturn, refundAmount, adminNotes);
+        }
+        if (isCollectedCod(order)) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Collected COD refund must be recorded with refund method and payment reference"
+            );
+        }
         String existingRefundId = StringUtils.trimToNull(orderReturn.getRazorpayRefundId());
         try {
             if (existingRefundId == null) {
                 String refundId = razorpayRefundService.refundPayment(order, refundAmount);
                 orderReturn.setRazorpayRefundId(refundId);
             }
-            orderReturn.setRefundAmount(refundAmount);
-            if (orderReturn.getRequestType() == OrderRequestType.RETURN && order.getPaymentStatus() != PaymentStatus.REFUNDED) {
-                order.setPaymentStatus(
-                    refundAmount.compareTo(money(order.getTotal())) >= 0 ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED
-                );
+            return finalizeRefund(orderReturn, refundAmount, adminNotes);
+        } catch (RuntimeException e) {
+            if (existingRefundId == null) {
+                orderReturn.setStatus(OrderReturnStatus.FAILED);
+                orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), "Refund failed: " + StringUtils.left(e.getMessage(), 500)));
+                OrderReturn failedSaved = orderReturnRepository.save(orderReturn);
+                queueReturnEmail(order, failedSaved);
+            }
+            throw e;
+        }
+    }
+
+    private OrderReturn finalizeRefund(OrderReturn orderReturn, BigDecimal refundAmount, String adminNotes) {
+        CustomerOrder order = orderReturn.getOrder();
+        orderReturn.setRefundAmount(refundAmount);
+        if (orderReturn.getRequestType() == OrderRequestType.RETURN && order.getPaymentStatus() != PaymentStatus.REFUNDED) {
+            PaymentStatus nextPaymentStatus = isUncollectedCod(order)
+                ? order.getPaymentStatus()
+                : refundAmount.compareTo(money(order.getTotal())) >= 0 ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED;
+            if (nextPaymentStatus != order.getPaymentStatus()) {
+                order.setPaymentStatus(nextPaymentStatus);
                 customerOrderRepository.save(order);
             }
-            if (applicationProperties.getLedgerly().isSyncReturns() && StringUtils.isBlank(orderReturn.getLedgerlyCreditNoteId())) {
+        }
+        if (applicationProperties.getLedgerly().isSyncReturns() && StringUtils.isBlank(orderReturn.getLedgerlyCreditNoteId())) {
                 try {
                     Optional<String> creditNoteId = ledgerlyIntegrationClient.cancelOrder(
                         order.getOrderNumber(),
                         orderReturn.getReturnNumber(),
-                        orderReturn.getRazorpayRefundId()
+                        StringUtils.firstNonBlank(orderReturn.getRazorpayRefundId(), orderReturn.getManualRefundReference())
                     );
                     if (creditNoteId.isPresent()) {
                         orderReturn.setLedgerlyCreditNoteId(creditNoteId.orElseThrow());
@@ -1184,21 +1244,47 @@ public class OrderReturnService {
                     }
                 }
             }
-            orderReturn.setStatus(OrderReturnStatus.REFUNDED);
-            orderReturn.setResolvedAt(Instant.now());
-            orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
-            OrderReturn saved = orderReturnRepository.save(orderReturn);
-            queueReturnEmail(order, saved);
-            return saved;
-        } catch (RuntimeException e) {
-            if (existingRefundId == null) {
-                orderReturn.setStatus(OrderReturnStatus.FAILED);
-                orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), "Refund failed: " + StringUtils.left(e.getMessage(), 500)));
-                OrderReturn failedSaved = orderReturnRepository.save(orderReturn);
-                queueReturnEmail(order, failedSaved);
-            }
-            throw e;
+        orderReturn.setStatus(OrderReturnStatus.REFUNDED);
+        orderReturn.setResolvedAt(Instant.now());
+        orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
+        OrderReturn saved = orderReturnRepository.save(orderReturn);
+        queueReturnEmail(order, saved);
+        return saved;
+    }
+
+    private BigDecimal resolveRefundAmount(OrderReturn orderReturn) {
+        BigDecimal refundAmount = orderReturnItemRepository
+            .findAllByOrderReturnIdOrderById(orderReturn.getId())
+            .stream()
+            .map(OrderReturnItem::getRefundAmount)
+            .filter(java.util.Objects::nonNull)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (refundAmount.signum() <= 0) {
+            refundAmount = money(orderReturn.getRefundAmount());
         }
+        if (refundAmount.signum() <= 0 && orderReturnItemRepository.findAllByOrderReturnIdOrderById(orderReturn.getId()).isEmpty()) {
+            refundAmount = money(orderReturn.getOrder().getTotal());
+        }
+        if (refundAmount.signum() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return has no refundable accepted lines");
+        }
+        return refundAmount.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    public static boolean isCollectedCod(CustomerOrder order) {
+        return order != null && "cod".equalsIgnoreCase(order.getPaymentMethod()) && order.getPaymentStatus() == PaymentStatus.PAID;
+    }
+
+    private static boolean isUncollectedCod(CustomerOrder order) {
+        return order != null && "cod".equalsIgnoreCase(order.getPaymentMethod()) && order.getPaymentStatus() != PaymentStatus.PAID;
+    }
+
+    private static String validateManualRefundReference(String reference) {
+        String normalized = StringUtils.normalizeSpace(StringUtils.trimToEmpty(reference));
+        if (normalized.length() < 4) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refund reference must be at least 4 characters");
+        }
+        return StringUtils.left(normalized, 160);
     }
 
     // ---------------------------------------------------------------------

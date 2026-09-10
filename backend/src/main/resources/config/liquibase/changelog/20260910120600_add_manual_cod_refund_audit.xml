@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260910120600-1" author="miniandmore">
+        <addColumn tableName="order_return">
+            <column name="manual_refund_method" type="varchar(32)"/>
+            <column name="manual_refund_reference" type="varchar(160)"/>
+            <column name="manual_refund_recorded_at" type="${datetimeType}"/>
+            <column name="manual_refund_recorded_by" type="varchar(50)"/>
+        </addColumn>
+        <addColumn tableName="order_cancellation_request">
+            <column name="manual_refund_method" type="varchar(32)"/>
+            <column name="manual_refund_reference" type="varchar(160)"/>
+            <column name="manual_refund_recorded_at" type="${datetimeType}"/>
+            <column name="manual_refund_recorded_by" type="varchar(50)"/>
+            <column name="refund_amount" type="decimal(21,2)"/>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>

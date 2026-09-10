@@ -15,6 +15,7 @@ import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.ReturnDisposition;
 import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
+import com.miniandmore.app.service.CaseSlaSupport;
 import com.miniandmore.app.service.OrderReturnService;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -38,6 +39,9 @@ class InternalAdminOrderReturnResourceTest {
 
     @MockitoBean
     private OrderReturnService orderReturnService;
+
+    @MockitoBean
+    private CaseSlaSupport caseSlaSupport;
 
     @Test
     void list_returns200() throws Exception {

@@ -2,11 +2,13 @@ package com.miniandmore.app.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.miniandmore.app.domain.enumeration.CancellationRequestStatus;
+import com.miniandmore.app.domain.enumeration.ManualRefundMethod;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.io.Serial;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.Instant;
 
 @Entity
@@ -65,6 +67,24 @@ public class OrderCancellationRequest implements Serializable {
     @Size(min = 1, max = 50)
     @Column(name = "user_login", length = 50, nullable = false)
     private String userLogin;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "manual_refund_method", length = 32)
+    private ManualRefundMethod manualRefundMethod;
+
+    @Size(max = 160)
+    @Column(name = "manual_refund_reference", length = 160)
+    private String manualRefundReference;
+
+    @Column(name = "manual_refund_recorded_at")
+    private Instant manualRefundRecordedAt;
+
+    @Size(max = 50)
+    @Column(name = "manual_refund_recorded_by", length = 50)
+    private String manualRefundRecordedBy;
+
+    @Column(name = "refund_amount", precision = 21, scale = 2)
+    private BigDecimal refundAmount;
 
     public Long getId() {
         return id;
@@ -152,5 +172,45 @@ public class OrderCancellationRequest implements Serializable {
 
     public void setUserLogin(String userLogin) {
         this.userLogin = userLogin;
+    }
+
+    public ManualRefundMethod getManualRefundMethod() {
+        return manualRefundMethod;
+    }
+
+    public void setManualRefundMethod(ManualRefundMethod manualRefundMethod) {
+        this.manualRefundMethod = manualRefundMethod;
+    }
+
+    public String getManualRefundReference() {
+        return manualRefundReference;
+    }
+
+    public void setManualRefundReference(String manualRefundReference) {
+        this.manualRefundReference = manualRefundReference;
+    }
+
+    public Instant getManualRefundRecordedAt() {
+        return manualRefundRecordedAt;
+    }
+
+    public void setManualRefundRecordedAt(Instant manualRefundRecordedAt) {
+        this.manualRefundRecordedAt = manualRefundRecordedAt;
+    }
+
+    public String getManualRefundRecordedBy() {
+        return manualRefundRecordedBy;
+    }
+
+    public void setManualRefundRecordedBy(String manualRefundRecordedBy) {
+        this.manualRefundRecordedBy = manualRefundRecordedBy;
+    }
+
+    public BigDecimal getRefundAmount() {
+        return refundAmount;
+    }
+
+    public void setRefundAmount(BigDecimal refundAmount) {
+        this.refundAmount = refundAmount;
     }
 }
