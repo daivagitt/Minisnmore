@@ -13,10 +13,21 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 
+import com.miniandmore.app.client.ZohoBooksClient.BinaryDownload;
+import com.miniandmore.app.client.ZohoBooksClient.ImageUpload;
 import com.miniandmore.app.service.ZohoOAuthService;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.net.http.HttpClient;
+import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import org.mockito.ArgumentCaptor;
 import org.springframework.test.web.client.ExpectedCount;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -378,5 +389,191 @@ class ZohoBooksClientTest {
 
         server.verify();
         verify(httpClient, never()).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void downloadItemImage_success_returnsBytesAndContentType() throws Exception {
+        byte[] imageBytes = "jpeg-bytes".getBytes(StandardCharsets.UTF_8);
+        HttpResponse<InputStream> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.headers()).thenReturn(HttpHeaders.of(Map.of("Content-Type", List.of("image/jpeg")), (name, value) -> true));
+        when(response.body()).thenReturn(new ByteArrayInputStream(imageBytes));
+
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+
+        Optional<BinaryDownload> result = client.downloadItemImage("item-img-1", 8192);
+
+        assertThat(result).isPresent();
+        assertThat(result.orElseThrow().bytes()).isEqualTo(imageBytes);
+        assertThat(result.orElseThrow().contentType()).isEqualTo("image/jpeg");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void downloadItemImage_notFound_returnsEmpty() throws Exception {
+        HttpResponse<InputStream> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(404);
+        InputStream body = mock(InputStream.class);
+        when(response.body()).thenReturn(body);
+
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+
+        assertThat(client.downloadItemImage("item-img-2", 8192)).isEmpty();
+        verify(body).close();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void downloadItemImage_unauthorized_retriesAfterTokenRefresh() throws Exception {
+        byte[] imageBytes = "refreshed-bytes".getBytes(StandardCharsets.UTF_8);
+
+        HttpResponse<InputStream> unauthorized = mock(HttpResponse.class);
+        when(unauthorized.statusCode()).thenReturn(401);
+        InputStream unauthorizedBody = mock(InputStream.class);
+        when(unauthorized.body()).thenReturn(unauthorizedBody);
+
+        HttpResponse<InputStream> success = mock(HttpResponse.class);
+        when(success.statusCode()).thenReturn(200);
+        when(success.headers()).thenReturn(HttpHeaders.of(Map.of("Content-Type", List.of("image/png")), (name, value) -> true));
+        when(success.body()).thenReturn(new ByteArrayInputStream(imageBytes));
+
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(unauthorized, success);
+        when(oauthService.accessToken()).thenReturn("token-1", "token-refreshed");
+
+        Optional<BinaryDownload> result = client.downloadItemImage("item-img-3", 8192);
+
+        assertThat(result).isPresent();
+        assertThat(result.orElseThrow().bytes()).isEqualTo(imageBytes);
+        assertThat(result.orElseThrow().contentType()).isEqualTo("image/png");
+        verify(unauthorizedBody).close();
+        verify(oauthService, times(3)).accessToken();
+        verify(httpClient, times(2)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void downloadItemImage_jsonResponse_returnsEmpty() throws Exception {
+        HttpResponse<InputStream> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.headers()).thenReturn(
+            HttpHeaders.of(Map.of("Content-Type", List.of("application/json")), (name, value) -> true)
+        );
+        InputStream body = mock(InputStream.class);
+        when(response.body()).thenReturn(body);
+
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+
+        assertThat(client.downloadItemImage("item-img-4", 8192)).isEmpty();
+        verify(body).close();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void downloadItemImage_exceedsMaxBytes_throws() throws Exception {
+        HttpResponse<InputStream> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.headers()).thenReturn(HttpHeaders.of(Map.of("Content-Type", List.of("image/jpeg")), (name, value) -> true));
+        when(response.body()).thenReturn(new ByteArrayInputStream("0123456789".getBytes(StandardCharsets.UTF_8)));
+
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+
+        assertThatThrownBy(() -> client.downloadItemImage("item-img-5", 5))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("download failed")
+            .hasCauseInstanceOf(java.io.IOException.class)
+            .cause()
+            .hasMessageContaining("exceeds max size (5 bytes)");
+    }
+
+    @Test
+    void uploadItemImage_rejectsEmptyBytes() {
+        assertThatThrownBy(() -> client.uploadItemImage("item-up-1", new byte[0], "photo.jpg", "image/jpeg"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Item image bytes are empty");
+
+        assertThatThrownBy(() -> client.uploadItemImage("item-up-1", null, "photo.jpg", "image/jpeg"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Item image bytes are empty");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void uploadItemImage_success_postsMultipartToImageEndpoint() throws Exception {
+        HttpResponse<String> uploadResponse = mock(HttpResponse.class);
+        when(uploadResponse.statusCode()).thenReturn(200);
+
+        ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+        when(httpClient.send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class))).thenReturn(uploadResponse);
+
+        byte[] imageBytes = "upload-bytes".getBytes(StandardCharsets.UTF_8);
+        client.uploadItemImage("item-up-2", imageBytes, "photo.jpg", "image/jpeg");
+
+        HttpRequest request = requestCaptor.getValue();
+        assertThat(request.method()).isEqualTo("POST");
+        assertThat(request.uri().toString()).isEqualTo("https://www.zohoapis.in/books/v3/items/item-up-2/image?organization_id=org-1");
+        assertThat(request.headers().firstValue("Authorization")).contains("Zoho-oauthtoken token-1");
+        assertThat(request.headers().firstValue("Content-Type").orElse("")).contains("multipart/form-data");
+        assertThat(request.headers().firstValue("Content-Type").orElse("")).contains("boundary=");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void uploadItemImages_clearsExistingThenUploadsEachImage() throws Exception {
+        HttpResponse<String> frontDeleteResponse = mock(HttpResponse.class);
+        when(frontDeleteResponse.statusCode()).thenReturn(204);
+        HttpResponse<String> pluralDeleteResponse = mock(HttpResponse.class);
+        when(pluralDeleteResponse.statusCode()).thenReturn(200);
+        HttpResponse<String> uploadResponse = mock(HttpResponse.class);
+        when(uploadResponse.statusCode()).thenReturn(200);
+
+        List<String> uploadUris = new ArrayList<>();
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenAnswer(invocation -> {
+                HttpRequest request = invocation.getArgument(0);
+                String uri = request.uri().toString();
+                if (uri.endsWith("/items/gallery-1/image?organization_id=org-1") && "DELETE".equals(request.method())) {
+                    return frontDeleteResponse;
+                }
+                if (uri.contains("/items/gallery-1/images?organization_id=org-1&document_ids=doc-1%2Cdoc-2")) {
+                    return pluralDeleteResponse;
+                }
+                if (uri.endsWith("/items/gallery-1/images?organization_id=org-1") && "POST".equals(request.method())) {
+                    uploadUris.add(uri);
+                    return uploadResponse;
+                }
+                throw new AssertionError("Unexpected HTTP request: " + request.method() + " " + uri);
+            });
+
+        server
+            .expect(requestTo("https://www.zohoapis.in/books/v3/items/gallery-1?organization_id=org-1"))
+            .andRespond(
+                withSuccess(
+                    "{\"item\":{\"documents\":[{\"document_id\":\"doc-1\"},{\"document_id\":\"doc-2\"}]}}",
+                    MediaType.APPLICATION_JSON
+                )
+            );
+
+        client.uploadItemImages(
+            "gallery-1",
+            List.of(
+                new ImageUpload("front".getBytes(StandardCharsets.UTF_8), "front.jpg", "image/jpeg"),
+                new ImageUpload("rear".getBytes(StandardCharsets.UTF_8), "rear.jpg", "image/jpeg")
+            )
+        );
+
+        server.verify();
+        assertThat(uploadUris).hasSize(2);
+        verify(httpClient, times(4)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
+    void sanitizeMultipartFilename_stripsUnsafeCharactersAndFallsBackToDefault() {
+        assertThat(ZohoBooksClient.sanitizeMultipartFilename(null)).isEqualTo("product.jpg");
+        assertThat(ZohoBooksClient.sanitizeMultipartFilename("   ")).isEqualTo("product.jpg");
+        assertThat(ZohoBooksClient.sanitizeMultipartFilename("path/to/photo.jpg")).isEqualTo("path/to/photo.jpg");
+        assertThat(ZohoBooksClient.sanitizeMultipartFilename("path\\to\\photo.jpg")).isEqualTo("path\\to\\photo.jpg");
+        assertThat(ZohoBooksClient.sanitizeMultipartFilename("\"bad\"\nname.jpg")).isEqualTo("badname.jpg");
+        assertThat(ZohoBooksClient.sanitizeMultipartFilename("safe\u0001name.jpg")).isEqualTo("safename.jpg");
     }
 }
