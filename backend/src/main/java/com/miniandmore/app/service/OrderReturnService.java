@@ -595,6 +595,7 @@ public class OrderReturnService {
         assertFeatureEnabled();
         OrderReturn orderReturn = loadReturn(returnNumber);
         if (
+            orderReturn.getStatus() != OrderReturnStatus.APPROVED &&
             orderReturn.getStatus() != OrderReturnStatus.PICKUP_SCHEDULED &&
             orderReturn.getStatus() != OrderReturnStatus.PICKUP_REQUESTED
         ) {
@@ -650,7 +651,7 @@ public class OrderReturnService {
     public OrderReturn markPickedUp(String returnNumber, String adminNotes) {
         return transition(
             returnNumber,
-            EnumSet.of(OrderReturnStatus.PICKUP_REQUESTED, OrderReturnStatus.PICKUP_SCHEDULED),
+            EnumSet.of(OrderReturnStatus.APPROVED, OrderReturnStatus.PICKUP_REQUESTED, OrderReturnStatus.PICKUP_SCHEDULED),
             OrderReturnStatus.PICKED_UP,
             adminNotes,
             "Pickup must be scheduled before marking picked up"

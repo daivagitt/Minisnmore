@@ -112,4 +112,66 @@ class XpressBeesReturnWebhookHandlerServiceTest {
         assertThat(result.get("ok")).isEqualTo(true);
         verify(orderReturnService).markDelivered("RET-ORD-1", "ExpressBees: delivered");
     }
+
+    @Test
+    void handle_pickedUpWebhookFromApproved_marksReturnPickedUp() {
+        OrderReturn orderReturn = new OrderReturn();
+        orderReturn.setReturnNumber("RET-ORD-1");
+        orderReturn.setStatus(OrderReturnStatus.APPROVED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-ORD-1")).thenReturn(Optional.of(orderReturn));
+        when(webhookEventRepository.existsByEventId("evt-approved-pickup")).thenReturn(false);
+        when(webhookEventRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(webhookEventRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = handlerService.handle(
+            "{\"event_id\":\"evt-approved-pickup\",\"return_number\":\"RET-ORD-1\",\"status\":\"picked_up\"}",
+            null,
+            "secret-123"
+        );
+
+        assertThat(result.get("ok")).isEqualTo(true);
+        verify(orderReturnService).markPickedUp("RET-ORD-1", "ExpressBees: picked_up");
+    }
+
+    @Test
+    void handle_receivedWebhookFromApproved_marksReturnReceived() {
+        OrderReturn orderReturn = new OrderReturn();
+        orderReturn.setReturnNumber("RET-ORD-1");
+        orderReturn.setStatus(OrderReturnStatus.APPROVED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-ORD-1")).thenReturn(Optional.of(orderReturn));
+        when(webhookEventRepository.existsByEventId("evt-approved-received")).thenReturn(false);
+        when(webhookEventRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(webhookEventRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = handlerService.handle(
+            "{\"event_id\":\"evt-approved-received\",\"return_number\":\"RET-ORD-1\",\"status\":\"warehouse_received\"}",
+            null,
+            "secret-123"
+        );
+
+        assertThat(result.get("ok")).isEqualTo(true);
+        verify(orderReturnService).markReceived("RET-ORD-1", "ExpressBees: warehouse_received");
+    }
+
+    @Test
+    void handle_outboundDeliveredFromReadyToShip_marksShippedThenDelivered() {
+        OrderReturn orderReturn = new OrderReturn();
+        orderReturn.setReturnNumber("RET-ORD-1");
+        orderReturn.setStatus(OrderReturnStatus.READY_TO_SHIP);
+        orderReturn.setOutboundAwb("OUT-AWB-9");
+        when(orderReturnRepository.findFirstByOutboundAwbOrderByRequestedAtDesc("OUT-AWB-9")).thenReturn(Optional.of(orderReturn));
+        when(webhookEventRepository.existsByEventId(any())).thenReturn(false);
+        when(webhookEventRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(webhookEventRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = handlerService.handle(
+            "{\"event_id\":\"evt-out-2\",\"awb\":\"OUT-AWB-9\",\"status\":\"delivered\"}",
+            null,
+            "secret-123"
+        );
+
+        assertThat(result.get("ok")).isEqualTo(true);
+        verify(orderReturnService).markShipped("RET-ORD-1", "ExpressBees: delivered");
+        verify(orderReturnService).markDelivered("RET-ORD-1", "ExpressBees: delivered");
+    }
 }

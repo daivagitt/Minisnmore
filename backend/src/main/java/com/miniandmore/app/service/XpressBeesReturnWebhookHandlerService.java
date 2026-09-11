@@ -190,7 +190,11 @@ public class XpressBeesReturnWebhookHandlerService {
                 yield OrderReturnStatus.SHIPPED.name().toLowerCase(Locale.ROOT);
             }
             case "delivered", "delivery_done", "delivered_to_customer" -> {
-                if (current == OrderReturnStatus.SHIPPED || current == OrderReturnStatus.READY_TO_SHIP) {
+                if (current == OrderReturnStatus.READY_TO_SHIP) {
+                    orderReturnService.markShipped(orderReturn.getReturnNumber(), "ExpressBees: " + providerStatus);
+                    current = OrderReturnStatus.SHIPPED;
+                }
+                if (current == OrderReturnStatus.SHIPPED) {
                     orderReturnService.markDelivered(orderReturn.getReturnNumber(), "ExpressBees: " + providerStatus);
                 }
                 yield OrderReturnStatus.DELIVERED.name().toLowerCase(Locale.ROOT);
@@ -224,6 +228,7 @@ public class XpressBeesReturnWebhookHandlerService {
             }
             case "received", "rto_delivered", "warehouse_received" -> {
                 if (
+                    current == OrderReturnStatus.APPROVED ||
                     current == OrderReturnStatus.PICKED_UP ||
                     current == OrderReturnStatus.PICKUP_SCHEDULED ||
                     current == OrderReturnStatus.PICKUP_REQUESTED

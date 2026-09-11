@@ -781,6 +781,17 @@ class OrderReturnServiceTest {
     }
 
     @Test
+    void markPickedUp_approvedReturn_movesToPickedUp() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.APPROVED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.markPickedUp("RET-1", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.PICKED_UP);
+    }
+
+    @Test
     void markInspected_receivedReturn_movesToInspected() {
         OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));

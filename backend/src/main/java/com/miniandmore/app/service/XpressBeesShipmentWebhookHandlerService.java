@@ -90,7 +90,7 @@ public class XpressBeesShipmentWebhookHandlerService {
         }
 
         order.setShipmentCarrierStatus(normalized);
-        if (isDelivered(normalized)) {
+        if (isDelivered(normalized) && canMarkDelivered(order)) {
             order.setShipmentDeliveredAt(Instant.now());
             order.setStatus(OrderStatus.FULFILLED);
         }
@@ -136,6 +136,10 @@ public class XpressBeesShipmentWebhookHandlerService {
 
     private static String value(Map<String, Object> data, String key) {
         return ZohoWebhookSupport.stringValue(data.get(key));
+    }
+
+    private static boolean canMarkDelivered(CustomerOrder order) {
+        return order.getStatus() != OrderStatus.CANCELLED && order.getShipmentCancelledAt() == null;
     }
 
     private static boolean isDelivered(String status) {

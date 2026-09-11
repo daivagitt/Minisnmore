@@ -74,4 +74,28 @@ class XpressBeesShipmentWebhookHandlerServiceTest {
         assertThat(order.getShipmentDeliveredAt()).isNotNull();
         verify(orderEventService).syncLifecycleEvents(order);
     }
+
+    @Test
+    void deliveredEventDoesNotResurrectCancelledOrder() {
+        CustomerOrder order = new CustomerOrder()
+            .id(11L)
+            .orderNumber("MNM-2")
+            .status(OrderStatus.CANCELLED)
+            .paymentStatus(PaymentStatus.REFUNDED)
+            .trackingNumber("XB-2");
+        when(orderRepository.findOneByOrderNumber("MNM-2")).thenReturn(Optional.of(order));
+        when(orderRepository.save(order)).thenReturn(order);
+        when(eventRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(eventRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.handle(
+            "{\"event_id\":\"evt-2\",\"order_number\":\"MNM-2\",\"awb\":\"XB-2\",\"status\":\"delivered\"}",
+            null,
+            "secret"
+        );
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(order.getShipmentDeliveredAt()).isNull();
+        verify(orderEventService).syncLifecycleEvents(order);
+    }
 }
