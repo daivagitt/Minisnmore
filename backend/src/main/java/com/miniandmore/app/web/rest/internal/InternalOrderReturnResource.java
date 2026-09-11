@@ -2,12 +2,14 @@ package com.miniandmore.app.web.rest.internal;
 
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.OrderReturn;
+import com.miniandmore.app.domain.OrderReturnItem;
 import com.miniandmore.app.security.SecurityUtils;
 import com.miniandmore.app.service.OrderReturnService;
 import com.miniandmore.app.web.rest.v1.ApiResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,7 +37,12 @@ public class InternalOrderReturnResource {
     @PostMapping
     public ApiResponse<Map<String, Object>> requestReturn(@Valid @RequestBody CreateReturnRequest request) {
         String login = requireLogin();
-        OrderReturn orderReturn = orderReturnService.requestReturn(login, request.order_number(), request.reason());
+        List<OrderReturnService.ReturnLineSelection> lines = request.items() == null
+            ? List.of()
+            : request.items().stream().map(item -> new OrderReturnService.ReturnLineSelection(item.order_item_id(), item.quantity())).toList();
+        OrderReturn orderReturn = lines.isEmpty()
+            ? orderReturnService.requestReturn(login, request.order_number(), request.reason())
+            : orderReturnService.requestReturn(login, request.order_number(), request.reason(), lines);
         return ApiResponse.ok(toDto(orderReturn));
     }
 
@@ -112,13 +119,47 @@ public class InternalOrderReturnResource {
         }
         data.put("replacement_size", orderReturn.getReplacementSize());
         data.put("replacement_color", orderReturn.getReplacementColor());
+        data.put("outbound_awb", orderReturn.getOutboundAwb());
+        data.put("outbound_tracking_url", orderReturn.getOutboundTrackingUrl());
+        data.put("original_item_amount", orderReturn.getOriginalItemAmount());
+        data.put("replacement_item_amount", orderReturn.getReplacementItemAmount());
+        data.put("price_difference", orderReturn.getPriceDifference());
+        data.put(
+            "settlement_status",
+            orderReturn.getSettlementStatus() == null ? null : orderReturn.getSettlementStatus().name().toLowerCase()
+        );
+        data.put("items", orderReturnService.returnLineBreakdown(orderReturn).stream().map(this::toLineDto).toList());
+        return data;
+    }
+
+    private Map<String, Object> toLineDto(OrderReturnItem line) {
+        var data = new LinkedHashMap<String, Object>();
+        data.put("id", line.getId());
+        data.put("order_item_id", line.getOrderItem().getId());
+        data.put("product_name", line.getOrderItem().getProductName());
+        data.put("size", line.getOrderItem().getItemSize());
+        data.put("color", line.getOrderItem().getColor());
+        data.put("requested_qty", line.getRequestedQty());
+        data.put("accepted_qty", line.getAcceptedQty());
+        data.put("unit_amount", line.getUnitAmount());
+        data.put("gross_amount", line.getGrossAmount());
+        data.put("discount_allocation", line.getDiscountAllocation());
+        data.put("refund_amount", line.getRefundAmount());
+        data.put("disposition", line.getDisposition() == null ? null : line.getDisposition().name().toLowerCase());
         return data;
     }
 
     public record CreateReturnRequest(
         @NotBlank @Size(max = 40) String order_number,
-        @NotBlank @Size(min = 10, max = 4000) String reason
-    ) {}
+        @NotBlank @Size(min = 10, max = 4000) String reason,
+        @Valid List<ReturnLineRequest> items
+    ) {
+        public CreateReturnRequest(String order_number, String reason) {
+            this(order_number, reason, List.of());
+        }
+    }
+
+    public record ReturnLineRequest(@NotNull Long order_item_id, @NotNull @Min(1) Integer quantity) {}
 
     public record CreateExchangeRequest(
         @NotBlank @Size(max = 40) String order_number,

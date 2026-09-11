@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
+import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
@@ -194,6 +195,40 @@ public class CustomerOrder implements Serializable {
     @Size(max = 20)
     @Column(name = "shipment_date", length = 20)
     private String shipmentDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "shipment_logistics_mode", length = 16)
+    private ReturnLogisticsMode shipmentLogisticsMode;
+
+    @Size(max = 500)
+    @Column(name = "tracking_url", length = 500)
+    private String trackingUrl;
+
+    @Size(max = 500)
+    @Column(name = "shipment_label_url", length = 500)
+    private String shipmentLabelUrl;
+
+    @Size(max = 120)
+    @Column(name = "shipment_provider_request_id", length = 120)
+    private String shipmentProviderRequestId;
+
+    @Size(max = 80)
+    @Column(name = "shipment_carrier_status", length = 80)
+    private String shipmentCarrierStatus;
+
+    @Column(name = "shipment_delivered_at")
+    private Instant shipmentDeliveredAt;
+
+    @Column(name = "shipment_cancelled_at")
+    private Instant shipmentCancelledAt;
+
+    @Size(max = 50)
+    @Column(name = "shipment_cancelled_by", length = 50)
+    private String shipmentCancelledBy;
+
+    @Size(max = 500)
+    @Column(name = "shipment_cancellation_reason", length = 500)
+    private String shipmentCancellationReason;
 
     @Column(name = "ledgerly_tracking_last_pulled_at")
     private Instant ledgerlyTrackingLastPulledAt;
@@ -722,6 +757,98 @@ public class CustomerOrder implements Serializable {
 
     public void setShipmentDate(String shipmentDate) {
         this.shipmentDate = shipmentDate;
+    }
+
+    public ReturnLogisticsMode getShipmentLogisticsMode() {
+        return this.shipmentLogisticsMode;
+    }
+
+    public CustomerOrder shipmentLogisticsMode(ReturnLogisticsMode shipmentLogisticsMode) {
+        this.setShipmentLogisticsMode(shipmentLogisticsMode);
+        return this;
+    }
+
+    public void setShipmentLogisticsMode(ReturnLogisticsMode shipmentLogisticsMode) {
+        this.shipmentLogisticsMode = shipmentLogisticsMode;
+    }
+
+    public String getTrackingUrl() {
+        return this.trackingUrl;
+    }
+
+    public CustomerOrder trackingUrl(String trackingUrl) {
+        this.setTrackingUrl(trackingUrl);
+        return this;
+    }
+
+    public void setTrackingUrl(String trackingUrl) {
+        this.trackingUrl = trackingUrl;
+    }
+
+    public String getShipmentLabelUrl() {
+        return this.shipmentLabelUrl;
+    }
+
+    public CustomerOrder shipmentLabelUrl(String shipmentLabelUrl) {
+        this.setShipmentLabelUrl(shipmentLabelUrl);
+        return this;
+    }
+
+    public void setShipmentLabelUrl(String shipmentLabelUrl) {
+        this.shipmentLabelUrl = shipmentLabelUrl;
+    }
+
+    public String getShipmentProviderRequestId() {
+        return this.shipmentProviderRequestId;
+    }
+
+    public CustomerOrder shipmentProviderRequestId(String shipmentProviderRequestId) {
+        this.setShipmentProviderRequestId(shipmentProviderRequestId);
+        return this;
+    }
+
+    public void setShipmentProviderRequestId(String shipmentProviderRequestId) {
+        this.shipmentProviderRequestId = shipmentProviderRequestId;
+    }
+
+    public String getShipmentCarrierStatus() {
+        return shipmentCarrierStatus;
+    }
+
+    public void setShipmentCarrierStatus(String shipmentCarrierStatus) {
+        this.shipmentCarrierStatus = shipmentCarrierStatus;
+    }
+
+    public Instant getShipmentDeliveredAt() {
+        return shipmentDeliveredAt;
+    }
+
+    public void setShipmentDeliveredAt(Instant shipmentDeliveredAt) {
+        this.shipmentDeliveredAt = shipmentDeliveredAt;
+    }
+
+    public Instant getShipmentCancelledAt() {
+        return shipmentCancelledAt;
+    }
+
+    public void setShipmentCancelledAt(Instant shipmentCancelledAt) {
+        this.shipmentCancelledAt = shipmentCancelledAt;
+    }
+
+    public String getShipmentCancelledBy() {
+        return shipmentCancelledBy;
+    }
+
+    public void setShipmentCancelledBy(String shipmentCancelledBy) {
+        this.shipmentCancelledBy = shipmentCancelledBy;
+    }
+
+    public String getShipmentCancellationReason() {
+        return shipmentCancellationReason;
+    }
+
+    public void setShipmentCancellationReason(String shipmentCancellationReason) {
+        this.shipmentCancellationReason = shipmentCancellationReason;
     }
 
     public Instant getLedgerlyTrackingLastPulledAt() {

@@ -82,6 +82,8 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     Optional<CustomerOrder> findOneByOrderNumber(String orderNumber);
 
+    Optional<CustomerOrder> findFirstByTrackingNumber(String trackingNumber);
+
     Optional<CustomerOrder> findOneByZohoSalesOrderId(String zohoSalesOrderId);
 
     Optional<CustomerOrder> findOneByZohoInvoiceId(String zohoInvoiceId);

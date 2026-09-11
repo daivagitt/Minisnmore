@@ -17,8 +17,11 @@ import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import com.miniandmore.app.repository.*;
+import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.service.LedgerlySyncService;
+import com.miniandmore.app.service.OrderCancellationService;
 import com.miniandmore.app.service.OrderEventService;
+import com.miniandmore.app.service.OrderShipmentService;
 import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import java.math.BigDecimal;
@@ -84,6 +87,12 @@ class InternalAdminOrderResourceTest {
 
     @MockitoBean
     private InternalAccountOrderResource accountOrders;
+
+    @MockitoBean
+    private OrderShipmentService orderShipmentService;
+
+    @MockitoBean
+    private OrderCancellationService orderCancellationService;
 
     private CustomerOrder codOrder() {
         return new CustomerOrder()
@@ -283,6 +292,44 @@ class InternalAdminOrderResourceTest {
             .perform(get("/internal/v1/admin/orders/MNM-COD1"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.order.order_number").value("MNM-COD1"));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
+    void bookShipment_returnsBookedOrderSummary() throws Exception {
+        CustomerOrder booked = codOrder()
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .trackingNumber("XB-1")
+            .trackingCarrier("XpressBees")
+            .trackingUrl("https://track/XB-1")
+            .shipmentLabelUrl("https://label/XB-1")
+            .shipmentLogisticsMode(ReturnLogisticsMode.XPRESSBEES)
+            .shipmentDate("2026-09-10");
+        when(
+            orderShipmentService.bookShipment(
+                "MNM-COD1",
+                ReturnLogisticsMode.XPRESSBEES,
+                null,
+                null,
+                null,
+                null,
+                false,
+                null
+            )
+        ).thenReturn(booked);
+
+        mockMvc
+            .perform(
+                post("/internal/v1/admin/orders/MNM-COD1/book-shipment")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content("{\"mode\":\"xpressbees\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.order_number").value("MNM-COD1"))
+            .andExpect(jsonPath("$.data.order.tracking_number").value("XB-1"))
+            .andExpect(jsonPath("$.data.order.shipment_label_url").value("https://label/XB-1"))
+            .andExpect(jsonPath("$.data.order.can_book_shipment").value(false));
     }
 
     @TestConfiguration

@@ -11,18 +11,25 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
+import com.miniandmore.app.client.XpressBeesClient;
 import com.miniandmore.app.client.ZohoBooksIntegrationClient;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.OrderReturn;
+import com.miniandmore.app.domain.OrderReturnItem;
 import com.miniandmore.app.domain.Product;
+import com.miniandmore.app.domain.enumeration.ExchangeSettlementStatus;
 import com.miniandmore.app.domain.enumeration.OrderRequestType;
 import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
+import com.miniandmore.app.domain.enumeration.ReturnDisposition;
+import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.OrderItemRepository;
+import com.miniandmore.app.repository.OrderReturnItemRepository;
 import com.miniandmore.app.repository.OrderReturnRepository;
 import com.miniandmore.app.repository.ProductRepository;
 import java.math.BigDecimal;
@@ -55,6 +62,9 @@ class OrderReturnServiceTest {
     private OrderItemRepository orderItemRepository;
 
     @Mock
+    private OrderReturnItemRepository orderReturnItemRepository;
+
+    @Mock
     private ProductRepository productRepository;
 
     @Mock
@@ -78,6 +88,12 @@ class OrderReturnServiceTest {
     @Mock
     private ApplicationProperties applicationProperties;
 
+    @Mock
+    private XpressBeesClient xpressBeesClient;
+
+    @Mock
+    private ObjectMapper objectMapper;
+
     @InjectMocks
     private OrderReturnService orderReturnService;
 
@@ -85,6 +101,8 @@ class OrderReturnServiceTest {
     void setUp() {
         lenient().when(applicationProperties.getZoho()).thenReturn(new ApplicationProperties.Zoho());
         lenient().when(applicationProperties.getLedgerly()).thenReturn(new ApplicationProperties.Ledgerly());
+        lenient().when(applicationProperties.getXpressbees()).thenReturn(new ApplicationProperties.XpressBees());
+        lenient().when(objectMapper.createObjectNode()).thenReturn(new ObjectMapper().createObjectNode());
     }
 
     private void enableLedgerlyReturnsSync() {
@@ -422,8 +440,8 @@ class OrderReturnServiceTest {
     }
 
     @Test
-    void approve_incrementsProductStock() {
-        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.REQUESTED);
+    void acceptWithRestockableDisposition_incrementsProductStock() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.INSPECTED);
         OrderItem item = new OrderItem().productId("1").qty(2);
         Product product = new Product().id(1L).stock(5);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
@@ -432,7 +450,7 @@ class OrderReturnServiceTest {
         when(productRepository.save(product)).thenReturn(product);
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
-        orderReturnService.approve("RET-1", null);
+        orderReturnService.acceptAfterInspection("RET-1", ReturnDisposition.RESTOCKABLE, null);
 
         assertThat(product.getStock()).isEqualTo(7);
     }
@@ -569,8 +587,8 @@ class OrderReturnServiceTest {
     }
 
     @Test
-    void approve_variantProduct_incrementsVariantStock() {
-        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.REQUESTED);
+    void acceptWithRestockable_variantProduct_incrementsVariantStock() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.INSPECTED);
         String variantsJson =
             "[{\"sku\":\"TEE-S-RED\",\"size\":\"S\",\"color\":\"Red\",\"rate\":500,\"stock\":1,\"active\":true}]";
         OrderItem item = new OrderItem().productId("2").qty(1).variantSku("TEE-S-RED").itemSize("S").color("Red");
@@ -581,7 +599,7 @@ class OrderReturnServiceTest {
         when(productRepository.save(product)).thenReturn(product);
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
-        orderReturnService.approve("RET-1", null);
+        orderReturnService.acceptAfterInspection("RET-1", ReturnDisposition.RESTOCKABLE, null);
 
         verify(productRepository).save(product);
         assertThat(product.getStock()).isEqualTo(2);
@@ -763,6 +781,17 @@ class OrderReturnServiceTest {
     }
 
     @Test
+    void markPickedUp_approvedReturn_movesToPickedUp() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.APPROVED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.markPickedUp("RET-1", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.PICKED_UP);
+    }
+
+    @Test
     void markInspected_receivedReturn_movesToInspected() {
         OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.RECEIVED);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
@@ -779,7 +808,7 @@ class OrderReturnServiceTest {
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
-        OrderReturn result = orderReturnService.acceptAfterInspection("RET-1", null);
+        OrderReturn result = orderReturnService.acceptAfterInspection("RET-1", ReturnDisposition.QUARANTINE, null);
 
         assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.ACCEPTED);
     }
@@ -816,38 +845,27 @@ class OrderReturnServiceTest {
     }
 
     @Test
-    void rejectAfterInspection_reversesPreviouslyCreditedStock() {
+    void rejectAfterInspection_inspectedReturn_rejectsWithoutStockChange() {
         OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.INSPECTED);
-        OrderItem item = new OrderItem().productId("1").qty(2);
-        Product product = new Product().id(1L).stock(7);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
-        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
-        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
-        when(productRepository.save(product)).thenReturn(product);
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
         OrderReturn result = orderReturnService.rejectAfterInspection("RET-1", "Item damaged by customer", null);
 
         assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REJECTED);
-        assertThat(product.getStock()).isEqualTo(5);
-        assertThat(result.getAdminNotes()).isNull();
+        verify(productRepository, never()).findOneForInventoryUpdate(any());
     }
 
     @Test
-    void rejectAfterInspection_stockAlreadyResold_notesDiscrepancy() {
+    void rejectAfterInspection_rejectsEvenWhenStockWasPreviouslyCredited() {
         OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.INSPECTED);
-        OrderItem item = new OrderItem().productId("1").qty(5);
-        Product product = new Product().id(1L).stock(2);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
-        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
-        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
-        when(productRepository.save(product)).thenReturn(product);
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
         OrderReturn result = orderReturnService.rejectAfterInspection("RET-1", "Item damaged by customer", null);
 
-        assertThat(product.getStock()).isEqualTo(0);
-        assertThat(result.getAdminNotes()).contains("already been resold");
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REJECTED);
+        assertThat(result.getAdminNotes()).isNull();
     }
 
     // ---------------------------------------------------------------------
@@ -949,18 +967,13 @@ class OrderReturnServiceTest {
     @Test
     void rejectAtCurrentStage_inspectedReturn_delegatesToRejectAfterInspection() {
         OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.INSPECTED);
-        OrderItem item = new OrderItem().productId("1").qty(1);
-        Product product = new Product().id(1L).stock(6);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
-        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
-        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
-        when(productRepository.save(product)).thenReturn(product);
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
         OrderReturn result = orderReturnService.rejectAtCurrentStage("RET-1", "Damaged item", "note");
 
         assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REJECTED);
-        assertThat(product.getStock()).isEqualTo(5);
+        verify(productRepository, never()).findOneForInventoryUpdate(any());
     }
 
     @Test
@@ -1002,8 +1015,8 @@ class OrderReturnServiceTest {
     }
 
     @Test
-    void approve_exchangeRestoresItemStock() {
-        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.REQUESTED, "TEE-M-BLUE", "M", "Blue");
+    void acceptWithRestockable_exchangeRestoresItemStock() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.INSPECTED, "TEE-M-BLUE", "M", "Blue");
         Product product = new Product().id(2L).stock(4);
         orderReturn.getOrderItem().productId("2").qty(1);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
@@ -1011,7 +1024,7 @@ class OrderReturnServiceTest {
         when(productRepository.save(product)).thenReturn(product);
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
-        orderReturnService.approve("RET-1", null);
+        orderReturnService.acceptAfterInspection("RET-1", ReturnDisposition.RESTOCKABLE, null);
 
         assertThat(product.getStock()).isEqualTo(5);
         verify(orderItemRepository, never()).findAllByOrderId(any());
@@ -1113,22 +1126,15 @@ class OrderReturnServiceTest {
     }
 
     @Test
-    void rejectAfterInspection_exchangeReversesVariantStock() {
+    void rejectAfterInspection_exchangeRejectsWithoutStockChange() {
         OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.INSPECTED, "TEE-M-BLUE", "M", "Blue");
-        String variantsJson =
-            "[{\"sku\":\"TEE-M-BLUE\",\"size\":\"M\",\"color\":\"Blue\",\"rate\":500,\"stock\":5,\"active\":true}]";
-        OrderItem item = orderReturn.getOrderItem();
-        item.productId("2").qty(1).variantSku("TEE-M-BLUE").itemSize("M").color("Blue");
-        Product product = new Product().id(2L).stock(5).itemStructure("VARIANTS").variantsJson(variantsJson);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
-        when(productRepository.findOneForInventoryUpdate(2L)).thenReturn(Optional.of(product));
-        when(productRepository.save(product)).thenReturn(product);
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
         OrderReturn result = orderReturnService.rejectAfterInspection("RET-1", "Customer damaged item", null);
 
         assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REJECTED);
-        assertThat(product.getStock()).isEqualTo(4);
+        verify(productRepository, never()).findOneForInventoryUpdate(any());
     }
 
     @Test
@@ -1217,34 +1223,34 @@ class OrderReturnServiceTest {
     }
 
     @Test
-    void approve_invalidProductId_skipsInventoryRestore() {
-        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.REQUESTED);
+    void acceptWithRestockable_invalidProductId_skipsInventoryRestore() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.INSPECTED);
         OrderItem item = new OrderItem().productId("not-a-number").qty(2);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
         when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
-        orderReturnService.approve("RET-1", null);
+        orderReturnService.acceptAfterInspection("RET-1", ReturnDisposition.RESTOCKABLE, null);
 
         verify(productRepository, never()).findOneForInventoryUpdate(any());
     }
 
     @Test
-    void approve_zeroQuantityItem_skipsStockChange() {
-        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.REQUESTED);
+    void acceptWithRestockable_zeroQuantityItem_skipsStockChange() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.INSPECTED);
         OrderItem item = new OrderItem().productId("1").qty(0);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
         when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
-        orderReturnService.approve("RET-1", null);
+        orderReturnService.acceptAfterInspection("RET-1", ReturnDisposition.RESTOCKABLE, null);
 
         verify(productRepository, never()).save(any());
     }
 
     @Test
-    void approve_variantIncrementFails_fallsBackToProductStock() {
-        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.REQUESTED);
+    void acceptWithRestockable_variantIncrementFails_fallsBackToProductStock() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.INSPECTED);
         OrderItem item = new OrderItem().productId("2").qty(1).variantSku("MISSING").itemSize("M").color("Blue");
         Product product = new Product().id(2L).stock(3).itemStructure("VARIANTS").variantsJson("[]");
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
@@ -1253,7 +1259,7 @@ class OrderReturnServiceTest {
         when(productRepository.save(product)).thenReturn(product);
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
-        orderReturnService.approve("RET-1", null);
+        orderReturnService.acceptAfterInspection("RET-1", ReturnDisposition.RESTOCKABLE, null);
 
         assertThat(product.getStock()).isEqualTo(4);
     }
@@ -1313,27 +1319,24 @@ class OrderReturnServiceTest {
     }
 
     @Test
-    void approve_exchangeWithZeroQtyItem_doesNotSaveProduct() {
-        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.REQUESTED, "TEE-M-BLUE", "M", "Blue");
+    void acceptWithRestockable_exchangeWithZeroQtyItem_doesNotSaveProduct() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.INSPECTED, "TEE-M-BLUE", "M", "Blue");
         orderReturn.getOrderItem().productId("2").qty(0);
         Product product = new Product().id(2L).stock(4);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
         when(productRepository.findOneForInventoryUpdate(2L)).thenReturn(Optional.of(product));
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
-        orderReturnService.approve("RET-1", null);
+        orderReturnService.acceptAfterInspection("RET-1", ReturnDisposition.RESTOCKABLE, null);
 
         verify(productRepository, never()).save(any());
         assertThat(product.getStock()).isEqualTo(4);
     }
 
     @Test
-    void rejectAfterInspection_missingProduct_treatsAsReversed() {
+    void rejectAfterInspection_missingProduct_stillRejects() {
         OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.INSPECTED);
-        OrderItem item = new OrderItem().productId("1").qty(2);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
-        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
-        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.empty());
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
         OrderReturn result = orderReturnService.rejectAfterInspection("RET-1", "Item damaged by customer", null);
@@ -1343,11 +1346,9 @@ class OrderReturnServiceTest {
     }
 
     @Test
-    void rejectAfterInspection_zeroQuantityItem_skipsStockReverse() {
+    void rejectAfterInspection_zeroQuantityItem_stillRejects() {
         OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.INSPECTED);
-        OrderItem item = new OrderItem().productId("1").qty(0);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
-        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
         OrderReturn result = orderReturnService.rejectAfterInspection("RET-1", "Item damaged by customer", null);
@@ -1357,11 +1358,9 @@ class OrderReturnServiceTest {
     }
 
     @Test
-    void rejectAfterInspection_invalidProductId_skipsStockReverse() {
+    void rejectAfterInspection_invalidProductId_stillRejects() {
         OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.INSPECTED);
-        OrderItem item = new OrderItem().productId("bad-id").qty(2);
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
-        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
         OrderReturn result = orderReturnService.rejectAfterInspection("RET-1", "Item damaged by customer", null);
@@ -1378,6 +1377,178 @@ class OrderReturnServiceTest {
         assertThatThrownBy(() -> orderReturnService.allocateReplacementItem("RET-1", null))
             .isInstanceOf(ResponseStatusException.class)
             .hasMessageContaining("could not be resolved");
+    }
+
+    @Test
+    void bookPickup_manualWithoutAwb_throwsBadRequest() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.APPROVED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+
+        assertThatThrownBy(() ->
+            orderReturnService.bookPickup("RET-1", ReturnLogisticsMode.MANUAL, "Delhivery", "", null, null, null)
+        )
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Reverse AWB");
+    }
+
+    @Test
+    void bookPickup_xpressBeesNotConfigured_throwsServiceUnavailable() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.APPROVED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(xpressBeesClient.isReversePickupConfigured()).thenReturn(false);
+
+        assertThatThrownBy(() ->
+            orderReturnService.bookPickup("RET-1", ReturnLogisticsMode.XPRESSBEES, null, null, null, null, null)
+        )
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("not configured");
+    }
+
+    @Test
+    void bookPickup_xpressBeesSuccess_persistsAwbAndTracking() throws Exception {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.APPROVED);
+        orderReturn.getOrder().shippingAddressJson(
+            "{\"full_name\":\"Jane Doe\",\"phone\":\"9876543210\",\"line1\":\"12 MG Road\",\"city\":\"Bengaluru\",\"state\":\"Karnataka\",\"pincode\":\"560001\"}"
+        );
+        OrderItem item = new OrderItem().productName("Tee").variantSku("TEE-1").qty(1).price(BigDecimal.TEN);
+        orderReturn.setOrderItem(item);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(xpressBeesClient.isReversePickupConfigured()).thenReturn(true);
+        when(xpressBeesClient.createReversePickup(any())).thenReturn(
+            new XpressBeesClient.ReversePickupResult("AWB123", "https://track.example/AWB123", "Tomorrow", "REQ-1", "Success")
+        );
+        when(xpressBeesClient.buildTrackingUrl("AWB123")).thenReturn("https://track.example/AWB123");
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.bookPickup("RET-1", ReturnLogisticsMode.XPRESSBEES, null, null, null, null, "Book now");
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.PICKUP_SCHEDULED);
+        assertThat(result.getLogisticsMode()).isEqualTo(ReturnLogisticsMode.XPRESSBEES);
+        assertThat(result.getReverseAwb()).isEqualTo("AWB123");
+        assertThat(result.getTrackingUrl()).isEqualTo("https://track.example/AWB123");
+        assertThat(result.getProviderRequestId()).isEqualTo("REQ-1");
+    }
+
+    @Test
+    void bookOutbound_manualMode_movesToShippedWithAwb() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.READY_TO_SHIP, "TEE-M-BLUE", "M", "Blue");
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.bookOutbound(
+            "RET-1",
+            ReturnLogisticsMode.MANUAL,
+            "Delhivery",
+            "OUT-AWB-1",
+            "https://track/out",
+            "https://label/out",
+            "Manual outbound"
+        );
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.SHIPPED);
+        assertThat(result.getOutboundLogisticsMode()).isEqualTo(ReturnLogisticsMode.MANUAL);
+        assertThat(result.getOutboundAwb()).isEqualTo("OUT-AWB-1");
+        assertThat(result.getOutboundTrackingUrl()).isEqualTo("https://track/out");
+        assertThat(result.getOutboundLabelUrl()).isEqualTo("https://label/out");
+    }
+
+    @Test
+    void bookOutbound_xpressBeesSuccess_persistsOutboundAwb() throws Exception {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.READY_TO_SHIP, "TEE-M-BLUE", "M", "Blue");
+        orderReturn
+            .getOrder()
+            .shippingAddressJson(
+                "{\"full_name\":\"Jane Doe\",\"phone\":\"9876543210\",\"line1\":\"12 MG Road\",\"city\":\"Bengaluru\",\"state\":\"Karnataka\",\"pincode\":\"560001\"}"
+            );
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(xpressBeesClient.isForwardShipmentConfigured()).thenReturn(true);
+        when(xpressBeesClient.createForwardShipment(any())).thenReturn(
+            new XpressBeesClient.ForwardShipmentResult("OUT123", "https://track.example/OUT123", "https://label/out", "OUT-REQ-1", "Success")
+        );
+        when(xpressBeesClient.buildTrackingUrl("OUT123")).thenReturn("https://track.example/OUT123");
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.bookOutbound("RET-1", ReturnLogisticsMode.XPRESSBEES, null, null, null, null, "Book outbound");
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.SHIPPED);
+        assertThat(result.getOutboundLogisticsMode()).isEqualTo(ReturnLogisticsMode.XPRESSBEES);
+        assertThat(result.getOutboundAwb()).isEqualTo("OUT123");
+        assertThat(result.getOutboundTrackingUrl()).isEqualTo("https://track.example/OUT123");
+        assertThat(result.getOutboundProviderRequestId()).isEqualTo("OUT-REQ-1");
+    }
+
+    @Test
+    void requestReturn_selectedQuantityCreatesProratedRefundSnapshot() {
+        CustomerOrder order = eligibleOrder().subtotal(new BigDecimal("1000.00")).discount(new BigDecimal("100.00")).total(new BigDecimal("900.00"));
+        OrderItem item = new OrderItem().id(77L).order(order).productId("2").productName("Romper").qty(2).price(new BigDecimal("500.00"));
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin(ORDER_NUMBER, USER)).thenReturn(Optional.of(order));
+        when(orderReturnRepository.existsByOrderIdAndStatusIn(eq(10L), any())).thenReturn(false);
+        when(orderReturnRepository.save(any(OrderReturn.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
+        when(orderReturnItemRepository.save(any(OrderReturnItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OrderReturn result = orderReturnService.requestReturn(
+            USER,
+            ORDER_NUMBER,
+            "The selected item is the wrong size",
+            List.of(new OrderReturnService.ReturnLineSelection(77L, 1))
+        );
+
+        assertThat(result.getRefundAmount()).isEqualByComparingTo("450.00");
+        verify(orderReturnItemRepository).save(
+            org.mockito.ArgumentMatchers.argThat(line ->
+                line.getRequestedQty() == 1 &&
+                line.getGrossAmount().compareTo(new BigDecimal("500.00")) == 0 &&
+                line.getDiscountAllocation().compareTo(new BigDecimal("50.00")) == 0 &&
+                line.getRefundAmount().compareTo(new BigDecimal("450.00")) == 0
+            )
+        );
+    }
+
+    @Test
+    void approveExchangeReservesReplacementAndSnapshotsPriceDifference() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.REQUESTED, "TEE-M-BLUE", "M", "Blue");
+        orderReturn.getOrderItem().price(new BigDecimal("100.00"));
+        Product product = new Product()
+            .id(2L)
+            .itemStructure("VARIANTS")
+            .variantsJson("[{\"sku\":\"TEE-M-BLUE\",\"size\":\"M\",\"color\":\"Blue\",\"rate\":500,\"stock\":2,\"active\":true}]");
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(productRepository.findOneForInventoryUpdate(2L)).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.approve("RET-1", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.APPROVED);
+        assertThat(result.getReplacementReservedAt()).isNotNull();
+        assertThat(result.getPriceDifference()).isPositive();
+        assertThat(result.getSettlementStatus()).isEqualTo(ExchangeSettlementStatus.PENDING);
+        assertThat(product.getStock()).isEqualTo(1);
+    }
+
+    @Test
+    void settlePriceDifferenceRecordsAuditedCollection() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.APPROVED, "TEE-M-BLUE", "M", "Blue");
+        orderReturn.setPriceDifference(new BigDecimal("100.00"));
+        orderReturn.setSettlementStatus(ExchangeSettlementStatus.PENDING);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.settlePriceDifference(
+            "RET-1",
+            ExchangeSettlementStatus.COLLECTED,
+            new BigDecimal("100.00"),
+            "UPI",
+            "UTR-123",
+            "admin",
+            null
+        );
+
+        assertThat(result.getSettlementStatus()).isEqualTo(ExchangeSettlementStatus.COLLECTED);
+        assertThat(result.getSettlementReference()).isEqualTo("UTR-123");
+        assertThat(result.getSettledBy()).isEqualTo("admin");
+        assertThat(result.getSettledAt()).isNotNull();
     }
 
     private OrderReturn exchangeReturnWithStatus(OrderReturnStatus status, String replacementSku, String size, String color) {

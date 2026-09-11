@@ -1,9 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminPage } from "@/components/admin/AdminPage";
-import { AlertCircle, CheckCircle2, CloudUpload, FileText, Loader2, RefreshCw, Search, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, CloudUpload, FileText, Loader2, Printer, RefreshCw, Search, Truck, X } from "lucide-react";
 import { toast } from "sonner";
 import {
+  bookAdminOrderShipment,
+  cancelAdminOrderShipment,
   listAdminOrders,
   markCodCollected,
   type AdminOrderRow,
@@ -18,6 +20,13 @@ import { showApiError } from "@/lib/ui-errors";
 import { ListPagination } from "@/components/ListPagination";
 import { LIST_PAGE_SIZE } from "@/lib/pagination";
 import { isInvoiceAvailable } from "@/lib/invoice-availability";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/admin/orders")({ component: AdminOrdersPage });
 
@@ -128,6 +137,17 @@ function AdminOrdersPage() {
   const [rows, setRows] = useState<AdminOrderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [bookTarget, setBookTarget] = useState<string | null>(null);
+  const [bookMode, setBookMode] = useState<"xpressbees" | "manual">("xpressbees");
+  const [bookCarrier, setBookCarrier] = useState("");
+  const [bookAwb, setBookAwb] = useState("");
+  const [bookTrackingUrl, setBookTrackingUrl] = useState("");
+  const [bookLabelUrl, setBookLabelUrl] = useState("");
+  const [bookRequiresOverride, setBookRequiresOverride] = useState(false);
+  const [bookOverrideReason, setBookOverrideReason] = useState("");
+  const [cancelShipmentTarget, setCancelShipmentTarget] = useState<AdminOrderRow | null>(null);
+  const [cancelShipmentMode, setCancelShipmentMode] = useState<"xpressbees" | "manual">("xpressbees");
+  const [cancelShipmentReason, setCancelShipmentReason] = useState("");
   const [period, setPeriod] = useState<Period>("all");
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -199,6 +219,62 @@ function AdminOrdersPage() {
     }
   };
 
+  const submitBookShipment = async () => {
+    if (!bookTarget) return;
+    if (bookMode !== "xpressbees" && bookAwb.trim().length < 3) {
+      toast.error("AWB or tracking reference is required");
+      return;
+    }
+    if (bookRequiresOverride && bookOverrideReason.trim().length < 5) {
+      toast.error("Override reason must be at least 5 characters");
+      return;
+    }
+    setBusy(`ship:${bookTarget}`);
+    try {
+      await bookAdminOrderShipment(bookTarget, {
+        mode: bookMode,
+        carrier_name: bookCarrier.trim() || undefined,
+        awb: bookAwb.trim() || undefined,
+        tracking_url: bookTrackingUrl.trim() || undefined,
+        label_url: bookLabelUrl.trim() || undefined,
+        override_fulfillment_hold: bookRequiresOverride || undefined,
+        override_reason: bookRequiresOverride ? bookOverrideReason.trim() : undefined,
+      });
+      toast.success(bookMode === "xpressbees" ? `${bookTarget} booked with ExpressBees` : `${bookTarget} shipment recorded`);
+      setBookTarget(null);
+      setBookCarrier("");
+      setBookAwb("");
+      setBookTrackingUrl("");
+      setBookLabelUrl("");
+      setBookRequiresOverride(false);
+      setBookOverrideReason("");
+      await load();
+    } catch (error) {
+      showApiError(error, "Could not book shipment");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const submitCancelShipment = async () => {
+    if (!cancelShipmentTarget || cancelShipmentReason.trim().length < 5) return;
+    setBusy(`cancel-ship:${cancelShipmentTarget.order_number}`);
+    try {
+      await cancelAdminOrderShipment(cancelShipmentTarget.order_number, {
+        mode: cancelShipmentMode,
+        reason: cancelShipmentReason.trim(),
+      });
+      toast.success(`${cancelShipmentTarget.order_number} shipment cancelled`);
+      setCancelShipmentTarget(null);
+      setCancelShipmentReason("");
+      await load();
+    } catch (error) {
+      showApiError(error, "Could not cancel shipment");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const sync = async (orderNumber: string) => {
     setBusy(`zoho:${orderNumber}`);
     try {
@@ -248,7 +324,7 @@ function AdminOrdersPage() {
     <AdminPage
       eyebrow="Fulfilment"
       title="Orders"
-      description="Search orders, mark wrapping complete, confirm COD collection, and sync with Zoho Books."
+      description="Search orders, mark wrapping complete, book ExpressBees or a manual AWB, and sync with Zoho Books."
     >
       <div className="mb-5 flex flex-wrap items-end gap-3 rounded-2xl border border-border/70 bg-card/70 p-4">
         <div>
@@ -499,6 +575,112 @@ function AdminOrdersPage() {
 
                 <div className="mt-3 rounded-xl border border-border/70 bg-background/60 p-3">
                   <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold">Shipment</p>
+                    {order.tracking_number ? (
+                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
+                        Booked
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                        Not booked
+                      </span>
+                    )}
+                  </div>
+                  {order.tracking_number ? (
+                    <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                      <p>
+                        {order.tracking_carrier || "Carrier"} · AWB {order.tracking_number}
+                      </p>
+                      {order.tracking_url ? (
+                        <a
+                          href={order.tracking_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline"
+                        >
+                          Open tracking
+                        </a>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Book ExpressBees or record a manual AWB once the order is packed.
+                    </p>
+                  )}
+                  {order.pending_cancellation && !order.tracking_number && (
+                    <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900">
+                      <p className="font-semibold">Cancellation requested — shipment on hold</p>
+                      <p className="mt-1">
+                        A customer cancellation is pending review. Reject it on{" "}
+                        <Link to="/admin/cancellations" className="underline">
+                          Cancellations
+                        </Link>{" "}
+                        or book with an audited override if fulfilment must continue.
+                      </p>
+                    </div>
+                  )}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {order.can_book_shipment && (
+                      <button
+                        type="button"
+                        disabled={busy !== null}
+                        onClick={() => {
+                          setBookMode("xpressbees");
+                          setBookRequiresOverride(false);
+                          setBookOverrideReason("");
+                          setBookTarget(order.order_number);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium disabled:opacity-60"
+                      >
+                        <Truck className="h-3.5 w-3.5" /> Book shipment
+                      </button>
+                    )}
+                    {order.can_book_shipment_with_override && (
+                      <button
+                        type="button"
+                        disabled={busy !== null}
+                        onClick={() => {
+                          setBookMode("xpressbees");
+                          setBookRequiresOverride(true);
+                          setBookOverrideReason("");
+                          setBookTarget(order.order_number);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 disabled:opacity-60"
+                      >
+                        <Truck className="h-3.5 w-3.5" /> Override hold & book
+                      </button>
+                    )}
+                    {order.shipment_label_url ? (
+                      <a
+                        href={order.shipment_label_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium"
+                      >
+                        <Printer className="h-3.5 w-3.5" /> Download label
+                      </a>
+                    ) : null}
+                    {order.tracking_number && order.status !== "fulfilled" ? (
+                      <button
+                        type="button"
+                        disabled={busy !== null}
+                        onClick={() => {
+                          setCancelShipmentTarget(order);
+                          setCancelShipmentMode(
+                            order.shipment_logistics_mode === "xpressbees" ? "xpressbees" : "manual",
+                          );
+                          setCancelShipmentReason("");
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-destructive/40 px-3 py-1.5 text-xs font-medium text-destructive"
+                      >
+                        <X className="h-3.5 w-3.5" /> Cancel shipment
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-xl border border-border/70 bg-background/60 p-3">
+                  <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-semibold">Zoho</p>
                     <SyncBadge status={order.zoho_sync_status} eligible={order.zoho_sync_eligible} />
                   </div>
@@ -552,6 +734,160 @@ function AdminOrdersPage() {
           onPageChange={setPage}
         />
       )}
+      <Dialog
+        open={!!bookTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setBookTarget(null);
+            setBookCarrier("");
+            setBookAwb("");
+            setBookTrackingUrl("");
+            setBookLabelUrl("");
+            setBookRequiresOverride(false);
+            setBookOverrideReason("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {bookRequiresOverride ? "Override hold & book" : "Book shipment"}
+              {bookTarget ? ` · ${bookTarget}` : ""}
+            </DialogTitle>
+          </DialogHeader>
+          {bookRequiresOverride && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900">
+              This order has a pending cancellation request. Provide a reason — it is logged server-side.
+            </div>
+          )}
+          <div className="space-y-3">
+            <label className="block text-sm font-medium">
+              Mode
+              <select
+                className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                value={bookMode}
+                onChange={(event) => setBookMode(event.target.value as "xpressbees" | "manual")}
+              >
+                <option value="xpressbees">ExpressBees</option>
+                <option value="manual">Manual carrier</option>
+              </select>
+            </label>
+            {bookMode !== "xpressbees" ? (
+              <>
+                <label className="block text-sm font-medium">
+                  Carrier name
+                  <input
+                    className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                    value={bookCarrier}
+                    onChange={(event) => setBookCarrier(event.target.value)}
+                    placeholder="e.g. Delhivery"
+                  />
+                </label>
+                <label className="block text-sm font-medium">
+                  AWB / reference *
+                  <input
+                    className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                    value={bookAwb}
+                    onChange={(event) => setBookAwb(event.target.value)}
+                  />
+                </label>
+                <label className="block text-sm font-medium">
+                  Tracking URL
+                  <input
+                    className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                    value={bookTrackingUrl}
+                    onChange={(event) => setBookTrackingUrl(event.target.value)}
+                  />
+                </label>
+                <label className="block text-sm font-medium">
+                  Label URL
+                  <input
+                    className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                    value={bookLabelUrl}
+                    onChange={(event) => setBookLabelUrl(event.target.value)}
+                    placeholder="Optional printable label link"
+                  />
+                </label>
+              </>
+            ) : (
+              <label className="block text-sm font-medium">
+                Pre-assigned AWB (optional)
+                <input
+                  className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                  value={bookAwb}
+                  onChange={(event) => setBookAwb(event.target.value)}
+                  placeholder="Leave blank if ExpressBees generates the AWB"
+                />
+              </label>
+            )}
+            {bookRequiresOverride && (
+              <label className="block text-sm font-medium">
+                Override reason *
+                <textarea
+                  className="mt-1 min-h-20 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                  value={bookOverrideReason}
+                  onChange={(event) => setBookOverrideReason(event.target.value)}
+                  placeholder="Why is this order shipping while cancellation is pending?"
+                />
+              </label>
+            )}
+          </div>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => void submitBookShipment()}
+              disabled={
+                busy === `ship:${bookTarget}` ||
+                (bookMode !== "xpressbees" && bookAwb.trim().length < 3) ||
+                (bookRequiresOverride && bookOverrideReason.trim().length < 5)
+              }
+              className="rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50"
+            >
+              {busy === `ship:${bookTarget}` ? "Booking…" : bookRequiresOverride ? "Override & book" : "Book shipment"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!cancelShipmentTarget} onOpenChange={(open) => !open && setCancelShipmentTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel shipment · {cancelShipmentTarget?.order_number}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Use ExpressBees to cancel the AWB, or choose manual after confirming cancellation directly with the carrier.
+          </p>
+          <label className="block text-sm font-medium">
+            Mode
+            <select
+              value={cancelShipmentMode}
+              onChange={(event) => setCancelShipmentMode(event.target.value as "xpressbees" | "manual")}
+              className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3"
+            >
+              <option value="xpressbees">ExpressBees API</option>
+              <option value="manual">Manual carrier confirmation</option>
+            </select>
+          </label>
+          <label className="block text-sm font-medium">
+            Reason
+            <textarea
+              value={cancelShipmentReason}
+              onChange={(event) => setCancelShipmentReason(event.target.value)}
+              className="mt-1 min-h-20 w-full rounded-xl border border-border bg-background px-3 py-2"
+            />
+          </label>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => void submitCancelShipment()}
+              disabled={busy !== null || cancelShipmentReason.trim().length < 5}
+              className="rounded-full bg-destructive px-4 py-2 text-sm text-destructive-foreground disabled:opacity-50"
+            >
+              Cancel shipment
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminPage>
   );
 }

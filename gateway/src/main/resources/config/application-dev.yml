@@ -83,6 +83,10 @@ spring:
               uri: http://127.0.0.1:8084
               predicates:
                 - Path=/internal/v1/zoho/invoice-webhook,/api/v1/zoho/invoice-webhook
+            - id: miniandmore-xpressbees-return-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/webhooks/xpressbees/returns,/api/v1/webhooks/xpressbees/returns
             - id: miniandmore-ledgerly-api
               uri: http://127.0.0.1:8081
               predicates:

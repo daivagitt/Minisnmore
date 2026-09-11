@@ -1,6 +1,7 @@
 package com.miniandmore.app.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.miniandmore.app.domain.enumeration.ExchangeSettlementStatus;
 import com.miniandmore.app.domain.enumeration.OrderRequestType;
 import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
 import jakarta.persistence.*;
@@ -100,6 +101,114 @@ public class OrderReturn implements Serializable {
     @Size(max = 40)
     @Column(name = "replacement_color", length = 40)
     private String replacementColor;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "disposition", length = 32)
+    private com.miniandmore.app.domain.enumeration.ReturnDisposition disposition;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "logistics_mode", length = 16)
+    private com.miniandmore.app.domain.enumeration.ReturnLogisticsMode logisticsMode;
+
+    @Size(max = 80)
+    @Column(name = "carrier_name", length = 80)
+    private String carrierName;
+
+    @Size(max = 80)
+    @Column(name = "reverse_awb", length = 80)
+    private String reverseAwb;
+
+    @Size(max = 500)
+    @Column(name = "tracking_url", length = 500)
+    private String trackingUrl;
+
+    @Size(max = 200)
+    @Column(name = "pickup_window", length = 200)
+    private String pickupWindow;
+
+    @Size(max = 120)
+    @Column(name = "provider_request_id", length = 120)
+    private String providerRequestId;
+
+    @Size(max = 500)
+    @Column(name = "pickup_failure_reason", length = 500)
+    private String pickupFailureReason;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "outbound_logistics_mode", length = 16)
+    private com.miniandmore.app.domain.enumeration.ReturnLogisticsMode outboundLogisticsMode;
+
+    @Size(max = 80)
+    @Column(name = "outbound_carrier_name", length = 80)
+    private String outboundCarrierName;
+
+    @Size(max = 80)
+    @Column(name = "outbound_awb", length = 80)
+    private String outboundAwb;
+
+    @Size(max = 500)
+    @Column(name = "outbound_tracking_url", length = 500)
+    private String outboundTrackingUrl;
+
+    @Size(max = 500)
+    @Column(name = "outbound_label_url", length = 500)
+    private String outboundLabelUrl;
+
+    @Size(max = 120)
+    @Column(name = "outbound_provider_request_id", length = 120)
+    private String outboundProviderRequestId;
+
+    @Column(name = "original_item_amount", precision = 21, scale = 2)
+    private BigDecimal originalItemAmount;
+
+    @Column(name = "replacement_item_amount", precision = 21, scale = 2)
+    private BigDecimal replacementItemAmount;
+
+    @Column(name = "price_difference", precision = 21, scale = 2)
+    private BigDecimal priceDifference;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "settlement_status", length = 20)
+    private ExchangeSettlementStatus settlementStatus;
+
+    @Size(max = 40)
+    @Column(name = "settlement_method", length = 40)
+    private String settlementMethod;
+
+    @Size(max = 160)
+    @Column(name = "settlement_reference", length = 160)
+    private String settlementReference;
+
+    @Column(name = "settlement_amount", precision = 21, scale = 2)
+    private BigDecimal settlementAmount;
+
+    @Column(name = "settled_at")
+    private Instant settledAt;
+
+    @Size(max = 50)
+    @Column(name = "settled_by", length = 50)
+    private String settledBy;
+
+    @Column(name = "replacement_reserved_at")
+    private Instant replacementReservedAt;
+
+    @Column(name = "replacement_reservation_released_at")
+    private Instant replacementReservationReleasedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "manual_refund_method", length = 32)
+    private com.miniandmore.app.domain.enumeration.ManualRefundMethod manualRefundMethod;
+
+    @Size(max = 160)
+    @Column(name = "manual_refund_reference", length = 160)
+    private String manualRefundReference;
+
+    @Column(name = "manual_refund_recorded_at")
+    private Instant manualRefundRecordedAt;
+
+    @Size(max = 50)
+    @Column(name = "manual_refund_recorded_by", length = 50)
+    private String manualRefundRecordedBy;
 
     public Long getId() {
         return id;
@@ -251,5 +360,237 @@ public class OrderReturn implements Serializable {
 
     public void setReplacementColor(String replacementColor) {
         this.replacementColor = replacementColor;
+    }
+
+    public com.miniandmore.app.domain.enumeration.ReturnDisposition getDisposition() {
+        return disposition;
+    }
+
+    public void setDisposition(com.miniandmore.app.domain.enumeration.ReturnDisposition disposition) {
+        this.disposition = disposition;
+    }
+
+    public com.miniandmore.app.domain.enumeration.ReturnLogisticsMode getLogisticsMode() {
+        return logisticsMode;
+    }
+
+    public void setLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode logisticsMode) {
+        this.logisticsMode = logisticsMode;
+    }
+
+    public String getCarrierName() {
+        return carrierName;
+    }
+
+    public void setCarrierName(String carrierName) {
+        this.carrierName = carrierName;
+    }
+
+    public String getReverseAwb() {
+        return reverseAwb;
+    }
+
+    public void setReverseAwb(String reverseAwb) {
+        this.reverseAwb = reverseAwb;
+    }
+
+    public String getTrackingUrl() {
+        return trackingUrl;
+    }
+
+    public void setTrackingUrl(String trackingUrl) {
+        this.trackingUrl = trackingUrl;
+    }
+
+    public String getPickupWindow() {
+        return pickupWindow;
+    }
+
+    public void setPickupWindow(String pickupWindow) {
+        this.pickupWindow = pickupWindow;
+    }
+
+    public String getProviderRequestId() {
+        return providerRequestId;
+    }
+
+    public void setProviderRequestId(String providerRequestId) {
+        this.providerRequestId = providerRequestId;
+    }
+
+    public String getPickupFailureReason() {
+        return pickupFailureReason;
+    }
+
+    public void setPickupFailureReason(String pickupFailureReason) {
+        this.pickupFailureReason = pickupFailureReason;
+    }
+
+    public com.miniandmore.app.domain.enumeration.ReturnLogisticsMode getOutboundLogisticsMode() {
+        return outboundLogisticsMode;
+    }
+
+    public void setOutboundLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode outboundLogisticsMode) {
+        this.outboundLogisticsMode = outboundLogisticsMode;
+    }
+
+    public String getOutboundCarrierName() {
+        return outboundCarrierName;
+    }
+
+    public void setOutboundCarrierName(String outboundCarrierName) {
+        this.outboundCarrierName = outboundCarrierName;
+    }
+
+    public String getOutboundAwb() {
+        return outboundAwb;
+    }
+
+    public void setOutboundAwb(String outboundAwb) {
+        this.outboundAwb = outboundAwb;
+    }
+
+    public String getOutboundTrackingUrl() {
+        return outboundTrackingUrl;
+    }
+
+    public void setOutboundTrackingUrl(String outboundTrackingUrl) {
+        this.outboundTrackingUrl = outboundTrackingUrl;
+    }
+
+    public String getOutboundLabelUrl() {
+        return outboundLabelUrl;
+    }
+
+    public void setOutboundLabelUrl(String outboundLabelUrl) {
+        this.outboundLabelUrl = outboundLabelUrl;
+    }
+
+    public String getOutboundProviderRequestId() {
+        return outboundProviderRequestId;
+    }
+
+    public void setOutboundProviderRequestId(String outboundProviderRequestId) {
+        this.outboundProviderRequestId = outboundProviderRequestId;
+    }
+
+    public BigDecimal getOriginalItemAmount() {
+        return originalItemAmount;
+    }
+
+    public void setOriginalItemAmount(BigDecimal originalItemAmount) {
+        this.originalItemAmount = originalItemAmount;
+    }
+
+    public BigDecimal getReplacementItemAmount() {
+        return replacementItemAmount;
+    }
+
+    public void setReplacementItemAmount(BigDecimal replacementItemAmount) {
+        this.replacementItemAmount = replacementItemAmount;
+    }
+
+    public BigDecimal getPriceDifference() {
+        return priceDifference;
+    }
+
+    public void setPriceDifference(BigDecimal priceDifference) {
+        this.priceDifference = priceDifference;
+    }
+
+    public ExchangeSettlementStatus getSettlementStatus() {
+        return settlementStatus;
+    }
+
+    public void setSettlementStatus(ExchangeSettlementStatus settlementStatus) {
+        this.settlementStatus = settlementStatus;
+    }
+
+    public String getSettlementMethod() {
+        return settlementMethod;
+    }
+
+    public void setSettlementMethod(String settlementMethod) {
+        this.settlementMethod = settlementMethod;
+    }
+
+    public String getSettlementReference() {
+        return settlementReference;
+    }
+
+    public void setSettlementReference(String settlementReference) {
+        this.settlementReference = settlementReference;
+    }
+
+    public BigDecimal getSettlementAmount() {
+        return settlementAmount;
+    }
+
+    public void setSettlementAmount(BigDecimal settlementAmount) {
+        this.settlementAmount = settlementAmount;
+    }
+
+    public Instant getSettledAt() {
+        return settledAt;
+    }
+
+    public void setSettledAt(Instant settledAt) {
+        this.settledAt = settledAt;
+    }
+
+    public String getSettledBy() {
+        return settledBy;
+    }
+
+    public void setSettledBy(String settledBy) {
+        this.settledBy = settledBy;
+    }
+
+    public Instant getReplacementReservedAt() {
+        return replacementReservedAt;
+    }
+
+    public void setReplacementReservedAt(Instant replacementReservedAt) {
+        this.replacementReservedAt = replacementReservedAt;
+    }
+
+    public Instant getReplacementReservationReleasedAt() {
+        return replacementReservationReleasedAt;
+    }
+
+    public void setReplacementReservationReleasedAt(Instant replacementReservationReleasedAt) {
+        this.replacementReservationReleasedAt = replacementReservationReleasedAt;
+    }
+
+    public com.miniandmore.app.domain.enumeration.ManualRefundMethod getManualRefundMethod() {
+        return manualRefundMethod;
+    }
+
+    public void setManualRefundMethod(com.miniandmore.app.domain.enumeration.ManualRefundMethod manualRefundMethod) {
+        this.manualRefundMethod = manualRefundMethod;
+    }
+
+    public String getManualRefundReference() {
+        return manualRefundReference;
+    }
+
+    public void setManualRefundReference(String manualRefundReference) {
+        this.manualRefundReference = manualRefundReference;
+    }
+
+    public Instant getManualRefundRecordedAt() {
+        return manualRefundRecordedAt;
+    }
+
+    public void setManualRefundRecordedAt(Instant manualRefundRecordedAt) {
+        this.manualRefundRecordedAt = manualRefundRecordedAt;
+    }
+
+    public String getManualRefundRecordedBy() {
+        return manualRefundRecordedBy;
+    }
+
+    public void setManualRefundRecordedBy(String manualRefundRecordedBy) {
+        this.manualRefundRecordedBy = manualRefundRecordedBy;
     }
 }

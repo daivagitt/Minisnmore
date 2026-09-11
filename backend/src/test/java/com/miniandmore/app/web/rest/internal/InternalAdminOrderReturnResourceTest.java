@@ -13,6 +13,9 @@ import com.miniandmore.app.domain.OrderReturn;
 import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
+import com.miniandmore.app.domain.enumeration.ReturnDisposition;
+import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
+import com.miniandmore.app.service.CaseSlaSupport;
 import com.miniandmore.app.service.OrderReturnService;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -36,6 +39,9 @@ class InternalAdminOrderReturnResourceTest {
 
     @MockitoBean
     private OrderReturnService orderReturnService;
+
+    @MockitoBean
+    private CaseSlaSupport caseSlaSupport;
 
     @Test
     void list_returns200() throws Exception {
@@ -119,10 +125,14 @@ class InternalAdminOrderReturnResourceTest {
     void accept_returns200() throws Exception {
         OrderReturn updated = sampleReturn();
         updated.setStatus(OrderReturnStatus.ACCEPTED);
-        when(orderReturnService.acceptAfterInspection("RET-1", null)).thenReturn(updated);
+        when(orderReturnService.acceptAfterInspection("RET-1", ReturnDisposition.RESTOCKABLE, null)).thenReturn(updated);
 
         mockMvc
-            .perform(post("/internal/v1/admin/order-returns/RET-1/accept"))
+            .perform(
+                post("/internal/v1/admin/order-returns/RET-1/accept")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"disposition\":\"restockable\"}")
+            )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("accepted"));
     }
@@ -173,6 +183,26 @@ class InternalAdminOrderReturnResourceTest {
             .perform(post("/internal/v1/admin/order-returns/RET-1/ready-to-ship"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("ready_to_ship"));
+    }
+
+    @Test
+    void bookOutbound_returns200() throws Exception {
+        OrderReturn updated = sampleReturn();
+        updated.setStatus(OrderReturnStatus.SHIPPED);
+        updated.setOutboundAwb("OUT123");
+        when(
+            orderReturnService.bookOutbound("RET-1", ReturnLogisticsMode.XPRESSBEES, null, null, null, null, null)
+        ).thenReturn(updated);
+
+        mockMvc
+            .perform(
+                post("/internal/v1/admin/order-returns/RET-1/book-outbound")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"mode\":\"xpressbees\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("shipped"))
+            .andExpect(jsonPath("$.data.outbound_awb").value("OUT123"));
     }
 
     @Test

@@ -14,6 +14,8 @@ public enum OrderReturnStatus {
     APPROVED,
     REJECTED,
     PICKUP_REQUESTED,
+    PICKUP_SCHEDULED,
+    PICKUP_FAILED,
     PICKED_UP,
     RECEIVED,
     INSPECTED,

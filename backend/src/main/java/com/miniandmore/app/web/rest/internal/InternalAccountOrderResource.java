@@ -13,6 +13,7 @@ import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import com.miniandmore.app.security.AuthoritiesConstants;
 import com.miniandmore.app.security.SecurityUtils;
 import com.miniandmore.app.service.LedgerlySyncService;
+import com.miniandmore.app.service.OrderCancellationService;
 import com.miniandmore.app.service.OrderEventService;
 import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.service.OrderTrackingStatusResolver;
@@ -81,6 +82,7 @@ public class InternalAccountOrderResource {
     private final StorePricingService storePricingService;
     private final OrderEventService orderEventService;
     private final RazorpayRefundService razorpayRefundService;
+    private final OrderCancellationService orderCancellationService;
     private final TransactionTemplate inventoryRestoreTransaction;
 
     @Value("${razorpay.key-id:DEMO}")
@@ -102,6 +104,7 @@ public class InternalAccountOrderResource {
         StorePricingService storePricingService,
         OrderEventService orderEventService,
         RazorpayRefundService razorpayRefundService,
+        OrderCancellationService orderCancellationService,
         PlatformTransactionManager transactionManager
     ) {
         this.dataAccess = dataAccess;
@@ -113,6 +116,7 @@ public class InternalAccountOrderResource {
         this.storePricingService = storePricingService;
         this.orderEventService = orderEventService;
         this.razorpayRefundService = razorpayRefundService;
+        this.orderCancellationService = orderCancellationService;
         this.inventoryRestoreTransaction = new TransactionTemplate(transactionManager);
     }
 
@@ -494,65 +498,53 @@ public class InternalAccountOrderResource {
         return ApiResponse.ok(Map.of("order", orderDetail(order)));
     }
 
+    @PostMapping("/orders/{orderNumber}/cancel-request")
+    public ApiResponse<Map<String, Object>> submitCancelRequest(
+        @PathVariable String orderNumber,
+        @Valid @RequestBody CancelOrderRequest request
+    ) {
+        String login = requireLogin();
+        var cancellationRequest = orderCancellationService.submitRequest(login, orderNumber, request.reason());
+        CustomerOrder order = dataAccess
+            .customerOrderRepository()
+            .findOneByOrderNumberAndUserLogin(orderNumber, login)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("order", orderDetail(order));
+        data.put("cancellation_request", orderCancellationService.toDto(cancellationRequest));
+        return ApiResponse.ok(data);
+    }
+
+    @GetMapping("/orders/{orderNumber}/cancel-request")
+    public ApiResponse<Map<String, Object>> getCancelRequest(@PathVariable String orderNumber) {
+        String login = requireLogin();
+        var cancellationRequest = orderCancellationService.getOpenForUser(login, orderNumber);
+        if (cancellationRequest == null) {
+            return ApiResponse.ok(Map.of("cancellation_request", null));
+        }
+        return ApiResponse.ok(Map.of("cancellation_request", orderCancellationService.toDto(cancellationRequest)));
+    }
+
+    @PostMapping("/orders/{orderNumber}/cancel-request/withdraw")
+    public ApiResponse<Map<String, Object>> withdrawCancelRequest(@PathVariable String orderNumber) {
+        String login = requireLogin();
+        var cancellationRequest = orderCancellationService.withdrawByCustomer(login, orderNumber);
+        CustomerOrder order = dataAccess
+            .customerOrderRepository()
+            .findOneByOrderNumberAndUserLogin(orderNumber, login)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("order", orderDetail(order));
+        data.put("cancellation_request", orderCancellationService.toDto(cancellationRequest));
+        return ApiResponse.ok(data);
+    }
+
     @PostMapping("/orders/{orderNumber}/cancel")
     public ApiResponse<Map<String, Object>> cancelOrder(
         @PathVariable String orderNumber,
         @Valid @RequestBody CancelOrderRequest request
     ) {
-        String login = requireLogin();
-        CustomerOrder order = dataAccess
-            .customerOrderRepository()
-            .findOneByOrderNumberAndUserLogin(orderNumber, login)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
-
-        if (order.getStatus() == OrderStatus.CANCELLED) {
-            syncCancellationToZoho(order);
-            return ApiResponse.ok(Map.of("order", orderDetail(order)));
-        }
-
-        order = refreshTrackingIfStale(order);
-        String trackingStatus = OrderTrackingStatusResolver.resolve(order);
-        if (order.getStatus() == OrderStatus.FULFILLED || "shipped".equals(trackingStatus) || "delivered".equals(trackingStatus)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "This order has already been dispatched and can no longer be cancelled");
-        }
-
-        // Only an "online" (Razorpay) payment can be refunded through this API. A COD order
-        // marked paid via markCodCollected() was settled in cash with no razorpay_payment_id —
-        // refunding that is a manual/offline process, not something to attempt here.
-        boolean onlinePayment =
-            "online".equalsIgnoreCase(order.getPaymentMethod()) && StringUtils.isNotBlank(order.getRazorpayPaymentId());
-        String refundId = null;
-        if (order.getPaymentStatus() == PaymentStatus.PAID && onlinePayment) {
-            refundId = razorpayRefundService.refundPayment(order, order.getTotal());
-            // The refund above is a real, irreversible call to Razorpay. Persist its outcome
-            // immediately, on its own, before touching anything else that could still fail
-            // (inventory restore below has been seen to throw on transient errors) — otherwise a
-            // later failure would roll back paymentStatus/status while the money has already left,
-            // and a retry (which only skips the refund when status is already CANCELLED) would
-            // refund the customer a second time.
-            order.setPaymentStatus(PaymentStatus.REFUNDED);
-            order = dataAccess.customerOrderRepository().save(order);
-        }
-
-        CustomerOrder orderForInventoryRestore = order;
-        try {
-            // restoreInventoryForCancellation takes a PESSIMISTIC_WRITE lock per product (see
-            // ProductRepository#findOneForInventoryUpdate), which needs its own real transaction —
-            // this method is no longer @Transactional (that's the whole point of the fix above), so
-            // give it one explicitly rather than relying on an enclosing one that no longer exists.
-            inventoryRestoreTransaction.executeWithoutResult(status -> restoreInventoryForCancellation(orderForInventoryRestore));
-        } catch (RuntimeException ex) {
-            // Any refund above is already durably recorded; inventory reconciliation is
-            // best-effort here so it can never re-expose the order to a duplicate refund attempt.
-            LOG.warn("Inventory restore failed while cancelling {}: {}", order.getOrderNumber(), ex.getMessage());
-        }
-        order.setStatus(OrderStatus.CANCELLED);
-        order.setCancellationReason(StringUtils.normalizeSpace(request.reason()).trim());
-        CustomerOrder cancelled = dataAccess.customerOrderRepository().save(order);
-        syncCancellationToLedgerly(cancelled, refundId);
-        syncCancellationToZoho(cancelled);
-        orderEventService.syncLifecycleEvents(cancelled);
-        return ApiResponse.ok(Map.of("order", orderDetail(cancelled)));
+        return submitCancelRequest(orderNumber, request);
     }
 
     @GetMapping("/payments")
@@ -1198,6 +1190,9 @@ public class InternalAccountOrderResource {
         if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FULFILLED) {
             return false;
         }
+        if (orderCancellationService.hasPendingRequest(order.getId())) {
+            return false;
+        }
         String trackingStatus = OrderTrackingStatusResolver.resolve(order);
         return !"shipped".equals(trackingStatus) && !"delivered".equals(trackingStatus);
     }
@@ -1214,6 +1209,12 @@ public class InternalAccountOrderResource {
         data.put("shipping_address", readJson(order.getShippingAddressJson()));
         data.put("notes", order.getNotes());
         data.put("cancellation_reason", order.getCancellationReason());
+        var openCancellationRequest = orderCancellationService.getOpenForUser(order.getUserLogin(), order.getOrderNumber());
+        data.put(
+            "cancellation_request",
+            openCancellationRequest != null ? orderCancellationService.toDto(openCancellationRequest) : null
+        );
+        data.put("pending_cancellation", orderCancellationService.hasPendingRequest(order.getId()));
         data.put("razorpay_order_id", order.getRazorpayOrderId());
         data.put("razorpay_payment_id", order.getRazorpayPaymentId());
         data.put("invoice_pdf_url", invoicePdfUrl(order));
@@ -1256,6 +1257,7 @@ public class InternalAccountOrderResource {
         limited.put("tracking_status", fields.get("tracking_status"));
         limited.put("tracking_number", fields.get("tracking_number"));
         limited.put("tracking_carrier", fields.get("tracking_carrier"));
+        limited.put("tracking_url", fields.get("tracking_url"));
         limited.put("shipment_date", fields.get("shipment_date"));
         return limited;
     }
@@ -1267,6 +1269,7 @@ public class InternalAccountOrderResource {
         fields.put("tracking_status", OrderTrackingStatusResolver.resolve(order));
         fields.put("tracking_number", StringUtils.defaultString(order.getTrackingNumber()));
         fields.put("tracking_carrier", StringUtils.defaultString(order.getTrackingCarrier()));
+        fields.put("tracking_url", StringUtils.defaultString(order.getTrackingUrl()));
         fields.put("shipment_date", StringUtils.defaultString(order.getShipmentDate()));
         return fields;
     }
