@@ -71,7 +71,7 @@ describe("product size charts", () => {
     for (const sku of skus) {
       expect(SIZE_CHARTS_BY_SKU[sku], sku).toBeTruthy();
       expect(catalogSizeChartTemplate({ sku })?.code).toMatch(/^MnM-\d+$/);
-      expect(sizeChartForProduct({ sku })).toBeNull();
+      expect(sizeChartForProduct({ sku })?.code).toMatch(/^MnM-\d+$/);
     }
   });
 
@@ -147,25 +147,25 @@ describe("product size charts", () => {
     expect(chart?.sections[0]?.rows[0]?.values["0-3M"]).toBe(20);
   });
 
-  it("does not fall back to the SKU map when product sizeChart is empty", () => {
+  it("falls back to SKU map for the calculator when product sizeChart is empty", () => {
     expect(
       sizeChartForProduct({
         sku: "BASIC-SHORTS",
         sizeChart: { code: "", title: "", tolerance: "", sections: [] },
-      }),
-    ).toBeNull();
+      })?.code,
+    ).toBe("MnM-8");
     expect(catalogSizeChartTemplate({ sku: "BASIC-SHORTS" })?.code).toBe("MnM-8");
   });
 
-  it("treats empty starter charts as unusable with no storefront fallback", () => {
+  it("treats empty starter charts as unusable and uses the SKU catalog for fit", () => {
     const starter = emptySizeChart({ title: "Draft", code: "" });
     expect(isUsableSizeChart(starter)).toBe(false);
     expect(
       sizeChartForProduct({
         sku: "BASIC-SHORTS",
         sizeChart: starter,
-      }),
-    ).toBeNull();
+      })?.code,
+    ).toBe("MnM-8");
   });
 
   it("reads blank chest/length cells as null, not 0", () => {

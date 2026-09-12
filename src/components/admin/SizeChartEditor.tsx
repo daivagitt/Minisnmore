@@ -177,9 +177,10 @@ export function SizeChartEditor({
         <div>
           <div className="text-sm font-medium">Size chart</div>
           <p className="text-xs text-muted-foreground mt-0.5 leading-snug max-w-xl">
-            Drives the storefront size guide and calculator. The guide stays hidden until you
-            Import Excel, Start editing (with numbers), or Load from catalog, then Save.
-            0-3M is a from–to range; later sizes are upper values.
+            Drives the storefront size guide and calculator. The Size chart link stays hidden
+            until you Import Excel, Start editing (with numbers), or Load from catalog, then Save.
+            The calculator can still use the catalog template. 0-3M is a from–to range; later
+            sizes are upper values.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
@@ -253,8 +254,9 @@ export function SizeChartEditor({
 
       {!chart ? (
         <p className="text-xs text-muted-foreground">
-          No product chart saved — the storefront will hide the size guide until you import
-          Excel or load a catalog template and save.
+          No product chart saved — the storefront hides the Size chart link until you import
+          Excel or load a catalog template and save. The size calculator still uses the catalog
+          template when one matches this SKU.
         </p>
       ) : (
         <>

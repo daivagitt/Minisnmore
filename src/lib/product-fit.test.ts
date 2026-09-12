@@ -44,13 +44,9 @@ const shortsInput = {
 const now = new Date("2026-05-29T12:00:00");
 
 describe("product fit from MnM length/chest", () => {
-  it("does not invent fit limits from SKU when no product size chart is saved", () => {
-    expect(measurementLimitsForProduct({ sku: "FRONT-OPEN-VEST-SLEVELESS", sizes: vestInput.sizes })).toBeNull();
-    expect(
-      sizeGuideRowsForProduct({ sku: "BASIC-SHORTS", sizes: shortsInput.sizes }).every(
-        (row) => row.length === "—" && row.chest === "—",
-      ),
-    ).toBe(true);
+  it("uses the SKU catalog for fit limits when no product size chart is saved", () => {
+    expect(measurementLimitsForProduct({ sku: "FRONT-OPEN-VEST-SLEVELESS", sizes: vestInput.sizes })).not.toBeNull();
+    expect(measurementLimitsForProduct({ sku: "BASIC-SHORTS", sizes: shortsInput.sizes })?.hasLength).toBe(true);
   });
 
   it("validates length and chest against product chart windows", () => {
