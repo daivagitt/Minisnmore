@@ -14,7 +14,7 @@ import {
   measurementLimitsForProduct,
   sizeGuideRowsForProduct,
 } from "@/lib/product-fit";
-import { sizeChartForProduct } from "@/lib/product-size-charts";
+import { isUsableSizeChart, sizeChartForProduct } from "@/lib/product-size-charts";
 import { ProductSizeChartTables } from "@/components/ProductSizeChart";
 import { galleryForSelectedColor } from "@/lib/product-gallery";
 import { resolveStorefrontColorLabel } from "@/lib/expected-prints";
@@ -179,14 +179,14 @@ function ProductPage() {
 
   const sizeGuideChart = useMemo(() => {
     if (!product) return null;
-    const chart = sizeChartForProduct({
+    return sizeChartForProduct({
       sku: product.sku,
       name: product.name,
       slug: product.slug,
       sizeChart: product.sizeChart,
     });
-    return chart;
   }, [product]);
+  const hasConfiguredSizeChart = isUsableSizeChart(product?.sizeChart);
 
   const handleAdd = () => {
     if (!product || !canAdd) {
@@ -288,7 +288,9 @@ function ProductPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Size</div>
-                <button type="button" onClick={() => setSizeChart(true)} className="text-[11px] text-primary underline-offset-2 hover:underline">Size chart</button>
+                {hasConfiguredSizeChart ? (
+                  <button type="button" onClick={() => setSizeChart(true)} className="text-[11px] text-primary underline-offset-2 hover:underline">Size chart</button>
+                ) : null}
               </div>
               <VariantSizeButtons product={product} size={size} onSizeChange={setSize} />
               {isVariantsProduct(product) &&
@@ -537,7 +539,7 @@ function ProductPage() {
         </div>
       </div>
 
-      {sizeChart && (
+      {sizeChart && hasConfiguredSizeChart && (
         <div className="fixed inset-0 z-[70] grid place-items-end sm:place-items-center p-0 sm:p-4 bg-foreground/30 backdrop-blur-sm" onClick={() => setSizeChart(false)}>
           <div
             onClick={(e) => e.stopPropagation()}

@@ -551,16 +551,25 @@ export function parseProductSizeChart(raw: unknown): ProductSizeChart | null {
   return !invalid && isUsableSizeChart(chart) ? chart : null;
 }
 
+/** Approved SKU/name template for admin “Load from catalog”. Not used on the storefront. */
+export function catalogSizeChartTemplate(input: {
+  sku?: string | null;
+  name?: string | null;
+  slug?: string | null;
+}): ProductSizeChart | null {
+  const key = resolveSizeChartSku(input);
+  if (!key) return null;
+  return SIZE_CHARTS_BY_SKU[key] ?? null;
+}
+
+/** Saved product chart only — no hardcoded SKU fallback. */
 export function sizeChartForProduct(input: {
   sku?: string | null;
   name?: string | null;
   slug?: string | null;
   sizeChart?: ProductSizeChart | null;
 }): ProductSizeChart | null {
-  if (isUsableSizeChart(input.sizeChart)) return input.sizeChart;
-  const key = resolveSizeChartSku(input);
-  if (!key) return null;
-  return SIZE_CHARTS_BY_SKU[key] ?? null;
+  return isUsableSizeChart(input.sizeChart) ? input.sizeChart : null;
 }
 
 export type ChartFitPoint = {

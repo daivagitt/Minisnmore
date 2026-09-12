@@ -527,7 +527,7 @@ export type ProductRow = {
   age_min_months: number | null;
   age_max_months: number | null;
   sizes: string[];
-  /** Per-product measurement chart; null clears / uses SKU fallback on storefront. */
+  /** Per-product measurement chart; null hides the storefront size guide. */
   size_chart?: ProductSizeChart | null;
   colors: ProductColorEntry[];
   color_images_json?: string | null;

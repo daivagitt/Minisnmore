@@ -247,7 +247,6 @@ describe("ShopProvider branch coverage", () => {
     vi.mocked(replaceMyWishlist).mockRejectedValueOnce(new Error("offline"));
 
     await userEvent.click(screen.getByRole("button", { name: "toggle" }));
-    expect(screen.getByTestId("wishlist")).toHaveTextContent("");
 
     await waitFor(
       () =>
@@ -255,6 +254,33 @@ describe("ShopProvider branch coverage", () => {
       { timeout: 2000 },
     );
     expect(screen.getByTestId("wishlist")).toHaveTextContent("p1");
+  });
+
+  it("toasts when cart persist fails twice", async () => {
+    const { toast } = await import("sonner");
+    vi.mocked(replaceMyCart).mockRejectedValue(new Error("offline"));
+
+    function Probe() {
+      const shop = useShop();
+      return (
+        <div>
+          <span data-testid="count">{shop.cartCount}</span>
+          <button type="button" onClick={() => shop.addToCart(product)}>add</button>
+        </div>
+      );
+    }
+
+    render(
+      <ShopProvider>
+        <Probe />
+      </ShopProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+    await userEvent.click(screen.getByRole("button", { name: "add" }));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("Could not update your bag. Please try again."),
+    );
   });
 
   it("merges cart lines by variant SKU and clamps quantity to the fit limit", async () => {

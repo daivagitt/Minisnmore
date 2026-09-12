@@ -15,7 +15,7 @@ import {
   formatMeasurementCell,
   isZeroToThreeBand,
   parseMeasurementCell,
-  sizeChartForProduct,
+  catalogSizeChartTemplate,
   type ProductSizeChart,
   type SizeChartSection,
 } from "@/lib/product-size-charts";
@@ -135,7 +135,7 @@ export function SizeChartEditor({
   };
 
   const loadFromTemplate = () => {
-    const template = sizeChartForProduct({
+    const template = catalogSizeChartTemplate({
       sku: productSku,
       name: productName,
       slug: productSlug,
@@ -177,9 +177,9 @@ export function SizeChartEditor({
         <div>
           <div className="text-sm font-medium">Size chart</div>
           <p className="text-xs text-muted-foreground mt-0.5 leading-snug max-w-xl">
-            Drives the storefront size guide and calculator. Download the filled example Excel,
-            edit the numbers, then Import Excel. 0-3M is a from–to range; later sizes are upper
-            values. Leave empty to use the catalog SKU fallback.
+            Drives the storefront size guide and calculator. The guide stays hidden until you
+            Import Excel, Start editing (with numbers), or Load from catalog, then Save.
+            0-3M is a from–to range; later sizes are upper values.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
@@ -253,7 +253,8 @@ export function SizeChartEditor({
 
       {!chart ? (
         <p className="text-xs text-muted-foreground">
-          No product chart saved — storefront will use the hardcoded SKU map when available.
+          No product chart saved — the storefront will hide the size guide until you import
+          Excel or load a catalog template and save.
         </p>
       ) : (
         <>

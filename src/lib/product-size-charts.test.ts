@@ -9,6 +9,7 @@ import {
   parseProductSizeChart,
   serializeProductSizeChart,
   resolveSizeChartSku,
+  catalogSizeChartTemplate,
   sizeChartForProduct,
   SIZE_CHARTS_BY_SKU,
 } from "./product-size-charts";
@@ -69,7 +70,8 @@ describe("product size charts", () => {
     ];
     for (const sku of skus) {
       expect(SIZE_CHARTS_BY_SKU[sku], sku).toBeTruthy();
-      expect(sizeChartForProduct({ sku })?.code).toMatch(/^MnM-\d+$/);
+      expect(catalogSizeChartTemplate({ sku })?.code).toMatch(/^MnM-\d+$/);
+      expect(sizeChartForProduct({ sku })).toBeNull();
     }
   });
 
@@ -88,14 +90,14 @@ describe("product size charts", () => {
   });
 
   it("includes garment + bottoms sections for set products", () => {
-    const chart = sizeChartForProduct({ sku: "FRONT-OPEN-VEST-SLEEVELESS-SHORT-SET" });
+    const chart = catalogSizeChartTemplate({ sku: "FRONT-OPEN-VEST-SLEEVELESS-SHORT-SET" });
     expect(chart?.sections.map((s) => s.title)).toEqual(["Vest", "Shorts"]);
     expect(chart?.sections[0]?.rows.find((r) => r.label === "Chest width")?.values["0-3M"]).toBe(23);
     expect(chart?.sections[1]?.rows.find((r) => r.label === "Inseam")?.values["18-24M"]).toBe(9);
   });
 
   it("keeps MnM-13 body-suit half-chest values from the approved sheet", () => {
-    const chart = sizeChartForProduct({ sku: "BODY-SUIT-HALF-SLEEVE" });
+    const chart = catalogSizeChartTemplate({ sku: "BODY-SUIT-HALF-SLEEVE" });
     expect(chart?.code).toBe("MnM-13");
     expect(chart?.sections[0]?.rows.find((r) => r.label === "Chest (½)")?.values).toEqual({
       "0-3M": 21,
@@ -107,7 +109,7 @@ describe("product size charts", () => {
   });
 
   it("filters age columns to sizes the product sells", () => {
-    const full = sizeChartForProduct({ sku: "BASIC-SHORTS" })!;
+    const full = catalogSizeChartTemplate({ sku: "BASIC-SHORTS" })!;
     const filtered = filterSizeChartToProductSizes(full, ["0-3 M", "3-6 M", "6-12 M"]);
     expect(filtered.sections[0]?.bands).toEqual(["0-3M", "3-6M", "6-12M"]);
     expect(filtered.sections[0]?.rows[0]?.values["12-18M"]).toBeUndefined();
@@ -115,7 +117,7 @@ describe("product size charts", () => {
   });
 
   it("leaves common-size charts unchanged when filtering", () => {
-    const chart = sizeChartForProduct({ sku: "BABY-SWADDLE" })!;
+    const chart = catalogSizeChartTemplate({ sku: "BABY-SWADDLE" })!;
     const filtered = filterSizeChartToProductSizes(chart, ["One Size"]);
     expect(filtered.sections[0]?.bands).toEqual(["Single size"]);
     expect(filtered.sections[0]?.rows[0]?.values["Single size"]).toBe(100);
@@ -145,24 +147,25 @@ describe("product size charts", () => {
     expect(chart?.sections[0]?.rows[0]?.values["0-3M"]).toBe(20);
   });
 
-  it("falls back to SKU map when product sizeChart is empty", () => {
+  it("does not fall back to the SKU map when product sizeChart is empty", () => {
     expect(
       sizeChartForProduct({
         sku: "BASIC-SHORTS",
         sizeChart: { code: "", title: "", tolerance: "", sections: [] },
-      })?.code,
-    ).toBe("MnM-8");
+      }),
+    ).toBeNull();
+    expect(catalogSizeChartTemplate({ sku: "BASIC-SHORTS" })?.code).toBe("MnM-8");
   });
 
-  it("treats empty starter charts as unusable and keeps the SKU fallback", () => {
+  it("treats empty starter charts as unusable with no storefront fallback", () => {
     const starter = emptySizeChart({ title: "Draft", code: "" });
     expect(isUsableSizeChart(starter)).toBe(false);
     expect(
       sizeChartForProduct({
         sku: "BASIC-SHORTS",
         sizeChart: starter,
-      })?.code,
-    ).toBe("MnM-8");
+      }),
+    ).toBeNull();
   });
 
   it("reads blank chest/length cells as null, not 0", () => {
@@ -188,7 +191,7 @@ describe("product size charts", () => {
   });
 
   it("extracts length and chest fit points from MnM garment rows", () => {
-    const vest = sizeChartForProduct({ sku: "FRONT-OPEN-VEST-SLEVELESS" })!;
+    const vest = catalogSizeChartTemplate({ sku: "FRONT-OPEN-VEST-SLEVELESS" })!;
     expect(fitPointsFromSizeChart(vest)).toEqual([
       { band: "0-3M", lengthCm: 28, chestCm: 23 },
       { band: "3-6M", lengthCm: 30, chestCm: 24 },
@@ -197,14 +200,14 @@ describe("product size charts", () => {
       { band: "18-24M", lengthCm: 36, chestCm: 27 },
     ]);
 
-    const frock = sizeChartForProduct({ sku: "BABY-FRONT-OPEN-FROCK-HALF-SLEEVE" })!;
+    const frock = catalogSizeChartTemplate({ sku: "BABY-FRONT-OPEN-FROCK-HALF-SLEEVE" })!;
     expect(fitPointsFromSizeChart(frock)[0]).toEqual({
       band: "0-3M",
       lengthCm: 30,
       chestCm: 24,
     });
 
-    const shorts = sizeChartForProduct({ sku: "BASIC-SHORTS" })!;
+    const shorts = catalogSizeChartTemplate({ sku: "BASIC-SHORTS" })!;
     expect(fitPointsFromSizeChart(shorts)[0]).toEqual({
       band: "0-3M",
       lengthCm: 17,

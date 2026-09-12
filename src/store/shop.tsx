@@ -28,6 +28,7 @@ import {
   listMyWishlist,
   replaceMyCart,
   replaceMyWishlist,
+  type PersistedCoupon,
 } from "@/lib/account.functions";
 import { toast } from "sonner";
 
@@ -97,6 +98,10 @@ function readJson<T>(key: string, fallback: T): T {
   }
 }
 
+function localStorageHasKey(key: string): boolean {
+  return localStorage.getItem(key) != null;
+}
+
 function isCartItem(raw: unknown): raw is CartItem {
   if (!raw || typeof raw !== "object") return false;
   const row = raw as Partial<CartItem>;
@@ -151,8 +156,11 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   const lastSyncedWishlistRef = useRef<string[]>([]);
   const wishlistPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wishlistPersistSeqRef = useRef(0);
+  const cartPersistSeqRef = useRef(0);
+  const wishlistLatestRef = useRef<string[]>([]);
   const userEditedDuringSyncRef = useRef(false);
   const [accountSyncReady, setAccountSyncReady] = useState(() => userId == null);
+  wishlistLatestRef.current = wishlist;
 
   useLayoutEffect(() => {
     if (authLoading) return;
@@ -179,6 +187,8 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     let nextWish: string[] = [];
     let nextCoupon: AppliedCoupon | null = null;
     if (userId != null) {
+      const wishKeyPresent = localStorageHasKey(wKey);
+      const cartKeyPresent = localStorageHasKey(cKey);
       nextCart = coerceCart(readJson<unknown>(cKey, []));
       nextWish = normalizeWishlistIds(readJson<string[]>(wKey, []));
       nextCoupon = coerceCoupon(readJson<PersistedCoupon>(couponKey, null));
@@ -190,31 +200,43 @@ export function ShopProvider({ children }: { children: ReactNode }) {
         const localWish = nextWish;
         const localCart = nextCart;
         const localCoupon = nextCoupon;
+        const localWishEmptyAuthoritative = wishKeyPresent && localWish.length === 0;
+        const localCartEmptyAuthoritative = cartKeyPresent && localCart.length === 0;
         try {
           const [wishRes, cartRes] = await Promise.all([listMyWishlist(), listMyCart()]);
           if (wishlistSyncRef.current !== wishSyncId) return;
 
           let serverWish = normalizeWishlistIds(wishRes.product_ids);
-          if (serverWish.length === 0 && localWish.length > 0) {
+          if (localWishEmptyAuthoritative) {
+            if (serverWish.length > 0) {
+              serverWish = normalizeWishlistIds((await replaceMyWishlist([])).product_ids);
+            }
+          } else if (serverWish.length === 0 && localWish.length > 0) {
             serverWish = normalizeWishlistIds((await replaceMyWishlist(localWish)).product_ids);
           }
           if (wishlistSyncRef.current !== wishSyncId) return;
           if (!userEditedDuringSyncRef.current) {
-            setWishlist(serverWish);
-            localStorage.setItem(wKey, JSON.stringify(serverWish));
-            lastSyncedWishlistRef.current = serverWish;
+            const nextWishState = localWishEmptyAuthoritative ? localWish : serverWish;
+            setWishlist(nextWishState);
+            localStorage.setItem(wKey, JSON.stringify(nextWishState));
+            lastSyncedWishlistRef.current = nextWishState;
           }
 
           const serverCart = coerceCart(cartRes.items);
           const serverCoupon = coerceCoupon(cartRes.coupon);
-          const adoptServer = !(serverCart.length === 0 && localCart.length > 0);
-          if (!adoptServer) {
+          const uploadLocalCart = serverCart.length === 0 && localCart.length > 0;
+          if (localCartEmptyAuthoritative) {
+            if (serverCart.length > 0) {
+              await replaceMyCart(localCart, localCoupon);
+            }
+          } else if (uploadLocalCart) {
             await replaceMyCart(localCart, localCoupon);
           }
           if (wishlistSyncRef.current !== wishSyncId) return;
           if (!userEditedDuringSyncRef.current) {
-            const nextCartState = adoptServer ? serverCart : localCart;
-            const nextCouponState = adoptServer ? serverCoupon : localCoupon;
+            const keepLocalCart = localCartEmptyAuthoritative || uploadLocalCart;
+            const nextCartState = keepLocalCart ? localCart : serverCart;
+            const nextCouponState = keepLocalCart ? localCoupon : serverCoupon;
             setCart(nextCartState);
             localStorage.setItem(cKey, JSON.stringify(nextCartState));
             setAppliedCoupon(nextCouponState);
@@ -257,12 +279,27 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(wKey, JSON.stringify(wishlist));
     if (appliedCoupon) localStorage.setItem(couponKey, JSON.stringify(appliedCoupon));
     else localStorage.removeItem(couponKey);
-    void replaceMyCart(cart, appliedCoupon).catch(() => {});
+
+    const cartSeq = ++cartPersistSeqRef.current;
+    void (async () => {
+      try {
+        await replaceMyCart(cart, appliedCoupon);
+      } catch {
+        try {
+          await replaceMyCart(cart, appliedCoupon);
+        } catch {
+          if (cartPersistSeqRef.current === cartSeq) {
+            toast.error("Could not update your bag. Please try again.");
+          }
+        }
+      }
+    })();
 
     if (wishlistPersistTimerRef.current) clearTimeout(wishlistPersistTimerRef.current);
     const wishlistToSync = wishlist;
     const persistSeq = ++wishlistPersistSeqRef.current;
-    wishlistPersistTimerRef.current = setTimeout(() => {
+    const persistWishlist = () => {
+      wishlistPersistTimerRef.current = null;
       void replaceMyWishlist(wishlistToSync)
         .then(() => {
           if (wishlistPersistSeqRef.current !== persistSeq) return;
@@ -275,12 +312,39 @@ export function ShopProvider({ children }: { children: ReactNode }) {
           localStorage.setItem(wKey, JSON.stringify(rollback));
           toast.error("Could not update your wishlist. Please try again.");
         });
-    }, 300);
+    };
+    if (wishlistToSync.length === 0) {
+      persistWishlist();
+    } else {
+      wishlistPersistTimerRef.current = setTimeout(persistWishlist, 300);
+    }
 
     return () => {
-      if (wishlistPersistTimerRef.current) clearTimeout(wishlistPersistTimerRef.current);
+      if (!wishlistPersistTimerRef.current) return;
+      clearTimeout(wishlistPersistTimerRef.current);
+      wishlistPersistTimerRef.current = null;
+      if (wishlistToSync.length === 0) persistWishlist();
     };
   }, [cart, wishlist, appliedCoupon, cKey, wKey, couponKey, scopeKey, authLoading, userId, accountSyncReady]);
+
+  useEffect(() => {
+    if (userId == null) return;
+    const flushPendingWishlist = () => {
+      if (!wishlistPersistTimerRef.current) return;
+      clearTimeout(wishlistPersistTimerRef.current);
+      wishlistPersistTimerRef.current = null;
+      const ids = wishlistLatestRef.current;
+      const persistSeq = ++wishlistPersistSeqRef.current;
+      void replaceMyWishlist(ids)
+        .then(() => {
+          if (wishlistPersistSeqRef.current !== persistSeq) return;
+          lastSyncedWishlistRef.current = ids;
+        })
+        .catch(() => {});
+    };
+    window.addEventListener("pagehide", flushPendingWishlist);
+    return () => window.removeEventListener("pagehide", flushPendingWishlist);
+  }, [userId]);
 
   const addToCart: ShopState["addToCart"] = (p, opts = {}) => {
     if (userId == null) {
