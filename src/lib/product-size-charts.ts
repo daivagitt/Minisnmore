@@ -551,7 +551,7 @@ export function parseProductSizeChart(raw: unknown): ProductSizeChart | null {
   return !invalid && isUsableSizeChart(chart) ? chart : null;
 }
 
-/** Approved SKU/name template for admin “Load from catalog” and the storefront calculator. */
+/** Approved SKU/name template for admin “Load from catalog”. */
 export function catalogSizeChartTemplate(input: {
   sku?: string | null;
   name?: string | null;
@@ -564,7 +564,7 @@ export function catalogSizeChartTemplate(input: {
 
 /**
  * Product chart when admin saved one; otherwise the SKU catalog template.
- * The PDP size-guide button stays gated on the saved chart only.
+ * The PDP size-guide button and size calculator stay gated on the saved chart only.
  */
 export function sizeChartForProduct(input: {
   sku?: string | null;

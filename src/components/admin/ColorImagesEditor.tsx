@@ -1,4 +1,4 @@
-import { Loader2, Upload, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, GripVertical, Loader2, Upload, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Field } from "@/components/admin/AdminPage";
@@ -13,10 +13,19 @@ import {
   colorNames,
   ensureColorEntries,
   hexForColorName,
+  moveItem,
   type ProductColorEntry,
 } from "@/lib/product-colors";
 import { getUserErrorMessage, showApiError } from "@/lib/ui-errors";
 import { sanitizePublicUrl, toDirectDownloadUrl } from "@/lib/utils";
+
+function parseGalleryDrag(raw: string): { color: number; image: number } | null {
+  const [colorRaw, imageRaw] = raw.split(":");
+  const color = Number(colorRaw);
+  const image = Number(imageRaw);
+  if (!Number.isInteger(color) || !Number.isInteger(image)) return null;
+  return { color, image };
+}
 
 function previewUrl(url: string): string {
   const direct = toDirectDownloadUrl(url.trim());
@@ -72,6 +81,7 @@ export function ColorImagesEditor({
   onPatchColor,
   onGalleryUploaded,
   onSwatchUploaded,
+  freezeSwatches = false,
 }: {
   colors: ProductColorEntry[];
   onPatchColor: (index: number, patch: Partial<ProductColorEntry>) => void;
@@ -79,10 +89,14 @@ export function ColorImagesEditor({
   onGalleryUploaded?: (patch: { index: number; imageUrls: string[] }) => void | Promise<void>;
   /** Persist swatch URL immediately after upload. */
   onSwatchUploaded?: (patch: { index: number; swatchUrl: string }) => void | Promise<void>;
+  /** Print swatches come from Zoho pull — show read-only previews. */
+  freezeSwatches?: boolean;
 }) {
   const normalizedColors = ensureColorEntries(colors);
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [dragging, setDragging] = useState<{ color: number; image: number } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ color: number; image: number } | null>(null);
 
   const names = colorNames(normalizedColors);
   if (!names.length) {
@@ -170,19 +184,32 @@ export function ColorImagesEditor({
     }
     if (!urls.length) return;
     const imageUrls = [...current, ...urls].slice(0, MAX_COLOR_IMAGES);
-    onPatchColor(index, { imageUrls });
     toast.success(`${urls.length} gallery image(s) uploaded for ${entry.name}.`);
+    await persistGallery(index, imageUrls);
+  };
+
+  const persistGallery = async (index: number, imageUrls: string[]) => {
+    onPatchColor(index, { imageUrls });
     try {
       await onGalleryUploaded?.({ index, imageUrls });
     } catch {
-      toast.error("Gallery uploaded but could not auto-save — click Save on the product.");
+      toast.error("Gallery updated but could not auto-save — click Save on the product.");
     }
   };
 
   const removeGalleryImage = (index: number, url: string) => {
     const entry = normalizedColors[index];
     if (!entry) return;
-    onPatchColor(index, { imageUrls: colorImageUrls(entry).filter((item) => item !== url) });
+    void persistGallery(index, colorImageUrls(entry).filter((item) => item !== url));
+  };
+
+  const moveGalleryImage = (index: number, from: number, to: number) => {
+    const entry = normalizedColors[index];
+    if (!entry) return;
+    const current = colorImageUrls(entry);
+    const imageUrls = moveItem(current, from, to);
+    if (imageUrls.every((url, i) => url === current[i])) return;
+    void persistGallery(index, imageUrls);
   };
 
   return (
@@ -199,7 +226,14 @@ export function ColorImagesEditor({
         </p>
       ) : null}
 
-      <Field label="Print swatches">
+      <Field
+        label="Print swatches"
+        hint={
+          freezeSwatches
+            ? "Swatches are frozen after Zoho inventory sync."
+            : undefined
+        }
+      >
         <ImageSpecHint spec={ADMIN_IMAGE_SPECS.printSwatch} className="mb-2" />
         <div className="grid gap-3 sm:grid-cols-2">
           {normalizedColors.map((entry, index) => {
@@ -228,17 +262,12 @@ export function ColorImagesEditor({
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {swatch ? (
-                    <div className="relative h-20 w-20 rounded-xl overflow-hidden ring-1 ring-border group shrink-0">
+                    <div className="relative h-20 w-20 rounded-xl overflow-hidden ring-1 ring-border shrink-0">
                       <img src={previewUrl(swatch)} alt="" loading="lazy" className="h-full w-full object-cover" />
-                      <button
-                        type="button"
-                        title="Remove swatch"
-                        disabled={!!uploadingKey}
-                        onClick={() => onPatchColor(index, { swatchUrl: undefined })}
-                        className="absolute top-1 right-1 h-5 w-5 grid place-items-center rounded-full bg-foreground/70 text-background opacity-0 group-hover:opacity-100 transition"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
+                    </div>
+                  ) : freezeSwatches ? (
+                    <div className="h-20 w-20 shrink-0 rounded-xl border border-dashed border-border/60 bg-muted/20 grid place-items-center px-1">
+                      <p className="text-[9px] text-center text-muted-foreground leading-tight">No swatch</p>
                     </div>
                   ) : (
                     <UploadTile
@@ -260,9 +289,8 @@ export function ColorImagesEditor({
       <Field label="Colour gallery (main product photos)">
         <ImageSpecHint spec={ADMIN_IMAGE_SPECS.productGallery} className="mb-2" />
         <p className="text-xs text-muted-foreground mb-3">
-          When a shopper selects a colour, these photos are used if that colour has only one size.
-          Same colour / different sizes use the photo stored on each variant row (Zoho item image only).
-          Up to {MAX_COLOR_IMAGES} images per colour.
+          First photo is the main product image for this colour. Drag photos to reorder, or use
+          the arrows. Up to {MAX_COLOR_IMAGES} images per colour.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           {normalizedColors.map((entry, index) => {
@@ -280,20 +308,104 @@ export function ColorImagesEditor({
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {gallery.map((url) => (
-                    <div key={url} className="relative h-20 w-20 rounded-xl overflow-hidden ring-1 ring-border group shrink-0">
-                      <img src={previewUrl(url)} alt="" loading="lazy" className="h-full w-full object-cover" />
+                  {gallery.map((url, imageIndex) => {
+                    const isDragging =
+                      dragging?.color === index && dragging.image === imageIndex;
+                    const isDropTarget =
+                      dropTarget?.color === index && dropTarget.image === imageIndex && !isDragging;
+                    const canDrag = !uploadingKey && gallery.length > 1;
+                    return (
+                    <div
+                      key={url}
+                      draggable={canDrag}
+                      onDragStart={(event) => {
+                        if (!canDrag) {
+                          event.preventDefault();
+                          return;
+                        }
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData("text/plain", `${index}:${imageIndex}`);
+                        setDragging({ color: index, image: imageIndex });
+                      }}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = "move";
+                        if (!isDropTarget) setDropTarget({ color: index, image: imageIndex });
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        const payload = parseGalleryDrag(event.dataTransfer.getData("text/plain"));
+                        setDragging(null);
+                        setDropTarget(null);
+                        if (!payload || payload.color !== index) return;
+                        moveGalleryImage(index, payload.image, imageIndex);
+                      }}
+                      onDragEnd={() => {
+                        setDragging(null);
+                        setDropTarget(null);
+                      }}
+                      aria-grabbed={isDragging || undefined}
+                      aria-label={`Reorder ${entry.name} image ${imageIndex + 1}`}
+                      className={`relative h-20 w-20 rounded-xl overflow-hidden ring-1 ring-border group shrink-0 ${
+                        canDrag ? "cursor-grab active:cursor-grabbing" : ""
+                      } ${isDragging ? "opacity-40" : ""} ${
+                        isDropTarget ? "ring-2 ring-primary" : ""
+                      }`}
+                    >
+                      <img
+                        src={previewUrl(url)}
+                        alt=""
+                        loading="lazy"
+                        draggable={false}
+                        className="h-full w-full object-cover pointer-events-none"
+                      />
+                      {canDrag ? (
+                        <span className="absolute top-1 left-1 h-5 w-5 grid place-items-center rounded-full bg-foreground/70 text-background">
+                          <GripVertical className="h-3 w-3" aria-hidden />
+                        </span>
+                      ) : null}
+                      {imageIndex === 0 ? (
+                        <span className="absolute bottom-1 left-1 rounded bg-foreground/70 px-1 text-[8px] leading-tight text-background">
+                          Main
+                        </span>
+                      ) : null}
+                      <div className="absolute bottom-1 right-1 flex gap-0.5">
+                        <button
+                          type="button"
+                          title="Move left"
+                          aria-label={`Move ${entry.name} image ${imageIndex + 1} left`}
+                          disabled={!!uploadingKey || imageIndex === 0}
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onClick={() => moveGalleryImage(index, imageIndex, imageIndex - 1)}
+                          className="h-5 w-5 grid place-items-center rounded-full bg-foreground/70 text-background disabled:opacity-30"
+                        >
+                          <ChevronLeft className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          title="Move right"
+                          aria-label={`Move ${entry.name} image ${imageIndex + 1} right`}
+                          disabled={!!uploadingKey || imageIndex === gallery.length - 1}
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onClick={() => moveGalleryImage(index, imageIndex, imageIndex + 1)}
+                          className="h-5 w-5 grid place-items-center rounded-full bg-foreground/70 text-background disabled:opacity-30"
+                        >
+                          <ChevronRight className="h-3 w-3" />
+                        </button>
+                      </div>
                       <button
                         type="button"
                         title="Remove gallery image"
                         disabled={!!uploadingKey}
+                        onPointerDown={(event) => event.stopPropagation()}
                         onClick={() => removeGalleryImage(index, url)}
                         className="absolute top-1 right-1 h-5 w-5 grid place-items-center rounded-full bg-foreground/70 text-background opacity-0 group-hover:opacity-100 transition"
                       >
                         <X className="h-3 w-3" />
                       </button>
                     </div>
-                  ))}
+                    );
+                  })}
                   {canAdd ? (
                     <UploadTile
                       busy={busy}

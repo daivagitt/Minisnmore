@@ -3,7 +3,8 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { Product } from "@/data/products";
 import { useProduct, useProducts, useProductsLoaded } from "@/hooks/useProducts";
 import { useShop } from "@/store/shop";
-import { Heart, Truck, Leaf, ChevronRight, Ruler, Plus, Minus, Share2, Banknote, RotateCcw, X } from "lucide-react";
+import { Heart, Truck, Leaf, ChevronRight, Plus, Minus, Share2, Banknote, RotateCcw, X } from "lucide-react";
+import { ProductSizeCalculator } from "@/components/ProductSizeCalculator";
 import { ProductInfoSections } from "@/components/ProductInfoSections";
 import { toast } from "sonner";
 import { ProductCard } from "@/components/ProductCard";
@@ -144,8 +145,10 @@ function ProductPage() {
     [product, availableFitSizes],
   );
 
+  const hasConfiguredSizeChart = isUsableSizeChart(product?.sizeChart);
+
   const sizeFit = useMemo(() => {
-    if (!product || (!lengthCm.trim() && !chestCm.trim())) return null;
+    if (!hasConfiguredSizeChart || !product || (!lengthCm.trim() && !chestCm.trim())) return null;
     const result = checkSizeFit({
       lengthCm,
       chestCm,
@@ -156,7 +159,7 @@ function ProductPage() {
       sizeChart: product.sizeChart,
     });
     return result.ok ? { size: result.size } : { error: result.error };
-  }, [lengthCm, chestCm, product, availableFitSizes]);
+  }, [hasConfiguredSizeChart, lengthCm, chestCm, product, availableFitSizes]);
 
   useEffect(() => {
     if (!sizeFit || !("size" in sizeFit)) return;
@@ -186,7 +189,12 @@ function ProductPage() {
       sizeChart: product.sizeChart,
     });
   }, [product]);
-  const hasConfiguredSizeChart = isUsableSizeChart(product?.sizeChart);
+
+  useEffect(() => {
+    if (hasConfiguredSizeChart) return;
+    setLengthCm("");
+    setChestCm("");
+  }, [hasConfiguredSizeChart]);
 
   const handleAdd = () => {
     if (!product || !canAdd) {
@@ -317,61 +325,15 @@ function ProductPage() {
             )}
           </div>
 
-          {fitLimits ? (
-          <div className="glass rounded-xl p-3 space-y-2">
-            <div className="flex items-center gap-2 text-xs font-medium">
-              <Ruler className="h-3.5 w-3.5 text-primary shrink-0" />
-              Size calculator
-            </div>
-            {sizeFit && "size" in sizeFit ? (
-              <p className="text-xs text-muted-foreground leading-snug">
-                Auto-selected <span className="text-primary font-medium">{sizeFit.size}</span> from
-                {lengthCm.trim() && chestCm.trim()
-                  ? " length and chest"
-                  : lengthCm.trim()
-                    ? " length"
-                    : " chest"}
-                .
-              </p>
-            ) : sizeFit && "error" in sizeFit ? (
-              <p className="text-destructive text-xs leading-snug line-clamp-2">{sizeFit.error}</p>
-            ) : (
-              <p className="text-[11px] text-muted-foreground leading-snug">
-                Enter length or chest (cm) from the size guide to pick a size automatically.
-              </p>
-            )}
-            <div className={`grid gap-2 ${fitLimits.hasLength && fitLimits.hasChest ? "grid-cols-1 min-[400px]:grid-cols-2" : "grid-cols-1"}`}>
-              {fitLimits.hasLength ? (
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min={fitLimits.lengthMin}
-                  max={fitLimits.lengthMax}
-                  step="0.1"
-                  value={lengthCm}
-                  onChange={(e) => setLengthCm(e.target.value)}
-                  placeholder={`Length (${fitLimits.lengthMin}–${fitLimits.lengthMax} cm)`}
-                  aria-label="Garment length in centimetres"
-                  className="h-10 glass rounded-full px-3 sm:px-4 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40 min-w-0 w-full"
-                />
-              ) : null}
-              {fitLimits.hasChest ? (
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min={fitLimits.chestMin}
-                  max={fitLimits.chestMax}
-                  step="0.1"
-                  value={chestCm}
-                  onChange={(e) => setChestCm(e.target.value)}
-                  placeholder={`Chest (${fitLimits.chestMin}–${fitLimits.chestMax} cm)`}
-                  aria-label="Chest width in centimetres"
-                  className="h-10 glass rounded-full px-3 sm:px-4 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40 min-w-0 w-full"
-                />
-              ) : null}
-            </div>
-          </div>
-          ) : null}
+          <ProductSizeCalculator
+            configured={hasConfiguredSizeChart}
+            limits={fitLimits}
+            lengthCm={lengthCm}
+            chestCm={chestCm}
+            onLengthChange={setLengthCm}
+            onChestChange={setChestCm}
+            sizeFit={sizeFit}
+          />
 
           <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-3 sm:items-start">
             <div>
