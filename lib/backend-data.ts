@@ -12,6 +12,7 @@ import {
   toDirectDownloadUrl,
 } from "@/lib/utils";
 import { assertAllowedImageFile, type AdminImageFolder } from "@/lib/admin-image";
+import { assertAllowedPdfFile } from "@/lib/admin-pdf";
 import {
   collectStorefrontCardImages,
   buildColorImagesJson,
@@ -1072,6 +1073,7 @@ export type SiteSettingsRow = Record<string, string | number | boolean | null | 
   cod_fee_inr?: number | null;
   delivery_eta_buffer_days?: number | null;
   store_discount_percent?: number | null;
+  about_page_json?: string | null;
 };
 
 const siteStringMap: Record<string, string> = {
@@ -1106,6 +1108,7 @@ const siteStringMap: Record<string, string> = {
   subscribe_badges_json: "subscribeBadgesJson",
   subscribe_plans_json: "subscribePlansJson",
   subscribe_features_json: "subscribeFeaturesJson",
+  about_page_json: "aboutPageJson",
 };
 
 function fromSiteSettingDto(dto: Record<string, unknown> | null): SiteSettingsRow | null {
@@ -1169,6 +1172,14 @@ export type SubscribePageContent = {
 
 export const getSubscribePage = () =>
   api.get<SubscribePageContent | null>("/api/v1/subscribe-page").then((row) => row ?? {});
+
+export type AboutPageApiContent = {
+  about_page_json?: string;
+};
+
+export const getAboutPage = () =>
+  api.get<AboutPageApiContent | null>("/api/v1/about-page").then((row) => row ?? {});
+
 export const getAdminSiteSettings = () =>
   api
     .get<Record<string, unknown> | null>("/api/v1/admin/site-settings", { auth: true })
@@ -1276,6 +1287,22 @@ function shouldFallbackToPresign(error: unknown) {
     }
   }
   return true;
+}
+
+export async function uploadAdminCataloguePdf(file: File) {
+  assertAllowedPdfFile(file);
+  const form = new FormData();
+  const filename = file.name?.trim() || "e-catalogue.pdf";
+  form.append("file", file, filename);
+  const uploaded = await api.post<unknown>("/api/v1/admin/uploads/catalogue-pdf", form, { auth: true });
+  if (
+    !uploaded ||
+    typeof uploaded !== "object" ||
+    typeof (uploaded as { publicUrl?: unknown }).publicUrl !== "string"
+  ) {
+    throw new Error("Upload response missing publicUrl.");
+  }
+  return (uploaded as { publicUrl: string }).publicUrl;
 }
 
 /** Server-side upload first (reliable on R2); presign only as fallback. */

@@ -19,6 +19,7 @@ import {
   formatLedgerlySyncSummary,
   getAdminSiteSettings,
   getSiteSettings,
+  getAboutPage,
   getLedgerlyIntegrationStatus,
   getLedgerlySettings,
   pullLedgerlyInventory,
@@ -41,6 +42,7 @@ import {
   saveSiteSettings,
   saveLedgerlySettings,
   uploadAdminImage,
+  uploadAdminCataloguePdf,
 } from "./backend-data";
 import { emptySizeChart } from "./size-chart-excel";
 
@@ -573,6 +575,10 @@ describe("backend data API calls", () => {
     });
     expect(mockedApi.get).toHaveBeenLastCalledWith("/api/v1/admin/site-settings", { auth: true });
 
+    mockedApi.get.mockResolvedValueOnce({ about_page_json: "{\"hero_title\":\"Hi\"}" });
+    await expect(getAboutPage()).resolves.toEqual({ about_page_json: "{\"hero_title\":\"Hi\"}" });
+    expect(mockedApi.get).toHaveBeenLastCalledWith("/api/v1/about-page");
+
     mockedApi.put.mockResolvedValueOnce({ ok: true });
     await saveSiteSettings({
       brand_name: "Mini",
@@ -626,6 +632,29 @@ describe("backend data API calls", () => {
       }),
       { auth: true },
     );
+  });
+
+  it("uploads catalogue PDFs via the dedicated multipart endpoint", async () => {
+    const file = new File(["%PDF-1.4"], "soft-bloom.pdf", { type: "application/pdf" });
+    mockedApi.post.mockResolvedValueOnce({
+      publicUrl: "https://cdn.example.com/catalogues/soft-bloom.pdf",
+    });
+
+    await expect(uploadAdminCataloguePdf(file)).resolves.toBe(
+      "https://cdn.example.com/catalogues/soft-bloom.pdf",
+    );
+
+    const [path, body, options] = mockedApi.post.mock.calls.at(-1)!;
+    expect(path).toBe("/api/v1/admin/uploads/catalogue-pdf");
+    expect(options).toEqual({ auth: true });
+    expect(body).toBeInstanceOf(FormData);
+  });
+
+  it("rejects non-PDF catalogue uploads before calling the API", async () => {
+    await expect(uploadAdminCataloguePdf(new File(["x"], "photo.jpg"))).rejects.toThrow(
+      /PDF only/i,
+    );
+    expect(mockedApi.post).not.toHaveBeenCalled();
   });
 
   it("rejects unsupported image types before calling the upload API", async () => {
