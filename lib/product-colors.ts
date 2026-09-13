@@ -134,7 +134,22 @@ function parseColorImageUrls(o: {
     : [];
   const legacy =
     o.imageUrl == null || o.imageUrl === "" ? null : String(o.imageUrl).trim();
-  return uniqueUrls(legacy ? [legacy, ...fromArray] : fromArray).slice(0, MAX_COLOR_IMAGES);
+  if (!legacy) return uniqueUrls(fromArray).slice(0, MAX_COLOR_IMAGES);
+  if (!fromArray.length) return uniqueUrls([legacy]).slice(0, MAX_COLOR_IMAGES);
+  return uniqueUrls(fromArray.includes(legacy) ? fromArray : [...fromArray, legacy]).slice(
+    0,
+    MAX_COLOR_IMAGES,
+  );
+}
+
+/** Move one gallery URL without changing the relative order of the rest. */
+export function moveItem<T>(list: T[], from: number, to: number): T[] {
+  if (from === to) return [...list];
+  if (from < 0 || to < 0 || from >= list.length || to >= list.length) return [...list];
+  const next = [...list];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
 }
 
 /** Lifestyle / main-gallery images stored on a colour (excludes swatch). */

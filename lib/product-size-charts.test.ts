@@ -147,7 +147,7 @@ describe("product size charts", () => {
     expect(chart?.sections[0]?.rows[0]?.values["0-3M"]).toBe(20);
   });
 
-  it("falls back to SKU map for the calculator when product sizeChart is empty", () => {
+  it("falls back to SKU map when product sizeChart is empty", () => {
     expect(
       sizeChartForProduct({
         sku: "BASIC-SHORTS",

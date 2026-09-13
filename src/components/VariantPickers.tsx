@@ -41,7 +41,7 @@ export function VariantSizeButtons({
     <div className={cn("flex flex-wrap", gapClass)}>
       {sizes.map((s) => {
         const unavailable = isVariants && !sizeHasSellableVariants(product, s);
-        const selected = !readOnly && !unavailable && size === s;
+        const selected = !readOnly && size === s;
         const className = cn(
           SIZE_PILL_CLASS,
           selected ? "bg-primary text-primary-foreground" : "glass",

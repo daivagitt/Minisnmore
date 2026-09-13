@@ -32,7 +32,7 @@ if [ -d "${CURRENT_LINK}/dist/client/assets" ]; then
 fi
 
 rm -rf dist node_modules/.vite
-export VITE_API_BASE_URL="${VITE_API_BASE_URL:-https://uat.minisnmore.com}"
+export VITE_API_BASE_URL="${VITE_API_BASE_URL:-https://minisnmore.com}"
 npm run build
 
 if [ -n "$ASSET_BACKUP" ] && [ -d "$ASSET_BACKUP" ] && [ -d dist/client/assets ]; then

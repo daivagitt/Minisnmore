@@ -255,8 +255,8 @@ function ProductPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto w-full px-3 sm:px-4 md:px-6 space-y-6 sm:space-y-8 md:space-y-10 pb-28 sm:pb-24 lg:pb-12 overflow-x-hidden">
-      <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+    <div className="max-w-7xl mx-auto w-full px-3 sm:px-4 md:px-6 pb-28 sm:pb-24 lg:pb-12 overflow-x-hidden">
+      <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap pt-1 pb-3 md:pb-4">
         <Link to="/" className="hover:text-foreground">Home</Link><ChevronRight className="h-3 w-3" />
         <Link to="/shop" className="hover:text-foreground">Shop</Link><ChevronRight className="h-3 w-3" />
         <span className="truncate">{product.name}</span>
@@ -267,7 +267,7 @@ function ProductPage() {
           name={product.name}
           image={colorGallery.image}
           gallery={colorGallery.gallery}
-          className="lg:sticky lg:top-24"
+          className="lg:sticky lg:top-2"
         />
 
         <div className="flex flex-col gap-3 min-w-0 w-full">
@@ -439,12 +439,12 @@ function ProductPage() {
             ))}
           </div>
         </div>
+
+        <ProductInfoSections product={product} />
         </div>
       </div>
 
-      <ProductInfoSections product={product} />
-
-      <section className="space-y-6">
+      <section className="space-y-6 mt-6 sm:mt-8 md:mt-10">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4 sm:mb-6">
           <div className="min-w-0">
             <div className="text-xs uppercase tracking-[0.28em] text-muted-foreground">You may also love</div>

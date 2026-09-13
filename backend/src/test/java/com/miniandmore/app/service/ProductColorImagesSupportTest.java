@@ -262,6 +262,31 @@ class ProductColorImagesSupportTest {
     }
 
     @Test
+    void mergeFrozenColorMedia_ignoresAdminSwatchUploads() {
+        String matrixColors = "[\"AQUA\",\"Baby Blue\"]";
+        String adminColors =
+            "[{\"name\":\"AQUA\",\"swatchUrl\":\"https://cdn.example.com/new-aqua.jpg\"}," +
+            "{\"name\":\"Baby Blue\",\"imageUrls\":[\"https://cdn.example.com/gallery.jpg\"]}]";
+
+        String merged = support.mergeFrozenColorMedia(matrixColors, adminColors);
+
+        assertThat(merged).doesNotContain("new-aqua.jpg").contains("gallery.jpg");
+    }
+
+    @Test
+    void freezeSwatchesFromStored_restoresSwatchBySlotWhenZohoRenamedPrint() {
+        String currentColors = "[\"AQUA\",\"Baby Blue\"]";
+        String frozenColors =
+            "[{\"name\":\"OLD AQUA\",\"swatchUrl\":\"https://cdn.example.com/aqua.jpg\"}," +
+            "{\"name\":\"OLD BLUE\",\"swatchUrl\":\"https://cdn.example.com/blue.jpg\"}]";
+
+        String merged = support.freezeSwatchesFromStored(currentColors, frozenColors);
+
+        assertThat(merged).contains("\"name\":\"AQUA\"").contains("aqua.jpg");
+        assertThat(merged).contains("\"name\":\"Baby Blue\"").contains("blue.jpg");
+    }
+
+    @Test
     void applyGalleryMapToColorsJson_buildsFromEmptyColorsJson() {
         Map<String, List<String>> gallery = Map.of("Navy", List.of("https://cdn.example.com/navy.jpg"));
 
@@ -445,5 +470,33 @@ class ProductColorImagesSupportTest {
     @Test
     void collectSwatchUrlsFromColorsJson_blank_returnsEmpty() {
         assertThat(support.collectSwatchUrlsFromColorsJson(null)).isEmpty();
+    }
+
+    @Test
+    void galleryMapFromColorsJson_doesNotPromoteImageUrlAheadOfImageUrls() {
+        String colorsJson =
+            "[{\"name\":\"Print\",\"imageUrl\":\"https://cdn.example.com/a.jpg\",\"imageUrls\":[\"https://cdn.example.com/b.jpg\",\"https://cdn.example.com/a.jpg\",\"https://cdn.example.com/c.jpg\"]}]";
+
+        Map<String, List<String>> map = support.galleryMapFromColorsJson(colorsJson);
+
+        assertThat(map.get("Print")).containsExactly(
+            "https://cdn.example.com/b.jpg",
+            "https://cdn.example.com/a.jpg",
+            "https://cdn.example.com/c.jpg"
+        );
+    }
+
+    @Test
+    void galleryMapFromColorsJson_appendsImageUrlOnlyWhenMissingFromImageUrls() {
+        String colorsJson =
+            "[{\"name\":\"Print\",\"imageUrl\":\"https://cdn.example.com/extra.jpg\",\"imageUrls\":[\"https://cdn.example.com/b.jpg\",\"https://cdn.example.com/c.jpg\"]}]";
+
+        Map<String, List<String>> map = support.galleryMapFromColorsJson(colorsJson);
+
+        assertThat(map.get("Print")).containsExactly(
+            "https://cdn.example.com/b.jpg",
+            "https://cdn.example.com/c.jpg",
+            "https://cdn.example.com/extra.jpg"
+        );
     }
 }

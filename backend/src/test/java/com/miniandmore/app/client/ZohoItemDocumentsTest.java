@@ -34,7 +34,7 @@ class ZohoItemDocumentsTest {
     }
 
     @Test
-    void documentIdsForImport_prefersDocumentsOverStandaloneImageDocumentId() {
+    void documentIdsForImport_includesStandaloneFrontImageWhenMissingFromDocuments() {
         Map<String, Object> item = Map.of(
             "image_document_id",
             "front-99",
@@ -42,7 +42,22 @@ class ZohoItemDocumentsTest {
             List.of(Map.of("document_id", "doc-gallery"))
         );
 
-        assertThat(ZohoItemDocuments.documentIdsForImport(item)).containsExactly("doc-gallery");
+        assertThat(ZohoItemDocuments.documentIdsForImport(item)).containsExactly("front-99", "doc-gallery");
+    }
+
+    @Test
+    void documentIdsForImport_doesNotDuplicateFrontAlreadyListedInDocuments() {
+        Map<String, Object> item = Map.of(
+            "image_document_id",
+            "front-1",
+            "documents",
+            List.of(
+                Map.of("document_id", "front-1", "attachment_order", 1),
+                Map.of("document_id", "gallery-2", "attachment_order", 2)
+            )
+        );
+
+        assertThat(ZohoItemDocuments.documentIdsForImport(item)).containsExactly("front-1", "gallery-2");
     }
 
     @Test
@@ -66,5 +81,29 @@ class ZohoItemDocumentsTest {
 
         assertThat(ZohoItemDocuments.exposesDocuments(response)).isTrue();
         assertThat(ZohoItemDocuments.pluralDocumentIdsBeforeFrontImageDelete(response)).containsExactly("gallery-2");
+    }
+
+    @Test
+    void documentIdsForImport_sortsByAttachmentOrderWhenListIsReversed() {
+        Map<String, Object> item = Map.of(
+            "documents",
+            List.of(
+                Map.of("document_id", "doc-3", "attachment_order", 3),
+                Map.of("document_id", "doc-1", "attachment_order", 1),
+                Map.of("document_id", "doc-2", "attachment_order", 2)
+            )
+        );
+
+        assertThat(ZohoItemDocuments.documentIdsForImport(item)).containsExactly("doc-1", "doc-2", "doc-3");
+    }
+
+    @Test
+    void documentIdsForImport_keepsEncounterOrderWhenAttachmentOrderMissing() {
+        Map<String, Object> item = Map.of(
+            "documents",
+            List.of(Map.of("document_id", "later"), Map.of("document_id", "earlier"))
+        );
+
+        assertThat(ZohoItemDocuments.documentIdsForImport(item)).containsExactly("later", "earlier");
     }
 }

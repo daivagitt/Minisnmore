@@ -16,26 +16,39 @@ import {
   validateQuantity,
   validateVirtualFitFile,
 } from "./product-fit";
+import { catalogSizeChartTemplate } from "./product-size-charts";
 
+const vestChart = catalogSizeChartTemplate({ sku: "FRONT-OPEN-VEST-SLEVELESS" });
+const jablaChart = catalogSizeChartTemplate({ sku: "BOOK-STYLE-TYING-JABLA" });
+const shortsChart = catalogSizeChartTemplate({ sku: "BASIC-SHORTS" });
 const vestInput = {
   sku: "FRONT-OPEN-VEST-SLEVELESS",
   sizes: ["0-3 M", "3-6 M", "6-12 M", "12-18 M", "18-24 M"],
+  sizeChart: vestChart,
 };
 const vestSizesShort = {
   sku: "FRONT-OPEN-VEST-SLEVELESS",
   sizes: ["0-3 M", "3-6 M", "6-12 M"],
+  sizeChart: vestChart,
 };
 const jablaInput = {
   sku: "BOOK-STYLE-TYING-JABLA",
   sizes: ["0-3M", "3-6M", "6-12M", "12-18M", "18-24M"],
+  sizeChart: jablaChart,
 };
 const shortsInput = {
   sku: "BASIC-SHORTS",
   sizes: ["0-3M", "3-6M", "6-12M", "12-18M", "18-24M"],
+  sizeChart: shortsChart,
 };
 const now = new Date("2026-05-29T12:00:00");
 
 describe("product fit from MnM length/chest", () => {
+  it("uses the SKU catalog for fit limits when no product size chart is saved", () => {
+    expect(measurementLimitsForProduct({ sku: "FRONT-OPEN-VEST-SLEVELESS", sizes: vestInput.sizes })).not.toBeNull();
+    expect(measurementLimitsForProduct({ sku: "BASIC-SHORTS", sizes: shortsInput.sizes })?.hasLength).toBe(true);
+  });
+
   it("validates length and chest against product chart windows", () => {
     const limits = measurementLimitsForProduct(vestInput)!;
     expect(limits.hasLength).toBe(true);
@@ -79,6 +92,7 @@ describe("product fit from MnM length/chest", () => {
     const twoSizes = {
       sku: "FRONT-OPEN-VEST-SLEVELESS",
       sizes: ["0-3 M", "6-12 M"],
+      sizeChart: vestChart,
     };
     const rows = sizeGuideRowsForProduct({ ...twoSizes, availableOnly: true });
     expect(rows.map((r) => r.size)).toEqual(["0-3 M", "6-12 M"]);

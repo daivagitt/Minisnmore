@@ -446,6 +446,72 @@ public class ProductColorImagesSupport {
     }
 
     /**
+     * Admin save: matrix/Zoho print names are frozen; restore lifestyle gallery URLs from the admin
+     * payload by name, then by slot index. Swatches are frozen separately via
+     * {@link #freezeSwatchesFromStored}.
+     */
+    public String mergeFrozenColorMedia(String matrixColorsJson, String adminColorsJson) {
+        String galleriesOnly = mergeRichColorMetadata(matrixColorsJson, stripSwatchesFromColorsJson(adminColorsJson));
+        List<ColorEntry> admin = parseColorEntries(stripSwatchesFromColorsJson(adminColorsJson));
+        List<ColorEntry> merged = parseColorEntries(galleriesOnly);
+        if (admin.isEmpty() || merged.isEmpty()) {
+            return galleriesOnly;
+        }
+        List<ColorEntry> out = new ArrayList<>();
+        for (int i = 0; i < merged.size(); i++) {
+            ColorEntry entry = merged.get(i);
+            if (!entry.galleryUrls().isEmpty()) {
+                out.add(entry);
+                continue;
+            }
+            ColorEntry adminAtSlot = i < admin.size() ? admin.get(i) : null;
+            if (adminAtSlot != null && !adminAtSlot.galleryUrls().isEmpty()) {
+                out.add(new ColorEntry(entry.name(), entry.swatchUrl(), adminAtSlot.galleryUrls()));
+            } else {
+                out.add(entry);
+            }
+        }
+        return writeColorEntries(out);
+    }
+
+    /**
+     * Admin save: print swatches are frozen after Zoho pull — restore {@code swatchUrl} from stored
+     * {@code colors_json} by print name, then by slot index when Zoho renamed a print.
+     */
+    public String freezeSwatchesFromStored(String currentColorsJson, String frozenColorsJson) {
+        List<ColorEntry> frozen = parseColorEntries(frozenColorsJson);
+        List<ColorEntry> current = parseColorEntries(currentColorsJson);
+        if (frozen.isEmpty() || current.isEmpty()) {
+            return normalizeColorsJson(currentColorsJson);
+        }
+        LinkedHashMap<String, String> swatchByKey = new LinkedHashMap<>();
+        List<String> swatchByPosition = new ArrayList<>();
+        for (ColorEntry entry : frozen) {
+            String swatch = entry.swatchUrl();
+            if (swatch == null || swatch.isBlank()) {
+                swatchByPosition.add(null);
+                continue;
+            }
+            swatchByPosition.add(swatch.trim());
+            String key = entry.name().trim().toLowerCase(Locale.ROOT);
+            if (!key.isEmpty()) {
+                swatchByKey.putIfAbsent(key, swatch.trim());
+            }
+        }
+        List<ColorEntry> out = new ArrayList<>();
+        for (int i = 0; i < current.size(); i++) {
+            ColorEntry entry = current.get(i);
+            String key = entry.name().trim().toLowerCase(Locale.ROOT);
+            String swatch = swatchByKey.get(key);
+            if ((swatch == null || swatch.isBlank()) && i < swatchByPosition.size()) {
+                swatch = swatchByPosition.get(i);
+            }
+            out.add(new ColorEntry(entry.name(), swatch, entry.galleryUrls()));
+        }
+        return writeColorEntries(out);
+    }
+
+    /**
      * After the variant matrix rebuilds {@code colors_json} as plain print names, restore swatch and
      * gallery URLs from the admin payload so print uploads are not lost on Save.
      */
@@ -505,6 +571,18 @@ public class ProductColorImagesSupport {
 
     public String normalizeColorsJson(String colorsJson) {
         return writeColorEntries(parseColorEntries(colorsJson));
+    }
+
+    private String stripSwatchesFromColorsJson(String colorsJson) {
+        List<ColorEntry> entries = parseColorEntries(colorsJson);
+        if (entries.isEmpty()) {
+            return colorsJson;
+        }
+        List<ColorEntry> stripped = new ArrayList<>();
+        for (ColorEntry entry : entries) {
+            stripped.add(new ColorEntry(entry.name(), null, entry.galleryUrls()));
+        }
+        return writeColorEntries(stripped);
     }
 
     public String serializeMap(Map<String, List<String>> map) {
@@ -649,8 +727,10 @@ public class ProductColorImagesSupport {
             }
         }
         String imageUrl = textOrNull(node.get("imageUrl"));
-        if (imageUrl != null) {
-            urls.add(0, imageUrl);
+        if (imageUrl != null && urls.isEmpty()) {
+            urls.add(imageUrl);
+        } else if (imageUrl != null && !urls.contains(imageUrl)) {
+            urls.add(imageUrl);
         }
         List<String> unique = uniqueUrls(urls);
         if (swatchUrl != null && !swatchUrl.isBlank()) {

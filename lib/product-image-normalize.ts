@@ -1,6 +1,6 @@
 import { PRODUCT_IMAGE_SURFACE } from "@/lib/product-gallery";
 
-export const PRODUCT_GALLERY_EXPORT_PX = 1200;
+export const PRODUCT_GALLERY_EXPORT_PX = 1250;
 export const PRODUCT_SWATCH_EXPORT_PX = 400;
 
 /** Scale down to fit within maxPx on the longest edge; never upscale. */
@@ -101,7 +101,7 @@ async function exportNaturalCanvas(
   return new File([blob], `${stem}-${suffix}.jpg`, { type: "image/jpeg" });
 }
 
-/** Downscale to max 1200px on the longest edge — preserves aspect ratio (no square letterboxing). */
+/** Downscale to max 1250px on the longest edge — preserves aspect ratio (no square letterboxing). */
 export async function normalizeProductGalleryImage(file: File): Promise<File> {
   const img = await loadImageFromFile(file);
   return exportNaturalCanvas(img, PRODUCT_GALLERY_EXPORT_PX, file.name, "gallery");

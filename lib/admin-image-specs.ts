@@ -48,10 +48,10 @@ export const ADMIN_IMAGE_SPECS = {
     notes: "Shown small in the shop menu dropdown.",
   },
   productGallery: {
-    ratio: "Any (landscape or square)",
-    recommendedPx: "1200 px max on longest edge",
+    ratio: "Matches each photo",
+    recommendedPx: "1250 px longest edge",
     notes:
-      "Aspect ratio is preserved on upload and on the product page — landscape lifestyle shots fill the frame without letterboxing.",
+      "The product-page box follows this photo’s width and height. Landscape stays landscape, portrait stays portrait. Nothing is stretched or padded into a square. Larger files scale down so the longest edge is 1250px.",
   },
   printSwatch: {
     ratio: "1 : 1",

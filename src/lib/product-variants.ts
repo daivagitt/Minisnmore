@@ -186,11 +186,14 @@ export function catalogSizesForProduct(product: VariantProductLike): string[] {
   return sortSizesAsc([...labelByKey.values()]);
 }
 
-/** In-stock catalog sizes for the size calculator (not the size-chart table). */
+/**
+ * Catalog sizes for the size calculator (not the size-chart table).
+ * Includes sold-out (zero-stock) sizes so shoppers can still find their fit.
+ */
 export function availableSizesForFit(product: VariantProductLike): string[] {
   const catalog = catalogSizesForProduct(product);
   if (!isVariantsProduct(product)) return catalog;
-  return catalog.filter((s) => sizeHasSellableVariants(product, s));
+  return catalog.filter((s) => sizeHasActiveVariants(product, s));
 }
 
 export function findVariant(
@@ -249,6 +252,13 @@ export function isVariantSellable(variant: ProductVariant | undefined | null): b
 export function isSimpleProductSellable(product: VariantProductLike | null | undefined): boolean {
   if (!product) return false;
   return product.stock == null || product.stock > 0;
+}
+
+/** True if at least one active variant exists for this size (stock may be zero). */
+export function sizeHasActiveVariants(product: VariantProductLike, size: string | null | undefined): boolean {
+  if (!isVariantsProduct(product)) return true;
+  const want = sizeKey(size);
+  return (product.variants ?? []).some((v) => v.active && sizeKey(v.size) === want);
 }
 
 /** True if at least one active in-stock variant exists for this size. */

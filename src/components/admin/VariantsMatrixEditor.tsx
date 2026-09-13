@@ -58,6 +58,7 @@ export function VariantsMatrixEditor({
   onChange,
   onPullFromZoho,
   pullingRowKeys,
+  freezeColors = false,
 }: {
   parentSku: string;
   sizes: string[];
@@ -73,6 +74,8 @@ export function VariantsMatrixEditor({
   }) => void;
   onPullFromZoho?: (row: VariantEditorRow, index: number) => void;
   pullingRowKeys?: Set<string>;
+  /** Print/colour names come from Zoho pull — matrix rows show them read-only. */
+  freezeColors?: boolean;
 }) {
   const settings = useSiteSettings();
   const discountPercent = settings.store_discount_percent ?? 20;
@@ -237,11 +240,17 @@ export function VariantsMatrixEditor({
                 </td>
                 <td className="p-1.5">
                   <input
-                    className={inputCls() + " !text-xs"}
+                    className={inputCls() + " !text-xs" + (freezeColors ? " bg-muted/30 cursor-default" : "")}
                     value={r.color}
                     placeholder="Navy"
-                    onChange={(e) => patchRow(index, { color: e.target.value })}
+                    readOnly={freezeColors}
+                    title={freezeColors ? "Updated via Zoho pull only" : undefined}
+                    onChange={(e) => {
+                      if (freezeColors) return;
+                      patchRow(index, { color: e.target.value });
+                    }}
                     onBlur={() => {
+                      if (freezeColors) return;
                       if (!r.sku.trim() && (r.size || r.color)) {
                         patchRow(index, { sku: suggestVariantSku(parentSku, r.size, r.color) });
                       }

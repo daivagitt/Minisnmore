@@ -64,17 +64,21 @@ export function Navbar() {
   }, [pathname]);
 
   useEffect(() => {
+    const pdp = document.querySelector<HTMLElement>("[data-pdp-scroll]");
+    const readY = () => (pdp ? pdp.scrollTop : window.scrollY);
     const onScroll = () => {
-      const y = window.scrollY;
+      const y = readY();
       setScrolled(y > 20);
-      // hide on scroll down past 120px, show on scroll up
-      if (y > 120 && y > lastY.current) setHidden(true);
+      // Product pages keep the bar visible; elsewhere hide on scroll down past 120px.
+      if (!pdp && y > 120 && y > lastY.current) setHidden(true);
       else setHidden(false);
       lastY.current = y;
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+    const target: EventTarget = pdp ?? window;
+    target.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => target.removeEventListener("scroll", onScroll);
+  }, [pathname]);
 
   useEffect(() => {
     if (!searchOpen) return;

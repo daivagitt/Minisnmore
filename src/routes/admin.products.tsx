@@ -840,30 +840,31 @@ function ProductsPage() {
                             placeholder="S, M, L or 0-3m, 3-6m"
                           />
                           <CommaListField
-                            label="Colors (comma-separated)"
+                            label="Colors (from Zoho)"
                             value={colorNames(p.colors)}
-                            onChange={(names) => update(i, { colors: mergeColorNames(p.colors, names) })}
-                            placeholder="Navy, Ivory, Blush"
+                            readOnly
+                            hint="Print names and swatches are frozen after Zoho inventory sync. Colour galleries below can still be edited manually."
+                            placeholder="Pull from Zoho to populate"
                           />
                         </div>
                         <AdminSizeAvailabilityPreview product={p} />
                         <ColorImagesEditor
                           colors={p.colors ?? []}
+                          freezeSwatches
                           onPatchColor={(colorIndex, patch) => patchProductColor(i, colorIndex, patch)}
                           onGalleryUploaded={({ index, imageUrls }) => saveWithColorGallery(p, index, imageUrls)}
-                          onSwatchUploaded={({ index, swatchUrl }) => saveWithColorSwatch(p, index, swatchUrl)}
                         />
                         <VariantsMatrixEditor
                           parentSku={p.sku?.trim() || suggestParentSku(p.name || "")}
                           sizes={p.sizes ?? []}
                           colors={colorNames(p.colors)}
                           value={p.variants_json}
+                          freezeColors
                           pullingRowKeys={pullingVariantRowKeysForProduct(p)}
-                          onPullFromZoho={(row, rowIndex) => void pullVariantFromZoho(i, p, row, rowIndex)}
                           onChange={(next) =>
                             update(i, {
                               ...next,
-                              colors: mergeColorNames(p.colors, next.colors),
+                              colors: p.colors ?? [],
                             })
                           }
                         />
@@ -1061,6 +1062,7 @@ function ProductsPage() {
                       {p.id && (
                         <button
                           type="button"
+                          hidden
                           disabled={zohoSyncing.has(i)}
                           onClick={() => void syncToZoho(i, p)}
                           className="rounded-full glass px-4 py-2 text-sm flex items-center gap-2 disabled:opacity-50"

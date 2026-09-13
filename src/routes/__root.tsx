@@ -82,6 +82,8 @@ function RootComponent() {
   const wasAdminRef = useRef(isAdmin);
   const isCustomerInvoice = /^\/account\/orders\/[^/]+\/invoice$/.test(pathname);
   const isInvoice = isCustomerInvoice || /^\/admin\/orders\/[^/]+\/invoice$/.test(pathname);
+  const isProductPage = !isAdmin && !isInvoice && pathname.startsWith("/product/");
+  const pdpScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     return initStorefrontCacheSync();
@@ -131,6 +133,32 @@ function RootComponent() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isProductPage) return;
+    const html = document.documentElement;
+    const { overflow: prevHtmlOverflow, height: prevHtmlHeight } = html.style;
+    const { overflow: prevBodyOverflow, height: prevBodyHeight } = document.body.style;
+    html.classList.add("pdp-lock-scroll");
+    document.body.classList.add("pdp-lock-scroll");
+    html.style.overflow = "hidden";
+    html.style.height = "100%";
+    document.body.style.overflow = "hidden";
+    document.body.style.height = "100%";
+    return () => {
+      html.classList.remove("pdp-lock-scroll");
+      document.body.classList.remove("pdp-lock-scroll");
+      html.style.overflow = prevHtmlOverflow;
+      html.style.height = prevHtmlHeight;
+      document.body.style.overflow = prevBodyOverflow;
+      document.body.style.height = prevBodyHeight;
+    };
+  }, [isProductPage]);
+
+  useEffect(() => {
+    if (!isProductPage) return;
+    pdpScrollRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [isProductPage, pathname]);
+
   return (
     <AuthProvider>
     <ShopProvider>
@@ -138,19 +166,42 @@ function RootComponent() {
       {!isAdmin && !isInvoice && (
         <>
           <Watermark />
-          <ScrollProgress />
           <div aria-hidden className="fixed inset-0 pointer-events-none z-0">
             <FloatingDecor count={10} variant="leaves" />
           </div>
           <Navbar />
         </>
       )}
-      <main className={isAdmin || isInvoice ? "relative z-10" : "relative z-10 pt-24 md:pt-28"}>
-        <Outlet />
-      </main>
+      {isProductPage ? (
+        <div className="relative z-10 flex h-[100dvh] flex-col overflow-hidden">
+          <div className="h-24 shrink-0 md:h-28" aria-hidden />
+          <div
+            ref={pdpScrollRef}
+            data-pdp-scroll
+            className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain"
+          >
+            <main>
+              <Outlet />
+            </main>
+            <Footer />
+          </div>
+        </div>
+      ) : (
+        <>
+          <main className={isAdmin || isInvoice ? "relative z-10" : "relative z-10 pt-24 md:pt-28"}>
+            <Outlet />
+          </main>
+          {!isAdmin && !isInvoice && <Footer />}
+        </>
+      )}
+      {!isAdmin && !isInvoice && (
+        <ScrollProgress
+          key={isProductPage ? "pdp" : "page"}
+          containerRef={isProductPage ? pdpScrollRef : undefined}
+        />
+      )}
       {!isAdmin && !isInvoice && (
         <>
-          <Footer />
           <CartDrawer />
           <QuickView />
         </>

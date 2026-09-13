@@ -1,7 +1,12 @@
 import { motion, useScroll, useSpring } from "framer-motion";
+import type { RefObject } from "react";
 
-export function ScrollProgress() {
-  const { scrollYProgress } = useScroll();
+export function ScrollProgress({
+  containerRef,
+}: {
+  containerRef?: RefObject<HTMLElement | null>;
+}) {
+  const { scrollYProgress } = useScroll(containerRef ? { container: containerRef } : undefined);
   const scaleX = useSpring(scrollYProgress, { stiffness: 120, damping: 24, mass: 0.3 });
   return (
     <motion.div style={{ scaleX, transformOrigin: "0% 50%" }}
