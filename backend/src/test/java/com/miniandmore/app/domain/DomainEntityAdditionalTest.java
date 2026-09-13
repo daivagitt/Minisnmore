@@ -71,9 +71,11 @@ class DomainEntityAdditionalTest {
             .freeShippingMinInr(2500);
         setting.setSubscribeHeroTitle("Hero");
         setting.setSubscribePlansJson("[]");
+        setting.setAboutPageJson("{}");
 
         assertThat(setting.getGstRate()).isEqualByComparingTo("18");
         assertThat(setting.getSubscribeHeroTitle()).isEqualTo("Hero");
+        assertThat(setting.getAboutPageJson()).isEqualTo("{}");
         assertThat(setting.toString()).contains("brandName");
     }
 }

@@ -202,6 +202,13 @@ class InternalStorefrontResourceTest {
     }
 
     @Test
+    void aboutPage_returns200() throws Exception {
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/internal/v1/about-page")).andExpect(status().isOk());
+    }
+
+    @Test
     void pageVisibility_returns200() throws Exception {
         when(pageVisibilityRepository.findAllByOrderByPageKeyAsc()).thenReturn(List.of());
 

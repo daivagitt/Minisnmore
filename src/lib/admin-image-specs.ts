@@ -68,6 +68,16 @@ export const ADMIN_IMAGE_SPECS = {
     recommendedPx: "600 × 200 px",
     notes: "Wide PNG with transparent background (navbar).",
   },
+  aboutHero: {
+    ratio: "4 : 5",
+    recommendedPx: "1200 × 1500 px",
+    notes: "Right-hand photo on the About page hero.",
+  },
+  aboutFounder: {
+    ratio: "16 : 10",
+    recommendedPx: "1600 × 1000 px",
+    notes: "Wide founder photo; name and role overlay the bottom.",
+  },
   invoiceLogo: {
     ratio: "Wide, up to ~4 : 1",
     recommendedPx: "800 × 240 px",

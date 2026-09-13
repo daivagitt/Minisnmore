@@ -98,9 +98,20 @@ public class CatalogCoreClient {
     }
 
     /**
+     * Forward the storefront e-catalogue PDF to catalog core (PDF-only, not image uploads).
+     */
+    public ResponseEntity<byte[]> forwardCataloguePdfUpload(MultipartFile file) throws IOException {
+        return forwardMultipartFile("/internal/v1/admin/uploads/catalogue-pdf", file);
+    }
+
+    /**
      * Forward a multipart file to catalog core's SKU-wise print import endpoint.
      */
     public ResponseEntity<byte[]> forwardSkuWiseImport(MultipartFile file) throws IOException {
+        return forwardMultipartFile("/internal/v1/admin/import/sku-wise-print", file);
+    }
+
+    private ResponseEntity<byte[]> forwardMultipartFile(String catalogPath, MultipartFile file) throws IOException {
         LinkedMultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
         parts.add("file", new org.springframework.core.io.ByteArrayResource(file.getBytes()) {
             @Override
@@ -111,7 +122,7 @@ public class CatalogCoreClient {
 
         RestClient.RequestBodySpec spec = restClient
             .post()
-            .uri("/internal/v1/admin/import/sku-wise-print")
+            .uri(catalogPath)
             .contentType(MediaType.MULTIPART_FORM_DATA);
 
         String auth = SecurityUtils.currentBearerToken();

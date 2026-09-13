@@ -14,7 +14,8 @@ export type AdminImageFolder =
   | "subscriptions"
   | "banners"
   | "home"
-  | "blog";
+  | "blog"
+  | "about";
 
 export const UNSUPPORTED_IMAGE_TYPE_MESSAGE =
   "Image type not accepted. Use JPG, PNG, WebP, or GIF only.";

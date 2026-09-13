@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   LayoutDashboard, Image as ImgIcon, Tag, BookOpen, FileText, Package, Plug, LogOut, Loader2,
   Folder, Home, EyeOff, Settings as SettingsIcon, ExternalLink, ShoppingCart, ReceiptText, Percent, RotateCcw,
+  Users,
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
@@ -18,6 +19,7 @@ const nav = [
   { to: "/admin/categories", label: "Categories", icon: Folder },
   { to: "/admin/products", label: "Products", icon: Package },
   { to: "/admin/home", label: "Home sections", icon: Home },
+  { to: "/admin/about", label: "About page", icon: Users },
   { to: "/admin/pages", label: "Page visibility", icon: EyeOff },
   { to: "/admin/coupons", label: "Coupons", icon: Tag },
   { to: "/admin/discount", label: "Discount", icon: Percent },

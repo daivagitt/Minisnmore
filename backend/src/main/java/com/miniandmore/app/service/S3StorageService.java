@@ -39,7 +39,8 @@ public class S3StorageService {
         "subscriptions",
         "banners",
         "home",
-        "blog"
+        "blog",
+        "about"
     );
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("jpg", "jpeg", "png", "webp", "gif");
     /** Browser-controlled headers must not be returned to clients. */
@@ -129,16 +130,37 @@ public class S3StorageService {
      * invariant for admin uploads and must not be loosened to let PDFs through everywhere.
      */
     public String uploadInvoicePdf(String filename, byte[] body) {
+        return uploadDedicatedPdf("invoices", filename == null ? "invoice.pdf" : filename, body, "Invoice PDF");
+    }
+
+    /**
+     * Stores the storefront e-catalogue PDF. Same image-only invariant as invoice uploads:
+     * do not add {@code pdf} to {@link #ALLOWED_EXTENSIONS}.
+     */
+    public String uploadCataloguePdf(String filename, byte[] body) {
+        return uploadDedicatedPdf("catalogues", filename == null ? "e-catalogue.pdf" : filename, body, "Catalogue PDF");
+    }
+
+    private String uploadDedicatedPdf(String folder, String filename, byte[] body, String label) {
+        if (body == null || body.length == 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + " is empty.");
+        }
         if (body.length > properties.getMaxUploadBytes()) {
             var maxMb = Math.max(1, Math.round(properties.getMaxUploadBytes() / (1024.0 * 1024.0)));
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invoice PDF is too large. Maximum size is " + maxMb + " MB.");
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                label + " is too large. Maximum size is " + maxMb + " MB."
+            );
         }
         validateConfig();
-        var safeName = filename == null ? "invoice.pdf" : filename.replaceAll("[^A-Za-z0-9._-]", "-");
+        var safeName = filename.replaceAll("[^A-Za-z0-9._-]", "-");
+        if (safeName.isBlank()) {
+            safeName = "document.pdf";
+        }
         if (!safeName.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
             safeName = safeName + ".pdf";
         }
-        var objectKey = buildObjectKey("invoices", safeName);
+        var objectKey = buildObjectKey(folder, safeName);
         var bucket = properties.getBucket();
         var putObjectRequest = PutObjectRequest.builder().bucket(bucket).key(objectKey).contentType("application/pdf").build();
         try {

@@ -33,6 +33,13 @@ public class InternalStorageUploadResource {
         return ApiResponse.ok(s3StorageService.presignUpload(request.folder(), request.filename(), request.contentType()));
     }
 
+    @PostMapping(value = "/catalogue-pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<UploadResult> uploadCataloguePdf(@RequestParam("file") MultipartFile file) throws IOException {
+        String publicUrl = s3StorageService.uploadCataloguePdf(file.getOriginalFilename(), file.getBytes());
+        auditUpload("catalogues", file.getOriginalFilename(), publicUrl, null, null);
+        return ApiResponse.ok(new UploadResult(publicUrl));
+    }
+
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<UploadResult> upload(
         @RequestParam("folder") String folder,

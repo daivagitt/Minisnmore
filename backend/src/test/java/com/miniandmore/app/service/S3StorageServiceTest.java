@@ -165,6 +165,13 @@ class S3StorageServiceTest {
     }
 
     @Test
+    void uploadInvoicePdf_emptyBody_throwsBadRequest() {
+        assertThatThrownBy(() -> s3StorageService.uploadInvoicePdf("invoice-inv-1.pdf", new byte[0]))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("empty");
+    }
+
+    @Test
     void uploadInvoicePdf_filenameWithoutExtension_appendsPdf() {
         S3Client mockClient = mock(S3Client.class);
         ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
@@ -172,6 +179,33 @@ class S3StorageServiceTest {
         String url = s3StorageService.uploadInvoicePdf("invoice-inv-2", "pdf-bytes".getBytes());
 
         assertThat(url).endsWith("-invoice-inv-2.pdf");
+    }
+
+    @Test
+    void uploadCataloguePdf_success_returnsPublicUrl() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+
+        String url = s3StorageService.uploadCataloguePdf("Soft Bloom.pdf", "pdf-bytes".getBytes());
+
+        assertThat(url).startsWith("https://cdn.example.com/my-bucket/catalogues/");
+        assertThat(url).contains("Soft-Bloom.pdf");
+    }
+
+    @Test
+    void uploadCataloguePdf_emptyBody_throwsBadRequest() {
+        assertThatThrownBy(() -> s3StorageService.uploadCataloguePdf("catalogue.pdf", new byte[0]))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("empty");
+    }
+
+    @Test
+    void uploadCataloguePdf_exceedsMaxBytes_throwsBadRequest() {
+        byte[] body = new byte[6_000_000];
+
+        assertThatThrownBy(() -> s3StorageService.uploadCataloguePdf("catalogue.pdf", body))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("too large");
     }
 
     @Test

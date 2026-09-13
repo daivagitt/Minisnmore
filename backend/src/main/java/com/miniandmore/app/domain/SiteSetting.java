@@ -197,6 +197,9 @@ public class SiteSetting implements Serializable {
     @Column(name = "subscribe_features_json", columnDefinition = "text")
     private String subscribeFeaturesJson;
 
+    @Column(name = "about_page_json", columnDefinition = "text")
+    private String aboutPageJson;
+
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
     public Long getId() {
@@ -700,6 +703,14 @@ public class SiteSetting implements Serializable {
 
     public void setSubscribeFeaturesJson(String subscribeFeaturesJson) {
         this.subscribeFeaturesJson = subscribeFeaturesJson;
+    }
+
+    public String getAboutPageJson() {
+        return aboutPageJson;
+    }
+
+    public void setAboutPageJson(String aboutPageJson) {
+        this.aboutPageJson = aboutPageJson;
     }
 
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here

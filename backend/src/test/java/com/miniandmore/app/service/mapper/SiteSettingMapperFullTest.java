@@ -54,6 +54,7 @@ class SiteSettingMapperFullTest {
         entity.setSubscribeBadgesJson("[\"Badge\"]");
         entity.setSubscribePlansJson("[{\"name\":\"Basic\"}]");
         entity.setSubscribeFeaturesJson("[\"Feature\"]");
+        entity.setAboutPageJson("{\"hero_title\":\"About us\"}");
 
         SiteSettingDTO dto = mapper.toDto(entity);
         SiteSetting roundTrip = mapper.toEntity(dto);
@@ -70,6 +71,8 @@ class SiteSettingMapperFullTest {
         assertThat(roundTrip.getInvoiceQrUrl()).isEqualTo("https://cdn/invoice-qr.png");
         assertThat(roundTrip.getInvoiceSellerState()).isEqualTo("Karnataka");
         assertThat(dto.getSubscribeHeroTitle()).isEqualTo("Subscribe");
+        assertThat(dto.getAboutPageJson()).isEqualTo("{\"hero_title\":\"About us\"}");
+        assertThat(roundTrip.getAboutPageJson()).isEqualTo("{\"hero_title\":\"About us\"}");
         assertThat(dto.getFreeShippingMinInr()).isEqualTo(2500);
         assertThat(roundTrip.getCodFeeInr()).isEqualTo(149);
         assertThat(roundTrip.getDeliveryEtaBufferDays()).isEqualTo(3);

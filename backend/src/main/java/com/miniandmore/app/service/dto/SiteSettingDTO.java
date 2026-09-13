@@ -138,6 +138,8 @@ public class SiteSettingDTO implements Serializable {
 
     private String subscribeFeaturesJson;
 
+    private String aboutPageJson;
+
     public Long getId() {
         return id;
     }
@@ -464,6 +466,14 @@ public class SiteSettingDTO implements Serializable {
 
     public void setSubscribeFeaturesJson(String subscribeFeaturesJson) {
         this.subscribeFeaturesJson = subscribeFeaturesJson;
+    }
+
+    public String getAboutPageJson() {
+        return aboutPageJson;
+    }
+
+    public void setAboutPageJson(String aboutPageJson) {
+        this.aboutPageJson = aboutPageJson;
     }
 
     @Override

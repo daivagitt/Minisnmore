@@ -45,4 +45,16 @@ class AdminUploadProxyResourceTest {
 
         verify(catalogCoreClient).forwardMultipartUpload(eq("home"), any());
     }
+
+    @Test
+    void uploadCataloguePdf_delegatesMultipartToCatalog() throws Exception {
+        when(catalogCoreClient.forwardCataloguePdfUpload(any())).thenReturn(
+            ResponseEntity.status(HttpStatus.OK).body("{\"success\":true}".getBytes())
+        );
+
+        var file = new MockMultipartFile("file", "soft-bloom.pdf", "application/pdf", new byte[] { 1, 2, 3 });
+        mockMvc.perform(multipart("/api/v1/admin/uploads/catalogue-pdf").file(file)).andExpect(status().isOk());
+
+        verify(catalogCoreClient).forwardCataloguePdfUpload(any());
+    }
 }

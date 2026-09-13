@@ -83,4 +83,6 @@
     <include file="config/liquibase/changelog/20260903120000_add_cod_fee_site_setting.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260903140000_add_delivery_eta_buffer_days.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260904090000_add_product_size_chart_json.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260913120000_add_about_page_json.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>
+

@@ -60,4 +60,23 @@ class InternalStorageUploadResourceTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.publicUrl").value("https://cdn/products/photo.jpg"));
     }
+
+    @Test
+    void uploadCataloguePdf_returns200() throws Exception {
+        when(s3StorageService.uploadCataloguePdf(eq("soft-bloom.pdf"), any(byte[].class))).thenReturn(
+            "https://cdn/catalogues/soft-bloom.pdf"
+        );
+
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "soft-bloom.pdf",
+            "application/pdf",
+            "pdf-bytes".getBytes()
+        );
+
+        mockMvc
+            .perform(multipart("/internal/v1/admin/uploads/catalogue-pdf").file(file))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.publicUrl").value("https://cdn/catalogues/soft-bloom.pdf"));
+    }
 }
