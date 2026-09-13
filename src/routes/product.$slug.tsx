@@ -440,8 +440,11 @@ function ProductPage() {
           </div>
         </div>
 
-        <ProductInfoSections product={product} />
         </div>
+      </div>
+
+      <div className="mt-6 sm:mt-8 md:mt-10">
+        <ProductInfoSections product={product} />
       </div>
 
       <section className="space-y-6 mt-6 sm:mt-8 md:mt-10">
