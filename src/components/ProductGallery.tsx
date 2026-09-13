@@ -104,7 +104,7 @@ function GalleryThumb({ src, index, total, active, onSelect }: ThumbProps) {
           src={src}
           alt=""
           decoding="async"
-          priority="auto"
+          priority="low"
           className="h-full w-full object-contain object-center select-none"
           draggable={false}
         />
@@ -127,28 +127,6 @@ export function ProductGallery({ name, image, gallery = [], className }: Props) 
   const { sizeFor, rememberSize } = useImageNaturalSize();
 
   useEffect(() => {
-    if (!rawImages.length) return;
-
-    let cancelled = false;
-
-    for (const src of rawImages) {
-      const img = new Image();
-      img.decoding = "async";
-      img.onload = () => {
-        if (!cancelled) {
-          rememberSize(src, img);
-        }
-      };
-      img.onerror = () => {};
-      img.src = src;
-    }
-
-    return () => {
-      cancelled = true;
-    };
-  }, [rawImagesKey, rememberSize]);
-
-  useEffect(() => {
     setActive(0);
   }, [rawImagesKey]);
 
@@ -156,6 +134,29 @@ export function ProductGallery({ name, image, gallery = [], className }: Props) 
   const current = rawImages[safeActive] ?? rawImages[0] ?? "";
   const natural = sizeFor(current);
   const fit = galleryHeroFitSize(natural?.width, natural?.height);
+
+  useEffect(() => {
+    if (rawImages.length <= 1 || !current || !natural) return;
+
+    const next = rawImages[(safeActive + 1) % rawImages.length];
+    const prev = rawImages[(safeActive - 1 + rawImages.length) % rawImages.length];
+    const neighbors = [...new Set([next, prev].filter((src) => src && src !== current))];
+    if (!neighbors.length) return;
+
+    const loaders: HTMLImageElement[] = [];
+    for (const src of neighbors) {
+      const img = new Image();
+      img.decoding = "async";
+      img.src = src;
+      loaders.push(img);
+    }
+
+    return () => {
+      for (const img of loaders) {
+        img.src = "";
+      }
+    };
+  }, [rawImages, safeActive, current, natural]);
 
   const go = (delta: number) => {
     if (rawImages.length <= 1) return;
