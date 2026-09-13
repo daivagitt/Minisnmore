@@ -200,16 +200,15 @@ export function Footer() {
 
         <div className={`relative ${FOOTER_TOP_GRID}`}>
             <FooterColumn className="sm:col-span-2 lg:col-span-1">
-            <div className="mx-auto w-full max-w-[13rem] sm:max-w-[14rem] text-left lg:mx-0">
+            <div className="w-full max-w-[13rem] sm:max-w-[14rem] text-left">
               <img
                 src={logo}
                 alt={settings.brand_name}
-                className="mb-2 block h-20 sm:h-24 md:h-28 w-full object-contain object-left object-[left_top]"
+                className="mb-2 block h-20 sm:h-24 md:h-28 w-auto max-w-full object-contain object-left"
                 style={{ background: "transparent" }}
                 loading="lazy"
                 decoding="async"
               />
-              <div className="pl-[calc(15%-0.5rem)]">
             <div className="text-xs text-muted-foreground space-y-0.5">
               {settings.legal_entity_name ? (
                 <div className="text-foreground/80 font-medium">{settings.legal_entity_name}</div>
@@ -234,7 +233,6 @@ export function Footer() {
                 </div>
               ) : null}
             </div>
-              </div>
             </div>
           </FooterColumn>
 
