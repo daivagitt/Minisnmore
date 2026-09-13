@@ -15,7 +15,7 @@ describe("ColorImagesEditor gallery reorder", () => {
     vi.clearAllMocks();
   });
 
-  it("moves a gallery photo left and auto-saves the new order", async () => {
+  it("moves a gallery photo left without auto-saving", async () => {
     const onPatchColor = vi.fn();
     const onGalleryUploaded = vi.fn().mockResolvedValue(undefined);
 
@@ -37,10 +37,7 @@ describe("ColorImagesEditor gallery reorder", () => {
     expect(onPatchColor).toHaveBeenCalledWith(0, {
       imageUrls: ["https://cdn.example.com/navy-2.jpg", "https://cdn.example.com/navy-1.jpg"],
     });
-    expect(onGalleryUploaded).toHaveBeenCalledWith({
-      index: 0,
-      imageUrls: ["https://cdn.example.com/navy-2.jpg", "https://cdn.example.com/navy-1.jpg"],
-    });
+    expect(onGalleryUploaded).not.toHaveBeenCalled();
   });
 
   it("disables move left on the first photo", () => {
@@ -60,7 +57,7 @@ describe("ColorImagesEditor gallery reorder", () => {
     expect(screen.getByRole("button", { name: "Move Navy image 2 right" })).toBeDisabled();
   });
 
-  it("reorders gallery photos by drag and drop and auto-saves", async () => {
+  it("reorders gallery photos by drag and drop without auto-saving", async () => {
     const onPatchColor = vi.fn();
     const onGalleryUploaded = vi.fn().mockResolvedValue(undefined);
     const store: Record<string, string> = {};
@@ -95,9 +92,6 @@ describe("ColorImagesEditor gallery reorder", () => {
     expect(onPatchColor).toHaveBeenCalledWith(0, {
       imageUrls: ["https://cdn.example.com/navy-2.jpg", "https://cdn.example.com/navy-1.jpg"],
     });
-    expect(onGalleryUploaded).toHaveBeenCalledWith({
-      index: 0,
-      imageUrls: ["https://cdn.example.com/navy-2.jpg", "https://cdn.example.com/navy-1.jpg"],
-    });
+    expect(onGalleryUploaded).not.toHaveBeenCalled();
   });
 });

@@ -209,7 +209,7 @@ export function ColorImagesEditor({
     const current = colorImageUrls(entry);
     const imageUrls = moveItem(current, from, to);
     if (imageUrls.every((url, i) => url === current[i])) return;
-    void persistGallery(index, imageUrls);
+    onPatchColor(index, { imageUrls });
   };
 
   return (
@@ -290,7 +290,8 @@ export function ColorImagesEditor({
         <ImageSpecHint spec={ADMIN_IMAGE_SPECS.productGallery} className="mb-2" />
         <p className="text-xs text-muted-foreground mb-3">
           First photo is the main product image for this colour. Drag photos to reorder, or use
-          the arrows. Up to {MAX_COLOR_IMAGES} images per colour.
+          the arrows. Click Save on the product to keep the new order. Up to {MAX_COLOR_IMAGES}{" "}
+          images per colour.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           {normalizedColors.map((entry, index) => {

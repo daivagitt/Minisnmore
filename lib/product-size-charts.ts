@@ -407,7 +407,11 @@ export function parseMeasurementCell(value: number | string | undefined | null):
 }
 
 export function formatMeasurementCell(min: number | null, max: number | null): number | string {
-  if (min != null && max != null && min !== max) return `${min}-${max}`;
+  if (min != null && max != null) {
+    const lo = Math.min(min, max);
+    const hi = Math.max(min, max);
+    return `${lo}-${hi}`;
+  }
   if (max != null) return max;
   if (min != null) return min;
   return "";
@@ -417,9 +421,10 @@ export function formatMeasurementCell(min: number | null, max: number | null): n
 export function isZeroToThreeBand(band: string): boolean {
   const key = band
     .toUpperCase()
+    .replace(/[–—]/g, "-")
     .replace(/\s+/g, "")
-    .replace(/MONTHS?/, "M")
-    .replace(/MOS?/, "M");
+    .replace(/MONTHS?/g, "M")
+    .replace(/MOS?/g, "M");
   return key === "0-3M" || key === "0-3";
 }
 
@@ -551,6 +556,21 @@ export function parseProductSizeChart(raw: unknown): ProductSizeChart | null {
   return !invalid && isUsableSizeChart(chart) ? chart : null;
 }
 
+/** Approved SKU/name template for admin “Load from catalog” and the storefront calculator. */
+export function catalogSizeChartTemplate(input: {
+  sku?: string | null;
+  name?: string | null;
+  slug?: string | null;
+}): ProductSizeChart | null {
+  const key = resolveSizeChartSku(input);
+  if (!key) return null;
+  return SIZE_CHARTS_BY_SKU[key] ?? null;
+}
+
+/**
+ * Product chart when admin saved one; otherwise the SKU catalog template.
+ * The PDP size-guide button stays gated on the saved chart only.
+ */
 export function sizeChartForProduct(input: {
   sku?: string | null;
   name?: string | null;
@@ -558,9 +578,7 @@ export function sizeChartForProduct(input: {
   sizeChart?: ProductSizeChart | null;
 }): ProductSizeChart | null {
   if (isUsableSizeChart(input.sizeChart)) return input.sizeChart;
-  const key = resolveSizeChartSku(input);
-  if (!key) return null;
-  return SIZE_CHARTS_BY_SKU[key] ?? null;
+  return catalogSizeChartTemplate(input);
 }
 
 export type ChartFitPoint = {

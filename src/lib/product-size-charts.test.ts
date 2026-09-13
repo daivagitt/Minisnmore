@@ -222,8 +222,12 @@ describe("product size charts", () => {
     expect(parseMeasurementCell("")).toEqual({ min: null, max: null });
     expect(parseMeasurementCell("n/a")).toEqual({ min: null, max: null });
     expect(formatMeasurementCell(25, 27)).toBe("25-27");
+    expect(formatMeasurementCell(27, 25)).toBe("25-27");
+    expect(formatMeasurementCell(25, 25)).toBe("25-25");
     expect(formatMeasurementCell(null, 28)).toBe(28);
     expect(isZeroToThreeBand("0-3 M")).toBe(true);
+    expect(isZeroToThreeBand("0–3M")).toBe(true);
+    expect(isZeroToThreeBand("0-3 months")).toBe(true);
     expect(isZeroToThreeBand("3-6M")).toBe(false);
 
     const points = fitPointsFromSizeChart({

@@ -407,7 +407,11 @@ export function parseMeasurementCell(value: number | string | undefined | null):
 }
 
 export function formatMeasurementCell(min: number | null, max: number | null): number | string {
-  if (min != null && max != null && min !== max) return `${min}-${max}`;
+  if (min != null && max != null) {
+    const lo = Math.min(min, max);
+    const hi = Math.max(min, max);
+    return `${lo}-${hi}`;
+  }
   if (max != null) return max;
   if (min != null) return min;
   return "";
@@ -417,9 +421,10 @@ export function formatMeasurementCell(min: number | null, max: number | null): n
 export function isZeroToThreeBand(band: string): boolean {
   const key = band
     .toUpperCase()
+    .replace(/[–—]/g, "-")
     .replace(/\s+/g, "")
-    .replace(/MONTHS?/, "M")
-    .replace(/MOS?/, "M");
+    .replace(/MONTHS?/g, "M")
+    .replace(/MOS?/g, "M");
   return key === "0-3M" || key === "0-3";
 }
 

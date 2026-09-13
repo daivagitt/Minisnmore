@@ -556,9 +556,30 @@ function MeasurementCellInput({
     const maxT = maxRaw.trim();
     const minParsed = parseCmInput(minT);
     const maxParsed = parseCmInput(maxT);
-    if (minT !== "" && minParsed == null) return;
-    if (maxT !== "" && maxParsed == null) return;
+    if (minT !== "" && minParsed == null) return false;
+    if (maxT !== "" && maxParsed == null) return false;
+    // A from-only value must not be stored as a single number — parseMeasurementCell
+    // treats numbers as the end of the range, which swapped 0-3M start/end while typing.
+    if (minParsed != null && maxParsed == null) return false;
     onCommit(formatMeasurementCell(minParsed, maxParsed));
+    return true;
+  };
+
+  const finishRange = () => {
+    const minRaw = minDraft ?? minText;
+    const maxRaw = maxDraft ?? maxText;
+    const committed = commitPair(minRaw, maxRaw);
+    if (committed) {
+      setMinDraft(null);
+      setMaxDraft(null);
+      return;
+    }
+    if (minRaw.trim() !== "" && maxRaw.trim() === "") {
+      setMinDraft(minRaw.trim());
+      return;
+    }
+    setMinDraft(null);
+    setMaxDraft(null);
   };
 
   if (range) {
@@ -570,12 +591,8 @@ function MeasurementCellInput({
           placeholder="from"
           inputMode="decimal"
           aria-label="Range from"
-          onChange={(e) => {
-            const next = e.target.value;
-            setMinDraft(next);
-            commitPair(next, maxDraft ?? maxText);
-          }}
-          onBlur={() => setMinDraft(null)}
+          onChange={(e) => setMinDraft(e.target.value)}
+          onBlur={finishRange}
         />
         <span className="text-muted-foreground shrink-0">–</span>
         <input
@@ -584,12 +601,8 @@ function MeasurementCellInput({
           placeholder="to"
           inputMode="decimal"
           aria-label="Range to"
-          onChange={(e) => {
-            const next = e.target.value;
-            setMaxDraft(next);
-            commitPair(minDraft ?? minText, next);
-          }}
-          onBlur={() => setMaxDraft(null)}
+          onChange={(e) => setMaxDraft(e.target.value)}
+          onBlur={finishRange}
         />
       </div>
     );
