@@ -15,7 +15,34 @@ import { FloatingDecor } from "@/components/FloatingDecor";
 import { Toaster } from "sonner";
 import { initStorefrontCacheSync, invalidateAllStorefrontCaches } from "@/lib/storefront-cache-sync";
 
-const SOCIAL_SHARE_IMAGE = "https://minisnmore.com/og-share.jpg";
+const SITE_ORIGIN = "https://minisnmore.com";
+const SOCIAL_SHARE_IMAGE = `${SITE_ORIGIN}/og-share.jpg`;
+const FAVICON_48 = `${SITE_ORIGIN}/favicon-48x48.png`;
+const ORGANIZATION_JSON_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_ORIGIN}/#organization`,
+      name: "Mini's n More",
+      legalName: "Stolt Global Private Limited",
+      url: `${SITE_ORIGIN}/`,
+      logo: {
+        "@type": "ImageObject",
+        url: `${SITE_ORIGIN}/icon-512.png`,
+        width: 512,
+        height: 512,
+      },
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_ORIGIN}/#website`,
+      url: `${SITE_ORIGIN}/`,
+      name: "Mini's n More",
+      publisher: { "@id": `${SITE_ORIGIN}/#organization` },
+    },
+  ],
+};
 
 function NotFoundComponent() {
   return (
@@ -47,12 +74,11 @@ export const Route = createRootRoute({
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/favicon.ico", sizes: "48x48" },
-      { rel: "icon", href: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
-      { rel: "icon", href: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
-      { rel: "icon", href: "/icon-192.png", type: "image/png", sizes: "192x192" },
-      { rel: "icon", href: "/icon-512.png", type: "image/png", sizes: "512x512" },
-      { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
+      { rel: "icon", href: FAVICON_48, type: "image/png", sizes: "48x48" },
+      { rel: "icon", href: `${SITE_ORIGIN}/favicon-96x96.png`, type: "image/png", sizes: "96x96" },
+      { rel: "icon", href: `${SITE_ORIGIN}/favicon.ico`, sizes: "any" },
+      { rel: "apple-touch-icon", href: `${SITE_ORIGIN}/apple-touch-icon.png`, sizes: "180x180" },
+      { rel: "manifest", href: "/site.webmanifest" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "preconnect", href: "https://pub-f227d5520be64479a318380ac346334d.r2.dev" },
@@ -67,7 +93,10 @@ export const Route = createRootRoute({
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <head><HeadContent /></head>
+      <head>
+        <HeadContent />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ORGANIZATION_JSON_LD) }} />
+      </head>
       <body>
         {children}
         <Scripts />
