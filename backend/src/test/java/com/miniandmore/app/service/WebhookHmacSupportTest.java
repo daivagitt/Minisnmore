@@ -46,6 +46,16 @@ class WebhookHmacSupportTest {
     }
 
     @Test
+    void signaturesMatch_acceptsBase64HmacLikeXpressBees() {
+        String secret = "webhook-secret";
+        String payload = "{\"awb_number\":\"4152912381315\",\"status\":\"in transit\"}";
+        String expected = WebhookHmacSupport.hmacSha256Base64(secret, payload);
+
+        assertThat(WebhookHmacSupport.signaturesMatch(secret, payload, expected)).isTrue();
+        assertThat(WebhookHmacSupport.signaturesMatch(secret, payload, expected.toLowerCase())).isFalse();
+    }
+
+    @Test
     void signaturesMatch_blankSecretOrSignature_returnsFalse() {
         assertThat(WebhookHmacSupport.signaturesMatch("", "payload", "sig")).isFalse();
         assertThat(WebhookHmacSupport.signaturesMatch("secret", "payload", " ")).isFalse();

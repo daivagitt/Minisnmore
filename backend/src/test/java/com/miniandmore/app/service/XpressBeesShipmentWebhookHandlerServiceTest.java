@@ -98,4 +98,29 @@ class XpressBeesShipmentWebhookHandlerServiceTest {
         assertThat(order.getShipmentDeliveredAt()).isNull();
         verify(orderEventService).syncLifecycleEvents(order);
     }
+
+    @Test
+    void sampleCarrierPayload_looksUpOrderByAwbNumber() {
+        CustomerOrder order = new CustomerOrder()
+            .id(12L)
+            .orderNumber("MNM-3")
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .trackingNumber("4152912381315");
+        when(orderRepository.findFirstByTrackingNumber("4152912381315")).thenReturn(Optional.of(order));
+        when(orderRepository.save(order)).thenReturn(order);
+        when(eventRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(eventRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = service.handle(
+            "{\"awb_number\":\"4152912381315\",\"status\":\"in transit\",\"event_time\":\"2021-02-26 16:19:59\",\"location\":\"Delhi\",\"message\":\"Reached at nearest hub\",\"rto_awb\":\"\"}",
+            null,
+            "secret"
+        );
+
+        assertThat(result.get("ok")).isEqualTo(true);
+        assertThat(result.get("order_number")).isEqualTo("MNM-3");
+        assertThat(order.getShipmentCarrierStatus()).isEqualTo("in_transit");
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+    }
 }

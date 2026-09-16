@@ -64,6 +64,7 @@ public class XpressBeesReturnWebhookHandlerService {
         String reverseAwb = ZohoWebhookSupport.firstNonBlank(
             ZohoWebhookSupport.stringValue(data.get("reverse_awb")),
             ZohoWebhookSupport.stringValue(data.get("awb")),
+            ZohoWebhookSupport.stringValue(data.get("awb_number")),
             ZohoWebhookSupport.stringValue(data.get("AWBNumber")),
             ZohoWebhookSupport.stringValue(data.get("AirWayBillNO"))
         );

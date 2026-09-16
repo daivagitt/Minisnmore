@@ -1,21 +1,31 @@
 package com.miniandmore.app.service;
 
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.Base64;
 import java.util.HexFormat;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.apache.commons.lang3.StringUtils;
 
-/** Shared HMAC-SHA256 hex helpers for signed webhook payloads. */
+/** Shared HMAC-SHA256 helpers for signed webhook payloads (hex and base64). */
 public final class WebhookHmacSupport {
 
     private WebhookHmacSupport() {}
 
     public static String hmacSha256Hex(String secret, String payload) {
+        return HexFormat.of().formatHex(hmacSha256(secret, payload));
+    }
+
+    public static String hmacSha256Base64(String secret, String payload) {
+        return Base64.getEncoder().encodeToString(hmacSha256(secret, payload));
+    }
+
+    private static byte[] hmacSha256(String secret, String payload) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            return HexFormat.of().formatHex(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
+            return mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
             throw new IllegalStateException("HMAC unavailable", e);
         }
@@ -52,8 +62,13 @@ public final class WebhookHmacSupport {
         if (StringUtils.isBlank(secret) || StringUtils.isBlank(signatureHeader)) {
             return false;
         }
-        String expected = hmacSha256Hex(secret, rawBody);
+        byte[] digest = hmacSha256(secret, rawBody);
         String provided = normalizeProvidedSignature(signatureHeader);
-        return constantTimeEquals(expected, provided);
+        if (constantTimeEquals(HexFormat.of().formatHex(digest), provided)) {
+            return true;
+        }
+        byte[] expectedBase64 = Base64.getEncoder().encodeToString(digest).getBytes(StandardCharsets.UTF_8);
+        byte[] providedBytes = provided.getBytes(StandardCharsets.UTF_8);
+        return MessageDigest.isEqual(expectedBase64, providedBytes);
     }
 }

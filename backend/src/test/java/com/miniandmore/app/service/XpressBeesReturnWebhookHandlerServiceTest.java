@@ -174,4 +174,25 @@ class XpressBeesReturnWebhookHandlerServiceTest {
         verify(orderReturnService).markShipped("RET-ORD-1", "ExpressBees: delivered");
         verify(orderReturnService).markDelivered("RET-ORD-1", "ExpressBees: delivered");
     }
+
+    @Test
+    void handle_samplePayloadAwbNumber_looksUpReturnByAwb() {
+        OrderReturn orderReturn = new OrderReturn();
+        orderReturn.setReturnNumber("RET-ORD-1");
+        orderReturn.setStatus(OrderReturnStatus.PICKUP_SCHEDULED);
+        orderReturn.setReverseAwb("4152912381315");
+        when(orderReturnRepository.findFirstByReverseAwbOrderByRequestedAtDesc("4152912381315")).thenReturn(Optional.of(orderReturn));
+        when(webhookEventRepository.existsByEventId(any())).thenReturn(false);
+        when(webhookEventRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(webhookEventRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = handlerService.handle(
+            "{\"awb_number\":\"4152912381315\",\"status\":\"picked_up\",\"event_time\":\"2021-02-26 16:19:59\"}",
+            null,
+            "secret-123"
+        );
+
+        assertThat(result.get("ok")).isEqualTo(true);
+        verify(orderReturnService).markPickedUp("RET-ORD-1", "ExpressBees: picked_up");
+    }
 }
