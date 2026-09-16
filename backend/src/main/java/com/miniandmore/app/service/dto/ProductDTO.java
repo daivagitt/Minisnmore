@@ -55,6 +55,8 @@ public class ProductDTO implements Serializable {
 
     private String sizeChartJson;
 
+    private String sizeNotesJson;
+
     private String colorsJson;
 
     private String colorImagesJson;
@@ -68,6 +70,9 @@ public class ProductDTO implements Serializable {
 
     @Size(max = 80)
     private String badge;
+
+    @Size(max = 80)
+    private String detailsKicker;
 
     @NotNull
     @Min(value = 0)
@@ -229,6 +234,14 @@ public class ProductDTO implements Serializable {
         this.sizeChartJson = sizeChartJson;
     }
 
+    public String getSizeNotesJson() {
+        return sizeNotesJson;
+    }
+
+    public void setSizeNotesJson(String sizeNotesJson) {
+        this.sizeNotesJson = sizeNotesJson;
+    }
+
     public String getColorsJson() {
         return colorsJson;
     }
@@ -275,6 +288,14 @@ public class ProductDTO implements Serializable {
 
     public void setBadge(String badge) {
         this.badge = badge;
+    }
+
+    public String getDetailsKicker() {
+        return detailsKicker;
+    }
+
+    public void setDetailsKicker(String detailsKicker) {
+        this.detailsKicker = detailsKicker;
     }
 
     public Integer getStock() {
@@ -452,11 +473,13 @@ public class ProductDTO implements Serializable {
             ", ageMaxMonths=" + getAgeMaxMonths() +
             ", sizesJson='" + getSizesJson() + "'" +
             ", sizeChartJson='" + getSizeChartJson() + "'" +
+            ", sizeNotesJson='" + getSizeNotesJson() + "'" +
             ", colorsJson='" + getColorsJson() + "'" +
             ", itemStructure='" + getItemStructure() + "'" +
             ", variantsJson='" + getVariantsJson() + "'" +
             ", imagesJson='" + getImagesJson() + "'" +
             ", badge='" + getBadge() + "'" +
+            ", detailsKicker='" + getDetailsKicker() + "'" +
             ", stock=" + getStock() +
             ", sortOrder=" + getSortOrder() +
             ", featured='" + getFeatured() + "'" +

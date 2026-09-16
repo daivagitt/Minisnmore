@@ -26,6 +26,10 @@ export type Product = {
   stock?: number | null;
   /** Per-product measurement chart (admin/Excel). Falls back to SKU map when absent. */
   sizeChart?: ProductSizeChart | null;
+  /** Per-size storefront callouts, e.g. socks 6-12m: "This size has grippers". */
+  sizeNotes?: Record<string, string>;
+  /** PDP purchase-card kicker, e.g. "Organic Cotton · Newborn". */
+  detailsKicker?: string;
   isNew?: boolean;
   isBestseller?: boolean;
   isTrending?: boolean;

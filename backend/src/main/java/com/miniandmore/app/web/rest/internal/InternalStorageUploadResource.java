@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,7 +36,10 @@ public class InternalStorageUploadResource {
 
     @PostMapping(value = "/catalogue-pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<UploadResult> uploadCataloguePdf(@RequestParam("file") MultipartFile file) throws IOException {
-        String publicUrl = s3StorageService.uploadCataloguePdf(file.getOriginalFilename(), file.getBytes());
+        String publicUrl;
+        try (InputStream in = file.getInputStream()) {
+            publicUrl = s3StorageService.uploadCataloguePdf(file.getOriginalFilename(), in, file.getSize());
+        }
         auditUpload("catalogues", file.getOriginalFilename(), publicUrl, null, null);
         return ApiResponse.ok(new UploadResult(publicUrl));
     }
@@ -55,6 +59,12 @@ public class InternalStorageUploadResource {
         );
         auditUpload(folder, file.getOriginalFilename(), publicUrl, productSku, colorName);
         return ApiResponse.ok(new UploadResult(publicUrl));
+    }
+
+    @PostMapping("/derivatives")
+    public ApiResponse<UploadResult> ensureDerivatives(@Valid @RequestBody DerivativesRequest request) {
+        s3StorageService.ensureImageDerivativesFromPublicUrl(request.publicUrl());
+        return ApiResponse.ok(new UploadResult(request.publicUrl().trim()));
     }
 
     @GetMapping("/objects")
@@ -113,6 +123,8 @@ public class InternalStorageUploadResource {
     ) {}
 
     public record UploadResult(String publicUrl) {}
+
+    public record DerivativesRequest(@NotBlank @Size(max = 2000) String publicUrl) {}
 
     public record DeleteObjectsRequest(@NotEmpty List<String> keys) {}
 }

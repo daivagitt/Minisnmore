@@ -1,8 +1,9 @@
 spring:
   servlet:
     multipart:
-      max-file-size: 8MB
-      max-request-size: 9MB
+      max-file-size: 75MB
+      max-request-size: 80MB
+      file-size-threshold: 1MB
   application:
     name: miniandmore-store
   security:

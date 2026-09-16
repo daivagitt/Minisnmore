@@ -12,6 +12,7 @@ import { commerceFromSiteSettings } from "@/lib/commerce";
 import { orderTotals } from "@/lib/money";
 import { DEFAULT_STORE_DISCOUNT_PERCENT } from "@/lib/pricing";
 import { LazyImage } from "@/components/LazyImage";
+import { storefrontImageUrl } from "@/lib/storefront-image";
 import { CouponOffers } from "@/components/CouponOffers";
 import { EmptyCartState } from "@/components/EmptyCartState";
 export const Route = createFileRoute("/cart")({
@@ -87,7 +88,7 @@ function CartPage() {
           <motion.div key={item.product.id + item.size + item.color}
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}
             className="glass rounded-2xl p-4 flex gap-4">
-            <LazyImage src={cartLineImage(item)} alt={item.product.name} className="h-24 w-24 rounded-xl object-cover" priority="auto" />
+            <LazyImage src={storefrontImageUrl(cartLineImage(item), "thumb")} fallbackSrc={cartLineImage(item)} alt={item.product.name} className="h-24 w-24 rounded-xl object-cover" priority="auto" />
             <div className="flex-1 min-w-0">
               <div className="flex justify-between gap-2">
                 <Link to="/product/$slug" params={{ slug: item.product.slug }} className="font-medium hover:text-primary">{item.product.name}</Link>

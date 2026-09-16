@@ -318,7 +318,7 @@ export function SizeChartEditor({
           {previewRows.length > 0 ? (
             <div className="rounded-lg glass p-3">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
-                Calculator preview (this product’s sizes only)
+                Size guide preview (this product’s sizes only)
               </div>
               <ProductSizeChartTables rows={previewRows} title={chart.title || null} chart={chart} />
             </div>

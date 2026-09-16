@@ -34,7 +34,8 @@ public class StorefrontCacheControlFilter extends OncePerRequestFilter {
             path.startsWith("/internal/v1/account/") ||
             path.startsWith("/internal/v1/zoho/") ||
             path.startsWith("/internal/v1/ledgerly/") ||
-            path.startsWith("/internal/v1/order-returns/")
+            path.startsWith("/internal/v1/order-returns/") ||
+            path.startsWith("/internal/v1/media/")
         );
     }
 

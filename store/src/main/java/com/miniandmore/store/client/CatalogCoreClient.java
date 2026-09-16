@@ -72,12 +72,7 @@ public class CatalogCoreClient {
     public ResponseEntity<byte[]> forwardMultipartUpload(String folder, MultipartFile file) throws IOException {
         LinkedMultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
         parts.add("folder", folder);
-        parts.add("file", new org.springframework.core.io.ByteArrayResource(file.getBytes()) {
-            @Override
-            public String getFilename() {
-                return file.getOriginalFilename();
-            }
-        });
+        parts.add("file", file.getResource());
 
         RestClient.RequestBodySpec spec = restClient
             .post()
@@ -113,12 +108,7 @@ public class CatalogCoreClient {
 
     private ResponseEntity<byte[]> forwardMultipartFile(String catalogPath, MultipartFile file) throws IOException {
         LinkedMultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
-        parts.add("file", new org.springframework.core.io.ByteArrayResource(file.getBytes()) {
-            @Override
-            public String getFilename() {
-                return file.getOriginalFilename();
-            }
-        });
+        parts.add("file", file.getResource());
 
         RestClient.RequestBodySpec spec = restClient
             .post()

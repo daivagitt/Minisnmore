@@ -177,13 +177,63 @@ describe("product fit from MnM length/chest", () => {
     });
   });
 
-  it("shorts chart exposes length only", () => {
+  it("shorts chart exposes length and waistband width", () => {
     const limits = measurementLimitsForProduct(shortsInput)!;
     expect(limits.hasLength).toBe(true);
-    expect(limits.hasChest).toBe(false);
+    expect(limits.hasChest).toBe(true);
+    expect(limits.lengthLabel).toBe("Total length");
+    expect(limits.chestLabel).toBe("Waistband width");
     const rows = sizeGuideRowsForProduct(shortsInput);
     expect(rows[0]?.lengthCm).toBe(17);
-    expect(rows[0]?.chest).toBe("—");
+    expect(rows[0]?.chestCm).toBe(16);
+    expect(rows[0]?.chestLabel).toBe("Waistband width");
+  });
+
+  it("recommends a size from custom waistband measurements", () => {
+    const input = {
+      sku: "UNKNOWN-SKU-NO-MAP",
+      sizes: ["0-3M", "3-6M", "6-12M", "12-18M", "18-24M"],
+      sizeChart: {
+        code: "MnM-4",
+        title: "Shorts Sets",
+        tolerance: "±1 cm",
+        sections: [
+          {
+            title: "Measurements",
+            bands: ["0-3M", "3-6M", "6-12M", "12-18M", "18-24M"],
+            rows: [
+              {
+                label: "Waistband width",
+                values: { "0-3M": "12-16", "3-6M": 17, "6-12M": 18, "12-18M": 19, "18-24M": 20 },
+              },
+              {
+                label: "Waistband Height",
+                values: { "0-3M": "1.1-1.5", "3-6M": 1.5, "6-12M": 1.5, "12-18M": 1.5, "18-24M": 1.5 },
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const limits = measurementLimitsForProduct(input)!;
+    expect(limits.hasLength).toBe(false);
+    expect(limits.hasChest).toBe(true);
+    expect(limits.chestLabel).toBe("Waistband width");
+    expect(recommendSizeByChest(12, input)).toBe("0-3M");
+    expect(recommendSizeByChest(16, input)).toBe("0-3M");
+    expect(recommendSizeByChest(17, input)).toBe("3-6M");
+    expect(checkSizeFit({ lengthCm: "", chestCm: "18", ...input })).toEqual({
+      ok: true,
+      size: "6-12M",
+    });
+    const rows = sizeGuideRowsForProduct(input);
+    expect(rows.map((r) => [r.size, r.length, r.chest])).toEqual([
+      ["0-3M", "—", "12–16 cm"],
+      ["3-6M", "—", "17 cm"],
+      ["6-12M", "—", "18 cm"],
+      ["12-18M", "—", "19 cm"],
+      ["18-24M", "—", "20 cm"],
+    ]);
   });
 
   it("uses product sizeChart for fit when provided", () => {

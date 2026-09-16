@@ -1,40 +1,44 @@
 import { createFileRoute, Outlet, Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { ADMIN_NAV_ITEMS, filterAdminNavItems } from "@/lib/admin-nav";
 import {
   LayoutDashboard, Image as ImgIcon, Tag, BookOpen, FileText, Package, Plug, LogOut, Loader2,
   Folder, Home, EyeOff, Settings as SettingsIcon, ExternalLink, ShoppingCart, ReceiptText, Percent, RotateCcw,
-  Users,
+  Users, Search,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin · Mini's n More" }] }),
   component: AdminLayout,
 });
 
-const nav = [
-  { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { to: "/admin/settings", label: "Site settings", icon: SettingsIcon },
-  { to: "/admin/banners", label: "Banners", icon: ImgIcon },
-  { to: "/admin/categories", label: "Categories", icon: Folder },
-  { to: "/admin/products", label: "Products", icon: Package },
-  { to: "/admin/home", label: "Home sections", icon: Home },
-  { to: "/admin/about", label: "About page", icon: Users },
-  { to: "/admin/pages", label: "Page visibility", icon: EyeOff },
-  { to: "/admin/coupons", label: "Coupons", icon: Tag },
-  { to: "/admin/discount", label: "Discount", icon: Percent },
-  { to: "/admin/blog", label: "Blogs", icon: BookOpen },
-  { to: "/admin/policies", label: "Policies", icon: FileText },
-  { to: "/admin/invoices", label: "Invoices", icon: ReceiptText },
-  { to: "/admin/orders", label: "Orders", icon: ShoppingCart },
-  { to: "/admin/returns", label: "Order returns", icon: RotateCcw },
-  { to: "/admin/zoho", label: "Zoho settings", icon: Plug },
-];
+const NAV_ICONS: Record<string, LucideIcon> = {
+  "/admin": LayoutDashboard,
+  "/admin/settings": SettingsIcon,
+  "/admin/banners": ImgIcon,
+  "/admin/categories": Folder,
+  "/admin/products": Package,
+  "/admin/home": Home,
+  "/admin/about": Users,
+  "/admin/pages": EyeOff,
+  "/admin/coupons": Tag,
+  "/admin/discount": Percent,
+  "/admin/blog": BookOpen,
+  "/admin/policies": FileText,
+  "/admin/invoices": ReceiptText,
+  "/admin/orders": ShoppingCart,
+  "/admin/returns": RotateCcw,
+  "/admin/zoho": Plug,
+};
 
 function AdminLayout() {
   const { user, isAdmin, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
+  const [navQuery, setNavQuery] = useState("");
+  const nav = useMemo(() => filterAdminNavItems(ADMIN_NAV_ITEMS, navQuery), [navQuery]);
 
   useEffect(() => {
     if (loading) return;
@@ -74,18 +78,33 @@ function AdminLayout() {
         <div className="relative px-2 pb-3 mb-1 border-b border-white/15">
           <div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/90 font-semibold">Admin</div>
           <div className="font-display text-lg leading-tight mt-0.5 text-white">Mini's n More</div>
+          <label className="relative mt-3 block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-amber-100/70" />
+            <input
+              type="search"
+              value={navQuery}
+              onChange={(e) => setNavQuery(e.target.value)}
+              placeholder="Search pages…"
+              aria-label="Search admin pages"
+              className="w-full rounded-xl bg-black/20 pl-9 pr-3 py-2 text-sm text-white placeholder:text-amber-100/50 outline-none ring-1 ring-white/15 focus:ring-white/40"
+            />
+          </label>
         </div>
-        {nav.map((n) => {
+        {nav.length === 0 ? (
+          <div className="relative px-4 py-3 text-xs text-amber-100/70">No matching pages.</div>
+        ) : nav.map((n) => {
           const active = n.exact ? path === n.to : path.startsWith(n.to);
+          const Icon = NAV_ICONS[n.to] ?? LayoutDashboard;
           return (
             <Link key={n.to} to={n.to}
+              onClick={() => setNavQuery("")}
               className={`group relative flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm whitespace-nowrap transition-all duration-200 ${
                 active
                   ? "bg-gradient-to-r from-white/95 to-amber-50/90 text-[#6b3a1f] shadow-[0_10px_24px_-10px_rgba(0,0,0,0.45)] font-semibold ring-1 ring-white/60"
                   : "text-amber-50/90 hover:bg-white/10 hover:text-white hover:translate-x-0.5"
               }`}>
               {active && <span className="absolute left-1 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#6b3a1f]/70" aria-hidden />}
-              <n.icon className={`h-4 w-4 ${active ? "" : "text-amber-100/80 group-hover:text-white"}`} /> <span>{n.label}</span>
+              <Icon className={`h-4 w-4 ${active ? "" : "text-amber-100/80 group-hover:text-white"}`} /> <span>{n.label}</span>
             </Link>
           );
         })}
@@ -111,16 +130,31 @@ function AdminLayout() {
             "linear-gradient(160deg, #6b3a1f 0%, #8a4a26 38%, #b56b3a 72%, #7a3f22 100%)",
         }}
       >
-        {nav.map((n) => {
+        <label className="relative w-full">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-amber-100/70" />
+          <input
+            type="search"
+            value={navQuery}
+            onChange={(e) => setNavQuery(e.target.value)}
+            placeholder="Search pages…"
+            aria-label="Search admin pages"
+            className="w-full rounded-xl bg-black/20 pl-9 pr-3 py-2 text-sm text-white placeholder:text-amber-100/50 outline-none ring-1 ring-white/15 focus:ring-white/40"
+          />
+        </label>
+        {nav.length === 0 ? (
+          <div className="px-3 py-2 text-xs text-amber-100/70">No matching pages.</div>
+        ) : nav.map((n) => {
           const active = n.exact ? path === n.to : path.startsWith(n.to);
+          const Icon = NAV_ICONS[n.to] ?? LayoutDashboard;
           return (
             <Link key={n.to} to={n.to}
+              onClick={() => setNavQuery("")}
               className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition ${
                 active
                   ? "bg-white text-[#6b3a1f] shadow-md font-semibold"
                   : "text-amber-50/90 hover:bg-white/10 hover:text-white"
               }`}>
-              <n.icon className="h-4 w-4 shrink-0" /> <span>{n.label}</span>
+              <Icon className="h-4 w-4 shrink-0" /> <span>{n.label}</span>
             </Link>
           );
         })}

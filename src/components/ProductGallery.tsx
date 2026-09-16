@@ -1,9 +1,21 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { LazyImage } from "@/components/LazyImage";
 import { cn } from "@/lib/utils";
-import { galleryHeroFitSize, PRODUCT_GALLERY_HERO_MAX_PX } from "@/lib/product-gallery";
+import {
+  galleryHeroFitSize,
+  PRODUCT_GALLERY_HERO_MAX_PX,
+  type GalleryHeroFitSize,
+} from "@/lib/product-gallery";
+import {
+  STOREFRONT_HERO_SIZES,
+  STOREFRONT_THUMB_SIZES,
+  prefetchStorefrontImage,
+  prefetchStorefrontImages,
+  storefrontImageSrcSet,
+  storefrontImageUrl,
+} from "@/lib/storefront-image";
+import { SizeFeatureNote } from "@/components/SizeFeatureNote";
 
 /** Warm cream frame (site --cream), not cool catalogue white. */
 const galleryCreamFrame =
@@ -13,6 +25,8 @@ const galleryImageRound = "rounded-[1.35rem] sm:rounded-[1.6rem] lg:rounded-[2re
 /** Small thumbs need a tighter radius than the hero or they render as stacked circles. */
 const galleryThumbRound = "rounded-2xl";
 const galleryThumbImageRound = "rounded-[0.85rem] sm:rounded-xl";
+/** In-viewport side-rail thumbs; the rest stay lazy. */
+const GALLERY_EAGER_THUMB_COUNT = 6;
 
 function uniqueImages(...sources: (string | undefined)[]) {
   const seen = new Set<string>();
@@ -24,6 +38,13 @@ function uniqueImages(...sources: (string | undefined)[]) {
     out.push(s);
   }
   return out;
+}
+
+function neighborGalleryUrls(images: string[], activeIndex: number, current: string): string[] {
+  if (images.length <= 1) return [];
+  const next = images[(activeIndex + 1) % images.length];
+  const prev = images[(activeIndex - 1 + images.length) % images.length];
+  return [...new Set([next, prev].filter((src) => src && src !== current))];
 }
 
 type NaturalSize = { width: number; height: number };
@@ -50,24 +71,42 @@ function useImageNaturalSize() {
 }
 
 type HeroImageProps = {
-  src: string;
+  originalSrc: string;
   alt: string;
   className?: string;
   style?: CSSProperties;
-  priority?: "high" | "auto" | "low";
+  priority?: "high" | "eager" | "auto" | "low";
   onSize: (src: string, img: HTMLImageElement) => void;
 };
 
-function HeroGalleryImage({ src, alt, className, style, priority, onSize }: HeroImageProps) {
-  if (!src) return null;
+function HeroGalleryImage({ originalSrc, alt, className, style, priority, onSize }: HeroImageProps) {
+  const imgRef = useRef<HTMLImageElement>(null);
+  const displaySrc = storefrontImageUrl(originalSrc, "display");
+  const srcSet = storefrontImageSrcSet(originalSrc);
+
+  const reportSize = useCallback(() => {
+    const img = imgRef.current;
+    if (!img) return;
+    onSize(originalSrc, img);
+  }, [originalSrc, onSize]);
+
+  useLayoutEffect(() => {
+    reportSize();
+  }, [reportSize]);
+
+  if (!originalSrc) return null;
 
   return (
     <LazyImage
-      src={src}
+      ref={imgRef}
+      src={displaySrc}
+      fallbackSrc={originalSrc}
+      srcSet={srcSet || undefined}
+      sizes={srcSet ? STOREFRONT_HERO_SIZES : undefined}
       alt={alt}
-      decoding="async"
+      decoding="auto"
       priority={priority ?? "auto"}
-      onLoad={(e) => onSize(src, e.currentTarget)}
+      onLoad={reportSize}
       className={cn("object-contain object-center select-none", className)}
       style={style}
       draggable={false}
@@ -85,6 +124,7 @@ type ThumbProps = {
 
 /** Each thumb is a fixed square so flex layout cannot collapse them into a stacked pile. */
 function GalleryThumb({ src, index, total, active, onSelect }: ThumbProps) {
+  const eager = index < GALLERY_EAGER_THUMB_COUNT;
   return (
     <button
       type="button"
@@ -101,10 +141,13 @@ function GalleryThumb({ src, index, total, active, onSelect }: ThumbProps) {
     >
       <span className={cn("block h-full w-full overflow-hidden bg-cream", galleryThumbImageRound)}>
         <LazyImage
-          src={src}
+          src={storefrontImageUrl(src, "thumb")}
+          fallbackSrc={src}
           alt=""
+          sizes={STOREFRONT_THUMB_SIZES}
           decoding="async"
-          priority="low"
+          priority={eager ? "eager" : "low"}
+          fetchPriority="low"
           className="h-full w-full object-contain object-center select-none"
           draggable={false}
         />
@@ -117,16 +160,28 @@ type Props = {
   name: string;
   image: string;
   gallery?: string[];
+  sizeNote?: string | null;
+  /** Other print heroes to warm during idle time (not the current gallery). */
+  relatedImages?: string[];
   className?: string;
 };
 
-export function ProductGallery({ name, image, gallery = [], className }: Props) {
+export function ProductGallery({
+  name,
+  image,
+  gallery = [],
+  sizeNote,
+  relatedImages = [],
+  className,
+}: Props) {
   const rawImages = useMemo(() => uniqueImages(image, ...gallery), [image, gallery]);
   const rawImagesKey = useMemo(() => rawImages.join("\0"), [rawImages]);
+  const relatedKey = useMemo(() => relatedImages.join("\0"), [relatedImages]);
   const [active, setActive] = useState(0);
   const { sizeFor, rememberSize } = useImageNaturalSize();
+  const lastFrameRef = useRef<GalleryHeroFitSize | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setActive(0);
   }, [rawImagesKey]);
 
@@ -134,34 +189,49 @@ export function ProductGallery({ name, image, gallery = [], className }: Props) 
   const current = rawImages[safeActive] ?? rawImages[0] ?? "";
   const natural = sizeFor(current);
   const fit = galleryHeroFitSize(natural?.width, natural?.height);
+  if (fit) lastFrameRef.current = fit;
+  const frame = fit ?? lastFrameRef.current;
 
   useEffect(() => {
-    if (rawImages.length <= 1 || !current || !natural) return;
+    if (!current || !natural) return;
 
-    const next = rawImages[(safeActive + 1) % rawImages.length];
-    const prev = rawImages[(safeActive - 1 + rawImages.length) % rawImages.length];
-    const neighbors = [...new Set([next, prev].filter((src) => src && src !== current))];
-    if (!neighbors.length) return;
+    const neighbors = neighborGalleryUrls(rawImages, safeActive, current);
+    for (const src of neighbors) prefetchStorefrontImage(src, "display");
 
-    const loaders: HTMLImageElement[] = [];
-    for (const src of neighbors) {
-      const img = new Image();
-      img.decoding = "async";
-      img.src = src;
-      loaders.push(img);
-    }
-
-    return () => {
-      for (const img of loaders) {
-        img.src = "";
-      }
-    };
-  }, [rawImages, safeActive, current, natural]);
+    const neighborSet = new Set(neighbors);
+    const restOfGallery = rawImages.filter((src) => src !== current && !neighborSet.has(src));
+    const related = (relatedKey ? relatedKey.split("\0") : []).filter((src) => src !== current);
+    return prefetchStorefrontImages([...restOfGallery, ...related], "display", { idle: true });
+  }, [rawImages, safeActive, current, natural, relatedKey]);
 
   const go = (delta: number) => {
     if (rawImages.length <= 1) return;
     setActive((i) => (i + delta + rawImages.length) % rawImages.length);
   };
+
+  const thumbStrip =
+    rawImages.length > 1 ? (
+      <div
+        className="order-2 lg:order-1 shrink-0 lg:self-start flex flex-row lg:flex-col gap-2 sm:gap-2.5 overflow-x-auto lg:overflow-y-auto snap-x snap-mandatory lg:snap-none [scrollbar-width:thin]"
+        style={{
+          maxHeight: frame
+            ? `min(${frame.height}px, ${PRODUCT_GALLERY_HERO_MAX_PX}px)`
+            : `min(70vh, ${PRODUCT_GALLERY_HERO_MAX_PX}px)`,
+        }}
+        aria-label="Product image thumbnails"
+      >
+        {rawImages.map((src, i) => (
+          <GalleryThumb
+            key={src}
+            src={src}
+            index={i}
+            total={rawImages.length}
+            active={safeActive === i}
+            onSelect={() => setActive(i)}
+          />
+        ))}
+      </div>
+    ) : null;
 
   return (
     <div
@@ -170,97 +240,88 @@ export function ProductGallery({ name, image, gallery = [], className }: Props) 
         className,
       )}
     >
-      {rawImages.length > 1 ? (
-        <div
-          className="order-2 lg:order-1 shrink-0 lg:self-start flex flex-row lg:flex-col gap-2 sm:gap-2.5 overflow-x-auto lg:overflow-y-auto snap-x snap-mandatory lg:snap-none [scrollbar-width:thin]"
-          style={{
-            maxHeight: fit
-              ? `min(${fit.height}px, ${PRODUCT_GALLERY_HERO_MAX_PX}px)`
-              : `min(70vh, ${PRODUCT_GALLERY_HERO_MAX_PX}px)`,
-          }}
-          aria-label="Product image thumbnails"
-        >
-          {rawImages.map((src, i) => (
-            <GalleryThumb
-              key={src}
-              src={src}
-              index={i}
-              total={rawImages.length}
-              active={safeActive === i}
-              onSelect={() => setActive(i)}
-            />
-          ))}
-        </div>
-      ) : null}
-
       <div className="order-1 lg:order-2 flex-1 min-w-0 flex justify-center lg:justify-start">
         <div
           className={cn(
             galleryCreamFrame,
             galleryHeroRound,
             "relative max-w-full p-1.5 sm:p-2",
-            fit ? "w-full" : "w-fit",
+            frame ? "w-full" : "w-fit min-w-[12rem] sm:min-w-[16rem]",
           )}
-          style={fit ? { maxWidth: `${fit.width}px` } : undefined}
+          style={frame ? { maxWidth: `${frame.width}px` } : undefined}
         >
-          <div className={cn("group relative w-full overflow-hidden bg-cream", galleryImageRound)}>
-            {fit ? (
+          <div
+            className={cn(
+              "group relative w-full overflow-hidden bg-cream",
+              galleryImageRound,
+              !frame && "min-h-[12rem] sm:min-h-[16rem]",
+            )}
+          >
+            {frame ? (
               <div
                 className="w-full"
-                style={{ paddingBottom: `${(fit.height / fit.width) * 100}%` }}
+                style={{ paddingBottom: `${(frame.height / frame.width) * 100}%` }}
                 aria-hidden
               />
             ) : null}
 
-            <AnimatePresence mode="sync" initial={false}>
-              <motion.div
-                key={current}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                className={fit ? "absolute inset-0 overflow-hidden" : "relative overflow-hidden"}
-              >
-                {current ? (
+            <div className={frame ? "absolute inset-0 overflow-hidden" : "relative overflow-hidden min-h-[12rem] sm:min-h-[16rem]"}>
+              {current ? (
+                <>
+                  <LazyImage
+                    src={storefrontImageUrl(current, "thumb")}
+                    fallbackSrc={current}
+                    alt=""
+                    aria-hidden
+                    sizes={STOREFRONT_THUMB_SIZES}
+                    decoding="async"
+                    priority="eager"
+                    fetchPriority="low"
+                    className="absolute inset-0 h-full w-full object-contain object-center blur-md scale-105 pointer-events-none select-none"
+                    draggable={false}
+                  />
                   <HeroGalleryImage
-                    src={current}
+                    key={current}
+                    originalSrc={current}
                     alt={name}
                     priority="high"
                     onSize={rememberSize}
                     className={
-                      fit
+                      frame
                         ? "absolute inset-0 h-full w-full"
-                        : "relative block h-auto w-auto max-w-full"
+                        : "relative z-[1] block h-auto w-auto max-w-full"
                     }
-                    style={fit ? undefined : { maxHeight: PRODUCT_GALLERY_HERO_MAX_PX }}
+                    style={frame ? undefined : { maxHeight: PRODUCT_GALLERY_HERO_MAX_PX }}
                   />
-                ) : null}
-              </motion.div>
-            </AnimatePresence>
+                </>
+              ) : null}
+            </div>
 
             {rawImages.length > 1 ? (
               <>
                 <button
                   type="button"
                   onClick={() => go(-1)}
-                  className="absolute left-2 sm:left-3 top-1/2 z-10 -translate-y-1/2 h-8 w-8 sm:h-9 sm:w-9 grid place-items-center rounded-full bg-white/80 backdrop-blur-sm hover:bg-white shadow-sm border border-white/70 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto"
+                  className="absolute left-2 sm:left-3 top-1/2 z-10 -translate-y-1/2 h-9 w-9 grid place-items-center rounded-full bg-white/90 backdrop-blur-sm hover:bg-white shadow-sm border border-white/70 opacity-100 pointer-events-auto transition-opacity lg:opacity-0 lg:pointer-events-none lg:group-hover:opacity-100 lg:group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto"
                   aria-label="Previous image"
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="h-5 w-5" />
                 </button>
                 <button
                   type="button"
                   onClick={() => go(1)}
-                  className="absolute right-2 sm:right-3 top-1/2 z-10 -translate-y-1/2 h-8 w-8 sm:h-9 sm:w-9 grid place-items-center rounded-full bg-white/80 backdrop-blur-sm hover:bg-white shadow-sm border border-white/70 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto"
+                  className="absolute right-2 sm:right-3 top-1/2 z-10 -translate-y-1/2 h-9 w-9 grid place-items-center rounded-full bg-white/90 backdrop-blur-sm hover:bg-white shadow-sm border border-white/70 opacity-100 pointer-events-auto transition-opacity lg:opacity-0 lg:pointer-events-none lg:group-hover:opacity-100 lg:group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto"
                   aria-label="Next image"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-5 w-5" />
                 </button>
               </>
             ) : null}
+            <SizeFeatureNote note={sizeNote} variant="overlay" />
           </div>
         </div>
       </div>
+      {thumbStrip}
     </div>
   );
 }

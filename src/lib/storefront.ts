@@ -8,6 +8,8 @@ import { parseVariantsJson, storefrontListPricing } from "@/lib/product-variants
 import { DEFAULT_STORE_DISCOUNT_PERCENT, sellingFromMrp } from "@/lib/pricing";
 import type { ProductSizeChart } from "@/lib/product-size-charts";
 import { isUsableSizeChart } from "@/lib/product-size-charts";
+import { parseSizeNotes } from "@/lib/product-size-notes";
+import { normalizeDetailsKicker } from "@/lib/product-details-kicker";
 
 /**
  * Storefront data layer.
@@ -78,6 +80,8 @@ type DbProductRow = {
   variants?: unknown;
   stock?: number | null;
   size_chart?: ProductSizeChart | null;
+  size_notes?: Record<string, string> | null;
+  details_kicker?: string | null;
 };
 
 type CategoryLookup = Map<string, { slug: string; name: string }>;
@@ -120,6 +124,8 @@ function mapProduct(row: DbProductRow, discountPercent = DEFAULT_STORE_DISCOUNT_
     parentMrp > 0 ? sellingFromMrp(parentMrp, discountPercent) : Number(row.price) || 0;
   const parentCompareAt = parentMrp > 0 ? parentMrp : undefined;
   const merchandisingCopy = stripCommonSizeAgeFromDescription(row.description ?? row.story ?? "");
+  const sizeNotes = parseSizeNotes(row.size_notes);
+  const detailsKicker = normalizeDetailsKicker(row.details_kicker);
   const mapped: Product = {
     id: row.id,
     slug: row.slug,
@@ -143,6 +149,8 @@ function mapProduct(row: DbProductRow, discountPercent = DEFAULT_STORE_DISCOUNT_
     variants: variants.length ? variants : undefined,
     stock: row.stock ?? null,
     sizeChart: isUsableSizeChart(row.size_chart) ? row.size_chart : null,
+    sizeNotes: Object.keys(sizeNotes).length ? sizeNotes : undefined,
+    detailsKicker: detailsKicker ?? undefined,
     isNew: !!row.new_arrival || badge.includes("new"),
     isBestseller: !!row.best_seller || badge.includes("best"),
     isTrending: !!row.trending,
@@ -208,6 +216,8 @@ export async function loadProducts(): Promise<Product[]> {
             variants_json: row.variants_json,
             stock: row.stock,
             size_chart: row.size_chart ?? null,
+            size_notes: row.size_notes ?? null,
+            details_kicker: row.details_kicker ?? null,
           }, discountPercent);
         });
       productsCache = mapped;

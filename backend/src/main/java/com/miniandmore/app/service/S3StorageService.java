@@ -1,7 +1,13 @@
 package com.miniandmore.app.service;
 
 import com.miniandmore.app.config.ApplicationProperties;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -15,14 +21,19 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.services.s3.model.Delete;
 import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectsResponse;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Error;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
@@ -72,6 +83,7 @@ public class S3StorageService {
             .bucket(bucket)
             .key(objectKey)
             .contentType(resolvedContentType)
+            .cacheControl(ImagePreviewSupport.IMAGE_CACHE_CONTROL)
             .build();
 
         var presignRequest = PutObjectPresignRequest.builder()
@@ -108,20 +120,106 @@ public class S3StorageService {
         var safeName = sanitizeFilename(filename);
         var objectKey = buildObjectKey(safeFolder, safeName);
         var resolvedContentType = resolveContentType(contentType, safeName);
-        var bucket = properties.getBucket();
-
-        var putObjectRequest = PutObjectRequest.builder()
-            .bucket(bucket)
-            .key(objectKey)
-            .contentType(resolvedContentType)
-            .build();
 
         try {
-            client().putObject(putObjectRequest, RequestBody.fromBytes(body));
+            putImageObject(objectKey, body, resolvedContentType);
         } catch (Exception ex) {
             throw storageUploadException(ex);
         }
+        ensureImageDerivatives(objectKey, body);
         return publicObjectUrl(objectKey);
+    }
+
+    public String publicBaseUrl() {
+        return effectivePublicBaseUrl();
+    }
+
+    /**
+     * Best-effort thumb (240) + display (800) JPEGs beside the original object.
+     * Failures leave the original in place; preview/ensure can retry later.
+     */
+    public void ensureImageDerivatives(String objectKey, byte[] originalBytes) {
+        if (isBlank(objectKey) || originalBytes == null || originalBytes.length == 0) {
+            return;
+        }
+        try {
+            byte[] thumb = ImagePreviewSupport.resizeToJpeg(
+                originalBytes,
+                ImagePreviewSupport.DEFAULT_WIDTH,
+                ImagePreviewSupport.THUMB_JPEG_QUALITY
+            );
+            putImageObject(ImagePreviewSupport.thumbKey(objectKey), thumb, "image/jpeg");
+        } catch (RuntimeException ignored) {
+            // Original is already stored.
+        }
+        try {
+            byte[] display = ImagePreviewSupport.resizeToJpeg(
+                originalBytes,
+                ImagePreviewSupport.DISPLAY_WIDTH,
+                ImagePreviewSupport.DISPLAY_JPEG_QUALITY
+            );
+            putImageObject(ImagePreviewSupport.displayKey(objectKey), display, "image/jpeg");
+        } catch (RuntimeException ignored) {
+            // Original is already stored.
+        }
+    }
+
+    public void ensureImageDerivativesFromPublicUrl(String publicUrl) {
+        validateConfig();
+        String objectKey = ImagePreviewSupport.objectKeyFromPublicUrl(effectivePublicBaseUrl(), publicUrl)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image URL is not a catalog storage URL"));
+        byte[] original = getObjectBytes(objectKey)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Stored image was not found"));
+        ensureImageDerivatives(objectKey, original);
+    }
+
+    public Optional<byte[]> getObjectBytes(String objectKey) {
+        if (isBlank(objectKey)) {
+            return Optional.empty();
+        }
+        validateConfig();
+        try {
+            ResponseBytes<GetObjectResponse> bytes = client()
+                .getObjectAsBytes(GetObjectRequest.builder().bucket(properties.getBucket()).key(objectKey).build());
+            byte[] data = bytes.asByteArray();
+            if (data.length > ImagePreviewSupport.MAX_SOURCE_BYTES) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image is too large to preview.");
+            }
+            return Optional.of(data);
+        } catch (NoSuchKeyException ex) {
+            return Optional.empty();
+        } catch (ResponseStatusException ex) {
+            throw ex;
+        } catch (S3Exception ex) {
+            if (ex.statusCode() == 404) {
+                return Optional.empty();
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Could not read stored image", ex);
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Could not read stored image", ex);
+        }
+    }
+
+    public void putPublicImage(String objectKey, byte[] body) {
+        if (isBlank(objectKey) || body == null || body.length == 0) {
+            return;
+        }
+        validateConfig();
+        try {
+            putImageObject(objectKey, body, "image/jpeg");
+        } catch (Exception ex) {
+            throw storageUploadException(ex);
+        }
+    }
+
+    private void putImageObject(String objectKey, byte[] body, String contentType) {
+        var putObjectRequest = PutObjectRequest.builder()
+            .bucket(properties.getBucket())
+            .key(objectKey)
+            .contentType(contentType)
+            .cacheControl(ImagePreviewSupport.IMAGE_CACHE_CONTROL)
+            .build();
+        client().putObject(putObjectRequest, RequestBody.fromBytes(body));
     }
 
     /**
@@ -130,7 +228,16 @@ public class S3StorageService {
      * invariant for admin uploads and must not be loosened to let PDFs through everywhere.
      */
     public String uploadInvoicePdf(String filename, byte[] body) {
-        return uploadDedicatedPdf("invoices", filename == null ? "invoice.pdf" : filename, body, "Invoice PDF");
+        if (body == null) {
+            return uploadDedicatedPdf("invoices", filename == null ? "invoice.pdf" : filename, null, 0, "Invoice PDF");
+        }
+        return uploadDedicatedPdf(
+            "invoices",
+            filename == null ? "invoice.pdf" : filename,
+            new ByteArrayInputStream(body),
+            body.length,
+            "Invoice PDF"
+        );
     }
 
     /**
@@ -138,19 +245,28 @@ public class S3StorageService {
      * do not add {@code pdf} to {@link #ALLOWED_EXTENSIONS}.
      */
     public String uploadCataloguePdf(String filename, byte[] body) {
-        return uploadDedicatedPdf("catalogues", filename == null ? "e-catalogue.pdf" : filename, body, "Catalogue PDF");
+        if (body == null) {
+            return uploadCataloguePdf(filename, null, 0);
+        }
+        return uploadCataloguePdf(filename, new ByteArrayInputStream(body), body.length);
     }
 
-    private String uploadDedicatedPdf(String folder, String filename, byte[] body, String label) {
-        if (body == null || body.length == 0) {
+    public String uploadCataloguePdf(String filename, InputStream body, long contentLength) {
+        return uploadDedicatedPdf(
+            "catalogues",
+            filename == null ? "e-catalogue.pdf" : filename,
+            body,
+            contentLength,
+            "Catalogue PDF"
+        );
+    }
+
+    private String uploadDedicatedPdf(String folder, String filename, InputStream body, long contentLength, String label) {
+        if (body == null || contentLength <= 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + " is empty.");
         }
-        if (body.length > properties.getMaxUploadBytes()) {
-            var maxMb = Math.max(1, Math.round(properties.getMaxUploadBytes() / (1024.0 * 1024.0)));
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                label + " is too large. Maximum size is " + maxMb + " MB."
-            );
+        if (contentLength > maxPdfUploadBytes()) {
+            throw pdfTooLarge(label);
         }
         validateConfig();
         var safeName = filename.replaceAll("[^A-Za-z0-9._-]", "-");
@@ -162,13 +278,57 @@ public class S3StorageService {
         }
         var objectKey = buildObjectKey(folder, safeName);
         var bucket = properties.getBucket();
-        var putObjectRequest = PutObjectRequest.builder().bucket(bucket).key(objectKey).contentType("application/pdf").build();
+        var putBuilder = PutObjectRequest.builder().bucket(bucket).key(objectKey).contentType("application/pdf");
+        if ("catalogues".equals(folder)) {
+            putBuilder = putBuilder.contentDisposition("attachment; filename=\"" + safeName + "\"");
+        }
+        var putObjectRequest = putBuilder.build();
+        // R2 requires Content-Length to match the body exactly. Multipart InputStreams are
+        // one-shot and AWS checksum signing can consume them, so buffer to a file first.
+        Path temp = null;
         try {
-            client().putObject(putObjectRequest, RequestBody.fromBytes(body));
+            temp = Files.createTempFile("pdf-upload-", ".pdf");
+            try (body) {
+                Files.copy(body, temp, StandardCopyOption.REPLACE_EXISTING);
+            }
+            long actual = Files.size(temp);
+            if (actual <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + " is empty.");
+            }
+            if (actual > maxPdfUploadBytes()) {
+                throw pdfTooLarge(label);
+            }
+            client().putObject(putObjectRequest, RequestBody.fromFile(temp));
+        } catch (ResponseStatusException ex) {
+            throw ex;
         } catch (Exception ex) {
             throw storageUploadException(ex);
+        } finally {
+            if (temp != null) {
+                try {
+                    Files.deleteIfExists(temp);
+                } catch (IOException ignored) {
+                    // best-effort cleanup
+                }
+            }
         }
         return publicObjectUrl(objectKey);
+    }
+
+    private ResponseStatusException pdfTooLarge(String label) {
+        var maxMb = Math.max(1, Math.round(maxPdfUploadBytes() / (1024.0 * 1024.0)));
+        return new ResponseStatusException(
+            HttpStatus.BAD_REQUEST,
+            label + " is too large. Maximum size is " + maxMb + " MB."
+        );
+    }
+
+    private long maxPdfUploadBytes() {
+        Long pdfMax = properties.getMaxPdfUploadBytes();
+        if (pdfMax != null && pdfMax > 0) {
+            return pdfMax;
+        }
+        return properties.getMaxUploadBytes();
     }
 
     /**

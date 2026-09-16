@@ -19,15 +19,20 @@ describe("admin-pdf", () => {
     expect(() => assertAllowedPdfFile(new File([], "notes.docx"))).toThrow(UNSUPPORTED_PDF_TYPE_MESSAGE);
   });
 
+  it("accepts PDFs up to the 75 MB admin upload limit", () => {
+    const ok = new File(["x"], "catalogue.pdf", { type: "application/pdf" });
+    Object.defineProperty(ok, "size", { value: Math.round(59.4 * 1024 * 1024) });
+    expect(validateAdminPdfFile(ok)).toEqual({ ok: true });
+  });
+
   it("rejects PDFs larger than the admin upload limit", () => {
-    const big = new File([new Uint8Array(MAX_ADMIN_PDF_BYTES + 1)], "big.pdf", {
-      type: "application/pdf",
-    });
+    const big = new File(["x"], "big.pdf", { type: "application/pdf" });
+    Object.defineProperty(big, "size", { value: MAX_ADMIN_PDF_BYTES + 1 });
     const result = validateAdminPdfFile(big);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toMatch(/too large/i);
-      expect(result.error).toMatch(/8 MB/i);
+      expect(result.error).toMatch(/75 MB/i);
     }
   });
 });

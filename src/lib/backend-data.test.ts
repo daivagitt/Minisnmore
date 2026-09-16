@@ -117,6 +117,8 @@ describe("backend data mappers", () => {
         price: 1299,
         compareAtPrice: "1499" as unknown as number,
         sizesJson: "[\"0-3m\"]",
+        sizeNotesJson: JSON.stringify({ "6-12m": "This size has grippers" }),
+        detailsKicker: "Organic Cotton · Newborn",
         sizeChartJson: JSON.stringify({
           code: "T-1",
           title: "Romper chart",
@@ -144,6 +146,8 @@ describe("backend data mappers", () => {
       compare_at_price: 1499,
       currency: "INR",
       sizes: ["0-3m"],
+      size_notes: { "6-12m": "This size has grippers" },
+      details_kicker: "Organic Cotton · Newborn",
       size_chart: {
         code: "T-1",
         title: "Romper chart",
@@ -699,7 +703,8 @@ describe("backend data API calls", () => {
     await expect(uploadAdminImage("products", file)).resolves.toBe(
       "https://cdn.example.com/romper.png",
     );
-    expect(mockedApi.post).toHaveBeenCalledTimes(2);
+    expect(mockedApi.post).toHaveBeenCalledTimes(3);
+    expect(mockedApi.post.mock.calls[2]?.[0]).toBe("/api/v1/admin/uploads/derivatives");
     fetchMock.mockRestore();
   });
 
@@ -792,6 +797,21 @@ describe("backend data API calls", () => {
         images: ["/img.jpg"],
       } as Parameters<typeof getProductValidationErrors>[0]),
     ).toEqual(expect.arrayContaining([`Product name must be ${PRODUCT_NAME_MAX_LEN} characters or fewer.`]));
+    expect(
+      getProductValidationErrors({
+        name: "Romper",
+        slug: "romper",
+        sku: "SKU-1",
+        category_id: "1",
+        fabric_type: "Cotton",
+        price: 100,
+        stock: 1,
+        age_min_months: 0,
+        age_max_months: 12,
+        details_kicker: "x".repeat(81),
+        images: ["/img.jpg"],
+      } as Parameters<typeof getProductValidationErrors>[0]),
+    ).toEqual(expect.arrayContaining(["Details card label must be 80 characters or fewer."]));
     expect(mockedApi.post).not.toHaveBeenCalled();
   });
 

@@ -1,9 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  downloadFilenameFromUrl,
   isExampleOrPlaceholderUrl,
   isPrivateObjectStorageUrl,
+  isSameOriginPublicPath,
   optionalPublicUrlFieldError,
   sanitizePublicUrl,
+  toDirectDownloadUrl,
+  triggerPublicFileDownload,
 } from "@/lib/utils";
 
 describe("public URL validation", () => {
@@ -29,6 +33,59 @@ describe("public URL validation", () => {
   it("returns a field error for placeholder category images", () => {
     expect(optionalPublicUrlFieldError("https://…/cover.jpg", "Category image")).toBe(
       "Category image must be a real uploaded image or valid site path, not a placeholder example.",
+    );
+  });
+});
+
+describe("public file download", () => {
+  it("derives filenames from URLs", () => {
+    expect(downloadFilenameFromUrl("https://cdn.example.com/catalogues/soft-bloom.pdf")).toBe(
+      "soft-bloom.pdf",
+    );
+    expect(downloadFilenameFromUrl("/e-catalogue.pdf")).toBe("e-catalogue.pdf");
+    expect(downloadFilenameFromUrl("")).toBe("download");
+  });
+
+  it("treats site paths as same-origin", () => {
+    expect(isSameOriginPublicPath("/e-catalogue.pdf")).toBe(true);
+    expect(isSameOriginPublicPath("https://cdn.example.com/cat.pdf")).toBe(false);
+  });
+
+  it("downloads cross-origin files via fetch and blob URL", async () => {
+    const click = vi.fn();
+    const remove = vi.fn();
+    const appendChild = vi.fn();
+    const createElement = vi.spyOn(document, "createElement").mockReturnValue({
+      click,
+      remove,
+    } as unknown as HTMLAnchorElement);
+    vi.spyOn(document.body, "appendChild").mockImplementation(appendChild);
+    URL.createObjectURL = vi.fn(() => "blob:mock");
+    URL.revokeObjectURL = vi.fn();
+
+    const blob = new Blob(["pdf"], { type: "application/pdf" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        blob: () => Promise.resolve(blob),
+      }),
+    );
+
+    await triggerPublicFileDownload("https://cdn.example.com/catalogues/soft-bloom.pdf");
+
+    expect(fetch).toHaveBeenCalledWith("https://cdn.example.com/catalogues/soft-bloom.pdf");
+    expect(createElement).toHaveBeenCalledWith("a");
+    expect(click).toHaveBeenCalled();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:mock");
+
+    createElement.mockRestore();
+  });
+
+  it("converts Google Drive view links before downloading", async () => {
+    const driveView = "https://drive.google.com/file/d/abc123/view?usp=sharing";
+    expect(toDirectDownloadUrl(driveView)).toBe(
+      "https://drive.google.com/uc?export=download&id=abc123",
     );
   });
 });

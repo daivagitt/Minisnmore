@@ -3,6 +3,12 @@ import type { MeasurementLimits } from "@/lib/product-fit";
 
 export type SizeFitState = { size: string } | { error: string } | null;
 
+function joinMeasurementNames(names: string[]): string {
+  if (names.length === 0) return "length or chest";
+  if (names.length === 1) return names[0]!.toLowerCase();
+  return `${names.slice(0, -1).join(", ").toLowerCase()} or ${names[names.length - 1]!.toLowerCase()}`;
+}
+
 export function ProductSizeCalculator({
   configured,
   limits,
@@ -23,9 +29,15 @@ export function ProductSizeCalculator({
   const frozen = !configured;
   if (!frozen && !limits) return null;
 
+  const lengthLabel = frozen ? "Length" : limits?.lengthLabel || "Length";
+  const chestLabel = frozen ? "Chest" : limits?.chestLabel || "Chest";
   const showLength = frozen || !!limits?.hasLength;
   const showChest = frozen || !!limits?.hasChest;
   const twoCols = showLength && showChest;
+  const enteredNames = [
+    ...(lengthCm.trim() ? [lengthLabel] : []),
+    ...(chestCm.trim() ? [chestLabel] : []),
+  ];
 
   return (
     <div
@@ -42,19 +54,18 @@ export function ProductSizeCalculator({
         </p>
       ) : sizeFit && "size" in sizeFit ? (
         <p className="text-xs text-muted-foreground leading-snug">
-          Auto-selected <span className="text-primary font-medium">{sizeFit.size}</span> from
-          {lengthCm.trim() && chestCm.trim()
-            ? " length and chest"
-            : lengthCm.trim()
-              ? " length"
-              : " chest"}
-          .
+          Auto-selected <span className="text-primary font-medium">{sizeFit.size}</span> from{" "}
+          {joinMeasurementNames(enteredNames)}.
         </p>
       ) : sizeFit && "error" in sizeFit ? (
         <p className="text-destructive text-xs leading-snug line-clamp-2">{sizeFit.error}</p>
       ) : (
         <p className="text-[11px] text-muted-foreground leading-snug">
-          Enter length or chest (cm) from the size guide to pick a size automatically.
+          Enter {joinMeasurementNames([
+            ...(showLength ? [lengthLabel] : []),
+            ...(showChest ? [chestLabel] : []),
+          ])}{" "}
+          (cm) from the size guide to pick a size automatically.
         </p>
       )}
       <div className={`grid gap-2 ${twoCols ? "grid-cols-1 min-[400px]:grid-cols-2" : "grid-cols-1"}`}>
@@ -74,10 +85,10 @@ export function ProductSizeCalculator({
             }}
             placeholder={
               frozen
-                ? "Length (cm)"
-                : `Length (${limits!.lengthMin}–${limits!.lengthMax} cm)`
+                ? `${lengthLabel} (cm)`
+                : `${lengthLabel} (${limits!.lengthMin}–${limits!.lengthMax} cm)`
             }
-            aria-label="Garment length in centimetres"
+            aria-label={`${lengthLabel} in centimetres`}
             className="h-10 glass rounded-full px-3 sm:px-4 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40 min-w-0 w-full disabled:cursor-not-allowed disabled:opacity-60"
           />
         ) : null}
@@ -97,10 +108,10 @@ export function ProductSizeCalculator({
             }}
             placeholder={
               frozen
-                ? "Chest (cm)"
-                : `Chest (${limits!.chestMin}–${limits!.chestMax} cm)`
+                ? `${chestLabel} (cm)`
+                : `${chestLabel} (${limits!.chestMin}–${limits!.chestMax} cm)`
             }
-            aria-label="Chest width in centimetres"
+            aria-label={`${chestLabel} in centimetres`}
             className="h-10 glass rounded-full px-3 sm:px-4 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40 min-w-0 w-full disabled:cursor-not-allowed disabled:opacity-60"
           />
         ) : null}

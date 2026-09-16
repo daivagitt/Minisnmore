@@ -18,6 +18,7 @@ import {
 import { isUsableSizeChart, sizeChartForProduct } from "@/lib/product-size-charts";
 import { ProductSizeChartTables } from "@/components/ProductSizeChart";
 import { galleryForSelectedColor } from "@/lib/product-gallery";
+import { prefetchStorefrontImage } from "@/lib/storefront-image";
 import { resolveStorefrontColorLabel } from "@/lib/expected-prints";
 import { lookupPincode, normalizePincode } from "@/lib/pincode";
 import {
@@ -36,6 +37,9 @@ import { StockAvailability, stockAvailabilityState } from "@/components/StockAva
 import { VariantColorButtons, VariantSizeButtons, variantColorsForDisplay } from "@/components/VariantPickers";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { commerceFromSiteSettings } from "@/lib/commerce";
+import { sizeNoteForSelection } from "@/lib/product-size-notes";
+import { SizeFeatureNote } from "@/components/SizeFeatureNote";
+import { productDetailsKicker } from "@/lib/product-details-kicker";
 
 export const Route = createFileRoute("/product/$slug")({
   head: ({ params }) => ({
@@ -125,6 +129,29 @@ function ProductPage() {
     () => (product ? galleryForSelectedColor(product, color, size) : { image: "", gallery: [] as string[] }),
     [product, color, size],
   );
+  const relatedHeroes = useMemo(() => {
+    if (!product) return [] as string[];
+    const seen = new Set<string>(colorGallery.image ? [colorGallery.image] : []);
+    const out: string[] = [];
+    for (const entry of availableColors) {
+      const image = galleryForSelectedColor(product, entry.name, size).image;
+      if (!image || seen.has(image)) continue;
+      seen.add(image);
+      out.push(image);
+    }
+    return out;
+  }, [product, availableColors, size, colorGallery.image]);
+  const prefetchColorGallery = (colorName: string) => {
+    if (!product) return;
+    const next = galleryForSelectedColor(product, colorName, size);
+    prefetchStorefrontImage(next.image, "display");
+    prefetchStorefrontImage(next.gallery[0], "display");
+  };
+  const sizeNote = useMemo(
+    () => (product ? sizeNoteForSelection(product.sizeNotes, size) : null),
+    [product, size],
+  );
+  const detailsKicker = product ? productDetailsKicker(product) : "";
 
   const availableFitSizes = useMemo(
     () => (product ? availableSizesForFit(product) : []),
@@ -267,6 +294,8 @@ function ProductPage() {
           name={product.name}
           image={colorGallery.image}
           gallery={colorGallery.gallery}
+          relatedImages={relatedHeroes}
+          sizeNote={sizeNote}
           className="lg:sticky lg:top-2"
         />
 
@@ -274,7 +303,9 @@ function ProductPage() {
         {/* Purchase card — compact, fully visible like reference PDP */}
         <div className="glass-strong rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 md:p-5 space-y-3.5 sm:space-y-4 w-full min-w-0">
           <div className="space-y-1.5">
-            <div className="text-[10px] uppercase tracking-[0.24em] text-primary">{product.fabric} · {product.category}</div>
+            {detailsKicker ? (
+              <div className="text-[10px] uppercase tracking-[0.24em] text-primary">{detailsKicker}</div>
+            ) : null}
             <h1 className="font-display text-lg sm:text-xl md:text-2xl lg:text-[1.65rem] leading-tight text-balance">{product.name}</h1>
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 pt-0.5">
               <span className="font-display text-xl sm:text-2xl">&#8377;{displayPrice.toLocaleString("en-IN")}</span>
@@ -290,6 +321,7 @@ function ProductPage() {
             {stockState && (isVariantsProduct(product) || stockState.kind !== "in_stock") && (
               <StockAvailability state={stockState} className="mt-1" />
             )}
+            <SizeFeatureNote note={sizeNote} className="mt-1" />
           </div>
 
           <div className="space-y-3">
@@ -315,6 +347,7 @@ function ProductPage() {
                 size={size}
                 color={color}
                 onColorChange={setColor}
+                onColorIntent={prefetchColorGallery}
                 colors={availableColors}
               />
             </div>
@@ -457,7 +490,7 @@ function ProductPage() {
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
           {recommendedProducts.map((p, i) => (
-            <ProductCard key={p.id} product={p} index={i} />
+            <ProductCard key={p.id} product={p} index={i} imagePriority="low" />
           ))}
         </div>
       </section>

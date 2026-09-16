@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Plus, Minus } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { LazyImage } from "@/components/LazyImage";
+import { storefrontImageUrl } from "@/lib/storefront-image";
 import { EmptyCartState } from "@/components/EmptyCartState";
 import { cartLineColorLabel, cartLineImage } from "@/lib/cart-catalog";
 import { FIT_LIMITS } from "@/lib/product-fit";
@@ -33,7 +34,13 @@ export function CartDrawer() {
                 )}
                 {cart.map((item) => (
                   <div key={item.product.id + item.size + item.color} className="glass rounded-2xl p-3 flex gap-3">
-                    <LazyImage src={cartLineImage(item)} alt={item.product.name} className="h-20 w-20 rounded-xl object-cover" priority="auto" />
+                    <LazyImage
+                      src={storefrontImageUrl(cartLineImage(item), "thumb")}
+                      fallbackSrc={cartLineImage(item)}
+                      alt={item.product.name}
+                      className="h-20 w-20 rounded-xl object-cover"
+                      priority="auto"
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between gap-2">
                         <div className="font-medium text-sm leading-tight">{item.product.name}</div>

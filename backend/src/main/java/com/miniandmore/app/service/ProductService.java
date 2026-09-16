@@ -53,6 +53,7 @@ public class ProductService {
      */
     public ProductDTO save(ProductDTO productDTO) {
         ProductSizeChartValidation.validate(productDTO.getSizeChartJson());
+        ProductSizeNotesValidation.validate(productDTO.getSizeNotesJson());
         LOG.debug("Request to save Product : {}", productDTO);
         Product product = productMapper.toEntity(productDTO);
         normalizeVariants(product, null, null);
@@ -68,6 +69,7 @@ public class ProductService {
      */
     public ProductDTO update(ProductDTO productDTO) {
         ProductSizeChartValidation.validate(productDTO.getSizeChartJson());
+        ProductSizeNotesValidation.validate(productDTO.getSizeNotesJson());
         LOG.debug("Request to update Product : {}", productDTO);
         String frozenVariantsJson = null;
         String frozenColorsJson = null;
@@ -90,6 +92,7 @@ public class ProductService {
      */
     public Optional<ProductDTO> partialUpdate(ProductDTO productDTO) {
         ProductSizeChartValidation.validate(productDTO.getSizeChartJson());
+        ProductSizeNotesValidation.validate(productDTO.getSizeNotesJson());
         LOG.debug("Request to partially update Product : {}", productDTO);
 
         return productRepository

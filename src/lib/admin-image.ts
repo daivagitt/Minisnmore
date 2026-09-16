@@ -1,7 +1,7 @@
 /** Matches S3StorageService.ALLOWED_EXTENSIONS */
 export const ALLOWED_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif"]);
 
-/** Aligns with spring.servlet.multipart.max-file-size and S3_MAX_UPLOAD_BYTES (8 MB). */
+/** Aligns with S3_MAX_UPLOAD_BYTES (8 MB). Multipart max is higher for catalogue PDFs. */
 export const MAX_ADMIN_IMAGE_BYTES = 8 * 1024 * 1024;
 
 export const IMAGE_ACCEPT =

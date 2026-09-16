@@ -84,5 +84,7 @@
     <include file="config/liquibase/changelog/20260903140000_add_delivery_eta_buffer_days.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260904090000_add_product_size_chart_json.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260913120000_add_about_page_json.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260916120000_add_product_size_notes_json.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260916140000_add_product_details_kicker.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>
 

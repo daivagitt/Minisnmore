@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   filterSizeChartToProductSizes,
+  fitAxesFromSizeChart,
   fitPointsFromSizeChart,
   formatMeasurementCell,
   isUsableSizeChart,
@@ -211,8 +212,41 @@ describe("product size charts", () => {
     expect(fitPointsFromSizeChart(shorts)[0]).toEqual({
       band: "0-3M",
       lengthCm: 17,
-      chestCm: null,
+      chestCm: 16,
     });
+  });
+
+  it("uses size-varying custom rows when chest/length labels are missing", () => {
+    const axes = fitAxesFromSizeChart({
+      code: "MnM-4",
+      title: "Shorts Sets",
+      tolerance: "±1 cm",
+      sections: [
+        {
+          title: "Measurements",
+          bands: ["0-3M", "3-6M", "6-12M", "12-18M", "18-24M"],
+          rows: [
+            {
+              label: "Waistband width",
+              values: { "0-3M": "12-16", "3-6M": 17, "6-12M": 18, "12-18M": 19, "18-24M": 20 },
+            },
+            {
+              label: "Waistband Height",
+              values: { "0-3M": "1.1-1.5", "3-6M": 1.5, "6-12M": 1.5, "12-18M": 1.5, "18-24M": 1.5 },
+            },
+          ],
+        },
+      ],
+    });
+    expect(axes.lengthLabel).toBeNull();
+    expect(axes.chestLabel).toBe("Waistband width");
+    expect(axes.points[0]).toEqual({
+      band: "0-3M",
+      lengthCm: null,
+      chestCm: 16,
+      chestMin: 12,
+    });
+    expect(axes.points[1]).toEqual({ band: "3-6M", lengthCm: null, chestCm: 17 });
   });
 
   it("parses 0-3M min–max cells without concatenating digits", () => {

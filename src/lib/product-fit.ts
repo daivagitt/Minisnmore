@@ -1,8 +1,9 @@
 import type { AgeRange } from "@/data/products";
 import { normalizeSizeKey, sizeToAgeBand } from "@/lib/product-ages";
 import {
-  fitPointsFromSizeChart,
+  fitAxesFromSizeChart,
   sizeChartForProduct,
+  type ChartFitAxes,
   type ChartFitPoint,
   type ProductSizeChart,
 } from "@/lib/product-size-charts";
@@ -34,6 +35,8 @@ export type MeasurementLimits = {
   chestMax: number;
   hasLength: boolean;
   hasChest: boolean;
+  lengthLabel: string;
+  chestLabel: string;
 };
 
 export type SizeGuideRow = {
@@ -42,6 +45,8 @@ export type SizeGuideRow = {
   chest: string;
   lengthCm: number | null;
   chestCm: number | null;
+  lengthLabel: string | null;
+  chestLabel: string | null;
 };
 
 type BandRange = {
@@ -124,32 +129,34 @@ export function validateBirthDate(dob: string, now = new Date()): BirthDateValid
 
 export function validateLengthCm(
   raw: string,
-  limits?: Pick<MeasurementLimits, "lengthMin" | "lengthMax">,
+  limits?: Pick<MeasurementLimits, "lengthMin" | "lengthMax" | "lengthLabel">,
 ): FieldValidation | { ok: true; value: number | null } {
   const trimmed = raw.trim();
+  const label = limits?.lengthLabel?.trim() || "Length";
   if (!trimmed) return { ok: true, value: null };
   const value = Number(trimmed);
-  if (!Number.isFinite(value)) return { ok: false, error: "Enter a valid length" };
+  if (!Number.isFinite(value)) return { ok: false, error: `Enter a valid ${label.toLowerCase()}` };
   const min = limits?.lengthMin ?? FIT_LIMITS.lengthMin;
   const max = limits?.lengthMax ?? FIT_LIMITS.lengthMax;
   if (value < min || value > max) {
-    return { ok: false, error: `Length should be ${min}–${max} cm for this item` };
+    return { ok: false, error: `${label} should be ${min}–${max} cm for this item` };
   }
   return { ok: true, value };
 }
 
 export function validateChestCm(
   raw: string,
-  limits?: Pick<MeasurementLimits, "chestMin" | "chestMax">,
+  limits?: Pick<MeasurementLimits, "chestMin" | "chestMax" | "chestLabel">,
 ): FieldValidation | { ok: true; value: number | null } {
   const trimmed = raw.trim();
+  const label = limits?.chestLabel?.trim() || "Chest";
   if (!trimmed) return { ok: true, value: null };
   const value = Number(trimmed);
-  if (!Number.isFinite(value)) return { ok: false, error: "Enter a valid chest measurement" };
+  if (!Number.isFinite(value)) return { ok: false, error: `Enter a valid ${label.toLowerCase()} measurement` };
   const min = limits?.chestMin ?? FIT_LIMITS.chestMin;
   const max = limits?.chestMax ?? FIT_LIMITS.chestMax;
   if (value < min || value > max) {
-    return { ok: false, error: `Chest should be ${min}–${max} cm for this item` };
+    return { ok: false, error: `${label} should be ${min}–${max} cm for this item` };
   }
   return { ok: true, value };
 }
@@ -186,15 +193,24 @@ function matchBandToProductSize(band: string, sizes: string[]): string | null {
   return sizes.find((s) => normalizeSizeLabel(s) === norm) ?? null;
 }
 
+function chartAxesFromSheet(input: {
+  sku?: string | null;
+  name?: string | null;
+  slug?: string | null;
+  sizeChart?: ProductSizeChart | null;
+}): ChartFitAxes {
+  const chart = sizeChartForProduct(input);
+  if (!chart) return { lengthLabel: null, chestLabel: null, points: [] };
+  return fitAxesFromSizeChart(chart);
+}
+
 function chartPointsFromSheet(input: {
   sku?: string | null;
   name?: string | null;
   slug?: string | null;
   sizeChart?: ProductSizeChart | null;
 }): ChartFitPoint[] {
-  const chart = sizeChartForProduct(input);
-  if (!chart) return [];
-  return fitPointsFromSizeChart(chart);
+  return chartAxesFromSheet(input).points;
 }
 
 /**
@@ -240,7 +256,11 @@ function buildBandRanges(points: ChartFitPoint[]): BandRange[] {
   });
 }
 
-function rowsFromFitPoints(points: ChartFitPoint[], sizes: string[]): SizeGuideRow[] {
+function rowsFromFitPoints(
+  axes: ChartFitAxes,
+  sizes: string[],
+): SizeGuideRow[] {
+  const points = axes.points;
   if (points.length === 0) {
     return sizes.map((size) => ({
       size,
@@ -248,6 +268,8 @@ function rowsFromFitPoints(points: ChartFitPoint[], sizes: string[]): SizeGuideR
       chest: "—",
       lengthCm: null,
       chestCm: null,
+      lengthLabel: axes.lengthLabel,
+      chestLabel: axes.chestLabel,
     }));
   }
 
@@ -271,11 +293,13 @@ function rowsFromFitPoints(points: ChartFitPoint[], sizes: string[]): SizeGuideR
             : "—",
       lengthCm: p.lengthCm,
       chestCm: p.chestCm,
+      lengthLabel: axes.lengthLabel,
+      chestLabel: axes.chestLabel,
     };
   });
 }
 
-/** Size guide rows (Length + Chest) for every chart band, including sizes not currently sold. */
+/** Size guide rows for every chart band, including sizes not currently sold. */
 export function sizeGuideRowsForProduct(input: {
   sku?: string | null;
   name?: string | null;
@@ -285,7 +309,7 @@ export function sizeGuideRowsForProduct(input: {
   /** When true, hide unsold bands after calculating ranges from the complete chart. */
   availableOnly?: boolean;
 }): SizeGuideRow[] {
-  const rows = rowsFromFitPoints(chartPointsFromSheet(input), input.sizes);
+  const rows = rowsFromFitPoints(chartAxesFromSheet(input), input.sizes);
   if (!input.availableOnly) return rows;
   return rows.filter((row) => matchBandToProductSize(row.size, input.sizes) != null);
 }
@@ -312,6 +336,7 @@ export function measurementLimitsForProduct(input: {
 
   if (lengthMaxs.length === 0 && chestMaxs.length === 0) return null;
 
+  const axes = chartAxesFromSheet(input);
   return {
     lengthMin: lengthMins.length ? roundDisplay(Math.min(...lengthMins)) : FIT_LIMITS.lengthMin,
     lengthMax: lengthMaxs.length ? roundDisplay(Math.max(...lengthMaxs)) : FIT_LIMITS.lengthMax,
@@ -319,6 +344,8 @@ export function measurementLimitsForProduct(input: {
     chestMax: chestMaxs.length ? roundDisplay(Math.max(...chestMaxs)) : FIT_LIMITS.chestMax,
     hasLength: lengthMaxs.length > 0,
     hasChest: chestMaxs.length > 0,
+    lengthLabel: axes.lengthLabel || "Length",
+    chestLabel: axes.chestLabel || "Chest",
   };
 }
 
@@ -407,10 +434,6 @@ export function checkSizeFit(input: {
 }): SizeFitResult {
   const lengthRaw = input.lengthCm?.trim() ?? "";
   const chestRaw = input.chestCm?.trim() ?? "";
-  if (!lengthRaw && !chestRaw) {
-    return { ok: false, error: "Enter length or chest measurement" };
-  }
-
   const productInput = {
     sku: input.sku,
     name: input.name,
@@ -423,37 +446,50 @@ export function checkSizeFit(input: {
     return { ok: false, error: "Size calculator is not available for this item" };
   }
 
+  const lengthName = limits.lengthLabel;
+  const chestName = limits.chestLabel;
+  if (!lengthRaw && !chestRaw) {
+    const names = [
+      ...(limits.hasLength ? [lengthName] : []),
+      ...(limits.hasChest ? [chestName] : []),
+    ];
+    return {
+      ok: false,
+      error: `Enter ${names.join(" or ").toLowerCase() || "a"} measurement`,
+    };
+  }
+
   let fromLength: string | null = null;
   let fromChest: string | null = null;
 
   if (lengthRaw) {
     if (!limits.hasLength) {
-      return { ok: false, error: "This item has no length guide on the measurement sheet" };
+      return { ok: false, error: `This item has no ${lengthName.toLowerCase()} guide on the measurement sheet` };
     }
     const length = validateLengthCm(lengthRaw, limits);
     if (!length.ok) return { ok: false, error: length.error };
-    if (length.value === null) return { ok: false, error: "Enter a valid length" };
+    if (length.value === null) return { ok: false, error: `Enter a valid ${lengthName.toLowerCase()}` };
     fromLength = recommendSizeByLength(length.value, productInput);
     if (!fromLength) {
       return {
         ok: false,
-        error: `No size on this item for length ${length.value} cm (${roundDisplay(limits.lengthMin)}–${roundDisplay(limits.lengthMax)} cm)`,
+        error: `No size on this item for ${lengthName.toLowerCase()} ${length.value} cm (${roundDisplay(limits.lengthMin)}–${roundDisplay(limits.lengthMax)} cm)`,
       };
     }
   }
 
   if (chestRaw) {
     if (!limits.hasChest) {
-      return { ok: false, error: "This item has no chest guide on the measurement sheet" };
+      return { ok: false, error: `This item has no ${chestName.toLowerCase()} guide on the measurement sheet` };
     }
     const chest = validateChestCm(chestRaw, limits);
     if (!chest.ok) return { ok: false, error: chest.error };
-    if (chest.value === null) return { ok: false, error: "Enter a valid chest measurement" };
+    if (chest.value === null) return { ok: false, error: `Enter a valid ${chestName.toLowerCase()} measurement` };
     fromChest = recommendSizeByChest(chest.value, productInput);
     if (!fromChest) {
       return {
         ok: false,
-        error: `No size on this item for chest ${chest.value} cm (${roundDisplay(limits.chestMin)}–${roundDisplay(limits.chestMax)} cm)`,
+        error: `No size on this item for ${chestName.toLowerCase()} ${chest.value} cm (${roundDisplay(limits.chestMin)}–${roundDisplay(limits.chestMax)} cm)`,
       };
     }
   }

@@ -1,4 +1,4 @@
-import { CloudDownload, Loader2, Plus, Trash2, X } from "lucide-react";
+import { GripVertical, CloudDownload, Loader2, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Field, inputCls } from "@/components/admin/AdminPage";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -17,7 +17,9 @@ import {
   variantRowSelling,
   type VariantEditorRow,
 } from "@/lib/admin-variants";
+import { AdminProductImage } from "@/components/admin/AdminProductImage";
 import { normalizeProductImageUrl } from "@/lib/backend-data";
+import { setDisplayImageDragData } from "@/lib/admin-display-image";
 
 export { validateVariantRows } from "@/lib/admin-variants";
 
@@ -340,13 +342,27 @@ export function VariantsMatrixEditor({
                   {photos.length ? (
                     <div className="flex items-center gap-1">
                       {photos.slice(0, 3).map((url) => (
-                        <img
+                        <div
                           key={url}
-                          src={normalizeProductImageUrl(url) ?? url}
-                          alt=""
-                          loading="lazy"
-                          className="h-10 w-10 rounded-md object-cover border border-border/60"
-                        />
+                          draggable
+                          onDragStart={(event) => {
+                            event.dataTransfer.effectAllowed = "copy";
+                            setDisplayImageDragData(event.dataTransfer, url);
+                          }}
+                          title="Drag to Display image"
+                          aria-label={`Drag variant photo as display image`}
+                          className="relative h-10 w-10 shrink-0 cursor-grab active:cursor-grabbing"
+                        >
+                          <AdminProductImage
+                            src={normalizeProductImageUrl(url) ?? url}
+                            alt=""
+                            draggable={false}
+                            className="h-10 w-10 rounded-md object-cover border border-border/60 pointer-events-none"
+                          />
+                          <span className="pointer-events-none absolute inset-0 grid place-items-start justify-start p-0.5">
+                            <GripVertical className="h-3 w-3 text-background drop-shadow" aria-hidden />
+                          </span>
+                        </div>
                       ))}
                       <button
                         type="button"
@@ -407,7 +423,9 @@ export function VariantsMatrixEditor({
         Zoho Books does not use a single parent item for variant products — each variant SKU syncs as its own Zoho item.
         The <span className="font-medium">Zoho item</span> column shows the linked id after sync or pull (read-only).
         Photo is stored on this Mini product, not read from the Zoho Books item-image screen.
-        Pull from Zoho always clears these thumbnails. Use the colour gallery above for real photos.
+        Pull from Zoho always clears these thumbnails. Drag a variant photo onto Display image
+        (just above this table) to use it on shop cards. Use the colour gallery above for real
+        product-page photos.
       </p>
       <div className="mt-2 flex flex-wrap gap-2">
         <button

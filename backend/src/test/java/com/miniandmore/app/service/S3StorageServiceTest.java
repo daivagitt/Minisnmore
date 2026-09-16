@@ -5,22 +5,27 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.miniandmore.app.config.ApplicationProperties;
+import java.awt.Color;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeletedObject;
 import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectsResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Object;
 
 class S3StorageServiceTest {
@@ -39,6 +44,7 @@ class S3StorageServiceTest {
         s3.setSecretKey("secret");
         s3.setPublicBaseUrl("https://cdn.example.com/my-bucket");
         s3.setMaxUploadBytes(5_000_000L);
+        s3.setMaxPdfUploadBytes(5_000_000L);
         s3StorageService = new S3StorageService(applicationProperties);
     }
 
@@ -142,6 +148,37 @@ class S3StorageServiceTest {
 
         assertThat(url).startsWith("https://cdn.example.com/my-bucket/");
         assertThat(url).contains("photo.jpg");
+    }
+
+    @Test
+    void uploadObject_setsImmutableCacheControl() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+        ArgumentCaptor<PutObjectRequest> captor = ArgumentCaptor.forClass(PutObjectRequest.class);
+
+        s3StorageService.uploadObject("products", "photo.jpg", "image-bytes".getBytes(), "image/jpeg");
+
+        verify(mockClient).putObject(captor.capture(), any(RequestBody.class));
+        assertThat(captor.getValue().cacheControl()).isEqualTo(ImagePreviewSupport.IMAGE_CACHE_CONTROL);
+    }
+
+    @Test
+    void uploadObject_realJpeg_alsoWritesThumb() throws Exception {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+
+        s3StorageService.uploadObject("products", "photo.jpg", ImagePreviewSupportTest.jpeg(80, 80, Color.RED), "image/jpeg");
+
+        verify(mockClient, times(3)).putObject(any(PutObjectRequest.class), any(RequestBody.class));
+    }
+
+    @Test
+    void ensureImageDerivativesFromPublicUrl_rejectsForeignHost() {
+        assertThatThrownBy(() ->
+            s3StorageService.ensureImageDerivativesFromPublicUrl("https://evil.example/products/photo.jpg")
+        )
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("not a catalog storage URL");
     }
 
     @Test

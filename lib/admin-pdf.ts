@@ -1,5 +1,5 @@
-/** Aligns with spring.servlet.multipart.max-file-size and S3_MAX_UPLOAD_BYTES (8 MB). */
-export const MAX_ADMIN_PDF_BYTES = 8 * 1024 * 1024;
+/** Aligns with spring.servlet.multipart.max-file-size and S3_MAX_PDF_UPLOAD_BYTES (75 MB). */
+export const MAX_ADMIN_PDF_BYTES = 75 * 1024 * 1024;
 
 export const PDF_ACCEPT = ".pdf,application/pdf";
 

@@ -521,6 +521,7 @@ export function resolveProductImages(
 /**
  * Storefront listing gallery. When prints have dedicated galleries, avoid mixing every print
  * into `product.gallery` — the PDP switches galleries per selected print.
+ * An explicit `images[0]` (admin display image) wins on shop cards over the first print photo.
  */
 export function resolveStorefrontProductImages(
   images: string[] | null | undefined,
@@ -530,7 +531,15 @@ export function resolveStorefrontProductImages(
   const explicit = (images ?? []).map((url) => url?.trim()).filter((url): url is string => !!url);
 
   if (perPrint) {
-    const cardImage = storefrontCardImageFromColors(colors) ?? explicit[0] ?? "";
+    const auto = storefrontCardImageFromColors(colors);
+    const explicitHero = explicit[0];
+    const swatches = new Set(
+      parseProductColors(colors)
+        .map((entry) => swatchUrlForEntry(entry))
+        .filter((url): url is string => Boolean(url)),
+    );
+    const skipSwatchHero = Boolean(explicitHero && swatches.has(explicitHero) && hasPerPrintLifestyleGalleries(colors));
+    const cardImage = skipSwatchHero ? (auto ?? explicitHero ?? "") : (explicitHero ?? auto ?? "");
     return { image: cardImage, gallery: [] };
   }
 

@@ -25,6 +25,7 @@ class MapperImplFullRoundTripTest {
         assertThat(mapper.toDto(entity).getCategory()).isNull();
         Product roundTrip = mapper.toEntity(mapper.toDto(entity));
         assertThat(roundTrip.getSku()).isEqualTo("SKU-X");
+        assertThat(roundTrip.getDetailsKicker()).isEqualTo("Organic Cotton · Newborn");
         Product copy = mapper.toEntity(mapper.toDto(entity));
         ProductDTO patch = new ProductDTO();
         patch.setBadge("Sale");
@@ -201,6 +202,7 @@ class MapperImplFullRoundTripTest {
             .colorsJson("[]")
             .imagesJson("[]")
             .badge("B")
+            .detailsKicker("Organic Cotton · Newborn")
             .stock(5)
             .sortOrder(1)
             .featured(true)

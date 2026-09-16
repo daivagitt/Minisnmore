@@ -18,6 +18,22 @@ const AUTHOR_MAX = 80;
 const DATE_MAX = 40;
 const NAME_HAS_LETTER_RE = /\p{L}/u;
 
+/** Whole and half stars from 1 to 5. */
+export const HOME_REVIEW_RATING_OPTIONS = [5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1] as const;
+
+export function snapHomeReviewRating(value: number): number {
+  if (!Number.isFinite(value)) return 5;
+  return Math.min(5, Math.max(1, Math.round(value * 2) / 2));
+}
+
+export function isAllowedHomeReviewRating(value: number): boolean {
+  return HOME_REVIEW_RATING_OPTIONS.some((stars) => stars === value);
+}
+
+export function homeReviewRatingLabel(stars: number): string {
+  return stars === 1 ? "1 star" : `${stars} stars`;
+}
+
 export function emptyHomeReview(): HomeReviewDraft {
   return { title: "", body: "", author: "", date: "", rating: 5, photo: "" };
 }
@@ -31,7 +47,7 @@ function draftFromRaw(raw: unknown): HomeReviewDraft {
     body: String(row.body ?? ""),
     author: String(row.author ?? ""),
     date: String(row.date ?? "").trim() === "Recent" ? "" : String(row.date ?? ""),
-    rating: Number.isFinite(rating) ? Math.min(5, Math.max(1, Math.round(rating))) : 5,
+    rating: snapHomeReviewRating(rating),
     photo: String(row.photo ?? ""),
   };
 }
@@ -98,8 +114,8 @@ export function getHomeReviewValidationErrors(draft: HomeReviewDraft, index?: nu
 
   if (date && date.length > DATE_MAX) errors.push(`${prefix}Date must be ${DATE_MAX} characters or fewer.`);
 
-  if (!Number.isFinite(draft.rating) || draft.rating < 1 || draft.rating > 5) {
-    errors.push(`${prefix}Rating must be between 1 and 5 stars.`);
+  if (!isAllowedHomeReviewRating(draft.rating)) {
+    errors.push(`${prefix}Rating must be 1 to 5 stars in half-star steps.`);
   }
 
   const photoError = optionalPublicUrlFieldError(photo, "Photo");
@@ -133,7 +149,7 @@ export function normalizeHomeReviewDraft(draft: HomeReviewDraft): Review {
     body: draft.body.trim(),
     author: draft.author.trim(),
     date: draft.date.trim() || "Recent",
-    rating: Math.round(draft.rating),
+    rating: snapHomeReviewRating(draft.rating),
     photo: photo || (defaultReviews[0]?.photo ?? ""),
   };
 }

@@ -32,9 +32,11 @@ class EntityFullFieldsMapperTest {
             .ageMinMonths(6)
             .ageMaxMonths(24)
             .sizesJson("[\"S\",\"M\"]")
+            .sizeNotesJson("{\"6-12m\":\"This size has grippers\"}")
             .colorsJson("[\"Pink\"]")
             .imagesJson("[\"img.jpg\"]")
             .badge("New")
+            .detailsKicker("Organic Cotton · Newborn")
             .stock(10)
             .sortOrder(1)
             .featured(true)
@@ -53,6 +55,8 @@ class EntityFullFieldsMapperTest {
 
         assertThat(roundTrip.getSlug()).isEqualTo("dress");
         assertThat(roundTrip.getPrice()).isEqualByComparingTo("999");
+        assertThat(roundTrip.getSizeNotesJson()).isEqualTo("{\"6-12m\":\"This size has grippers\"}");
+        assertThat(roundTrip.getDetailsKicker()).isEqualTo("Organic Cotton · Newborn");
         assertThat(roundTrip.getFeatured()).isTrue();
         assertThat(roundTrip.getCategory()).isNotNull();
         assertThat(roundTrip.getCategory().getName()).isEqualTo("Dresses");

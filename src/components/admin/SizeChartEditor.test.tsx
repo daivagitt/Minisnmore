@@ -106,3 +106,36 @@ describe("SizeChartEditor 0-3M range", () => {
     expect(screen.getAllByLabelText("Range to")[0]).toHaveValue("23");
   });
 });
+
+describe("SizeChartEditor preview", () => {
+  it("shows entered rows on the main chart and uses them for calculator ranges", () => {
+    renderEditor({
+      code: "MnM-4",
+      title: "Shorts Sets",
+      tolerance: "±1 cm",
+      sections: [
+        {
+          title: "Measurements",
+          bands: ["0-3M", "3-6M", "6-12M", "12-18M", "18-24M"],
+          rows: [
+            {
+              label: "Waistband width",
+              values: { "0-3M": "12-16", "3-6M": 17, "6-12M": 18, "12-18M": 19, "18-24M": 20 },
+            },
+            {
+              label: "Waistband Height",
+              values: { "0-3M": "1.1-1.5", "3-6M": 1.5, "6-12M": 1.5, "12-18M": 1.5, "18-24M": 1.5 },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(screen.getByText("Waistband Height")).toBeInTheDocument();
+    expect(screen.getAllByText("Waistband width").length).toBeGreaterThan(0);
+    expect(screen.getByText("Size calculator ranges")).toBeInTheDocument();
+    expect(screen.getByText("12–16 cm")).toBeInTheDocument();
+    expect(screen.queryByText(/No Chest/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No Body length/)).not.toBeInTheDocument();
+  });
+});

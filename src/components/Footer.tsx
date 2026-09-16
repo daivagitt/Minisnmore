@@ -13,7 +13,7 @@ import {
 import { useCategories } from "@/hooks/useCategories";
 import { usePageVisibility } from "@/hooks/usePageVisibility";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
-import { resolveContactEmail, toDirectDownloadUrl } from "@/lib/utils";
+import { resolveContactEmail, toDirectDownloadUrl, triggerPublicFileDownload } from "@/lib/utils";
 import footerLogo from "@/assets/logo-footer.png";
 
 const COLLECTION_LINKS = [
@@ -298,8 +298,13 @@ export function Footer() {
                   <FooterNavItem>
                     <a
                       href={toDirectDownloadUrl(settings.ecatalogue_url) || "/e-catalogue.pdf"}
-                      download
                       className="story-link text-muted-foreground hover:text-foreground"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        void triggerPublicFileDownload(
+                          toDirectDownloadUrl(settings.ecatalogue_url) || "/e-catalogue.pdf",
+                        );
+                      }}
                     >
                       Download e-catalogue
                     </a>

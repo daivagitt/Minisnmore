@@ -94,4 +94,42 @@ describe("ColorImagesEditor gallery reorder", () => {
     });
     expect(onGalleryUploaded).not.toHaveBeenCalled();
   });
+
+  it("exposes a print photo for the display-image drop target even when there is only one image", () => {
+    render(
+      <ColorImagesEditor
+        colors={[{ name: "Navy", imageUrls: ["https://cdn.example.com/navy-1.jpg"] }]}
+        onPatchColor={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText("Drag Navy image 1 as display image")).toBeInTheDocument();
+  });
+
+  it("hides extra gallery photos until Show all is clicked", async () => {
+    render(
+      <ColorImagesEditor
+        colors={[
+          {
+            name: "Navy",
+            imageUrls: [
+              "https://cdn.example.com/navy-1.jpg",
+              "https://cdn.example.com/navy-2.jpg",
+              "https://cdn.example.com/navy-3.jpg",
+            ],
+          },
+        ]}
+        onPatchColor={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText("Reorder Navy image 1")).toBeInTheDocument();
+    expect(screen.getByLabelText("Reorder Navy image 2")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Reorder Navy image 3")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Show all 3" }));
+
+    expect(screen.getByLabelText("Reorder Navy image 3")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show fewer" })).toBeInTheDocument();
+  });
 });

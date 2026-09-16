@@ -3,12 +3,23 @@ import { motion } from "framer-motion";
 import { Link } from "@tanstack/react-router";
 import { Heart, Eye, Star } from "lucide-react";
 import type { Product } from "@/data/products";
-import { LazyImage } from "@/components/LazyImage";
+import { LazyImage, type LazyImagePriority } from "@/components/LazyImage";
+import { STOREFRONT_CARD_SIZES, storefrontImageSrcSet, storefrontImageUrl } from "@/lib/storefront-image";
 import { useShop } from "@/store/shop";
 
-export function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
+export function ProductCard({
+  product,
+  index = 0,
+  imagePriority,
+}: {
+  product: Product;
+  index?: number;
+  /** Below-fold grids (PDP recommendations) should not compete with the hero. */
+  imagePriority?: LazyImagePriority;
+}) {
   const { toggleWish, wishlist, setQuickView } = useShop();
   const wished = wishlist.includes(product.id);
+  const srcSet = storefrontImageSrcSet(product.image);
 
   const handleWishlistClick = (e: MouseEvent) => {
     e.preventDefault();
@@ -24,8 +35,15 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
       <div className="glass rounded-3xl p-2.5 md:p-3 relative overflow-hidden flex flex-col h-full">
         <Link to="/product/$slug" params={{ slug: product.slug }} className="block">
           <div className="relative aspect-square overflow-hidden rounded-2xl bg-secondary/40">
-            <LazyImage src={product.image} alt={product.name} priority={index < 6 ? "high" : "auto"}
-              className="img-zoom h-full w-full object-cover" />
+            <LazyImage
+              src={storefrontImageUrl(product.image, "display")}
+              fallbackSrc={product.image}
+              srcSet={srcSet || undefined}
+              sizes={srcSet ? STOREFRONT_CARD_SIZES : undefined}
+              alt={product.name}
+              priority={imagePriority ?? (index < 6 ? "high" : "auto")}
+              className="img-zoom h-full w-full object-cover"
+            />
             <div className="absolute top-3 left-3 flex flex-col gap-1.5">
               {product.isNew && <span className="glass-strong text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full">New</span>}
               {product.isBestseller && <span className="bg-primary/90 text-primary-foreground text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full">Bestseller</span>}

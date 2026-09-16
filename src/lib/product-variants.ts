@@ -28,7 +28,7 @@ export type VariantProductLike = {
   itemStructure?: string | null;
   variants?: ProductVariant[];
   sizes: string[];
-  colors: { name: string; hex: string; imageUrl?: string; imageUrls?: string[] }[];
+  colors: { name: string; hex: string; swatchUrl?: string; imageUrl?: string; imageUrls?: string[] }[];
   price: number;
   compareAt?: number;
   sku?: string;

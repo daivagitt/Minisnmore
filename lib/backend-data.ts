@@ -32,6 +32,16 @@ import {
   parseProductSizeChart,
   type ProductSizeChart,
 } from "@/lib/product-size-charts";
+import {
+  parseSizeNotes,
+  serializeSizeNotes,
+  sizeNoteValidationErrors,
+  type SizeNotes,
+} from "@/lib/product-size-notes";
+import {
+  detailsKickerValidationErrors,
+  normalizeDetailsKicker,
+} from "@/lib/product-details-kicker";
 
 type Id = string | number;
 type JsonRecord = Record<string, unknown>;
@@ -206,6 +216,9 @@ export function getProductValidationErrors(row: ProductRow): string[] {
   if ((row.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS") {
     errors.push(...validateVariantRows(row.variants_json));
   }
+
+  errors.push(...sizeNoteValidationErrors(row.size_notes));
+  errors.push(...detailsKickerValidationErrors(row.details_kicker));
 
   // Product description is optional (CSV import + Ledgerly pull may omit it).
 
@@ -530,6 +543,10 @@ export type ProductRow = {
   sizes: string[];
   /** Per-product measurement chart; null hides the Size chart link (calculator may still use the SKU catalog). */
   size_chart?: ProductSizeChart | null;
+  /** Per-size callouts shown on the product photo (e.g. grippers). */
+  size_notes?: SizeNotes;
+  /** PDP purchase-card kicker, e.g. Organic Cotton · Newborn. */
+  details_kicker?: string | null;
   colors: ProductColorEntry[];
   color_images_json?: string | null;
   item_structure: string | null;
@@ -563,6 +580,8 @@ type ProductDto = {
   ageMaxMonths?: number | null;
   sizesJson?: string | null;
   sizeChartJson?: string | null;
+  sizeNotesJson?: string | null;
+  detailsKicker?: string | null;
   colorsJson?: string | null;
   colorImagesJson?: string | null;
   itemStructure?: string | null;
@@ -608,6 +627,8 @@ export const fromProductDto = (dto: ProductDto): ProductRow => ({
   age_max_months: dto.ageMaxMonths ?? null,
   sizes: parseJson<string[]>(dto.sizesJson, []),
   size_chart: parseProductSizeChart(dto.sizeChartJson),
+  size_notes: parseSizeNotes(dto.sizeNotesJson),
+  details_kicker: normalizeDetailsKicker(dto.detailsKicker),
   colors: normalizeColorEntries(
     applyExpectedPrintNamesToColors(
       mergeColorImagesIntoColors(
@@ -655,6 +676,8 @@ const toProductDto = (row: ProductRow): ProductDto => ({
   ageMaxMonths: row.age_max_months,
   sizesJson: JSON.stringify(row.sizes ?? []),
   sizeChartJson: serializeProductSizeChart(row.size_chart),
+  sizeNotesJson: serializeSizeNotes(row.size_notes),
+  detailsKicker: normalizeDetailsKicker(row.details_kicker),
   colorsJson: JSON.stringify(serializeProductColors(row.colors ?? [])),
   itemStructure: row.item_structure ?? "SIMPLE",
   variantsJson: row.variants_json ?? null,
@@ -1276,7 +1299,13 @@ async function uploadAdminImageViaPresign(folder: AdminImageFolder, file: File) 
     throw new Error(`Upload to storage failed (${storageResponse.status}).`);
   }
 
-  return presigned.publicUrl;
+  const publicUrl = presigned.publicUrl;
+  try {
+    await api.post("/api/v1/admin/uploads/derivatives", { publicUrl }, { auth: true });
+  } catch {
+    // Best-effort; storefront falls back to the original object if derivatives are missing.
+  }
+  return publicUrl;
 }
 
 function shouldFallbackToPresign(error: unknown) {

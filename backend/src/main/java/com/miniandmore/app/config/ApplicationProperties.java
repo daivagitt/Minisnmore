@@ -108,6 +108,8 @@ public class ApplicationProperties {
 
             private Long maxUploadBytes = 5_242_880L;
 
+            private Long maxPdfUploadBytes = 78_643_200L;
+
             public String getEndpoint() {
                 return endpoint;
             }
@@ -170,6 +172,14 @@ public class ApplicationProperties {
 
             public void setMaxUploadBytes(Long maxUploadBytes) {
                 this.maxUploadBytes = maxUploadBytes;
+            }
+
+            public Long getMaxPdfUploadBytes() {
+                return maxPdfUploadBytes;
+            }
+
+            public void setMaxPdfUploadBytes(Long maxPdfUploadBytes) {
+                this.maxPdfUploadBytes = maxPdfUploadBytes;
             }
         }
     }

@@ -10,6 +10,8 @@ const limits = {
   chestMax: 27,
   hasLength: true,
   hasChest: true,
+  lengthLabel: "Length",
+  chestLabel: "Chest",
 };
 
 describe("ProductSizeCalculator", () => {
@@ -29,8 +31,8 @@ describe("ProductSizeCalculator", () => {
       />,
     );
 
-    const length = screen.getByLabelText("Garment length in centimetres");
-    const chest = screen.getByLabelText("Chest width in centimetres");
+    const length = screen.getByLabelText("Length in centimetres");
+    const chest = screen.getByLabelText("Chest in centimetres");
     expect(length).toBeDisabled();
     expect(chest).toBeDisabled();
     expect(length).toHaveValue(null);
@@ -58,9 +60,36 @@ describe("ProductSizeCalculator", () => {
       />,
     );
 
-    const length = screen.getByLabelText("Garment length in centimetres");
+    const length = screen.getByLabelText("Length in centimetres");
     expect(length).toBeEnabled();
     await userEvent.type(length, "3");
     expect(onLengthChange).toHaveBeenCalled();
+  });
+
+  it("labels inputs from the entered size-chart rows", () => {
+    render(
+      <ProductSizeCalculator
+        configured
+        limits={{
+          lengthMin: 1,
+          lengthMax: 1,
+          chestMin: 12,
+          chestMax: 20,
+          hasLength: false,
+          hasChest: true,
+          lengthLabel: "Length",
+          chestLabel: "Waistband width",
+        }}
+        lengthCm=""
+        chestCm=""
+        onLengthChange={vi.fn()}
+        onChestChange={vi.fn()}
+        sizeFit={null}
+      />,
+    );
+
+    expect(screen.getByLabelText("Waistband width in centimetres")).toBeEnabled();
+    expect(screen.queryByLabelText("Length in centimetres")).not.toBeInTheDocument();
+    expect(screen.getByText(/enter waistband width/i)).toBeInTheDocument();
   });
 });

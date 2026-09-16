@@ -1,12 +1,14 @@
 import { ChevronLeft, ChevronRight, GripVertical, Loader2, Upload, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { AdminProductImage } from "@/components/admin/AdminProductImage";
 import { Field } from "@/components/admin/AdminPage";
 import { ImageSpecHint } from "@/components/admin/ImageSpecHint";
 import { ADMIN_IMAGE_SPECS } from "@/lib/admin-image-specs";
 import { IMAGE_ACCEPT, validateAdminImageFile } from "@/lib/admin-image";
 import { prepareProductImageForUpload } from "@/lib/product-image-normalize";
 import { uploadAdminImage } from "@/lib/backend-data";
+import { getGalleryReorderKey, setDisplayImageDragData } from "@/lib/admin-display-image";
 import {
   MAX_COLOR_IMAGES,
   colorImageUrls,
@@ -31,6 +33,8 @@ function previewUrl(url: string): string {
   const direct = toDirectDownloadUrl(url.trim());
   return sanitizePublicUrl(direct) ?? url;
 }
+
+const GALLERY_PREVIEW_LIMIT = 2;
 
 function UploadTile({
   busy,
@@ -97,6 +101,7 @@ export function ColorImagesEditor({
   const [status, setStatus] = useState<string | null>(null);
   const [dragging, setDragging] = useState<{ color: number; image: number } | null>(null);
   const [dropTarget, setDropTarget] = useState<{ color: number; image: number } | null>(null);
+  const [expandedGalleries, setExpandedGalleries] = useState<Set<number>>(() => new Set());
 
   const names = colorNames(normalizedColors);
   if (!names.length) {
@@ -245,7 +250,7 @@ export function ColorImagesEditor({
                   <div className="flex items-center gap-2 min-w-0">
                     {swatch ? (
                       <span className="h-6 w-6 shrink-0 rounded-full border border-white/80 ring-1 ring-border/40 overflow-hidden">
-                        <img src={previewUrl(swatch)} alt="" loading="lazy" className="h-full w-full object-cover" />
+                        <AdminProductImage src={previewUrl(swatch)} alt="" className="h-full w-full object-cover" />
                       </span>
                     ) : (
                       <span
@@ -263,7 +268,7 @@ export function ColorImagesEditor({
                 <div className="flex flex-wrap gap-2">
                   {swatch ? (
                     <div className="relative h-20 w-20 rounded-xl overflow-hidden ring-1 ring-border shrink-0">
-                      <img src={previewUrl(swatch)} alt="" loading="lazy" className="h-full w-full object-cover" />
+                      <AdminProductImage src={previewUrl(swatch)} alt="" className="h-full w-full object-cover" />
                     </div>
                   ) : freezeSwatches ? (
                     <div className="h-20 w-20 shrink-0 rounded-xl border border-dashed border-border/60 bg-muted/20 grid place-items-center px-1">
@@ -289,8 +294,9 @@ export function ColorImagesEditor({
       <Field label="Colour gallery (main product photos)">
         <ImageSpecHint spec={ADMIN_IMAGE_SPECS.productGallery} className="mb-2" />
         <p className="text-xs text-muted-foreground mb-3">
-          First photo is the main product image for this colour. Drag photos to reorder, or use
-          the arrows. Click Save on the product to keep the new order. Up to {MAX_COLOR_IMAGES}{" "}
+          First photo is the main product image for this colour on the product page. Drag a photo
+          onto Display image below to choose the shop-card photo. Drag within a colour to reorder,
+          or use the arrows. Click Save on the product to keep the new order. Up to {MAX_COLOR_IMAGES}{" "}
           images per colour.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -298,6 +304,10 @@ export function ColorImagesEditor({
             const gallery = colorImageUrls(entry);
             const canAdd = gallery.length < MAX_COLOR_IMAGES;
             const busy = uploadingKey?.startsWith(`gallery-${index}-`) ?? false;
+            const galleryExpanded = expandedGalleries.has(index) || gallery.length <= GALLERY_PREVIEW_LIMIT;
+            const visibleGallery = galleryExpanded
+              ? gallery.map((url, imageIndex) => ({ url, imageIndex }))
+              : gallery.slice(0, GALLERY_PREVIEW_LIMIT).map((url, imageIndex) => ({ url, imageIndex }));
             return (
               <div key={`gallery-${entry.name}-${index}`} className="rounded-xl border border-border/60 bg-white/30 p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2 min-w-0">
@@ -309,12 +319,13 @@ export function ColorImagesEditor({
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {gallery.map((url, imageIndex) => {
+                  {visibleGallery.map(({ url, imageIndex }) => {
                     const isDragging =
                       dragging?.color === index && dragging.image === imageIndex;
                     const isDropTarget =
                       dropTarget?.color === index && dropTarget.image === imageIndex && !isDragging;
-                    const canDrag = !uploadingKey && gallery.length > 1;
+                    const canReorder = !uploadingKey && gallery.length > 1;
+                    const canDrag = !uploadingKey;
                     return (
                     <div
                       key={url}
@@ -324,18 +335,22 @@ export function ColorImagesEditor({
                           event.preventDefault();
                           return;
                         }
-                        event.dataTransfer.effectAllowed = "move";
-                        event.dataTransfer.setData("text/plain", `${index}:${imageIndex}`);
+                        event.dataTransfer.effectAllowed = canReorder ? "copyMove" : "copy";
+                        setDisplayImageDragData(
+                          event.dataTransfer,
+                          url,
+                          canReorder ? `${index}:${imageIndex}` : undefined,
+                        );
                         setDragging({ color: index, image: imageIndex });
                       }}
                       onDragOver={(event) => {
                         event.preventDefault();
-                        event.dataTransfer.dropEffect = "move";
+                        event.dataTransfer.dropEffect = canReorder ? "move" : "copy";
                         if (!isDropTarget) setDropTarget({ color: index, image: imageIndex });
                       }}
                       onDrop={(event) => {
                         event.preventDefault();
-                        const payload = parseGalleryDrag(event.dataTransfer.getData("text/plain"));
+                        const payload = parseGalleryDrag(getGalleryReorderKey(event.dataTransfer));
                         setDragging(null);
                         setDropTarget(null);
                         if (!payload || payload.color !== index) return;
@@ -346,17 +361,21 @@ export function ColorImagesEditor({
                         setDropTarget(null);
                       }}
                       aria-grabbed={isDragging || undefined}
-                      aria-label={`Reorder ${entry.name} image ${imageIndex + 1}`}
+                      aria-label={
+                        canReorder
+                          ? `Reorder ${entry.name} image ${imageIndex + 1}`
+                          : `Drag ${entry.name} image ${imageIndex + 1} as display image`
+                      }
+                      title="Drag to Display image, or reorder within this colour"
                       className={`relative h-20 w-20 rounded-xl overflow-hidden ring-1 ring-border group shrink-0 ${
                         canDrag ? "cursor-grab active:cursor-grabbing" : ""
                       } ${isDragging ? "opacity-40" : ""} ${
                         isDropTarget ? "ring-2 ring-primary" : ""
                       }`}
                     >
-                      <img
+                      <AdminProductImage
                         src={previewUrl(url)}
                         alt=""
-                        loading="lazy"
                         draggable={false}
                         className="h-full w-full object-cover pointer-events-none"
                       />
@@ -407,6 +426,22 @@ export function ColorImagesEditor({
                     </div>
                     );
                   })}
+                  {gallery.length > GALLERY_PREVIEW_LIMIT ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedGalleries((current) => {
+                          const next = new Set(current);
+                          if (next.has(index)) next.delete(index);
+                          else next.add(index);
+                          return next;
+                        })
+                      }
+                      className="h-20 min-w-20 shrink-0 rounded-xl border border-dashed border-border px-2 text-[10px] leading-tight text-muted-foreground hover:bg-white/30"
+                    >
+                      {galleryExpanded ? "Show fewer" : `Show all ${gallery.length}`}
+                    </button>
+                  ) : null}
                   {canAdd ? (
                     <UploadTile
                       busy={busy}

@@ -68,6 +68,7 @@ public class ProductAsserts {
             .satisfies(a -> assertThat(a.getColorsJson()).as("check colorsJson").isEqualTo(expected.getColorsJson()))
             .satisfies(a -> assertThat(a.getImagesJson()).as("check imagesJson").isEqualTo(expected.getImagesJson()))
             .satisfies(a -> assertThat(a.getBadge()).as("check badge").isEqualTo(expected.getBadge()))
+            .satisfies(a -> assertThat(a.getDetailsKicker()).as("check detailsKicker").isEqualTo(expected.getDetailsKicker()))
             .satisfies(a -> assertThat(a.getStock()).as("check stock").isEqualTo(expected.getStock()))
             .satisfies(a -> assertThat(a.getSortOrder()).as("check sortOrder").isEqualTo(expected.getSortOrder()))
             .satisfies(a -> assertThat(a.getFeatured()).as("check featured").isEqualTo(expected.getFeatured()))

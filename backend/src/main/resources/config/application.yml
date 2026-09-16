@@ -93,8 +93,9 @@ management:
 spring:
   servlet:
     multipart:
-      max-file-size: 8MB
-      max-request-size: 9MB
+      max-file-size: 75MB
+      max-request-size: 80MB
+      file-size-threshold: 1MB
   application:
     name: miniandmore
   cloud:
@@ -243,6 +244,7 @@ application:
       public-base-url: ${S3_PUBLIC_BASE_URL:}
       key-prefix: ${S3_KEY_PREFIX:${R2_KEY_PREFIX:}}
       max-upload-bytes: ${S3_MAX_UPLOAD_BYTES:8192000}
+      max-pdf-upload-bytes: ${S3_MAX_PDF_UPLOAD_BYTES:78643200}
   internal-api-key: ${INTERNAL_API_KEY:}
   zoho:
     sync-product-images: ${ZOHO_SYNC_PRODUCT_IMAGES:true}

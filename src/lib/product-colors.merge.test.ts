@@ -57,6 +57,33 @@ describe("resolveStorefrontProductImages", () => {
     expect(result.image).toBe("https://cdn.example.com/a.jpg");
     expect(result.gallery).toEqual([]);
   });
+
+  it("uses an explicit display image on shop cards instead of the first print photo", () => {
+    const colors = mergeColorImagesIntoColors(
+      ["Print A", "Print B"],
+      {
+        "Print A": ["https://cdn.example.com/a.jpg"],
+        "Print B": ["https://cdn.example.com/b.jpg"],
+      },
+    );
+    const result = resolveStorefrontProductImages(["https://cdn.example.com/b.jpg"], colors);
+    expect(result.image).toBe("https://cdn.example.com/b.jpg");
+    expect(result.gallery).toEqual([]);
+  });
+
+  it("does not use a print swatch as the shop card when lifestyle photos exist", () => {
+    const result = resolveStorefrontProductImages(
+      ["https://cdn.example.com/swatch.jpg"],
+      [
+        {
+          name: "Print A",
+          swatchUrl: "https://cdn.example.com/swatch.jpg",
+          imageUrls: ["https://cdn.example.com/a.jpg"],
+        },
+      ],
+    );
+    expect(result.image).toBe("https://cdn.example.com/a.jpg");
+  });
   it("realigns generic print slots to colorImagesJson keys by position", () => {
     const merged = mergeColorImagesIntoColors(
       ["Print 3", "Print 4", "Print 5"],

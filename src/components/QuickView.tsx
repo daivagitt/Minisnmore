@@ -1,3 +1,4 @@
+import { LazyImage } from "@/components/LazyImage";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Star } from "lucide-react";
 import { Link } from "@tanstack/react-router";
@@ -15,7 +16,11 @@ import {
 import { StockAvailability, stockAvailabilityState } from "@/components/StockAvailability";
 import { VariantColorButtons, VariantSizeButtons, variantColorsForDisplay } from "@/components/VariantPickers";
 import { galleryForSelectedColor } from "@/lib/product-gallery";
+import { STOREFRONT_CARD_SIZES, prefetchStorefrontImage, storefrontImageSrcSet, storefrontImageUrl } from "@/lib/storefront-image";
 import { resolveStorefrontColorLabel } from "@/lib/expected-prints";
+import { sizeNoteForSelection } from "@/lib/product-size-notes";
+import { SizeFeatureNote } from "@/components/SizeFeatureNote";
+import { productDetailsKicker } from "@/lib/product-details-kicker";
 
 export function QuickView() {
   const { quickView, setQuickView, addToCart } = useShop();
@@ -59,6 +64,10 @@ export function QuickView() {
     () => (quickView ? galleryForSelectedColor(quickView, color, size) : { image: "", gallery: [] as string[] }),
     [quickView, color, size],
   );
+  const sizeNote = useMemo(
+    () => (quickView ? sizeNoteForSelection(quickView.sizeNotes, size) : null),
+    [quickView, size],
+  );
 
   return (
     <AnimatePresence>
@@ -73,24 +82,32 @@ export function QuickView() {
             <div className="glass-strong rounded-[1.75rem] sm:rounded-[2rem] overflow-y-auto md:overflow-hidden grid md:grid-cols-2 h-full max-h-[min(90vh,100dvh)]">
               <div className="relative aspect-[4/3] sm:aspect-square md:aspect-auto min-h-0 overflow-hidden bg-secondary/40 shrink-0">
                 <AnimatePresence mode="wait">
-                  <motion.img
+                  <motion.div
                     key={colorGallery.image || quickView.image}
-                    src={colorGallery.image || quickView.image}
-                    alt={quickView.name}
                     initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.98 }}
                     transition={{ type: "spring", stiffness: 400, damping: 32 }}
-                    className="absolute inset-0 h-full w-full object-cover object-center"
-                    decoding="async"
-                  />
+                    className="absolute inset-0"
+                  >
+                    <LazyImage
+                      src={storefrontImageUrl(colorGallery.image || quickView.image, "display")}
+                      fallbackSrc={colorGallery.image || quickView.image}
+                      srcSet={storefrontImageSrcSet(colorGallery.image || quickView.image) || undefined}
+                      sizes={storefrontImageSrcSet(colorGallery.image || quickView.image) ? STOREFRONT_CARD_SIZES : undefined}
+                      alt={quickView.name}
+                      className="h-full w-full object-cover object-center"
+                      decoding="async"
+                    />
+                    <SizeFeatureNote note={sizeNote} variant="overlay" />
+                  </motion.div>
                 </AnimatePresence>
               </div>
               <div className="p-5 sm:p-6 md:p-8 flex flex-col overflow-y-visible md:overflow-y-auto relative min-h-0">
                 <button onClick={() => setQuickView(null)} className="absolute top-4 right-4 h-9 w-9 grid place-items-center rounded-full glass hover:scale-105 transition">
                   <X className="h-4 w-4" />
                 </button>
-                <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">{quickView.fabric}</div>
+                <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">{productDetailsKicker(quickView)}</div>
                 <h3 className="font-display text-3xl mt-1">{quickView.name}</h3>
                 <div className="flex items-center gap-2 text-sm mt-2">
                   <Star className="h-3.5 w-3.5 fill-primary text-primary" />
@@ -107,6 +124,7 @@ export function QuickView() {
                 {stockState && (isVariantsProduct(quickView) || stockState.kind !== "in_stock") && (
                   <StockAvailability state={stockState} className="mt-3" />
                 )}
+                <SizeFeatureNote note={sizeNote} className="mt-3" />
                 <div className="mt-5">
                   <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Size</div>
                   <VariantSizeButtons
@@ -123,6 +141,10 @@ export function QuickView() {
                     size={size}
                     color={color}
                     onColorChange={setColor}
+                    onColorIntent={(name) => {
+                      const next = galleryForSelectedColor(quickView, name, size);
+                      prefetchStorefrontImage(next.image, "display");
+                    }}
                     colors={availableColors}
                     gapClass="gap-2.5"
                     swatchClass="h-11 w-11"
