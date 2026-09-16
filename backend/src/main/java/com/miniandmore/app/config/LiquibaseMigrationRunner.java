@@ -37,6 +37,8 @@ public final class LiquibaseMigrationRunner {
         ) {
             Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connection));
             try (Liquibase liquibase = new Liquibase(changelog, resources, database)) {
+                liquibase.setChangeLogParameter("clobType", "text");
+                liquibase.setChangeLogParameter("datetimeType", "timestamp");
                 Contexts contexts = new Contexts("prod");
                 LabelExpression labels = new LabelExpression();
                 liquibase.validate();
