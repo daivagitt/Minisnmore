@@ -2483,7 +2483,7 @@ class ZohoSyncServiceTest {
                 return (
                     "zoho-var-line".equals(salesLine.get("item_id")) &&
                     "Horizon Set — S / Navy".equals(salesLine.get("name")) &&
-                    "".equals(salesLine.get("description"))
+                    "SKU: HORIZON-S-NAVY".equals(salesLine.get("description"))
                 );
             })
         );
@@ -2525,7 +2525,7 @@ class ZohoSyncServiceTest {
                 }
                 return (
                     "Book Style Tying Jabla Short Set — 0-3m / Aqua".equals(salesLine.get("name")) &&
-                    "".equals(salesLine.get("description")) &&
+                    "SKU: JABLA".equals(salesLine.get("description")) &&
                     "zoho-jabla-parent".equals(salesLine.get("item_id"))
                 );
             })
