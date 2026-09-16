@@ -399,13 +399,7 @@ public class ZohoSyncService {
         String locationId
     ) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        String size = StringUtils.trimToEmpty(row.size());
-        String color = StringUtils.trimToEmpty(row.color());
-        String variantName = product.getName();
-        if (!size.isEmpty() || !color.isEmpty()) {
-            variantName = product.getName() + " — " + String.join(" / ", List.of(size, color).stream().filter(StringUtils::isNotBlank).toList());
-        }
-        payload.put("name", variantName);
+        payload.put("name", variantDisplayName(product.getName(), row.size(), row.color()));
         payload.put("sku", row.sku());
         BigDecimal sellingPrice = variantSupport.variantSellingPrice(row);
         payload.put("rate", sellingPrice);
@@ -2725,7 +2719,11 @@ public class ZohoSyncService {
         }
         for (OrderItem item : items) {
             Map<String, Object> line = new LinkedHashMap<>();
-            line.put("name", item.getProductName());
+            line.put("name", variantDisplayName(item.getProductName(), item.getItemSize(), item.getColor()));
+            String description = zohoOrderLineDescription(item);
+            if (description != null) {
+                line.put("description", description);
+            }
             line.put("rate", item.getPrice());
             line.put("quantity", item.getQty());
             Optional<String> zohoItemId = resolveZohoItemId(item);
@@ -2762,6 +2760,35 @@ public class ZohoSyncService {
             lineItems.add(codLine);
         }
         return lineItems;
+    }
+
+    static String variantDisplayName(String productName, String size, String color) {
+        String name = StringUtils.trimToEmpty(productName);
+        String suffix = String.join(
+            " / ",
+            List.of(StringUtils.trimToEmpty(size), StringUtils.trimToEmpty(color)).stream().filter(StringUtils::isNotBlank).toList()
+        );
+        return suffix.isEmpty() ? name : name + " — " + suffix;
+    }
+
+    static String zohoOrderLineDescription(OrderItem item) {
+        if (item == null) {
+            return null;
+        }
+        List<String> parts = new ArrayList<>();
+        String size = StringUtils.trimToNull(item.getItemSize());
+        String color = StringUtils.trimToNull(item.getColor());
+        String sku = StringUtils.trimToNull(item.getVariantSku());
+        if (size != null) {
+            parts.add("Size: " + size);
+        }
+        if (color != null) {
+            parts.add("Color: " + color);
+        }
+        if (sku != null) {
+            parts.add("SKU: " + sku);
+        }
+        return parts.isEmpty() ? null : String.join("\n", parts);
     }
 
     private void recordCodPaymentIfNeeded(CustomerOrder order, String customerId) {
