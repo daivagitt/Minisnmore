@@ -2720,10 +2720,8 @@ public class ZohoSyncService {
         for (OrderItem item : items) {
             Map<String, Object> line = new LinkedHashMap<>();
             line.put("name", variantDisplayName(item.getProductName(), item.getItemSize(), item.getColor()));
-            String description = zohoOrderLineDescription(item);
-            if (description != null) {
-                line.put("description", description);
-            }
+            // Empty so Zoho does not copy catalog item copy or repeat size/color already in the name.
+            line.put("description", "");
             line.put("rate", item.getPrice());
             line.put("quantity", item.getQty());
             Optional<String> zohoItemId = resolveZohoItemId(item);
@@ -2769,26 +2767,6 @@ public class ZohoSyncService {
             List.of(StringUtils.trimToEmpty(size), StringUtils.trimToEmpty(color)).stream().filter(StringUtils::isNotBlank).toList()
         );
         return suffix.isEmpty() ? name : name + " — " + suffix;
-    }
-
-    static String zohoOrderLineDescription(OrderItem item) {
-        if (item == null) {
-            return null;
-        }
-        List<String> parts = new ArrayList<>();
-        String size = StringUtils.trimToNull(item.getItemSize());
-        String color = StringUtils.trimToNull(item.getColor());
-        String sku = StringUtils.trimToNull(item.getVariantSku());
-        if (size != null) {
-            parts.add("Size: " + size);
-        }
-        if (color != null) {
-            parts.add("Color: " + color);
-        }
-        if (sku != null) {
-            parts.add("SKU: " + sku);
-        }
-        return parts.isEmpty() ? null : String.join("\n", parts);
     }
 
     private void recordCodPaymentIfNeeded(CustomerOrder order, String customerId) {
