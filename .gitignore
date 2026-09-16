@@ -66,7 +66,13 @@ artifacts/reports-site/
 .vscode/*
 !.vscode/extensions.json
 .idea
+*.code-workspace
 .DS_Store
+
+# Local screenshots and media (not part of the product)
+/Screenshot*.png
+/WhatsApp Image*
+/Screen Recording*.mov
 *.suo
 *.ntvs*
 *.njsproj
