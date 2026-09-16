@@ -7,6 +7,8 @@ import {
   resolveStorefrontProductImages,
   swatchImageForColor,
   hexForColorName,
+  colorImageUrls,
+  moveItem,
 } from "@/lib/product-colors";
 
 describe("mergeColorImagesIntoColors", () => {
@@ -54,6 +56,33 @@ describe("resolveStorefrontProductImages", () => {
     );
     expect(result.image).toBe("https://cdn.example.com/a.jpg");
     expect(result.gallery).toEqual([]);
+  });
+
+  it("uses an explicit display image on shop cards instead of the first print photo", () => {
+    const colors = mergeColorImagesIntoColors(
+      ["Print A", "Print B"],
+      {
+        "Print A": ["https://cdn.example.com/a.jpg"],
+        "Print B": ["https://cdn.example.com/b.jpg"],
+      },
+    );
+    const result = resolveStorefrontProductImages(["https://cdn.example.com/b.jpg"], colors);
+    expect(result.image).toBe("https://cdn.example.com/b.jpg");
+    expect(result.gallery).toEqual([]);
+  });
+
+  it("does not use a print swatch as the shop card when lifestyle photos exist", () => {
+    const result = resolveStorefrontProductImages(
+      ["https://cdn.example.com/swatch.jpg"],
+      [
+        {
+          name: "Print A",
+          swatchUrl: "https://cdn.example.com/swatch.jpg",
+          imageUrls: ["https://cdn.example.com/a.jpg"],
+        },
+      ],
+    );
+    expect(result.image).toBe("https://cdn.example.com/a.jpg");
   });
   it("realigns generic print slots to colorImagesJson keys by position", () => {
     const merged = mergeColorImagesIntoColors(
@@ -115,5 +144,52 @@ describe("collectStorefrontCardImages", () => {
       { name: "BLUE", swatchUrl: "https://cdn.example.com/blue.jpg" },
     ]);
     expect(urls).toEqual(["https://cdn.example.com/bee.jpg"]);
+  });
+});
+
+describe("colorImageUrls", () => {
+  it("keeps imageUrls order when imageUrl is already in the array", () => {
+    expect(
+      colorImageUrls({
+        imageUrl: "https://cdn.example.com/a.jpg",
+        imageUrls: [
+          "https://cdn.example.com/b.jpg",
+          "https://cdn.example.com/a.jpg",
+          "https://cdn.example.com/c.jpg",
+        ],
+      }),
+    ).toEqual([
+      "https://cdn.example.com/b.jpg",
+      "https://cdn.example.com/a.jpg",
+      "https://cdn.example.com/c.jpg",
+    ]);
+  });
+
+  it("appends imageUrl when it is missing from imageUrls", () => {
+    expect(
+      colorImageUrls({
+        imageUrl: "https://cdn.example.com/extra.jpg",
+        imageUrls: ["https://cdn.example.com/b.jpg", "https://cdn.example.com/c.jpg"],
+      }),
+    ).toEqual([
+      "https://cdn.example.com/b.jpg",
+      "https://cdn.example.com/c.jpg",
+      "https://cdn.example.com/extra.jpg",
+    ]);
+  });
+});
+
+describe("moveItem", () => {
+  it("moves an item and keeps the rest in relative order", () => {
+    expect(moveItem(["a", "b", "c"], 2, 0)).toEqual(["c", "a", "b"]);
+    expect(moveItem(["a", "b", "c"], 0, 1)).toEqual(["b", "a", "c"]);
+  });
+
+  it("returns a copy when the index is out of range", () => {
+    const list = ["a", "b"];
+    expect(moveItem(list, -1, 0)).toEqual(["a", "b"]);
+    expect(moveItem(list, 0, 9)).toEqual(["a", "b"]);
+    expect(moveItem(list, 0, 0)).toEqual(["a", "b"]);
+    expect(moveItem(list, 0, 0)).not.toBe(list);
   });
 });

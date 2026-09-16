@@ -336,17 +336,23 @@ public class ProductVariantSupport {
             return previousColorsJson != null ? previousColorsJson : "[]";
         }
         Map<String, JsonNode> richByKey = indexRichColorNodes(previousColorsJson, colorImagesJson);
-        if (richByKey.isEmpty()) {
+        List<JsonNode> richByPosition = indexRichColorNodesByPosition(previousColorsJson, colorImagesJson);
+        if (richByKey.isEmpty() && richByPosition.isEmpty()) {
             return objectMapper.writeValueAsString(colorNames);
         }
         ArrayNode out = objectMapper.createArrayNode();
         Set<String> seen = new LinkedHashSet<>();
+        int position = 0;
         for (String rawName : colorNames) {
             String name = normalize(rawName);
             if (name == null || !seen.add(name.toLowerCase(Locale.ROOT))) {
                 continue;
             }
             JsonNode previous = richByKey.get(name.toLowerCase(Locale.ROOT));
+            if (previous == null && position < richByPosition.size()) {
+                previous = richByPosition.get(position);
+            }
+            position++;
             if (previous != null && previous.isObject()) {
                 ObjectNode copy = previous.deepCopy();
                 copy.put("name", name);
@@ -356,6 +362,64 @@ public class ProductVariantSupport {
             }
         }
         return objectMapper.writeValueAsString(out);
+    }
+
+    private List<JsonNode> indexRichColorNodesByPosition(String colorsJson, String colorImagesJson) {
+        List<JsonNode> out = new ArrayList<>();
+        if (colorsJson != null && !colorsJson.isBlank()) {
+            try {
+                JsonNode root = objectMapper.readTree(colorsJson);
+                if (root != null && root.isArray()) {
+                    for (JsonNode node : root) {
+                        if (node == null) {
+                            continue;
+                        }
+                        if (node.isObject()) {
+                            String name = node.path("name").asText("");
+                            if (name.isBlank()) {
+                                continue;
+                            }
+                            boolean hasMedia =
+                                node.hasNonNull("imageUrl") ||
+                                node.hasNonNull("swatchUrl") ||
+                                (node.has("imageUrls") && node.get("imageUrls").isArray() && node.get("imageUrls").size() > 0);
+                            if (hasMedia) {
+                                out.add(node);
+                                continue;
+                            }
+                        }
+                        if (node.isTextual() && !node.asText("").isBlank()) {
+                            out.add(node);
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+                // keep whatever was indexed
+            }
+        }
+        if (out.isEmpty() && colorImagesJson != null && !colorImagesJson.isBlank()) {
+            try {
+                JsonNode root = objectMapper.readTree(colorImagesJson);
+                if (root != null && root.isObject()) {
+                    var fields = root.fields();
+                    while (fields.hasNext()) {
+                        var entry = fields.next();
+                        String name = entry.getKey();
+                        JsonNode urls = entry.getValue();
+                        if (name == null || name.isBlank() || urls == null || !urls.isArray() || urls.isEmpty()) {
+                            continue;
+                        }
+                        ObjectNode node = objectMapper.createObjectNode();
+                        node.put("name", name.trim());
+                        node.set("imageUrls", urls.deepCopy());
+                        out.add(node);
+                    }
+                }
+            } catch (Exception ignored) {
+                return out;
+            }
+        }
+        return out;
     }
 
     private Map<String, JsonNode> indexRichColorNodes(String colorsJson, String colorImagesJson) {
@@ -415,6 +479,46 @@ public class ProductVariantSupport {
             return out;
         }
         return out;
+    }
+
+    /**
+     * Admin save: print/colour names are frozen after Zoho pull — restore stored labels per SKU and
+     * ignore manual renames in the incoming variants matrix.
+     */
+    public void freezeVariantColorsFromStored(Product product, String frozenVariantsJson) {
+        if (product == null || frozenVariantsJson == null || frozenVariantsJson.isBlank()) {
+            return;
+        }
+        List<VariantRow> frozenRows = parse(frozenVariantsJson);
+        if (frozenRows.isEmpty()) {
+            return;
+        }
+        Map<String, String> colorBySku = new LinkedHashMap<>();
+        for (VariantRow row : frozenRows) {
+            if (row.sku() == null || row.sku().isBlank() || row.color() == null || row.color().isBlank()) {
+                continue;
+            }
+            colorBySku.putIfAbsent(row.sku().trim(), row.color().trim());
+        }
+        if (colorBySku.isEmpty()) {
+            return;
+        }
+        List<VariantRow> incoming = new ArrayList<>(parseProduct(product));
+        boolean changed = false;
+        for (int i = 0; i < incoming.size(); i++) {
+            VariantRow row = incoming.get(i);
+            if (row.sku() == null || row.sku().isBlank()) {
+                continue;
+            }
+            String frozenColor = colorBySku.get(row.sku().trim());
+            if (frozenColor != null && !Objects.equals(row.color(), frozenColor)) {
+                incoming.set(i, row.withColor(frozenColor));
+                changed = true;
+            }
+        }
+        if (changed) {
+            product.setVariantsJson(serialize(incoming));
+        }
     }
 
     /** Keep variant matrix colour labels in sync after print names are realigned to gallery keys. */

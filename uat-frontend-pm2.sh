@@ -13,7 +13,7 @@ if [ -s "$NVM_DIR/nvm.sh" ]; then
 fi
 
 REPO_ROOT="${REPO_ROOT:-/var/www/uat1/mini_ms_test}"
-PM2_NAME="${PM2_NAME:-mini-uat-frontend}"
+PM2_NAME="${PM2_NAME:-mini-prod-frontend}"
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 
 if [ ! -f "$REPO_ROOT/package.json" ]; then
@@ -30,7 +30,7 @@ if [ -f /etc/mini-and-more/uat.env ]; then
   set +a
 fi
 
-export VITE_API_BASE_URL="${VITE_API_BASE_URL:-https://uat.minisnmore.com}"
+export VITE_API_BASE_URL="${VITE_API_BASE_URL:-https://minisnmore.com}"
 
 echo "=== Frontend build (VITE_API_BASE_URL=$VITE_API_BASE_URL) ==="
 echo "Node: $(node -v 2>/dev/null || echo missing)  npm: $(npm -v 2>/dev/null || echo missing)"

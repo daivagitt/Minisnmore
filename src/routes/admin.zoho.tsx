@@ -361,6 +361,7 @@ function ZohoSyncPanel({
     description: string;
     icon: typeof Package;
     run: () => Promise<ZohoSyncSummary>;
+    hidden?: boolean;
   }[] = [
     {
       id: "products",
@@ -369,6 +370,7 @@ function ZohoSyncPanel({
         "Push all active products (SKU and category required). Syncs stock and each variant SKU's own image when enabled in Zoho Books (Locations + Item Image).",
       icon: Package,
       run: syncAllZohoProducts,
+      hidden: true,
     },
     {
       id: "productsPull",
@@ -422,7 +424,9 @@ function ZohoSyncPanel({
         </p>
       ) : (
         <ul className="space-y-3">
-          {actions.map(({ id, label, description, icon: Icon, run: runAction }) => {
+          {actions
+            .filter((action) => !action.hidden)
+            .map(({ id, label, description, icon: Icon, run: runAction }) => {
             const isBusy = busy === id;
             const disabled = busy !== null && !isBusy;
             return (
@@ -571,7 +575,7 @@ function ZohoConnectPanel({
       <p className="text-xs text-muted-foreground">
         Create a <span className="text-foreground">Server-based</span> app. Redirect URI must include{" "}
         <span className="font-mono text-[11px]">
-          {oauthSetup?.primaryRedirectUri ?? "https://uat.minisnmore.com/admin/zoho"}
+          {oauthSetup?.primaryRedirectUri ?? "https://minisnmore.com/admin/zoho"}
         </span>
         .
       </p>

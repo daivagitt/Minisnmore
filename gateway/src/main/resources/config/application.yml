@@ -101,6 +101,8 @@ management:
       application: ${spring.application.name}
 
 spring:
+  codec:
+    max-in-memory-size: 80MB
   application:
     name: gateway
   cloud:

@@ -539,6 +539,50 @@ class ProductVariantSupportTest {
     }
 
     @Test
+    void freezeVariantColorsFromStored_restoresStoredLabelsPerSku() {
+        Product product = variantProduct(
+            """
+            [{"sku":"SKU-AQUA-S","size":"0-3m","color":"Manual Blue","rate":999,"stock":2,"active":true}]
+            """
+        );
+        String frozen =
+            """
+            [{"sku":"SKU-AQUA-S","size":"0-3m","color":"AQUA","rate":999,"stock":2,"active":true}]
+            """;
+
+        support.freezeVariantColorsFromStored(product, frozen);
+
+        assertThat(support.parseProduct(product).get(0).color()).isEqualTo("AQUA");
+    }
+
+    @Test
+    void upsertPulledVariantFromZoho_overridesFrozenColorNames() {
+        Product product = variantProduct(
+            """
+            [{"sku":"SKU-AQUA-S","size":"0-3m","color":"AQUA","rate":999,"stock":2,"active":true}]
+            """
+        );
+        product.setColorsJson("[{\"name\":\"AQUA\",\"swatchUrl\":\"https://cdn.example.com/aqua.jpg\"}]");
+
+        assertThat(
+            support.upsertPulledVariantFromZoho(
+                product,
+                "SKU-AQUA-S",
+                "0-3m",
+                "Baby Blue",
+                BigDecimal.valueOf(999),
+                null,
+                2,
+                "zoho-aqua",
+                false
+            )
+        ).isTrue();
+
+        assertThat(support.parseProduct(product).get(0).color()).isEqualTo("Baby Blue");
+        assertThat(product.getColorsJson()).contains("Baby Blue");
+    }
+
+    @Test
     void upsertPulledVariantFromZoho_appendsMissingSkuOntoParent() {
         Product product = variantProduct(
             """

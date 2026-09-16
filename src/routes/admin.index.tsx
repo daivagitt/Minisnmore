@@ -14,6 +14,7 @@ import {
   Layers,
   Home,
   Barcode,
+  Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -132,6 +133,7 @@ function AdminDashboard() {
     { to: "/admin/categories", label: "Categories", icon: Folder, n: s.categories },
     { to: "/admin/products", label: "Products", icon: Package, n: s.products },
     { to: "/admin/home", label: "Home sections", icon: Home, n: "Configure" },
+    { to: "/admin/about", label: "About page", icon: Users, n: "Configure" },
     { to: "/admin/coupons", label: "Coupons", icon: Tag, n: s.coupons },
     { to: "/admin/blog", label: "Blogs", icon: BookOpen, n: s.blogs },
     { to: "/admin/policies", label: "Policies", icon: FileText, n: s.policies },

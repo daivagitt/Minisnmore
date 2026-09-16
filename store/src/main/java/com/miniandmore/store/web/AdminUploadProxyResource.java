@@ -25,6 +25,11 @@ public class AdminUploadProxyResource {
         this.catalogCoreClient = catalogCoreClient;
     }
 
+    @PostMapping(value = "/catalogue-pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<byte[]> uploadCataloguePdf(@RequestPart("file") MultipartFile file) throws IOException {
+        return catalogCoreClient.forwardCataloguePdfUpload(file);
+    }
+
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<byte[]> upload(@RequestParam("folder") String folder, @RequestPart("file") MultipartFile file)
         throws IOException {

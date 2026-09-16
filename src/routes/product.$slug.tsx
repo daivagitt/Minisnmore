@@ -3,7 +3,8 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { Product } from "@/data/products";
 import { useProduct, useProducts, useProductsLoaded } from "@/hooks/useProducts";
 import { useShop } from "@/store/shop";
-import { Heart, Truck, Leaf, ChevronRight, Ruler, Plus, Minus, Share2, Banknote, RotateCcw, X } from "lucide-react";
+import { Heart, Truck, Leaf, ChevronRight, Plus, Minus, Share2, Banknote, RotateCcw, X } from "lucide-react";
+import { ProductSizeCalculator } from "@/components/ProductSizeCalculator";
 import { ProductInfoSections } from "@/components/ProductInfoSections";
 import { toast } from "sonner";
 import { ProductCard } from "@/components/ProductCard";
@@ -14,9 +15,10 @@ import {
   measurementLimitsForProduct,
   sizeGuideRowsForProduct,
 } from "@/lib/product-fit";
-import { sizeChartForProduct } from "@/lib/product-size-charts";
+import { isUsableSizeChart, sizeChartForProduct } from "@/lib/product-size-charts";
 import { ProductSizeChartTables } from "@/components/ProductSizeChart";
 import { galleryForSelectedColor } from "@/lib/product-gallery";
+import { prefetchStorefrontImage } from "@/lib/storefront-image";
 import { resolveStorefrontColorLabel } from "@/lib/expected-prints";
 import { lookupPincode, normalizePincode } from "@/lib/pincode";
 import {
@@ -35,6 +37,9 @@ import { StockAvailability, stockAvailabilityState } from "@/components/StockAva
 import { VariantColorButtons, VariantSizeButtons, variantColorsForDisplay } from "@/components/VariantPickers";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { commerceFromSiteSettings } from "@/lib/commerce";
+import { sizeNoteForSelection } from "@/lib/product-size-notes";
+import { SizeFeatureNote } from "@/components/SizeFeatureNote";
+import { productDetailsKicker } from "@/lib/product-details-kicker";
 
 export const Route = createFileRoute("/product/$slug")({
   head: ({ params }) => ({
@@ -124,6 +129,29 @@ function ProductPage() {
     () => (product ? galleryForSelectedColor(product, color, size) : { image: "", gallery: [] as string[] }),
     [product, color, size],
   );
+  const relatedHeroes = useMemo(() => {
+    if (!product) return [] as string[];
+    const seen = new Set<string>(colorGallery.image ? [colorGallery.image] : []);
+    const out: string[] = [];
+    for (const entry of availableColors) {
+      const image = galleryForSelectedColor(product, entry.name, size).image;
+      if (!image || seen.has(image)) continue;
+      seen.add(image);
+      out.push(image);
+    }
+    return out;
+  }, [product, availableColors, size, colorGallery.image]);
+  const prefetchColorGallery = (colorName: string) => {
+    if (!product) return;
+    const next = galleryForSelectedColor(product, colorName, size);
+    prefetchStorefrontImage(next.image, "display");
+    prefetchStorefrontImage(next.gallery[0], "display");
+  };
+  const sizeNote = useMemo(
+    () => (product ? sizeNoteForSelection(product.sizeNotes, size) : null),
+    [product, size],
+  );
+  const detailsKicker = product ? productDetailsKicker(product) : "";
 
   const availableFitSizes = useMemo(
     () => (product ? availableSizesForFit(product) : []),
@@ -144,8 +172,10 @@ function ProductPage() {
     [product, availableFitSizes],
   );
 
+  const hasConfiguredSizeChart = isUsableSizeChart(product?.sizeChart);
+
   const sizeFit = useMemo(() => {
-    if (!product || (!lengthCm.trim() && !chestCm.trim())) return null;
+    if (!hasConfiguredSizeChart || !product || (!lengthCm.trim() && !chestCm.trim())) return null;
     const result = checkSizeFit({
       lengthCm,
       chestCm,
@@ -156,7 +186,7 @@ function ProductPage() {
       sizeChart: product.sizeChart,
     });
     return result.ok ? { size: result.size } : { error: result.error };
-  }, [lengthCm, chestCm, product, availableFitSizes]);
+  }, [hasConfiguredSizeChart, lengthCm, chestCm, product, availableFitSizes]);
 
   useEffect(() => {
     if (!sizeFit || !("size" in sizeFit)) return;
@@ -179,14 +209,19 @@ function ProductPage() {
 
   const sizeGuideChart = useMemo(() => {
     if (!product) return null;
-    const chart = sizeChartForProduct({
+    return sizeChartForProduct({
       sku: product.sku,
       name: product.name,
       slug: product.slug,
       sizeChart: product.sizeChart,
     });
-    return chart;
   }, [product]);
+
+  useEffect(() => {
+    if (hasConfiguredSizeChart) return;
+    setLengthCm("");
+    setChestCm("");
+  }, [hasConfiguredSizeChart]);
 
   const handleAdd = () => {
     if (!product || !canAdd) {
@@ -247,8 +282,8 @@ function ProductPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto w-full px-3 sm:px-4 md:px-6 space-y-6 sm:space-y-8 md:space-y-10 pb-28 sm:pb-24 lg:pb-12 overflow-x-hidden">
-      <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+    <div className="max-w-7xl mx-auto w-full px-3 sm:px-4 md:px-6 pb-28 sm:pb-24 lg:pb-12 overflow-x-hidden">
+      <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap pt-1 pb-3 md:pb-4">
         <Link to="/" className="hover:text-foreground">Home</Link><ChevronRight className="h-3 w-3" />
         <Link to="/shop" className="hover:text-foreground">Shop</Link><ChevronRight className="h-3 w-3" />
         <span className="truncate">{product.name}</span>
@@ -259,14 +294,18 @@ function ProductPage() {
           name={product.name}
           image={colorGallery.image}
           gallery={colorGallery.gallery}
-          className="lg:sticky lg:top-24"
+          relatedImages={relatedHeroes}
+          sizeNote={sizeNote}
+          className="lg:sticky lg:top-2"
         />
 
         <div className="flex flex-col gap-3 min-w-0 w-full">
         {/* Purchase card — compact, fully visible like reference PDP */}
         <div className="glass-strong rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 md:p-5 space-y-3.5 sm:space-y-4 w-full min-w-0">
           <div className="space-y-1.5">
-            <div className="text-[10px] uppercase tracking-[0.24em] text-primary">{product.fabric} · {product.category}</div>
+            {detailsKicker ? (
+              <div className="text-[10px] uppercase tracking-[0.24em] text-primary">{detailsKicker}</div>
+            ) : null}
             <h1 className="font-display text-lg sm:text-xl md:text-2xl lg:text-[1.65rem] leading-tight text-balance">{product.name}</h1>
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 pt-0.5">
               <span className="font-display text-xl sm:text-2xl">&#8377;{displayPrice.toLocaleString("en-IN")}</span>
@@ -282,13 +321,16 @@ function ProductPage() {
             {stockState && (isVariantsProduct(product) || stockState.kind !== "in_stock") && (
               <StockAvailability state={stockState} className="mt-1" />
             )}
+            <SizeFeatureNote note={sizeNote} className="mt-1" />
           </div>
 
           <div className="space-y-3">
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Size</div>
-                <button type="button" onClick={() => setSizeChart(true)} className="text-[11px] text-primary underline-offset-2 hover:underline">Size chart</button>
+                {hasConfiguredSizeChart ? (
+                  <button type="button" onClick={() => setSizeChart(true)} className="text-[11px] text-primary underline-offset-2 hover:underline">Size chart</button>
+                ) : null}
               </div>
               <VariantSizeButtons product={product} size={size} onSizeChange={setSize} />
               {isVariantsProduct(product) &&
@@ -305,6 +347,7 @@ function ProductPage() {
                 size={size}
                 color={color}
                 onColorChange={setColor}
+                onColorIntent={prefetchColorGallery}
                 colors={availableColors}
               />
             </div>
@@ -315,61 +358,15 @@ function ProductPage() {
             )}
           </div>
 
-          {fitLimits ? (
-          <div className="glass rounded-xl p-3 space-y-2">
-            <div className="flex items-center gap-2 text-xs font-medium">
-              <Ruler className="h-3.5 w-3.5 text-primary shrink-0" />
-              Size calculator
-            </div>
-            {sizeFit && "size" in sizeFit ? (
-              <p className="text-xs text-muted-foreground leading-snug">
-                Auto-selected <span className="text-primary font-medium">{sizeFit.size}</span> from
-                {lengthCm.trim() && chestCm.trim()
-                  ? " length and chest"
-                  : lengthCm.trim()
-                    ? " length"
-                    : " chest"}
-                .
-              </p>
-            ) : sizeFit && "error" in sizeFit ? (
-              <p className="text-destructive text-xs leading-snug line-clamp-2">{sizeFit.error}</p>
-            ) : (
-              <p className="text-[11px] text-muted-foreground leading-snug">
-                Enter length or chest (cm) from the size guide to pick a size automatically.
-              </p>
-            )}
-            <div className={`grid gap-2 ${fitLimits.hasLength && fitLimits.hasChest ? "grid-cols-1 min-[400px]:grid-cols-2" : "grid-cols-1"}`}>
-              {fitLimits.hasLength ? (
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min={fitLimits.lengthMin}
-                  max={fitLimits.lengthMax}
-                  step="0.1"
-                  value={lengthCm}
-                  onChange={(e) => setLengthCm(e.target.value)}
-                  placeholder={`Length (${fitLimits.lengthMin}–${fitLimits.lengthMax} cm)`}
-                  aria-label="Garment length in centimetres"
-                  className="h-10 glass rounded-full px-3 sm:px-4 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40 min-w-0 w-full"
-                />
-              ) : null}
-              {fitLimits.hasChest ? (
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min={fitLimits.chestMin}
-                  max={fitLimits.chestMax}
-                  step="0.1"
-                  value={chestCm}
-                  onChange={(e) => setChestCm(e.target.value)}
-                  placeholder={`Chest (${fitLimits.chestMin}–${fitLimits.chestMax} cm)`}
-                  aria-label="Chest width in centimetres"
-                  className="h-10 glass rounded-full px-3 sm:px-4 text-sm bg-transparent outline-none focus:ring-2 focus:ring-primary/40 min-w-0 w-full"
-                />
-              ) : null}
-            </div>
-          </div>
-          ) : null}
+          <ProductSizeCalculator
+            configured={hasConfiguredSizeChart}
+            limits={fitLimits}
+            lengthCm={lengthCm}
+            chestCm={chestCm}
+            onLengthChange={setLengthCm}
+            onChestChange={setChestCm}
+            sizeFit={sizeFit}
+          />
 
           <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-3 sm:items-start">
             <div>
@@ -475,12 +472,15 @@ function ProductPage() {
             ))}
           </div>
         </div>
+
         </div>
       </div>
 
-      <ProductInfoSections product={product} />
+      <div className="mt-6 sm:mt-8 md:mt-10">
+        <ProductInfoSections product={product} />
+      </div>
 
-      <section className="space-y-6">
+      <section className="space-y-6 mt-6 sm:mt-8 md:mt-10">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4 sm:mb-6">
           <div className="min-w-0">
             <div className="text-xs uppercase tracking-[0.28em] text-muted-foreground">You may also love</div>
@@ -490,7 +490,7 @@ function ProductPage() {
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
           {recommendedProducts.map((p, i) => (
-            <ProductCard key={p.id} product={p} index={i} />
+            <ProductCard key={p.id} product={p} index={i} imagePriority="low" />
           ))}
         </div>
       </section>
@@ -537,8 +537,8 @@ function ProductPage() {
         </div>
       </div>
 
-      {sizeChart && (
-        <div className="fixed inset-0 z-70 grid place-items-end sm:place-items-center p-0 sm:p-4 bg-foreground/30 backdrop-blur-sm" onClick={() => setSizeChart(false)}>
+      {sizeChart && hasConfiguredSizeChart && (
+        <div className="fixed inset-0 z-[70] grid place-items-end sm:place-items-center p-0 sm:p-4 bg-foreground/30 backdrop-blur-sm" onClick={() => setSizeChart(false)}>
           <div
             onClick={(e) => e.stopPropagation()}
             className="glass-strong rounded-t-3xl sm:rounded-3xl max-w-lg w-full p-5 sm:p-6 max-h-[85vh] overflow-y-auto"

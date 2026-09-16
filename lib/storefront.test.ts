@@ -73,6 +73,69 @@ describe("storefront cache", () => {
     await storefront.loadProducts();
   });
 
+  it("maps per-size callouts onto storefront products", async () => {
+    const storefront = await loadStorefront({
+      products: [
+        {
+          id: "p-socks",
+          slug: "socks",
+          name: "Gripper Socks",
+          description: "Socks",
+          story: null,
+          price: 199,
+          compare_at_price: null,
+          images: ["/socks.jpg"],
+          sizes: ["0-3m", "6-12m"],
+          size_notes: { "0-3m": "Without grippers", "6-12m": "This size has grippers" },
+          colors: ["cream"],
+          age_min_months: 0,
+          age_max_months: 12,
+          badge: null,
+          featured: false,
+          best_seller: false,
+          new_arrival: false,
+          trending: false,
+          active: true,
+        },
+      ],
+    });
+    const products = await storefront.loadProducts();
+    expect(products[0].sizeNotes).toEqual({
+      "0-3m": "Without grippers",
+      "6-12m": "This size has grippers",
+    });
+  });
+
+  it("maps the admin details card label onto storefront products", async () => {
+    const storefront = await loadStorefront({
+      products: [
+        {
+          id: "p-shorts",
+          slug: "shorts-sets",
+          name: "Shorts Sets",
+          description: "Sets",
+          story: null,
+          price: 239,
+          compare_at_price: 299,
+          images: ["/shorts.jpg"],
+          sizes: ["0-3m"],
+          details_kicker: "Organic Cotton · Newborn",
+          colors: ["bee"],
+          age_min_months: 0,
+          age_max_months: 24,
+          badge: null,
+          featured: false,
+          best_seller: false,
+          new_arrival: false,
+          trending: false,
+          active: true,
+        },
+      ],
+    });
+    const products = await storefront.loadProducts();
+    expect(products[0].detailsKicker).toBe("Organic Cotton · Newborn");
+  });
+
   it("keeps print images off the card hero when product gallery is empty", async () => {
     const storefront = await loadStorefront({
       products: [
@@ -103,6 +166,40 @@ describe("storefront cache", () => {
     expect(products[0]?.image).toBe("https://cdn.example.com/print1.jpg");
     expect(products[0]?.gallery).toEqual([]);
     expect(products[0]?.colors[0]?.imageUrls).toEqual(["https://cdn.example.com/print1.jpg"]);
+  });
+
+  it("uses an explicit listing image on shop cards when per-print galleries exist", async () => {
+    const storefront = await loadStorefront({
+      products: [
+        {
+          id: "p-display",
+          slug: "mittens",
+          name: "Mittens",
+          description: "Set",
+          story: null,
+          price: 199,
+          compare_at_price: 249,
+          images: ["https://cdn.example.com/chosen.jpg"],
+          sizes: ["0-3 M"],
+          colors: [
+            { name: "Print 1", imageUrls: ["https://cdn.example.com/print1.jpg"] },
+            { name: "Print 2", imageUrls: ["https://cdn.example.com/chosen.jpg"] },
+          ],
+          age_min_months: 0,
+          age_max_months: 3,
+          badge: null,
+          featured: false,
+          best_seller: false,
+          new_arrival: false,
+          trending: true,
+          active: true,
+        },
+      ],
+    });
+
+    const products = await storefront.loadProducts();
+    expect(products[0]?.image).toBe("https://cdn.example.com/chosen.jpg");
+    expect(products[0]?.gallery).toEqual([]);
   });
 
   it("resolves category slug from categories when product DTO omits slug", async () => {

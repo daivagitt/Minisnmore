@@ -1,14 +1,19 @@
 import { ages as ALL_AGE_BANDS, type AgeRange } from "@/data/products";
 
 const SIZE_TO_AGE: Record<string, AgeRange> = {
+  "0-3": "0-3m",
   "0-3m": "0-3m",
+  "3-6": "3-6m",
   "3-6m": "3-6m",
+  "6-12": "6-12m",
   "6-12m": "6-12m",
+  "12-18": "12-18m",
   "12-18m": "12-18m",
+  "18-24": "18-24m",
   "18-24m": "18-24m",
 };
 
-const UNIVERSAL_SIZES = new Set(["freesize", "onesize", "one size", "os", "free", "universal"]);
+const UNIVERSAL_SIZES = new Set(["commonsize", "freesize", "onesize", "os", "free", "universal"]);
 
 const LETTER_SIZE_ORDER = ["xxs", "xs", "s", "m", "l", "xl", "xxl", "xxxl"];
 

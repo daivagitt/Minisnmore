@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +48,7 @@ public class ZohoItemImageSync {
     private final ProductColorImagesSupport colorImagesSupport;
     private final HttpClient downloadClient;
     private final Map<String, String> importedHashUrls = new LinkedHashMap<>();
+    private final Set<String> replacedColorGalleries = ConcurrentHashMap.newKeySet();
 
     public ZohoItemImageSync(
         ObjectMapper objectMapper,
@@ -66,6 +68,14 @@ public class ZohoItemImageSync {
 
     public boolean isEnabled() {
         return applicationProperties.getZoho().isSyncProductImages();
+    }
+
+    /**
+     * Call at the start of a product pull so a later size of the same print cannot revert a gallery
+     * that this pass already replaced with newer Zoho photos.
+     */
+    public void beginImageImportPass() {
+        replacedColorGalleries.clear();
     }
 
     public void syncProductImage(String zohoItemId, Product product) {
@@ -232,6 +242,7 @@ public class ZohoItemImageSync {
         for (int i = imported.size() - 1; i >= 0; i--) {
             setPrimaryImage(product, imported.get(i));
         }
+        applyImportedSimpleProductColorGalleries(product, imported);
     }
 
     /**
@@ -242,6 +253,8 @@ public class ZohoItemImageSync {
      * so the first size we see photos for seeds the colour's one shared gallery; later same-colour
      * sizes must NOT also dump their own (duplicate) photos into it — that would union multiple
      * sizes' sets into one inflated gallery instead of leaving it as the single shared set.
+     * A later pull that brings <em>new</em> Zoho photos (not already in the local gallery) replaces
+     * that shared set, so changing an image in Zoho and resyncing actually updates the store.
      */
     public void importZohoVariantColorImage(Product product, String color, String zohoItemId, Map<String, Object> item) {
         String sku = textOf(item, "sku");
@@ -252,8 +265,8 @@ public class ZohoItemImageSync {
             variantSupport.clearVariantImages(product, sku);
         }
         String colorName = StringUtils.trimToNull(color);
-        if (colorName != null && !importedUrls.isEmpty() && colorImagesSupport.galleryUrlsForColor(product, colorName).isEmpty()) {
-            colorImagesSupport.replaceColorGallery(product, colorName, importedUrls);
+        if (colorName != null && !importedUrls.isEmpty()) {
+            applyImportedColorGallery(product, colorName, importedUrls);
         }
         colorImagesSupport.ensureProductImagesFromColorGalleries(product);
         if (colorName == null && !importedUrls.isEmpty() && colorImagesSupport.isImagesJsonEmpty(product.getImagesJson())) {
@@ -261,21 +274,72 @@ public class ZohoItemImageSync {
         }
     }
 
+    /**
+     * Simple products keep lifestyle photos on the colour gallery, which the storefront prefers over
+     * {@code images_json}. A Zoho resync must update that gallery or the new item image never shows.
+     */
+    private void applyImportedSimpleProductColorGalleries(Product product, List<String> importedUrls) {
+        if (product == null || importedUrls == null || importedUrls.isEmpty()) {
+            return;
+        }
+        LinkedHashSet<String> colors = new LinkedHashSet<>();
+        colors.addAll(colorImagesSupport.galleryMapFromColorsJson(product.getColorsJson()).keySet());
+        colors.addAll(colorImagesSupport.parseMap(product.getColorImagesJson()).keySet());
+        if (colors.isEmpty()) {
+            return;
+        }
+        if (colors.size() > 1) {
+            LinkedHashSet<String> signatures = new LinkedHashSet<>();
+            for (String color : colors) {
+                signatures.add(String.join("\0", colorImagesSupport.galleryUrlsForColor(product, color)));
+            }
+            if (signatures.size() > 1) {
+                return;
+            }
+        }
+        for (String color : colors) {
+            applyImportedColorGallery(product, color, importedUrls);
+        }
+    }
+
+    /**
+     * Seed an empty print gallery, or replace it when Zoho has photos the store does not already
+     * have. A representative leftover photo that is already in a richer local gallery is ignored.
+     * The first replace in this pull pass wins so a sibling size with the old photo cannot revert it.
+     */
+    private void applyImportedColorGallery(Product product, String colorName, List<String> importedUrls) {
+        if (product == null || StringUtils.isBlank(colorName) || importedUrls == null || importedUrls.isEmpty()) {
+            return;
+        }
+        String passKey = colorGalleryPassKey(product, colorName);
+        if (replacedColorGalleries.contains(passKey)) {
+            return;
+        }
+        List<String> existing = colorImagesSupport.galleryUrlsForColor(product, colorName);
+        if (!existing.isEmpty() && existing.containsAll(importedUrls)) {
+            return;
+        }
+        colorImagesSupport.replaceColorGallery(product, colorName, importedUrls);
+        if (!existing.isEmpty()) {
+            colorImagesSupport.stripUrlsFromImagesJson(product, existing);
+        }
+        replacedColorGalleries.add(passKey);
+    }
+
+    private static String colorGalleryPassKey(Product product, String colorName) {
+        String id = product.getId() == null ? "new-" + System.identityHashCode(product) : product.getId().toString();
+        return id + "\0" + colorName.trim().toLowerCase(Locale.ROOT);
+    }
+
     private List<String> storeImportedImages(Product product, String zohoItemId, Map<String, Object> item) {
         if (!isEnabled() || StringUtils.isBlank(zohoItemId) || product == null) {
             return List.of();
         }
         LinkedHashSet<String> urls = new LinkedHashSet<>();
-        List<String> itemHttpUrls = collectItemHttpImageUrls(item);
-        for (String httpUrl : itemHttpUrls) {
-            String imported = importHttpImageUrl(product, httpUrl);
-            if (StringUtils.isNotBlank(imported)) {
-                urls.add(imported.trim());
-            }
-        }
+        List<String> documentIds = ZohoItemDocuments.documentIdsForImport(item);
         long maxBytes = applicationProperties.getStorage().getS3().getMaxUploadBytes();
         int index = 0;
-        for (String documentId : ZohoItemDocuments.documentIdsForImport(item)) {
+        for (String documentId : documentIds) {
             Optional<BinaryDownload> downloaded = booksClient.downloadDocument(documentId, maxBytes);
             if (downloaded.isEmpty()) {
                 throw new IllegalStateException("Zoho returned no bytes for declared document " + documentId);
@@ -297,9 +361,18 @@ public class ZohoItemImageSync {
                     urls.add(stored.trim());
                 }
             }
-            if (urls.isEmpty()) {
-                throw new IllegalStateException("Zoho declared an item image but returned no usable image bytes");
+        }
+        if (urls.isEmpty()) {
+            List<String> itemHttpUrls = collectItemHttpImageUrls(item);
+            for (String httpUrl : itemHttpUrls) {
+                String imported = importHttpImageUrl(product, httpUrl);
+                if (StringUtils.isNotBlank(imported)) {
+                    urls.add(imported.trim());
+                }
             }
+        }
+        if (urls.isEmpty() && itemDeclaresImage(item)) {
+            throw new IllegalStateException("Zoho declared an item image but returned no usable image bytes");
         }
         if (urls.isEmpty()) {
             LOG.debug("No Zoho image bytes for item {} (sku={})", zohoItemId, textOf(item, "sku"));

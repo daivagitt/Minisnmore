@@ -30,6 +30,7 @@ import { orderTotals } from "@/lib/money";
 import { DEFAULT_STORE_DISCOUNT_PERCENT } from "@/lib/pricing";
 import { lookupPincode, normalizePincode } from "@/lib/pincode";
 import { LazyImage } from "@/components/LazyImage";
+import { storefrontImageUrl } from "@/lib/storefront-image";
 import { CopyButton } from "@/components/CopyButton";
 import { CouponOffers } from "@/components/CouponOffers";
 import { openRazorpayCheckout } from "@/lib/razorpay";
@@ -907,7 +908,7 @@ function Checkout() {
                 </div>
                 {cart.map((i) => (
                   <div key={i.product.id + i.size + i.color} className="glass rounded-2xl p-3 flex gap-3 items-center">
-                    <LazyImage src={cartLineImage(i)} alt="" className="h-14 w-14 rounded-xl object-cover" priority="auto" />
+                    <LazyImage src={storefrontImageUrl(cartLineImage(i), "thumb")} fallbackSrc={cartLineImage(i)} alt="" className="h-14 w-14 rounded-xl object-cover" priority="auto" />
                     <div className="flex-1 text-sm min-w-0">
                       <div className="font-medium truncate">{i.product.name}</div>
                       <div className="text-xs text-muted-foreground">{i.size} · {cartLineColorLabel(i)}</div>
@@ -957,7 +958,7 @@ function Checkout() {
         <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
           {cart.map((i) => (
             <div key={i.product.id + i.size + i.color} className="flex gap-3 text-sm">
-              <LazyImage src={cartLineImage(i)} className="h-12 w-12 rounded-lg object-cover" alt="" priority="auto" />
+              <LazyImage src={storefrontImageUrl(cartLineImage(i), "thumb")} fallbackSrc={cartLineImage(i)} className="h-12 w-12 rounded-lg object-cover" alt="" priority="auto" />
               <div className="flex-1 min-w-0">
                 <div className="font-medium leading-tight truncate">{i.product.name}</div>
                 <div className="text-[11px] text-muted-foreground">{i.size} · {cartLineColorLabel(i)}</div>

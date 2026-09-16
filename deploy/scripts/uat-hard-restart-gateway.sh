@@ -27,7 +27,7 @@ if [ -z "${JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET:-}" ]; then
 fi
 
 export LOG_JSON=false
-export FRONTEND_AUTH_CALLBACK_URL="${FRONTEND_AUTH_CALLBACK_URL:-https://uat.minisnmore.com/auth/callback}"
+export FRONTEND_AUTH_CALLBACK_URL="${FRONTEND_AUTH_CALLBACK_URL:-https://minisnmore.com/auth/callback}"
 export SPRING_R2DBC_URL="r2dbc:postgresql://127.0.0.1:5432/miniandmore"
 export SPRING_R2DBC_USERNAME="minisandmore_user"
 export SPRING_R2DBC_PASSWORD="${SPRING_R2DBC_PASSWORD:-${SPRING_DATASOURCE_PASSWORD:-}}"

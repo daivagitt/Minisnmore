@@ -6,6 +6,7 @@ import {
   imageFitStyles,
   isFullImageBounds,
   isProductImageBackground,
+  usableContentBounds,
 } from "./product-image-bounds";
 
 describe("product-image-bounds", () => {
@@ -13,6 +14,11 @@ describe("product-image-bounds", () => {
     expect(isProductImageBackground(255, 255, 255, 255)).toBe(true);
     expect(isProductImageBackground(246, 246, 246, 255)).toBe(true);
     expect(isProductImageBackground(40, 80, 120, 255)).toBe(false);
+  });
+
+  it("treats warm cream studio backdrops as background", () => {
+    expect(isProductImageBackground(245, 230, 210, 255)).toBe(true);
+    expect(isProductImageBackground(252, 244, 232, 255)).toBe(true);
   });
 
   it("finds content bounds in a synthetic mask", () => {
@@ -81,6 +87,35 @@ describe("product-image-bounds", () => {
       naturalHeight: 600,
     };
     expect(isFullImageBounds(bounds)).toBe(true);
+  });
+
+  it("keeps a real content crop and discards tiny noise crops", () => {
+    const crop = {
+      x: 80,
+      y: 60,
+      width: 640,
+      height: 480,
+      naturalWidth: 800,
+      naturalHeight: 600,
+    };
+    expect(usableContentBounds(crop)).toEqual(crop);
+    expect(
+      usableContentBounds({
+        x: 10,
+        y: 10,
+        width: 8,
+        height: 8,
+        naturalWidth: 800,
+        naturalHeight: 600,
+      }),
+    ).toEqual({
+      x: 0,
+      y: 0,
+      width: 800,
+      height: 600,
+      naturalWidth: 800,
+      naturalHeight: 600,
+    });
   });
 
   it("detects bounds from centred content in image data", () => {

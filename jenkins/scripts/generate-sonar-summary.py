@@ -11,11 +11,10 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from report_theme import PROJECT_NAME, brand_logo_markup, esc, page_shell  # noqa: E402
+from report_theme import PROJECT_NAME, brand_logo_markup, esc, generated_at_iso, generated_at_utc_label, page_shell  # noqa: E402
 
 PROJECTS = [
     ("frontend", "Frontend"),
@@ -211,13 +210,13 @@ def main() -> None:
 
     rows = [fetch_project(args.sonar_url, token, key, label) for key, label in PROJECTS]
     payload = {
-        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "generatedAt": generated_at_iso(),
         "frontend": rows[0],
         "backend": rows[1],
     }
     (out / "sonar-summary.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
-    refreshed = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    refreshed = generated_at_utc_label()
     extra_css = """
       .metrics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin: 16px 0 24px; }
       .metric { background: var(--surface-muted); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }

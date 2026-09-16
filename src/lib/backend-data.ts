@@ -12,6 +12,7 @@ import {
   toDirectDownloadUrl,
 } from "@/lib/utils";
 import { assertAllowedImageFile, type AdminImageFolder } from "@/lib/admin-image";
+import { assertAllowedPdfFile } from "@/lib/admin-pdf";
 import {
   collectStorefrontCardImages,
   buildColorImagesJson,
@@ -31,6 +32,16 @@ import {
   parseProductSizeChart,
   type ProductSizeChart,
 } from "@/lib/product-size-charts";
+import {
+  parseSizeNotes,
+  serializeSizeNotes,
+  sizeNoteValidationErrors,
+  type SizeNotes,
+} from "@/lib/product-size-notes";
+import {
+  detailsKickerValidationErrors,
+  normalizeDetailsKicker,
+} from "@/lib/product-details-kicker";
 
 type Id = string | number;
 type JsonRecord = Record<string, unknown>;
@@ -205,6 +216,9 @@ export function getProductValidationErrors(row: ProductRow): string[] {
   if ((row.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS") {
     errors.push(...validateVariantRows(row.variants_json));
   }
+
+  errors.push(...sizeNoteValidationErrors(row.size_notes));
+  errors.push(...detailsKickerValidationErrors(row.details_kicker));
 
   // Product description is optional (CSV import + Ledgerly pull may omit it).
 
@@ -527,8 +541,12 @@ export type ProductRow = {
   age_min_months: number | null;
   age_max_months: number | null;
   sizes: string[];
-  /** Per-product measurement chart; null clears / uses SKU fallback on storefront. */
+  /** Per-product measurement chart; null hides the Size chart link (calculator may still use the SKU catalog). */
   size_chart?: ProductSizeChart | null;
+  /** Per-size callouts shown on the product photo (e.g. grippers). */
+  size_notes?: SizeNotes;
+  /** PDP purchase-card kicker, e.g. Organic Cotton · Newborn. */
+  details_kicker?: string | null;
   colors: ProductColorEntry[];
   color_images_json?: string | null;
   item_structure: string | null;
@@ -562,6 +580,8 @@ type ProductDto = {
   ageMaxMonths?: number | null;
   sizesJson?: string | null;
   sizeChartJson?: string | null;
+  sizeNotesJson?: string | null;
+  detailsKicker?: string | null;
   colorsJson?: string | null;
   colorImagesJson?: string | null;
   itemStructure?: string | null;
@@ -607,6 +627,8 @@ export const fromProductDto = (dto: ProductDto): ProductRow => ({
   age_max_months: dto.ageMaxMonths ?? null,
   sizes: parseJson<string[]>(dto.sizesJson, []),
   size_chart: parseProductSizeChart(dto.sizeChartJson),
+  size_notes: parseSizeNotes(dto.sizeNotesJson),
+  details_kicker: normalizeDetailsKicker(dto.detailsKicker),
   colors: normalizeColorEntries(
     applyExpectedPrintNamesToColors(
       mergeColorImagesIntoColors(
@@ -654,6 +676,8 @@ const toProductDto = (row: ProductRow): ProductDto => ({
   ageMaxMonths: row.age_max_months,
   sizesJson: JSON.stringify(row.sizes ?? []),
   sizeChartJson: serializeProductSizeChart(row.size_chart),
+  sizeNotesJson: serializeSizeNotes(row.size_notes),
+  detailsKicker: normalizeDetailsKicker(row.details_kicker),
   colorsJson: JSON.stringify(serializeProductColors(row.colors ?? [])),
   itemStructure: row.item_structure ?? "SIMPLE",
   variantsJson: row.variants_json ?? null,
@@ -1072,6 +1096,7 @@ export type SiteSettingsRow = Record<string, string | number | boolean | null | 
   cod_fee_inr?: number | null;
   delivery_eta_buffer_days?: number | null;
   store_discount_percent?: number | null;
+  about_page_json?: string | null;
 };
 
 const siteStringMap: Record<string, string> = {
@@ -1106,6 +1131,7 @@ const siteStringMap: Record<string, string> = {
   subscribe_badges_json: "subscribeBadgesJson",
   subscribe_plans_json: "subscribePlansJson",
   subscribe_features_json: "subscribeFeaturesJson",
+  about_page_json: "aboutPageJson",
 };
 
 function fromSiteSettingDto(dto: Record<string, unknown> | null): SiteSettingsRow | null {
@@ -1169,6 +1195,14 @@ export type SubscribePageContent = {
 
 export const getSubscribePage = () =>
   api.get<SubscribePageContent | null>("/api/v1/subscribe-page").then((row) => row ?? {});
+
+export type AboutPageApiContent = {
+  about_page_json?: string;
+};
+
+export const getAboutPage = () =>
+  api.get<AboutPageApiContent | null>("/api/v1/about-page").then((row) => row ?? {});
+
 export const getAdminSiteSettings = () =>
   api
     .get<Record<string, unknown> | null>("/api/v1/admin/site-settings", { auth: true })
@@ -1253,19 +1287,25 @@ async function uploadAdminImageViaPresign(folder: AdminImageFolder, file: File) 
     });
   } catch {
     throw new Error(
-      "Upload to storage was blocked (often missing R2 CORS for https://uat.minisnmore.com).",
+      "Upload to storage was blocked (often missing R2 CORS for https://minisnmore.com).",
     );
   }
   if (!storageResponse.ok) {
     if (storageResponse.status === 403) {
       throw new Error(
-        "R2 storage rejected the upload (403). The S3 API token likely lacks Object Read & Write on bucket miniandmore — update S3_ACCESS_KEY and S3_SECRET_KEY in UAT env, then restart catalog.",
+        "R2 storage rejected the upload (403). The S3 API token likely lacks Object Read & Write on bucket miniandmore — update S3_ACCESS_KEY and S3_SECRET_KEY in prod.env, then restart catalog.",
       );
     }
     throw new Error(`Upload to storage failed (${storageResponse.status}).`);
   }
 
-  return presigned.publicUrl;
+  const publicUrl = presigned.publicUrl;
+  try {
+    await api.post("/api/v1/admin/uploads/derivatives", { publicUrl }, { auth: true });
+  } catch {
+    // Best-effort; storefront falls back to the original object if derivatives are missing.
+  }
+  return publicUrl;
 }
 
 function shouldFallbackToPresign(error: unknown) {
@@ -1276,6 +1316,22 @@ function shouldFallbackToPresign(error: unknown) {
     }
   }
   return true;
+}
+
+export async function uploadAdminCataloguePdf(file: File) {
+  assertAllowedPdfFile(file);
+  const form = new FormData();
+  const filename = file.name?.trim() || "e-catalogue.pdf";
+  form.append("file", file, filename);
+  const uploaded = await api.post<unknown>("/api/v1/admin/uploads/catalogue-pdf", form, { auth: true });
+  if (
+    !uploaded ||
+    typeof uploaded !== "object" ||
+    typeof (uploaded as { publicUrl?: unknown }).publicUrl !== "string"
+  ) {
+    throw new Error("Upload response missing publicUrl.");
+  }
+  return (uploaded as { publicUrl: string }).publicUrl;
 }
 
 /** Server-side upload first (reliable on R2); presign only as fallback. */

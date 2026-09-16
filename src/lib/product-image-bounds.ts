@@ -183,6 +183,75 @@ export function detectContentBoundsFromImage(img: HTMLImageElement): ImageConten
   }
 }
 
+/** Ignore specks / failed scans — fall back to the full file. */
+const MIN_CONTENT_AREA_FRACTION = 0.04;
+
+export function naturalImageBounds(naturalWidth: number, naturalHeight: number): ImageContentBounds {
+  return fullBounds(naturalWidth, naturalHeight);
+}
+
+/** Keep a crop only when it actually removes padding; otherwise use the full photo. */
+export function usableContentBounds(bounds: ImageContentBounds): ImageContentBounds {
+  const { naturalWidth, naturalHeight } = bounds;
+  if (!naturalWidth || !naturalHeight) return fullBounds(naturalWidth, naturalHeight);
+  if (isFullImageBounds(bounds)) return fullBounds(naturalWidth, naturalHeight);
+  const area = bounds.width * bounds.height;
+  const full = naturalWidth * naturalHeight;
+  if (!full || area / full < MIN_CONTENT_AREA_FRACTION) {
+    return fullBounds(naturalWidth, naturalHeight);
+  }
+  return bounds;
+}
+
+function isCrossOriginSrc(src: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return new URL(src, window.location.href).origin !== window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Cross-origin img pixels taint the canvas. Fetch the file (CORS) into a blob URL
+ * so we can still detect cream/white studio padding.
+ */
+export async function detectContentBoundsFromUrl(src: string): Promise<ImageContentBounds | null> {
+  const trimmed = src.trim();
+  if (!trimmed || trimmed.startsWith("data:") || trimmed.startsWith("blob:")) return null;
+  try {
+    const response = await fetch(trimmed, { mode: "cors", credentials: "omit" });
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    try {
+      const img = new Image();
+      img.decoding = "async";
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Could not decode image."));
+        img.src = objectUrl;
+      });
+      return detectContentBoundsFromImage(img);
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  } catch {
+    return null;
+  }
+}
+
+/** Scan a loaded image, falling back to a CORS fetch when the canvas is tainted. */
+export async function resolveContentBounds(src: string, img: HTMLImageElement): Promise<ImageContentBounds> {
+  const natural = fullBounds(img.naturalWidth, img.naturalHeight);
+  const fromElement = usableContentBounds(detectContentBoundsFromImage(img));
+  if (!isFullImageBounds(fromElement)) return fromElement;
+  if (!isCrossOriginSrc(src)) return fromElement;
+  const fromUrl = await detectContentBoundsFromUrl(src);
+  if (!fromUrl) return natural;
+  return usableContentBounds(fromUrl);
+}
+
 export function gallerySurfaceStyle(): CSSProperties {
   return { backgroundColor: PRODUCT_IMAGE_SURFACE };
 }

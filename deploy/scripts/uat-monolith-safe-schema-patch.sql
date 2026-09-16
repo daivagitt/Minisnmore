@@ -91,6 +91,9 @@ CREATE INDEX IF NOT EXISTS idx_customer_order__zoho_tracking_last_pulled_at
   ON customer_order (zoho_tracking_last_pulled_at);
 
 -- 6) Microservices insert user_login only; monolith schema may still require user_id NOT NULL.
+-- Only install the sync trigger when user_id still exists. On fully migrated DBs
+-- (user_login only) creating this trigger breaks inserts with:
+--   ERROR: record "new" has no field "user_id"
 DO $$
 BEGIN
   IF EXISTS (
@@ -98,24 +101,27 @@ BEGIN
     WHERE table_name = 'customer_order' AND column_name = 'user_id'
   ) THEN
     ALTER TABLE customer_order ALTER COLUMN user_id DROP NOT NULL;
+
+    CREATE OR REPLACE FUNCTION trg_customer_order_sync_user_id()
+    RETURNS TRIGGER AS $fn$
+    BEGIN
+      IF NEW.user_id IS NULL AND NEW.user_login IS NOT NULL THEN
+        SELECT u.id INTO NEW.user_id
+        FROM jhi_user u
+        WHERE LOWER(u.login) = LOWER(NEW.user_login)
+        LIMIT 1;
+      END IF;
+      RETURN NEW;
+    END;
+    $fn$ LANGUAGE plpgsql;
+
+    DROP TRIGGER IF EXISTS customer_order_sync_user_id ON customer_order;
+    CREATE TRIGGER customer_order_sync_user_id
+      BEFORE INSERT OR UPDATE ON customer_order
+      FOR EACH ROW EXECUTE FUNCTION trg_customer_order_sync_user_id();
+  ELSE
+    -- Fully migrated: ensure a stale trigger from an older patch run cannot break inserts.
+    DROP TRIGGER IF EXISTS customer_order_sync_user_id ON customer_order;
+    DROP FUNCTION IF EXISTS trg_customer_order_sync_user_id();
   END IF;
 END $$;
-
--- Back-fill user_id from user_login on new rows (keeps monolith FK reports working).
-CREATE OR REPLACE FUNCTION trg_customer_order_sync_user_id()
-RETURNS TRIGGER AS $$
-BEGIN
-  IF NEW.user_id IS NULL AND NEW.user_login IS NOT NULL THEN
-    SELECT u.id INTO NEW.user_id
-    FROM jhi_user u
-    WHERE LOWER(u.login) = LOWER(NEW.user_login)
-    LIMIT 1;
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS customer_order_sync_user_id ON customer_order;
-CREATE TRIGGER customer_order_sync_user_id
-  BEFORE INSERT OR UPDATE ON customer_order
-  FOR EACH ROW EXECUTE FUNCTION trg_customer_order_sync_user_id();

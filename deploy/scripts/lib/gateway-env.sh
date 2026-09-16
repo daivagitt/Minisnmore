@@ -43,7 +43,8 @@ uat_gateway_sanitize_env() {
 
 # Select active SMTP provider without removing alternate credentials from uat.env.
 # SPRING_MAIL_PROVIDER: gmail (default) | zoho
-# Gmail uses SPRING_MAIL_* directly; Zoho uses ZOHO_MAIL_* (copied to SPRING_MAIL_* at runtime).
+# Copies GMAIL_MAIL_* or ZOHO_MAIL_* onto SPRING_MAIL_* so leftover values from the
+# other provider (common when uat.env sets SPRING_MAIL_* to Zoho) cannot leak through.
 uat_gateway_resolve_mail_provider() {
   local _provider
   _provider="$(printf '%s' "${SPRING_MAIL_PROVIDER:-gmail}" | tr '[:upper:]' '[:lower:]')"
@@ -65,6 +66,20 @@ uat_gateway_resolve_mail_provider() {
       fi
       ;;
     gmail)
+      if [ -n "${GMAIL_MAIL_HOST:-}" ] && [ -n "${GMAIL_MAIL_USERNAME:-}" ] && [ -n "${GMAIL_MAIL_PASSWORD:-}" ]; then
+        export SPRING_MAIL_HOST="${GMAIL_MAIL_HOST}"
+        export SPRING_MAIL_PORT="${GMAIL_MAIL_PORT:-587}"
+        export SPRING_MAIL_USERNAME="${GMAIL_MAIL_USERNAME}"
+        export SPRING_MAIL_PASSWORD="${GMAIL_MAIL_PASSWORD}"
+        if [ -n "${GMAIL_MAIL_FROM:-}" ]; then
+          export JHIPSTER_MAIL_FROM="${GMAIL_MAIL_FROM}"
+        else
+          export JHIPSTER_MAIL_FROM="${GMAIL_MAIL_USERNAME}"
+        fi
+      elif [ -z "${SPRING_MAIL_HOST:-}" ] || [ -z "${SPRING_MAIL_USERNAME:-}" ] || [ -z "${SPRING_MAIL_PASSWORD:-}" ]; then
+        echo "ERROR: SPRING_MAIL_PROVIDER=gmail but GMAIL_MAIL_* / SPRING_MAIL_HOST/USERNAME/PASSWORD not set." >&2
+        return 1
+      fi
       ;;
     *)
       echo "ERROR: SPRING_MAIL_PROVIDER must be gmail or zoho (got: ${_provider})." >&2

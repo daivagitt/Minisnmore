@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getSubscribePageValidationErrors } from "@/lib/admin-subscribe-validation";
+import { getAboutPageValidationErrors } from "@/lib/about-page";
 import {
   getBlogPostValidationErrors,
   getCategoryValidationErrors,
@@ -155,5 +156,12 @@ describe("admin validation helpers", () => {
       subscribe_features_json: "[]",
     });
     expect(errors).toEqual(["Badge 1: Text is required."]);
+  });
+
+  it("collects about page founder errors", () => {
+    const errors = getAboutPageValidationErrors({
+      founders: [{ name: "Ravi", role: "", image_url: "", paragraphs: [""], quote: "" }],
+    });
+    expect(errors).toEqual(["Founder 1: Role is required."]);
   });
 });

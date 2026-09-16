@@ -2,6 +2,7 @@ package com.miniandmore.app.web.rest.internal;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
@@ -53,6 +54,7 @@ public class InternalAdminOrderResource {
     private static final int MAX_PAGE_SIZE = 50;
 
     private final AccountOrderDataAccess dataAccess;
+    private final ApplicationProperties applicationProperties;
     private final LedgerlySyncService ledgerlySyncService;
     private final ZohoSyncService zohoSyncService;
     private final ObjectMapper objectMapper;
@@ -63,6 +65,7 @@ public class InternalAdminOrderResource {
 
     public InternalAdminOrderResource(
         AccountOrderDataAccess dataAccess,
+        ApplicationProperties applicationProperties,
         LedgerlySyncService ledgerlySyncService,
         ZohoSyncService zohoSyncService,
         ObjectMapper objectMapper,
@@ -72,6 +75,7 @@ public class InternalAdminOrderResource {
         OrderCancellationService orderCancellationService
     ) {
         this.dataAccess = dataAccess;
+        this.applicationProperties = applicationProperties;
         this.ledgerlySyncService = ledgerlySyncService;
         this.zohoSyncService = zohoSyncService;
         this.objectMapper = objectMapper;
@@ -160,6 +164,7 @@ public class InternalAdminOrderResource {
             .findOneByOrderNumber(orderNumber)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
         if (
+            applicationProperties.getZoho().getOrderTracking().isEnabled() &&
             order.getStatus() != OrderStatus.FULFILLED &&
             order.getStatus() != OrderStatus.CANCELLED &&
             StringUtils.isNotBlank(order.getZohoSalesOrderId()) &&

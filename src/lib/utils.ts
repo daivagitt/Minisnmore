@@ -30,6 +30,71 @@ export function toDirectDownloadUrl(url: string | null | undefined): string {
   return url;
 }
 
+export function downloadFilenameFromUrl(url: string, fallback = "download"): string {
+  try {
+    const pathname = new URL(url, "https://x.invalid").pathname;
+    const base = pathname.split("/").pop() ?? "";
+    if (base) return decodeURIComponent(base);
+  } catch {
+    /* fall through */
+  }
+  return fallback;
+}
+
+/** True for site-relative paths and absolute URLs on the current origin. */
+export function isSameOriginPublicPath(url: string): boolean {
+  const href = (url ?? "").trim();
+  if (!href) return false;
+  if (href.startsWith("/") && !href.startsWith("//")) return true;
+  if (typeof window === "undefined") return false;
+  try {
+    return new URL(href).origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Force a public file download. Same-origin links use the native download attribute;
+ * cross-origin CDN URLs are fetched and saved as a blob (requires CORS on the host).
+ */
+export async function triggerPublicFileDownload(
+  url: string | null | undefined,
+  filename?: string,
+): Promise<void> {
+  const href = toDirectDownloadUrl(url);
+  if (!href || typeof document === "undefined") return;
+
+  const name = filename || downloadFilenameFromUrl(href, "e-catalogue.pdf");
+
+  const clickDownload = (target: string) => {
+    const anchor = document.createElement("a");
+    anchor.href = target;
+    anchor.download = name;
+    anchor.rel = "noopener";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  };
+
+  if (isSameOriginPublicPath(href)) {
+    clickDownload(href);
+    return;
+  }
+
+  const response = await fetch(href);
+  if (!response.ok) {
+    throw new Error(`Download failed (${response.status})`);
+  }
+  const blob = await response.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  try {
+    clickDownload(blobUrl);
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
+}
+
 export function isPlaceholderValue(value: unknown): boolean {
   if (typeof value !== "string") return false;
   const text = value.trim().toLowerCase();

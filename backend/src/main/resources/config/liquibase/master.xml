@@ -90,4 +90,8 @@
     <include file="config/liquibase/changelog/20260910120400_add_customer_order_forward_shipment.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260910120500_complete_returns_exchanges.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260910120600_add_manual_cod_refund_audit.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260913120000_add_about_page_json.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260916120000_add_product_size_notes_json.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260916140000_add_product_details_kicker.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>
+

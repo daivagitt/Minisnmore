@@ -1,5 +1,5 @@
 import type { ProductSizeChart, SizeChartSection, SizeChartRow } from "@/lib/product-size-charts";
-import { isUsableSizeChart, isValidMeasurementCell, parseProductSizeChart, sizeChartMeasurementErrors } from "@/lib/product-size-charts";
+import { fitAxesFromSizeChart, isUsableSizeChart, isValidMeasurementCell, parseProductSizeChart, sizeChartMeasurementErrors } from "@/lib/product-size-charts";
 
 const META_SHEET = "Meta";
 const CHART_SHEET = "Chart";
@@ -172,14 +172,11 @@ export function validateSizeChartStructure(chart: ProductSizeChart | null | unde
       if (!row.label.trim()) errors.push(`Section "${sec.title}" has a row without a label`);
     }
   }
-  const labels = chart.sections.flatMap((s) => s.rows.map((r) => r.label));
-  const hasChest = labels.some((l) => /^(chest(\s*width|\s*\(½\)|\s*\(1\/2\))?)$/i.test(l.trim()));
-  const hasLength = labels.some((l) =>
-    /^(body\s*length.*|length\s*\(hps.*|total\s*length|length)$/i.test(l.trim()),
-  );
-  if (!hasChest) warnings.push("No Chest / Chest width row — size calculator may lack chest fit");
-  if (!hasLength) {
-    warnings.push("No Body length / Total length row — size calculator may lack length fit");
+  const axes = fitAxesFromSizeChart(chart);
+  if (!axes.lengthLabel && !axes.chestLabel) {
+    warnings.push(
+      "No size-varying measurement rows — size calculator cannot recommend a size",
+    );
   }
   return { ok: errors.length === 0, errors, warnings };
 }
@@ -383,6 +380,6 @@ export async function parseSizeChartExcelFile(file: File): Promise<ProductSizeCh
 }
 
 export function chartHasCalculatorMetrics(chart: ProductSizeChart): boolean {
-  const { warnings } = validateSizeChartStructure(chart);
-  return warnings.length === 0;
+  const axes = fitAxesFromSizeChart(chart);
+  return axes.lengthLabel != null || axes.chestLabel != null;
 }

@@ -18,22 +18,30 @@ import {
   validateQuantity,
   validateVirtualFitFile,
 } from "./product-fit";
+import { catalogSizeChartTemplate } from "./product-size-charts";
 
+const vestChart = catalogSizeChartTemplate({ sku: "FRONT-OPEN-VEST-SLEVELESS" });
+const jablaChart = catalogSizeChartTemplate({ sku: "BOOK-STYLE-TYING-JABLA" });
+const shortsChart = catalogSizeChartTemplate({ sku: "BASIC-SHORTS" });
 const vestInput = {
   sku: "FRONT-OPEN-VEST-SLEVELESS",
   sizes: ["0-3 M", "3-6 M", "6-12 M", "12-18 M", "18-24 M"],
+  sizeChart: vestChart,
 };
 const vestSizesShort = {
   sku: "FRONT-OPEN-VEST-SLEVELESS",
   sizes: ["0-3 M", "3-6 M", "6-12 M"],
+  sizeChart: vestChart,
 };
 const jablaInput = {
   sku: "BOOK-STYLE-TYING-JABLA",
   sizes: ["0-3M", "3-6M", "6-12M", "12-18M", "18-24M"],
+  sizeChart: jablaChart,
 };
 const shortsInput = {
   sku: "BASIC-SHORTS",
   sizes: ["0-3M", "3-6M", "6-12M", "12-18M", "18-24M"],
+  sizeChart: shortsChart,
 };
 const now = new Date("2026-05-29T12:00:00");
 
@@ -77,6 +85,11 @@ const shoulderOnlyInput = {
 };
 
 describe("product fit from MnM length/chest", () => {
+  it("uses the SKU catalog for fit limits when no product size chart is saved", () => {
+    expect(measurementLimitsForProduct({ sku: "FRONT-OPEN-VEST-SLEVELESS", sizes: vestInput.sizes })).not.toBeNull();
+    expect(measurementLimitsForProduct({ sku: "BASIC-SHORTS", sizes: shortsInput.sizes })?.hasLength).toBe(true);
+  });
+
   it("validates length and chest against product chart windows", () => {
     const limits = measurementLimitsForProduct(vestInput)!;
     expect(limits.hasLength).toBe(true);
@@ -120,6 +133,7 @@ describe("product fit from MnM length/chest", () => {
     const twoSizes = {
       sku: "FRONT-OPEN-VEST-SLEVELESS",
       sizes: ["0-3 M", "6-12 M"],
+      sizeChart: vestChart,
     };
     const rows = sizeGuideRowsForProduct({ ...twoSizes, availableOnly: true });
     expect(rows.map((r) => r.size)).toEqual(["0-3 M", "6-12 M"]);
@@ -204,13 +218,63 @@ describe("product fit from MnM length/chest", () => {
     });
   });
 
-  it("shorts chart exposes length only", () => {
+  it("shorts chart exposes length and waistband width", () => {
     const limits = measurementLimitsForProduct(shortsInput)!;
     expect(limits.hasLength).toBe(true);
-    expect(limits.hasChest).toBe(false);
+    expect(limits.hasChest).toBe(true);
+    expect(limits.lengthLabel).toBe("Total length");
+    expect(limits.chestLabel).toBe("Waistband width");
     const rows = sizeGuideRowsForProduct(shortsInput);
     expect(rows[0]?.lengthCm).toBe(17);
-    expect(rows[0]?.chest).toBe("—");
+    expect(rows[0]?.chestCm).toBe(16);
+    expect(rows[0]?.chestLabel).toBe("Waistband width");
+  });
+
+  it("recommends a size from custom waistband measurements", () => {
+    const input = {
+      sku: "UNKNOWN-SKU-NO-MAP",
+      sizes: ["0-3M", "3-6M", "6-12M", "12-18M", "18-24M"],
+      sizeChart: {
+        code: "MnM-4",
+        title: "Shorts Sets",
+        tolerance: "±1 cm",
+        sections: [
+          {
+            title: "Measurements",
+            bands: ["0-3M", "3-6M", "6-12M", "12-18M", "18-24M"],
+            rows: [
+              {
+                label: "Waistband width",
+                values: { "0-3M": "12-16", "3-6M": 17, "6-12M": 18, "12-18M": 19, "18-24M": 20 },
+              },
+              {
+                label: "Waistband Height",
+                values: { "0-3M": "1.1-1.5", "3-6M": 1.5, "6-12M": 1.5, "12-18M": 1.5, "18-24M": 1.5 },
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const limits = measurementLimitsForProduct(input)!;
+    expect(limits.hasLength).toBe(false);
+    expect(limits.hasChest).toBe(true);
+    expect(limits.chestLabel).toBe("Waistband width");
+    expect(recommendSizeByChest(12, input)).toBe("0-3M");
+    expect(recommendSizeByChest(16, input)).toBe("0-3M");
+    expect(recommendSizeByChest(17, input)).toBe("3-6M");
+    expect(checkSizeFit({ lengthCm: "", chestCm: "18", ...input })).toEqual({
+      ok: true,
+      size: "6-12M",
+    });
+    const rows = sizeGuideRowsForProduct(input);
+    expect(rows.map((r) => [r.size, r.length, r.chest])).toEqual([
+      ["0-3M", "—", "12–16 cm"],
+      ["3-6M", "—", "17 cm"],
+      ["6-12M", "—", "18 cm"],
+      ["12-18M", "—", "19 cm"],
+      ["18-24M", "—", "20 cm"],
+    ]);
   });
 
   it("uses product sizeChart for fit when provided", () => {
@@ -308,9 +372,14 @@ describe("product fit from MnM length/chest", () => {
   it("validates quantity and virtual fit uploads", () => {
     expect(validateQuantity(1)).toEqual({ ok: true, value: 1 });
     expect(clampQuantity(99)).toBe(10);
+    expect(validateVirtualFitFile(null).ok).toBe(false);
+    expect(validateVirtualFitFile(new File(["x"], "pic.txt", { type: "text/plain" })).ok).toBe(false);
     expect(validateVirtualFitFile(new File(["x"], "pic.jpg", { type: "image/jpeg" }))).toEqual({
       ok: true,
     });
+    expect(
+      validateVirtualFitFile(new File([new Uint8Array(6 * 1024 * 1024)], "big.jpg", { type: "image/jpeg" })).ok,
+    ).toBe(false);
   });
 
   it("rejects invalid birth dates and counts months before the birthday", () => {

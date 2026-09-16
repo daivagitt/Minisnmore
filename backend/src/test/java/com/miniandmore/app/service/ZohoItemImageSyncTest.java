@@ -126,6 +126,31 @@ class ZohoItemImageSyncTest {
     }
 
     @Test
+    void importZohoItemImage_prefersNativeZohoImageOverLeftoverStoreCdnUrl() {
+        Product product = new Product()
+            .id(33L)
+            .sku("SKU-33")
+            .imagesJson("[\"https://cdn.example.com/uat/products/old.jpg\"]");
+        when(booksClient.downloadItemImage(eq("zoho-33"), any(Long.class)))
+            .thenReturn(Optional.of(new BinaryDownload("new-bytes".getBytes(), "image/jpeg")));
+        when(s3StorageService.uploadObject(eq("products"), any(), eq("new-bytes".getBytes()), eq("image/jpeg")))
+            .thenReturn("https://cdn.example.com/uat/products/zoho-new.jpg");
+
+        itemImageSync.importZohoItemImage(
+            product,
+            "zoho-33",
+            Map.of(
+                "sku", "SKU-33",
+                "image_name", "replaced.jpg",
+                "image_url", "https://cdn.example.com/uat/products/old.jpg"
+            )
+        );
+
+        assertThat(product.getImagesJson()).contains("https://cdn.example.com/uat/products/zoho-new.jpg");
+        verify(booksClient).downloadItemImage(eq("zoho-33"), any(Long.class));
+    }
+
+    @Test
     void importZohoItemImage_keepsRearImageWhenUpdatingPrimary() {
         Product product = new Product()
             .id(3L)
@@ -176,17 +201,26 @@ class ZohoItemImageSyncTest {
             Map.of(
                 "sku", "JAB-AQU",
                 "image_name", "1.png",
+                "image_url", "https://cdn.example.com/uat/products/should-not-lead.jpg",
                 "documents", List.of(
+                    Map.of("document_id", "doc-3", "attachment_order", 3),
                     Map.of("document_id", "doc-1", "attachment_order", 1),
-                    Map.of("document_id", "doc-2", "attachment_order", 2, "is_back_image", true),
-                    Map.of("document_id", "doc-3", "attachment_order", 3)
+                    Map.of("document_id", "doc-2", "attachment_order", 2, "is_back_image", true)
                 )
             )
         );
 
-        assertThat(product.getColorsJson()).contains("aqua-front.png");
-        assertThat(product.getColorsJson()).contains("aqua-back.png");
-        assertThat(product.getColorsJson()).contains("aqua-other.png");
+        assertThat(new ProductColorImagesSupport(new com.fasterxml.jackson.databind.ObjectMapper())
+            .galleryMapFromColorsJson(product.getColorsJson()))
+            .containsEntry(
+                "aqua",
+                List.of(
+                    "https://cdn.example.com/uat/products/aqua-front.png",
+                    "https://cdn.example.com/uat/products/aqua-back.png",
+                    "https://cdn.example.com/uat/products/aqua-other.png"
+                )
+            );
+        assertThat(product.getColorsJson()).doesNotContain("should-not-lead.jpg");
     }
 
     @Test
@@ -422,6 +456,99 @@ class ZohoItemImageSyncTest {
         assertThat(product.getColorsJson()).contains("blue-1.png");
         assertThat(product.getColorsJson()).contains("blue-2.png");
         assertThat(product.getColorsJson()).contains("blue-3.png");
+    }
+
+    @Test
+    void importZohoVariantColorImage_replacesExistingPrintGalleryWhenZohoPhotoChanged() {
+        Product product = new Product()
+            .id(31L)
+            .sku("KEDAR")
+            .itemStructure("VARIANTS")
+            .colorsJson("[{\"name\":\"Blue\",\"imageUrls\":[\"https://cdn.example.com/uat/products/old-blue.jpg\"]}]")
+            .colorImagesJson("{\"Blue\":[\"https://cdn.example.com/uat/products/old-blue.jpg\"]}")
+            .variantsJson(
+                """
+                [
+                  {"sku":"KED-BLU-0-3","size":"0-3","color":"Blue","rate":100,"stock":2,"active":true},
+                  {"sku":"KED-BLU-3-6","size":"3-6","color":"Blue","rate":100,"stock":2,"active":true}
+                ]
+                """
+            );
+
+        itemImageSync.importZohoVariantColorImage(
+            product,
+            "Blue",
+            "zoho-03",
+            Map.of("sku", "KED-BLU-0-3", "image_name", "new.jpg", "image_url", "https://cdn.example.com/uat/products/new-blue.jpg")
+        );
+        itemImageSync.importZohoVariantColorImage(
+            product,
+            "Blue",
+            "zoho-36",
+            Map.of("sku", "KED-BLU-3-6", "image_name", "old.jpg", "image_url", "https://cdn.example.com/uat/products/old-blue.jpg")
+        );
+
+        assertThat(new ProductColorImagesSupport(new com.fasterxml.jackson.databind.ObjectMapper())
+            .galleryUrlsForColor(product, "Blue"))
+            .containsExactly("https://cdn.example.com/uat/products/new-blue.jpg");
+        assertThat(product.getColorsJson()).doesNotContain("old-blue.jpg");
+    }
+
+    @Test
+    void importZohoItemImage_replacesSimpleProductColorGalleryWhenZohoPhotoChanged() {
+        Product product = new Product()
+            .id(32L)
+            .sku("SIDE-BUTTON")
+            .itemStructure("SIMPLE")
+            .imagesJson("[\"https://cdn.example.com/uat/products/old-front.jpg\"]")
+            .colorsJson("[{\"name\":\"Aqua\",\"imageUrls\":[\"https://cdn.example.com/uat/products/old-front.jpg\"]}]")
+            .colorImagesJson("{\"Aqua\":[\"https://cdn.example.com/uat/products/old-front.jpg\"]}");
+
+        itemImageSync.importZohoItemImage(
+            product,
+            "zoho-side",
+            Map.of("sku", "SIDE-BUTTON", "image_name", "new.jpg", "image_url", "https://cdn.example.com/uat/products/new-front.jpg")
+        );
+
+        assertThat(product.getImagesJson()).contains("new-front.jpg");
+        assertThat(new ProductColorImagesSupport(new com.fasterxml.jackson.databind.ObjectMapper())
+            .galleryUrlsForColor(product, "Aqua"))
+            .containsExactly("https://cdn.example.com/uat/products/new-front.jpg");
+        assertThat(product.getColorsJson()).doesNotContain("old-front.jpg");
+    }
+
+    @Test
+    void importZohoVariantColorImage_secondPullCanReplaceAgainAfterBeginImageImportPass() {
+        Product product = new Product()
+            .id(34L)
+            .sku("KEDAR")
+            .itemStructure("VARIANTS")
+            .colorsJson("[{\"name\":\"Blue\",\"imageUrls\":[\"https://cdn.example.com/uat/products/first.jpg\"]}]")
+            .variantsJson(
+                """
+                [
+                  {"sku":"KED-BLU-0-3","size":"0-3","color":"Blue","rate":100,"stock":2,"active":true}
+                ]
+                """
+            );
+
+        itemImageSync.importZohoVariantColorImage(
+            product,
+            "Blue",
+            "zoho-03",
+            Map.of("sku", "KED-BLU-0-3", "image_name", "second.jpg", "image_url", "https://cdn.example.com/uat/products/second.jpg")
+        );
+        itemImageSync.beginImageImportPass();
+        itemImageSync.importZohoVariantColorImage(
+            product,
+            "Blue",
+            "zoho-03",
+            Map.of("sku", "KED-BLU-0-3", "image_name", "third.jpg", "image_url", "https://cdn.example.com/uat/products/third.jpg")
+        );
+
+        assertThat(new ProductColorImagesSupport(new com.fasterxml.jackson.databind.ObjectMapper())
+            .galleryUrlsForColor(product, "Blue"))
+            .containsExactly("https://cdn.example.com/uat/products/third.jpg");
     }
 
     @Test

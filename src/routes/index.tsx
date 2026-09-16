@@ -9,6 +9,7 @@ import {
   Smile, Feather, Wind, Droplets, RefreshCw,
 } from "lucide-react";
 import { resolveHomeReviews } from "@/lib/home-reviews";
+import { ReviewStars } from "@/components/ReviewStars";
 import { useProducts, useProductsLoaded } from "@/hooks/useProducts";
 import { ProductGridSkeleton } from "@/components/ProductGridSkeleton";
 import { WatchShopSkeleton } from "@/components/WatchShopSkeleton";
@@ -29,7 +30,7 @@ import {
 import { parseWatchReels, resolveWatchShopReels } from "@/lib/watch-reels";
 import { parseFabricStoryVideo } from "@/lib/asset-url";
 import { productMatchesCategory } from "@/lib/shop-filters";
-import { toDirectDownloadUrl } from "@/lib/utils";
+import { toDirectDownloadUrl, triggerPublicFileDownload } from "@/lib/utils";
 import heroBaby from "@/assets/hero-smiling-baby.jpg";
 import lifestyle from "@/assets/lifestyle-mother.webp";
 import heroComfort from "@/assets/hero-comfort-carousel.webp";
@@ -49,9 +50,11 @@ export const Route = createFileRoute("/")({
       { name: "description", content: "Soft, organic, beautifully made baby clothing for the first 24 months. 100% certified organic cotton, hand-loomed knits and feather-soft muslins." },
       { property: "og:title", content: "Mini's n More — Minis today, memories forever" },
       { property: "og:description", content: "Hand-finished organic baby clothing with thoughtful gifting and heirloom quality." },
-      { property: "og:image", content: heroBaby },
+      { property: "og:image", content: "https://minisnmore.com/og-share.jpg" },
+      { name: "twitter:image", content: "https://minisnmore.com/og-share.jpg" },
     ],
     links: [
+      { rel: "canonical", href: "https://minisnmore.com/" },
       { rel: "preload", as: "image", href: heroBaby, fetchPriority: "high" },
       { rel: "preload", as: "image", href: heroInfant },
       { rel: "preload", as: "image", href: lifestyle },
@@ -85,7 +88,16 @@ type HeroSlide = {
   link: string;
   image: string;
   align?: "left" | "right";
+  /** Tailwind object-position so the subject stays in the mobile crop. */
+  imageFocus?: string;
 };
+
+const HERO_FOCUS_FALLBACK = "object-[center_20%] md:object-[right_20%]";
+/** First two slides: babies sit on the right of landscape photos — pin them into the tall mobile crop. */
+const HERO_FOCUS_BY_INDEX = [
+  "object-[84%_12%] md:object-[right_16%]",
+  "object-[78%_28%] md:object-[70%_28%]",
+] as const;
 
 const defaultHeroSlides: HeroSlide[] = [
   {
@@ -98,6 +110,7 @@ const defaultHeroSlides: HeroSlide[] = [
     link: "/shop",
     image: heroBaby,
     align: "left",
+    imageFocus: HERO_FOCUS_BY_INDEX[0],
   },
   {
     id: "slide-organic",
@@ -109,6 +122,7 @@ const defaultHeroSlides: HeroSlide[] = [
     link: "/shop",
     image: heroInfant,
     align: "left",
+    imageFocus: HERO_FOCUS_BY_INDEX[1],
   },
   {
     id: "slide-comfort",
@@ -167,6 +181,7 @@ function Home() {
         link: b.link_url || "/shop",
         image: b.image_url as string,
         align: "left",
+        imageFocus: HERO_FOCUS_BY_INDEX[i] ?? HERO_FOCUS_FALLBACK,
       }));
     if (fromCms.length > 0) {
       return fromCms.slice(0, HOME_SECTION_PRODUCT_LIMIT);
@@ -343,14 +358,11 @@ function Home() {
       {/* GIFTS */}
       {isEnabled("gifts") && (
       <section className="px-4 md:px-6">
-        <div className="flex items-end justify-between mb-5">
-          <div>
-            <div className="text-xs uppercase tracking-[0.28em] text-muted-foreground inline-flex items-center gap-2">
-              <Gift className="h-3.5 w-3.5 text-primary" /> {subtitleFor("gifts", "Thoughtful bundles for every occasion")}
-            </div>
-            <h2 className="font-display text-2xl md:text-3xl mt-2">{titleFor("gifts", "Gift with love")}</h2>
+        <div className="mb-5">
+          <div className="text-xs uppercase tracking-[0.28em] text-muted-foreground inline-flex items-center gap-2">
+            <Gift className="h-3.5 w-3.5 text-primary" /> {subtitleFor("gifts", "Thoughtful bundles for every occasion")}
           </div>
-          <Link to="/gift" className="story-link text-sm hidden md:inline">Build a gift</Link>
+          <h2 className="font-display text-2xl md:text-3xl mt-2">{titleFor("gifts", "Gift with love")}</h2>
         </div>
         {productsLoaded || liveProducts.length > 0 ? (
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
@@ -438,11 +450,7 @@ function Home() {
             {[...momReviews, ...momReviews, ...momReviews, ...momReviews].map((r, i) => (
               <div key={i} className="glass-strong rounded-3xl p-5 w-[300px] md:w-[360px] shrink-0">
                 <Quote className="h-5 w-5 text-primary/60" />
-                <div className="flex gap-0.5 mt-2">
-                  {Array.from({ length: 5 }).map((_, k) => (
-                    <Star key={k} className={`h-3.5 w-3.5 ${k < r.rating ? "fill-primary text-primary" : "text-muted-foreground"}`} />
-                  ))}
-                </div>
+                <ReviewStars rating={r.rating} className="flex gap-0.5 mt-2" />
                 <div className="font-display text-lg mt-2">{r.title}</div>
                 <p className="text-sm text-foreground/75 mt-1.5 leading-relaxed line-clamp-4">{r.body}</p>
                 <div className="mt-3 flex items-center gap-2">
@@ -742,7 +750,7 @@ function HeroCarousel({
             fetchPriority={i === 0 ? "high" : i === 1 ? "low" : "auto"}
             priority={i <= 1 ? "high" : "auto"}
             decoding="async"
-            className={`absolute inset-0 h-full w-full object-cover object-[center_20%] md:object-[right_20%] transition-opacity duration-500 ease-out ${
+            className={`absolute inset-0 h-full w-full object-cover ${s.imageFocus ?? HERO_FOCUS_BY_INDEX[i] ?? HERO_FOCUS_FALLBACK} transition-opacity duration-500 ease-out ${
               i === index ? "opacity-100" : "opacity-0"
             }`}
           />
@@ -756,8 +764,11 @@ function HeroCarousel({
       {/* Top-right brand pill — click to download e-catalogue */}
       <motion.a
         href={ecatalogueUrl}
-        download
         aria-label={`Download ${ecatalogueLabel}`}
+        onClick={(event) => {
+          event.preventDefault();
+          void triggerPublicFileDownload(ecatalogueUrl);
+        }}
         initial={{ opacity: 0, x: 30 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 1, ease: [0.2, 0.8, 0.2, 1] }}

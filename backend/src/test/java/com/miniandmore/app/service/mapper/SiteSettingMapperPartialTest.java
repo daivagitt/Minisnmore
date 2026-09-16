@@ -46,11 +46,13 @@ class SiteSettingMapperPartialTest {
         patch.setSubscribeBadgesJson("[]");
         patch.setSubscribePlansJson("[]");
         patch.setSubscribeFeaturesJson("[]");
+        patch.setAboutPageJson("{\"hero_title\":\"About\"}");
 
         mapper.partialUpdate(entity, patch);
 
         assertThat(entity.getContactEmail()).isEqualTo("a@b.com");
         assertThat(entity.getSubscribeHeroTitle()).isEqualTo("Hero");
+        assertThat(entity.getAboutPageJson()).isEqualTo("{\"hero_title\":\"About\"}");
         assertThat(entity.getGstRate()).isEqualByComparingTo("18");
         mapper.partialUpdate(entity, null);
     }

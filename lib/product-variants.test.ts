@@ -12,6 +12,7 @@ import {
   lineUnitPrice,
   parseVariantsJson,
   sellableColorsForSize,
+  sizeHasActiveVariants,
   sizeHasSellableVariants,
   sizesForDisplay,
   storefrontListPricing,
@@ -139,7 +140,25 @@ describe("product-variants", () => {
     expect(sizesForDisplay(partial)).toEqual(["0-3 M", "3-6 M", "6-12 M", "12-18 M"]);
     expect(sizeHasSellableVariants(partial, "3-6 M")).toBe(false);
     expect(sizeHasSellableVariants(partial, "0-3 M")).toBe(true);
-    expect(availableSizesForFit(partial)).toEqual(["0-3 M"]);
+    expect(sizeHasSellableVariants(partial, "6-12 M")).toBe(false);
+    expect(sizeHasActiveVariants(partial, "6-12 M")).toBe(true);
+    expect(availableSizesForFit(partial)).toEqual(["0-3 M", "6-12 M"]);
+  });
+
+  it("includes zero-stock catalog sizes in the size calculator but not inactive sizes", () => {
+    const mixed: Product = {
+      ...matrixProduct,
+      sizes: ["S", "M", "L"],
+      variants: parseVariantsJson([
+        { sku: "HORIZON-S-NAVY", size: "S", color: "Navy", rate: 999, stock: 0, active: true },
+        { sku: "HORIZON-M-NAVY", size: "M", color: "Navy", rate: 1199, stock: 4, active: true },
+        { sku: "HORIZON-L-IVORY", size: "L", color: "Ivory", rate: 1299, stock: 0, active: false },
+      ]),
+    };
+    expect(sizeHasActiveVariants(mixed, "S")).toBe(true);
+    expect(sizeHasSellableVariants(mixed, "S")).toBe(false);
+    expect(sizeHasActiveVariants(mixed, "L")).toBe(false);
+    expect(availableSizesForFit(mixed)).toEqual(["S", "M"]);
   });
 
   it("lists only catalog/variant sizes without standard-band padding", () => {

@@ -15,7 +15,33 @@ import { FloatingDecor } from "@/components/FloatingDecor";
 import { Toaster } from "sonner";
 import { initStorefrontCacheSync, invalidateAllStorefrontCaches } from "@/lib/storefront-cache-sync";
 
-const SOCIAL_SHARE_IMAGE = "https://minisnmore.com/og-share.jpg";
+const SITE_ORIGIN = "https://minisnmore.com";
+const SOCIAL_SHARE_IMAGE = `${SITE_ORIGIN}/og-share.jpg`;
+const ORGANIZATION_JSON_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_ORIGIN}/#organization`,
+      name: "Mini's n More",
+      legalName: "Stolt Global Private Limited",
+      url: `${SITE_ORIGIN}/`,
+      logo: {
+        "@type": "ImageObject",
+        url: `${SITE_ORIGIN}/icon-512.png`,
+        width: 512,
+        height: 512,
+      },
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_ORIGIN}/#website`,
+      url: `${SITE_ORIGIN}/`,
+      name: "Mini's n More",
+      publisher: { "@id": `${SITE_ORIGIN}/#organization` },
+    },
+  ],
+};
 
 function NotFoundComponent() {
   return (
@@ -47,12 +73,11 @@ export const Route = createRootRoute({
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/favicon.ico", sizes: "48x48" },
-      { rel: "icon", href: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
-      { rel: "icon", href: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
-      { rel: "icon", href: "/icon-192.png", type: "image/png", sizes: "192x192" },
-      { rel: "icon", href: "/icon-512.png", type: "image/png", sizes: "512x512" },
+      { rel: "icon", href: "/favicon-48x48.png", type: "image/png", sizes: "48x48" },
+      { rel: "icon", href: "/favicon-96x96.png", type: "image/png", sizes: "96x96" },
+      { rel: "icon", href: "/favicon.ico", type: "image/x-icon", sizes: "48x48" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
+      { rel: "manifest", href: "/site.webmanifest" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "preconnect", href: "https://pub-f227d5520be64479a318380ac346334d.r2.dev" },
@@ -67,7 +92,10 @@ export const Route = createRootRoute({
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <head><HeadContent /></head>
+      <head>
+        <HeadContent />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ORGANIZATION_JSON_LD) }} />
+      </head>
       <body>
         {children}
         <Scripts />
@@ -82,6 +110,8 @@ function RootComponent() {
   const wasAdminRef = useRef(isAdmin);
   const isCustomerInvoice = /^\/account\/orders\/[^/]+\/invoice$/.test(pathname);
   const isInvoice = isCustomerInvoice || /^\/admin\/orders\/[^/]+\/invoice$/.test(pathname);
+  const isProductPage = !isAdmin && !isInvoice && pathname.startsWith("/product/");
+  const pdpScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     return initStorefrontCacheSync();
@@ -131,6 +161,32 @@ function RootComponent() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isProductPage) return;
+    const html = document.documentElement;
+    const { overflow: prevHtmlOverflow, height: prevHtmlHeight } = html.style;
+    const { overflow: prevBodyOverflow, height: prevBodyHeight } = document.body.style;
+    html.classList.add("pdp-lock-scroll");
+    document.body.classList.add("pdp-lock-scroll");
+    html.style.overflow = "hidden";
+    html.style.height = "100%";
+    document.body.style.overflow = "hidden";
+    document.body.style.height = "100%";
+    return () => {
+      html.classList.remove("pdp-lock-scroll");
+      document.body.classList.remove("pdp-lock-scroll");
+      html.style.overflow = prevHtmlOverflow;
+      html.style.height = prevHtmlHeight;
+      document.body.style.overflow = prevBodyOverflow;
+      document.body.style.height = prevBodyHeight;
+    };
+  }, [isProductPage]);
+
+  useEffect(() => {
+    if (!isProductPage) return;
+    pdpScrollRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [isProductPage, pathname]);
+
   return (
     <AuthProvider>
     <ShopProvider>
@@ -138,19 +194,42 @@ function RootComponent() {
       {!isAdmin && !isInvoice && (
         <>
           <Watermark />
-          <ScrollProgress />
           <div aria-hidden className="fixed inset-0 pointer-events-none z-0">
             <FloatingDecor count={10} variant="leaves" />
           </div>
           <Navbar />
         </>
       )}
-      <main className={isAdmin || isInvoice ? "relative z-10" : "relative z-10 pt-24 md:pt-28"}>
-        <Outlet />
-      </main>
+      {isProductPage ? (
+        <div className="relative z-10 flex h-[100dvh] flex-col overflow-hidden">
+          <div className="h-24 shrink-0 md:h-28" aria-hidden />
+          <div
+            ref={pdpScrollRef}
+            data-pdp-scroll
+            className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain"
+          >
+            <main>
+              <Outlet />
+            </main>
+            <Footer />
+          </div>
+        </div>
+      ) : (
+        <>
+          <main className={isAdmin || isInvoice ? "relative z-10" : "relative z-10 pt-24 md:pt-28"}>
+            <Outlet />
+          </main>
+          {!isAdmin && !isInvoice && <Footer />}
+        </>
+      )}
+      {!isAdmin && !isInvoice && (
+        <ScrollProgress
+          key={isProductPage ? "pdp" : "page"}
+          containerRef={isProductPage ? pdpScrollRef : undefined}
+        />
+      )}
       {!isAdmin && !isInvoice && (
         <>
-          <Footer />
           <CartDrawer />
           <QuickView />
         </>

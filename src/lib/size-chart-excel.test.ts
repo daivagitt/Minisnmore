@@ -79,7 +79,7 @@ describe("size chart excel", () => {
     expect(parsed).toEqual(original);
   });
 
-  it("warns when chest/length rows are missing", () => {
+  it("warns when no size-varying calculator rows exist", () => {
     const chart = sizeChartFromExcelSheets({
       chartRows: [
         {
@@ -92,6 +92,28 @@ describe("size chart excel", () => {
     const result = validateSizeChartStructure(chart);
     expect(result.ok).toBe(true);
     expect(result.warnings.length).toBeGreaterThan(0);
+  });
+
+  it("does not warn when custom size-varying rows can drive the calculator", () => {
+    const chart = sizeChartFromExcelSheets({
+      chartRows: [
+        {
+          Section: "Measurements",
+          Measurement: "Waistband width",
+          "0-3M": "12-16",
+          "3-6M": 17,
+          "6-12M": 18,
+        },
+        {
+          Section: "Measurements",
+          Measurement: "Waistband Height",
+          "0-3M": "1.1-1.5",
+          "3-6M": 1.5,
+          "6-12M": 1.5,
+        },
+      ],
+    });
+    expect(validateSizeChartStructure(chart)).toEqual({ ok: true, errors: [], warnings: [] });
   });
 
   it("keeps 0-3M min–max text in Excel cells", () => {

@@ -34,6 +34,7 @@ export function productSearchHaystack(product: Product): string {
   pushField(parts, product.categoryName);
   pushField(parts, product.categorySlug);
   pushField(parts, product.sku);
+  pushField(parts, product.detailsKicker);
   for (const age of product.ages ?? []) pushField(parts, age);
   for (const size of product.sizes ?? []) pushField(parts, size);
   for (const color of product.colors ?? []) pushField(parts, color?.name);
@@ -57,6 +58,7 @@ export function adminProductSearchHaystack(row: ProductRow): string {
   pushField(parts, row.category_name);
   pushField(parts, row.category_slug);
   pushField(parts, row.badge);
+  pushField(parts, row.details_kicker);
   pushField(parts, row.hsn);
   pushField(parts, row.ledgerly_item_id);
   for (const size of row.sizes ?? []) pushField(parts, size);

@@ -55,6 +55,17 @@ class ProductServiceTest {
     }
 
     @Test
+    void invalidSizeNotesAreRejectedBeforeAnyProductMutation() {
+        ProductDTO input = new ProductDTO();
+        input.setId(ID);
+        input.setSizeNotesJson("{\"0-3m\":true}");
+        assertThatThrownBy(() -> productService.save(input)).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> productService.update(input)).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> productService.partialUpdate(input)).isInstanceOf(ResponseStatusException.class);
+        org.mockito.Mockito.verifyNoInteractions(productMapper, productRepository);
+    }
+
+    @Test
     void save() {
         ProductDTO input = new ProductDTO();
         Product entity = new Product().id(ID);

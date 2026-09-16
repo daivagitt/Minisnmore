@@ -407,7 +407,11 @@ export function parseMeasurementCell(value: number | string | undefined | null):
 }
 
 export function formatMeasurementCell(min: number | null, max: number | null): number | string {
-  if (min != null && max != null && min !== max) return `${min}-${max}`;
+  if (min != null && max != null) {
+    const lo = Math.min(min, max);
+    const hi = Math.max(min, max);
+    return `${lo}-${hi}`;
+  }
   if (max != null) return max;
   if (min != null) return min;
   return "";
@@ -417,9 +421,10 @@ export function formatMeasurementCell(min: number | null, max: number | null): n
 export function isZeroToThreeBand(band: string): boolean {
   const key = band
     .toUpperCase()
+    .replace(/[–—]/g, "-")
     .replace(/\s+/g, "")
-    .replace(/MONTHS?/, "M")
-    .replace(/MOS?/, "M");
+    .replace(/MONTHS?/g, "M")
+    .replace(/MOS?/g, "M");
   return key === "0-3M" || key === "0-3";
 }
 
@@ -551,6 +556,21 @@ export function parseProductSizeChart(raw: unknown): ProductSizeChart | null {
   return !invalid && isUsableSizeChart(chart) ? chart : null;
 }
 
+/** Approved SKU/name template for admin “Load from catalog”. */
+export function catalogSizeChartTemplate(input: {
+  sku?: string | null;
+  name?: string | null;
+  slug?: string | null;
+}): ProductSizeChart | null {
+  const key = resolveSizeChartSku(input);
+  if (!key) return null;
+  return SIZE_CHARTS_BY_SKU[key] ?? null;
+}
+
+/**
+ * Product chart when admin saved one; otherwise the SKU catalog template.
+ * The PDP size-guide button and size calculator stay gated on the saved chart only.
+ */
 export function sizeChartForProduct(input: {
   sku?: string | null;
   name?: string | null;
@@ -558,9 +578,7 @@ export function sizeChartForProduct(input: {
   sizeChart?: ProductSizeChart | null;
 }): ProductSizeChart | null {
   if (isUsableSizeChart(input.sizeChart)) return input.sizeChart;
-  const key = resolveSizeChartSku(input);
-  if (!key) return null;
-  return SIZE_CHARTS_BY_SKU[key] ?? null;
+  return catalogSizeChartTemplate(input);
 }
 
 export type ChartFitPoint = {
@@ -573,9 +591,26 @@ export type ChartFitPoint = {
   chestMin?: number | null;
 };
 
+export type ChartFitAxes = {
+  /** Row label used as the length-style calculator input, if any. */
+  lengthLabel: string | null;
+  /** Row label used as the girth/width calculator input, if any. */
+  chestLabel: string | null;
+  points: ChartFitPoint[];
+};
+
 const CHEST_LABEL = /^(chest(\s*width|\s*\(½\)|\s*\(1\/2\))?)$/i;
 const LENGTH_LABEL =
   /^(body\s*length.*|length\s*\(hps.*|total\s*length|length)$/i;
+const GIRTH_FALLBACK =
+  /waistband\s*width|waist\s*width|hip(\s*\/\s*body)?(\s*width)?|bottom\s*width|head\s*(open|circumference)|foot\s*width/i;
+const LENGTH_FALLBACK =
+  /body\s*length|length\s*\(hps|total\s*length|^length$|center\s*(front|back)\s*length|full\s*length|foot\s*length|cap\s*height|inseam/i;
+const WIDTH_LIKE = /width|open|circ|hip|waist|chest/i;
+const LENGTH_LIKE = /length|height|inseam/i;
+const SKIP_FIT_ROW = /waistband\s*height|sleeve\s*(length|open)|neck\s*(drop|width)|armhole|rise|placement|cuff|rib|frill|thickness/i;
+/** Ignore construction rows that barely change between sizes (e.g. waistband height). */
+const MIN_FIT_SPREAD_CM = 1;
 
 function findRow(
   section: SizeChartSection,
@@ -584,24 +619,85 @@ function findRow(
   return section.rows.find((r) => matcher.test(r.label.trim()));
 }
 
-/**
- * Length + chest points from the approved MnM sheet for the product's primary
- * garment section (first age-banded section). Used by the storefront size guide
- * and calculator.
- */
-export function fitPointsFromSizeChart(chart: ProductSizeChart): ChartFitPoint[] {
-  const section =
+function rowHasNumeric(row: SizeChartRow, bands: string[]): boolean {
+  return bands.some((band) => parseMeasurementCell(row.values[band]).max != null);
+}
+
+function rowNumericSpread(row: SizeChartRow, bands: string[]): number {
+  const vals = bands
+    .map((band) => parseMeasurementCell(row.values[band]).max)
+    .filter((n): n is number => n != null);
+  if (vals.length === 0) return 0;
+  return Math.max(...vals) - Math.min(...vals);
+}
+
+function rowVariesForFit(row: SizeChartRow, bands: string[]): boolean {
+  return rowHasNumeric(row, bands) && rowNumericSpread(row, bands) >= MIN_FIT_SPREAD_CM;
+}
+
+function primaryFitSection(chart: ProductSizeChart): SizeChartSection | undefined {
+  return (
     chart.sections.find(
       (s) => s.bands.length > 1 && !/common|single/i.test(s.bands[0] ?? ""),
-    ) ?? chart.sections[0];
-  if (!section) return [];
+    ) ?? chart.sections[0]
+  );
+}
 
-  const chestRow = findRow(section, CHEST_LABEL);
-  // Prefer body/HPS length over "Total length" when both exist (tees have both sleeve-related totals).
-  const lengthRow =
+function pickFitRow(
+  candidates: SizeChartRow[],
+  bands: string[],
+  matcher: (row: SizeChartRow) => boolean,
+  requireSpread: boolean,
+): SizeChartRow | undefined {
+  return candidates.find((row) => {
+    if (!matcher(row)) return false;
+    if (SKIP_FIT_ROW.test(row.label.trim())) return false;
+    return requireSpread ? rowVariesForFit(row, bands) : rowHasNumeric(row, bands);
+  });
+}
+
+function selectFitRows(section: SizeChartSection): {
+  lengthRow?: SizeChartRow;
+  chestRow?: SizeChartRow;
+} {
+  const bands = section.bands;
+  let chestRow = findRow(section, CHEST_LABEL);
+  if (chestRow && !rowHasNumeric(chestRow, bands)) chestRow = undefined;
+
+  let lengthRow =
     section.rows.find((r) => /body\s*length|length\s*\(hps/i.test(r.label)) ??
     findRow(section, LENGTH_LABEL);
+  if (lengthRow && !rowHasNumeric(lengthRow, bands)) lengthRow = undefined;
 
+  const unused = () => section.rows.filter((row) => row !== chestRow && row !== lengthRow);
+
+  if (!chestRow) {
+    chestRow =
+      pickFitRow(unused(), bands, (row) => GIRTH_FALLBACK.test(row.label.trim()), true) ??
+      pickFitRow(unused(), bands, (row) => WIDTH_LIKE.test(row.label.trim()), true);
+  }
+
+  if (!lengthRow) {
+    lengthRow =
+      pickFitRow(unused(), bands, (row) => LENGTH_FALLBACK.test(row.label.trim()), true) ??
+      pickFitRow(unused(), bands, (row) => LENGTH_LIKE.test(row.label.trim()), true);
+  }
+
+  if (!chestRow) {
+    chestRow = pickFitRow(unused(), bands, () => true, true);
+  }
+  if (!lengthRow) {
+    lengthRow = pickFitRow(unused(), bands, () => true, true);
+  }
+
+  return { lengthRow, chestRow };
+}
+
+function pointsFromRows(
+  section: SizeChartSection,
+  lengthRow: SizeChartRow | undefined,
+  chestRow: SizeChartRow | undefined,
+): ChartFitPoint[] {
   return section.bands.map((band) => {
     const length = parseMeasurementCell(lengthRow?.values[band]);
     const chest = parseMeasurementCell(chestRow?.values[band]);
@@ -613,6 +709,28 @@ export function fitPointsFromSizeChart(chart: ProductSizeChart): ChartFitPoint[]
       ...(chest.min != null ? { chestMin: chest.min } : {}),
     };
   });
+}
+
+/**
+ * Length + girth points from the product's primary garment section (first
+ * age-banded section). Prefers Chest / Body length rows, then other
+ * size-varying measurements the admin entered (e.g. waistband width).
+ */
+export function fitAxesFromSizeChart(chart: ProductSizeChart): ChartFitAxes {
+  const section = primaryFitSection(chart);
+  if (!section) return { lengthLabel: null, chestLabel: null, points: [] };
+
+  const { lengthRow, chestRow } = selectFitRows(section);
+  return {
+    lengthLabel: lengthRow?.label.trim() || null,
+    chestLabel: chestRow?.label.trim() || null,
+    points: pointsFromRows(section, lengthRow, chestRow),
+  };
+}
+
+/** Fit points from {@link fitAxesFromSizeChart} for callers that only need values. */
+export function fitPointsFromSizeChart(chart: ProductSizeChart): ChartFitPoint[] {
+  return fitAxesFromSizeChart(chart).points;
 }
 
 /** Filter chart columns to sizes the product actually sells (when age-banded). */

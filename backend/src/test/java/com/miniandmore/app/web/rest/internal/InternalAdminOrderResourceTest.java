@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
+import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
@@ -54,6 +55,9 @@ class InternalAdminOrderResourceTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private ApplicationProperties applicationProperties;
 
     @MockitoBean
     private CouponRepository couponRepository;
@@ -332,12 +336,47 @@ class InternalAdminOrderResourceTest {
             .andExpect(jsonPath("$.data.order.can_book_shipment").value(false));
     }
 
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
+    void getOrder_pullsZohoTrackingWhenStale() throws Exception {
+        CustomerOrder order = codOrder().status(OrderStatus.CONFIRMED).zohoSalesOrderId("so-1");
+        when(customerOrderRepository.findOneByOrderNumber("MNM-COD1")).thenReturn(Optional.of(order));
+        when(accountOrders.orderDetail(any(CustomerOrder.class)))
+            .thenReturn(java.util.Map.of("order_number", "MNM-COD1", "status", "confirmed"));
+
+        mockMvc.perform(get("/internal/v1/admin/orders/MNM-COD1")).andExpect(status().isOk());
+
+        verify(zohoSyncService).pullOrderTracking(900L);
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
+    void getOrder_skipsZohoPullWhenTrackingDisabled() throws Exception {
+        applicationProperties.getZoho().getOrderTracking().setEnabled(false);
+        try {
+            CustomerOrder order = codOrder().status(OrderStatus.CONFIRMED).zohoSalesOrderId("so-1");
+            when(customerOrderRepository.findOneByOrderNumber("MNM-COD1")).thenReturn(Optional.of(order));
+            when(accountOrders.orderDetail(order)).thenReturn(java.util.Map.of("order_number", "MNM-COD1", "status", "confirmed"));
+
+            mockMvc.perform(get("/internal/v1/admin/orders/MNM-COD1")).andExpect(status().isOk());
+
+            verify(zohoSyncService, never()).pullOrderTracking(any());
+        } finally {
+            applicationProperties.getZoho().getOrderTracking().setEnabled(true);
+        }
+    }
+
     @TestConfiguration
     static class DataAccessConfig {
 
         @Bean
         ObjectMapper objectMapper() {
             return new ObjectMapper();
+        }
+
+        @Bean
+        ApplicationProperties applicationProperties() {
+            return new ApplicationProperties();
         }
 
         @Bean

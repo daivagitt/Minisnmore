@@ -12,6 +12,7 @@ import {
 } from "@/lib/commerce";
 import { invalidateSiteSettings, type SiteSettings } from "@/hooks/useSiteSettings";
 import { ImageUploadField } from "@/components/admin/ImageUploadField";
+import { PdfUploadField } from "@/components/admin/PdfUploadField";
 import { showApiError, showValidationErrors } from "@/lib/ui-errors";
 import {
   getAdminSiteSettings,
@@ -371,14 +372,11 @@ function SettingsPage() {
           <div className="glass-strong rounded-3xl p-5 space-y-3">
             <div className="font-display text-lg">E-Catalogue</div>
             <div className="grid sm:grid-cols-2 gap-3">
-              <Field label="PDF URL">
-                <input
-                  className={inputCls()}
-                  value={s.ecatalogue_url ?? ""}
-                  onChange={(e) => up("ecatalogue_url", e.target.value)}
-                  placeholder="/e-catalogue.pdf or https://…"
-                />
-              </Field>
+              <PdfUploadField
+                label="Catalogue PDF"
+                value={s.ecatalogue_url ?? ""}
+                onChange={(ecatalogue_url) => up("ecatalogue_url", ecatalogue_url)}
+              />
               <Field label="Button / link label">
                 <input
                   className={inputCls()}

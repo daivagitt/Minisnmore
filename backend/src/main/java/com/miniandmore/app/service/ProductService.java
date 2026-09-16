@@ -53,9 +53,10 @@ public class ProductService {
      */
     public ProductDTO save(ProductDTO productDTO) {
         ProductSizeChartValidation.validate(productDTO.getSizeChartJson());
+        ProductSizeNotesValidation.validate(productDTO.getSizeNotesJson());
         LOG.debug("Request to save Product : {}", productDTO);
         Product product = productMapper.toEntity(productDTO);
-        normalizeVariants(product);
+        normalizeVariants(product, null, null);
         product = productRepository.save(product);
         return productMapper.toDto(product);
     }
@@ -68,9 +69,17 @@ public class ProductService {
      */
     public ProductDTO update(ProductDTO productDTO) {
         ProductSizeChartValidation.validate(productDTO.getSizeChartJson());
+        ProductSizeNotesValidation.validate(productDTO.getSizeNotesJson());
         LOG.debug("Request to update Product : {}", productDTO);
+        String frozenVariantsJson = null;
+        String frozenColorsJson = null;
+        if (productDTO.getId() != null) {
+            Optional<Product> existing = productRepository.findById(productDTO.getId());
+            frozenVariantsJson = existing.map(Product::getVariantsJson).orElse(null);
+            frozenColorsJson = existing.map(Product::getColorsJson).orElse(null);
+        }
         Product product = productMapper.toEntity(productDTO);
-        normalizeVariants(product);
+        normalizeVariants(product, frozenVariantsJson, frozenColorsJson);
         product = productRepository.save(product);
         return productMapper.toDto(product);
     }
@@ -83,20 +92,23 @@ public class ProductService {
      */
     public Optional<ProductDTO> partialUpdate(ProductDTO productDTO) {
         ProductSizeChartValidation.validate(productDTO.getSizeChartJson());
+        ProductSizeNotesValidation.validate(productDTO.getSizeNotesJson());
         LOG.debug("Request to partially update Product : {}", productDTO);
 
         return productRepository
             .findById(productDTO.getId())
             .map(existingProduct -> {
+                String frozenVariantsJson = existingProduct.getVariantsJson();
+                String frozenColorsJson = existingProduct.getColorsJson();
                 productMapper.partialUpdate(existingProduct, productDTO);
-                normalizeVariants(existingProduct);
+                normalizeVariants(existingProduct, frozenVariantsJson, frozenColorsJson);
                 return existingProduct;
             })
             .map(productRepository::save)
             .map(productMapper::toDto);
     }
 
-    private void normalizeVariants(Product product) {
+    private void normalizeVariants(Product product, String frozenVariantsJson, String frozenColorsJson) {
         if (product == null) {
             return;
         }
@@ -115,6 +127,7 @@ public class ProductService {
             structure = ProductVariantSupport.STRUCTURE_SIMPLE;
         }
         if (variantSupport.isVariantsStructure(structure)) {
+            variantSupport.freezeVariantColorsFromStored(product, frozenVariantsJson);
             if (!variantSupport.applyMatrixToProduct(product, structure, product.getVariantsJson())) {
                 throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -124,7 +137,8 @@ public class ProductService {
             if (!galleryMap.isEmpty()) {
                 product.setColorsJson(colorImagesSupport.applyGalleryMapToColorsJson(product.getColorsJson(), galleryMap));
             }
-            product.setColorsJson(colorImagesSupport.mergeRichColorMetadata(product.getColorsJson(), adminColorsJson));
+            product.setColorsJson(colorImagesSupport.mergeFrozenColorMedia(product.getColorsJson(), adminColorsJson));
+            product.setColorsJson(colorImagesSupport.freezeSwatchesFromStored(product.getColorsJson(), frozenColorsJson));
         } else {
             product.setItemStructure(ProductVariantSupport.STRUCTURE_SIMPLE);
             product.setVariantsJson(null);

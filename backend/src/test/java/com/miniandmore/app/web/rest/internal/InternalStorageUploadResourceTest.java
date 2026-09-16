@@ -1,6 +1,7 @@
 package com.miniandmore.app.web.rest.internal;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -9,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.miniandmore.app.service.S3StorageService;
+import java.io.InputStream;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,5 +61,36 @@ class InternalStorageUploadResourceTest {
             .perform(multipart("/internal/v1/admin/uploads").file(file).param("folder", "products"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.publicUrl").value("https://cdn/products/photo.jpg"));
+    }
+
+    @Test
+    void uploadCataloguePdf_returns200() throws Exception {
+        when(s3StorageService.uploadCataloguePdf(eq("soft-bloom.pdf"), any(InputStream.class), anyLong())).thenReturn(
+            "https://cdn/catalogues/soft-bloom.pdf"
+        );
+
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "soft-bloom.pdf",
+            "application/pdf",
+            "pdf-bytes".getBytes()
+        );
+
+        mockMvc
+            .perform(multipart("/internal/v1/admin/uploads/catalogue-pdf").file(file))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.publicUrl").value("https://cdn/catalogues/soft-bloom.pdf"));
+    }
+
+    @Test
+    void ensureDerivatives_returns200() throws Exception {
+        mockMvc
+            .perform(
+                post("/internal/v1/admin/uploads/derivatives")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"publicUrl\":\"https://cdn.example.com/products/photo.jpg\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.publicUrl").value("https://cdn.example.com/products/photo.jpg"));
     }
 }

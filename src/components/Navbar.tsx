@@ -1,6 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, ShoppingBag, Search, Menu, X, User, ArrowRight, Sparkles, Star, Flame } from "lucide-react";
+import { Heart, ShoppingBag, Search, Menu, X, User, ArrowRight, Sparkles, Star, Flame, Download } from "lucide-react";
 import { useState, useEffect, useRef, useMemo, useId } from "react";
 import { useShop } from "@/store/shop";
 import { useProducts, useProductsLoaded } from "@/hooks/useProducts";
@@ -11,7 +11,9 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useAuth } from "@/hooks/useAuth";
 import { buildShopSearch } from "@/lib/shop-filters";
 import { filterProductsByQuery } from "@/lib/product-search";
+import { toDirectDownloadUrl, triggerPublicFileDownload } from "@/lib/utils";
 import { LazyImage } from "@/components/LazyImage";
+import { storefrontImageUrl } from "@/lib/storefront-image";
 import defaultLogo from "@/assets/logo-horizontal-optimized.webp";
 import type { FileRoutesByTo } from '@/routeTree.gen';
 
@@ -64,17 +66,21 @@ export function Navbar() {
   }, [pathname]);
 
   useEffect(() => {
+    const pdp = document.querySelector<HTMLElement>("[data-pdp-scroll]");
+    const readY = () => (pdp ? pdp.scrollTop : window.scrollY);
     const onScroll = () => {
-      const y = window.scrollY;
+      const y = readY();
       setScrolled(y > 20);
-      // hide on scroll down past 120px, show on scroll up
-      if (y > 120 && y > lastY.current) setHidden(true);
+      // Product pages keep the bar visible; elsewhere hide on scroll down past 120px.
+      if (!pdp && y > 120 && y > lastY.current) setHidden(true);
       else setHidden(false);
       lastY.current = y;
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+    const target: EventTarget = pdp ?? window;
+    target.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => target.removeEventListener("scroll", onScroll);
+  }, [pathname]);
 
   useEffect(() => {
     if (!searchOpen) return;
@@ -204,9 +210,8 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center gap-0.5 sm:gap-1.5 md:gap-2 shrink-0">
-          {/* Search stays in the hamburger on the narrowest phones to avoid icon crowding */}
-          <button onClick={() => setSearchOpen(true)} title="Search" className="hidden sm:grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-full hover:bg-white/40 transition" aria-label="Search">
-            <Search className="h-4.5 w-4.5" />
+          <button onClick={() => setSearchOpen(true)} title="Search" className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-full hover:bg-white/40 transition" aria-label="Search">
+            <Search className="h-4.5 w-4.5 sm:h-5 sm:w-5" strokeWidth={1.6} />
           </button>
           <Link
             to={profileTo}
@@ -259,6 +264,19 @@ export function Navbar() {
                 {n.label}
               </Link>
             ))}
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                void triggerPublicFileDownload(
+                  toDirectDownloadUrl(settings.ecatalogue_url) || "/e-catalogue.pdf",
+                );
+              }}
+              className="flex items-center gap-2 text-base py-1.5 text-left"
+            >
+              <Download className="h-4 w-4" aria-hidden />
+              Download catalogue
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -341,7 +359,7 @@ export function Navbar() {
                             onMouseEnter={() => setActiveIndex(index)}
                             className={`flex items-center gap-3 p-2 rounded-2xl transition ${index === activeIndex ? "bg-white/50" : "hover:bg-white/40"}`}
                           >
-                            <LazyImage src={p.image} alt="" className="h-12 w-12 rounded-xl object-cover" priority="low" />
+                            <LazyImage src={storefrontImageUrl(p.image, "thumb")} fallbackSrc={p.image} alt="" className="h-12 w-12 rounded-xl object-cover" priority="low" />
                             <div className="flex-1 min-w-0">
                               <div className="text-sm font-medium truncate">{p.name}</div>
                               <div className="text-xs text-muted-foreground truncate">
@@ -446,7 +464,7 @@ function MegaMenu({ categories, products, onClose }: { categories: Category[]; p
                         className="group flex items-center gap-3 rounded-2xl p-2 hover:bg-primary/10 transition"
                       >
                         {c.image_url ? (
-                          <LazyImage src={c.image_url} alt="" className="h-11 w-11 rounded-xl object-cover shrink-0" priority="auto" />
+                          <LazyImage src={storefrontImageUrl(c.image_url, "thumb")} fallbackSrc={c.image_url} alt="" className="h-11 w-11 rounded-xl object-cover shrink-0" priority="auto" />
                         ) : (
                           <div className="h-11 w-11 rounded-xl bg-primary/10 shrink-0" />
                         )}
@@ -484,7 +502,7 @@ function MegaMenu({ categories, products, onClose }: { categories: Category[]; p
                 onClick={onClose}
                 className="group flex items-center gap-3 rounded-2xl p-2 hover:bg-primary/10 transition"
               >
-                <LazyImage src={p.image} alt={p.name} className="h-14 w-14 rounded-xl object-cover shrink-0" priority="auto" />
+                <LazyImage src={storefrontImageUrl(p.image, "thumb")} fallbackSrc={p.image} alt={p.name} className="h-14 w-14 rounded-xl object-cover shrink-0" priority="auto" />
                 <div className="min-w-0 flex-1">
                   <div className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{p.category}</div>
                   <div className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition">{p.name}</div>

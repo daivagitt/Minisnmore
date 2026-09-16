@@ -69,6 +69,37 @@ describe("home-reviews", () => {
     );
   });
 
+  it("keeps half-star ratings when parsing and saving", () => {
+    const parsed = reviewsFromHomePayload({
+      reviews: [
+        {
+          title: "Almost perfect",
+          body: "Loved the fabric, just a little long in the sleeves.",
+          rating: 4.5,
+          author: "Test Mom",
+          date: "May 2025",
+          photo: "/mom.jpg",
+        },
+      ],
+    });
+    expect(parsed[0]?.rating).toBe(4.5);
+    expect(
+      normalizeHomeReviewDrafts([
+        {
+          title: "Almost perfect",
+          body: "Loved the fabric, just a little long in the sleeves.",
+          author: "Test Mom",
+          date: "May 2025",
+          rating: 4.5,
+          photo: "/mom.jpg",
+        },
+      ])[0]?.rating,
+    ).toBe(4.5);
+    expect(getHomeReviewValidationErrors({ ...emptyHomeReview(), title: "Hi", body: "Long enough review text", author: "Mom", rating: 4.7 })).toEqual(
+      expect.arrayContaining([expect.stringMatching(/half-star/i)]),
+    );
+  });
+
   it("skips blank rows and normalizes saved reviews", () => {
     const errors = validateHomeReviewDrafts([
       emptyHomeReview(),

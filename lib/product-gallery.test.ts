@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { galleryForSelectedColor } from "@/lib/product-gallery";
+import {
+  PRODUCT_GALLERY_HERO_MAX_PX,
+  galleryForSelectedColor,
+  galleryHeroFitSize,
+} from "@/lib/product-gallery";
 
 describe("galleryForSelectedColor", () => {
   it("uses per-colour gallery when the selected colour has images", () => {
@@ -510,5 +514,36 @@ describe("galleryForSelectedColor", () => {
       image: "https://cdn.example.com/card.jpg",
       gallery: [],
     });
+  });
+});
+
+describe("galleryHeroFitSize", () => {
+  it("scales large photos into 1250 on the longest edge and keeps aspect", () => {
+    expect(galleryHeroFitSize(2000, 1800)).toEqual({ width: 1250, height: 1125 });
+    expect(galleryHeroFitSize(1800, 1800)).toEqual({
+      width: PRODUCT_GALLERY_HERO_MAX_PX,
+      height: PRODUCT_GALLERY_HERO_MAX_PX,
+    });
+  });
+
+  it("keeps smaller photos at natural size without upscaling", () => {
+    expect(galleryHeroFitSize(800, 600)).toEqual({ width: 800, height: 600 });
+    expect(galleryHeroFitSize(400, 400)).toEqual({ width: 400, height: 400 });
+  });
+
+  it("keeps landscape photos landscape (no square padding)", () => {
+    expect(galleryHeroFitSize(2000, 1000)).toEqual({ width: 1250, height: 625 });
+    expect(galleryHeroFitSize(800, 400)).toEqual({ width: 800, height: 400 });
+  });
+
+  it("keeps portrait photos portrait (no square padding)", () => {
+    expect(galleryHeroFitSize(900, 1200)).toEqual({ width: 900, height: 1200 });
+    expect(galleryHeroFitSize(900, 1400)).toEqual({ width: 804, height: 1250 });
+  });
+
+  it("returns null until natural size is known so the frame is not forced square", () => {
+    expect(galleryHeroFitSize()).toBeNull();
+    expect(galleryHeroFitSize(0, 800)).toBeNull();
+    expect(galleryHeroFitSize(800, undefined)).toBeNull();
   });
 });

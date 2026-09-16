@@ -11,8 +11,12 @@ import { ImageSpecHint } from "@/components/admin/ImageSpecHint";
 import { ADMIN_IMAGE_SPECS } from "@/lib/admin-image-specs";
 import { BulkImport } from "@/components/admin/BulkImport";
 import { ColorImagesEditor } from "@/components/admin/ColorImagesEditor";
+import { AdminProductImage } from "@/components/admin/AdminProductImage";
+import { DisplayImageField } from "@/components/admin/DisplayImageField";
 import { AdminSizeAvailabilityPreview } from "@/components/admin/AdminSizeAvailabilityPreview";
 import { SizeChartEditor } from "@/components/admin/SizeChartEditor";
+import { SizeNotesEditor } from "@/components/admin/SizeNotesEditor";
+import { DETAILS_KICKER_MAX_LEN } from "@/lib/product-details-kicker";
 import { toast } from "sonner";
 import {
   Plus,
@@ -30,7 +34,6 @@ import {
 } from "lucide-react";
 import { getUserErrorMessage, showApiError, showValidationErrors } from "@/lib/ui-errors";
 import { api } from "@/lib/api";
-import { sanitizePublicUrl } from "@/lib/utils";
 import { IMAGE_ACCEPT, validateAdminImageFile } from "@/lib/admin-image";
 import { prepareProductImageForUpload } from "@/lib/product-image-normalize";
 import {
@@ -62,7 +65,9 @@ import {
 import { invalidateProducts } from "@/lib/storefront";
 import { isBestsellerFromBadge } from "@/lib/product-flags";
 import { filterAdminProductsByQuery } from "@/lib/product-search";
-import { colorNames, ensureColorEntries, mergeColorNames, normalizeColorEntries, resolveProductImages, type ProductColorEntry } from "@/lib/product-colors";
+import { clearDisplayImage, promoteDisplayImage } from "@/lib/admin-display-image";
+import { colorNames, ensureColorEntries, mergeColorNames, normalizeColorEntries, resolveProductImages, resolveStorefrontProductImages, storefrontCardImageFromColors, type ProductColorEntry } from "@/lib/product-colors";
+import { catalogSizesForProduct, parseVariantsJson } from "@/lib/product-variants";
 import { ListPagination } from "@/components/ListPagination";
 import { useListPagination } from "@/hooks/useListPagination";
 import { ADMIN_PAGE_SIZE } from "@/lib/pagination";
@@ -87,6 +92,8 @@ const empty: Product = {
   age_max_months: null,
   sizes: [],
   size_chart: null,
+  size_notes: {},
+  details_kicker: "",
   colors: [],
   item_structure: "SIMPLE",
   variants_json: null,
@@ -109,6 +116,45 @@ const slugify = (s: string) =>
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+
+function ProductDisplayImageEditor({
+  product,
+  sticky,
+  onChange,
+}: {
+  product: Product;
+  sticky?: boolean;
+  onChange: (patch: Partial<Product>) => void;
+}) {
+  const field = (
+    <DisplayImageField
+      imageUrl={resolveStorefrontProductImages(product.images, product.colors).image || null}
+      autoFromPrints={!(product.images ?? []).length}
+      onSetDisplayImage={(url) => {
+        const normalized = normalizeProductImageUrl(url) ?? url.trim();
+        onChange({
+          images: promoteDisplayImage(resolveProductImages(product.images, product.colors), normalized),
+        });
+        toast.success("Display image set. Click Save to show it on shop cards.");
+      }}
+      onClear={
+        (product.images ?? []).length
+          ? () => {
+              const fallback = storefrontCardImageFromColors(product.colors) ?? "";
+              onChange({ images: clearDisplayImage(product.images, fallback) });
+              toast.success("Display image cleared. Click Save to use the first print photo on shop cards.");
+            }
+          : undefined
+      }
+    />
+  );
+  if (!sticky) return field;
+  return (
+    <div className="sticky top-2 z-20 rounded-2xl bg-background/95 p-2 shadow-sm ring-1 ring-border/60 backdrop-blur">
+      {field}
+    </div>
+  );
+}
 
 const normalizeImageUrl = (value: string) => normalizeProductImageUrl(value);
 
@@ -501,6 +547,11 @@ function ProductsPage() {
               { key: "age_min_months", example: 0, note: "Optional if age_range is set" },
               { key: "age_max_months", example: 24, note: "Optional if age_range is set" },
               { key: "fabric_type", required: true, example: "100% Cotton" },
+              {
+                key: "details_kicker",
+                example: "Organic Cotton · Newborn",
+                note: "Optional. Shown above the product name on the details card. Leave blank to use fabric and age group.",
+              },
               { key: "stock", required: true, example: 50 },
               {
                 key: "images",
@@ -617,7 +668,7 @@ function ProductsPage() {
             const i = rowIndexFor(p);
             if (i < 0) return null;
             const isOpen = editing === i;
-            const previewImage = resolveProductImages(p.images, p.colors)[0];
+            const previewImage = resolveStorefrontProductImages(p.images, p.colors).image;
             return (
               <div key={p.id ?? `new-${i}`} className="glass-strong rounded-3xl overflow-hidden">
                 <button
@@ -626,10 +677,10 @@ function ProductsPage() {
                 >
                   <div className="h-14 w-14 rounded-xl bg-muted overflow-hidden grid place-items-center text-xs text-muted-foreground">
                     {previewImage ? (
-                      <img
+                      <AdminProductImage
                         src={normalizeImageUrl(String(previewImage)) ?? ""}
                         alt=""
-                        loading="lazy"
+                        priority="high"
                         className="h-full w-full object-cover"
                       />
                     ) : (
@@ -724,6 +775,18 @@ function ProductsPage() {
                         />
                       </Field>
                     </div>
+                    <Field
+                      label="Details card label"
+                      hint='Shown above the product name on the product details card, e.g. “Organic Cotton · Newborn”. Leave blank to use fabric and age group.'
+                    >
+                      <input
+                        className={inputCls()}
+                        maxLength={DETAILS_KICKER_MAX_LEN}
+                        value={p.details_kicker ?? ""}
+                        onChange={(e) => update(i, { details_kicker: e.target.value })}
+                        placeholder="Organic Cotton · Newborn"
+                      />
+                    </Field>
                     <div className="grid sm:grid-cols-4 gap-3">
                       <NumberField
                         label={
@@ -840,30 +903,32 @@ function ProductsPage() {
                             placeholder="S, M, L or 0-3m, 3-6m"
                           />
                           <CommaListField
-                            label="Colors (comma-separated)"
+                            label="Colors (from Zoho)"
                             value={colorNames(p.colors)}
-                            onChange={(names) => update(i, { colors: mergeColorNames(p.colors, names) })}
-                            placeholder="Navy, Ivory, Blush"
+                            readOnly
+                            hint="Print names and swatches are frozen after Zoho inventory sync. Colour galleries below can still be edited manually."
+                            placeholder="Pull from Zoho to populate"
                           />
                         </div>
                         <AdminSizeAvailabilityPreview product={p} />
                         <ColorImagesEditor
                           colors={p.colors ?? []}
+                          freezeSwatches
                           onPatchColor={(colorIndex, patch) => patchProductColor(i, colorIndex, patch)}
                           onGalleryUploaded={({ index, imageUrls }) => saveWithColorGallery(p, index, imageUrls)}
-                          onSwatchUploaded={({ index, swatchUrl }) => saveWithColorSwatch(p, index, swatchUrl)}
                         />
+                        <ProductDisplayImageEditor product={p} sticky onChange={(patch) => update(i, patch)} />
                         <VariantsMatrixEditor
                           parentSku={p.sku?.trim() || suggestParentSku(p.name || "")}
                           sizes={p.sizes ?? []}
                           colors={colorNames(p.colors)}
                           value={p.variants_json}
+                          freezeColors
                           pullingRowKeys={pullingVariantRowKeysForProduct(p)}
-                          onPullFromZoho={(row, rowIndex) => void pullVariantFromZoho(i, p, row, rowIndex)}
                           onChange={(next) =>
                             update(i, {
                               ...next,
-                              colors: mergeColorNames(p.colors, next.colors),
+                              colors: p.colors ?? [],
                             })
                           }
                         />
@@ -891,6 +956,7 @@ function ProductsPage() {
                           onSwatchUploaded={({ index, swatchUrl }) => saveWithColorSwatch(p, index, swatchUrl)}
                           />
                         ) : null}
+                        <ProductDisplayImageEditor product={p} onChange={(patch) => update(i, patch)} />
                       </>
                     )}
                     <Field label="Description">
@@ -909,6 +975,18 @@ function ProductsPage() {
                         onChange={(e) => update(i, { story: e.target.value })}
                       />
                     </Field>
+
+                    <SizeNotesEditor
+                      sizes={catalogSizesForProduct({
+                        sizes: p.sizes ?? [],
+                        colors: p.colors ?? [],
+                        variants: parseVariantsJson(p.variants_json),
+                        itemStructure: p.item_structure,
+                        price: Number(p.price) || 0,
+                      })}
+                      value={p.size_notes ?? {}}
+                      onChange={(size_notes) => update(i, { size_notes })}
+                    />
 
                     <SizeChartEditor
                       value={p.size_chart ?? null}
@@ -932,18 +1010,17 @@ function ProductsPage() {
                           </p>
                         ) : null}
                         <div className="flex flex-wrap gap-2">
-                          {displayImages.map((url, k) => (
+                          {!fromColorGalleries
+                            ? displayImages.map((url, k) => (
                             <div
                               key={`${url}-${k}`}
-                              className={`relative h-24 w-24 rounded-xl overflow-hidden ring-1 ring-border group ${fromColorGalleries ? "ring-primary/30" : ""}`}
+                              className="relative h-24 w-24 rounded-xl overflow-hidden ring-1 ring-border group"
                             >
-                              <img
+                              <AdminProductImage
                                 src={normalizeImageUrl(String(url)) ?? ""}
                                 alt=""
-                                loading="lazy"
                                 className="h-full w-full object-cover"
                               />
-                              {!fromColorGalleries ? (
                               <button
                                 type="button"
                                 onClick={() =>
@@ -953,9 +1030,9 @@ function ProductsPage() {
                               >
                                 <X className="h-3 w-3" />
                               </button>
-                              ) : null}
                             </div>
-                          ))}
+                          ))
+                            : null}
                           <div className={`relative h-24 w-24 shrink-0 rounded-xl border-2 border-dashed border-border text-muted-foreground overflow-hidden hover:bg-white/30 ${imageUploading === i ? "opacity-50" : ""}`}>
                             <input
                               type="file"
@@ -1061,6 +1138,7 @@ function ProductsPage() {
                       {p.id && (
                         <button
                           type="button"
+                          hidden
                           disabled={zohoSyncing.has(i)}
                           onClick={() => void syncToZoho(i, p)}
                           className="rounded-full glass px-4 py-2 text-sm flex items-center gap-2 disabled:opacity-50"

@@ -1,6 +1,7 @@
 package com.miniandmore.app.client;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -9,7 +10,8 @@ import org.apache.commons.lang3.StringUtils;
 
 /**
  * Extracts Zoho Books item document identifiers from API responses. Plural-gallery delete falls back
- * to {@code image_document_id} when {@code documents} is empty; pull-import uses the same fallback.
+ * to {@code image_document_id} when {@code documents} is empty. Pull-import always includes that
+ * dedicated front image, even when leftover gallery {@code documents} remain after a Zoho replace.
  */
 public final class ZohoItemDocuments {
 
@@ -62,29 +64,67 @@ public final class ZohoItemDocuments {
         Set<String> ids = new LinkedHashSet<>();
         Object documentsValue = item.get("documents");
         if (documentsValue instanceof List<?> documents) {
+            List<OrderedDocument> ordered = new ArrayList<>();
+            int index = 0;
             for (Object entry : documents) {
                 if (entry instanceof Map<?, ?> document && document.get("document_id") != null) {
                     String id = document.get("document_id").toString().trim();
                     if (!id.isEmpty()) {
-                        ids.add(id);
+                        ordered.add(new OrderedDocument(id, attachmentOrder(document), index));
                     }
                 }
+                index++;
+            }
+            ordered.sort(
+                Comparator.comparing(
+                    (OrderedDocument document) -> document.order() == null ? Integer.MAX_VALUE : document.order()
+                ).thenComparingInt(OrderedDocument::index)
+            );
+            for (OrderedDocument document : ordered) {
+                ids.add(document.id());
             }
         }
-        if (ids.isEmpty() && includeStandaloneImageDocumentId) {
-            Object imageDocumentId = item.get("image_document_id");
-            if (imageDocumentId != null) {
-                String id = imageDocumentId.toString().trim();
-                if (
-                    StringUtils.isNotBlank(id) &&
-                    !"0".equals(id) &&
-                    !"null".equalsIgnoreCase(id)
-                ) {
-                    ids.add(id);
+        if (includeStandaloneImageDocumentId) {
+            String frontId = standaloneImageDocumentId(item);
+            if (frontId != null && !ids.contains(frontId)) {
+                if (ids.isEmpty()) {
+                    ids.add(frontId);
+                } else {
+                    LinkedHashSet<String> withFront = new LinkedHashSet<>();
+                    withFront.add(frontId);
+                    withFront.addAll(ids);
+                    return new ArrayList<>(withFront);
                 }
             }
         }
         return new ArrayList<>(ids);
+    }
+
+    private static String standaloneImageDocumentId(Map<?, ?> item) {
+        Object imageDocumentId = item.get("image_document_id");
+        if (imageDocumentId == null) {
+            return null;
+        }
+        String id = imageDocumentId.toString().trim();
+        if (StringUtils.isBlank(id) || "0".equals(id) || "null".equalsIgnoreCase(id)) {
+            return null;
+        }
+        return id;
+    }
+
+    private static Integer attachmentOrder(Map<?, ?> document) {
+        Object raw = document.get("attachment_order");
+        if (raw == null) {
+            return null;
+        }
+        if (raw instanceof Number number) {
+            return number.intValue();
+        }
+        try {
+            return Integer.parseInt(raw.toString().trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private static String text(Object value) {
@@ -94,4 +134,6 @@ public final class ZohoItemDocuments {
         String text = value.toString().trim();
         return "0".equals(text) || "null".equalsIgnoreCase(text) ? "" : text;
     }
+
+    private record OrderedDocument(String id, Integer order, int index) {}
 }

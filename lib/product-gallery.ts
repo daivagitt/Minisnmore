@@ -13,16 +13,30 @@ import { findVariant, type ProductVariant } from "@/lib/product-variants";
 /** Neutral PDP / listing backdrop (Carter's #F6F6F6, A Toddler Thing off-white tiles). */
 export const PRODUCT_IMAGE_SURFACE = "#F6F6F6";
 
-/** Tailwind classes — hero caps height; width follows each image's aspect ratio. */
-export const PRODUCT_GALLERY_HERO_MAX_H =
-  "max-h-[min(92vw,28rem)] sm:max-h-[min(80vw,32rem)] lg:max-h-[min(42vw,36rem)]";
-
-/** Width shrinks for tall portraits once height hits the cap (--hero-ar set on the frame). */
-export const PRODUCT_GALLERY_HERO_FRAME =
-  "max-w-full w-[calc(min(92vw,28rem)*var(--hero-ar,1))] sm:w-[calc(min(80vw,32rem)*var(--hero-ar,1))] lg:w-[calc(min(42vw,36rem)*var(--hero-ar,1))]";
+/** Longest-edge cap for the PDP hero. The box follows each photo’s aspect — never a forced square. */
+export const PRODUCT_GALLERY_HERO_MAX_PX = 1250;
 
 export const PRODUCT_GALLERY_QUICKVIEW_MAX_H =
   "max-h-[min(72vw,20rem)] md:max-h-[min(50vh,24rem)]";
+
+export type GalleryHeroFitSize = { width: number; height: number };
+
+/**
+ * CSS pixel size of the hero box: same aspect as the photo, scaled to fit in maxPx×maxPx, never upscaled.
+ * Returns null until natural dimensions are known so the frame is not forced square.
+ */
+export function galleryHeroFitSize(
+  naturalWidth?: number,
+  naturalHeight?: number,
+  maxPx = PRODUCT_GALLERY_HERO_MAX_PX,
+): GalleryHeroFitSize | null {
+  if (!naturalWidth || !naturalHeight) return null;
+  const scale = Math.min(maxPx / naturalWidth, maxPx / naturalHeight, 1);
+  return {
+    width: Math.round(naturalWidth * scale),
+    height: Math.round(naturalHeight * scale),
+  };
+}
 
 function uniqueImages(...sources: (string | undefined | null)[]): string[] {
   const seen = new Set<string>();

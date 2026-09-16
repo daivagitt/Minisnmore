@@ -107,22 +107,22 @@ fi
 
 # Prod JSON logging needs logstash encoder on classpath; disable to avoid startup crash.
 export LOG_JSON=false
-export FRONTEND_AUTH_CALLBACK_URL="${FRONTEND_AUTH_CALLBACK_URL:-https://uat.minisnmore.com/auth/callback}"
+export FRONTEND_AUTH_CALLBACK_URL="${FRONTEND_AUTH_CALLBACK_URL:-https://minisnmore.com/auth/callback}"
 
-# Gateway prod profile requires non-empty OAuth client ids (uat.env often has APPLE_CLIENT_ID=).
+# Gateway prod profile requires non-empty OAuth client ids (env often has APPLE_CLIENT_ID=).
 # Bash ${VAR:-x} does NOT replace empty string — force placeholders when blank.
 for _oauth_var in GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET APPLE_CLIENT_ID APPLE_CLIENT_SECRET FACEBOOK_CLIENT_ID FACEBOOK_CLIENT_SECRET; do
   if [ -z "${!_oauth_var:-}" ]; then
-    export "${_oauth_var}=uat-isolated-placeholder"
+    export "${_oauth_var}=prod-isolated-placeholder"
   fi
 done
 
 # Integration prod validator requires https Zoho/oauth URLs (not localhost defaults).
-export ZOHO_OAUTH_HOMEPAGE_URL="${ZOHO_OAUTH_HOMEPAGE_URL:-https://uat.minisnmore.com}"
-export ZOHO_OAUTH_REDIRECT_URI="${ZOHO_OAUTH_REDIRECT_URI:-https://uat.minisnmore.com}"
-export ZOHO_OAUTH_ADMIN_REDIRECT_URI="${ZOHO_OAUTH_ADMIN_REDIRECT_URI:-https://uat.minisnmore.com/admin/zoho}"
-export ZOHO_OAUTH_JAVASCRIPT_DOMAIN="${ZOHO_OAUTH_JAVASCRIPT_DOMAIN:-https://uat.minisnmore.com}"
-export ZOHO_OAUTH_JAVASCRIPT_DOMAIN_ALT="${ZOHO_OAUTH_JAVASCRIPT_DOMAIN_ALT:-https://uat.minisnmore.com}"
+export ZOHO_OAUTH_HOMEPAGE_URL="${ZOHO_OAUTH_HOMEPAGE_URL:-https://minisnmore.com}"
+export ZOHO_OAUTH_REDIRECT_URI="${ZOHO_OAUTH_REDIRECT_URI:-https://minisnmore.com}"
+export ZOHO_OAUTH_ADMIN_REDIRECT_URI="${ZOHO_OAUTH_ADMIN_REDIRECT_URI:-https://minisnmore.com/admin/zoho}"
+export ZOHO_OAUTH_JAVASCRIPT_DOMAIN="${ZOHO_OAUTH_JAVASCRIPT_DOMAIN:-https://minisnmore.com}"
+export ZOHO_OAUTH_JAVASCRIPT_DOMAIN_ALT="${ZOHO_OAUTH_JAVASCRIPT_DOMAIN_ALT:-https://www.minisnmore.com}"
 
 # Gateway auth: reuse existing jhi_* tables in miniandmore (ignore uat.env gateway@5433 defaults).
 export SPRING_R2DBC_URL="r2dbc:postgresql://127.0.0.1:5432/miniandmore"
@@ -223,11 +223,11 @@ LIQUIBASE_OFF=(
   --spring.liquibase.contexts=prod
 )
 ZOHO_HTTPS_ARGS=(
-  --application.zoho.oauth.homepage-url=https://uat.minisnmore.com
-  --application.zoho.oauth.redirect-uris[0]=https://uat.minisnmore.com
-  --application.zoho.oauth.redirect-uris[1]=https://uat.minisnmore.com/admin/zoho
-  --application.zoho.oauth.javascript-domains[0]=https://uat.minisnmore.com
-  --application.zoho.oauth.javascript-domains[1]=https://uat.minisnmore.com
+  --application.zoho.oauth.homepage-url="${ZOHO_OAUTH_HOMEPAGE_URL}"
+  --application.zoho.oauth.redirect-uris[0]="${ZOHO_OAUTH_REDIRECT_URI}"
+  --application.zoho.oauth.redirect-uris[1]="${ZOHO_OAUTH_ADMIN_REDIRECT_URI}"
+  --application.zoho.oauth.javascript-domains[0]="${ZOHO_OAUTH_JAVASCRIPT_DOMAIN}"
+  --application.zoho.oauth.javascript-domains[1]="${ZOHO_OAUTH_JAVASCRIPT_DOMAIN_ALT}"
 )
 
 # Catalog core serves the public /api/v1 OpenAPI contract (springdoc + path remap).

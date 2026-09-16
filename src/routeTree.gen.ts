@@ -53,6 +53,7 @@ import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
 import { Route as AdminCancellationsRouteImport } from './routes/admin.cancellations'
 import { Route as AdminBlogRouteImport } from './routes/admin.blog'
 import { Route as AdminBannersRouteImport } from './routes/admin.banners'
+import { Route as AdminAboutRouteImport } from './routes/admin.about'
 import { Route as AccountWishlistRouteImport } from './routes/account.wishlist'
 import { Route as AccountTrackRouteImport } from './routes/account.track'
 import { Route as AccountReturnsRouteImport } from './routes/account.returns'
@@ -290,6 +291,11 @@ const AdminBannersRoute = AdminBannersRouteImport.update({
   path: '/banners',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAboutRoute = AdminAboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AccountWishlistRoute = AccountWishlistRouteImport.update({
   id: '/wishlist',
   path: '/wishlist',
@@ -407,6 +413,7 @@ export interface FileRoutesByFullPath {
   '/account/returns': typeof AccountReturnsRoute
   '/account/track': typeof AccountTrackRoute
   '/account/wishlist': typeof AccountWishlistRoute
+  '/admin/about': typeof AdminAboutRoute
   '/admin/banners': typeof AdminBannersRoute
   '/admin/blog': typeof AdminBlogRoute
   '/admin/cancellations': typeof AdminCancellationsRoute
@@ -465,6 +472,7 @@ export interface FileRoutesByTo {
   '/account/returns': typeof AccountReturnsRoute
   '/account/track': typeof AccountTrackRoute
   '/account/wishlist': typeof AccountWishlistRoute
+  '/admin/about': typeof AdminAboutRoute
   '/admin/banners': typeof AdminBannersRoute
   '/admin/blog': typeof AdminBlogRoute
   '/admin/cancellations': typeof AdminCancellationsRoute
@@ -528,6 +536,7 @@ export interface FileRoutesById {
   '/account/returns': typeof AccountReturnsRoute
   '/account/track': typeof AccountTrackRoute
   '/account/wishlist': typeof AccountWishlistRoute
+  '/admin/about': typeof AdminAboutRoute
   '/admin/banners': typeof AdminBannersRoute
   '/admin/blog': typeof AdminBlogRoute
   '/admin/cancellations': typeof AdminCancellationsRoute
@@ -592,6 +601,7 @@ export interface FileRouteTypes {
     | '/account/returns'
     | '/account/track'
     | '/account/wishlist'
+    | '/admin/about'
     | '/admin/banners'
     | '/admin/blog'
     | '/admin/cancellations'
@@ -650,6 +660,7 @@ export interface FileRouteTypes {
     | '/account/returns'
     | '/account/track'
     | '/account/wishlist'
+    | '/admin/about'
     | '/admin/banners'
     | '/admin/blog'
     | '/admin/cancellations'
@@ -712,6 +723,7 @@ export interface FileRouteTypes {
     | '/account/returns'
     | '/account/track'
     | '/account/wishlist'
+    | '/admin/about'
     | '/admin/banners'
     | '/admin/blog'
     | '/admin/cancellations'
@@ -1079,6 +1091,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminBannersRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/about': {
+      id: '/admin/about'
+      path: '/about'
+      fullPath: '/admin/about'
+      preLoaderRoute: typeof AdminAboutRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/account/wishlist': {
       id: '/account/wishlist'
       path: '/wishlist'
@@ -1244,6 +1263,7 @@ const AccountRouteWithChildren =
   AccountRoute._addFileChildren(AccountRouteChildren)
 
 interface AdminRouteChildren {
+  AdminAboutRoute: typeof AdminAboutRoute
   AdminBannersRoute: typeof AdminBannersRoute
   AdminBlogRoute: typeof AdminBlogRoute
   AdminCancellationsRoute: typeof AdminCancellationsRoute
@@ -1267,6 +1287,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminAboutRoute: AdminAboutRoute,
   AdminBannersRoute: AdminBannersRoute,
   AdminBlogRoute: AdminBlogRoute,
   AdminCancellationsRoute: AdminCancellationsRoute,

@@ -78,6 +78,9 @@ public class Product implements Serializable {
     @Column(name = "size_chart_json", columnDefinition = "text")
     private String sizeChartJson;
 
+    @Column(name = "size_notes_json", columnDefinition = "text")
+    private String sizeNotesJson;
+
     @Column(name = "colors_json", columnDefinition = "text")
     private String colorsJson;
 
@@ -97,6 +100,10 @@ public class Product implements Serializable {
     @Size(max = 80)
     @Column(name = "badge", length = 80)
     private String badge;
+
+    @Size(max = 80)
+    @Column(name = "details_kicker", length = 80)
+    private String detailsKicker;
 
     @NotNull
     @Min(value = 0)
@@ -396,6 +403,19 @@ public class Product implements Serializable {
         this.sizeChartJson = sizeChartJson;
     }
 
+    public String getSizeNotesJson() {
+        return this.sizeNotesJson;
+    }
+
+    public Product sizeNotesJson(String sizeNotesJson) {
+        this.setSizeNotesJson(sizeNotesJson);
+        return this;
+    }
+
+    public void setSizeNotesJson(String sizeNotesJson) {
+        this.sizeNotesJson = sizeNotesJson;
+    }
+
     public String getColorsJson() {
         return this.colorsJson;
     }
@@ -472,6 +492,19 @@ public class Product implements Serializable {
 
     public void setBadge(String badge) {
         this.badge = badge;
+    }
+
+    public String getDetailsKicker() {
+        return this.detailsKicker;
+    }
+
+    public Product detailsKicker(String detailsKicker) {
+        this.setDetailsKicker(detailsKicker);
+        return this;
+    }
+
+    public void setDetailsKicker(String detailsKicker) {
+        this.detailsKicker = detailsKicker;
     }
 
     public Integer getStock() {
@@ -719,11 +752,13 @@ public class Product implements Serializable {
             ", ageMaxMonths=" + getAgeMaxMonths() +
             ", sizesJson='" + getSizesJson() + "'" +
             ", sizeChartJson='" + getSizeChartJson() + "'" +
+            ", sizeNotesJson='" + getSizeNotesJson() + "'" +
             ", colorsJson='" + getColorsJson() + "'" +
             ", itemStructure='" + getItemStructure() + "'" +
             ", variantsJson='" + getVariantsJson() + "'" +
             ", imagesJson='" + getImagesJson() + "'" +
             ", badge='" + getBadge() + "'" +
+            ", detailsKicker='" + getDetailsKicker() + "'" +
             ", stock=" + getStock() +
             ", sortOrder=" + getSortOrder() +
             ", featured='" + getFeatured() + "'" +

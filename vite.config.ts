@@ -20,7 +20,6 @@ export default defineConfig({
     },
     preview: {
       allowedHosts: [
-        "uat.minisnmore.com",
         "minisnmore.com",
         "www.minisnmore.com",
       ],

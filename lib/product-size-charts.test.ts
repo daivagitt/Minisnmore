@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   filterSizeChartToProductSizes,
+  fitAxesFromSizeChart,
   fitPointsFromSizeChart,
   formatMeasurementCell,
   isUsableSizeChart,
@@ -9,6 +10,7 @@ import {
   parseProductSizeChart,
   serializeProductSizeChart,
   resolveSizeChartSku,
+  catalogSizeChartTemplate,
   sizeChartForProduct,
   SIZE_CHARTS_BY_SKU,
 } from "./product-size-charts";
@@ -69,6 +71,7 @@ describe("product size charts", () => {
     ];
     for (const sku of skus) {
       expect(SIZE_CHARTS_BY_SKU[sku], sku).toBeTruthy();
+      expect(catalogSizeChartTemplate({ sku })?.code).toMatch(/^MnM-\d+$/);
       expect(sizeChartForProduct({ sku })?.code).toMatch(/^MnM-\d+$/);
     }
   });
@@ -88,14 +91,14 @@ describe("product size charts", () => {
   });
 
   it("includes garment + bottoms sections for set products", () => {
-    const chart = sizeChartForProduct({ sku: "FRONT-OPEN-VEST-SLEEVELESS-SHORT-SET" });
+    const chart = catalogSizeChartTemplate({ sku: "FRONT-OPEN-VEST-SLEEVELESS-SHORT-SET" });
     expect(chart?.sections.map((s) => s.title)).toEqual(["Vest", "Shorts"]);
     expect(chart?.sections[0]?.rows.find((r) => r.label === "Chest width")?.values["0-3M"]).toBe(23);
     expect(chart?.sections[1]?.rows.find((r) => r.label === "Inseam")?.values["18-24M"]).toBe(9);
   });
 
   it("keeps MnM-13 body-suit half-chest values from the approved sheet", () => {
-    const chart = sizeChartForProduct({ sku: "BODY-SUIT-HALF-SLEEVE" });
+    const chart = catalogSizeChartTemplate({ sku: "BODY-SUIT-HALF-SLEEVE" });
     expect(chart?.code).toBe("MnM-13");
     expect(chart?.sections[0]?.rows.find((r) => r.label === "Chest (½)")?.values).toEqual({
       "0-3M": 21,
@@ -107,7 +110,7 @@ describe("product size charts", () => {
   });
 
   it("filters age columns to sizes the product sells", () => {
-    const full = sizeChartForProduct({ sku: "BASIC-SHORTS" })!;
+    const full = catalogSizeChartTemplate({ sku: "BASIC-SHORTS" })!;
     const filtered = filterSizeChartToProductSizes(full, ["0-3 M", "3-6 M", "6-12 M"]);
     expect(filtered.sections[0]?.bands).toEqual(["0-3M", "3-6M", "6-12M"]);
     expect(filtered.sections[0]?.rows[0]?.values["12-18M"]).toBeUndefined();
@@ -115,7 +118,7 @@ describe("product size charts", () => {
   });
 
   it("leaves common-size charts unchanged when filtering", () => {
-    const chart = sizeChartForProduct({ sku: "BABY-SWADDLE" })!;
+    const chart = catalogSizeChartTemplate({ sku: "BABY-SWADDLE" })!;
     const filtered = filterSizeChartToProductSizes(chart, ["One Size"]);
     expect(filtered.sections[0]?.bands).toEqual(["Single size"]);
     expect(filtered.sections[0]?.rows[0]?.values["Single size"]).toBe(100);
@@ -152,9 +155,10 @@ describe("product size charts", () => {
         sizeChart: { code: "", title: "", tolerance: "", sections: [] },
       })?.code,
     ).toBe("MnM-8");
+    expect(catalogSizeChartTemplate({ sku: "BASIC-SHORTS" })?.code).toBe("MnM-8");
   });
 
-  it("treats empty starter charts as unusable and keeps the SKU fallback", () => {
+  it("treats empty starter charts as unusable and uses the SKU catalog for fit", () => {
     const starter = emptySizeChart({ title: "Draft", code: "" });
     expect(isUsableSizeChart(starter)).toBe(false);
     expect(
@@ -188,7 +192,7 @@ describe("product size charts", () => {
   });
 
   it("extracts length and chest fit points from MnM garment rows", () => {
-    const vest = sizeChartForProduct({ sku: "FRONT-OPEN-VEST-SLEVELESS" })!;
+    const vest = catalogSizeChartTemplate({ sku: "FRONT-OPEN-VEST-SLEVELESS" })!;
     expect(fitPointsFromSizeChart(vest)).toEqual([
       { band: "0-3M", lengthCm: 28, chestCm: 23 },
       { band: "3-6M", lengthCm: 30, chestCm: 24 },
@@ -197,19 +201,52 @@ describe("product size charts", () => {
       { band: "18-24M", lengthCm: 36, chestCm: 27 },
     ]);
 
-    const frock = sizeChartForProduct({ sku: "BABY-FRONT-OPEN-FROCK-HALF-SLEEVE" })!;
+    const frock = catalogSizeChartTemplate({ sku: "BABY-FRONT-OPEN-FROCK-HALF-SLEEVE" })!;
     expect(fitPointsFromSizeChart(frock)[0]).toEqual({
       band: "0-3M",
       lengthCm: 30,
       chestCm: 24,
     });
 
-    const shorts = sizeChartForProduct({ sku: "BASIC-SHORTS" })!;
+    const shorts = catalogSizeChartTemplate({ sku: "BASIC-SHORTS" })!;
     expect(fitPointsFromSizeChart(shorts)[0]).toEqual({
       band: "0-3M",
       lengthCm: 17,
-      chestCm: null,
+      chestCm: 16,
     });
+  });
+
+  it("uses size-varying custom rows when chest/length labels are missing", () => {
+    const axes = fitAxesFromSizeChart({
+      code: "MnM-4",
+      title: "Shorts Sets",
+      tolerance: "±1 cm",
+      sections: [
+        {
+          title: "Measurements",
+          bands: ["0-3M", "3-6M", "6-12M", "12-18M", "18-24M"],
+          rows: [
+            {
+              label: "Waistband width",
+              values: { "0-3M": "12-16", "3-6M": 17, "6-12M": 18, "12-18M": 19, "18-24M": 20 },
+            },
+            {
+              label: "Waistband Height",
+              values: { "0-3M": "1.1-1.5", "3-6M": 1.5, "6-12M": 1.5, "12-18M": 1.5, "18-24M": 1.5 },
+            },
+          ],
+        },
+      ],
+    });
+    expect(axes.lengthLabel).toBeNull();
+    expect(axes.chestLabel).toBe("Waistband width");
+    expect(axes.points[0]).toEqual({
+      band: "0-3M",
+      lengthCm: null,
+      chestCm: 16,
+      chestMin: 12,
+    });
+    expect(axes.points[1]).toEqual({ band: "3-6M", lengthCm: null, chestCm: 17 });
   });
 
   it("parses 0-3M min–max cells without concatenating digits", () => {
@@ -219,8 +256,12 @@ describe("product size charts", () => {
     expect(parseMeasurementCell("")).toEqual({ min: null, max: null });
     expect(parseMeasurementCell("n/a")).toEqual({ min: null, max: null });
     expect(formatMeasurementCell(25, 27)).toBe("25-27");
+    expect(formatMeasurementCell(27, 25)).toBe("25-27");
+    expect(formatMeasurementCell(25, 25)).toBe("25-25");
     expect(formatMeasurementCell(null, 28)).toBe(28);
     expect(isZeroToThreeBand("0-3 M")).toBe(true);
+    expect(isZeroToThreeBand("0–3M")).toBe(true);
+    expect(isZeroToThreeBand("0-3 months")).toBe(true);
     expect(isZeroToThreeBand("3-6M")).toBe(false);
 
     const points = fitPointsFromSizeChart({

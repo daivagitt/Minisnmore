@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { LazyImage } from "@/components/LazyImage";
+import { storefrontImageUrl } from "@/lib/storefront-image";
 import { EmptyCartState } from "@/components/EmptyCartState";
 import { cartLineColorLabel, cartLineImage } from "@/lib/cart-catalog";
 import { useShop } from "@/store/shop";
@@ -27,7 +28,7 @@ function CartPage() {
           <div className="space-y-3">
             {cart.map((it) => (
               <div key={it.product.id + it.size + it.color} className="glass rounded-2xl p-3 flex items-center gap-3">
-                <LazyImage src={cartLineImage(it)} alt="" className="h-16 w-16 rounded-xl object-cover" priority="auto" />
+                <LazyImage src={storefrontImageUrl(cartLineImage(it), "thumb")} fallbackSrc={cartLineImage(it)} alt="" className="h-16 w-16 rounded-xl object-cover" priority="auto" />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{it.product.name}</div>
                   <div className="text-xs text-muted-foreground">{[it.size, cartLineColorLabel(it)].filter(Boolean).join(" · ")}</div>

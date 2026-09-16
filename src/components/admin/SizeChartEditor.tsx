@@ -15,7 +15,7 @@ import {
   formatMeasurementCell,
   isZeroToThreeBand,
   parseMeasurementCell,
-  sizeChartForProduct,
+  catalogSizeChartTemplate,
   type ProductSizeChart,
   type SizeChartSection,
 } from "@/lib/product-size-charts";
@@ -135,7 +135,7 @@ export function SizeChartEditor({
   };
 
   const loadFromTemplate = () => {
-    const template = sizeChartForProduct({
+    const template = catalogSizeChartTemplate({
       sku: productSku,
       name: productName,
       slug: productSlug,
@@ -177,9 +177,9 @@ export function SizeChartEditor({
         <div>
           <div className="text-sm font-medium">Size chart</div>
           <p className="text-xs text-muted-foreground mt-0.5 leading-snug max-w-xl">
-            Drives the storefront size guide and calculator. Download the filled example Excel,
-            edit the numbers, then Import Excel. 0-3M is a from–to range; later sizes are upper
-            values. Leave empty to use the catalog SKU fallback.
+            Drives the storefront size guide and calculator. The Size chart link stays hidden
+            and the calculator stays locked until you Import Excel, Start editing (with numbers),
+            or Load from catalog, then Save. 0-3M is a from–to range; later sizes are upper values.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
@@ -253,7 +253,8 @@ export function SizeChartEditor({
 
       {!chart ? (
         <p className="text-xs text-muted-foreground">
-          No product chart saved — storefront will use the hardcoded SKU map when available.
+          No product chart saved — the storefront hides the Size chart link and freezes the size
+          calculator until you import Excel or load a catalog template and save.
         </p>
       ) : (
         <>
@@ -317,7 +318,7 @@ export function SizeChartEditor({
           {previewRows.length > 0 ? (
             <div className="rounded-lg glass p-3">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
-                Calculator preview (this product’s sizes only)
+                Size guide preview (this product’s sizes only)
               </div>
               <ProductSizeChartTables rows={previewRows} title={chart.title || null} chart={chart} />
             </div>
@@ -555,9 +556,30 @@ function MeasurementCellInput({
     const maxT = maxRaw.trim();
     const minParsed = parseCmInput(minT);
     const maxParsed = parseCmInput(maxT);
-    if (minT !== "" && minParsed == null) return;
-    if (maxT !== "" && maxParsed == null) return;
+    if (minT !== "" && minParsed == null) return false;
+    if (maxT !== "" && maxParsed == null) return false;
+    // A from-only value must not be stored as a single number — parseMeasurementCell
+    // treats numbers as the end of the range, which swapped 0-3M start/end while typing.
+    if (minParsed != null && maxParsed == null) return false;
     onCommit(formatMeasurementCell(minParsed, maxParsed));
+    return true;
+  };
+
+  const finishRange = () => {
+    const minRaw = minDraft ?? minText;
+    const maxRaw = maxDraft ?? maxText;
+    const committed = commitPair(minRaw, maxRaw);
+    if (committed) {
+      setMinDraft(null);
+      setMaxDraft(null);
+      return;
+    }
+    if (minRaw.trim() !== "" && maxRaw.trim() === "") {
+      setMinDraft(minRaw.trim());
+      return;
+    }
+    setMinDraft(null);
+    setMaxDraft(null);
   };
 
   if (range) {
@@ -569,12 +591,8 @@ function MeasurementCellInput({
           placeholder="from"
           inputMode="decimal"
           aria-label="Range from"
-          onChange={(e) => {
-            const next = e.target.value;
-            setMinDraft(next);
-            commitPair(next, maxDraft ?? maxText);
-          }}
-          onBlur={() => setMinDraft(null)}
+          onChange={(e) => setMinDraft(e.target.value)}
+          onBlur={finishRange}
         />
         <span className="text-muted-foreground shrink-0">–</span>
         <input
@@ -583,12 +601,8 @@ function MeasurementCellInput({
           placeholder="to"
           inputMode="decimal"
           aria-label="Range to"
-          onChange={(e) => {
-            const next = e.target.value;
-            setMaxDraft(next);
-            commitPair(minDraft ?? minText, next);
-          }}
-          onBlur={() => setMaxDraft(null)}
+          onChange={(e) => setMaxDraft(e.target.value)}
+          onBlur={finishRange}
         />
       </div>
     );

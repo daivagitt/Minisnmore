@@ -5,6 +5,7 @@ import com.miniandmore.app.service.PincodeLookupService;
 import com.miniandmore.app.service.ProductVariantSupport;
 import com.miniandmore.app.service.dto.*;
 import com.miniandmore.app.service.mapper.*;
+import com.miniandmore.app.web.rest.v1.AboutPageDTO;
 import com.miniandmore.app.web.rest.v1.ApiResponse;
 import com.miniandmore.app.web.rest.v1.SubscribePageDTO;
 import java.util.List;
@@ -149,6 +150,17 @@ public class InternalStorefrontResource {
                 .map(siteSettingMapper::toDto)
                 .map(SubscribePageDTO::from)
                 .orElseGet(SubscribePageDTO::new)
+        );
+    }
+
+    @GetMapping("/about-page")
+    public ApiResponse<AboutPageDTO> aboutPage() {
+        return ApiResponse.ok(
+            siteSettingRepository
+                .findFirstByOrderByIdAsc()
+                .map(siteSettingMapper::toDto)
+                .map(AboutPageDTO::from)
+                .orElseGet(AboutPageDTO::new)
         );
     }
 

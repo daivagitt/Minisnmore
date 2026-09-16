@@ -163,7 +163,7 @@ The frontend should allow production hosts in `vite.config.ts`:
 
 ```ts
 preview: {
-  allowedHosts: ["uat.minisnmore.com", "minisnmore.com", "www.minisnmore.com"],
+  allowedHosts: ["minisnmore.com", "www.minisnmore.com"],
 },
 ```
 
@@ -331,18 +331,16 @@ Authorized redirect URIs:
 ```text
 https://minisnmore.com/login/oauth2/code/google
 https://www.minisnmore.com/login/oauth2/code/google
-https://uat.minisnmore.com/login/oauth2/code/google
 ```
 
-Authorized JavaScript origins (add UAT when testing social login on UAT):
+Authorized JavaScript origins:
 
 ```text
 https://minisnmore.com
 https://www.minisnmore.com
-https://uat.minisnmore.com
 ```
 
-UAT backend must have `GOOGLE_CLIENT_ID` and **`GOOGLE_CLIENT_SECRET`** set (PM2 / Jenkins deploy env). An empty secret causes Google sign-in to fail after account selection and redirect to `/login?error`.
+The production backend must have `GOOGLE_CLIENT_ID` and **`GOOGLE_CLIENT_SECRET`** set (PM2 / Jenkins deploy env). An empty secret causes Google sign-in to fail after account selection and redirect to `/login?error`.
 
 After updating Google Cloud Console, restart the backend:
 
@@ -405,15 +403,15 @@ curl -I https://minisnmore.com/oauth2/authorization/facebook
 
 Create a **Server-based Application** at [Zoho API Console (India)](https://api-console.zoho.in/). Do not use Client-based — the backend stores `client_secret` and `refresh_token`.
 
-Redirect URIs and JavaScript domains are configured in Spring (`application-prod.yml` → `application.zoho.oauth`). Defaults for UAT:
+Redirect URIs and JavaScript domains are configured in Spring (`application-prod.yml` → `application.zoho.oauth`). Production values:
 
 | Zoho field | Value |
 | --- | --- |
-| Homepage URL | `https://uat.minisnmore.com` |
-| Authorized Redirect URIs | `https://uat.minisnmore.com`, `https://uat.minisnmore.com/admin/zoho` |
-| JavaScript Domain | `https://uat.minisnmore.com` |
+| Homepage URL | `https://minisnmore.com` |
+| Authorized Redirect URIs | `https://minisnmore.com`, `https://minisnmore.com/admin/zoho` |
+| JavaScript Domain | `https://minisnmore.com` |
 
-Production (`minisnmore.com`) — set env vars or override YAML before go-live:
+Set env vars on the production server:
 
 ```bash
 export ZOHO_OAUTH_HOMEPAGE_URL=https://minisnmore.com
@@ -422,7 +420,7 @@ export ZOHO_OAUTH_ADMIN_REDIRECT_URI=https://minisnmore.com/admin/zoho
 export ZOHO_OAUTH_JAVASCRIPT_DOMAIN=https://minisnmore.com
 ```
 
-**Client experience (recommended):** set these once on the UAT/production server (PM2 / Jenkins env). The store admin only clicks **Connect to Zoho Books** and signs in — no API console or token copying.
+**Client experience (recommended):** set these once on the production server (PM2 / Jenkins env). The store admin only clicks **Connect to Zoho Books** and signs in — no API console or token copying.
 
 ```bash
 export ZOHO_CLIENT_ID=1000.xxxx          # example — use your Zoho Server-based client ID
@@ -439,9 +437,9 @@ pm2 restart mini-backend-prod --update-env
 
 If any Zoho client secret was ever committed to git, rotate it in the [Zoho API Console](https://api-console.zoho.in/) and update the server env / secret store only.
 
-Ensure Zoho API Console redirect URI includes `https://uat.minisnmore.com/admin/zoho` (or prod equivalent).
+Ensure Zoho API Console redirect URI includes `https://minisnmore.com/admin/zoho`.
 
-**Manual fallback (UI, not an API call):** when `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, and `ZOHO_ORG_ID` are unset, open the admin page **`/admin/zoho`** (e.g. `https://uat.minisnmore.com/admin/zoho`). The frontend automatically shows the legacy credential form instead of **Connect to Zoho Books**. Admins paste credentials there and click Save — no need to call `GET /api/v1/admin/zoho/oauth-setup` directly (that endpoint is for optional console hints when using manual mode).
+**Manual fallback (UI, not an API call):** when `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, and `ZOHO_ORG_ID` are unset, open the admin page **`/admin/zoho`** (e.g. `https://minisnmore.com/admin/zoho`). The frontend automatically shows the legacy credential form instead of **Connect to Zoho Books**. Admins paste credentials there and click Save — no need to call `GET /api/v1/admin/zoho/oauth-setup` directly (that endpoint is for optional console hints when using manual mode).
 
 ### Admin sync (production UI)
 
@@ -476,8 +474,7 @@ In Zoho Books, create a webhook action:
 | Webhook name | `MNM Invoice Status Webhook` |
 | Module | Invoices |
 | Method | POST |
-| UAT URL | `https://uat.minisnmore.com/api/v1/zoho/invoice-webhook` |
-| Production URL | `https://minisnmore.com/api/v1/zoho/invoice-webhook` |
+| URL | `https://minisnmore.com/api/v1/zoho/invoice-webhook` |
 | Content type | JSON / `application/json` |
 | Secure this webhook | Yes |
 | Secret token | Same value as `ZOHO_INVOICE_WEBHOOK_SECRET`, alphanumeric only |

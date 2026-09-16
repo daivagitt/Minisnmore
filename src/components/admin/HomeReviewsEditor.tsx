@@ -4,7 +4,9 @@ import { ImageUploadField } from "@/components/admin/ImageUploadField";
 import { HOME_SECTION_CARD_LIMIT } from "@/lib/home-section-limit";
 import {
   emptyHomeReview,
+  HOME_REVIEW_RATING_OPTIONS,
   homeReviewDraftsForEditor,
+  homeReviewRatingLabel,
   type HomeReviewDraft,
 } from "@/lib/home-reviews";
 
@@ -114,12 +116,12 @@ export function HomeReviewsEditor({ payload, onChange }: Props) {
             <Field label="Rating (required)">
               <select
                 className={inputCls()}
-                value={review.rating}
+                value={String(review.rating)}
                 onChange={(e) => update(index, { rating: Number(e.target.value) })}
               >
-                {[5, 4, 3, 2, 1].map((stars) => (
-                  <option key={stars} value={stars}>
-                    {stars} star{stars === 1 ? "" : "s"}
+                {HOME_REVIEW_RATING_OPTIONS.map((stars) => (
+                  <option key={stars} value={String(stars)}>
+                    {homeReviewRatingLabel(stars)}
                   </option>
                 ))}
               </select>

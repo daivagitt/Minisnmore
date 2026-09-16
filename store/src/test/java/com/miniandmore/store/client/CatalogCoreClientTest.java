@@ -84,6 +84,25 @@ class CatalogCoreClientTest {
     }
 
     @Test
+    void forwardCataloguePdfUpload_postsToInternalCataloguePdf() throws Exception {
+        server
+            .expect(requestTo("http://catalog.test/internal/v1/admin/uploads/catalogue-pdf"))
+            .andExpect(method(HttpMethod.POST))
+            .andRespond(withSuccess("{\"ok\":true}", MediaType.APPLICATION_JSON));
+
+        org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
+            "file",
+            "soft-bloom.pdf",
+            "application/pdf",
+            "pdf-bytes".getBytes()
+        );
+        ResponseEntity<byte[]> response = client.forwardCataloguePdfUpload(file);
+
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        server.verify();
+    }
+
+    @Test
     void forwardSkuWiseImport_postsToInternalSkuWiseEndpoint() throws Exception {
         server
             .expect(requestTo("http://catalog.test/internal/v1/admin/import/sku-wise-print"))

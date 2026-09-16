@@ -48,10 +48,10 @@ export const ADMIN_IMAGE_SPECS = {
     notes: "Shown small in the shop menu dropdown.",
   },
   productGallery: {
-    ratio: "Any (landscape or square)",
-    recommendedPx: "1200 px max on longest edge",
+    ratio: "Matches each photo",
+    recommendedPx: "1250 px longest edge",
     notes:
-      "Aspect ratio is preserved on upload and on the product page — landscape lifestyle shots fill the frame without letterboxing.",
+      "The product-page box follows this photo’s width and height. Landscape stays landscape, portrait stays portrait. Nothing is stretched or padded into a square. Larger files scale down so the longest edge is 1250px.",
   },
   printSwatch: {
     ratio: "1 : 1",
@@ -67,6 +67,16 @@ export const ADMIN_IMAGE_SPECS = {
     ratio: "~3 : 1",
     recommendedPx: "600 × 200 px",
     notes: "Wide PNG with transparent background (navbar).",
+  },
+  aboutHero: {
+    ratio: "4 : 5",
+    recommendedPx: "1200 × 1500 px",
+    notes: "Right-hand photo on the About page hero.",
+  },
+  aboutFounder: {
+    ratio: "16 : 10",
+    recommendedPx: "1600 × 1000 px",
+    notes: "Wide founder photo; name and role overlay the bottom.",
   },
   invoiceLogo: {
     ratio: "Wide, up to ~4 : 1",

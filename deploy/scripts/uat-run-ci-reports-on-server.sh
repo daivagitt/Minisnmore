@@ -23,7 +23,7 @@ PUBLISH_REPORTS="${PUBLISH_REPORTS:-true}"
 CONTINUE_ON_TEST_FAIL="${CONTINUE_ON_TEST_FAIL:-true}"
 API_TEST_BASE_URL="${API_TEST_BASE_URL:-http://127.0.0.1:9180}"
 API_CATALOG_BASE_URL="${API_CATALOG_BASE_URL:-http://127.0.0.1:9184}"
-API_INTEGRATION_BASE_URL="${API_INTEGRATION_BASE_URL:-https://uat.minisnmore.com}"
+API_INTEGRATION_BASE_URL="${API_INTEGRATION_BASE_URL:-https://minisnmore.com}"
 OPENAPI_SNAPSHOT_FALLBACK="${OPENAPI_SNAPSHOT_FALLBACK:-false}"
 
 PKG="${PKG:-artifacts/reports-site}"
@@ -194,7 +194,7 @@ if [ "$PUBLISH_REPORTS" = "true" ]; then
   mkdir -p "$REMOTE/releases"
   rsync -a --delete "$PKG/" "$RELEASE_PATH/"
   ln -sfn "$RELEASE_PATH" "$REMOTE/current"
-  echo "Published: https://uat.minisnmore.com/reports/ ($RELEASE_ID)"
+  echo "Published: https://minisnmore.com/reports/ ($RELEASE_ID)"
 else
   echo "Skipping publish (PUBLISH_REPORTS=false). Package at: $PKG"
 fi

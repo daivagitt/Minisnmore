@@ -58,7 +58,7 @@ public class ZohoSyncService {
     private static final String COD_PAYMENT_TERMS_LABEL = "Cash on Delivery";
     private static final String COD_FEE_LINE_NAME = "COD handling fee";
     /** Zoho sales-order custom field: channel = Online (org-specific field id). */
-    private static final String SALES_ORDER_CHANNEL_CUSTOM_FIELD_ID = "4066570000000458006";
+    private static final String SALES_ORDER_CHANNEL_CUSTOM_FIELD_ID = "3624052000000835002";
     private static final String SALES_ORDER_CHANNEL_CUSTOM_FIELD_VALUE = "Online";
 
     private final ZohoBooksClient booksClient;
@@ -823,6 +823,7 @@ public class ZohoSyncService {
     }
 
     public Map<String, Object> pullProduct(Long productId) {
+        itemImageSync.beginImageImportPass();
         ZohoSyncSummary.Builder builder = ZohoSyncSummary.builder();
         Optional<Product> product = productRepository.findById(productId);
         if (product.isEmpty()) {
@@ -873,6 +874,7 @@ public class ZohoSyncService {
     }
 
     public Map<String, Object> pullProductVariant(Long productId, String variantSku, String zohoItemId) {
+        itemImageSync.beginImageImportPass();
         ZohoSyncSummary.Builder builder = ZohoSyncSummary.builder();
         Optional<Product> product = productRepository.findById(productId);
         if (product.isEmpty()) {
@@ -907,6 +909,7 @@ public class ZohoSyncService {
     }
 
     public Map<String, Object> pullExternalProduct(String sku, String zohoItemId) {
+        itemImageSync.beginImageImportPass();
         ZohoSyncSummary.Builder builder = ZohoSyncSummary.builder();
         String normalizedSku = StringUtils.trimToNull(sku);
         String normalizedItemId = StringUtils.trimToNull(zohoItemId);
@@ -936,6 +939,7 @@ public class ZohoSyncService {
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Map<String, Object> pullProducts(boolean forceFullPull) {
+        itemImageSync.beginImageImportPass();
         ZohoSyncSummary.Builder builder = ZohoSyncSummary.builder();
         Optional<ZohoSetting> setting = zohoSettingRepository.findActiveOrLatest();
         boolean autoCreateCategory = setting
