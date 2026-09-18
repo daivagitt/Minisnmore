@@ -733,10 +733,7 @@ function OrderDetail() {
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel this order?</AlertDialogTitle>
             <AlertDialogDescription>
-              This cannot be undone. The items will be released back to stock
-              {order.payment_status === "paid" &&
-                ""}
-              .
+              This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-1.5">
