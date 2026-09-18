@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { AdminPage, Field, inputCls } from "@/components/admin/AdminPage";
+import { AdminCollapsibleSection, AdminPage, Field, inputCls } from "@/components/admin/AdminPage";
 import { AgeRangeField } from "@/components/admin/AgeRangeField";
 import { CommaListField } from "@/components/admin/CommaListField";
 import { NumberField } from "@/components/admin/NumberField";
@@ -75,6 +75,16 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { DEFAULT_STORE_DISCOUNT_PERCENT, sellingFromMrp } from "@/lib/pricing";
 
 export const Route = createFileRoute("/admin/products")({ component: ProductsPage });
+
+const PRODUCT_EDITOR_SECTIONS = ["merch", "copy", "notes", "chart", "gallery"] as const;
+type ProductEditorSection = (typeof PRODUCT_EDITOR_SECTIONS)[number];
+const DEFAULT_PRODUCT_EDITOR_SECTIONS: Record<ProductEditorSection, boolean> = {
+  merch: false,
+  copy: false,
+  notes: false,
+  chart: false,
+  gallery: false,
+};
 
 type Product = ProductRow;
 const empty: Product = {
@@ -175,6 +185,14 @@ function ProductsPage() {
   const [clearingVariantPhotos, setClearingVariantPhotos] = useState<Set<number>>(() => new Set());
   const [imageUploading, setImageUploading] = useState<number | null>(null);
   const [skuWiseImporting, setSkuWiseImporting] = useState(false);
+  const [editorSections, setEditorSections] = useState(DEFAULT_PRODUCT_EDITOR_SECTIONS);
+
+  const setEditorSection = (id: ProductEditorSection, open: boolean) =>
+    setEditorSections((prev) => ({ ...prev, [id]: open }));
+  const expandAllEditorSections = () =>
+    setEditorSections(Object.fromEntries(PRODUCT_EDITOR_SECTIONS.map((id) => [id, true])) as Record<ProductEditorSection, boolean>);
+  const collapseAllEditorSections = () =>
+    setEditorSections(Object.fromEntries(PRODUCT_EDITOR_SECTIONS.map((id) => [id, false])) as Record<ProductEditorSection, boolean>);
 
   const load = async () => {
     setLoading(true);
@@ -208,6 +226,10 @@ function ProductsPage() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    setEditorSections(DEFAULT_PRODUCT_EDITOR_SECTIONS);
+  }, [editing]);
 
   const upload = async (files: FileList, i: number) => {
     const accepted: File[] = [];
@@ -715,13 +737,33 @@ function ProductsPage() {
                 </button>
                 {isOpen && (
                   <div className="p-5 border-t border-white/40 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs text-muted-foreground">Fields marked with * are required.</p>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={expandAllEditorSections}
+                          className="text-xs text-primary story-link"
+                        >
+                          Expand all
+                        </button>
+                        <button
+                          type="button"
+                          onClick={collapseAllEditorSections}
+                          className="text-xs text-primary story-link"
+                        >
+                          Collapse all
+                        </button>
+                      </div>
+                    </div>
                     <div className="grid sm:grid-cols-3 gap-3">
-                      <Field label="Name">
+                      <Field label="Name" required>
                         <input
                           className={inputCls()}
                           maxLength={ADMIN_NAME_MAX_LEN}
                           value={p.name}
                           onChange={(e) => update(i, { name: e.target.value })}
+                          required
                         />
                       </Field>
                       <Field label="Slug">
@@ -732,11 +774,12 @@ function ProductsPage() {
                           onChange={(e) => update(i, { slug: e.target.value })}
                         />
                       </Field>
-                      <Field label="Category (required)">
+                      <Field label="Category" required>
                         <select
                           className={inputCls()}
                           value={p.category_id ?? ""}
                           onChange={(e) => update(i, { category_id: e.target.value || null })}
+                          required
                         >
                           <option value="">Select category…</option>
                           {cats.map((c) => (
@@ -748,13 +791,14 @@ function ProductsPage() {
                       </Field>
                     </div>
                     <div className="grid sm:grid-cols-2 gap-3">
-                      <Field label="SKU (required)">
+                      <Field label="SKU" required>
                         <div className="flex gap-2">
                           <input
                             className={inputCls()}
                             value={p.sku ?? ""}
                             onChange={(e) => update(i, { sku: e.target.value })}
                             placeholder={suggestParentSku(p.name || "Product")}
+                            required
                           />
                           <button
                             type="button"
@@ -766,12 +810,13 @@ function ProductsPage() {
                           </button>
                         </div>
                       </Field>
-                      <Field label="Fabric type (required)">
+                      <Field label="Fabric type" required>
                         <input
                           className={inputCls()}
                           value={p.fabric_type ?? ""}
                           onChange={(e) => update(i, { fabric_type: e.target.value })}
                           placeholder="100% Cotton"
+                          required
                         />
                       </Field>
                     </div>
@@ -893,6 +938,12 @@ function ProductsPage() {
                         </select>
                       </Field>
                     </div>
+                    <AdminCollapsibleSection
+                      title="Sizes, colours & variants"
+                      hint="Size list, colour galleries, display image, and the variants matrix."
+                      open={editorSections.merch}
+                      onOpenChange={(open) => setEditorSection("merch", open)}
+                    >
                     {(p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS" ? (
                       <>
                         <div className="grid sm:grid-cols-2 gap-3">
@@ -959,6 +1010,13 @@ function ProductsPage() {
                         <ProductDisplayImageEditor product={p} onChange={(patch) => update(i, patch)} />
                       </>
                     )}
+                    </AdminCollapsibleSection>
+                    <AdminCollapsibleSection
+                      title="Description & story"
+                      hint="Storefront copy. Closed by default to keep the editor shorter."
+                      open={editorSections.copy}
+                      onOpenChange={(open) => setEditorSection("copy", open)}
+                    >
                     <Field label="Description">
                       <textarea
                         rows={3}
@@ -975,7 +1033,14 @@ function ProductsPage() {
                         onChange={(e) => update(i, { story: e.target.value })}
                       />
                     </Field>
+                    </AdminCollapsibleSection>
 
+                    <AdminCollapsibleSection
+                      title="Size callouts"
+                      hint="Short notes shown on the product photo for a chosen size."
+                      open={editorSections.notes}
+                      onOpenChange={(open) => setEditorSection("notes", open)}
+                    >
                     <SizeNotesEditor
                       sizes={catalogSizesForProduct({
                         sizes: p.sizes ?? [],
@@ -987,7 +1052,14 @@ function ProductsPage() {
                       value={p.size_notes ?? {}}
                       onChange={(size_notes) => update(i, { size_notes })}
                     />
+                    </AdminCollapsibleSection>
 
+                    <AdminCollapsibleSection
+                      title="Size chart"
+                      hint="Measurement table shown on the product page."
+                      open={editorSections.chart}
+                      onOpenChange={(open) => setEditorSection("chart", open)}
+                    >
                     <SizeChartEditor
                       value={p.size_chart ?? null}
                       onChange={(size_chart) => update(i, { size_chart })}
@@ -996,7 +1068,14 @@ function ProductsPage() {
                       productSlug={p.slug}
                       productSizes={p.sizes ?? []}
                     />
+                    </AdminCollapsibleSection>
 
+                    <AdminCollapsibleSection
+                      title="Gallery images"
+                      hint="Main product photos used on shop cards when a display image is not set."
+                      open={editorSections.gallery}
+                      onOpenChange={(open) => setEditorSection("gallery", open)}
+                    >
                     <Field label="Images">
                       <ImageSpecHint spec={ADMIN_IMAGE_SPECS.productGallery} className="mb-2" />
                       {(() => {
@@ -1063,6 +1142,7 @@ function ProductsPage() {
                         );
                       })()}
                     </Field>
+                    </AdminCollapsibleSection>
 
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm">
                       <label className="flex items-center gap-2">
