@@ -2480,7 +2480,54 @@ class ZohoSyncServiceTest {
                 if (!(lineObj instanceof Map<?, ?> salesLine)) {
                     return false;
                 }
-                return "zoho-var-line".equals(salesLine.get("item_id"));
+                return (
+                    "zoho-var-line".equals(salesLine.get("item_id")) &&
+                    "Horizon Set — S / Navy".equals(salesLine.get("name")) &&
+                    "SKU: HORIZON-S-NAVY".equals(salesLine.get("description"))
+                );
+            })
+        );
+    }
+
+    @Test
+    void syncOrder_simpleProductWithSizeColor_sendsVariantDetailsOnInvoiceLine() {
+        Product product = new Product().id(51L).sku("JABLA").zohoItemId("zoho-jabla-parent").itemStructure("SIMPLE");
+        OrderItem line = new OrderItem()
+            .productId("51")
+            .productName("Book Style Tying Jabla Short Set")
+            .itemSize("0-3m")
+            .color("Aqua")
+            .qty(1)
+            .price(BigDecimal.valueOf(1890));
+        CustomerOrder order = new CustomerOrder().id(203L).orderNumber("MNM-JABLA-VAR").userLogin("buyer@example.com");
+        order.addItems(line);
+        line.setOrder(order);
+
+        when(customerOrderRepository.findById(203L)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(203L)).thenReturn(List.of(line));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-jabla-var")));
+        when(booksClient.createInvoiceFromSalesOrder("so-jabla-var"))
+            .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-jabla-var")));
+        when(productRepository.findById(51L)).thenReturn(Optional.of(product));
+
+        service.syncOrder(203L);
+
+        verify(booksClient).createSalesOrder(
+            argThat(payload -> {
+                Object linesObj = payload.get("line_items");
+                if (!(linesObj instanceof List<?> lines) || lines.isEmpty()) {
+                    return false;
+                }
+                Object lineObj = lines.get(0);
+                if (!(lineObj instanceof Map<?, ?> salesLine)) {
+                    return false;
+                }
+                return (
+                    "Book Style Tying Jabla Short Set — 0-3m / Aqua".equals(salesLine.get("name")) &&
+                    "SKU: JABLA".equals(salesLine.get("description")) &&
+                    "zoho-jabla-parent".equals(salesLine.get("item_id"))
+                );
             })
         );
     }
