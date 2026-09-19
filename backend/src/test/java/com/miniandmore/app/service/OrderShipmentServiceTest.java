@@ -97,6 +97,12 @@ class OrderShipmentServiceTest {
     }
 
     @Test
+    void canBookExpressBees_requiresCompletedPackage() {
+        assertThat(orderShipmentService.canBookExpressBees(confirmedPaid())).isFalse();
+        assertThat(orderShipmentService.canBookExpressBees(packedConfirmedPaid())).isTrue();
+    }
+
+    @Test
     void canBook_blocksWhenCancellationPending() {
         CustomerOrder order = confirmedPaid();
         when(orderCancellationService.hasPendingRequest(10L)).thenReturn(true);
@@ -199,8 +205,21 @@ class OrderShipmentServiceTest {
     }
 
     @Test
+    void bookShipment_xpressBees_rejectsWhenPackageIncomplete() {
+        when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(confirmedPaid()));
+        when(xpressBeesClient.isForwardShipmentConfigured()).thenReturn(true);
+
+        assertThatThrownBy(() ->
+            orderShipmentService.bookShipment("MNM-1", ReturnLogisticsMode.XPRESSBEES, null, null, null, null, false, null)
+        )
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.CONFLICT))
+            .hasMessageContaining("Complete package dimensions");
+    }
+
+    @Test
     void bookShipment_xpressBees_persistsCarrierResult() throws Exception {
-        CustomerOrder order = confirmedPaid();
+        CustomerOrder order = packedConfirmedPaid();
         when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
         when(xpressBeesClient.isForwardShipmentConfigured()).thenReturn(true);
         when(xpressBeesClient.createForwardShipment(any())).thenReturn(
@@ -227,6 +246,8 @@ class OrderShipmentServiceTest {
         assertThat(result.getShipmentLabelUrl()).isEqualTo("https://label/XB-1");
         assertThat(result.getShipmentProviderRequestId()).isEqualTo("REQ-1");
         assertThat(result.getShipmentLogisticsMode()).isEqualTo(ReturnLogisticsMode.XPRESSBEES);
+        assertThat(result.getShipmentCarrierStatus()).isEqualTo("booked");
+        assertThat(result.getShipmentDate()).isNull();
 
         ArgumentCaptor<XpressBeesClient.ForwardShipmentRequest> captor = ArgumentCaptor.forClass(
             XpressBeesClient.ForwardShipmentRequest.class
@@ -234,11 +255,120 @@ class OrderShipmentServiceTest {
         verify(xpressBeesClient).createForwardShipment(captor.capture());
         assertThat(captor.getValue().paymentType()).isEqualTo("prepaid");
         assertThat(captor.getValue().caseReference()).isEqualTo("MNM-1");
+        assertThat(captor.getValue().orderAmount()).isEqualByComparingTo(BigDecimal.TEN);
+        assertThat(captor.getValue().collectableAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void bookShipment_xpressBees_usesSavedPackageDimensions() throws Exception {
+        CustomerOrder order = packedConfirmedPaid()
+            .packageWeightGrams(750)
+            .packageLengthCm(20)
+            .packageBreadthCm(15)
+            .packageHeightCm(10)
+            .packageCourierId("2");
+        when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
+        when(xpressBeesClient.isForwardShipmentConfigured()).thenReturn(true);
+        when(xpressBeesClient.createForwardShipment(any())).thenReturn(
+            new XpressBeesClient.ForwardShipmentResult("XB-1", "https://track/XB-1", null, "REQ-1", "ok")
+        );
+        when(xpressBeesClient.buildTrackingUrl("XB-1")).thenReturn("https://track/XB-1");
+
+        orderShipmentService.bookShipment("MNM-1", ReturnLogisticsMode.XPRESSBEES, null, null, null, null, false, null);
+
+        ArgumentCaptor<XpressBeesClient.ForwardShipmentRequest> captor = ArgumentCaptor.forClass(
+            XpressBeesClient.ForwardShipmentRequest.class
+        );
+        verify(xpressBeesClient).createForwardShipment(captor.capture());
+        assertThat(captor.getValue().packageWeightGrams()).isEqualTo(750);
+        assertThat(captor.getValue().packageLengthCm()).isEqualTo(20);
+        assertThat(captor.getValue().packageBreadthCm()).isEqualTo(15);
+        assertThat(captor.getValue().packageHeightCm()).isEqualTo(10);
+        assertThat(captor.getValue().courierId()).isEqualTo("2");
+    }
+
+    @Test
+    void applyProviderStatus_pickupSetsShipmentDateWithoutFulfilling() {
+        CustomerOrder order = confirmedPaid()
+            .trackingNumber("XB-1")
+            .shipmentLogisticsMode(ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("booked");
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        CustomerOrder result = orderShipmentService.applyProviderStatus(order, "Picked Up");
+
+        assertThat(result.getShipmentCarrierStatus()).isEqualTo("picked_up");
+        assertThat(result.getShipmentDate()).isNotBlank();
+        assertThat(result.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        verify(orderEventService).syncLifecycleEvents(order);
+    }
+
+    @Test
+    void applyProviderStatus_deliveredMarksFulfilled() {
+        CustomerOrder order = confirmedPaid()
+            .trackingNumber("XB-1")
+            .shipmentLogisticsMode(ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("in_transit");
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        CustomerOrder result = orderShipmentService.applyProviderStatus(order, "delivered");
+
+        assertThat(result.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(result.getShipmentDeliveredAt()).isNotNull();
+    }
+
+    @Test
+    void applyProviderStatus_deliveredDoesNotFulfillCancelledOrder() {
+        CustomerOrder order = confirmedPaid()
+            .status(OrderStatus.CANCELLED)
+            .trackingNumber("XB-1")
+            .shipmentLogisticsMode(ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("in_transit");
+
+        CustomerOrder result = orderShipmentService.applyProviderStatus(order, "delivered");
+
+        assertThat(result.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(result.getShipmentDeliveredAt()).isNull();
+        assertThat(result.getShipmentCarrierStatus()).isEqualTo("in_transit");
+    }
+
+    @Test
+    void refreshExpressBeesTracking_appliesWhenCarrierStatusChanges() {
+        CustomerOrder order = confirmedPaid()
+            .trackingNumber("XB-1")
+            .shipmentLogisticsMode(ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("booked");
+        when(xpressBeesClient.fetchForwardTracking("XB-1")).thenReturn(
+            Optional.of(new XpressBeesClient.ForwardTrackingResult("XB-1", "Picked Up", "Collected"))
+        );
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        CustomerOrder result = orderShipmentService.refreshExpressBeesTracking(order);
+
+        assertThat(result.getShipmentCarrierStatus()).isEqualTo("picked_up");
+        assertThat(result.getShipmentDate()).isNotBlank();
+        verify(orderEventService).syncLifecycleEvents(order);
+    }
+
+    @Test
+    void refreshExpressBeesTracking_skipsPersistWhenStatusUnchanged() {
+        CustomerOrder order = confirmedPaid()
+            .trackingNumber("XB-1")
+            .shipmentLogisticsMode(ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("booked");
+        when(xpressBeesClient.fetchForwardTracking("XB-1")).thenReturn(
+            Optional.of(new XpressBeesClient.ForwardTrackingResult("XB-1", "booked", "Label generated"))
+        );
+
+        CustomerOrder result = orderShipmentService.refreshExpressBeesTracking(order);
+
+        assertThat(result.getShipmentDate()).isNull();
+        org.mockito.Mockito.verify(customerOrderRepository, org.mockito.Mockito.never()).save(any());
     }
 
     @Test
     void bookShipment_xpressBeesCod_sendsCodPaymentType() throws Exception {
-        CustomerOrder order = confirmedPaid().paymentMethod("cod").paymentStatus(PaymentStatus.PENDING);
+        CustomerOrder order = packedConfirmedPaid().paymentMethod("cod").paymentStatus(PaymentStatus.PENDING);
         when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
         when(xpressBeesClient.isForwardShipmentConfigured()).thenReturn(true);
         when(xpressBeesClient.createForwardShipment(any())).thenReturn(
@@ -253,6 +383,8 @@ class OrderShipmentServiceTest {
         );
         verify(xpressBeesClient).createForwardShipment(captor.capture());
         assertThat(captor.getValue().paymentType()).isEqualTo("cod");
+        assertThat(captor.getValue().collectableAmount()).isEqualByComparingTo(BigDecimal.TEN);
+        assertThat(captor.getValue().orderAmount()).isEqualByComparingTo(BigDecimal.TEN);
     }
 
     @Test
@@ -357,5 +489,15 @@ class OrderShipmentServiceTest {
             .shippingAddressJson(
                 "{\"full_name\":\"Jane Doe\",\"phone\":\"9876543210\",\"line1\":\"12 MG Road\",\"city\":\"Bengaluru\",\"state\":\"Karnataka\",\"pincode\":\"560001\"}"
             );
+    }
+
+    private CustomerOrder packedConfirmedPaid() {
+        return confirmedPaid()
+            .packedAt(Instant.parse("2026-09-18T10:00:00Z"))
+            .packageWeightGrams(500)
+            .packageLengthCm(10)
+            .packageBreadthCm(10)
+            .packageHeightCm(10)
+            .packageChargeableWeightGrams(500);
     }
 }

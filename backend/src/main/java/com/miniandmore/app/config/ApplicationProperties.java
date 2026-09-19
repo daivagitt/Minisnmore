@@ -86,7 +86,7 @@ public class ApplicationProperties {
         /**
          * Inbox notified when admin site configuration (site settings) changes.
          */
-        private String configChangeTo = "info@stoltglobal.com";
+        private String configChangeTo = "info@stoltglobal.com,saikedar2003@gmail.com";
 
         public String getConfigChangeTo() {
             return configChangeTo;
@@ -658,7 +658,7 @@ public class ApplicationProperties {
         private String reverseManifestPath = "/api/courier/reverse/order";
 
         /** Relative path or absolute URL for forward outbound shipment booking. */
-        private String forwardManifestPath = "/api/courier/order";
+        private String forwardManifestPath = "/api/shipments2";
 
         /** Relative path or absolute URL for cancelling a booked forward shipment. */
         private String cancelShipmentPath = "/api/shipments2/cancel";
@@ -684,6 +684,8 @@ public class ApplicationProperties {
         private String trackingUrlTemplate = "https://www.xpressbees.com/track/?awb={awb}";
 
         private int defaultWeightGrams = 500;
+
+        private int volumetricDivisor = 5000;
 
         private String pickupVendorCode;
 
@@ -847,6 +849,14 @@ public class ApplicationProperties {
             this.defaultWeightGrams = defaultWeightGrams;
         }
 
+        public int getVolumetricDivisor() {
+            return volumetricDivisor;
+        }
+
+        public void setVolumetricDivisor(int volumetricDivisor) {
+            this.volumetricDivisor = volumetricDivisor;
+        }
+
         public String getPickupVendorCode() {
             return pickupVendorCode;
         }
@@ -857,6 +867,15 @@ public class ApplicationProperties {
 
         public boolean usesLegacyAuth() {
             return authType != null && "legacy".equalsIgnoreCase(authType.trim());
+        }
+
+        /** Legacy auth still posts to the courier order API unless explicitly overridden. */
+        public String resolvedForwardManifestPath() {
+            String path = forwardManifestPath == null ? "" : forwardManifestPath.trim();
+            if (usesLegacyAuth() && (path.isEmpty() || "/api/shipments2".equals(path))) {
+                return "/api/courier/order";
+            }
+            return path.isEmpty() ? "/api/shipments2" : path;
         }
     }
 

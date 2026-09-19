@@ -13,13 +13,16 @@ import com.miniandmore.app.security.SecurityUtils;
 import com.miniandmore.app.service.LedgerlySyncService;
 import com.miniandmore.app.service.OrderCancellationService;
 import com.miniandmore.app.service.OrderEventService;
+import com.miniandmore.app.service.OrderPackageService;
 import com.miniandmore.app.service.OrderShipmentService;
 import com.miniandmore.app.service.OrderTrackingStatusResolver;
 import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import com.miniandmore.app.web.rest.v1.ApiResponse;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Duration;
 import java.time.Instant;
@@ -45,7 +48,7 @@ import org.springframework.web.server.ResponseStatusException;
  */
 @RestController
 @RequestMapping("/internal/v1/admin/orders")
-@PreAuthorize("hasAuthority('ROLE_ADMIN')")
+@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_OPERATIONS','ROLE_CUSTOMER_SUPPORT')")
 public class InternalAdminOrderResource {
 
     private static final Duration MAX_ORDER_RANGE = Duration.ofDays(31);
@@ -61,6 +64,7 @@ public class InternalAdminOrderResource {
     private final OrderEventService orderEventService;
     private final InternalAccountOrderResource accountOrders;
     private final OrderShipmentService orderShipmentService;
+    private final OrderPackageService orderPackageService;
     private final OrderCancellationService orderCancellationService;
 
     public InternalAdminOrderResource(
@@ -72,6 +76,7 @@ public class InternalAdminOrderResource {
         OrderEventService orderEventService,
         InternalAccountOrderResource accountOrders,
         OrderShipmentService orderShipmentService,
+        OrderPackageService orderPackageService,
         OrderCancellationService orderCancellationService
     ) {
         this.dataAccess = dataAccess;
@@ -82,6 +87,7 @@ public class InternalAdminOrderResource {
         this.orderEventService = orderEventService;
         this.accountOrders = accountOrders;
         this.orderShipmentService = orderShipmentService;
+        this.orderPackageService = orderPackageService;
         this.orderCancellationService = orderCancellationService;
     }
 
@@ -177,6 +183,7 @@ public class InternalAdminOrderResource {
     }
 
     @PostMapping("/{orderNumber}/mark-cod-collected")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_OPERATIONS')")
     @Transactional
     public ApiResponse<Map<String, Object>> markCodCollected(@PathVariable String orderNumber) {
         CustomerOrder order = dataAccess
@@ -215,6 +222,7 @@ public class InternalAdminOrderResource {
     }
 
     @PostMapping("/{orderNumber}/book-shipment")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_OPERATIONS')")
     public ApiResponse<Map<String, Object>> bookShipment(
         @PathVariable String orderNumber,
         @Valid @RequestBody BookShipmentRequest body
@@ -233,7 +241,43 @@ public class InternalAdminOrderResource {
         return ApiResponse.ok(Map.of("order", summary(saved)));
     }
 
+    @PostMapping("/{orderNumber}/package-rates")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_OPERATIONS')")
+    public ApiResponse<Map<String, Object>> packageRates(
+        @PathVariable String orderNumber,
+        @Valid @RequestBody PackageRatesRequest body
+    ) {
+        return ApiResponse.ok(
+            orderPackageService.previewRates(
+                orderNumber,
+                body.weight_grams(),
+                body.length_cm(),
+                body.breadth_cm(),
+                body.height_cm()
+            )
+        );
+    }
+
+    @PostMapping("/{orderNumber}/complete-package")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_OPERATIONS')")
+    public ApiResponse<Map<String, Object>> completePackage(
+        @PathVariable String orderNumber,
+        @Valid @RequestBody CompletePackageRequest body
+    ) {
+        CustomerOrder saved = orderPackageService.completePackage(
+            orderNumber,
+            body.weight_grams(),
+            body.length_cm(),
+            body.breadth_cm(),
+            body.height_cm(),
+            body.courier_id(),
+            body.courier_name()
+        );
+        return ApiResponse.ok(Map.of("order", summary(saved)));
+    }
+
     @PostMapping("/{orderNumber}/cancel-shipment")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_OPERATIONS')")
     public ApiResponse<Map<String, Object>> cancelShipment(
         @PathVariable String orderNumber,
         @Valid @RequestBody CancelShipmentRequest body
@@ -293,6 +337,18 @@ public class InternalAdminOrderResource {
         data.put("pending_cancellation", pendingCancellation);
         data.put("can_book_shipment", orderShipmentService.canBook(order));
         data.put("can_book_shipment_with_override", orderShipmentService.canBookWithOverride(order));
+        data.put("can_book_expressbees_shipment", orderShipmentService.canBookExpressBees(order));
+        data.put("can_book_expressbees_shipment_with_override", orderShipmentService.canBookExpressBeesWithOverride(order));
+        data.put("can_complete_package", orderPackageService.canCompletePackage(order));
+        data.put("default_package_weight_grams", orderPackageService.defaultPackageWeightGrams(order));
+        data.put("package_weight_grams", order.getPackageWeightGrams());
+        data.put("package_length_cm", order.getPackageLengthCm());
+        data.put("package_breadth_cm", order.getPackageBreadthCm());
+        data.put("package_height_cm", order.getPackageHeightCm());
+        data.put("package_chargeable_weight_grams", order.getPackageChargeableWeightGrams());
+        data.put("package_courier_id", StringUtils.defaultString(order.getPackageCourierId()));
+        data.put("package_courier_name", StringUtils.defaultString(order.getPackageCourierName()));
+        data.put("packed_at", instant(order.getPackedAt()));
         return data;
     }
 
@@ -345,5 +401,21 @@ public class InternalAdminOrderResource {
     public record CancelShipmentRequest(
         @NotBlank String mode,
         @NotBlank @Size(min = 5, max = 500) String reason
+    ) {}
+
+    public record PackageRatesRequest(
+        Integer weight_grams,
+        @NotNull @Min(1) Integer length_cm,
+        @NotNull @Min(1) Integer breadth_cm,
+        @NotNull @Min(1) Integer height_cm
+    ) {}
+
+    public record CompletePackageRequest(
+        Integer weight_grams,
+        @NotNull @Min(1) Integer length_cm,
+        @NotNull @Min(1) Integer breadth_cm,
+        @NotNull @Min(1) Integer height_cm,
+        @Size(max = 40) String courier_id,
+        @Size(max = 120) String courier_name
     ) {}
 }

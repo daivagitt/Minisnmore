@@ -57,6 +57,7 @@ const STATUS_INDEX: Record<string, number> = {
   processing: 1,
   hand_wrapped: 1,
   wrapped: 1,
+  awaiting_pickup: 1,
   shipped: 2,
   delivered: 3,
   fulfilled: 3,
@@ -98,6 +99,7 @@ export function trackingStatusLabel(order: OrderTrackingFields) {
   const key = normalizedTrackingKey(order);
   if (key === "cancelled" || key === "canceled") return "Cancelled";
   if (key === "confirmed") return "Order confirmed";
+  if (key === "awaiting_pickup") return "Waiting for pickup";
   if (isHandWrapped(order)) return "Hand-wrapped";
   const stage = TRACKING_STAGES.find((s) => s.key === key);
   if (stage) return stage.label;
@@ -107,7 +109,10 @@ export function trackingStatusLabel(order: OrderTrackingFields) {
 /** Label for a timeline row — stage 0 becomes "Order confirmed" after payment. */
 export function trackingStageLabel(order: OrderTrackingFields, stageKey: string): string {
   const key = normalizedTrackingKey(order);
-  if (stageKey === "pending" && (key === "confirmed" || isHandWrapped(order))) return "Order confirmed";
+  if (stageKey === "pending" && (key === "confirmed" || isHandWrapped(order) || key === "awaiting_pickup")) {
+    return "Order confirmed";
+  }
+  if (stageKey === "processing" && key === "awaiting_pickup") return "Waiting for pickup";
   return TRACKING_STAGES.find((s) => s.key === stageKey)?.label ?? stageKey;
 }
 
@@ -124,6 +129,15 @@ export function trackingStageDetail(
     if (state === "done") return "Order confirmed.";
   }
   const stage = TRACKING_STAGES.find((s) => s.key === stageKey);
+  if (stageKey === "processing" && key === "awaiting_pickup") {
+    if (state === "current") {
+      return "The shipping label is ready. We'll mark it on the way when ExpressBees collects the parcel.";
+    }
+    if (state === "done") return "Hand-wrapped with care.";
+  }
+  if (stageKey === "shipped" && key === "awaiting_pickup" && state === "upcoming") {
+    return "Tracking moves to on the way after courier pickup.";
+  }
   if (stage) return stage.detail[state];
   if (state === "done") return "Completed";
   if (state === "current") return "In progress";
@@ -157,6 +171,7 @@ export function trackingActivityTitle(order: OrderTrackingFields): string {
   const key = normalizedTrackingKey(order);
   if (key === "cancelled" || key === "canceled") return "Order cancelled";
   if (key === "confirmed") return "Order confirmed";
+  if (key === "awaiting_pickup") return "Waiting for pickup";
   if (isHandWrapped(order)) return "Hand-wrapped";
   const stage = TRACKING_STAGES.find((s) => s.key === key);
   if (stage) return stage.label;

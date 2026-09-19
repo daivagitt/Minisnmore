@@ -48,6 +48,7 @@ function formatFulfillmentLabel(order: OrderStatusFields): string {
     return "Hand-wrapped";
   }
   if (tracking === "shipped") return "On the way";
+  if (tracking === "awaiting_pickup") return "Waiting for pickup";
   if (tracking === "delivered") return "Delivered";
   if (tracking === "cancelled" || tracking === "canceled") return "Cancelled";
   return formatOrderStatusLabel(order.status);

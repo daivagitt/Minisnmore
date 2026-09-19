@@ -25,7 +25,19 @@ public class SecurityConfiguration {
                     .requestMatchers(HttpMethod.GET, "/api/v1/coupons/active").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/orders/track/**").permitAll()
                     .requestMatchers("/api/v1/admin/order-returns/**").hasAuthority(AuthoritiesConstants.ADMIN)
-                    .requestMatchers("/api/v1/admin/orders/**").hasAuthority(AuthoritiesConstants.ADMIN)
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/orders/**")
+                    .hasAnyAuthority(
+                        AuthoritiesConstants.SUPER_ADMIN,
+                        AuthoritiesConstants.ADMIN,
+                        AuthoritiesConstants.OPERATIONS,
+                        AuthoritiesConstants.CUSTOMER_SUPPORT
+                    )
+                    .requestMatchers("/api/v1/admin/orders/**")
+                    .hasAnyAuthority(
+                        AuthoritiesConstants.SUPER_ADMIN,
+                        AuthoritiesConstants.ADMIN,
+                        AuthoritiesConstants.OPERATIONS
+                    )
                     .requestMatchers("/api/v1/**").authenticated()
                     .requestMatchers("/management/health", "/management/health/**", "/management/info")
                     .permitAll()

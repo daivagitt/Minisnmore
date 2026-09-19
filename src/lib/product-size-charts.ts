@@ -608,7 +608,7 @@ const LENGTH_FALLBACK =
   /body\s*length|length\s*\(hps|total\s*length|^length$|center\s*(front|back)\s*length|full\s*length|foot\s*length|cap\s*height|inseam/i;
 const WIDTH_LIKE = /width|open|circ|hip|waist|chest/i;
 const LENGTH_LIKE = /length|height|inseam/i;
-const SKIP_FIT_ROW = /waistband\s*height|sleeve\s*(length|open)|neck\s*(drop|width)|armhole|rise|placement|cuff|rib|frill|thickness/i;
+const SKIP_FIT_ROW = /waistband\s*height|sleeve\s*(length|open)|neck\s*(drop|width)|armhole|rise|placement|cuff|rib|frill|thickness|shoulder/i;
 /** Ignore construction rows that barely change between sizes (e.g. waistband height). */
 const MIN_FIT_SPREAD_CM = 1;
 

@@ -35,7 +35,7 @@ class XpressBeesShipmentWebhookHandlerServiceTest {
     private CustomerOrderRepository orderRepository;
 
     @Mock
-    private OrderEventService orderEventService;
+    private OrderShipmentService orderShipmentService;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -59,7 +59,12 @@ class XpressBeesShipmentWebhookHandlerServiceTest {
             .paymentStatus(PaymentStatus.PAID)
             .trackingNumber("XB-1");
         when(orderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
-        when(orderRepository.save(order)).thenReturn(order);
+        when(orderShipmentService.applyProviderStatus(order, "delivered")).thenAnswer(invocation -> {
+            order.setStatus(OrderStatus.FULFILLED);
+            order.setShipmentDeliveredAt(java.time.Instant.now());
+            order.setShipmentCarrierStatus("delivered");
+            return order;
+        });
         when(eventRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(eventRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -72,7 +77,7 @@ class XpressBeesShipmentWebhookHandlerServiceTest {
         assertThat(result.get("local_status")).isEqualTo("delivered");
         assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
         assertThat(order.getShipmentDeliveredAt()).isNotNull();
-        verify(orderEventService).syncLifecycleEvents(order);
+        verify(orderShipmentService).applyProviderStatus(order, "delivered");
     }
 
     @Test
@@ -84,7 +89,7 @@ class XpressBeesShipmentWebhookHandlerServiceTest {
             .paymentStatus(PaymentStatus.REFUNDED)
             .trackingNumber("XB-2");
         when(orderRepository.findOneByOrderNumber("MNM-2")).thenReturn(Optional.of(order));
-        when(orderRepository.save(order)).thenReturn(order);
+        when(orderShipmentService.applyProviderStatus(order, "delivered")).thenReturn(order);
         when(eventRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(eventRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -96,7 +101,7 @@ class XpressBeesShipmentWebhookHandlerServiceTest {
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
         assertThat(order.getShipmentDeliveredAt()).isNull();
-        verify(orderEventService).syncLifecycleEvents(order);
+        verify(orderShipmentService).applyProviderStatus(order, "delivered");
     }
 
     @Test
@@ -108,7 +113,10 @@ class XpressBeesShipmentWebhookHandlerServiceTest {
             .paymentStatus(PaymentStatus.PAID)
             .trackingNumber("4152912381315");
         when(orderRepository.findFirstByTrackingNumber("4152912381315")).thenReturn(Optional.of(order));
-        when(orderRepository.save(order)).thenReturn(order);
+        when(orderShipmentService.applyProviderStatus(order, "in transit")).thenAnswer(invocation -> {
+            order.setShipmentCarrierStatus("in_transit");
+            return order;
+        });
         when(eventRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(eventRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 

@@ -80,12 +80,12 @@ class MailServiceTest {
     }
 
     @Test
-    void sendCreationEmail_processesTemplate() {
+    void sendInvitationEmail_processesTemplate() {
         when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
         when(templateEngine.process(anyString(), any())).thenReturn("content");
         when(messageSource.getMessage(anyString(), any(), any())).thenReturn("title");
 
-        mailService.sendCreationEmail(user);
+        mailService.sendInvitationEmail(user, "Sales");
 
         verify(templateEngine).process(anyString(), any());
     }

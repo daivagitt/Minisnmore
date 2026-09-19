@@ -1,9 +1,9 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string | undefined;
 
-const SAME_ORIGIN_STOREFRONT_HOSTS = new Set([
-  "minisnmore.com",
-  "www.minisnmore.com",
-]);
+function isSameOriginStorefrontHost(hostname: string) {
+  const host = hostname.toLowerCase();
+  return host === "minisnmore.com" || host.endsWith(".minisnmore.com");
+}
 
 export const AUTH_TOKEN_KEY = "mnm_backend_jwt";
 
@@ -32,7 +32,7 @@ function getApiBaseUrl() {
   // another environment's VITE_API_BASE_URL.
   if (
     typeof window !== "undefined" &&
-    SAME_ORIGIN_STOREFRONT_HOSTS.has(window.location.hostname.toLowerCase())
+    isSameOriginStorefrontHost(window.location.hostname)
   ) {
     return "";
   }

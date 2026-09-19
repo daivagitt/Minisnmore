@@ -134,4 +134,38 @@ class AdminOrdersProxyResourceTest {
 
         verify(catalog).post(eq("/internal/v1/admin/orders/MNM-42/book-shipment"), any());
     }
+
+    @Test
+    void packageRates_delegatesToCatalog() throws Exception {
+        when(catalog.post(eq("/internal/v1/admin/orders/MNM-42/package-rates"), any()))
+            .thenReturn(ResponseEntity.ok("{\"chargeable_weight_grams\":500}"));
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/orders/MNM-42/package-rates")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content("{\"length_cm\":10,\"breadth_cm\":10,\"height_cm\":10}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(content().string("{\"chargeable_weight_grams\":500}"));
+
+        verify(catalog).post(eq("/internal/v1/admin/orders/MNM-42/package-rates"), any());
+    }
+
+    @Test
+    void completePackage_delegatesToCatalog() throws Exception {
+        when(catalog.post(eq("/internal/v1/admin/orders/MNM-42/complete-package"), any()))
+            .thenReturn(ResponseEntity.ok("{\"order\":{}}"));
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/orders/MNM-42/complete-package")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content("{\"length_cm\":10,\"breadth_cm\":10,\"height_cm\":10}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(content().string("{\"order\":{}}"));
+
+        verify(catalog).post(eq("/internal/v1/admin/orders/MNM-42/complete-package"), any());
+    }
 }

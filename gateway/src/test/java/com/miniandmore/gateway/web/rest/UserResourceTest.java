@@ -2,6 +2,7 @@ package com.miniandmore.gateway.web.rest;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.mockUser;
 import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.springSecurity;
 
 import com.miniandmore.gateway.domain.User;
@@ -10,6 +11,7 @@ import com.miniandmore.gateway.security.AuthoritiesConstants;
 import com.miniandmore.gateway.service.MailService;
 import com.miniandmore.gateway.service.UserService;
 import com.miniandmore.gateway.service.dto.AdminUserDTO;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,7 +44,11 @@ class UserResourceTest {
     void setUp() {
         UserResource resource = new UserResource(userService, userRepository, mailService);
         ReflectionTestUtils.setField(resource, "applicationName", "gateway");
-        webTestClient = WebTestClientFactory.bindBuilder(resource).apply(springSecurity()).build();
+        webTestClient = WebTestClientFactory
+            .bindBuilder(resource)
+            .apply(springSecurity())
+            .build()
+            .mutateWith(mockUser("admin").authorities(AuthoritiesConstants.ADMIN));
     }
 
     @Test
@@ -52,11 +58,12 @@ class UserResourceTest {
         dto.setEmail("new@localhost");
         dto.setFirstName("A");
         dto.setLastName("B");
+        dto.setAuthorities(Set.of(AuthoritiesConstants.SALES));
         User user = new User();
         user.setLogin("newuser");
         when(userRepository.findOneByLogin("newuser")).thenReturn(Mono.empty());
         when(userRepository.findOneByEmailIgnoreCase("new@localhost")).thenReturn(Mono.empty());
-        when(userService.createUser(any())).thenReturn(Mono.just(user));
+        when(userService.createStaffUser(any(), any())).thenReturn(Mono.just(user));
 
         webTestClient
             .post()
@@ -116,7 +123,7 @@ class UserResourceTest {
 
     @Test
     void deleteUser_returnsNoContent() {
-        when(userService.deleteUser("user")).thenReturn(Mono.empty());
+        when(userService.deleteStaffUser(any(), any())).thenReturn(Mono.empty());
 
         webTestClient.delete().uri("/api/admin/users/user").exchange().expectStatus().isNoContent();
     }
@@ -126,6 +133,7 @@ class UserResourceTest {
         AdminUserDTO dto = new AdminUserDTO();
         dto.setLogin("existing");
         dto.setEmail("new@localhost");
+        dto.setAuthorities(Set.of(AuthoritiesConstants.SALES));
         when(userRepository.findOneByLogin("existing")).thenReturn(Mono.just(new User()));
 
         webTestClient
@@ -143,6 +151,7 @@ class UserResourceTest {
         AdminUserDTO dto = new AdminUserDTO();
         dto.setLogin("newuser");
         dto.setEmail("taken@localhost");
+        dto.setAuthorities(Set.of(AuthoritiesConstants.SALES));
         when(userRepository.findOneByLogin("newuser")).thenReturn(Mono.empty());
         when(userRepository.findOneByEmailIgnoreCase("taken@localhost")).thenReturn(Mono.just(new User()));
 
@@ -182,9 +191,10 @@ class UserResourceTest {
         dto.setId(1L);
         dto.setLogin("user");
         dto.setEmail("user@localhost");
+        dto.setAuthorities(Set.of(AuthoritiesConstants.SALES));
         when(userRepository.findOneByEmailIgnoreCase("user@localhost")).thenReturn(Mono.empty());
         when(userRepository.findOneByLogin("user")).thenReturn(Mono.empty());
-        when(userService.updateUser(any())).thenReturn(Mono.empty());
+        when(userService.updateStaffUser(any(), any())).thenReturn(Mono.empty());
 
         webTestClient
             .put()
@@ -204,9 +214,10 @@ class UserResourceTest {
         dto.setEmail("user@localhost");
         dto.setFirstName("A");
         dto.setLastName("B");
+        dto.setAuthorities(Set.of(AuthoritiesConstants.SALES));
         when(userRepository.findOneByEmailIgnoreCase("user@localhost")).thenReturn(Mono.empty());
         when(userRepository.findOneByLogin("user")).thenReturn(Mono.empty());
-        when(userService.updateUser(any())).thenReturn(Mono.just(dto));
+        when(userService.updateStaffUser(any(), any())).thenReturn(Mono.just(dto));
 
         webTestClient
             .put()

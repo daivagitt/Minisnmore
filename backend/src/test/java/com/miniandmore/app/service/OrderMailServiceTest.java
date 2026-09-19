@@ -14,7 +14,9 @@ import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.OrderReturn;
 import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
+import com.miniandmore.app.domain.SiteSetting;
 import com.miniandmore.app.repository.OrderItemRepository;
+import com.miniandmore.app.repository.SiteSettingRepository;
 import jakarta.mail.internet.MimeMessage;
 import java.math.BigDecimal;
 import java.util.List;
@@ -48,6 +50,9 @@ class OrderMailServiceTest {
     private OrderItemRepository orderItemRepository;
 
     @Mock
+    private SiteSettingRepository siteSettingRepository;
+
+    @Mock
     private MimeMessage mimeMessage;
 
     private OrderMailService service;
@@ -57,12 +62,17 @@ class OrderMailServiceTest {
         JHipsterProperties properties = new JHipsterProperties();
         properties.getMail().setFrom("hello@minisnmore.com");
         properties.getMail().setBaseUrl("https://minisnmore.com/");
-        service = new OrderMailService(
+        service = newService(properties);
+    }
+
+    private OrderMailService newService(JHipsterProperties properties) {
+        return new OrderMailService(
             properties,
             javaMailSender,
             messageSource,
             templateEngine,
             orderItemRepository,
+            siteSettingRepository,
             new ObjectMapper()
         );
     }
@@ -168,14 +178,7 @@ class OrderMailServiceTest {
         JHipsterProperties properties = new JHipsterProperties();
         properties.getMail().setFrom("hello@minisnmore.com");
         properties.getMail().setBaseUrl("https://minisnmore.com");
-        service = new OrderMailService(
-            properties,
-            javaMailSender,
-            messageSource,
-            templateEngine,
-            orderItemRepository,
-            new ObjectMapper()
-        );
+        service = newService(properties);
         CustomerOrder order = new CustomerOrder()
             .userLogin("guest")
             .orderNumber("MNM-3")
@@ -253,6 +256,22 @@ class OrderMailServiceTest {
         List<String> lines = (List<String>) contextCaptor.getValue().getVariable("addressLines");
         assertThat(lines).contains("Near Park");
         assertThat(contextCaptor.getValue().getVariable("orderDate")).isNotEqualTo("");
+    }
+
+    @Test
+    void sendPickupFailedAdminNotice_sendsToSiteContactEmail() {
+        CustomerOrder order = orderWithAddress();
+        OrderReturn orderReturn = new OrderReturn();
+        orderReturn.setReturnNumber("RET-9");
+        orderReturn.setPickupFailureReason("Customer not available");
+        SiteSetting settings = new SiteSetting();
+        settings.setContactEmail("ops@minisnmore.com");
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(java.util.Optional.of(settings));
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+
+        service.sendPickupFailedAdminNotice(order, orderReturn);
+
+        verify(javaMailSender).send(mimeMessage);
     }
 
     private CustomerOrder orderWithAddress() {

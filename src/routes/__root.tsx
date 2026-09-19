@@ -14,9 +14,8 @@ import { ScrollProgress } from "@/components/ScrollProgress";
 import { FloatingDecor } from "@/components/FloatingDecor";
 import { Toaster } from "sonner";
 import { initStorefrontCacheSync, invalidateAllStorefrontCaches } from "@/lib/storefront-cache-sync";
-
-const SITE_ORIGIN = "https://minisnmore.com";
-const SOCIAL_SHARE_IMAGE = `${SITE_ORIGIN}/og-share.jpg`;
+import { SITE_ORIGIN, SOCIAL_SHARE_IMAGE, uatNoindexMeta } from "@/lib/site-seo";
+import { isStaffInvoicePath } from "@/lib/staff-roles";
 const ORGANIZATION_JSON_LD = {
   "@context": "https://schema.org",
   "@graph": [
@@ -60,6 +59,10 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
+      ...(() => {
+        const noindex = uatNoindexMeta();
+        return noindex ? [noindex] : [];
+      })(),
       { title: "Mini's n More — Heirloom baby clothing 0–24m" },
       { name: "description", content: "Minis today, memories forever. Premium organic baby clothing for the first 24 months — softly made in India." },
       { property: "og:title", content: "Mini's n More — Heirloom baby clothing 0–24m" },
@@ -106,11 +109,16 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const isAdmin = pathname.startsWith("/admin");
-  const wasAdminRef = useRef(isAdmin);
+  const isStaffApp =
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/operations") ||
+    pathname.startsWith("/sales") ||
+    pathname.startsWith("/customersupport") ||
+    pathname.startsWith("/invite");
+  const wasAdminRef = useRef(isStaffApp);
   const isCustomerInvoice = /^\/account\/orders\/[^/]+\/invoice$/.test(pathname);
-  const isInvoice = isCustomerInvoice || /^\/admin\/orders\/[^/]+\/invoice$/.test(pathname);
-  const isProductPage = !isAdmin && !isInvoice && pathname.startsWith("/product/");
+  const isInvoice = isCustomerInvoice || isStaffInvoicePath(pathname);
+  const isProductPage = !isStaffApp && !isInvoice && pathname.startsWith("/product/");
   const pdpScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -118,21 +126,21 @@ function RootComponent() {
   }, []);
 
   useEffect(() => {
-    if (wasAdminRef.current && !isAdmin) {
+    if (wasAdminRef.current && !isStaffApp) {
       invalidateAllStorefrontCaches({ broadcast: false });
     }
-    wasAdminRef.current = isAdmin;
-  }, [isAdmin]);
+    wasAdminRef.current = isStaffApp;
+  }, [isStaffApp]);
 
   useEffect(() => {
     const onVisibilityChange = () => {
-      if (document.visibilityState === "visible" && !pathname.startsWith("/admin")) {
+      if (document.visibilityState === "visible" && !isStaffApp) {
         invalidateAllStorefrontCaches({ broadcast: false });
       }
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
-  }, [pathname]);
+  }, [pathname, isStaffApp]);
 
   useEffect(() => {
     const reloadKey = "mini:chunk-reload-attempted";
@@ -191,7 +199,7 @@ function RootComponent() {
     <AuthProvider>
     <ShopProvider>
       <CatalogSync />
-      {!isAdmin && !isInvoice && (
+      {!isStaffApp && !isInvoice && (
         <>
           <Watermark />
           <div aria-hidden className="fixed inset-0 pointer-events-none z-0">
@@ -216,19 +224,19 @@ function RootComponent() {
         </div>
       ) : (
         <>
-          <main className={isAdmin || isInvoice ? "relative z-10" : "relative z-10 pt-24 md:pt-28"}>
+          <main className={isStaffApp || isInvoice ? "relative z-10" : "relative z-10 pt-24 md:pt-28"}>
             <Outlet />
           </main>
-          {!isAdmin && !isInvoice && <Footer />}
+          {!isStaffApp && !isInvoice && <Footer />}
         </>
       )}
-      {!isAdmin && !isInvoice && (
+      {!isStaffApp && !isInvoice && (
         <ScrollProgress
           key={isProductPage ? "pdp" : "page"}
           containerRef={isProductPage ? pdpScrollRef : undefined}
         />
       )}
-      {!isAdmin && !isInvoice && (
+      {!isStaffApp && !isInvoice && (
         <>
           <CartDrawer />
           <QuickView />

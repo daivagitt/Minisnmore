@@ -61,6 +61,8 @@ import {
   listMyPayments,
   markCodCollected,
   bookAdminOrderShipment,
+  previewAdminOrderPackageRates,
+  completeAdminOrderPackage,
   markOrderReturnDelivered,
   markOrderReturnInspected,
   markOrderReturnPickedUp,
@@ -714,6 +716,49 @@ describe("orders functions", () => {
         awb: "AWB-2",
         override_fulfillment_hold: true,
         override_reason: "Customer confirmed they want delivery",
+      },
+      { auth: true },
+    );
+  });
+
+  it("previews package rates for an admin order", async () => {
+    postMock.mockResolvedValueOnce({
+      chargeable_weight_grams: 500,
+      preferred_courier_name: "Surface Xpressbees 0.5 K.G",
+      couriers: [],
+    });
+    await previewAdminOrderPackageRates("MNM-1", {
+      weight_grams: 500,
+      length_cm: 10,
+      breadth_cm: 10,
+      height_cm: 10,
+    });
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/admin/orders/MNM-1/package-rates",
+      { weight_grams: 500, length_cm: 10, breadth_cm: 10, height_cm: 10 },
+      { auth: true },
+    );
+  });
+
+  it("completes an admin package wrap", async () => {
+    postMock.mockResolvedValueOnce({ order: { order_number: "MNM-1", status: "hand_wrapped" } });
+    await completeAdminOrderPackage("MNM-1", {
+      weight_grams: 500,
+      length_cm: 12,
+      breadth_cm: 10,
+      height_cm: 8,
+      courier_id: "1",
+      courier_name: "Surface Xpressbees 0.5 K.G",
+    });
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/admin/orders/MNM-1/complete-package",
+      {
+        weight_grams: 500,
+        length_cm: 12,
+        breadth_cm: 10,
+        height_cm: 8,
+        courier_id: "1",
+        courier_name: "Surface Xpressbees 0.5 K.G",
       },
       { auth: true },
     );

@@ -606,6 +606,7 @@ public class OrderReturnService {
         orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
         OrderReturn saved = orderReturnRepository.save(orderReturn);
         queueReturnEmail(saved.getOrder(), saved);
+        queueAdminPickupFailedEmail(saved.getOrder(), saved);
         return saved;
     }
 
@@ -1410,6 +1411,19 @@ public class OrderReturnService {
                 orderSmsService.sendReturnUpdate(order, orderReturn);
             } catch (RuntimeException ex) {
                 LOG.warn("Return email/SMS failed for {}", orderReturn.getReturnNumber(), ex);
+            }
+        });
+    }
+
+    private void queueAdminPickupFailedEmail(CustomerOrder order, OrderReturn orderReturn) {
+        if (order == null || orderReturn == null) {
+            return;
+        }
+        AfterCommit.run(() -> {
+            try {
+                orderMailService.sendPickupFailedAdminNotice(order, orderReturn);
+            } catch (RuntimeException ex) {
+                LOG.warn("Admin pickup-failed email failed for {}", orderReturn.getReturnNumber(), ex);
             }
         });
     }

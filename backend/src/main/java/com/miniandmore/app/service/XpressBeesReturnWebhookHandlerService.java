@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.OrderReturn;
 import com.miniandmore.app.domain.XpressBeesReturnWebhookEvent;
+import com.miniandmore.app.domain.enumeration.OrderRequestType;
 import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
 import com.miniandmore.app.repository.OrderReturnRepository;
 import com.miniandmore.app.repository.XpressBeesReturnWebhookEventRepository;
@@ -197,6 +198,11 @@ public class XpressBeesReturnWebhookHandlerService {
                 }
                 if (current == OrderReturnStatus.SHIPPED) {
                     orderReturnService.markDelivered(orderReturn.getReturnNumber(), "ExpressBees: " + providerStatus);
+                    current = OrderReturnStatus.DELIVERED;
+                }
+                if (current == OrderReturnStatus.DELIVERED && orderReturn.getRequestType() == OrderRequestType.EXCHANGE) {
+                    orderReturnService.completeExchange(orderReturn.getReturnNumber(), "ExpressBees: " + providerStatus);
+                    yield OrderReturnStatus.COMPLETED.name().toLowerCase(Locale.ROOT);
                 }
                 yield OrderReturnStatus.DELIVERED.name().toLowerCase(Locale.ROOT);
             }

@@ -5,8 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.OrderReturn;
+import com.miniandmore.app.domain.SiteSetting;
 import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
 import com.miniandmore.app.repository.OrderItemRepository;
+import com.miniandmore.app.repository.SiteSettingRepository;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.math.BigDecimal;
@@ -48,6 +50,7 @@ public class OrderMailService {
     private final MessageSource messageSource;
     private final SpringTemplateEngine templateEngine;
     private final OrderItemRepository orderItemRepository;
+    private final SiteSettingRepository siteSettingRepository;
     private final ObjectMapper objectMapper;
 
     public OrderMailService(
@@ -56,6 +59,7 @@ public class OrderMailService {
         MessageSource messageSource,
         SpringTemplateEngine templateEngine,
         OrderItemRepository orderItemRepository,
+        SiteSettingRepository siteSettingRepository,
         ObjectMapper objectMapper
     ) {
         this.jHipsterProperties = jHipsterProperties;
@@ -63,6 +67,7 @@ public class OrderMailService {
         this.messageSource = messageSource;
         this.templateEngine = templateEngine;
         this.orderItemRepository = orderItemRepository;
+        this.siteSettingRepository = siteSettingRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -102,6 +107,57 @@ public class OrderMailService {
                 StringUtils.defaultString(orderReturn.getRejectionReason())
             )
         );
+    }
+
+    public void sendPickupFailedAdminNotice(CustomerOrder order, OrderReturn orderReturn) {
+        if (order == null || orderReturn == null) {
+            return;
+        }
+        String to = resolveAdminRecipient();
+        if (StringUtils.isBlank(to)) {
+            LOG.warn(
+                "Pickup failed for return {} / order {} but no admin contact email is configured",
+                orderReturn.getReturnNumber(),
+                order.getOrderNumber()
+            );
+            return;
+        }
+        String returnNumber = StringUtils.defaultString(orderReturn.getReturnNumber());
+        String orderNumber = StringUtils.defaultString(order.getOrderNumber());
+        String reason = StringUtils.defaultIfBlank(orderReturn.getPickupFailureReason(), "Pickup failed");
+        String baseUrl = StringUtils.defaultIfBlank(jHipsterProperties.getMail().getBaseUrl(), "https://minisnmore.com");
+        String adminUrl = trimTrailingSlash(baseUrl) + "/admin/returns";
+        String content =
+            "<p>ExpressBees could not complete pickup for return <strong>" +
+            escape(returnNumber) +
+            "</strong> (order <strong>" +
+            escape(orderNumber) +
+            "</strong>).</p><p>Reason: " +
+            escape(reason) +
+            "</p><p><a href=\"" +
+            escape(adminUrl) +
+            "\">Open order returns</a> to reschedule pickup or close the case.</p>";
+        sendHtml(to, "Pickup failed · " + returnNumber + " · order " + orderNumber, wrapAdminNotice(content));
+    }
+
+    private String resolveAdminRecipient() {
+        return siteSettingRepository
+            .findFirstByOrderByIdAsc()
+            .map(SiteSetting::getContactEmail)
+            .filter(StringUtils::isNotBlank)
+            .orElseGet(() -> StringUtils.trimToNull(jHipsterProperties.getMail().getFrom()));
+    }
+
+    private static String wrapAdminNotice(String body) {
+        return "<html><body style=\"font-family:Georgia,serif;color:#4a3f45\">" + body + "</body></html>";
+    }
+
+    private static String escape(String value) {
+        return StringUtils.defaultString(value)
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;");
     }
 
     private void sendOrderTemplate(CustomerOrder order, String templateName, String titleKey, Map<String, Object> extra) {

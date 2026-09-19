@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.OrderReturn;
+import com.miniandmore.app.domain.enumeration.OrderRequestType;
 import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
 import com.miniandmore.app.repository.OrderReturnRepository;
 import com.miniandmore.app.repository.XpressBeesReturnWebhookEventRepository;
@@ -98,6 +99,7 @@ class XpressBeesReturnWebhookHandlerServiceTest {
         orderReturn.setReturnNumber("RET-ORD-1");
         orderReturn.setStatus(OrderReturnStatus.SHIPPED);
         orderReturn.setOutboundAwb("OUT-AWB-9");
+        orderReturn.setRequestType(OrderRequestType.EXCHANGE);
         when(orderReturnRepository.findFirstByOutboundAwbOrderByRequestedAtDesc("OUT-AWB-9")).thenReturn(Optional.of(orderReturn));
         when(webhookEventRepository.existsByEventId(any())).thenReturn(false);
         when(webhookEventRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -111,6 +113,7 @@ class XpressBeesReturnWebhookHandlerServiceTest {
 
         assertThat(result.get("ok")).isEqualTo(true);
         verify(orderReturnService).markDelivered("RET-ORD-1", "ExpressBees: delivered");
+        verify(orderReturnService).completeExchange("RET-ORD-1", "ExpressBees: delivered");
     }
 
     @Test
@@ -159,6 +162,7 @@ class XpressBeesReturnWebhookHandlerServiceTest {
         orderReturn.setReturnNumber("RET-ORD-1");
         orderReturn.setStatus(OrderReturnStatus.READY_TO_SHIP);
         orderReturn.setOutboundAwb("OUT-AWB-9");
+        orderReturn.setRequestType(OrderRequestType.EXCHANGE);
         when(orderReturnRepository.findFirstByOutboundAwbOrderByRequestedAtDesc("OUT-AWB-9")).thenReturn(Optional.of(orderReturn));
         when(webhookEventRepository.existsByEventId(any())).thenReturn(false);
         when(webhookEventRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -173,6 +177,7 @@ class XpressBeesReturnWebhookHandlerServiceTest {
         assertThat(result.get("ok")).isEqualTo(true);
         verify(orderReturnService).markShipped("RET-ORD-1", "ExpressBees: delivered");
         verify(orderReturnService).markDelivered("RET-ORD-1", "ExpressBees: delivered");
+        verify(orderReturnService).completeExchange("RET-ORD-1", "ExpressBees: delivered");
     }
 
     @Test

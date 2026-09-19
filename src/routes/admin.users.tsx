@@ -1,0 +1,217 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { AdminPage, Field, inputCls } from "@/components/admin/AdminPage";
+import { useAuth } from "@/hooks/useAuth";
+import { api } from "@/lib/api";
+import {
+  STAFF_ROLE_LABELS,
+  assignableRoles,
+  canManageStaff,
+  primaryStaffRole,
+  type StaffRole,
+} from "@/lib/staff-roles";
+import { showApiError } from "@/lib/ui-errors";
+import { toast } from "sonner";
+
+export const Route = createFileRoute("/admin/users")({
+  head: () => ({ meta: [{ title: "Users · Mini's n More" }] }),
+  component: AdminUsersPage,
+});
+
+type StaffUser = {
+  id: number;
+  login: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  activated: boolean;
+  authorities?: string[];
+};
+
+function displayName(user: StaffUser) {
+  return [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || user.login;
+}
+
+function AdminUsersPage() {
+  const { staffRole } = useAuth();
+  const roles = assignableRoles(staffRole);
+  const [users, setUsers] = useState<StaffUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<StaffRole>(roles[0] ?? "ROLE_SALES");
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const rows = await api.get<StaffUser[]>("/api/admin/users?page=0&size=200&sort=id,asc", { auth: true });
+      setUsers(Array.isArray(rows) ? rows : []);
+    } catch (error) {
+      showApiError(error, "Could not load users");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  useEffect(() => {
+    if (roles.length && !roles.includes(role)) setRole(roles[0]);
+  }, [roles, role]);
+
+  const invite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !roles.length) return;
+    setBusy(true);
+    try {
+      const login = email.trim().toLowerCase();
+      await api.post(
+        "/api/admin/users",
+        {
+          login,
+          email: login,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          langKey: "en",
+          activated: false,
+          authorities: [role],
+        },
+        { auth: true, unwrap: false },
+      );
+      toast.success("Invitation sent");
+      setFirstName("");
+      setLastName("");
+      setEmail("");
+      await load();
+    } catch (error) {
+      showApiError(error, "Could not send invitation");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveUser = async (user: StaffUser, patch: Partial<StaffUser> & { authorities?: string[] }) => {
+    try {
+      await api.put(
+        `/api/admin/users/${encodeURIComponent(user.login)}`,
+        {
+          id: user.id,
+          login: user.login,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          activated: user.activated,
+          langKey: "en",
+          authorities: user.authorities,
+          ...patch,
+        },
+        { auth: true, unwrap: false },
+      );
+      toast.success("User updated");
+      await load();
+    } catch (error) {
+      showApiError(error, "Could not update user");
+    }
+  };
+
+  const inviteRoleOptions = useMemo(() => roles, [roles]);
+
+  return (
+    <AdminPage eyebrow="Admin" title="Users" description="Invite staff and manage roles below your level.">
+      <form onSubmit={invite} className="glass-strong rounded-2xl p-5 grid gap-3 md:grid-cols-2 lg:grid-cols-5 items-end">
+        <Field label="First name">
+          <input className={inputCls()} value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+        </Field>
+        <Field label="Last name">
+          <input className={inputCls()} value={lastName} onChange={(e) => setLastName(e.target.value)} />
+        </Field>
+        <Field label="Email">
+          <input className={inputCls()} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        </Field>
+        <Field label="Role">
+          <select className={inputCls()} value={role} onChange={(e) => setRole(e.target.value as StaffRole)}>
+            {inviteRoleOptions.map((item) => (
+              <option key={item} value={item}>
+                {STAFF_ROLE_LABELS[item]}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <button
+          type="submit"
+          disabled={busy || !inviteRoleOptions.length}
+          className="rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm disabled:opacity-60"
+        >
+          {busy ? "Sending…" : "Send invitation"}
+        </button>
+      </form>
+
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-border">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2">Name</th>
+                <th className="px-3 py-2">Email</th>
+                <th className="px-3 py-2">Role</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((user) => {
+                const targetRole = primaryStaffRole(user.authorities);
+                const manageable = canManageStaff(staffRole, targetRole);
+                return (
+                  <tr key={user.id} className="border-t border-border/70">
+                    <td className="px-3 py-2 font-medium">{displayName(user)}</td>
+                    <td className="px-3 py-2">{user.email}</td>
+                    <td className="px-3 py-2">
+                      {manageable ? (
+                        <select
+                          className="rounded-xl border border-border bg-background px-2 py-1"
+                          value={targetRole ?? ""}
+                          onChange={(e) => void saveUser(user, { authorities: [e.target.value] })}
+                        >
+                          {assignableRoles(staffRole).map((item) => (
+                            <option key={item} value={item}>
+                              {STAFF_ROLE_LABELS[item]}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        (targetRole && STAFF_ROLE_LABELS[targetRole]) || "—"
+                      )}
+                    </td>
+                    <td className="px-3 py-2">{user.activated ? "Active" : "Pending"}</td>
+                    <td className="px-3 py-2">
+                      {manageable && user.activated ? (
+                        <button
+                          type="button"
+                          className="rounded-full border border-border px-3 py-1 text-xs"
+                          onClick={() => void saveUser(user, { activated: false })}
+                        >
+                          Deactivate
+                        </button>
+                      ) : manageable ? (
+                        <span className="text-xs text-muted-foreground">Waiting for invite</span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </AdminPage>
+  );
+}

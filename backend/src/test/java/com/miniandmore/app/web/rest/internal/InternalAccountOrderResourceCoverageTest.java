@@ -104,6 +104,9 @@ class InternalAccountOrderResourceCoverageTest {
     @MockitoBean
     private com.miniandmore.app.service.OrderCancellationService orderCancellationService;
 
+    @MockitoBean
+    private com.miniandmore.app.service.OrderShipmentService orderShipmentService;
+
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(resource, "razorpayKeyId", "rzp_test_livemode");

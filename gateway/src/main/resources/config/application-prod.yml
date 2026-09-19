@@ -91,7 +91,7 @@ spring:
             - id: miniandmore-commerce-api
               uri: http://127.0.0.1:8082
               predicates:
-                - Path=/api/v1/orders/**,/api/v1/account/**,/api/v1/payments,/api/v1/coupons/**,/api/v1/order-returns/**,/api/v1/admin/order-returns/**
+                - Path=/api/v1/orders/**,/api/v1/account/**,/api/v1/payments,/api/v1/coupons/**,/api/v1/order-returns/**,/api/v1/admin/order-returns/**,/api/v1/admin/orders,/api/v1/admin/orders/**
               metadata:
                 response-timeout: 120000
                 connect-timeout: 5000

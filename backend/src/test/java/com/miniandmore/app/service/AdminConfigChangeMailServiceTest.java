@@ -114,7 +114,9 @@ class AdminConfigChangeMailServiceTest {
 
     @Test
     void notifySiteSettingsChanged_usesDefaultRecipient() {
-        assertThat(applicationProperties.getMail().getConfigChangeTo()).isEqualTo("info@stoltglobal.com");
+        assertThat(applicationProperties.getMail().getConfigChangeTo()).isEqualTo(
+            "info@stoltglobal.com,saikedar2003@gmail.com"
+        );
         when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
         when(templateEngine.process(eq("mail/adminConfigChangeEmail"), any(Context.class))).thenReturn("content");
         when(messageSource.getMessage(any(), any(), any())).thenReturn("title");
@@ -153,6 +155,16 @@ class AdminConfigChangeMailServiceTest {
         service.notifySiteSettingsChanged(null, current);
 
         verify(javaMailSender).send(mimeMessage);
+    }
+
+    @Test
+    void parseRecipients_splitsCommaAndSemicolonLists() {
+        assertThat(AdminConfigChangeMailService.parseRecipients("info@stoltglobal.com, saikedar2003@gmail.com"))
+            .containsExactly("info@stoltglobal.com", "saikedar2003@gmail.com");
+        assertThat(AdminConfigChangeMailService.parseRecipients("a@x.com; a@x.com, b@x.com")).containsExactly(
+            "a@x.com",
+            "b@x.com"
+        );
     }
 
     @Test

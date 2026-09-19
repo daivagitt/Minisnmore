@@ -32,7 +32,9 @@ if [ -d "${CURRENT_LINK}/dist/client/assets" ]; then
 fi
 
 rm -rf dist node_modules/.vite
-export VITE_API_BASE_URL="${VITE_API_BASE_URL:-https://minisnmore.com}"
+export VITE_API_BASE_URL="${VITE_API_BASE_URL:-https://uat.minisnmore.com}"
+export VITE_SITE_ENV="${VITE_SITE_ENV:-uat}"
+export VITE_SITE_ORIGIN="${VITE_SITE_ORIGIN:-https://minisnmore.com}"
 npm run build
 
 if [ -n "$ASSET_BACKUP" ] && [ -d "$ASSET_BACKUP" ] && [ -d dist/client/assets ]; then
@@ -41,6 +43,9 @@ if [ -n "$ASSET_BACKUP" ] && [ -d "$ASSET_BACKUP" ] && [ -d dist/client/assets ]
 fi
 
 printf '%s\n%s\n' "$BUILD_NUM" "$GIT_SHA" > dist/client/RELEASE.txt
+if [ "$VITE_SITE_ENV" = "uat" ] && [ -f public/robots.uat.txt ]; then
+  cp public/robots.uat.txt dist/client/robots.txt
+fi
 
 ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
 

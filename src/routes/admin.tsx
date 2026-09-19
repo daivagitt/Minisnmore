@@ -5,9 +5,9 @@ import { ADMIN_NAV_ITEMS, filterAdminNavItems } from "@/lib/admin-nav";
 import {
   LayoutDashboard, Image as ImgIcon, Tag, BookOpen, FileText, Package, Plug, LogOut, Loader2,
   Folder, Home, EyeOff, Settings as SettingsIcon, ExternalLink, ShoppingCart, ReceiptText, Percent, RotateCcw, XCircle,
-  Users, Search,
+  Users, Search, type LucideIcon,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { staffHomePath } from "@/lib/staff-roles";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin · Mini's n More" }] }),
@@ -32,10 +32,11 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/admin/cancellations": XCircle,
   "/admin/returns": RotateCcw,
   "/admin/zoho": Plug,
+  "/admin/users": Users,
 };
 
 function AdminLayout() {
-  const { user, isAdmin, loading, signOut } = useAuth();
+  const { user, isAdmin, staffRole, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const [navQuery, setNavQuery] = useState("");
@@ -44,12 +45,23 @@ function AdminLayout() {
   useEffect(() => {
     if (loading) return;
     if (!user && path !== "/admin/login") navigate({ to: "/admin/login" });
-  }, [user, loading, path, navigate]);
+    if (user && !isAdmin && path !== "/admin/login") {
+      const home = staffHomePath(staffRole);
+      void navigate({ to: home as never });
+    }
+  }, [user, loading, path, navigate, isAdmin, staffRole]);
 
   // login route renders standalone
   if (path === "/admin/login") return <Outlet />;
 
   if (!loading && user && !isAdmin) {
+    if (staffRole) {
+      return (
+        <div className="grid place-items-center py-24">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      );
+    }
     return (
       <div className="px-4 max-w-md mx-auto">
         <div className="glass-strong rounded-[2rem] p-8 text-center">
@@ -91,7 +103,11 @@ function AdminLayout() {
             />
           </label>
         </div>
-        <nav className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain flex flex-col gap-1.5 pr-1 [scrollbar-width:thin]">
+        <nav
+          aria-label="Admin pages"
+          data-admin-nav-scroll
+          className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain flex flex-col gap-1.5 pr-1 [scrollbar-width:thin]"
+        >
           {nav.length === 0 ? (
             <div className="px-4 py-3 text-xs text-amber-100/70">No matching pages.</div>
           ) : nav.map((n) => {
@@ -110,14 +126,14 @@ function AdminLayout() {
               </Link>
             );
           })}
+        </nav>
+        <div className="relative shrink-0 pt-2 border-t border-white/15">
           <Link
             to="/"
-            className="relative mt-2 flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm text-amber-50/90 hover:bg-white/10 hover:text-white transition"
+            className="flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm text-amber-50/90 hover:bg-white/10 hover:text-white transition"
           >
             <ExternalLink className="h-4 w-4 text-amber-100/80" /> View storefront
           </Link>
-        </nav>
-        <div className="relative shrink-0 pt-3 border-t border-white/15">
           <button onClick={() => signOut()}
             className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm text-amber-50/90 hover:bg-white/10 hover:text-white transition">
             <LogOut className="h-4 w-4" /> Sign out

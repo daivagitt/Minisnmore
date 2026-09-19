@@ -7,16 +7,18 @@ import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.*;
 import com.miniandmore.app.domain.enumeration.DiscountType;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
+import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import com.miniandmore.app.security.AuthoritiesConstants;
 import com.miniandmore.app.security.SecurityUtils;
 import com.miniandmore.app.service.LedgerlySyncService;
-import com.miniandmore.app.service.OrderCancellationService;
+import com.miniandmore.app.service.OrderShipmentService;
 import com.miniandmore.app.service.OrderEventService;
 import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.service.BogoDiscountCalculator;
+import com.miniandmore.app.service.OrderCancellationService;
 import com.miniandmore.app.service.OrderTrackingStatusResolver;
 import com.miniandmore.app.service.ProductVariantSupport;
 import com.miniandmore.app.service.ProductVariantSupport.VariantRow;
@@ -84,6 +86,7 @@ public class InternalAccountOrderResource {
     private final OrderEventService orderEventService;
     private final RazorpayRefundService razorpayRefundService;
     private final OrderCancellationService orderCancellationService;
+    private final OrderShipmentService orderShipmentService;
     private final TransactionTemplate inventoryRestoreTransaction;
 
     @Value("${razorpay.key-id:DEMO}")
@@ -106,6 +109,7 @@ public class InternalAccountOrderResource {
         OrderEventService orderEventService,
         RazorpayRefundService razorpayRefundService,
         OrderCancellationService orderCancellationService,
+        OrderShipmentService orderShipmentService,
         PlatformTransactionManager transactionManager
     ) {
         this.dataAccess = dataAccess;
@@ -118,6 +122,7 @@ public class InternalAccountOrderResource {
         this.orderEventService = orderEventService;
         this.razorpayRefundService = razorpayRefundService;
         this.orderCancellationService = orderCancellationService;
+        this.orderShipmentService = orderShipmentService;
         this.inventoryRestoreTransaction = new TransactionTemplate(transactionManager);
     }
 
@@ -1381,6 +1386,17 @@ public class InternalAccountOrderResource {
                 } catch (Exception ex) {
                     LOG.warn("Zoho tracking refresh failed for {}: {}", order.getOrderNumber(), ex.getMessage());
                 }
+            }
+        }
+        if (order.getShipmentLogisticsMode() == ReturnLogisticsMode.XPRESSBEES && !orderShipmentService.isExpressBeesTrackingFresh(order)) {
+            try {
+                CustomerOrder pulled = orderShipmentService.refreshExpressBeesTracking(order);
+                if (pulled != order) {
+                    refreshed = true;
+                    order = pulled;
+                }
+            } catch (Exception ex) {
+                LOG.warn("ExpressBees tracking refresh failed for {}: {}", order.getOrderNumber(), ex.getMessage());
             }
         }
         if (refreshed) {

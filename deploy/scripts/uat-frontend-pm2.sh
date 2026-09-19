@@ -51,8 +51,10 @@ if [ -f /etc/mini-and-more/uat.env ]; then
 fi
 
 export VITE_API_BASE_URL="${VITE_API_BASE_URL:-https://uat.minisnmore.com}"
+export VITE_SITE_ENV="${VITE_SITE_ENV:-uat}"
+export VITE_SITE_ORIGIN="${VITE_SITE_ORIGIN:-https://minisnmore.com}"
 
-echo "=== Frontend build (VITE_API_BASE_URL=$VITE_API_BASE_URL) ==="
+echo "=== Frontend build (VITE_API_BASE_URL=$VITE_API_BASE_URL VITE_SITE_ENV=$VITE_SITE_ENV) ==="
 echo "Node: $(node -v 2>/dev/null || echo missing)  npm: $(npm -v 2>/dev/null || echo missing)"
 echo "Memory: $(free -h 2>/dev/null | awk '/Mem:/ {print $3 "/" $2}' || echo n/a)  $(date -u '+%H:%M:%S UTC')"
 echo "npm ci (5–15 min on UAT VPS; logs below — not frozen)..."
@@ -79,6 +81,9 @@ fi
 
 if [ -d dist/client ]; then
   printf '%s\n' "${BUILD_NUM:-local}" "${GIT_SHA:-local}" > dist/client/RELEASE.txt 2>/dev/null || true
+  if [ "$VITE_SITE_ENV" = "uat" ] && [ -f public/robots.uat.txt ]; then
+    cp public/robots.uat.txt dist/client/robots.txt
+  fi
 fi
 
 if ! command -v pm2 >/dev/null 2>&1; then

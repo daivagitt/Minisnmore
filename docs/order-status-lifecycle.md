@@ -57,7 +57,8 @@ COD orders are `CONFIRMED` at placement but `payment_status` stays `PENDING` unt
 | `pending` | Awaiting payment | Payment not `PAID` and order not cancelled |
 | `confirmed` | Order confirmed | Accepted, but wrapping has not yet been marked complete |
 | `hand_wrapped` | Hand-wrapped | A package was created for the linked Zoho sales order |
-| `shipped` | On the way | Tracking number, shipment date, or Zoho/Ledgerly shipped signal |
+| `awaiting_pickup` | Waiting for pickup | ExpressBees AWB/label exists, but the courier has not scanned pickup yet |
+| `shipped` | On the way | Courier pickup / in-transit, manual AWB, shipment date, or Zoho/Ledgerly shipped signal |
 | `delivered` | Delivered | Order `FULFILLED` or an explicit Zoho/Ledgerly delivered signal |
 | `cancelled` | Cancelled | Order `CANCELLED` or cancelled in external system |
 
@@ -65,6 +66,7 @@ COD orders are `CONFIRMED` at placement but `payment_status` stays `PENDING` unt
 
 - `status`, `payment_status`
 - `tracking_number`, `shipment_date`, `tracking_carrier`
+- `shipment_logistics_mode`, `shipment_carrier_status` (ExpressBees booked ≠ shipped)
 - `zoho_order_status` (from Zoho Books sales order / delivery challan pull)
 - `ledgerly_order_status` (from Ledgerly tracking pull)
 
@@ -126,9 +128,13 @@ Hand-wrapped (Zoho package created)
   status: HAND_WRAPPED
   tracking_status: hand_wrapped
 
-Shipped
+ExpressBees label booked
+  tracking_number set
+  tracking_status: awaiting_pickup  (not yet "On the way")
+
+Courier pickup / in-transit
   tracking_status: shipped
-  (+ tracking_number or shipment_date from ops / Zoho / Ledgerly)
+  (+ shipment_date from pickup scan, manual AWB, Zoho, or Ledgerly)
 
 Delivered
   status: FULFILLED

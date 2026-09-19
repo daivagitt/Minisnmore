@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.XpressBeesShipmentWebhookEvent;
-import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.XpressBeesShipmentWebhookEventRepository;
 import java.time.Instant;
@@ -25,20 +24,20 @@ public class XpressBeesShipmentWebhookHandlerService {
     private final ApplicationProperties applicationProperties;
     private final XpressBeesShipmentWebhookEventRepository eventRepository;
     private final CustomerOrderRepository orderRepository;
-    private final OrderEventService orderEventService;
+    private final OrderShipmentService orderShipmentService;
     private final ObjectMapper objectMapper;
 
     public XpressBeesShipmentWebhookHandlerService(
         ApplicationProperties applicationProperties,
         XpressBeesShipmentWebhookEventRepository eventRepository,
         CustomerOrderRepository orderRepository,
-        OrderEventService orderEventService,
+        OrderShipmentService orderShipmentService,
         ObjectMapper objectMapper
     ) {
         this.applicationProperties = applicationProperties;
         this.eventRepository = eventRepository;
         this.orderRepository = orderRepository;
-        this.orderEventService = orderEventService;
+        this.orderShipmentService = orderShipmentService;
         this.objectMapper = objectMapper;
     }
 
@@ -89,22 +88,17 @@ public class XpressBeesShipmentWebhookHandlerService {
             return ZohoWebhookSupport.duplicateEventResult(eventId);
         }
 
-        order.setShipmentCarrierStatus(normalized);
-        if (isDelivered(normalized) && canMarkDelivered(order)) {
-            order.setShipmentDeliveredAt(Instant.now());
-            order.setStatus(OrderStatus.FULFILLED);
-        }
-        CustomerOrder saved = orderRepository.save(order);
-        orderEventService.syncLifecycleEvents(saved);
-        event.setLocalStatus(isDelivered(normalized) ? "delivered" : normalized);
+        CustomerOrder saved = orderShipmentService.applyProviderStatus(order, providerStatus);
+        String localStatus = eventStatus(XpressBeesShipmentStatus.normalize(providerStatus));
+        event.setLocalStatus(localStatus);
         eventRepository.save(event);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("ok", true);
         result.put("eventId", eventId);
-        result.put("order_number", order.getOrderNumber());
+        result.put("order_number", saved.getOrderNumber());
         result.put("provider_status", providerStatus);
-        result.put("local_status", eventStatus(normalized));
+        result.put("local_status", localStatus);
         return result;
     }
 
@@ -138,16 +132,8 @@ public class XpressBeesShipmentWebhookHandlerService {
         return ZohoWebhookSupport.stringValue(data.get(key));
     }
 
-    private static boolean canMarkDelivered(CustomerOrder order) {
-        return order.getStatus() != OrderStatus.CANCELLED && order.getShipmentCancelledAt() == null;
-    }
-
-    private static boolean isDelivered(String status) {
-        return "delivered".equals(status) || "delivery_done".equals(status) || "delivered_to_customer".equals(status);
-    }
-
     private static String eventStatus(String status) {
-        return isDelivered(status) ? "delivered" : status;
+        return XpressBeesShipmentStatus.isDelivered(status) ? "delivered" : status;
     }
 
     private static String normalize(String status) {

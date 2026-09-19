@@ -63,6 +63,7 @@ public class SecurityConfiguration {
                     .pathMatchers("/api/register").permitAll()
                     .pathMatchers("/api/activate").permitAll()
                     .pathMatchers("/api/account/reset-password/**").permitAll()
+                    .pathMatchers("/api/account/invite/finish").permitAll()
                     .pathMatchers("/api/account/resend-activation").permitAll()
                     .pathMatchers("/api/users").permitAll()
                     // Social login (OAuth2 authorization + callback)
@@ -74,8 +75,8 @@ public class SecurityConfiguration {
                     .pathMatchers("/management/prometheus").permitAll()
                     .pathMatchers("/management/**").hasAuthority(AuthoritiesConstants.ADMIN)
                     // Gateway user administration
-                    .pathMatchers("/api/admin/**").hasAuthority(AuthoritiesConstants.ADMIN)
-                    .pathMatchers("/api/authorities/**").hasAuthority(AuthoritiesConstants.ADMIN)
+                    .pathMatchers("/api/admin/**").hasAnyAuthority(AuthoritiesConstants.ADMIN, AuthoritiesConstants.SUPER_ADMIN)
+                    .pathMatchers("/api/authorities/**").hasAnyAuthority(AuthoritiesConstants.ADMIN, AuthoritiesConstants.SUPER_ADMIN)
                     .pathMatchers("/api/**").authenticated()
                     .anyExchange().permitAll()
             )

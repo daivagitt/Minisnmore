@@ -25,6 +25,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { to: "/admin/cancellations", label: "Cancellations", keywords: "cancel request refund" },
   { to: "/admin/returns", label: "Order returns", keywords: "exchange refund pickup" },
   { to: "/admin/zoho", label: "Zoho settings", keywords: "ledgerly erp integration" },
+  { to: "/admin/users", label: "Users", keywords: "staff invite roles access" },
 ];
 
 export function adminNavHaystack(item: AdminNavItem): string {

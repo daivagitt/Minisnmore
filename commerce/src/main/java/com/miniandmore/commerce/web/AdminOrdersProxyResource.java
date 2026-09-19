@@ -53,6 +53,22 @@ public class AdminOrdersProxyResource {
         );
     }
 
+    @PostMapping("/{orderNumber}/package-rates")
+    public ResponseEntity<String> packageRates(@PathVariable String orderNumber, @RequestBody Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/admin/orders/{orderNumber}/package-rates", orderNumber),
+            body
+        );
+    }
+
+    @PostMapping("/{orderNumber}/complete-package")
+    public ResponseEntity<String> completePackage(@PathVariable String orderNumber, @RequestBody Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/admin/orders/{orderNumber}/complete-package", orderNumber),
+            body
+        );
+    }
+
     @PostMapping("/{orderNumber}/cancel-shipment")
     public ResponseEntity<String> cancelShipment(@PathVariable String orderNumber, @RequestBody Object body) {
         return catalog.post(

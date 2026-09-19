@@ -206,26 +206,85 @@ class UserServiceTest {
     }
 
     @Test
-    void createUser_persistsActivatedUser() {
+    void createUser_invitesInactiveStaffUser() {
         AdminUserDTO dto = adminDto("created", "created@localhost");
-        dto.setAuthorities(Set.of(AuthoritiesConstants.USER));
-        Authority authority = new Authority();
-        authority.setName(AuthoritiesConstants.USER);
-        org.mockito.Mockito.doReturn(Mono.just(authority)).when(authorityRepository).findById(AuthoritiesConstants.USER);
-        org.mockito.Mockito.doReturn(Mono.empty()).when(userRepository).deleteUserAuthorities(anyLong());
+        dto.setAuthorities(Set.of(AuthoritiesConstants.SALES));
         User saved = sampleUser();
-        saved.setLogin("newuser");
-        saved.setEmail("new@localhost");
-        org.mockito.Mockito.doReturn(Mono.just(saved)).when(userRepository).save(org.mockito.Mockito.any(User.class));
+        saved.setLogin("created");
+        saved.setEmail("created@localhost");
+        saved.setActivated(false);
+        org.mockito.Mockito
+            .doAnswer(invocation -> {
+                User persisted = invocation.getArgument(0);
+                persisted.setId(1L);
+                return Mono.just(persisted);
+            })
+            .when(userRepository)
+            .save(org.mockito.Mockito.any(User.class));
 
-        StepVerifier.create(userService.createUser(dto).contextWrite(securityContext())).expectNextCount(1).verifyComplete();
+        StepVerifier.create(userService.createUser(dto).contextWrite(securityContext()))
+            .assertNext(created -> {
+                assertThat(created.isActivated()).isFalse();
+                assertThat(created.getActivationKey()).isNotBlank();
+            })
+            .verifyComplete();
+    }
+
+    @Test
+    void completeInvite_activatesStaffAndClearsKey() {
+        user.setActivated(false);
+        user.setActivationKey("invite-key");
+        Authority sales = new Authority();
+        sales.setName(AuthoritiesConstants.SALES);
+        user.setAuthorities(Set.of(sales));
+        when(userRepository.findOneByActivationKey("invite-key")).thenReturn(Mono.just(user));
+
+        StepVerifier.create(userService.completeInvite("newpass123", "invite-key"))
+            .assertNext(activated -> {
+                assertThat(activated.isActivated()).isTrue();
+                assertThat(activated.getActivationKey()).isNull();
+                assertThat(activated.getPassword()).isEqualTo("encoded");
+            })
+            .verifyComplete();
+    }
+
+    @Test
+    void completeInvite_rejectsShopperActivationKey() {
+        user.setActivated(false);
+        user.setActivationKey("shopper-key");
+        when(userRepository.findOneByActivationKey("shopper-key")).thenReturn(Mono.just(user));
+
+        StepVerifier.create(userService.completeInvite("newpass123", "shopper-key")).verifyComplete();
+        verify(userRepository, never()).save(user);
+    }
+
+    @Test
+    void updateStaffUser_rejectsActivatingPendingInvite() {
+        user.setActivated(false);
+        user.setActivationKey("invite-key");
+        Authority sales = new Authority();
+        sales.setName(AuthoritiesConstants.SALES);
+        user.setAuthorities(Set.of(sales));
+        AdminUserDTO dto = adminDto("user", "user@localhost");
+        dto.setId(1L);
+        dto.setActivated(true);
+        dto.setAuthorities(Set.of(AuthoritiesConstants.SALES));
+        when(userRepository.findById(1L)).thenReturn(Mono.just(user));
+
+        StepVerifier.create(userService.updateStaffUser(dto, Set.of(AuthoritiesConstants.SUPER_ADMIN)))
+            .expectErrorSatisfies(error -> {
+                assertThat(error).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+                assertThat(error.getMessage()).contains("invitation email");
+            })
+            .verify();
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
     void updateUser_updatesFields() {
         AdminUserDTO dto = adminDto("user", "user@localhost");
         dto.setId(1L);
-        dto.setAuthorities(Set.of(AuthoritiesConstants.USER));
+        dto.setAuthorities(Set.of(AuthoritiesConstants.SALES));
         Authority authority = new Authority();
         authority.setName(AuthoritiesConstants.USER);
         when(userRepository.findById(1L)).thenReturn(Mono.just(user));
@@ -283,7 +342,7 @@ class UserServiceTest {
 
     @Test
     void getAllManagedUsers_mapsToDto() {
-        when(userRepository.findAllByIdNotNull(PageRequest.of(0, 20))).thenReturn(Flux.just(user));
+        when(userRepository.findAllStaffUsers(20, 0)).thenReturn(Flux.just(user));
 
         StepVerifier.create(userService.getAllManagedUsers(PageRequest.of(0, 20)))
             .assertNext(dto -> assertThat(dto.getLogin()).isEqualTo("user"))
@@ -298,8 +357,15 @@ class UserServiceTest {
     }
 
     @Test
+    void countPublicUsers_delegatesToActivatedCount() {
+        when(userRepository.countActivatedUsers()).thenReturn(Mono.just(7L));
+
+        StepVerifier.create(userService.countPublicUsers()).expectNext(7L).verifyComplete();
+    }
+
+    @Test
     void countManagedUsers_delegatesToRepository() {
-        when(userRepository.count()).thenReturn(Mono.just(3L));
+        when(userRepository.countStaffUsers()).thenReturn(Mono.just(3L));
 
         StepVerifier.create(userService.countManagedUsers()).expectNext(3L).verifyComplete();
     }
@@ -333,6 +399,28 @@ class UserServiceTest {
     }
 
     @Test
+    void removeNotActivatedUsers_deletesStaleStaffInvites() {
+        User staleStaff = sampleUser();
+        staleStaff.setActivated(false);
+        Authority sales = new Authority();
+        sales.setName(AuthoritiesConstants.SALES);
+        staleStaff.setAuthorities(Set.of(sales));
+        when(userAuthoritiesLoader.withAuthorities(staleStaff)).thenReturn(Mono.just(staleStaff));
+        when(userRepository.findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(any(Instant.class))).thenAnswer(invocation -> {
+            Instant cutoff = invocation.getArgument(0);
+            if (cutoff.isBefore(Instant.now().minus(13, ChronoUnit.DAYS))) {
+                return Flux.just(staleStaff);
+            }
+            return Flux.empty();
+        });
+        when(userRepository.delete(staleStaff)).thenReturn(Mono.empty());
+
+        userService.removeNotActivatedUsers();
+
+        verify(userRepository).delete(staleStaff);
+    }
+
+    @Test
     void removeNotActivatedUsers_blocksUntilComplete() {
         when(
             userRepository.findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(any(Instant.class))
@@ -340,7 +428,8 @@ class UserServiceTest {
 
         userService.removeNotActivatedUsers();
 
-        verify(userRepository).findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(any(Instant.class));
+        verify(userRepository, org.mockito.Mockito.times(2))
+            .findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(any(Instant.class));
     }
 
     @Test

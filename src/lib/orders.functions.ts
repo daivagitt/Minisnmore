@@ -647,6 +647,18 @@ export type AdminOrderRow = AdminCodOrderRow & {
   pending_cancellation?: boolean;
   can_book_shipment?: boolean;
   can_book_shipment_with_override?: boolean;
+  can_book_expressbees_shipment?: boolean;
+  can_book_expressbees_shipment_with_override?: boolean;
+  can_complete_package?: boolean;
+  default_package_weight_grams?: number | null;
+  package_weight_grams?: number | null;
+  package_length_cm?: number | null;
+  package_breadth_cm?: number | null;
+  package_height_cm?: number | null;
+  package_chargeable_weight_grams?: number | null;
+  package_courier_id?: string;
+  package_courier_name?: string;
+  packed_at?: string;
   payment_status: string;
   payment_method: string;
   zoho_sync_status: string;
@@ -749,6 +761,59 @@ export async function bookAdminOrderShipment(
 ) {
   return api.post(
     `/api/v1/admin/orders/${encodeURIComponent(orderNumber)}/book-shipment`,
+    payload,
+    { auth: true },
+  );
+}
+
+export type PackageCourierOption = {
+  id: string;
+  name: string;
+  edd_days?: number;
+  eta?: string;
+  rate?: number | string | null;
+  preferred?: boolean;
+};
+
+export type PackageRatesResult = {
+  actual_weight_grams: number;
+  volumetric_weight_grams: number;
+  chargeable_weight_grams: number;
+  volumetric_divisor?: number;
+  preferred_courier_id?: string | null;
+  preferred_courier_name?: string;
+  couriers: PackageCourierOption[];
+};
+
+export async function previewAdminOrderPackageRates(
+  orderNumber: string,
+  payload: {
+    weight_grams?: number;
+    length_cm: number;
+    breadth_cm: number;
+    height_cm: number;
+  },
+) {
+  return api.post<PackageRatesResult>(
+    `/api/v1/admin/orders/${encodeURIComponent(orderNumber)}/package-rates`,
+    payload,
+    { auth: true },
+  );
+}
+
+export async function completeAdminOrderPackage(
+  orderNumber: string,
+  payload: {
+    weight_grams?: number;
+    length_cm: number;
+    breadth_cm: number;
+    height_cm: number;
+    courier_id?: string;
+    courier_name?: string;
+  },
+) {
+  return api.post(
+    `/api/v1/admin/orders/${encodeURIComponent(orderNumber)}/complete-package`,
     payload,
     { auth: true },
   );

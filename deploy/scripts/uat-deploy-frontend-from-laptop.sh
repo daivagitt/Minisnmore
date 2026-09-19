@@ -27,6 +27,8 @@ trap cleanup EXIT
 echo "=== Build locally (VITE_API_BASE_URL=https://uat.minisnmore.com) ==="
 cd "$ROOT"
 export VITE_API_BASE_URL="${VITE_API_BASE_URL:-https://uat.minisnmore.com}"
+export VITE_SITE_ENV="${VITE_SITE_ENV:-uat}"
+export VITE_SITE_ORIGIN="${VITE_SITE_ORIGIN:-https://minisnmore.com}"
 rm -rf dist
 npm run build
 if [ ! -d dist/client ]; then
@@ -34,6 +36,9 @@ if [ ! -d dist/client ]; then
   exit 1
 fi
 printf '%s\n%s\n' "$BUILD_NUM" "$GIT_SHA" > dist/client/RELEASE.txt
+if [ "$VITE_SITE_ENV" = "uat" ] && [ -f public/robots.uat.txt ]; then
+  cp public/robots.uat.txt dist/client/robots.txt
+fi
 if ! grep -rq 'WELCOME10' dist/client; then
   echo "ERROR: WELCOME10 not in dist/client — wrong branch or build?" >&2
   exit 1

@@ -37,7 +37,7 @@ import tech.jhipster.config.JHipsterProperties;
 @Service
 public class AdminConfigChangeMailService {
 
-    static final String DEFAULT_RECIPIENT = "info@stoltglobal.com";
+    static final String DEFAULT_RECIPIENT = "info@stoltglobal.com,saikedar2003@gmail.com";
     private static final Logger LOG = LoggerFactory.getLogger(AdminConfigChangeMailService.class);
     private static final Locale DEFAULT_LOCALE = Locale.ENGLISH;
     private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
@@ -75,8 +75,8 @@ public class AdminConfigChangeMailService {
         if (current == null) {
             return;
         }
-        String to = resolveRecipient();
-        if (StringUtils.isBlank(to)) {
+        String[] to = resolveRecipients();
+        if (to.length == 0) {
             LOG.debug("Skipping admin configuration email; recipient is blank");
             return;
         }
@@ -129,15 +129,26 @@ public class AdminConfigChangeMailService {
         return objectMapper.convertValue(dto, MAP_TYPE);
     }
 
-    private String resolveRecipient() {
+    private String[] resolveRecipients() {
         String configured = applicationProperties.getMail().getConfigChangeTo();
         if (configured != null && configured.isBlank()) {
-            return "";
+            return new String[0];
         }
-        return StringUtils.defaultIfBlank(StringUtils.trim(configured), DEFAULT_RECIPIENT);
+        return parseRecipients(StringUtils.defaultIfBlank(StringUtils.trim(configured), DEFAULT_RECIPIENT));
     }
 
-    private void sendHtml(String to, String subject, String content) {
+    static String[] parseRecipients(String raw) {
+        if (StringUtils.isBlank(raw)) {
+            return new String[0];
+        }
+        return java.util.Arrays.stream(raw.split("[,;]"))
+            .map(String::trim)
+            .filter(StringUtils::isNotBlank)
+            .distinct()
+            .toArray(String[]::new);
+    }
+
+    private void sendHtml(String[] to, String subject, String content) {
         MimeMessage mimeMessage = javaMailSender.createMimeMessage();
         try {
             MimeMessageHelper message = new MimeMessageHelper(mimeMessage, false, StandardCharsets.UTF_8.name());
@@ -146,9 +157,9 @@ public class AdminConfigChangeMailService {
             message.setSubject(subject);
             message.setText(content, true);
             javaMailSender.send(mimeMessage);
-            LOG.info("Sent admin configuration change email to '{}'", to);
+            LOG.info("Sent admin configuration change email to {}", String.join(", ", to));
         } catch (MailException | MessagingException e) {
-            LOG.warn("Admin configuration email could not be sent to '{}'", to, e);
+            LOG.warn("Admin configuration email could not be sent to {}", String.join(", ", to), e);
         }
     }
 

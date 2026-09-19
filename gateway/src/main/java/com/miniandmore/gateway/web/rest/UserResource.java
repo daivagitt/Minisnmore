@@ -4,6 +4,8 @@ import com.miniandmore.gateway.config.Constants;
 import com.miniandmore.gateway.domain.User;
 import com.miniandmore.gateway.repository.UserRepository;
 import com.miniandmore.gateway.security.AuthoritiesConstants;
+import com.miniandmore.gateway.security.SecurityUtils;
+import com.miniandmore.gateway.security.StaffRoles;
 import com.miniandmore.gateway.service.MailService;
 import com.miniandmore.gateway.service.UserService;
 import com.miniandmore.gateway.service.dto.AdminUserDTO;
@@ -18,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -109,7 +112,7 @@ public class UserResource {
      * @throws BadRequestAlertException {@code 400 (Bad Request)} if the login or email is already in use.
      */
     @PostMapping("/users")
-    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
+    @PreAuthorize("hasAnyAuthority(\"" + AuthoritiesConstants.ADMIN + "\", \"" + AuthoritiesConstants.SUPER_ADMIN + "\")")
     public Mono<ResponseEntity<User>> createUser(@Valid @RequestBody AdminUserDTO userDTO) {
         LOG.debug("REST request to save User : {}", userDTO);
 
@@ -117,23 +120,29 @@ public class UserResource {
             throw new BadRequestAlertException("A new user cannot already have an ID", "userManagement", "idexists");
             // Lowercase the user login before comparing with database
         }
-        return userRepository
-            .findOneByLogin(userDTO.getLogin().toLowerCase())
-            .hasElement()
-            .flatMap(loginExists -> {
-                if (Boolean.TRUE.equals(loginExists)) {
-                    return Mono.error(new LoginAlreadyUsedException());
-                }
-                return userRepository.findOneByEmailIgnoreCase(userDTO.getEmail());
+        return currentActorAuthorities()
+            .flatMap(actor -> {
+                StaffRoles.requireAssignable(actor, userDTO.getAuthorities());
+                return userRepository
+                    .findOneByLogin(userDTO.getLogin().toLowerCase())
+                    .hasElement()
+                    .flatMap(loginExists -> {
+                        if (Boolean.TRUE.equals(loginExists)) {
+                            return Mono.error(new LoginAlreadyUsedException());
+                        }
+                        return userRepository.findOneByEmailIgnoreCase(userDTO.getEmail());
+                    })
+                    .hasElement()
+                    .flatMap(emailExists -> {
+                        if (Boolean.TRUE.equals(emailExists)) {
+                            return Mono.error(new EmailAlreadyUsedException());
+                        }
+                        return userService.createStaffUser(userDTO, actor);
+                    });
             })
-            .hasElement()
-            .flatMap(emailExists -> {
-                if (Boolean.TRUE.equals(emailExists)) {
-                    return Mono.error(new EmailAlreadyUsedException());
-                }
-                return userService.createUser(userDTO);
-            })
-            .doOnSuccess(mailService::sendCreationEmail)
+            .doOnSuccess(user ->
+                mailService.sendInvitationEmail(user, StaffRoles.displayName(StaffRoles.primaryRole(StaffRoles.names(user))))
+            )
             .map(user -> {
                 try {
                     return ResponseEntity.created(new URI("/api/admin/users/" + user.getLogin()))
@@ -154,30 +163,33 @@ public class UserResource {
      * @throws LoginAlreadyUsedException {@code 400 (Bad Request)} if the login is already in use.
      */
     @PutMapping({ "/users", "/users/{login}" })
-    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
+    @PreAuthorize("hasAnyAuthority(\"" + AuthoritiesConstants.ADMIN + "\", \"" + AuthoritiesConstants.SUPER_ADMIN + "\")")
     public Mono<ResponseEntity<AdminUserDTO>> updateUser(
         @PathVariable(name = "login", required = false) @Pattern(regexp = Constants.LOGIN_REGEX) String login,
         @Valid @RequestBody AdminUserDTO userDTO
     ) {
         LOG.debug("REST request to update User : {}", userDTO);
-        return userRepository
-            .findOneByEmailIgnoreCase(userDTO.getEmail())
-            .filter(user -> !user.getId().equals(userDTO.getId()))
-            .hasElement()
-            .flatMap(emailExists -> {
-                if (Boolean.TRUE.equals(emailExists)) {
-                    return Mono.error(new EmailAlreadyUsedException());
-                }
-                return userRepository.findOneByLogin(userDTO.getLogin().toLowerCase());
-            })
-            .filter(user -> !user.getId().equals(userDTO.getId()))
-            .hasElement()
-            .flatMap(loginExists -> {
-                if (Boolean.TRUE.equals(loginExists)) {
-                    return Mono.error(new LoginAlreadyUsedException());
-                }
-                return userService.updateUser(userDTO);
-            })
+        return currentActorAuthorities()
+            .flatMap(actor ->
+                userRepository
+                    .findOneByEmailIgnoreCase(userDTO.getEmail())
+                    .filter(user -> !user.getId().equals(userDTO.getId()))
+                    .hasElement()
+                    .flatMap(emailExists -> {
+                        if (Boolean.TRUE.equals(emailExists)) {
+                            return Mono.error(new EmailAlreadyUsedException());
+                        }
+                        return userRepository.findOneByLogin(userDTO.getLogin().toLowerCase());
+                    })
+                    .filter(user -> !user.getId().equals(userDTO.getId()))
+                    .hasElement()
+                    .flatMap(loginExists -> {
+                        if (Boolean.TRUE.equals(loginExists)) {
+                            return Mono.error(new LoginAlreadyUsedException());
+                        }
+                        return userService.updateStaffUser(userDTO, actor);
+                    })
+            )
             .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)))
             .map(user ->
                 ResponseEntity.ok()
@@ -194,7 +206,7 @@ public class UserResource {
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body all users.
      */
     @GetMapping("/users")
-    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
+    @PreAuthorize("hasAnyAuthority(\"" + AuthoritiesConstants.ADMIN + "\", \"" + AuthoritiesConstants.SUPER_ADMIN + "\")")
     public Mono<ResponseEntity<Flux<AdminUserDTO>>> getAllUsers(
         @org.springdoc.core.annotations.ParameterObject ServerHttpRequest request,
         @org.springdoc.core.annotations.ParameterObject Pageable pageable
@@ -227,7 +239,7 @@ public class UserResource {
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the "login" user, or with status {@code 404 (Not Found)}.
      */
     @GetMapping("/users/{login}")
-    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
+    @PreAuthorize("hasAnyAuthority(\"" + AuthoritiesConstants.ADMIN + "\", \"" + AuthoritiesConstants.SUPER_ADMIN + "\")")
     public Mono<AdminUserDTO> getUser(@PathVariable("login") String login) {
         LOG.debug("REST request to get User : {}", login);
         return userService
@@ -243,15 +255,20 @@ public class UserResource {
      * @return the {@link ResponseEntity} with status {@code 204 (NO_CONTENT)}.
      */
     @DeleteMapping("/users/{login}")
-    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
+    @PreAuthorize("hasAnyAuthority(\"" + AuthoritiesConstants.ADMIN + "\", \"" + AuthoritiesConstants.SUPER_ADMIN + "\")")
     public Mono<ResponseEntity<Void>> deleteUser(@PathVariable("login") @Pattern(regexp = Constants.LOGIN_REGEX) String login) {
         LOG.debug("REST request to delete User: {}", login);
-        return userService
-            .deleteUser(login)
+        return currentActorAuthorities()
+            .flatMap(actor -> userService.deleteStaffUser(login, actor))
             .then(
                 Mono.just(
                     ResponseEntity.noContent().headers(HeaderUtil.createAlert(applicationName, "userManagement.deleted", login)).build()
                 )
             );
+    }
+
+    private Mono<Set<String>> currentActorAuthorities() {
+        return SecurityUtils.getCurrentUserAuthorities()
+            .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "Not authenticated")));
     }
 }

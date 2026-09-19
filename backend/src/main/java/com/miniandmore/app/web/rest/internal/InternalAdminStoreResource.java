@@ -18,8 +18,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/internal/v1/admin")
-@PreAuthorize("hasAuthority('ROLE_ADMIN')")
 public class InternalAdminStoreResource {
+
+    private static final String CMS_ADMIN = "hasAuthority('ROLE_ADMIN')";
 
     private static final Logger LOG = LoggerFactory.getLogger(InternalAdminStoreResource.class);
 
@@ -116,6 +117,7 @@ public class InternalAdminStoreResource {
     }
 
     @GetMapping("/dashboard")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<Map<String, Object>> dashboard() {
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("categories", categoryRepository.count());
@@ -141,16 +143,19 @@ public class InternalAdminStoreResource {
     }
 
     @GetMapping("/categories")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<List<CategoryDTO>> categories() {
         return ApiResponse.ok(categoryRepository.findAllByOrderBySortOrderAsc().stream().map(categoryMapper::toDto).toList());
     }
 
     @PostMapping("/categories")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<CategoryDTO> createCategory(@Valid @RequestBody CategoryDTO dto) {
         return ApiResponse.ok(categoryService.save(dto));
     }
 
     @PutMapping("/categories/{id}")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<CategoryDTO> updateCategory(@PathVariable Long id, @Valid @RequestBody CategoryDTO dto) {
         requireExists(id, categoryRepository::existsById, "Category");
         dto.setId(id);
@@ -158,6 +163,7 @@ public class InternalAdminStoreResource {
     }
 
     @DeleteMapping("/categories/{id}")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<Map<String, Boolean>> deleteCategory(@PathVariable Long id) {
         requireExists(id, categoryRepository::existsById, "Category");
         if (productRepository.countByCategory_Id(id) > 0) {
@@ -168,11 +174,13 @@ public class InternalAdminStoreResource {
     }
 
     @GetMapping("/products")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SALES')")
     public ApiResponse<List<ProductDTO>> products() {
         return ApiResponse.ok(productRepository.findAllWithCategoryOrderBySortOrder().stream().map(productMapper::toDto).toList());
     }
 
     @PostMapping("/products")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ApiResponse<ProductDTO> createProduct(@Valid @RequestBody ProductDTO dto) {
         ProductDTO saved = productService.save(dto);
         scheduleLedgerlyProductSync(saved.getId());
@@ -181,6 +189,7 @@ public class InternalAdminStoreResource {
     }
 
     @PutMapping("/products/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ApiResponse<ProductDTO> updateProduct(@PathVariable Long id, @Valid @RequestBody ProductDTO dto) {
         requireExists(id, productRepository::existsById, "Product");
         dto.setId(id);
@@ -191,6 +200,7 @@ public class InternalAdminStoreResource {
     }
 
     @DeleteMapping("/products/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ApiResponse<Map<String, Boolean>> deleteProduct(@PathVariable Long id) {
         requireExists(id, productRepository::existsById, "Product");
         ledgerlySyncService.notifyLedgerlyBeforeStoreDelete(id);
@@ -199,22 +209,26 @@ public class InternalAdminStoreResource {
     }
 
     @PostMapping("/products/{id}/clear-variant-photos")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ApiResponse<ProductDTO> clearVariantPhotos(@PathVariable Long id) {
         requireExists(id, productRepository::existsById, "Product");
         return ApiResponse.ok(productService.clearVariantPhotos(id));
     }
 
     @GetMapping("/blog-posts")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<List<BlogPostDTO>> blogPosts() {
         return ApiResponse.ok(blogPostRepository.findAllByOrderByIdDesc().stream().map(blogPostMapper::toDto).toList());
     }
 
     @PostMapping("/blog-posts")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<BlogPostDTO> createBlogPost(@Valid @RequestBody BlogPostDTO dto) {
         return ApiResponse.ok(blogPostService.save(dto));
     }
 
     @PutMapping("/blog-posts/{id}")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<BlogPostDTO> updateBlogPost(@PathVariable Long id, @Valid @RequestBody BlogPostDTO dto) {
         requireExists(id, blogPostRepository::existsById, "Blog post");
         dto.setId(id);
@@ -222,6 +236,7 @@ public class InternalAdminStoreResource {
     }
 
     @DeleteMapping("/blog-posts/{id}")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<Map<String, Boolean>> deleteBlogPost(@PathVariable Long id) {
         requireExists(id, blogPostRepository::existsById, "Blog post");
         blogPostService.delete(id);
@@ -229,16 +244,19 @@ public class InternalAdminStoreResource {
     }
 
     @GetMapping("/banners")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<List<BannerDTO>> banners() {
         return ApiResponse.ok(bannerRepository.findAllByOrderBySortOrderAsc().stream().map(bannerMapper::toDto).toList());
     }
 
     @PostMapping("/banners")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<BannerDTO> createBanner(@Valid @RequestBody BannerDTO dto) {
         return ApiResponse.ok(bannerService.save(dto));
     }
 
     @PutMapping("/banners/{id}")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<BannerDTO> updateBanner(@PathVariable Long id, @Valid @RequestBody BannerDTO dto) {
         requireExists(id, bannerRepository::existsById, "Banner");
         dto.setId(id);
@@ -246,6 +264,7 @@ public class InternalAdminStoreResource {
     }
 
     @DeleteMapping("/banners/{id}")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<Map<String, Boolean>> deleteBanner(@PathVariable Long id) {
         requireExists(id, bannerRepository::existsById, "Banner");
         bannerService.delete(id);
@@ -253,11 +272,13 @@ public class InternalAdminStoreResource {
     }
 
     @GetMapping("/home-sections")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<List<HomeSectionDTO>> homeSections() {
         return ApiResponse.ok(homeSectionRepository.findAllByOrderBySortOrderAsc().stream().map(homeSectionMapper::toDto).toList());
     }
 
     @PutMapping("/home-sections/{id}")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<HomeSectionDTO> updateHomeSection(@PathVariable Long id, @Valid @RequestBody HomeSectionDTO dto) {
         requireExists(id, homeSectionRepository::existsById, "Home section");
         dto.setId(id);
@@ -265,11 +286,13 @@ public class InternalAdminStoreResource {
     }
 
     @GetMapping("/page-visibility")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<List<PageVisibilityDTO>> pageVisibility() {
         return ApiResponse.ok(pageVisibilityRepository.findAllByOrderByPageKeyAsc().stream().map(pageVisibilityMapper::toDto).toList());
     }
 
     @PutMapping("/page-visibility/{id}")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<PageVisibilityDTO> updatePageVisibility(@PathVariable Long id, @Valid @RequestBody PageVisibilityDTO dto) {
         requireExists(id, pageVisibilityRepository::existsById, "Page visibility");
         dto.setId(id);
@@ -277,11 +300,13 @@ public class InternalAdminStoreResource {
     }
 
     @GetMapping("/site-settings")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<SiteSettingDTO> siteSettings() {
         return ApiResponse.ok(siteSettingRepository.findFirstByOrderByIdAsc().map(siteSettingMapper::toDto).orElse(null));
     }
 
     @PutMapping("/site-settings")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<SiteSettingDTO> updateSiteSettings(@Valid @RequestBody SiteSettingDTO dto) {
         if (dto.getId() == null) {
             siteSettingRepository.findFirstByOrderByIdAsc().ifPresent(existing -> dto.setId(existing.getId()));
@@ -293,16 +318,19 @@ public class InternalAdminStoreResource {
     }
 
     @GetMapping("/policies")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<List<PolicyDTO>> policies() {
         return ApiResponse.ok(policyRepository.findAllByOrderBySlugAsc().stream().map(policyMapper::toDto).toList());
     }
 
     @PostMapping("/policies")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<PolicyDTO> createPolicy(@Valid @RequestBody PolicyDTO dto) {
         return ApiResponse.ok(policyService.save(dto));
     }
 
     @PutMapping("/policies/{id}")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<PolicyDTO> updatePolicy(@PathVariable Long id, @Valid @RequestBody PolicyDTO dto) {
         requireExists(id, policyRepository::existsById, "Policy");
         dto.setId(id);
@@ -310,6 +338,7 @@ public class InternalAdminStoreResource {
     }
 
     @DeleteMapping("/policies/{id}")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<Map<String, Boolean>> deletePolicy(@PathVariable Long id) {
         requireExists(id, policyRepository::existsById, "Policy");
         policyService.delete(id);
@@ -317,16 +346,19 @@ public class InternalAdminStoreResource {
     }
 
     @GetMapping("/coupons")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<List<CouponDTO>> coupons() {
         return ApiResponse.ok(couponRepository.findAllByOrderByIdDesc().stream().map(couponMapper::toDto).toList());
     }
 
     @PostMapping("/coupons")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<CouponDTO> createCoupon(@Valid @RequestBody CouponDTO dto) {
         return ApiResponse.ok(couponService.save(dto));
     }
 
     @PutMapping("/coupons/{id}")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<CouponDTO> updateCoupon(@PathVariable Long id, @Valid @RequestBody CouponDTO dto) {
         requireExists(id, couponRepository::existsById, "Coupon");
         dto.setId(id);
@@ -334,6 +366,7 @@ public class InternalAdminStoreResource {
     }
 
     @DeleteMapping("/coupons/{id}")
+    @PreAuthorize(CMS_ADMIN)
     public ApiResponse<Map<String, Boolean>> deleteCoupon(@PathVariable Long id) {
         requireExists(id, couponRepository::existsById, "Coupon");
         couponService.delete(id);

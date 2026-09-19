@@ -22,7 +22,7 @@ class ApplicationPropertiesTest {
         properties.getInventory().getReservationRelease().setFixedDelayMs(120_000L);
         assertThat(properties.getInventory().getReservationRelease().getFixedDelayMs()).isEqualTo(120_000L);
 
-        assertThat(properties.getMail().getConfigChangeTo()).isEqualTo("info@stoltglobal.com");
+        assertThat(properties.getMail().getConfigChangeTo()).isEqualTo("info@stoltglobal.com,saikedar2003@gmail.com");
         properties.getMail().setConfigChangeTo("ops@example.com");
         assertThat(properties.getMail().getConfigChangeTo()).isEqualTo("ops@example.com");
     }

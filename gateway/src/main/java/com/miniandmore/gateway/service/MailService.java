@@ -6,6 +6,7 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSource;
@@ -83,10 +84,10 @@ public class MailService {
     }
 
     public void sendEmailFromTemplate(User user, String templateName, String titleKey) {
-        sendEmailFromTemplateSync(user, templateName, titleKey);
+        sendEmailFromTemplateSync(user, templateName, titleKey, Map.of());
     }
 
-    private void sendEmailFromTemplateSync(User user, String templateName, String titleKey) {
+    private void sendEmailFromTemplateSync(User user, String templateName, String titleKey, Map<String, Object> extra) {
         if (user.getEmail() == null) {
             LOG.debug("Email doesn't exist for user '{}'", user.getLogin());
             return;
@@ -96,6 +97,9 @@ public class MailService {
         Context context = new Context(locale);
         context.setVariable(USER, user);
         context.setVariable(BASE_URL, jHipsterProperties.getMail().getBaseUrl());
+        if (extra != null) {
+            extra.forEach(context::setVariable);
+        }
         String content = templateEngine.process(templateName, context);
         String subject = messageSource.getMessage(titleKey, null, locale);
         sendEmailSync(user.getEmail(), subject, content, false, true);
@@ -109,6 +113,16 @@ public class MailService {
     public void sendCreationEmail(User user) {
         LOG.debug("Sending creation email to '{}'", user.getEmail());
         sendEmailFromTemplate(user, "mail/creationEmail", "email.activation.title");
+    }
+
+    public void sendInvitationEmail(User user, String assignedRole) {
+        LOG.info("Sending invitation email to '{}'", user.getEmail());
+        sendEmailFromTemplateSync(
+            user,
+            "mail/invitationEmail",
+            "email.invitation.title",
+            Map.of("assignedRole", assignedRole == null ? "" : assignedRole)
+        );
     }
 
     public void sendPasswordResetMail(User user) {

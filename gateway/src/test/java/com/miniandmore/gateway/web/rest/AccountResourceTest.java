@@ -335,4 +335,34 @@ class AccountResourceTest {
             .expectStatus()
             .isOk();
     }
+
+    @Test
+    void finishInvite_validKey_activatesStaffUser() {
+        User user = new User();
+        user.setLogin("staff");
+        when(userService.completeInvite("newpass123", "invite-key")).thenReturn(Mono.just(user));
+
+        webTestClient
+            .post()
+            .uri("/api/account/invite/finish")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("{\"key\":\"invite-key\",\"newPassword\":\"newpass123\"}")
+            .exchange()
+            .expectStatus()
+            .isOk();
+    }
+
+    @Test
+    void finishInvite_invalidKey_returnsBadRequest() {
+        when(userService.completeInvite("newpass123", "bad-key")).thenReturn(Mono.empty());
+
+        webTestClient
+            .post()
+            .uri("/api/account/invite/finish")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("{\"key\":\"bad-key\",\"newPassword\":\"newpass123\"}")
+            .exchange()
+            .expectStatus()
+            .isBadRequest();
+    }
 }

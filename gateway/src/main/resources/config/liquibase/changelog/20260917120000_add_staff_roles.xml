@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260917120000-staff-roles" author="mini">
+        <sql>
+            INSERT INTO jhi_authority (name)
+            SELECT 'ROLE_SUPER_ADMIN'
+            WHERE NOT EXISTS (SELECT 1 FROM jhi_authority WHERE name = 'ROLE_SUPER_ADMIN');
+
+            INSERT INTO jhi_authority (name)
+            SELECT 'ROLE_SALES'
+            WHERE NOT EXISTS (SELECT 1 FROM jhi_authority WHERE name = 'ROLE_SALES');
+
+            INSERT INTO jhi_authority (name)
+            SELECT 'ROLE_OPERATIONS'
+            WHERE NOT EXISTS (SELECT 1 FROM jhi_authority WHERE name = 'ROLE_OPERATIONS');
+
+            INSERT INTO jhi_authority (name)
+            SELECT 'ROLE_CUSTOMER_SUPPORT'
+            WHERE NOT EXISTS (SELECT 1 FROM jhi_authority WHERE name = 'ROLE_CUSTOMER_SUPPORT');
+
+            INSERT INTO jhi_user_authority (user_id, authority_name)
+            SELECT u.id, 'ROLE_SUPER_ADMIN'
+            FROM jhi_user u
+            WHERE u.login = 'admin'
+              AND NOT EXISTS (
+                  SELECT 1 FROM jhi_user_authority ua
+                  WHERE ua.user_id = u.id AND ua.authority_name = 'ROLE_SUPER_ADMIN'
+              );
+        </sql>
+    </changeSet>
+</databaseChangeLog>

@@ -3,6 +3,7 @@ package com.miniandmore.app.service;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
+import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import org.apache.commons.lang3.StringUtils;
 
 public final class OrderTrackingStatusResolver {
@@ -25,9 +26,13 @@ public final class OrderTrackingStatusResolver {
         ) {
             return "delivered";
         }
+        if (isExpressBeesAwaitingPickup(order)) {
+            return "awaiting_pickup";
+        }
         if (
             LedgerlyOrderStatus.isShipped(ledgerlyStatus) ||
             ZohoOrderStatus.isShipped(order.getZohoOrderStatus()) ||
+            XpressBeesShipmentStatus.isPickedUpOrInTransit(order.getShipmentCarrierStatus()) ||
             StringUtils.isNotBlank(order.getTrackingNumber()) ||
             StringUtils.isNotBlank(order.getShipmentDate())
         ) {
@@ -42,5 +47,19 @@ public final class OrderTrackingStatusResolver {
             return "confirmed";
         }
         return "pending";
+    }
+
+    /**
+     * ExpressBees AWB generation only prints a label. Customer "shipped" waits for a pickup scan.
+     */
+    static boolean isExpressBeesAwaitingPickup(CustomerOrder order) {
+        if (order.getShipmentLogisticsMode() != ReturnLogisticsMode.XPRESSBEES) {
+            return false;
+        }
+        if (StringUtils.isBlank(order.getTrackingNumber()) || order.getShipmentCancelledAt() != null) {
+            return false;
+        }
+        return !XpressBeesShipmentStatus.isPickedUpOrInTransit(order.getShipmentCarrierStatus()) &&
+            !XpressBeesShipmentStatus.isDelivered(order.getShipmentCarrierStatus());
     }
 }

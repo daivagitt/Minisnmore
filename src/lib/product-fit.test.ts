@@ -436,8 +436,8 @@ describe("product fit from MnM length/chest", () => {
     expect(measurementLimitsForProduct(noChartInput)).toBeNull();
     expect(measurementLimitsForSizes(["0-3M", "3-6M"])).toBeNull();
     expect(sizeGuideRowsForProduct(noChartInput)).toEqual([
-      { size: "0-3M", length: "—", chest: "—", lengthCm: null, chestCm: null },
-      { size: "3-6M", length: "—", chest: "—", lengthCm: null, chestCm: null },
+      { size: "0-3M", length: "—", chest: "—", lengthCm: null, chestCm: null, lengthLabel: null, chestLabel: null },
+      { size: "3-6M", length: "—", chest: "—", lengthCm: null, chestCm: null, lengthLabel: null, chestLabel: null },
     ]);
     expect(recommendSizeByLength(28, noChartInput)).toBeNull();
     expect(recommendSizeByChest(22, noChartInput)).toBeNull();
@@ -512,15 +512,15 @@ describe("product fit from MnM length/chest", () => {
   it("rejects the missing metric and unsold in-window values in checkSizeFit", () => {
     expect(checkSizeFit({ ...vestInput })).toEqual({
       ok: false,
-      error: "Enter length or chest measurement",
+      error: "Enter body length or chest width measurement",
     });
     expect(checkSizeFit({ lengthCm: "28", chestCm: "", ...chestOnlyInput })).toEqual({
       ok: false,
       error: "This item has no length guide on the measurement sheet",
     });
     expect(checkSizeFit({ lengthCm: "", chestCm: "20", ...shortsInput })).toEqual({
-      ok: false,
-      error: "This item has no chest guide on the measurement sheet",
+      ok: true,
+      size: "18-24M",
     });
     expect(recommendSizeByLength(28, chestOnlyInput)).toBeNull();
     expect(checkSizeFit({ lengthCm: "", chestCm: "22", ...chestOnlyInput })).toEqual({

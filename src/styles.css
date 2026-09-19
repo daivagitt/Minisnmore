@@ -307,3 +307,15 @@ body.pdp-lock-scroll {
   background: linear-gradient(oklch(0.72 0.10 50 / 60%), oklch(0.58 0.115 45 / 60%));
   border-radius: 999px;
 }
+
+[data-admin-nav-scroll] {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 225, 190, 0.65) transparent;
+}
+[data-admin-nav-scroll]::-webkit-scrollbar { width: 8px; }
+[data-admin-nav-scroll]::-webkit-scrollbar-track { background: transparent; }
+[data-admin-nav-scroll]::-webkit-scrollbar-thumb {
+  background: linear-gradient(rgba(255, 225, 190, 0.7), rgba(255, 200, 150, 0.55));
+  border-radius: 999px;
+}

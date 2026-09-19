@@ -12,11 +12,14 @@ import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.OrderItemRepository;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +34,8 @@ public class OrderShipmentService {
 
     private static final Logger LOG = LoggerFactory.getLogger(OrderShipmentService.class);
     private static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
+    private static final Duration EXPRESS_BEES_TRACKING_TTL = Duration.ofMinutes(5);
+    private final Map<Long, Instant> expressBeesTrackingLastPull = new ConcurrentHashMap<>();
 
     private final CustomerOrderRepository customerOrderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -85,6 +90,14 @@ public class OrderShipmentService {
         return isShipmentEligible(order) && orderCancellationService.hasPendingRequest(order.getId());
     }
 
+    public boolean canBookExpressBees(CustomerOrder order) {
+        return canBook(order) && isPackageCompleted(order);
+    }
+
+    public boolean canBookExpressBeesWithOverride(CustomerOrder order) {
+        return canBookWithOverride(order) && isPackageCompleted(order);
+    }
+
     public CustomerOrder bookShipment(
         String orderNumber,
         ReturnLogisticsMode mode,
@@ -130,6 +143,7 @@ public class OrderShipmentService {
                 "ExpressBees forward shipment is not configured. Set XPRESSBEES credentials, business account, warehouse address and forward manifest path, or book using manual mode."
             );
         }
+        assertPackageCompleted(order);
         try {
             XpressBeesClient.ForwardShipmentResult result = xpressBeesClient.createForwardShipment(
                 buildForwardShipmentRequest(order, preAssignedAwb)
@@ -258,8 +272,91 @@ public class OrderShipmentService {
         order.setShipmentCancelledAt(null);
         order.setShipmentCancelledBy(null);
         order.setShipmentCancellationReason(null);
-        if (StringUtils.isBlank(order.getShipmentDate())) {
+        if (mode != ReturnLogisticsMode.XPRESSBEES && StringUtils.isBlank(order.getShipmentDate())) {
             order.setShipmentDate(LocalDate.now(INDIA).toString());
+        }
+    }
+
+    public CustomerOrder applyProviderStatus(CustomerOrder order, String providerStatus) {
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getShipmentCancelledAt() != null) {
+            return order;
+        }
+        String normalized = XpressBeesShipmentStatus.normalize(providerStatus);
+        order.setShipmentCarrierStatus(normalized);
+        if (XpressBeesShipmentStatus.isPickedUpOrInTransit(normalized) && StringUtils.isBlank(order.getShipmentDate())) {
+            order.setShipmentDate(LocalDate.now(INDIA).toString());
+        }
+        if (XpressBeesShipmentStatus.isDelivered(normalized) && canMarkDelivered(order)) {
+            order.setShipmentDeliveredAt(Instant.now());
+            if (order.getStatus() != OrderStatus.CANCELLED) {
+                order.setStatus(OrderStatus.FULFILLED);
+            }
+        }
+        return persist(order);
+    }
+
+    public boolean isExpressBeesTrackingFresh(CustomerOrder order) {
+        if (order == null || order.getId() == null) {
+            return false;
+        }
+        Instant lastPull = expressBeesTrackingLastPull.get(order.getId());
+        return lastPull != null && lastPull.isAfter(Instant.now().minus(EXPRESS_BEES_TRACKING_TTL));
+    }
+
+    public CustomerOrder refreshExpressBeesTracking(CustomerOrder order) {
+        if (
+            order == null ||
+            order.getShipmentLogisticsMode() != ReturnLogisticsMode.XPRESSBEES ||
+            StringUtils.isBlank(order.getTrackingNumber()) ||
+            order.getShipmentCancelledAt() != null ||
+            order.getStatus() == OrderStatus.CANCELLED ||
+            order.getStatus() == OrderStatus.FULFILLED ||
+            isExpressBeesTrackingFresh(order)
+        ) {
+            return order;
+        }
+        expressBeesTrackingLastPull.put(order.getId(), Instant.now());
+        try {
+            return xpressBeesClient
+                .fetchForwardTracking(order.getTrackingNumber())
+                .map(result -> {
+                    String incoming = XpressBeesShipmentStatus.normalize(result.status());
+                    String current = XpressBeesShipmentStatus.normalize(order.getShipmentCarrierStatus());
+                    if (incoming.equals(current)) {
+                        return order;
+                    }
+                    return applyProviderStatus(order, result.status());
+                })
+                .orElse(order);
+        } catch (Exception ex) {
+            LOG.debug("ExpressBees tracking refresh skipped for {}: {}", order.getOrderNumber(), ex.getMessage());
+            return order;
+        }
+    }
+
+    private static boolean canMarkDelivered(CustomerOrder order) {
+        return order.getStatus() != OrderStatus.CANCELLED && order.getShipmentCancelledAt() == null;
+    }
+
+    static boolean isPackageCompleted(CustomerOrder order) {
+        return (
+            order != null &&
+            order.getPackedAt() != null &&
+            order.getPackageLengthCm() != null &&
+            order.getPackageBreadthCm() != null &&
+            order.getPackageHeightCm() != null &&
+            order.getPackageLengthCm() >= 1 &&
+            order.getPackageBreadthCm() >= 1 &&
+            order.getPackageHeightCm() >= 1
+        );
+    }
+
+    private static void assertPackageCompleted(CustomerOrder order) {
+        if (!isPackageCompleted(order)) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Complete package dimensions before booking an ExpressBees shipment"
+            );
         }
     }
 
@@ -299,7 +396,16 @@ public class OrderShipmentService {
             deliverTo,
             buildShipmentLines(order),
             StringUtils.trimToNull(preAssignedAwb),
-            isCod(order) ? "cod" : "prepaid"
+            isCod(order) ? "cod" : "prepaid",
+            order.getTotal(),
+            isCod(order) ? order.getTotal() : BigDecimal.ZERO,
+            order.getPackageLengthCm(),
+            order.getPackageBreadthCm(),
+            order.getPackageHeightCm(),
+            order.getPackageWeightGrams() != null && order.getPackageWeightGrams() > 0
+                ? order.getPackageWeightGrams()
+                : order.getPackageChargeableWeightGrams(),
+            StringUtils.trimToNull(order.getPackageCourierId())
         );
     }
 

@@ -247,7 +247,7 @@ application:
       max-pdf-upload-bytes: ${S3_MAX_PDF_UPLOAD_BYTES:78643200}
   internal-api-key: ${INTERNAL_API_KEY:}
   mail:
-    config-change-to: ${ADMIN_CONFIG_CHANGE_EMAIL:info@stoltglobal.com}
+    config-change-to: ${ADMIN_CONFIG_CHANGE_EMAIL:info@stoltglobal.com,saikedar2003@gmail.com}
   zoho:
     sync-product-images: ${ZOHO_SYNC_PRODUCT_IMAGES:true}
     max-product-images: ${ZOHO_MAX_PRODUCT_IMAGES:10}
@@ -315,7 +315,7 @@ application:
     xb-key: ${XPRESSBEES_XB_KEY:}
     business-account-name: ${XPRESSBEES_BUSINESS_ACCOUNT_NAME:}
     reverse-manifest-path: ${XPRESSBEES_REVERSE_MANIFEST_PATH:/api/courier/reverse/order}
-    forward-manifest-path: ${XPRESSBEES_FORWARD_MANIFEST_PATH:/api/courier/order}
+    forward-manifest-path: ${XPRESSBEES_FORWARD_MANIFEST_PATH:/api/shipments2}
     cancel-shipment-path: ${XPRESSBEES_CANCEL_SHIPMENT_PATH:/api/shipments2/cancel}
     webhook-secret: ${XPRESSBEES_WEBHOOK_SECRET:}
     auth-type: ${XPRESSBEES_AUTH_TYPE:token}
@@ -327,6 +327,7 @@ application:
     warehouse-state: ${XPRESSBEES_WAREHOUSE_STATE:Karnataka}
     tracking-url-template: ${XPRESSBEES_TRACKING_URL_TEMPLATE:https://www.xpressbees.com/track/?awb={awb}}
     default-weight-grams: ${XPRESSBEES_DEFAULT_WEIGHT_GRAMS:500}
+    volumetric-divisor: ${XPRESSBEES_VOLUMETRIC_DIVISOR:5000}
     pickup-vendor-code: ${XPRESSBEES_PICKUP_VENDOR_CODE:}
   fastsms:
     enabled: ${FASTSMS_ENABLED:false}

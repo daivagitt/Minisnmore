@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.miniandmore.app.config.ApplicationProperties;
+import com.miniandmore.app.service.OrderPackageService;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -127,16 +128,23 @@ public class XpressBeesClient {
         }
         validateForwardShipmentRequest(request);
         try {
-            String body = config.usesLegacyAuth() ? buildLegacyForwardManifestBody(request) : buildTokenForwardManifestBody(request);
+            String body = config.usesLegacyAuth()
+                ? buildLegacyForwardManifestBody(request)
+                : buildTokenForwardManifestBody(
+                    request,
+                    resolveForwardCourierId(
+                        request.deliverTo().pincode(),
+                        courierSelectionWeightGrams(request),
+                        request.courierId()
+                    )
+                );
             String token = config.usesLegacyAuth() ? null : accessToken();
             if (!config.usesLegacyAuth() && token == null) {
                 throw new XpressBeesApiException("ExpressBees login failed");
             }
             HttpResponse<String> response = postJson(resolveForwardManifestUrl(), body, token);
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new XpressBeesApiException(
-                    "ExpressBees forward shipment HTTP " + response.statusCode() + ": " + abbreviate(response.body(), 400)
-                );
+                throw new XpressBeesApiException(providerFailureMessage("forward shipment", response));
             }
             return parseForwardShipmentResponse(response.body(), request);
         } catch (XpressBeesApiException ex) {
@@ -162,9 +170,7 @@ public class XpressBeesClient {
             }
             HttpResponse<String> response = postJson(resolveReverseManifestUrl(), body, token);
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new XpressBeesApiException(
-                    "ExpressBees reverse pickup HTTP " + response.statusCode() + ": " + abbreviate(response.body(), 400)
-                );
+                throw new XpressBeesApiException(providerFailureMessage("reverse pickup", response));
             }
             return parseReversePickupResponse(response.body(), request);
         } catch (XpressBeesApiException ex) {
@@ -200,9 +206,7 @@ public class XpressBeesClient {
             }
             HttpResponse<String> response = postJson(resolveConfiguredUrl(config.getCancelShipmentPath()), objectMapper.writeValueAsString(payload), token);
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new XpressBeesApiException(
-                    "ExpressBees shipment cancellation HTTP " + response.statusCode() + ": " + abbreviate(response.body(), 400)
-                );
+                throw new XpressBeesApiException(providerFailureMessage("shipment cancellation", response));
             }
             JsonNode root = objectMapper.readTree(response.body());
             String code = firstText(root.path("data"), "status", "code", "return_code");
@@ -286,7 +290,7 @@ public class XpressBeesClient {
                 return new ForwardShipmentResult(
                     awb,
                     firstText(data, "tracking_url", "trackingUrl", "TrackingUrl"),
-                    firstText(data, "label_url", "labelUrl", "LabelUrl", "shipping_label"),
+                    firstText(data, "label_url", "labelUrl", "LabelUrl", "shipping_label", "label"),
                     firstText(data, "provider_request_id", "request_id", "shipment_id", "id"),
                     text(root, "message")
                 );
@@ -355,6 +359,46 @@ public class XpressBeesClient {
         return template.replace("{awb}", awb.trim());
     }
 
+    public Optional<ForwardTrackingResult> fetchForwardTracking(String awb) {
+        if (!isConfigured() || StringUtils.isBlank(awb)) {
+            return Optional.empty();
+        }
+        try {
+            String token = accessToken();
+            if (token == null) {
+                return Optional.empty();
+            }
+            String url = config.getBaseUrl().replaceAll("/$", "") + "/api/shipments2/track/" + awb.trim();
+            HttpResponse<String> response = getJson(url, token);
+            if (response.statusCode() != 200) {
+                LOG.debug("XpressBees tracking HTTP {} for AWB {}", response.statusCode(), awb);
+                return Optional.empty();
+            }
+            JsonNode root = objectMapper.readTree(response.body());
+            if (!root.path("status").asBoolean(false)) {
+                return Optional.empty();
+            }
+            JsonNode data = root.path("data");
+            String status = firstText(data, "status", "shipment_status", "current_status");
+            if (StringUtils.isBlank(status)) {
+                return Optional.empty();
+            }
+            return Optional.of(
+                new ForwardTrackingResult(
+                    StringUtils.defaultIfBlank(firstText(data, "awb_number", "awb"), awb.trim()),
+                    status,
+                    firstText(data, "shipment_info", "message", "remark")
+                )
+            );
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            return Optional.empty();
+        } catch (Exception ex) {
+            LOG.debug("XpressBees tracking failed for AWB {}: {}", awb, ex.getMessage());
+            return Optional.empty();
+        }
+    }
+
     private Optional<ForwardShipmentResult> parseLegacyForwardManifestResponse(JsonNode root, ForwardShipmentRequest request)
         throws XpressBeesApiException {
         JsonNode details = root.path("ForwardManifestDetails");
@@ -420,34 +464,72 @@ public class XpressBeesClient {
         );
     }
 
-    private String buildTokenForwardManifestBody(ForwardShipmentRequest request) throws Exception {
+    String buildTokenForwardManifestBody(ForwardShipmentRequest request, String courierId) throws Exception {
+        String paymentType = resolvePaymentType(request).toLowerCase(Locale.ROOT);
+        boolean cod = "cod".equals(paymentType);
+        BigDecimal orderAmount = firstAmount(
+            firstPositiveAmount(request.orderAmount(), sumLineValue(request.lines())),
+            BigDecimal.ZERO
+        );
+        BigDecimal collectable = firstAmount(
+            request.collectableAmount(),
+            cod ? orderAmount : BigDecimal.ZERO
+        );
+        int weightGrams = packageWeightGrams(request);
+
         ObjectNode root = objectMapper.createObjectNode();
         root.put("order_id", request.caseReference());
         root.put("order_number", request.caseReference());
-        root.put("business_account_name", config.getBusinessAccountName());
-        root.put("payment_type", resolvePaymentType(request));
+        root.put("payment_type", paymentType);
+        root.put("order_amount", orderAmount);
+        root.put("collectable_amount", collectable);
+        root.put("cod_charges", 0);
+        root.put("shipping_charges", 0);
+        root.put("discount", 0);
+        root.put("package_weight", weightGrams);
+        root.put("package_length", firstPositive(request.packageLengthCm(), 10));
+        root.put("package_breadth", firstPositive(request.packageBreadthCm(), 10));
+        root.put("package_height", firstPositive(request.packageHeightCm(), 10));
+        root.put("request_auto_pickup", "yes");
+        root.put("courier_id", StringUtils.defaultIfBlank(courierId, "1"));
         if (StringUtils.isNotBlank(request.preAssignedAwb())) {
             root.put("awb", request.preAssignedAwb());
         }
 
+        ReversePickupAddress warehouse = request.shipFrom();
         ObjectNode pickup = root.putObject("pickup");
-        writeAddress(pickup, request.shipFrom());
+        pickup.put("warehouse_name", StringUtils.defaultIfBlank(config.getWarehouseName(), warehouse.name()));
+        pickup.put("name", warehouse.name());
+        pickup.put("address", joinAddress(warehouse.line1(), warehouse.line2()));
+        pickup.put("address_2", StringUtils.defaultString(warehouse.line2()));
+        pickup.put("city", warehouse.city());
+        pickup.put("state", warehouse.state());
+        pickup.put("pincode", warehouse.pincode());
+        pickup.put("phone", indianMobile10(warehouse.phone()));
 
-        ObjectNode delivery = root.putObject("delivery");
-        writeAddress(delivery, request.deliverTo());
-
-        ArrayNode products = root.putArray("products");
-        for (ReversePickupLine line : request.lines()) {
-            ObjectNode product = products.addObject();
-            product.put("name", line.productName());
-            product.put("sku", line.sku());
-            product.put("quantity", line.quantity());
-            if (line.price() != null) {
-                product.put("price", line.price());
-            }
-            product.put("weight_grams", line.weightGrams());
+        ReversePickupAddress customer = request.deliverTo();
+        ObjectNode consignee = root.putObject("consignee");
+        consignee.put("name", customer.name());
+        consignee.put("address", joinAddress(customer.line1(), customer.line2()));
+        consignee.put("address_2", StringUtils.defaultString(customer.line2()));
+        consignee.put("city", customer.city());
+        consignee.put("state", customer.state());
+        consignee.put("pincode", customer.pincode());
+        consignee.put("phone", indianMobile10(customer.phone()));
+        if (StringUtils.isNotBlank(customer.email())) {
+            consignee.put("email", customer.email());
         }
-        root.put("weight_grams", totalWeightGrams(request.lines()));
+
+        ArrayNode items = root.putArray("order_items");
+        for (ReversePickupLine line : request.lines()) {
+            ObjectNode item = items.addObject();
+            item.put("name", line.productName());
+            item.put("sku", line.sku());
+            item.put("qty", String.valueOf(Math.max(1, line.quantity())));
+            if (line.price() != null) {
+                item.put("price", line.price().toPlainString());
+            }
+        }
         return objectMapper.writeValueAsString(root);
     }
 
@@ -459,6 +541,12 @@ public class XpressBeesClient {
         body.put("XBkey", config.getXbKey());
         body.put("BusinessAccountName", config.getBusinessAccountName());
         body.put("PaymentType", resolvePaymentType(request));
+        if ("cod".equalsIgnoreCase(resolvePaymentType(request))) {
+            BigDecimal collectable = firstAmount(request.collectableAmount(), firstPositiveAmount(request.orderAmount(), sumLineValue(request.lines())));
+            if (collectable != null) {
+                body.put("CollectableAmount", collectable.toPlainString());
+            }
+        }
         if (StringUtils.isNotBlank(request.preAssignedAwb())) {
             body.put("AirWayBillNO", request.preAssignedAwb());
         }
@@ -469,7 +557,7 @@ public class XpressBeesClient {
         body.put("CustomerCity", customer.city());
         body.put("CustomerState", customer.state());
         body.put("CustomerPincode", customer.pincode());
-        body.put("CustomerMobile", customer.phone());
+        body.put("CustomerMobile", indianMobile10(customer.phone()));
         if (StringUtils.isNotBlank(customer.email())) {
             body.put("CustomerEmail", customer.email());
         }
@@ -485,7 +573,7 @@ public class XpressBeesClient {
         body.put("PickupState", warehouse.state());
         body.put("PickupPincode", warehouse.pincode());
         if (StringUtils.isNotBlank(warehouse.phone())) {
-            body.put("PickupMobile", warehouse.phone());
+            body.put("PickupMobile", indianMobile10(warehouse.phone()));
         }
         return objectMapper.writeValueAsString(body);
     }
@@ -541,7 +629,7 @@ public class XpressBeesClient {
         body.put("CustomerCity", pickup.city());
         body.put("CustomerState", pickup.state());
         body.put("CustomerPincode", pickup.pincode());
-        body.put("CustomerMobile", pickup.phone());
+        body.put("CustomerMobile", indianMobile10(pickup.phone()));
         if (StringUtils.isNotBlank(pickup.email())) {
             body.put("CustomerEmail", pickup.email());
         }
@@ -558,14 +646,14 @@ public class XpressBeesClient {
         body.put("RTOState", warehouse.state());
         body.put("RTOPincode", warehouse.pincode());
         if (StringUtils.isNotBlank(warehouse.phone())) {
-            body.put("RTOMobile", warehouse.phone());
+            body.put("RTOMobile", indianMobile10(warehouse.phone()));
         }
         return objectMapper.writeValueAsString(body);
     }
 
     private static void writeAddress(ObjectNode node, ReversePickupAddress address) {
         node.put("name", address.name());
-        node.put("phone", address.phone());
+        node.put("phone", indianMobile10(address.phone()));
         if (StringUtils.isNotBlank(address.email())) {
             node.put("email", address.email());
         }
@@ -587,10 +675,13 @@ public class XpressBeesClient {
         }
         ReversePickupAddress delivery = request.deliverTo();
         if (
-            StringUtils.isAnyBlank(delivery.name(), delivery.phone(), delivery.line1(), delivery.city(), delivery.state(), delivery.pincode()) ||
+            StringUtils.isAnyBlank(delivery.name(), delivery.line1(), delivery.city(), delivery.state(), delivery.pincode()) ||
             !delivery.pincode().matches("^[1-9]\\d{5}$")
         ) {
             throw new XpressBeesApiException("Valid customer delivery address is required");
+        }
+        if (indianMobile10(delivery.phone()) == null) {
+            throw new XpressBeesApiException("Customer phone must be a 10-digit Indian mobile number");
         }
     }
 
@@ -603,15 +694,181 @@ public class XpressBeesClient {
         }
         ReversePickupAddress pickup = request.pickupFrom();
         if (
-            StringUtils.isAnyBlank(pickup.name(), pickup.phone(), pickup.line1(), pickup.city(), pickup.state(), pickup.pincode()) ||
+            StringUtils.isAnyBlank(pickup.name(), pickup.line1(), pickup.city(), pickup.state(), pickup.pincode()) ||
             !pickup.pincode().matches("^[1-9]\\d{5}$")
         ) {
             throw new XpressBeesApiException("Valid customer pickup address is required");
+        }
+        if (indianMobile10(pickup.phone()) == null) {
+            throw new XpressBeesApiException("Customer phone must be a 10-digit Indian mobile number");
         }
     }
 
     private String resolvePaymentType(ForwardShipmentRequest request) {
         return StringUtils.defaultIfBlank(request.paymentType(), StringUtils.defaultIfBlank(config.getPaymentType(), "prepaid"));
+    }
+
+    private static BigDecimal sumLineValue(List<ReversePickupLine> lines) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (ReversePickupLine line : lines) {
+            if (line.price() == null) {
+                continue;
+            }
+            total = total.add(line.price().multiply(BigDecimal.valueOf(Math.max(1, line.quantity()))));
+        }
+        return total;
+    }
+
+    private static BigDecimal firstPositiveAmount(BigDecimal preferred, BigDecimal fallback) {
+        if (preferred != null && preferred.compareTo(BigDecimal.ZERO) > 0) {
+            return preferred;
+        }
+        if (fallback != null && fallback.compareTo(BigDecimal.ZERO) > 0) {
+            return fallback;
+        }
+        return preferred != null ? preferred : fallback;
+    }
+
+    private static BigDecimal firstAmount(BigDecimal preferred, BigDecimal fallback) {
+        return preferred != null ? preferred : (fallback != null ? fallback : BigDecimal.ZERO);
+    }
+
+    public List<CourierOption> listForwardCourierOptions(String destinationPincode, int weightGrams) {
+        if (!isConfigured() || destinationPincode == null || !destinationPincode.matches("^[1-9]\\d{5}$")) {
+            return List.of();
+        }
+        try {
+            String token = accessToken();
+            if (token == null) {
+                return List.of();
+            }
+            String url =
+                config.getBaseUrl().replaceAll("/$", "") +
+                "/api/courier/serviceability/pincode/" +
+                destinationPincode;
+            HttpResponse<String> response = getJson(url, token);
+            if (response.statusCode() != 200) {
+                LOG.debug("XpressBees courier options HTTP {} for pincode {}", response.statusCode(), destinationPincode);
+                return List.of();
+            }
+            return parseForwardCourierOptions(response.body(), weightGrams);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            return List.of();
+        } catch (Exception ex) {
+            LOG.debug("XpressBees courier options failed for pincode {}: {}", destinationPincode, ex.getMessage());
+            return List.of();
+        }
+    }
+
+    List<CourierOption> parseForwardCourierOptions(String body, int weightGrams) {
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            JsonNode data = root.path("data");
+            if (!data.isArray() || data.isEmpty()) {
+                return List.of();
+            }
+            String preferred = preferredForwardCourierName(weightGrams);
+            List<CourierOption> options = new ArrayList<>();
+            for (JsonNode option : data) {
+                String id = text(option, "id");
+                String name = firstText(option, "name", "courier_name", "service_name");
+                if (StringUtils.isBlank(id) || StringUtils.isBlank(name) || name.toLowerCase(Locale.ROOT).contains("reverse")) {
+                    continue;
+                }
+                int eddDays = option.path("eddDays").asInt(option.path("edd_days").asInt(-1));
+                options.add(
+                    new CourierOption(
+                        id,
+                        name,
+                        eddDays,
+                        eddDays < 0 ? "" : formatEta(eddDays),
+                        firstDecimal(option, "rate", "freight", "charge", "price", "shipping_charge"),
+                        name.equalsIgnoreCase(preferred)
+                    )
+                );
+            }
+            return options;
+        } catch (Exception ex) {
+            LOG.debug("Could not parse XpressBees courier options: {}", ex.getMessage());
+            return List.of();
+        }
+    }
+
+    private String resolveForwardCourierId(String destinationPincode, int weightGrams, String preferredCourierId)
+        throws XpressBeesApiException {
+        if (StringUtils.isNotBlank(preferredCourierId)) {
+            return preferredCourierId.trim();
+        }
+        if (destinationPincode == null || !destinationPincode.matches("^[1-9]\\d{5}$")) {
+            throw courierResolutionFailure(destinationPincode, "invalid pincode");
+        }
+        try {
+            String token = accessToken();
+            if (token == null) {
+                throw courierResolutionFailure(destinationPincode, "login failed");
+            }
+            String url =
+                config.getBaseUrl().replaceAll("/$", "") +
+                "/api/courier/serviceability/pincode/" +
+                destinationPincode;
+            HttpResponse<String> response = getJson(url, token);
+            if (response.statusCode() != 200) {
+                throw courierResolutionFailure(destinationPincode, "serviceability HTTP " + response.statusCode());
+            }
+            JsonNode data = objectMapper.readTree(response.body()).path("data");
+            if (!data.isArray() || data.isEmpty()) {
+                throw courierResolutionFailure(destinationPincode, "no serviceable couriers");
+            }
+            String preferred = preferredForwardCourierName(weightGrams);
+            String firstForward = null;
+            for (JsonNode option : data) {
+                String id = text(option, "id");
+                String name = text(option, "name");
+                if (id.isBlank() || name.toLowerCase(Locale.ROOT).contains("reverse")) {
+                    continue;
+                }
+                if (firstForward == null) {
+                    firstForward = id;
+                }
+                if (name.equalsIgnoreCase(preferred)) {
+                    return id;
+                }
+            }
+            if (firstForward != null) {
+                return firstForward;
+            }
+            throw courierResolutionFailure(destinationPincode, "no forward courier match");
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw courierResolutionFailure(destinationPincode, "interrupted");
+        } catch (XpressBeesApiException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw courierResolutionFailure(destinationPincode, ex.getMessage());
+        }
+    }
+
+    private static XpressBeesApiException courierResolutionFailure(String destinationPincode, String reason) {
+        return new XpressBeesApiException(
+            "ExpressBees courier serviceability failed for pincode " + destinationPincode + ": " + reason
+        );
+    }
+
+    public static String preferredForwardCourierName(int weightGrams) {
+        if (weightGrams <= 500) {
+            return "Surface Xpressbees 0.5 K.G";
+        }
+        if (weightGrams <= 1000) {
+            return "Xpressbees 1 K.G";
+        }
+        if (weightGrams <= 2000) {
+            return "Xpressbees 2 K.G";
+        }
+        if (weightGrams <= 5000) {
+            return "Xpressbees 5 K.G";
+        }
+        return "Xpressbees 10 K.G";
     }
 
     private int totalWeightGrams(List<ReversePickupLine> lines) {
@@ -622,8 +879,36 @@ public class XpressBeesClient {
         return Math.max(total, Math.max(1, config.getDefaultWeightGrams()));
     }
 
+    private int packageWeightGrams(ForwardShipmentRequest request) {
+        if (request.packageWeightGrams() != null && request.packageWeightGrams() > 0) {
+            return request.packageWeightGrams();
+        }
+        return totalWeightGrams(request.lines());
+    }
+
+    private int courierSelectionWeightGrams(ForwardShipmentRequest request) {
+        int actual = packageWeightGrams(request);
+        Integer length = request.packageLengthCm();
+        Integer breadth = request.packageBreadthCm();
+        Integer height = request.packageHeightCm();
+        if (length != null && breadth != null && height != null && length > 0 && breadth > 0 && height > 0) {
+            int volumetric = OrderPackageService.volumetricWeightGrams(
+                length,
+                breadth,
+                height,
+                Math.max(1, config.getVolumetricDivisor())
+            );
+            return OrderPackageService.chargeableWeightGrams(actual, volumetric);
+        }
+        return actual;
+    }
+
+    private static int firstPositive(Integer value, int fallback) {
+        return value != null && value > 0 ? value : fallback;
+    }
+
     private String resolveForwardManifestUrl() {
-        String path = StringUtils.trimToEmpty(config.getForwardManifestPath());
+        String path = StringUtils.trimToEmpty(config.resolvedForwardManifestPath());
         if (path.startsWith("http://") || path.startsWith("https://")) {
             return path;
         }
@@ -668,6 +953,34 @@ public class XpressBeesClient {
             builder.header("Authorization", "Bearer " + bearerToken);
         }
         return httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+    }
+
+    private HttpResponse<String> getJson(String url, String bearerToken) throws Exception {
+        HttpRequest.Builder builder = HttpRequest
+            .newBuilder()
+            .uri(URI.create(url))
+            .timeout(REQUEST_TIMEOUT)
+            .header("Accept", "application/json")
+            .header("User-Agent", USER_AGENT)
+            .GET();
+        if (StringUtils.isNotBlank(bearerToken)) {
+            builder.header("Authorization", "Bearer " + bearerToken);
+        }
+        return httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+    }
+
+    private String providerFailureMessage(String operation, HttpResponse<String> response) {
+        String body = response.body();
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            String message = firstText(root, "message", "error", "ReturnMessage");
+            if (StringUtils.isNotBlank(message)) {
+                return "ExpressBees " + operation + " rejected: " + message.replace('\n', ' ').trim();
+            }
+        } catch (Exception ignored) {
+            // Fall through to the raw HTTP snippet.
+        }
+        return "ExpressBees " + operation + " HTTP " + response.statusCode() + ": " + abbreviate(body, 400);
     }
 
     private String accessToken() throws Exception {
@@ -737,6 +1050,44 @@ public class XpressBeesClient {
         return null;
     }
 
+    private static BigDecimal firstDecimal(JsonNode node, String... fields) {
+        for (String field : fields) {
+            JsonNode value = node.path(field);
+            if (value.isMissingNode() || value.isNull() || value.isObject() || value.isArray()) {
+                continue;
+            }
+            if (value.isNumber()) {
+                return value.decimalValue();
+            }
+            String text = value.asText("").trim().replaceAll("[^0-9.\\-]", "");
+            if (StringUtils.isNotBlank(text)) {
+                try {
+                    return new BigDecimal(text);
+                } catch (NumberFormatException ignored) {
+                    // try the next field
+                }
+            }
+        }
+        return null;
+    }
+
+    static String indianMobile10(String raw) {
+        if (StringUtils.isBlank(raw)) {
+            return null;
+        }
+        String digits = raw.replaceAll("\\D", "");
+        if (digits.startsWith("91") && digits.length() > 10) {
+            digits = digits.substring(2);
+        }
+        if (digits.startsWith("0") && digits.length() == 11) {
+            digits = digits.substring(1);
+        }
+        if (digits.length() > 10) {
+            digits = digits.substring(digits.length() - 10);
+        }
+        return digits.matches("^[6-9]\\d{9}$") ? digits : null;
+    }
+
     private static String joinAddress(String line1, String line2) {
         if (StringUtils.isBlank(line2)) {
             return StringUtils.defaultString(line1).trim();
@@ -751,6 +1102,8 @@ public class XpressBeesClient {
         String normalized = value.replaceAll("\\s+", " ").trim();
         return normalized.length() <= maxLen ? normalized : normalized.substring(0, maxLen);
     }
+
+    public record CourierOption(String id, String name, int eddDays, String eta, BigDecimal rate, boolean preferred) {}
 
     public record ServiceabilityResult(String city, String state, String eta, int eddDays, String pincode) {}
 
@@ -787,7 +1140,14 @@ public class XpressBeesClient {
         ReversePickupAddress deliverTo,
         List<ReversePickupLine> lines,
         String preAssignedAwb,
-        String paymentType
+        String paymentType,
+        BigDecimal orderAmount,
+        BigDecimal collectableAmount,
+        Integer packageLengthCm,
+        Integer packageBreadthCm,
+        Integer packageHeightCm,
+        Integer packageWeightGrams,
+        String courierId
     ) {
         public ForwardShipmentRequest {
             lines = lines == null ? List.of() : List.copyOf(lines);
@@ -799,9 +1159,50 @@ public class XpressBeesClient {
             ReversePickupAddress shipFrom,
             ReversePickupAddress deliverTo,
             List<ReversePickupLine> lines,
+            String preAssignedAwb,
+            String paymentType,
+            BigDecimal orderAmount,
+            BigDecimal collectableAmount
+        ) {
+            this(
+                caseReference,
+                orderNumber,
+                shipFrom,
+                deliverTo,
+                lines,
+                preAssignedAwb,
+                paymentType,
+                orderAmount,
+                collectableAmount,
+                null,
+                null,
+                null,
+                null,
+                null
+            );
+        }
+
+        public ForwardShipmentRequest(
+            String caseReference,
+            String orderNumber,
+            ReversePickupAddress shipFrom,
+            ReversePickupAddress deliverTo,
+            List<ReversePickupLine> lines,
             String preAssignedAwb
         ) {
-            this(caseReference, orderNumber, shipFrom, deliverTo, lines, preAssignedAwb, null);
+            this(caseReference, orderNumber, shipFrom, deliverTo, lines, preAssignedAwb, null, null, null);
+        }
+
+        public ForwardShipmentRequest(
+            String caseReference,
+            String orderNumber,
+            ReversePickupAddress shipFrom,
+            ReversePickupAddress deliverTo,
+            List<ReversePickupLine> lines,
+            String preAssignedAwb,
+            String paymentType
+        ) {
+            this(caseReference, orderNumber, shipFrom, deliverTo, lines, preAssignedAwb, paymentType, null, null);
         }
     }
 
@@ -824,6 +1225,8 @@ public class XpressBeesClient {
     }
 
     public record CancelShipmentResult(String providerRequestId, String message) {}
+
+    public record ForwardTrackingResult(String awb, String status, String message) {}
 
     public static class XpressBeesApiException extends Exception {
 

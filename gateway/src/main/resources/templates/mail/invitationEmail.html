@@ -1,0 +1,70 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="en">
+  <head>
+    <title th:text="#{email.invitation.title}">Staff invitation</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body
+    style="margin: 0; padding: 0; background-color: #fff8f3; font-family: Georgia, 'Times New Roman', serif; color: #4a3f45;"
+    th:with="staffName=${!#strings.isEmpty(user.firstName) ? user.firstName : user.login}, inviteUrl=(@{|${baseUrl}/invite?key=${user.activationKey}|})"
+  >
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #fff8f3; padding: 24px 12px;">
+      <tr>
+        <td align="center">
+          <table
+            role="presentation"
+            width="100%"
+            cellspacing="0"
+            cellpadding="0"
+            border="0"
+            style="max-width: 560px; background-color: #ffffff; border-radius: 24px; border: 1px solid #f3dbe4; overflow: hidden;"
+          >
+            <tr>
+              <td style="padding: 32px 28px 12px; text-align: center; font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; color: #c77d98;">
+                Minis n More
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 0 28px 8px; text-align: center; font-size: 28px; line-height: 1.3; color: #5c3d4f;" th:text="#{email.invitation.headline}">
+                You&rsquo;re invited to Mini Admin
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 28px 0; font-size: 16px; line-height: 1.7; color: #5f4f56;">
+                <p style="margin: 0 0 16px;" th:text="#{email.invitation.greeting(${staffName})}">Dear colleague,</p>
+                <p style="margin: 0 0 16px;" th:text="#{email.invitation.intro}">
+                  You have been invited to Mini Admin. Activate your account and set a password to get started.
+                </p>
+                <p style="margin: 0 0 8px;"><strong th:text="#{email.invitation.name}">Name</strong>: <span th:text="${staffName}">Name</span></p>
+                <p style="margin: 0 0 8px;"><strong th:text="#{email.invitation.email}">Email</strong>: <span th:text="${user.email}">email</span></p>
+                <p style="margin: 0 0 16px;"><strong th:text="#{email.invitation.role}">Role</strong>: <span th:text="${assignedRole}">Role</span></p>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding: 8px 28px 20px;">
+                <a
+                  th:href="${inviteUrl}"
+                  th:text="#{email.invitation.cta}"
+                  style="display: inline-block; background-color: #d889a8; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: bold; padding: 14px 28px; border-radius: 999px;"
+                  >Activate account</a
+                >
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 0 28px 16px; font-size: 14px; line-height: 1.6; color: #7a6670; word-break: break-all;">
+                <a th:href="${inviteUrl}" th:text="${inviteUrl}" style="color: #c77d98;">Activation link</a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 28px 28px; font-size: 15px; line-height: 1.7; color: #5f4f56;">
+                <p style="margin: 0 0 4px;" th:text="#{email.activation.closing}">Warm regards,</p>
+                <p style="margin: 0 0 4px; font-weight: bold;" th:text="#{email.signature}">Team Minis n More</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

@@ -41,6 +41,7 @@ import giftBox from "@/assets/gift-box.jpg";
 import heroInfant from "@/assets/hero-infant-organic.jpg";
 import heroFounders from "@/assets/hero-founders-atelier.jpg";
 import fabricStoryVideo from "@/assets/videos/fabric-story-children.mp4";
+import { canonicalUrl, SOCIAL_SHARE_IMAGE } from "@/lib/site-seo";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -49,11 +50,11 @@ export const Route = createFileRoute("/")({
       { name: "description", content: "Soft, organic, beautifully made baby clothing for the first 24 months. 100% certified organic cotton, hand-loomed knits and feather-soft muslins." },
       { property: "og:title", content: "Mini's n More — Minis today, memories forever" },
       { property: "og:description", content: "Hand-finished organic baby clothing with thoughtful gifting and heirloom quality." },
-      { property: "og:image", content: "https://minisnmore.com/og-share.jpg" },
-      { name: "twitter:image", content: "https://minisnmore.com/og-share.jpg" },
+      { property: "og:image", content: SOCIAL_SHARE_IMAGE },
+      { name: "twitter:image", content: SOCIAL_SHARE_IMAGE },
     ],
     links: [
-      { rel: "canonical", href: "https://minisnmore.com/" },
+      { rel: "canonical", href: canonicalUrl("/") },
       { rel: "preload", as: "image", href: heroBaby, fetchPriority: "high" },
       { rel: "preload", as: "image", href: heroInfant },
       { rel: "preload", as: "image", href: lifestyle },

@@ -69,6 +69,27 @@ class OrderTrackingStatusResolverTest {
     }
 
     @Test
+    void resolve_expressBeesBookedAwbIsAwaitingPickup() {
+        CustomerOrder order = paidOrder()
+            .trackingNumber("XB-1")
+            .shipmentDate("2026-09-16")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("booked");
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("awaiting_pickup");
+    }
+
+    @Test
+    void resolve_expressBeesPickedUpIsShipped() {
+        CustomerOrder order = paidOrder()
+            .trackingNumber("XB-1")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("picked_up");
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("shipped");
+    }
+
+    @Test
     void resolve_confirmedForConfirmedPaidOrder() {
         CustomerOrder order = paidOrder().status(OrderStatus.CONFIRMED);
 

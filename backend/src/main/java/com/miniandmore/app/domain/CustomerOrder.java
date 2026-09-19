@@ -230,6 +230,32 @@ public class CustomerOrder implements Serializable {
     @Column(name = "shipment_cancellation_reason", length = 500)
     private String shipmentCancellationReason;
 
+    @Column(name = "package_weight_grams")
+    private Integer packageWeightGrams;
+
+    @Column(name = "package_length_cm")
+    private Integer packageLengthCm;
+
+    @Column(name = "package_breadth_cm")
+    private Integer packageBreadthCm;
+
+    @Column(name = "package_height_cm")
+    private Integer packageHeightCm;
+
+    @Column(name = "package_chargeable_weight_grams")
+    private Integer packageChargeableWeightGrams;
+
+    @Size(max = 40)
+    @Column(name = "package_courier_id", length = 40)
+    private String packageCourierId;
+
+    @Size(max = 120)
+    @Column(name = "package_courier_name", length = 120)
+    private String packageCourierName;
+
+    @Column(name = "packed_at")
+    private Instant packedAt;
+
     @Column(name = "ledgerly_tracking_last_pulled_at")
     private Instant ledgerlyTrackingLastPulledAt;
 
@@ -815,6 +841,11 @@ public class CustomerOrder implements Serializable {
         return shipmentCarrierStatus;
     }
 
+    public CustomerOrder shipmentCarrierStatus(String shipmentCarrierStatus) {
+        this.setShipmentCarrierStatus(shipmentCarrierStatus);
+        return this;
+    }
+
     public void setShipmentCarrierStatus(String shipmentCarrierStatus) {
         this.shipmentCarrierStatus = shipmentCarrierStatus;
     }
@@ -849,6 +880,110 @@ public class CustomerOrder implements Serializable {
 
     public void setShipmentCancellationReason(String shipmentCancellationReason) {
         this.shipmentCancellationReason = shipmentCancellationReason;
+    }
+
+    public Integer getPackageWeightGrams() {
+        return packageWeightGrams;
+    }
+
+    public CustomerOrder packageWeightGrams(Integer packageWeightGrams) {
+        this.setPackageWeightGrams(packageWeightGrams);
+        return this;
+    }
+
+    public void setPackageWeightGrams(Integer packageWeightGrams) {
+        this.packageWeightGrams = packageWeightGrams;
+    }
+
+    public Integer getPackageLengthCm() {
+        return packageLengthCm;
+    }
+
+    public CustomerOrder packageLengthCm(Integer packageLengthCm) {
+        this.setPackageLengthCm(packageLengthCm);
+        return this;
+    }
+
+    public void setPackageLengthCm(Integer packageLengthCm) {
+        this.packageLengthCm = packageLengthCm;
+    }
+
+    public Integer getPackageBreadthCm() {
+        return packageBreadthCm;
+    }
+
+    public CustomerOrder packageBreadthCm(Integer packageBreadthCm) {
+        this.setPackageBreadthCm(packageBreadthCm);
+        return this;
+    }
+
+    public void setPackageBreadthCm(Integer packageBreadthCm) {
+        this.packageBreadthCm = packageBreadthCm;
+    }
+
+    public Integer getPackageHeightCm() {
+        return packageHeightCm;
+    }
+
+    public CustomerOrder packageHeightCm(Integer packageHeightCm) {
+        this.setPackageHeightCm(packageHeightCm);
+        return this;
+    }
+
+    public void setPackageHeightCm(Integer packageHeightCm) {
+        this.packageHeightCm = packageHeightCm;
+    }
+
+    public Integer getPackageChargeableWeightGrams() {
+        return packageChargeableWeightGrams;
+    }
+
+    public CustomerOrder packageChargeableWeightGrams(Integer packageChargeableWeightGrams) {
+        this.setPackageChargeableWeightGrams(packageChargeableWeightGrams);
+        return this;
+    }
+
+    public void setPackageChargeableWeightGrams(Integer packageChargeableWeightGrams) {
+        this.packageChargeableWeightGrams = packageChargeableWeightGrams;
+    }
+
+    public String getPackageCourierId() {
+        return packageCourierId;
+    }
+
+    public CustomerOrder packageCourierId(String packageCourierId) {
+        this.setPackageCourierId(packageCourierId);
+        return this;
+    }
+
+    public void setPackageCourierId(String packageCourierId) {
+        this.packageCourierId = packageCourierId;
+    }
+
+    public String getPackageCourierName() {
+        return packageCourierName;
+    }
+
+    public CustomerOrder packageCourierName(String packageCourierName) {
+        this.setPackageCourierName(packageCourierName);
+        return this;
+    }
+
+    public void setPackageCourierName(String packageCourierName) {
+        this.packageCourierName = packageCourierName;
+    }
+
+    public Instant getPackedAt() {
+        return packedAt;
+    }
+
+    public CustomerOrder packedAt(Instant packedAt) {
+        this.setPackedAt(packedAt);
+        return this;
+    }
+
+    public void setPackedAt(Instant packedAt) {
+        this.packedAt = packedAt;
     }
 
     public Instant getLedgerlyTrackingLastPulledAt() {

@@ -1,20 +1,19 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { useAuth } from "@/hooks/useAuth";
 import { emailFieldError, passwordFieldError } from "@/lib/password-validation";
+import { staffHomePath } from "@/lib/staff-roles";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/login")({
-  head: () => ({ meta: [{ title: "Admin Login · Mini's n More" }] }),
+  head: () => ({ meta: [{ title: "Staff Login · Mini's n More" }] }),
   component: AdminLogin,
 });
 
 function AdminLogin() {
-  const { signIn, signUp, user, isAdmin, loading, signOut } = useAuth();
+  const { signIn, user, isAdmin, staffRole, loading, signOut } = useAuth();
   const nav = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordError, setPasswordError] = useState<string | undefined>();
@@ -25,8 +24,12 @@ function AdminLogin() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!loading && user && isAdmin) nav({ to: "/admin" });
-  }, [user, isAdmin, loading, nav]);
+    if (loading || !user) return;
+    const home = staffHomePath(staffRole);
+    if (home !== "/") {
+      void nav({ to: home as never });
+    }
+  }, [user, isAdmin, staffRole, loading, nav]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,29 +44,20 @@ function AdminLogin() {
       return;
     }
     setBusy(true);
-    const fn = mode === "signin" ? signIn : signUp;
-    const { error } = await fn(email, password);
+    const { error } = await signIn(email, password);
     setBusy(false);
     if (error) return toast.error(error);
-    if (mode === "signup") toast.success("Account created. Check your inbox to confirm.");
-    else nav({ to: "/admin" });
   };
 
   return (
     <div className="px-4 max-w-md mx-auto">
       <div className="glass-strong rounded-[2rem] p-8 md:p-10">
         <div className="text-xs uppercase tracking-[0.28em] text-primary">Atelier</div>
-        <h1 className="font-display text-3xl md:text-4xl mt-2">
-          Admin {mode === "signin" ? "sign in" : "sign up"}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-2">
-          {mode === "signin"
-            ? "Sign in to manage banners, coupons, blog and more."
-            : "Create an account, then grant admin access from the backend."}
-        </p>
-        {!loading && user && !isAdmin && (
+        <h1 className="font-display text-3xl md:text-4xl mt-2">Staff sign in</h1>
+        <p className="text-sm text-muted-foreground mt-2">Sign in with your Mini Admin invitation account.</p>
+        {!loading && user && !staffRole && (
           <div className="mt-4 rounded-2xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
-            <p>Signed in as {user.email ?? user.login}, but this account does not have admin access.</p>
+            <p>Signed in as {user.email ?? user.login}, but this account does not have staff access.</p>
             <button
               type="button"
               onClick={() => signOut()}
@@ -129,27 +123,9 @@ function AdminLogin() {
             type="submit"
             className="w-full rounded-full bg-primary text-primary-foreground py-3 font-medium hover:shadow-glow transition disabled:opacity-60"
           >
-            {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
+            {busy ? "Please wait…" : "Sign in"}
           </button>
         </form>
-        <div className="my-5 flex items-center gap-3 text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-          <div className="h-px flex-1 bg-border" /> or <div className="h-px flex-1 bg-border" />
-        </div>
-        <OAuthButtons redirectTo="/admin" />
-        <div className="mt-4 text-sm text-center">
-          <button
-            onClick={() => {
-              setMode(mode === "signin" ? "signup" : "signin");
-              setEmailError(undefined);
-              setEmailTouched(false);
-              setPasswordError(undefined);
-              setPasswordTouched(false);
-            }}
-            className="story-link text-primary"
-          >
-            {mode === "signin" ? "Need an account? Sign up" : "Have an account? Sign in"}
-          </button>
-        </div>
         <div className="mt-6 text-center">
           <Link to="/" className="text-xs text-muted-foreground story-link">
             ← Back to store

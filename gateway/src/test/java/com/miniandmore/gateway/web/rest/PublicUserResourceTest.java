@@ -35,7 +35,7 @@ class PublicUserResourceTest {
 
     @Test
     void getAllPublicUsers_returnsOk() {
-        when(userService.countManagedUsers()).thenReturn(Mono.just(1L));
+        when(userService.countPublicUsers()).thenReturn(Mono.just(1L));
         when(userService.getAllPublicUsers(any(Pageable.class))).thenReturn(Flux.just(new UserDTO()));
 
         webTestClient.get().uri("/api/users?page=0&size=20").exchange().expectStatus().isOk();

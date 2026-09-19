@@ -38,11 +38,14 @@ describe("order-tracking helpers", () => {
   it("marks Hand-wrapped complete only once shipped", () => {
     expect(resolveTrackingStage({ tracking_status: "shipped" })).toBe(2);
     expect(resolveTrackingStage({ status: "confirmed", tracking_status: "shipped" })).toBe(2);
+    expect(resolveTrackingStage({ tracking_status: "awaiting_pickup" })).toBe(1);
+    expect(trackingStatusLabel({ tracking_status: "awaiting_pickup" })).toBe("Waiting for pickup");
   });
 
   it("builds activity titles from tracking_status", () => {
     expect(trackingActivityTitle({ tracking_status: "confirmed" })).toBe("Order confirmed");
     expect(trackingActivityTitle({ tracking_status: "hand_wrapped" })).toBe("Hand-wrapped");
+    expect(trackingActivityTitle({ tracking_status: "awaiting_pickup" })).toBe("Waiting for pickup");
     expect(trackingActivityTitle({ tracking_status: "shipped" })).toBe("On the way");
     expect(trackingActivityTitle({ tracking_status: "delivered" })).toBe("Delivered");
     expect(trackingActivityTitle({ status: "cancelled" })).toBe("Order cancelled");

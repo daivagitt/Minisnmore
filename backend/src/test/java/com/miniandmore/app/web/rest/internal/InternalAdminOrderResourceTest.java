@@ -22,6 +22,7 @@ import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.service.LedgerlySyncService;
 import com.miniandmore.app.service.OrderCancellationService;
 import com.miniandmore.app.service.OrderEventService;
+import com.miniandmore.app.service.OrderPackageService;
 import com.miniandmore.app.service.OrderShipmentService;
 import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
@@ -94,6 +95,9 @@ class InternalAdminOrderResourceTest {
 
     @MockitoBean
     private OrderShipmentService orderShipmentService;
+
+    @MockitoBean
+    private OrderPackageService orderPackageService;
 
     @MockitoBean
     private OrderCancellationService orderCancellationService;
@@ -334,6 +338,65 @@ class InternalAdminOrderResourceTest {
             .andExpect(jsonPath("$.data.order.tracking_number").value("XB-1"))
             .andExpect(jsonPath("$.data.order.shipment_label_url").value("https://label/XB-1"))
             .andExpect(jsonPath("$.data.order.can_book_shipment").value(false));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
+    void packageRates_returnsChargeableWeightAndCouriers() throws Exception {
+        when(orderPackageService.previewRates("MNM-COD1", 500, 10, 10, 10)).thenReturn(
+            java.util.Map.of(
+                "actual_weight_grams",
+                500,
+                "volumetric_weight_grams",
+                200,
+                "chargeable_weight_grams",
+                500,
+                "preferred_courier_name",
+                "Surface Xpressbees 0.5 K.G",
+                "couriers",
+                java.util.List.of()
+            )
+        );
+
+        mockMvc
+            .perform(
+                post("/internal/v1/admin/orders/MNM-COD1/package-rates")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content("{\"weight_grams\":500,\"length_cm\":10,\"breadth_cm\":10,\"height_cm\":10}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.chargeable_weight_grams").value(500))
+            .andExpect(jsonPath("$.data.preferred_courier_name").value("Surface Xpressbees 0.5 K.G"));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
+    void completePackage_returnsHandWrappedOrder() throws Exception {
+        CustomerOrder wrapped = codOrder()
+            .status(OrderStatus.HAND_WRAPPED)
+            .paymentStatus(PaymentStatus.PAID)
+            .packageWeightGrams(500)
+            .packageLengthCm(12)
+            .packageBreadthCm(10)
+            .packageHeightCm(8)
+            .packageChargeableWeightGrams(500);
+        when(
+            orderPackageService.completePackage("MNM-COD1", 500, 12, 10, 8, "1", "Surface Xpressbees 0.5 K.G")
+        ).thenReturn(wrapped);
+
+        mockMvc
+            .perform(
+                post("/internal/v1/admin/orders/MNM-COD1/complete-package")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"weight_grams\":500,\"length_cm\":12,\"breadth_cm\":10,\"height_cm\":8,\"courier_id\":\"1\",\"courier_name\":\"Surface Xpressbees 0.5 K.G\"}"
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.order_number").value("MNM-COD1"))
+            .andExpect(jsonPath("$.data.order.status").value("hand_wrapped"))
+            .andExpect(jsonPath("$.data.order.package_weight_grams").value(500))
+            .andExpect(jsonPath("$.data.order.package_length_cm").value(12));
     }
 
     @Test

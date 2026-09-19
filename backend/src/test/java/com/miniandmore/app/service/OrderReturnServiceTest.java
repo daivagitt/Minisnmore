@@ -957,6 +957,19 @@ class OrderReturnServiceTest {
     }
 
     @Test
+    void markPickupFailed_notifiesCustomerAndAdmin() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.PICKUP_SCHEDULED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.markPickupFailed("RET-1", "Customer not available", "webhook");
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.PICKUP_FAILED);
+        verify(orderMailService).sendReturnUpdate(eq(orderReturn.getOrder()), eq(orderReturn));
+        verify(orderMailService).sendPickupFailedAdminNotice(eq(orderReturn.getOrder()), eq(orderReturn));
+    }
+
+    @Test
     void publicConfig_exposesFeatureFlags() {
         Map<String, Object> config = orderReturnService.publicConfig();
 
