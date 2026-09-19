@@ -125,6 +125,19 @@ describe("coupon functions", () => {
       get: 10,
       groupSize: 11,
     });
+    expect(couponEligibilityHint(
+      {
+        code: "BOGO1",
+        discount_type: "bogo",
+        discount_value: 100,
+        min_order: 0,
+        max_discount: null,
+        bogo_buy_qty: 0,
+        bogo_get_qty: 99,
+      },
+      1000,
+      10,
+    )).toBe("Add 1 more item to unlock");
   });
 
   it("formats BOGO offers and eligibility", () => {
