@@ -133,13 +133,13 @@ public class SiteSettingService {
         Optional<SiteSetting> existing = id != null
             ? siteSettingRepository.findById(id)
             : siteSettingRepository.findFirstByOrderByIdAsc();
-        if (existing.isEmpty()) {
-            return null;
-        }
-        SiteSetting entity = existing.get();
-        SiteSettingDTO dto = siteSettingMapper.toDto(entity);
-        entityManager.detach(entity);
-        return dto;
+        return existing
+            .map(entity -> {
+                SiteSettingDTO dto = siteSettingMapper.toDto(entity);
+                entityManager.detach(entity);
+                return dto;
+            })
+            .orElse(null);
     }
 
     private void notifyConfigChanged(SiteSettingDTO previous, SiteSettingDTO current) {
