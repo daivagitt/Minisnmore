@@ -1199,6 +1199,32 @@ class InternalAccountOrderResourceCoverageTest {
     }
 
     @Test
+    void validateCoupon_bogoCoupon_returnsCheapestItemDiscount() throws Exception {
+        Coupon coupon = new Coupon()
+            .code("BOGO1")
+            .active(true)
+            .discountType(DiscountType.BOGO)
+            .discountValue(BigDecimal.valueOf(100))
+            .minOrder(BigDecimal.ZERO)
+            .bogoBuyQty(1)
+            .bogoGetQty(1);
+        when(couponRepository.findOneByCodeIgnoreCase("BOGO1")).thenReturn(Optional.of(coupon));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/coupons/validate")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"code\":\"BOGO1\",\"subtotal\":1500,\"items\":[{\"qty\":1,\"price\":1000},{\"qty\":1,\"price\":500}]}"
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(true))
+            .andExpect(jsonPath("$.data.discount").value(500.0));
+    }
+
+    @Test
     void activeCoupons_hidesWelcome10ForReturningCustomer() throws Exception {
         when(customerOrderRepository.existsByUserLoginAndStatusNot("customer1", OrderStatus.CANCELLED)).thenReturn(true);
         Coupon welcome = new Coupon()

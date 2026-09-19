@@ -230,7 +230,7 @@ Store and commerce do **not** run Liquibase against the catalog DB.
 | Gateway routes | `gateway/src/main/resources/config/application.yml` |
 | FE data layer | `src/lib/backend-data.ts`, `src/lib/storefront.ts` |
 | Admin products | `src/routes/admin.products.tsx` |
-| Deploy / ports | `deploy/scripts/uat-microservices-isolated-pm2.sh`, `deploy/nginx/*` |
+| Deploy / ports | `deploy/scripts/prod-microservices-isolated-pm2.sh`, `deploy/nginx/*` |
 
 ---
 

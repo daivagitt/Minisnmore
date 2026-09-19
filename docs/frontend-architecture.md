@@ -51,7 +51,7 @@ File-based routes under `src/routes/`, flat-file dot-segment convention (e.g. `a
 
 - **`api.ts`** — low-level fetch client: builds URLs against `VITE_API_BASE_URL` (empty in dev, proxied by Vite), attaches the JWT (`mnm_backend_jwt` in `localStorage`) when `auth: true`, throws `ApiError` with status/body on failure.
 - **`storefront.ts`**, **`commerce.ts`**, **`backend-data.ts`** — typed wrappers over `api.ts` per domain (catalog reads, orders/coupons/returns, and shared response shaping/normalization respectively). `backend-data.ts` is the largest file (~1.4k lines) and centralizes DTO → UI-model mapping (e.g. parsing `Product.variantsJson`/`colorImagesJson` from the backend's JSON-string columns).
-- **`product-variants.ts`, `product-colors.ts`, `product-gallery.ts`, `product-flags.ts`, `product-sort.ts`, `product-search.ts`, `product-ages.ts`** — product-model helper logic (variant selection, swatch/color merging, gallery normalization, badges, sorting/filtering).
+- **`product-variants.ts`, `product-colors.ts`, `product-gallery.ts`, `product-flags.ts`, `product-sort.ts`, `product-search.ts`, `product-ages.ts`** — product-model helper logic (variant selection, swatch/color merging, gallery normalization, badges, sorting/filtering). See [pdp-gallery-and-lazy-images.md](./pdp-gallery-and-lazy-images.md) for PDP gallery resolution, derivatives, and `LazyImage`.
 - **`cart-coupon.ts`, `coupons.functions.ts`, `orders.functions.ts`, `wishlist.functions.ts`, `gift-flow.ts`** — checkout-adjacent business rules.
 - **`money.ts`, `dates.ts`, `pincode.ts`, `order-tracking.ts`** — formatting/utility helpers.
 - **`admin-*.ts`** — admin-form validation/normalization (image specs, numeric fields, variants matrix, subscribe-page fields).

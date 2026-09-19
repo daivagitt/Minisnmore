@@ -6,7 +6,7 @@
   },
   "auth": { "type": "noauth" },
   "variable": [
-    { "key": "baseUrl", "value": "https://uat.minisnmore.com" },
+    { "key": "baseUrl", "value": "https://minisnmore.com" },
     { "key": "productSlug", "value": "12" },
     { "key": "blogSlug", "value": "sample-slug" }
   ],

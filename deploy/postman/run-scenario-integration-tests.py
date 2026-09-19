@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Scenario-based UAT integration tests (coupon checkout, Zoho sync, shipment, returns).
+Scenario-based production integration tests (coupon checkout, Zoho sync, shipment, returns).
 
 Writes JSON + HTML under artifacts/scenario-integration/.
 """
@@ -24,11 +24,11 @@ OUT_DIR = Path(os.environ.get("SCENARIO_REPORT_DIR", ROOT / "artifacts/scenario-
 OUT_JSON = OUT_DIR / "scenario-integration-report.json"
 OUT_HTML = OUT_DIR / "index.html"
 
-BASE = os.environ.get("API_TEST_BASE_URL", "https://uat.minisnmore.com").rstrip("/")
+BASE = os.environ.get("API_TEST_BASE_URL", "https://minisnmore.com").rstrip("/")
 CUSTOMER_USER = os.environ.get("SCENARIO_CUSTOMER_USER", "irfanpatan9948@gmail.com")
 SCENARIO_PRODUCT_SLUG_DEFAULT = "basic-shorts"
 CUSTOMER_PASS = os.environ.get("SCENARIO_CUSTOMER_PASS", "Zero@1234")
-ADMIN_USER = os.environ.get("SCENARIO_ADMIN_USER", "admin@uat.minisnmore.com")
+ADMIN_USER = os.environ.get("SCENARIO_ADMIN_USER", "admin@minisnmore.com")
 ADMIN_PASS = os.environ.get("SCENARIO_ADMIN_PASS", "admin6")
 COUPON_CODE = os.environ.get("SCENARIO_COUPON_CODE", "WELCOME10")
 PRODUCT_ID = os.environ.get("SCENARIO_PRODUCT_ID", "26523")

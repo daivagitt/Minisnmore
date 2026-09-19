@@ -19,7 +19,14 @@ vi.mock("@/lib/api", () => ({
   api: { post: postMock, get: getMock },
 }));
 
-import { listActiveCoupons, validateCoupon } from "./coupons.functions";
+import {
+  couponEligibilityHint,
+  couponValidationData,
+  formatCouponOffer,
+  listActiveCoupons,
+  resolveBogoQuantities,
+  validateCoupon,
+} from "./coupons.functions";
 
 describe("coupon functions", () => {
   beforeEach(() => {
@@ -85,5 +92,61 @@ describe("coupon functions", () => {
 
     await expect(listActiveCoupons()).resolves.toEqual({ coupons });
     expect(getMock).toHaveBeenCalledWith("/api/v1/coupons/active", { auth: true });
+  });
+
+  it("includes cart lines when validating a coupon", async () => {
+    postMock.mockResolvedValueOnce({ ok: true, code: "BOGO1", discount: 400 });
+    const payload = couponValidationData("BOGO1", 1400, [
+      { qty: 1, unitPrice: 1000 },
+      { qty: 1, unitPrice: 400 },
+    ]);
+    await expect(validateCoupon({ data: payload })).resolves.toEqual({
+      ok: true,
+      code: "BOGO1",
+      discount: 400,
+    });
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/coupons/validate",
+      {
+        code: "BOGO1",
+        subtotal: 1400,
+        items: [
+          { qty: 1, price: 1000 },
+          { qty: 1, price: 400 },
+        ],
+      },
+      { auth: true },
+    );
+  });
+
+  it("clamps BOGO quantities from active coupon payloads", () => {
+    expect(resolveBogoQuantities({ bogo_buy_qty: 0, bogo_get_qty: 99 })).toEqual({
+      buy: 1,
+      get: 10,
+      groupSize: 11,
+    });
+  });
+
+  it("formats BOGO offers and eligibility", () => {
+    const bogo = {
+      code: "BOGO1",
+      discount_type: "bogo" as const,
+      discount_value: 100,
+      min_order: 0,
+      max_discount: null,
+      bogo_buy_qty: 1,
+      bogo_get_qty: 1,
+    };
+    expect(formatCouponOffer(bogo)).toBe("Buy 1 Get 1 Free");
+    expect(couponEligibilityHint(bogo, 1000, 1)).toBe("Add 1 more item to unlock");
+    expect(couponEligibilityHint(bogo, 1400, 2)).toBeNull();
+    expect(
+      formatCouponOffer({
+        ...bogo,
+        discount_value: 50,
+        bogo_buy_qty: 2,
+        bogo_get_qty: 1,
+      }),
+    ).toBe("Buy 2 Get 1 at 50% off");
   });
 });

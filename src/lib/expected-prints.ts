@@ -9,7 +9,7 @@ function colorKey(name: string): string {
 }
 
 /**
- * UAT / Ledgerly display print names per parent SKU (Print-1 → index 0).
+ * Ledgerly display print names per parent SKU (Print-1 → index 0).
  * Used when the API still stores generic Print-N slot labels in colors_json.
  */
 export const EXPECTED_PRINTS_BY_SKU: Record<string, readonly string[]> = {

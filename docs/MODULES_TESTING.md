@@ -109,8 +109,8 @@ Obtain JWT: `POST http://localhost:8080/api/authenticate` with admin credentials
 | # | Item | Script / doc |
 |---|------|----------------|
 | 35 | Build JARs | `backend` + `gateway` `./mvnw -Pprod -DskipTests package` |
-| 36 | PM2 on VPS | `deploy/scripts/uat-microservices-pm2.sh` |
-| 37 | Nginx | `deploy/nginx/uat.minisnmore.com.locations.conf` → :8080 |
+| 36 | PM2 on VPS | `deploy/scripts/prod-microservices-pm2.sh` |
+| 37 | Nginx | `deploy/nginx/minisnmore.com.locations.conf` → :8080 |
 | 38 | Jenkins UAT1 | `BUILD_*` for core + gateway + store + commerce; `DEPLOY_UAT` → `/var/www/uat1/mini_and_more` |
 
 ---

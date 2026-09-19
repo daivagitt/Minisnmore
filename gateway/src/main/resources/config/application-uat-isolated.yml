@@ -1,6 +1,6 @@
-# Isolated UAT microservices stack (store :9181, commerce :9182). Does not use the monolith on :8081.
-# OAuth: non-empty defaults let the JVM start when uat.env has APPLE_CLIENT_ID= (unused on UAT).
-# Real GOOGLE_* / FACEBOOK_* from /etc/mini-and-more/uat.env override these for social login.
+# Isolated production microservices routes (store :9181, commerce :9182).
+# Profile name `uat-isolated` is baked into the currently deployed gateway JAR.
+# Real GOOGLE_* / FACEBOOK_* from /etc/mini-and-more/prod.env override these for social login.
 spring:
   security:
     oauth2:

@@ -2,7 +2,8 @@
 
 > **Updated 2026-08-03:** Per-print galleries and Ledgerly `colorImagesJson` sync are now implemented.  
 > **See the full guide:** [sku-wise-print-and-ledgerly-images.md](./sku-wise-print-and-ledgerly-images.md)  
-> **Swatch fallback chain:** [swatch-url-fallback.md](./swatch-url-fallback.md)
+> **Swatch fallback chain:** [swatch-url-fallback.md](./swatch-url-fallback.md)  
+> **PDP gallery, derivatives & LazyImage:** [pdp-gallery-and-lazy-images.md](./pdp-gallery-and-lazy-images.md)
 
 How product photos reach the Mini's n More storefront, what Ledgerly sync includes, and what the legacy Zoho integration used to do.
 
@@ -15,7 +16,7 @@ How product photos reach the Mini's n More storefront, what Ledgerly sync includ
 
 **Per-print lifestyle galleries can sync from Ledgerly** via `colorImagesJson` (downloaded to R2 when `LEDGERLY_SYNC_PRODUCT_IMAGES=true`).
 
-**Print swatches** (`swatchUrl`) are **not** part of the Ledgerly protocol — upload in Admin or use `uat-restore-print-swatch-images.py`.
+**Print swatches** (`swatchUrl`) are **not** part of the Ledgerly protocol — upload in Admin or use `prod-restore-print-swatch-images.py`.
 
 **Listing hero** can sync via Ledgerly `imageUrl`.
 
@@ -30,7 +31,7 @@ Admin → Products (upload) → R2/S3 → images_json in DB → Storefront API �
 ```
 
 1. An admin uploads images on the **Products** page (or sets image URLs).
-2. Uploads go to R2 via `S3_*` settings in `/etc/mini-and-more/uat.env`.
+2. Uploads go to R2 via `S3_*` settings in `/etc/mini-and-more/prod.env`.
 3. Public URLs are stored on the product record (`images_json`).
 4. The storefront loads products from `/api/v1/products` and maps:
    - First image → main `image`
@@ -82,7 +83,7 @@ Documented in [ledgerly-uat-cutover.md](./ledgerly-uat-cutover.md) under **R2 / 
 
 ## Legacy Zoho image pull (not active on UAT)
 
-The old **Zoho integration** service (`mini-uat-ms-integration`, port 9183) included `ZohoItemImageSync`:
+The old **Zoho integration** service (`mini-prod-ms-integration`, port 9183) included `ZohoItemImageSync`:
 
 - On **pull products** from Zoho Books, with `ZOHO_SYNC_PRODUCT_IMAGES=true`:
   - Download the Zoho item image
@@ -97,7 +98,7 @@ Requirements (historical):
 
 See [zoho-books-synced-fields.md](./zoho-books-synced-fields.md) (section 4) and [zoho-integration-test-scenarios.md](./zoho-integration-test-scenarios.md) (section 2.1–2.3).
 
-**UAT status:** `mini-uat-ms-integration` is **stopped**; cutover is to Ledgerly. This Zoho image path is **not** running.
+**UAT status:** `mini-prod-ms-integration` is **stopped**; cutover is to Ledgerly. This Zoho image path is **not** running.
 
 ---
 

@@ -156,18 +156,34 @@ function Shop() {
         </label>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <button
-          type="button"
-          onClick={() => setShowFilters((v) => !v)}
-          className="glass rounded-full px-4 py-2.5 text-sm flex items-center gap-2 lg:hidden"
+      <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
+        <div className="flex items-center justify-between gap-3 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setShowFilters((v) => !v)}
+            className="glass rounded-full px-4 py-2.5 text-sm flex items-center gap-2"
+          >
+            <SlidersHorizontal className="h-4 w-4" /> Filters
+          </button>
+          <select
+            value={filters.sort ?? "new"}
+            onChange={(e) => patchSearch({ sort: e.target.value as ShopSearch["sort"] })}
+            className="glass rounded-full px-4 py-2.5 text-sm bg-transparent"
+          >
+            <option value="new">Newest</option>
+            <option value="lo">Price: Low to high</option>
+            <option value="hi">Price: High to low</option>
+          </select>
+        </div>
+
+        <div
+          className={`${showFilters ? "flex" : "hidden"} lg:flex w-full flex-wrap gap-2 items-center lg:flex-1 lg:w-auto`}
         >
-          <SlidersHorizontal className="h-4 w-4" /> Filters
-        </button>
-        <div className={`${showFilters ? "flex" : "hidden"} lg:flex flex-wrap gap-2 items-center flex-1`}>
           {categories.length > 0 && (
             <>
-              <span className="text-xs uppercase tracking-wider text-muted-foreground mr-1">Category</span>
+              <span className="w-full text-xs uppercase tracking-wider text-muted-foreground lg:w-auto lg:mr-1">
+                Category
+              </span>
               {categories.map((c) => (
                 <button
                   key={c.id}
@@ -180,7 +196,9 @@ function Shop() {
               ))}
             </>
           )}
-          <span className="text-xs uppercase tracking-wider text-muted-foreground ml-1 mr-1">Age</span>
+          <span className="w-full text-xs uppercase tracking-wider text-muted-foreground lg:w-auto lg:ml-1 lg:mr-1">
+            Age
+          </span>
           {SHOP_AGE_FILTERS.map((a) => (
             <button
               key={a.value}
@@ -191,7 +209,9 @@ function Shop() {
               {a.label}
             </button>
           ))}
-          <span className="text-xs uppercase tracking-wider text-muted-foreground ml-1 mr-1">Fabric</span>
+          <span className="w-full text-xs uppercase tracking-wider text-muted-foreground lg:w-auto lg:ml-1 lg:mr-1">
+            Fabric
+          </span>
           {SHOP_FILTER_FABRICS.map((f) => (
             <button
               key={f}
@@ -212,10 +232,11 @@ function Shop() {
             </button>
           )}
         </div>
+
         <select
           value={filters.sort ?? "new"}
           onChange={(e) => patchSearch({ sort: e.target.value as ShopSearch["sort"] })}
-          className="glass rounded-full px-4 py-2.5 text-sm bg-transparent"
+          className="hidden lg:block glass rounded-full px-4 py-2.5 text-sm bg-transparent"
         >
           <option value="new">Newest</option>
           <option value="lo">Price: Low to high</option>

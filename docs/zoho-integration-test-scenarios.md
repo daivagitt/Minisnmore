@@ -7,7 +7,7 @@
 **Product:** Mini's n More storefront (Admin + Spring Boot + Zoho Books v3)  
 **Audience:** QA, engineering team lead, release sign-off  
 **Last updated:** 2026-06-02  
-**Environment under test:** UAT (`https://uat.minisnmore.com`) or local (`http://localhost:5173` + API **gateway** `:8080`)
+**Environment under test:** UAT (`https://minisnmore.com`) or local (`http://localhost:5173` + API **gateway** `:8080`)
 
 ---
 

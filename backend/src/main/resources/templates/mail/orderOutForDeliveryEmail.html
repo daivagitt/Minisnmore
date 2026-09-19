@@ -82,7 +82,7 @@
                         <span th:if="${!#strings.isEmpty(trackingCarrier)}" th:text="' · ' + ${trackingCarrier}"></span>
                       </div>
                       <div>
-                        <strong th:text="#{email.order.label.deliveredTo}">Delivered to</strong>
+                        <strong th:text="#{email.order.label.address}">Delivering to</strong>
                         <span th:text="${!#strings.isEmpty(addressName)} ? ${addressName} : ${customerName}">Customer</span>
                       </div>
                     </td>

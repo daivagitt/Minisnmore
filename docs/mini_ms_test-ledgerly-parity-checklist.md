@@ -14,7 +14,7 @@
 
 - **URL:** `https://github.com/developersqobox-org/mini_and_more.git` (workspace path `/var/www/uat1/mini_ms_test`)
 - **Branch / SHA:** workspace on **`uat3`** @ `d9694b0` (2026-07-14). Remote default `origin/HEAD` → **`uat`**. `origin/prod` tip is older (`3a1df26`, 2026-05-25) — treat **this tree as Ledgerly cutover source**, not a confirmed prod deploy SHA.
-- **Deployed env (from examples):** prod `https://minisnmore.com`; UAT `https://uat.minisnmore.com`
+- **Deployed env (from examples):** prod `https://minisnmore.com`; UAT `https://minisnmore.com`
 - **Zoho / Ledgerly / dual:** **Ledgerly** (columns renamed; admin UI `/admin/integrations/ledgerly`). Zoho = docs + Liquibase history + deploy leftovers.
 
 ---
@@ -27,7 +27,7 @@
 | Default branch (remote) | `uat` |
 | This checkout | `uat3` @ `d9694b0` (2026-07-14) |
 | Last deploy commit SHA + date | **Not confirmed for prod.** `origin/prod` tip `3a1df26` (2026-05-25) looks pre-cutover; this tree is post-Ledgerly. |
-| Deployed env (prod domain) | `https://minisnmore.com` (UAT: `https://uat.minisnmore.com`) |
+| Deployed env (prod domain) | `https://minisnmore.com` (UAT: `https://minisnmore.com`) |
 | Catalog / commerce service name + port | Catalog core holds Ledgerly client (`backend/`, port **8084** / UAT isolated **9184**). Commerce service separate (**8082** / **9182**) — not the Ledgerly HTTP client. |
 | Gateway / store service name + port | Gateway **8080** / **9180**; store **8081** / **9181** |
 | Still running Zoho integration service? | **Code path: N.** Cutover docs say stop after smoke. Deploy scripts may still mention `:8083`/`:9183` / `ZOHO_*`; hollow `integration/` remnant only. |
@@ -37,7 +37,7 @@
 
 ## 1. Env / config (sanitized — no live secrets)
 
-From `backend/src/main/resources/config/application.yml` + `deploy/env/*.env.example` + live UAT `/etc/mini-and-more/uat.env`:
+From `backend/src/main/resources/config/application.yml` + `deploy/env/*.env.example` + live UAT `/etc/mini-and-more/prod.env`:
 
 ```text
 LEDGERLY_API_BASE_URL=https://lender.qualityoutsidethebox.org/api
@@ -67,7 +67,7 @@ ZOHO_* still set on this UAT host?  No ZOHO_* in current uat.env
 
 - `backend/src/main/resources/config/application.yml` (`application.ledgerly.*`)
 - `backend/src/main/java/com/miniandmore/app/config/ApplicationProperties.java` (Ledgerly nested; no Zoho class)
-- `deploy/env/uat.env.example`
+- `deploy/env/prod.env.example`
 - `deploy/env/prod.env.example`
 
 ---

@@ -574,6 +574,26 @@ class InternalAdminStoreResourceTest {
     }
 
     @Test
+    void createCoupon_bogoType_returnsSavedDto() throws Exception {
+        CouponDTO dto = couponDto(18L, "BOGO1");
+        dto.setDiscountType(com.miniandmore.app.domain.enumeration.DiscountType.BOGO);
+        dto.setBogoBuyQty(1);
+        dto.setBogoGetQty(1);
+        when(couponService.save(any(CouponDTO.class))).thenReturn(dto);
+
+        mockMvc
+            .perform(
+                post("/internal/v1/admin/coupons")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"code\":\"BOGO1\",\"discountType\":\"BOGO\",\"discountValue\":100,\"minOrder\":0,\"bogoBuyQty\":1,\"bogoGetQty\":1,\"active\":true}"
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.code").value("BOGO1"));
+    }
+
+    @Test
     void updateCoupon_returnsUpdatedDto() throws Exception {
         when(couponRepository.existsById(9L)).thenReturn(true);
         CouponDTO dto = couponDto(9L, "WELCOME15");

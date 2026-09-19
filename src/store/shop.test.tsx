@@ -155,7 +155,7 @@ describe("ShopProvider", () => {
     await userEvent.click(screen.getByRole("button", { name: "add" }));
     await userEvent.click(screen.getByRole("button", { name: "zero" }));
     expect(screen.getByTestId("count")).toHaveTextContent("1");
-    await userEvent.click(screen.getByRole("button", { name: "Remove only" }));
+    await userEvent.click(screen.getByRole("button", { name: "Remove" }));
     expect(screen.getByTestId("count")).toHaveTextContent("0");
 
     await userEvent.click(screen.getByRole("button", { name: "add" }));

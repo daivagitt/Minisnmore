@@ -1,4 +1,4 @@
-# UAT profile: route to local edge services without relying on Consul discovery.
+# Localhost edge-service routes without Consul (legacy profile name `uat`).
 spring:
   cloud:
     gateway:

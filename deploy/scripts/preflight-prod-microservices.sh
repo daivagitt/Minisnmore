@@ -2,7 +2,7 @@
 # Pre-deploy checks before replacing prod monolith with microservices.
 set -euo pipefail
 
-REPO_ROOT="${REPO_ROOT:-/var/www/blossom-blueprint-craft}"
+REPO_ROOT="${REPO_ROOT:-/var/www/uat1/mini_ms_test}"
 ENV_FILE="${ENV_FILE:-/etc/mini-and-more/prod.env}"
 NGINX_SNIPPET="${NGINX_SNIPPET:-/etc/nginx/snippets/minisnmore-prod-locations.conf}"
 FAIL=0
@@ -101,7 +101,7 @@ fi
 echo ""
 echo "=== Legacy PM2 / ports ==="
 if command -v pm2 >/dev/null 2>&1; then
-  if pm2 jlist 2>/dev/null | grep -qE 'mini-backend-prod|mini-uat-backend'; then
+  if pm2 jlist 2>/dev/null | grep -qE 'mini-backend-prod|mini-prod-backend'; then
     warn "Legacy monolith PM2 process still listed — prod-microservices-pm2.sh will remove it"
   else
     ok "No legacy mini-backend-prod in pm2 list"

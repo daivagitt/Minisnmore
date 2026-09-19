@@ -49,6 +49,16 @@ public class Coupon implements Serializable {
     @Column(name = "max_discount", precision = 21, scale = 2)
     private BigDecimal maxDiscount;
 
+    @Min(1)
+    @Max(10)
+    @Column(name = "bogo_buy_qty", nullable = false)
+    private Integer bogoBuyQty = 1;
+
+    @Min(1)
+    @Max(10)
+    @Column(name = "bogo_get_qty", nullable = false)
+    private Integer bogoGetQty = 1;
+
     @Column(name = "expires_at")
     private Instant expiresAt;
 
@@ -136,6 +146,32 @@ public class Coupon implements Serializable {
         this.maxDiscount = maxDiscount;
     }
 
+    public Integer getBogoBuyQty() {
+        return this.bogoBuyQty;
+    }
+
+    public Coupon bogoBuyQty(Integer bogoBuyQty) {
+        this.setBogoBuyQty(bogoBuyQty);
+        return this;
+    }
+
+    public void setBogoBuyQty(Integer bogoBuyQty) {
+        this.bogoBuyQty = bogoBuyQty;
+    }
+
+    public Integer getBogoGetQty() {
+        return this.bogoGetQty;
+    }
+
+    public Coupon bogoGetQty(Integer bogoGetQty) {
+        this.setBogoGetQty(bogoGetQty);
+        return this;
+    }
+
+    public void setBogoGetQty(Integer bogoGetQty) {
+        this.bogoGetQty = bogoGetQty;
+    }
+
     public Instant getExpiresAt() {
         return this.expiresAt;
     }
@@ -191,6 +227,8 @@ public class Coupon implements Serializable {
             ", discountValue=" + getDiscountValue() +
             ", minOrder=" + getMinOrder() +
             ", maxDiscount=" + getMaxDiscount() +
+            ", bogoBuyQty=" + getBogoBuyQty() +
+            ", bogoGetQty=" + getBogoGetQty() +
             ", expiresAt='" + getExpiresAt() + "'" +
             ", active='" + getActive() + "'" +
             "}";

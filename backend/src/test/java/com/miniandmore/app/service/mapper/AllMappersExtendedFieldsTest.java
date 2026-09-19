@@ -46,6 +46,8 @@ class AllMappersExtendedFieldsTest {
             .discountValue(BigDecimal.TEN)
             .minOrder(BigDecimal.valueOf(500))
             .maxDiscount(BigDecimal.valueOf(100))
+            .bogoBuyQty(1)
+            .bogoGetQty(1)
             .expiresAt(Instant.parse("2026-12-31T00:00:00Z"))
             .active(true);
 
@@ -54,6 +56,8 @@ class AllMappersExtendedFieldsTest {
 
         assertThat(roundTrip.getDiscountType()).isEqualTo(DiscountType.PERCENT);
         assertThat(roundTrip.getMinOrder()).isEqualByComparingTo("500");
+        assertThat(roundTrip.getBogoBuyQty()).isEqualTo(1);
+        assertThat(roundTrip.getBogoGetQty()).isEqualTo(1);
         assertThat(roundTrip.getActive()).isTrue();
     }
 

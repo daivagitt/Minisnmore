@@ -348,11 +348,20 @@ export function getCouponValidationErrors(row: CouponRow): string[] {
   else if (!/^[A-Z0-9_-]+$/.test(code.toUpperCase())) {
     errors.push("Coupon code can contain only letters, numbers, _ and -.");
   }
-  if (!["flat", "percent"].includes(row.discount_type)) {
-    errors.push("Discount type must be percent or flat.");
+  if (!["flat", "percent", "bogo"].includes(row.discount_type)) {
+    errors.push("Discount type must be percent, flat, or BOGO.");
   }
-  const discountError = requireNumberField(row.discount_value, "Discount value");
+  const discountError =
+    row.discount_type === "bogo"
+      ? requireNumberField(row.discount_value, "BOGO percent off", { min: 1, max: 100 })
+      : requireNumberField(row.discount_value, "Discount value");
   if (discountError) errors.push(discountError);
+  if (row.discount_type === "bogo") {
+    const buyError = requireNumberField(row.bogo_buy_qty, "BOGO buy quantity", { min: 1, max: 10 });
+    if (buyError) errors.push(buyError);
+    const getError = requireNumberField(row.bogo_get_qty, "BOGO get quantity", { min: 1, max: 10 });
+    if (getError) errors.push(getError);
+  }
   return errors;
 }
 
@@ -1035,16 +1044,20 @@ export type CouponRow = {
   discount_value: number | null;
   min_order: number | null;
   max_discount: number | null;
+  bogo_buy_qty: number | null;
+  bogo_get_qty: number | null;
   expires_at: string | null;
   active: boolean;
 };
 type CouponDto = {
   id?: number;
   code: string;
-  discountType: "PERCENT" | "FLAT";
+  discountType: "PERCENT" | "FLAT" | "BOGO";
   discountValue: number;
   minOrder: number;
   maxDiscount?: number | null;
+  bogoBuyQty?: number | null;
+  bogoGetQty?: number | null;
   expiresAt?: string | null;
   active: boolean;
 };
@@ -1052,10 +1065,13 @@ type CouponDto = {
 export const fromCouponDto = (dto: CouponDto): CouponRow => ({
   id: dto.id == null ? undefined : String(dto.id),
   code: dto.code,
-  discount_type: dto.discountType === "FLAT" ? "flat" : "percent",
+  discount_type:
+    dto.discountType === "FLAT" ? "flat" : dto.discountType === "BOGO" ? "bogo" : "percent",
   discount_value: dto.discountValue == null ? null : Number(dto.discountValue),
   min_order: dto.minOrder == null ? null : Number(dto.minOrder),
   max_discount: dto.maxDiscount == null ? null : Number(dto.maxDiscount),
+  bogo_buy_qty: dto.bogoBuyQty == null ? 1 : Number(dto.bogoBuyQty),
+  bogo_get_qty: dto.bogoGetQty == null ? 1 : Number(dto.bogoGetQty),
   expires_at: dto.expiresAt ?? null,
   active: !!dto.active,
 });
@@ -1063,10 +1079,13 @@ export const fromCouponDto = (dto: CouponDto): CouponRow => ({
 const toCouponDto = (row: CouponRow): CouponDto => ({
   id: idValue(row.id),
   code: row.code,
-  discountType: row.discount_type === "flat" ? "FLAT" : "PERCENT",
+  discountType:
+    row.discount_type === "flat" ? "FLAT" : row.discount_type === "bogo" ? "BOGO" : "PERCENT",
   discountValue: row.discount_value as number,
   minOrder: numberFieldOr(row.min_order, 0),
   maxDiscount: row.max_discount == null ? null : Number(row.max_discount),
+  bogoBuyQty: numberFieldOr(row.bogo_buy_qty, 1),
+  bogoGetQty: numberFieldOr(row.bogo_get_qty, 1),
   expiresAt: row.expires_at,
   active: !!row.active,
 });

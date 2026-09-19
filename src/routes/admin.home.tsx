@@ -7,6 +7,7 @@ import { HomeHeroBannersPanel } from "@/components/admin/HomeHeroBannersPanel";
 import { HomeBlogStripEditor } from "@/components/admin/HomeBlogStripEditor";
 import { HomeReviewsEditor } from "@/components/admin/HomeReviewsEditor";
 import { HomeSectionProductsPicker } from "@/components/admin/HomeSectionProductsPicker";
+import { HomeWatchShopEditor } from "@/components/admin/HomeWatchShopEditor";
 import { toast } from "sonner";
 import { ADMIN_NAME_MAX_LEN } from "@/lib/backend-data";
 import { showApiError, showValidationErrors } from "@/lib/ui-errors";
@@ -34,6 +35,12 @@ import {
   validateHomeByAgeDrafts,
   type HomeByAgeCardDraft,
 } from "@/lib/home-by-age";
+import {
+  validateWatchReelDrafts,
+  watchReelDraftsFromPayload,
+  watchReelsToPayload,
+  type WatchReelDraft,
+} from "@/lib/watch-reels";
 import {
   getHomeBlogStripSlugErrors,
   homeBlogCardsFromPayload,
@@ -76,7 +83,8 @@ const SECTION_HINTS: Record<string, string> = {
   trending: "Shows five trending products. Pick up to five or leave empty for automatic picks.",
   new_arrivals: "Shows five new arrivals. Pick up to five or leave empty for new-arrival flagged items.",
   featured: "Featured tab strip — up to five products per tab when manually picked.",
-  watch_shop: "Shoppable video reels. Toggle visibility; reel videos are wired in the storefront theme.",
+  watch_shop:
+    "Shoppable video reels. Add a public MP4 link for each reel and relate it to a product SKU.",
   fabric_story:
     "Organic fabric video + copy beside it. Optional title/subtitle override the default “Fabric story” heading.",
   brand_story: "Founders / mission block with photo. Title overrides the default “Our story” heading.",
@@ -89,7 +97,7 @@ const SECTION_HINTS: Record<string, string> = {
 
 function HomePage() {
   const [rows, setRows] = useState<Section[]>([]);
-  const [products, setProducts] = useState<{ slug: string; name: string }[]>([]);
+  const [products, setProducts] = useState<{ slug: string; name: string; sku: string }[]>([]);
   const [blogPosts, setBlogPosts] = useState<{ slug: string; title: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -106,7 +114,9 @@ function HomePage() {
       showApiError(sectionsResult.reason, "Could not load home sections");
     }
     if (productsResult.status === "fulfilled") {
-      setProducts(productsResult.value.map(({ slug, name }) => ({ slug, name })));
+      setProducts(
+        productsResult.value.map(({ slug, name, sku }) => ({ slug, name, sku: sku?.trim() ?? "" })),
+      );
     } else {
       showApiError(productsResult.reason, "Could not load products for this page");
     }
@@ -176,6 +186,18 @@ function HomePage() {
           blog_cards: homeBlogCardsToPayload(normalized),
           blog_slugs: normalized.map((card) => card.slug),
         },
+      };
+    }
+    if (s.key === "watch_shop") {
+      const drafts = watchReelDraftsFromPayload(s.payload);
+      const errors = validateWatchReelDrafts(drafts);
+      if (errors.length) {
+        showValidationErrors(errors);
+        return;
+      }
+      section = {
+        ...s,
+        payload: { ...s.payload, reels: watchReelsToPayload(drafts) },
       };
     }
     if (s.key === "reviews") {
@@ -310,6 +332,16 @@ function HomePage() {
                           blog_slugs: blog_cards.map((card) => card.slug).filter(Boolean),
                         },
                       })
+                    }
+                  />
+                )}
+
+                {s.key === "watch_shop" && (
+                  <HomeWatchShopEditor
+                    products={products}
+                    payload={s.payload}
+                    onChange={(reels: WatchReelDraft[]) =>
+                      update(i, { payload: { ...s.payload, reels } })
                     }
                   />
                 )}

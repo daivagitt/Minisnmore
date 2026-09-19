@@ -33,6 +33,14 @@ public class CouponDTO implements Serializable {
     @DecimalMin(value = "0")
     private BigDecimal maxDiscount;
 
+    @Min(1)
+    @Max(10)
+    private Integer bogoBuyQty = 1;
+
+    @Min(1)
+    @Max(10)
+    private Integer bogoGetQty = 1;
+
     private Instant expiresAt;
 
     @NotNull
@@ -86,6 +94,22 @@ public class CouponDTO implements Serializable {
         this.maxDiscount = maxDiscount;
     }
 
+    public Integer getBogoBuyQty() {
+        return bogoBuyQty;
+    }
+
+    public void setBogoBuyQty(Integer bogoBuyQty) {
+        this.bogoBuyQty = bogoBuyQty;
+    }
+
+    public Integer getBogoGetQty() {
+        return bogoGetQty;
+    }
+
+    public void setBogoGetQty(Integer bogoGetQty) {
+        this.bogoGetQty = bogoGetQty;
+    }
+
     public Instant getExpiresAt() {
         return expiresAt;
     }
@@ -133,6 +157,8 @@ public class CouponDTO implements Serializable {
             ", discountValue=" + getDiscountValue() +
             ", minOrder=" + getMinOrder() +
             ", maxDiscount=" + getMaxDiscount() +
+            ", bogoBuyQty=" + getBogoBuyQty() +
+            ", bogoGetQty=" + getBogoGetQty() +
             ", expiresAt='" + getExpiresAt() + "'" +
             ", active='" + getActive() + "'" +
             "}";

@@ -10,6 +10,9 @@ describe("admin-nav", () => {
     const products = filterAdminNavItems(ADMIN_NAV_ITEMS, "sku");
     expect(products.map((item) => item.to)).toEqual(["/admin/products"]);
 
+    const bogo = filterAdminNavItems(ADMIN_NAV_ITEMS, "bogo");
+    expect(bogo.map((item) => item.to)).toEqual(["/admin/coupons"]);
+
     const reviews = filterAdminNavItems(ADMIN_NAV_ITEMS, "mom review");
     expect(reviews.map((item) => item.to)).toEqual(["/admin/home"]);
   });

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { RemoveFromCartDialog } from "./RemoveFromCartDialog";
 
 describe("RemoveFromCartDialog", () => {
-  it("shows save to wishlist and remove only when open", () => {
+  it("shows save to wishlist and remove when open", () => {
     render(
       <RemoveFromCartDialog
         open
@@ -20,7 +20,7 @@ describe("RemoveFromCartDialog", () => {
       screen.getByText("Save “Petal Romper” to your wishlist instead, or remove it from cart."),
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: "Save to wishlist" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Remove only" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Remove" })).toBeTruthy();
   });
 
   it("calls save and remove handlers", async () => {
@@ -40,7 +40,7 @@ describe("RemoveFromCartDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save to wishlist" }));
     expect(onMoveToWishlist).toHaveBeenCalledOnce();
 
-    await userEvent.click(screen.getByRole("button", { name: "Remove only" }));
+    await userEvent.click(screen.getByRole("button", { name: "Remove" }));
     expect(onRemoveOnly).toHaveBeenCalledOnce();
   });
 });

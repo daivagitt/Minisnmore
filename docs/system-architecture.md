@@ -69,7 +69,7 @@ Postgres (gateway)  127.0.0.1:5433
 Redis   127.0.0.1:6379
 ```
 
-All Java services run under **PM2** (`deploy/scripts/prod-microservices-pm2.sh` / `uat-microservices-pm2.sh`), built via `./mvnw -Pprod -DskipTests clean package` per module and health-checked against `/management/health/{liveness,readiness}`. The frontend is built with Vite and served separately (see `uat-frontend-pm2.sh`). See `docs/PRODUCTION_READINESS.md` and `docs/LOCAL_DEV.md` for the full runbook (note: those docs still list the defunct `integration` service — treat that as stale).
+All Java services run under **PM2** (`deploy/scripts/prod-microservices-pm2.sh` / `prod-microservices-pm2.sh`), built via `./mvnw -Pprod -DskipTests clean package` per module and health-checked against `/management/health/{liveness,readiness}`. The frontend is built with Vite and served separately (see `prod-frontend-pm2.sh`). See `docs/PRODUCTION_READINESS.md` and `docs/LOCAL_DEV.md` for the full runbook (note: those docs still list the defunct `integration` service — treat that as stale).
 
 ## Known architectural discrepancies (worth fixing)
 

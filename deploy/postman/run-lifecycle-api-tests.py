@@ -19,14 +19,14 @@ from pathlib import Path
 
 import os
 
-BASE = os.environ.get("API_TEST_BASE_URL", "https://uat.minisnmore.com").rstrip("/")
+BASE = os.environ.get("API_TEST_BASE_URL", "https://minisnmore.com").rstrip("/")
 SPEC_PATH = Path(__file__).resolve().parent / "openapi.snapshot.json"
 GEN_PATH = Path(__file__).resolve().parent / "generate-module-wise-collection.py"
 _default_out = Path(__file__).resolve().parent / "api-run-report.json"
 OUT_PATH = Path(os.environ.get("API_LIFECYCLE_REPORT", _default_out))
 OPENAPI_URL = os.environ.get("API_OPENAPI_URL", f"{BASE}/v3/api-docs")
 
-ADMIN_USER = os.environ.get("API_LIFECYCLE_ADMIN_USER", "admin@uat.minisnmore.com")
+ADMIN_USER = os.environ.get("API_LIFECYCLE_ADMIN_USER", "admin@minisnmore.com")
 ADMIN_PASS = os.environ.get("API_LIFECYCLE_ADMIN_PASS", "admin6")
 CUSTOMER_USER = "irfanpatan9948@gmail.com"
 CUSTOMER_PASS = "Zero@1234"

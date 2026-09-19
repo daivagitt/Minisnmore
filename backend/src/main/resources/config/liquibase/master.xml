@@ -86,5 +86,6 @@
     <include file="config/liquibase/changelog/20260913120000_add_about_page_json.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260916120000_add_product_size_notes_json.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260916140000_add_product_details_kicker.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260919120000_add_coupon_bogo_fields.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>
 

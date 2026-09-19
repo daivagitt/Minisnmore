@@ -4,7 +4,7 @@
 
 **Last updated:** 2026-08-04
 
-**Related:** [SKU-wise print mapping, image uploads & Ledgerly](./sku-wise-print-and-ledgerly-images.md)
+**Related:** [SKU-wise print mapping, image uploads & Ledgerly](./sku-wise-print-and-ledgerly-images.md) · [PDP gallery & LazyImage](./pdp-gallery-and-lazy-images.md)
 
 ---
 
@@ -96,7 +96,7 @@ There is **no** automatic placeholder CDN URL. Missing media → lifestyle → h
 ## 2. How Excel maps print swatches → print names
 
 **File:** `SKU WISE PRINT  FINAL DETAILS AS ON 25-07-26.xlsx` (repo root)  
-**Script:** `deploy/scripts/uat-sku-wise-print-import.py`
+**Script:** `deploy/scripts/prod-sku-wise-print-import.py`
 
 Print **names** and print **swatch image URLs** are two different stages.
 
@@ -175,7 +175,7 @@ API read merges Ledgerly `colorImagesJson` into colours via `mergeColorImagesInt
 
 ## 4. Optional: restore dedicated `swatchUrl`s from Excel
 
-**Script:** `deploy/scripts/uat-restore-print-swatch-images.py`
+**Script:** `deploy/scripts/prod-restore-print-swatch-images.py`
 
 After names exist on products:
 
@@ -195,9 +195,9 @@ After names exist on products:
 4. **Does not** overwrite lifestyle `imageUrl` / `imageUrls`.
 
 ```bash
-set -a && source /etc/mini-and-more/uat.env && set +a
+set -a && source /etc/mini-and-more/prod.env && set +a
 GATEWAY_URL=http://127.0.0.1:9180 ADMIN_USER=admin ADMIN_PASS=admin6 \
-  python3 deploy/scripts/uat-restore-print-swatch-images.py
+  python3 deploy/scripts/prod-restore-print-swatch-images.py
 ```
 
 Admin → Products → colour swatch upload also sets `swatchUrl` directly (correct when PRINT NAMES has a name but no image in col C).
@@ -206,7 +206,7 @@ Admin → Products → colour swatch upload also sets `swatchUrl` directly (corr
 
 ## 5. Re-import: keep media when names change
 
-`uat-sku-wise-print-import.py` → `merge_preserve_media()` copies `swatchUrl`, `hex`, and galleries from the previous DB row onto the new print name:
+`prod-sku-wise-print-import.py` → `merge_preserve_media()` copies `swatchUrl`, `hex`, and galleries from the previous DB row onto the new print name:
 
 ```
 1. exact norm_key(new name) in old colors_json
@@ -238,7 +238,7 @@ Non-empty listing `images_json` is kept across re-import when already set.
 |---------|--------------|-----|
 | Picker is a flat beige/tan square | No `swatchUrl` and no lifestyle URLs | Run swatch restore or upload lifestyle/swatch in admin |
 | Wrong print **name** on a SKU | Image match / override wrong | Fix `PRINT_NAME_MANUAL_OVERRIDES` or PRINT NAMES sheet; re-run import |
-| Name OK, wrong/missing **swatch image** | Restore not run, or alias/name mismatch | `uat-restore-print-swatch-images.py` or admin upload |
+| Name OK, wrong/missing **swatch image** | Restore not run, or alias/name mismatch | `prod-restore-print-swatch-images.py` or admin upload |
 | BLUE shows “baby blue” artwork | Expected via `SWATCH_NAME_ALIASES` | Rename print in sheet or change alias map |
 | Swatch in picker, empty PDP photos | Swatch-only print | Upload lifestyle gallery for that print |
 | Swatches gone after Ledgerly sync | Ledgerly does not carry `swatchUrl` | Re-run swatch restore |
@@ -253,8 +253,8 @@ Non-empty listing `images_json` is kept across re-import when already set.
 | Listing hero collection | `src/lib/product-colors.ts` → `collectStorefrontCardImages()` |
 | PDP gallery (no swatch) | `src/lib/product-gallery.ts` → `galleryForSelectedColor()` |
 | Print picker UI | `src/components/VariantPickers.tsx` |
-| Excel → print names | `deploy/scripts/uat-sku-wise-print-import.py` → `build_print_name_map()` |
-| Excel → `swatchUrl` | `deploy/scripts/uat-restore-print-swatch-images.py` |
+| Excel → print names | `deploy/scripts/prod-sku-wise-print-import.py` → `build_print_name_map()` |
+| Excel → `swatchUrl` | `deploy/scripts/prod-restore-print-swatch-images.py` |
 | Backend listing backfill | `ProductColorImagesSupport.ensureProductImagesFromColorGalleries()` |
 | Tests | `src/lib/product-colors.merge.test.ts` |
 
@@ -262,8 +262,8 @@ Non-empty listing `images_json` is kept across re-import when already set.
 
 ```bash
 # 1. Names + stock + variants from xlsx (preserves existing media)
-python3 deploy/scripts/uat-sku-wise-print-import.py
+python3 deploy/scripts/prod-sku-wise-print-import.py
 
 # 2. Dedicated swatch URLs from PRINT NAMES sheet → R2 → DB
-python3 deploy/scripts/uat-restore-print-swatch-images.py
+python3 deploy/scripts/prod-restore-print-swatch-images.py
 ```

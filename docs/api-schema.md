@@ -91,7 +91,7 @@ Backed by `InternalAdminStoreResource`:
 
 | Path | Method | Purpose |
 |---|---|---|
-| `/api/v1/admin/import/sku-wise-print` | POST (multipart) | SKU-wise print import — shells out to `deploy/scripts/uat-sku-wise-print-import.py` |
+| `/api/v1/admin/import/sku-wise-print` | POST (multipart) | SKU-wise print import — shells out to `deploy/scripts/prod-sku-wise-print-import.py` |
 | `/api/v1/admin/uploads/presign` | POST | S3/R2 presigned upload URL |
 | `/api/v1/admin/uploads` | POST (multipart) | Direct upload to S3/R2 |
 | `/api/v1/admin/uploads/objects` | GET | List stored objects |
@@ -119,7 +119,7 @@ Backed by `LedgerlyAdminResource`, protected by backend's filter-chain rule for 
 
 ### Ledgerly webhook (inbound)
 
-`InternalLedgerlyWebhookResource`, `POST /internal/v1/ledgerly/webhooks` — headers `X-Ledgerly-Signature`, `X-Ledgerly-Event`. **Reachability gap**: documented as `https://uat.minisnmore.com/internal/v1/ledgerly/webhooks` but no committed Nginx config or gateway route proxies `/internal/v1/*` — likely relies on an out-of-repo Nginx block. Needs verification/fix.
+`InternalLedgerlyWebhookResource`, `POST /internal/v1/ledgerly/webhooks` — headers `X-Ledgerly-Signature`, `X-Ledgerly-Event`. **Reachability gap**: documented as `https://minisnmore.com/internal/v1/ledgerly/webhooks` but no committed Nginx config or gateway route proxies `/internal/v1/*` — likely relies on an out-of-repo Nginx block. Needs verification/fix.
 
 ## Zoho Books admin — `/api/v1/admin/zoho` (backend directly, via store)
 

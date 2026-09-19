@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "https://uat.minisnmore.com",
+      "url": "https://minisnmore.com",
       "description": "UAT (public)"
     },
     {
@@ -4955,7 +4955,8 @@
             "type": "string",
             "enum": [
               "PERCENT",
-              "FLAT"
+              "FLAT",
+              "BOGO"
             ]
           },
           "discountValue": {
@@ -4969,6 +4970,16 @@
           "maxDiscount": {
             "type": "number",
             "minimum": 0
+          },
+          "bogoBuyQty": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "bogoGetQty": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
           },
           "expiresAt": {
             "type": "string",
@@ -5557,6 +5568,24 @@
           "replacement_size"
         ]
       },
+      "CouponLineRequest": {
+        "type": "object",
+        "properties": {
+          "qty": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "price": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "qty",
+          "price"
+        ]
+      },
       "CouponValidationRequest": {
         "type": "object",
         "properties": {
@@ -5568,6 +5597,13 @@
           "subtotal": {
             "type": "number",
             "minimum": 0
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "$ref": "#/components/schemas/CouponLineRequest"
+            }
           }
         },
         "required": [

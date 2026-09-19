@@ -1,6 +1,6 @@
 {
   "id": "9dc96782-2a8d-45aa-9cc3-5af6738c50d0",
-  "name": "Minis n More \u2014 API testing (UAT)",
+  "name": "Minis n More \u2014 API testing (production)",
   "values": [
     {
       "key": "activationKey",
@@ -16,7 +16,7 @@
     },
     {
       "key": "baseUrl",
-      "value": "https://uat.minisnmore.com",
+      "value": "https://minisnmore.com",
       "type": "default",
       "enabled": true
     },

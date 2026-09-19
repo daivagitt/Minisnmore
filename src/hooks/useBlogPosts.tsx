@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { getCachedBlogPosts, loadBlogPosts, subscribeBlogPosts } from "@/lib/storefront";
-import { posts as seedPosts, type BlogPost } from "@/data/blog";
+import { type BlogPost } from "@/data/blog";
 
 export function useBlogPosts(): BlogPost[] {
-  const [list, setList] = useState<BlogPost[]>(getCachedBlogPosts() ?? seedPosts);
+  const [list, setList] = useState<BlogPost[]>(getCachedBlogPosts() ?? []);
   useEffect(() => {
     let alive = true;
-    const cached = getCachedBlogPosts();
-    if (!cached) {
+    if (!getCachedBlogPosts()) {
       loadBlogPosts()
         .then((p) => {
           if (alive) setList(p);
@@ -27,5 +26,5 @@ export function useBlogPosts(): BlogPost[] {
 export function useBlogPost(slug: string | undefined): { post: BlogPost | undefined; loading: boolean } {
   const all = useBlogPosts();
   const post = slug ? all.find((p) => p.slug === slug) : undefined;
-  return { post, loading: all.length === 0 };
+  return { post, loading: getCachedBlogPosts() === null };
 }

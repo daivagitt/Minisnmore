@@ -26,7 +26,7 @@ export function NumberField({
   readOnly?: boolean;
 }) {
   return (
-    <Field label={label} hint={hint}>
+    <Field label={label} hint={hint} required={required}>
       <input
         type="number"
         className={`${inputCls()}${readOnly ? " opacity-70 cursor-default" : ""}`}

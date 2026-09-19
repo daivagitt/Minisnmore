@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Scenario-based UAT integration tests → artifacts/scenario-integration/
+# Scenario-based production integration tests → artifacts/scenario-integration/
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-export API_TEST_BASE_URL="${API_TEST_BASE_URL:-https://uat.minisnmore.com}"
+export API_TEST_BASE_URL="${API_TEST_BASE_URL:-https://minisnmore.com}"
 
-if [ -f /etc/mini-and-more/uat.env ]; then
+if [ -f /etc/mini-and-more/prod.env ]; then
   set -a
   # shellcheck source=/dev/null
-  . /etc/mini-and-more/uat.env
+  . /etc/mini-and-more/prod.env
   set +a
 fi
 

@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * Runs the SKU-wise print catalog import (deploy/scripts/uat-sku-wise-print-import.py) against an
+ * Runs the SKU-wise print catalog import (deploy/scripts/prod-sku-wise-print-import.py) against an
  * uploaded spreadsheet. Reached only via the store service's internal proxy — never exposed directly.
  */
 @RestController
@@ -26,7 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class InternalAdminImportResource {
 
     private static final Logger LOG = LoggerFactory.getLogger(InternalAdminImportResource.class);
-    private static final String SCRIPT_RELATIVE_PATH = "deploy/scripts/uat-sku-wise-print-import.py";
+    private static final String SCRIPT_RELATIVE_PATH = "deploy/scripts/prod-sku-wise-print-import.py";
 
     @PostMapping("/sku-wise-print")
     public ResponseEntity<Map<String, Object>> importSkuWisePrint(@RequestParam("file") MultipartFile file) {
@@ -50,9 +50,13 @@ public class InternalAdminImportResource {
         }
 
         try {
+            Path importScript = repoRoot.resolve(SCRIPT_RELATIVE_PATH);
+            if (!Files.isRegularFile(importScript)) {
+                importScript = repoRoot.resolve("deploy/scripts/uat-sku-wise-print-import.py");
+            }
             ProcessBuilder pb = new ProcessBuilder(
                 "python3",
-                repoRoot.resolve(SCRIPT_RELATIVE_PATH).toString(),
+                importScript.toString(),
                 "--file",
                 tempFile.toString()
             );
@@ -114,7 +118,13 @@ public class InternalAdminImportResource {
     private static Path resolveRepoRoot() {
         Path cwd = Path.of(System.getProperty("user.dir"));
         for (Path candidate : new Path[] { cwd, cwd.getParent() }) {
-            if (candidate != null && Files.isRegularFile(candidate.resolve(SCRIPT_RELATIVE_PATH))) {
+            if (candidate == null) {
+                continue;
+            }
+            if (Files.isRegularFile(candidate.resolve(SCRIPT_RELATIVE_PATH))) {
+                return candidate;
+            }
+            if (Files.isRegularFile(candidate.resolve("deploy/scripts/uat-sku-wise-print-import.py"))) {
                 return candidate;
             }
         }

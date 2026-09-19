@@ -516,6 +516,28 @@ describe("storefront cache", () => {
     expect(subscriber).toHaveBeenCalledWith(posts);
   });
 
+  it("returns an empty blog list when the backend has no posts", async () => {
+    const storefront = await loadStorefront({ blogPosts: [] });
+    await expect(storefront.loadBlogPosts()).resolves.toEqual([]);
+  });
+
+  it("returns an empty blog list when the blog API fails", async () => {
+    vi.resetModules();
+    const listBlogPosts = vi.fn(async () => {
+      throw new Error("blog down");
+    });
+    vi.doMock("@/lib/backend-data", () => ({
+      listProducts: vi.fn(async () => []),
+      listCategories: vi.fn(async () => []),
+      listBlogPosts,
+      getPolicy: vi.fn(async () => null),
+      getSiteSettings: vi.fn(async () => null),
+    }));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const storefront = await import("./storefront");
+    await expect(storefront.loadBlogPosts()).resolves.toEqual([]);
+  });
+
   it("caches policy lookups and notifies slug subscribers", async () => {
     const policy = {
       slug: "privacy",

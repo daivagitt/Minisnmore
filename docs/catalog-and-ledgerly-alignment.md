@@ -352,7 +352,7 @@ See [`docs/product-images-and-ledgerly-sync.md`](./product-images-and-ledgerly-s
 | Duplicate SKU errors | Same SKU on two products or variant = parent | Enforce unique SKUs in admin |
 | Store price wrong after pull | Confused MRP vs selling | Apply pricing contract above |
 | Variant OOS wrong after Ledgerly stock change | Pull sent parent SKU stock only for VARIANTS item | Use per-variant SKU or `variantsJson` on inventory pull |
-| UAT admin still shows “UAT price” | Stale frontend `dist/` | Rebuild + restart `mini-uat-frontend` |
+| UAT admin still shows “UAT price” | Stale frontend `dist/` | Rebuild + restart `mini-prod-frontend` |
 
 ---
 

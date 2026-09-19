@@ -288,7 +288,28 @@ describe("backend data mappers", () => {
         minOrder: 500,
         active: true,
       }),
-    ).toMatchObject({ id: "8", discount_type: "flat", max_discount: null });
+    ).toMatchObject({ id: "8", discount_type: "flat", max_discount: null, bogo_buy_qty: 1, bogo_get_qty: 1 });
+  });
+
+  it("maps BOGO coupon DTOs", () => {
+    expect(
+      fromCouponDto({
+        id: 9,
+        code: "BOGO1",
+        discountType: "BOGO",
+        discountValue: 100,
+        minOrder: 0,
+        bogoBuyQty: 1,
+        bogoGetQty: 1,
+        active: true,
+      }),
+    ).toMatchObject({
+      id: "9",
+      discount_type: "bogo",
+      discount_value: 100,
+      bogo_buy_qty: 1,
+      bogo_get_qty: 1,
+    });
   });
 });
 
@@ -451,6 +472,8 @@ describe("backend data API calls", () => {
       discount_value: 10,
       min_order: 0,
       max_discount: null,
+      bogo_buy_qty: 1,
+      bogo_get_qty: 1,
       expires_at: null,
       active: true,
     });

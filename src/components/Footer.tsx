@@ -271,6 +271,13 @@ export function Footer() {
           <FooterColumn className="shrink-0">
                 <FooterHeading>Care</FooterHeading>
                 <FooterNavList>
+                  {isVisible("blog") ? (
+                    <FooterNavItem>
+                      <Link to="/blog" className="story-link text-muted-foreground hover:text-foreground">
+                        Blogs
+                      </Link>
+                    </FooterNavItem>
+                  ) : null}
                   {isVisible("track") ? (
                     <FooterNavItem>
                       <Link to="/track" className="story-link text-muted-foreground hover:text-foreground">

@@ -3,7 +3,7 @@
 What the **legacy Zoho Books integration** synchronized between Mini's n More Admin / storefront and **Zoho Books (India)** before the **Ledgerly** cutover.
 
 **Status:** Deprecated — replaced by Ledgerly ([ledgerly-integration-test-scenarios.md](./ledgerly-integration-test-scenarios.md)).  
-**Service:** `mini-uat-ms-integration` (port **9183**), classes in `integration/` JAR (`ZohoBooksSyncService`, `ZohoItemImageSync`, `ZohoStockSync`, `ZohoItemCustomFields`).  
+**Service:** `mini-prod-ms-integration` (port **9183**), classes in `integration/` JAR (`ZohoBooksSyncService`, `ZohoItemImageSync`, `ZohoStockSync`, `ZohoItemCustomFields`).  
 **Admin UI:** `/admin/zoho`  
 **Last updated:** 2026-06-30
 

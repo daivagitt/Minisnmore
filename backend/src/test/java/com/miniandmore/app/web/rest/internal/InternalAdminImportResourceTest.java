@@ -126,7 +126,9 @@ class InternalAdminImportResourceTest {
     private static boolean scriptExistsAtRepoRoot() {
         Path cwd = Path.of(System.getProperty("user.dir"));
         for (Path candidate : new Path[] { cwd, cwd.getParent() }) {
-            if (candidate != null && Files.isRegularFile(candidate.resolve("deploy/scripts/uat-sku-wise-print-import.py"))) {
+            if (candidate != null
+                && (Files.isRegularFile(candidate.resolve("deploy/scripts/prod-sku-wise-print-import.py"))
+                    || Files.isRegularFile(candidate.resolve("deploy/scripts/uat-sku-wise-print-import.py")))) {
                 return true;
             }
         }

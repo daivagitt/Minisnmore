@@ -3,7 +3,7 @@ import { broadcastStorefrontInvalidation } from "@/lib/storefront-cache-broadcas
 import { agesFromSizes, sortSizesAsc } from "@/lib/product-ages";
 import { normalizeStorefrontColors, resolveStorefrontProductImages, hasPerColorGalleries } from "@/lib/product-colors";
 import { type Product, type Fabric } from "@/data/products";
-import { posts as seedPosts, type BlogPost } from "@/data/blog";
+import { type BlogPost } from "@/data/blog";
 import { parseVariantsJson, storefrontListPricing } from "@/lib/product-variants";
 import { DEFAULT_STORE_DISCOUNT_PERCENT, sellingFromMrp } from "@/lib/pricing";
 import type { ProductSizeChart } from "@/lib/product-size-charts";
@@ -13,7 +13,7 @@ import { normalizeDetailsKicker } from "@/lib/product-details-kicker";
 
 /**
  * Storefront data layer.
- * Live catalog only — an empty or failed API response must not fall back to mock seed products.
+ * Live catalog only — an empty or failed API response must not fall back to mock seed products or blogs.
  * Module-level caches dedupe in-flight requests across components.
  */
 
@@ -256,7 +256,7 @@ type DbBlogRow = {
 };
 
 function mapBlogPost(row: DbBlogRow): BlogPost {
-  const cover = row.cover_url ?? seedPosts[0]?.cover ?? "";
+  const cover = row.cover_url ?? "";
   const body = (row.content ?? "")
     .split(/\n{2,}/)
     .map((p) => p.trim())
@@ -300,17 +300,17 @@ export async function loadBlogPosts(): Promise<BlogPost[]> {
           published_at: row.published_at,
         }),
       );
-      const list = mapped.length > 0 ? mapped : seedPosts;
-      blogCache = list;
-      blogSubs.forEach((fn) => fn(list));
-      return list;
+      blogCache = mapped;
+      blogSubs.forEach((fn) => fn(mapped));
+      return mapped;
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error("loadBlogPosts", error);
       }
-      blogCache = seedPosts;
-      blogSubs.forEach((fn) => fn(seedPosts));
-      return seedPosts;
+      const empty: BlogPost[] = [];
+      blogCache = empty;
+      blogSubs.forEach((fn) => fn(empty));
+      return empty;
     } finally {
       blogInflight = null;
     }

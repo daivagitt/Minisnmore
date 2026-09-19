@@ -23,7 +23,7 @@ OUT = REPO / "docs" / "sku-wise-print-mapping-verification.md"
 
 spec = importlib.util.spec_from_file_location(
     "uat_sku_import",
-    REPO / "deploy/scripts/uat-sku-wise-print-import.py",
+    REPO / "deploy/scripts/prod-sku-wise-print-import.py",
 )
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)

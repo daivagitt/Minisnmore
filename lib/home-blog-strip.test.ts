@@ -55,18 +55,17 @@ describe("home-blog-strip", () => {
 
   it("uses admin-picked posts when provided", () => {
     const all = [post("a"), post("b"), post("c")];
-    const picked = resolveHomeBlogStripPosts(all, ["c", "missing", "a"], []);
+    const picked = resolveHomeBlogStripPosts(all, ["c", "missing", "a"]);
     expect(picked.map((p) => p.slug)).toEqual(["c", "a"]);
   });
 
   it("shows latest API posts when no slugs are set", () => {
     const all = ["a", "b", "c", "d", "e", "f"].map(post);
-    const auto = resolveHomeBlogStripPosts(all, [], []);
+    const auto = resolveHomeBlogStripPosts(all, []);
     expect(auto.map((p) => p.slug)).toEqual(["a", "b", "c", "d", "e"]);
   });
 
-  it("falls back to seed posts when API list is empty", () => {
-    const auto = resolveHomeBlogStripPosts([], [], [post("seed-a"), post("seed-b")]);
-    expect(auto.map((p) => p.slug)).toEqual(["seed-a", "seed-b"]);
+  it("shows nothing when the API list is empty", () => {
+    expect(resolveHomeBlogStripPosts([], [])).toEqual([]);
   });
 });
