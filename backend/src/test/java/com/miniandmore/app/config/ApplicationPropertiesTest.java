@@ -21,5 +21,9 @@ class ApplicationPropertiesTest {
         assertThat(properties.getInventory()).isNotNull();
         properties.getInventory().getReservationRelease().setFixedDelayMs(120_000L);
         assertThat(properties.getInventory().getReservationRelease().getFixedDelayMs()).isEqualTo(120_000L);
+
+        assertThat(properties.getMail().getConfigChangeTo()).isEqualTo("info@stoltglobal.com");
+        properties.getMail().setConfigChangeTo("ops@example.com");
+        assertThat(properties.getMail().getConfigChangeTo()).isEqualTo("ops@example.com");
     }
 }

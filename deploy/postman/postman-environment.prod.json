@@ -1,0 +1,87 @@
+{
+  "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+  "name": "Minis n More — Auth (UAT)",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "https://minisnmore.com",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "username",
+      "value": "admin",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "customerEmail",
+      "value": "irfanpatan9948@gmail.com",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "password",
+      "value": "admin6",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "email",
+      "value": "admin@minisnmore.com",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "login",
+      "value": "admin",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "firstName",
+      "value": "Test",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "lastName",
+      "value": "User",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "activationKey",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "resetKey",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "newPassword",
+      "value": "Zero@1234",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "customerPassword",
+      "value": "Zero@1234",
+      "type": "secret",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment",
+  "_postman_exported_at": "2026-05-25T00:00:00.000Z",
+  "_postman_exported_using": "blossom-blueprint-craft"
+}

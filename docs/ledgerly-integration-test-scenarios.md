@@ -2,7 +2,7 @@
 
 **Product:** Mini's n More storefront (Admin + Spring Boot + Ledgerly commerce API)  
 **Audience:** QA, engineering team lead, release sign-off  
-**Environment:** UAT (`https://uat.minisnmore.com`) or local (`http://localhost:5173` + gateway `:8080`)
+**Environment:** UAT (`https://minisnmore.com`) or local (`http://localhost:5173` + gateway `:8080`)
 
 Ledgerly replaces the former Zoho Books integration. Sync runs in **catalog core** (`backend/`, `:8084`); admin APIs are exposed via **store** (`:8081`) at `/api/v1/admin/ledgerly/**`.
 

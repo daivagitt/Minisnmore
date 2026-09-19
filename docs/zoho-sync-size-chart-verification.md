@@ -50,8 +50,8 @@ Mockito requires JVM attachment, so the sandbox-blocked backend run was repeated
 ## UAT deployment — 2026-09-08
 
 - Deployed the verified backend and frontend, including the variant conflict guard, to this workspace's UAT services only. Production was not restarted or modified.
-- Release marker: `https://uat.minisnmore.com/RELEASE.txt`, first line `variant-conflict-20260908`.
-- Restarted `mini-uat-ms-catalog-core` (:9184) and `mini-uat-frontend` (:3000), retaining their existing PM2 configuration/environment.
+- Release marker: `https://minisnmore.com/RELEASE.txt`, first line `variant-conflict-20260908`.
+- Restarted `mini-prod-ms-catalog-core` (:9184) and `mini-prod-frontend` (:3000), retaining their existing PM2 configuration/environment.
 - Catalog readiness and liveness reported `UP`; the public catalog API and storefront returned HTTP 200 after restart.
 - Backend SHA-256: `e6676e2a855f6a4d916dee94b72dca429e3bb1adeffac000b4d2a4f772e8daef`.
 - Rollback artifacts: `deploy/backups/variant-conflict.0LWGUc/miniandmore-0.0.1-SNAPSHOT.jar` and `deploy/backups/variant-conflict.0LWGUc/dist-previous/` (also a separate `dist/` copy).

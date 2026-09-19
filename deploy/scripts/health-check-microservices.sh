@@ -2,11 +2,11 @@
 # Health check for gateway + catalog (run on host where services listen on localhost).
 set -euo pipefail
 
-GATEWAY_URL="${GATEWAY_URL:-http://127.0.0.1:8080}"
-CATALOG_CORE_URL="${CATALOG_CORE_URL:-http://127.0.0.1:8084}"
-STORE_URL="${STORE_URL:-http://127.0.0.1:8081}"
-COMMERCE_URL="${COMMERCE_URL:-http://127.0.0.1:8082}"
-INTEGRATION_URL="${INTEGRATION_URL:-http://127.0.0.1:8083}"
+GATEWAY_URL="${GATEWAY_URL:-http://127.0.0.1:9180}"
+CATALOG_CORE_URL="${CATALOG_CORE_URL:-http://127.0.0.1:9184}"
+STORE_URL="${STORE_URL:-http://127.0.0.1:9181}"
+COMMERCE_URL="${COMMERCE_URL:-http://127.0.0.1:9182}"
+INTEGRATION_URL="${INTEGRATION_URL:-http://127.0.0.1:9183}"
 FAIL=0
 
 check() {

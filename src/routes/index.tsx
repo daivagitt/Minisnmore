@@ -41,7 +41,6 @@ import giftBox from "@/assets/gift-box.jpg";
 import heroInfant from "@/assets/hero-infant-organic.jpg";
 import heroFounders from "@/assets/hero-founders-atelier.jpg";
 import fabricStoryVideo from "@/assets/videos/fabric-story-children.mp4";
-import { watchReels } from "@/data/reels";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -355,6 +354,9 @@ function Home() {
       </section>
       )}
 
+      {/* WATCH & SHOP — shoppable video reels */}
+      {isEnabled("watch_shop") && <WatchAndShop />}
+
       {/* GIFTS */}
       {isEnabled("gifts") && (
       <section className="px-4 md:px-6">
@@ -612,16 +614,17 @@ function FabricStorySection({
 
 function WatchAndShop() {
   const live = useProducts();
-  const { byKey, loaded: homeLoaded } = useHomeSections();
+  const { byKey, loaded: homeLoaded, titleFor, subtitleFor } = useHomeSections();
   const reels = useMemo(() => {
     if (!homeLoaded) return [];
     const payload = byKey.get("watch_shop")?.payload;
     const fromCms = parseWatchReels(
       payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {},
     );
-    const reelSource = fromCms.length > 0 ? fromCms : watchReels;
-    return resolveWatchShopReels(reelSource, live);
+    return resolveWatchShopReels(fromCms, live);
   }, [live, byKey, homeLoaded]);
+  const heading = titleFor("watch_shop", "Watch & Shop");
+  const kicker = subtitleFor("watch_shop", "Tap a moment to shop the look");
 
   if (!homeLoaded) {
     return (
@@ -629,9 +632,9 @@ function WatchAndShop() {
         <div className="flex items-end justify-between mb-5">
           <div>
             <div className="text-xs uppercase tracking-[0.28em] text-muted-foreground inline-flex items-center gap-2">
-              <Play className="h-3.5 w-3.5 text-primary" /> Tap a moment to shop the look
+              <Play className="h-3.5 w-3.5 text-primary" /> {kicker}
             </div>
-            <h2 className="font-display text-2xl md:text-3xl mt-2">Watch & Shop</h2>
+            <h2 className="font-display text-2xl md:text-3xl mt-2">{heading}</h2>
           </div>
         </div>
         <WatchShopSkeleton />
@@ -646,16 +649,16 @@ function WatchAndShop() {
       <div className="flex items-end justify-between mb-5">
         <div>
           <div className="text-xs uppercase tracking-[0.28em] text-muted-foreground inline-flex items-center gap-2">
-            <Play className="h-3.5 w-3.5 text-primary" /> Tap a moment to shop the look
+            <Play className="h-3.5 w-3.5 text-primary" /> {kicker}
           </div>
-          <h2 className="font-display text-2xl md:text-3xl mt-2">Watch & Shop</h2>
+          <h2 className="font-display text-2xl md:text-3xl mt-2">{heading}</h2>
         </div>
         <Link to="/shop" className="story-link text-sm hidden md:inline">Browse all</Link>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-5">
         {reels.map((r, i) => (
           <motion.div
-            key={r.slug}
+            key={`${r.sku || r.slug}-${i}`}
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-60px" }}

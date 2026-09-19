@@ -6,4 +6,5 @@ package com.miniandmore.app.domain.enumeration;
 public enum DiscountType {
     PERCENT,
     FLAT,
+    BOGO,
 }

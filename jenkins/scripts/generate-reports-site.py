@@ -238,7 +238,7 @@ def main() -> None:
     parser.add_argument("--output-dir", required=True)
     default_sonar = os.environ.get(
         "SONAR_PUBLIC_URL",
-        os.environ.get("SONAR_REPORT_URL", "https://uat.minisnmore.com/sonar"),
+        os.environ.get("SONAR_REPORT_URL", "https://minisnmore.com/sonar"),
     )
     parser.add_argument("--sonar-url", default=default_sonar)
     args = parser.parse_args()

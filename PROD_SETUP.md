@@ -594,7 +594,7 @@ Jenkins **Deploy UAT** must run with **BUILD_FRONTEND** and **BUILD_BACKEND** en
 After deploy, verify the live release:
 
 ```bash
-curl -fsS https://uat.minisnmore.com/RELEASE.txt
+curl -fsS https://minisnmore.com/RELEASE.txt
 # First line = Jenkins BUILD_NUMBER, second line = git commit SHA
 ```
 
@@ -605,11 +605,11 @@ On the VPS:
 ```bash
 cd /var/www/uat1/mini_and_more/current
 cat dist/RELEASE.txt
-pm2 logs mini-uat-frontend --lines 30
-pm2 describe mini-uat-frontend
+pm2 logs mini-prod-frontend --lines 30
+pm2 describe mini-prod-frontend
 ```
 
-Hard-refresh the browser (`Cmd+Shift+R`). Ensure Nginx includes `location /` from `deploy/nginx/uat.minisnmore.com.locations.conf` with `Cache-Control: no-store` for HTML.
+Hard-refresh the browser (`Cmd+Shift+R`). Ensure Nginx includes `location /` from `deploy/nginx/minisnmore.com.locations.conf` with `Cache-Control: no-store` for HTML.
 
 ### R2 image upload (admin)
 
@@ -617,23 +617,23 @@ Admin uploads use **`POST /api/v1/admin/uploads`** (file through the backend + A
 
 **Broken images after save** usually mean `S3_PUBLIC_BASE_URL` is missing or wrong. The API must return URLs on your **public** host, not `*.r2.cloudflarestorage.com` (that host is upload-only).
 
-In `/etc/mini-and-more/uat.env` (and prod):
+In `/etc/mini-and-more/prod.env` (and prod):
 
 ```bash
 # Public bucket URL from Cloudflare R2 → bucket → Settings → Public access (r2.dev)
 S3_PUBLIC_BASE_URL=https://pub-xxxxxxxx.r2.dev
 # Must match the bucket where objects are stored
 S3_BUCKET=miniandmore
-S3_KEY_PREFIX=uat
+S3_KEY_PREFIX=prod
 ```
 
 Enable **public access** on the R2 bucket, then open a test object URL in the browser before using admin upload.
 
 Console **404** on `/__l5e/assets-v1/*.mp4` is expected on self-hosted UAT: those URLs are Lovable CDN placeholders. Upload videos to R2/S3 and reference them in admin, or leave Watch & Shop / fabric video disabled in **Admin → Home**.
 
-## 16. UAT OpenAPI (`uat.minisnmore.com`)
+## 16. UAT OpenAPI (`minisnmore.com`)
 
-Jenkins deploy should run **gateway** (`mini-uat-gateway`, port **8080**, public) and **catalog** (`mini-uat-catalog`, port **8081**, internal). Use `deploy/scripts/uat-microservices-pm2.sh` after building both JARs. OpenAPI on the VPS:
+Jenkins deploy should run **gateway** (`mini-prod-gateway`, port **8080**, public) and **catalog** (`mini-prod-catalog`, port **8081**, internal). Use `deploy/scripts/prod-microservices-pm2.sh` after building both JARs. OpenAPI on the VPS:
 
 ```text
 http://127.0.0.1:8080/v3/api-docs
@@ -642,16 +642,16 @@ http://127.0.0.1:8080/v3/api-docs
 Jenkins and browsers need the **public** URL:
 
 ```text
-https://uat.minisnmore.com/v3/api-docs
+https://minisnmore.com/v3/api-docs
 ```
 
-If that URL returns **404**, Nginx is sending `/v3/api-docs` to the frontend (Vite) instead of the backend. Copy the locations from `deploy/nginx/uat.minisnmore.com.locations.conf` into the UAT HTTPS server block **before** `location / { ... }`.
+If that URL returns **404**, Nginx is sending `/v3/api-docs` to the frontend (Vite) instead of the backend. Copy the locations from `deploy/nginx/minisnmore.com.locations.conf` into the UAT HTTPS server block **before** `location / { ... }`.
 
 On the VPS:
 
 ```bash
 sudo nano /etc/nginx/sites-available/<uat-site-config>
-# paste / adjust locations from deploy/nginx/uat.minisnmore.com.locations.conf
+# paste / adjust locations from deploy/nginx/minisnmore.com.locations.conf
 # ensure /api/, /oauth2/, and /v3/api-docs proxy to 127.0.0.1:8080 (gateway)
 sudo nginx -t
 sudo systemctl reload nginx
@@ -660,13 +660,13 @@ sudo systemctl reload nginx
 Verify:
 
 ```bash
-curl -fsS https://uat.minisnmore.com/management/health
-curl -fsS https://uat.minisnmore.com/v3/api-docs | head -c 200
-curl -I https://uat.minisnmore.com/swagger-ui/index.html
-pm2 list   # expect mini-uat-gateway :8080 and mini-uat-catalog :8081; remove legacy mini-uat / mini-uat-backend
+curl -fsS https://minisnmore.com/management/health
+curl -fsS https://minisnmore.com/v3/api-docs | head -c 200
+curl -I https://minisnmore.com/swagger-ui/index.html
+pm2 list   # expect mini-prod-gateway :8080 and mini-prod-catalog :8081; remove legacy mini-uat / mini-prod-backend
 ```
 
-Optional: browse Swagger UI at `https://uat.minisnmore.com/swagger-ui/index.html`.
+Optional: browse Swagger UI at `https://minisnmore.com/swagger-ui/index.html`.
 
 ## 16. Common Issues
 

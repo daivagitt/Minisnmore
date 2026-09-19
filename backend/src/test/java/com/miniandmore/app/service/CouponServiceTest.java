@@ -5,9 +5,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.miniandmore.app.domain.Coupon;
+import com.miniandmore.app.domain.enumeration.DiscountType;
 import com.miniandmore.app.repository.CouponRepository;
 import com.miniandmore.app.service.dto.CouponDTO;
 import com.miniandmore.app.service.mapper.CouponMapper;
+import java.math.BigDecimal;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,7 +32,26 @@ class CouponServiceTest {
     private CouponService couponService;
 
     @Test
-    void save() {
+    void save_clampsBogoPercentOff() {
+        CouponDTO input = new CouponDTO();
+        input.setDiscountType(DiscountType.BOGO);
+        input.setDiscountValue(BigDecimal.valueOf(150));
+        Coupon entity = new Coupon().id(ID);
+        Coupon saved = new Coupon().id(ID);
+        CouponDTO expected = new CouponDTO();
+        expected.setId(ID);
+
+        when(couponMapper.toEntity(input)).thenReturn(entity);
+        when(couponRepository.save(entity)).thenReturn(saved);
+        when(couponMapper.toDto(saved)).thenReturn(expected);
+
+        couponService.save(input);
+
+        assertThat(input.getDiscountValue()).isEqualByComparingTo("100");
+    }
+
+    @Test
+    void save_normalizesMissingBogoQuantities() {
         CouponDTO input = new CouponDTO();
         Coupon entity = new Coupon().id(ID);
         Coupon saved = new Coupon().id(ID);
@@ -41,9 +62,10 @@ class CouponServiceTest {
         when(couponRepository.save(entity)).thenReturn(saved);
         when(couponMapper.toDto(saved)).thenReturn(expected);
 
-        CouponDTO result = couponService.save(input);
+        couponService.save(input);
 
-        assertThat(result).isSameAs(expected);
+        assertThat(input.getBogoBuyQty()).isEqualTo(1);
+        assertThat(input.getBogoGetQty()).isEqualTo(1);
         verify(couponMapper).toEntity(input);
         verify(couponRepository).save(entity);
         verify(couponMapper).toDto(saved);
@@ -86,6 +108,27 @@ class CouponServiceTest {
         assertThat(result).contains(expected);
         verify(couponMapper).partialUpdate(existing, input);
         verify(couponRepository).save(existing);
+    }
+
+    @Test
+    void partialUpdate_normalizesBogoQuantities() {
+        CouponDTO input = new CouponDTO();
+        input.setId(ID);
+        input.setBogoBuyQty(0);
+        input.setBogoGetQty(99);
+        Coupon existing = new Coupon().id(ID);
+        CouponDTO expected = new CouponDTO();
+        expected.setId(ID);
+
+        when(couponRepository.findById(ID)).thenReturn(Optional.of(existing));
+        when(couponRepository.save(existing)).thenReturn(existing);
+        when(couponMapper.toDto(existing)).thenReturn(expected);
+
+        couponService.partialUpdate(input);
+
+        assertThat(input.getBogoBuyQty()).isEqualTo(1);
+        assertThat(input.getBogoGetQty()).isEqualTo(10);
+        verify(couponMapper).partialUpdate(existing, input);
     }
 
     @Test

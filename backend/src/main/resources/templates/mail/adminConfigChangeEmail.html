@@ -1,0 +1,101 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="en">
+  <head>
+    <title th:text="#{email.admin.config.title}">Admin configuration changed</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      background-color: #f4eff1;
+      font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #4a3f45;
+    "
+  >
+    <span
+      th:text="#{email.admin.config.preheader}"
+      style="display: none !important; visibility: hidden; opacity: 0; color: transparent; height: 0; width: 0; overflow: hidden; mso-hide: all;"
+      >Site settings were updated in admin.</span
+    >
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4eff1; padding: 24px 12px;">
+      <tr>
+        <td align="center">
+          <table
+            role="presentation"
+            width="100%"
+            cellspacing="0"
+            cellpadding="0"
+            border="0"
+            style="max-width: 600px; background-color: #ffffff; border-radius: 12px; border: 1px solid #ece0e4; overflow: hidden;"
+          >
+            <tr>
+              <td style="background-color: #1c1417; padding: 22px 26px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                  <tr>
+                    <td style="font-size: 16px; font-weight: bold; letter-spacing: 0.14em; color: #ffffff; text-transform: uppercase;">
+                      Minis n More
+                    </td>
+                    <td align="right" style="font-size: 13px; color: #ffffff;">
+                      <div style="font-weight: bold;" th:text="#{email.admin.config.subheading}">Configuration change</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 26px 26px 8px; font-size: 15px; line-height: 1.7; color: #5f4f56;">
+                <p style="margin: 0 0 14px;" th:text="#{email.admin.config.greeting}">Hello,</p>
+                <p style="margin: 0 0 8px; font-size: 20px; font-weight: bold; color: #3a2e34;" th:text="#{email.admin.config.headline}">
+                  Admin configuration updated
+                </p>
+                <p style="margin: 0;" th:text="#{email.admin.config.intro}">
+                  Site settings were saved in the Minis n More admin. Review the changes below.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 12px 26px 0; font-size: 14px; color: #5f4f56;">
+                <p style="margin: 0 0 4px;">
+                  <strong th:text="#{email.admin.config.changedBy}">Changed by</strong>:
+                  <span th:text="${changedBy}">admin</span>
+                </p>
+                <p style="margin: 0 0 16px;">
+                  <strong th:text="#{email.admin.config.changedAt}">Changed at</strong>:
+                  <span th:text="${changedAt}">Sat, 19 Sep 2026</span>
+                </p>
+              </td>
+            </tr>
+            <tr th:if="${hasChanges}">
+              <td style="padding: 0 26px 8px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border: 1px solid #ece0e4; border-radius: 8px;">
+                  <tr style="background-color: #faf6f7;">
+                    <td style="padding: 10px 12px; font-size: 12px; font-weight: bold; color: #3a2e34;" th:text="#{email.admin.config.field}">Field</td>
+                    <td style="padding: 10px 12px; font-size: 12px; font-weight: bold; color: #3a2e34;" th:text="#{email.admin.config.from}">Previous value</td>
+                    <td style="padding: 10px 12px; font-size: 12px; font-weight: bold; color: #3a2e34;" th:text="#{email.admin.config.to}">New value</td>
+                  </tr>
+                  <tr th:each="change : ${changes}">
+                    <td style="padding: 10px 12px; font-size: 13px; border-top: 1px solid #ece0e4; color: #3a2e34;" th:text="${change.field}">Brand name</td>
+                    <td style="padding: 10px 12px; font-size: 13px; border-top: 1px solid #ece0e4; color: #8a4a63; word-break: break-word;" th:text="${change.from}">(empty)</td>
+                    <td style="padding: 10px 12px; font-size: 13px; border-top: 1px solid #ece0e4; color: #3a2e34; word-break: break-word;" th:text="${change.to}">Minis n More</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr th:unless="${hasChanges}">
+              <td style="padding: 0 26px 8px; font-size: 14px; color: #5f4f56;" th:text="#{email.admin.config.none}">
+                Settings were saved with no field differences.
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 18px 26px 26px; font-size: 13px; line-height: 1.6; color: #8a7a80;" th:text="#{email.admin.config.after}">
+                This is an automated notice.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

@@ -1,6 +1,6 @@
 # UAT API test report — 100% 2xx
 
-**Target:** https://uat.minisnmore.com  
+**Target:** https://minisnmore.com  
 **Generated from:** `deploy/postman/api-run-report.json`  
 **Strategy:** Full lifecycle: POST mock → CRUD on created id + remaining OpenAPI
 

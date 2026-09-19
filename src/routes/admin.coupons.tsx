@@ -25,6 +25,8 @@ const empty: Coupon = {
   discount_value: null,
   min_order: null,
   max_discount: null,
+  bogo_buy_qty: 1,
+  bogo_get_qty: 1,
   expires_at: null,
   active: true,
 };
@@ -80,7 +82,7 @@ function CouponsPage() {
     <AdminPage
       eyebrow="Marketing"
       title="Coupons"
-      description="Discount codes customers can apply at checkout."
+      description="Discount codes and BOGO offers customers can apply at checkout."
       action={
         <div className="flex items-center gap-2 flex-wrap">
           <BulkImport
@@ -93,32 +95,35 @@ function CouponsPage() {
                 example: "WELCOME10",
                 note: "Letters/numbers only. Unique.",
               },
-              { key: "discount_type", required: true, example: "percent", note: "percent or flat" },
-              { key: "discount_value", required: true, example: 10 },
+              { key: "discount_type", required: true, example: "percent", note: "percent, flat, or bogo" },
+              { key: "discount_value", required: true, example: 10, note: "Percent/flat value, or % off the get item for BOGO (100 = free)" },
               { key: "min_order", example: 999 },
               { key: "max_discount", example: 500 },
+              { key: "bogo_buy_qty", example: 1, note: "BOGO only. Items the customer must buy." },
+              { key: "bogo_get_qty", example: 1, note: "BOGO only. Free/discounted items." },
               { key: "expires_at", example: "2026-12-31", note: "ISO date or blank" },
               { key: "active", example: "TRUE" },
             ]}
             transform={(r) => {
-              const code = String(r.code ?? "")
-                .trim()
-                .toUpperCase();
-              if (!code || !/^[A-Z0-9_-]+$/.test(code)) throw new Error("invalid code");
               const type = String(r.discount_type ?? "percent").toLowerCase();
-              if (!["percent", "flat"].includes(type))
-                throw new Error("discount_type must be percent or flat");
-              const value = Number(r.discount_value);
-              if (!isFinite(value) || value <= 0) throw new Error("discount_value must be > 0");
-              return {
-                code,
+              const row: Coupon = {
+                code: String(r.code ?? "").trim().toUpperCase(),
                 discount_type: type,
-                discount_value: value,
-                min_order: Number(r.min_order) || 0,
+                discount_value:
+                  r.discount_value === "" || r.discount_value == null ? null : Number(r.discount_value),
+                min_order: r.min_order === "" || r.min_order == null ? null : Number(r.min_order),
                 max_discount:
                   r.max_discount === "" || r.max_discount == null ? null : Number(r.max_discount),
+                bogo_buy_qty: type === "bogo" ? Number(r.bogo_buy_qty ?? 1) : 1,
+                bogo_get_qty: type === "bogo" ? Number(r.bogo_get_qty ?? 1) : 1,
                 expires_at: r.expires_at ? new Date(r.expires_at).toISOString() : null,
                 active: String(r.active ?? "true").toLowerCase() !== "false",
+              };
+              const errors = getCouponValidationErrors(row);
+              if (errors.length) throw new Error(errors.join("\n"));
+              return {
+                ...row,
+                min_order: Number(row.min_order) || 0,
               };
             }}
             persist={async (payloads) => {
@@ -176,22 +181,76 @@ function CouponsPage() {
                   value={c.discount_type}
                   onChange={(e) =>
                     setRows((r) =>
-                      r.map((x, j) => (j === i ? { ...x, discount_type: e.target.value } : x)),
+                      r.map((x, j) => {
+                        if (j !== i) return x;
+                        const discount_type = e.target.value;
+                        return {
+                          ...x,
+                          discount_type,
+                          ...(discount_type === "bogo"
+                            ? {
+                                discount_value:
+                                  x.discount_value && x.discount_value <= 100 ? x.discount_value : 100,
+                                bogo_buy_qty: x.bogo_buy_qty ?? 1,
+                                bogo_get_qty: x.bogo_get_qty ?? 1,
+                              }
+                            : {}),
+                        };
+                      }),
                     )
                   }
                 >
                   <option value="percent">Percent (%)</option>
                   <option value="flat">Flat (₹)</option>
+                  <option value="bogo">BOGO (buy X get Y)</option>
                 </select>
               </Field>
-              <NumberField
-                label="Value"
-                value={c.discount_value}
-                onChange={(discount_value) =>
-                  setRows((r) => r.map((x, j) => (j === i ? { ...x, discount_value } : x)))
-                }
-                required
-              />
+              {c.discount_type === "bogo" ? (
+                <>
+                  <NumberField
+                    label="Buy quantity"
+                    value={c.bogo_buy_qty}
+                    onChange={(bogo_buy_qty) =>
+                      setRows((r) => r.map((x, j) => (j === i ? { ...x, bogo_buy_qty } : x)))
+                    }
+                    min={1}
+                    max={10}
+                    step={1}
+                    required
+                  />
+                  <NumberField
+                    label="Get quantity"
+                    value={c.bogo_get_qty}
+                    onChange={(bogo_get_qty) =>
+                      setRows((r) => r.map((x, j) => (j === i ? { ...x, bogo_get_qty } : x)))
+                    }
+                    min={1}
+                    max={10}
+                    step={1}
+                    required
+                  />
+                  <NumberField
+                    label="% off get item"
+                    hint="100 = free"
+                    value={c.discount_value}
+                    onChange={(discount_value) =>
+                      setRows((r) => r.map((x, j) => (j === i ? { ...x, discount_value } : x)))
+                    }
+                    min={1}
+                    max={100}
+                    required
+                  />
+                </>
+              ) : (
+                <NumberField
+                  label="Value"
+                  value={c.discount_value}
+                  onChange={(discount_value) =>
+                    setRows((r) => r.map((x, j) => (j === i ? { ...x, discount_value } : x)))
+                  }
+                  required
+                />
+              )}
               <NumberField
                 label="Min order (₹)"
                 value={c.min_order}

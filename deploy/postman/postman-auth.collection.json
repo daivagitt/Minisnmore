@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Minis n More — Auth",
-    "description": "Account activation, login, password reset. Import with postman-environment.local.json or postman-environment.uat.json.\n\nOrder: Register → Activate → Authenticate (sets authToken) → other calls.\nPassword reset: Reset init (plain email) → copy resetKey from email → Reset finish.",
+    "description": "Account activation, login, password reset. Import with postman-environment.local.json or postman-environment.prod.json.\n\nOrder: Register → Activate → Authenticate (sets authToken) → other calls.\nPassword reset: Reset init (plain email) → copy resetKey from email → Reset finish.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {

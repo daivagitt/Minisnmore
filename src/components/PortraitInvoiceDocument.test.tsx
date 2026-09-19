@@ -56,7 +56,7 @@ describe("PortraitInvoiceDocument", () => {
 
     const invoice = container.querySelector(".invoice-document");
     expect(invoice).toBeTruthy();
-    expect(invoice).toHaveClass("min-h-[297mm]", "w-[210mm]");
+    expect(invoice).toHaveClass("min-h-[297mm]", "w-[210mm]", "print:h-[297mm]", "print:max-h-[297mm]");
     expect(invoice).toHaveTextContent("Tax Invoice");
     expect(container.querySelector("article header")).toHaveClass(
       "grid-cols-[minmax(0,1fr)_auto_minmax(72px,1fr)]",

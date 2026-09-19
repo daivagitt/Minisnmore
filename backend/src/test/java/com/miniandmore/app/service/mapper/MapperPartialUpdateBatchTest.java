@@ -38,10 +38,13 @@ class MapperPartialUpdateBatchTest {
         patch.setDiscountValue(BigDecimal.TEN);
         patch.setMinOrder(BigDecimal.ONE);
         patch.setMaxDiscount(BigDecimal.valueOf(50));
+        patch.setBogoBuyQty(2);
+        patch.setBogoGetQty(1);
         patch.setExpiresAt(Instant.now());
         patch.setActive(false);
         mapper.partialUpdate(entity, patch);
         assertThat(entity.getActive()).isFalse();
+        assertThat(entity.getBogoBuyQty()).isEqualTo(2);
     }
 
     @Test

@@ -10,7 +10,7 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "https://uat.minisnmore.com"
+      "value": "https://minisnmore.com"
     },
     {
       "key": "workerSeed",
@@ -782,7 +782,7 @@
                   "const ts = Date.now();",
                   "const login = `perf${ts}${seed}`;",
                   "pm.variables.set('registerLogin', login);",
-                  "pm.variables.set('registerEmail', `${login}@uat.test`);"
+                  "pm.variables.set('registerEmail', `${login}@minisnmore.test`);"
                 ]
               }
             },

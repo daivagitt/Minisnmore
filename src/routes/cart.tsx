@@ -6,7 +6,7 @@ import { useShop } from "@/store/shop";
 import { cartLineColorLabel, cartLineImage, cartPricingTotals } from "@/lib/cart-catalog";
 import { FIT_LIMITS } from "@/lib/product-fit";
 import { toast } from "sonner";
-import { validateCoupon } from "@/lib/coupons.functions";
+import { validateCoupon, couponValidationData } from "@/lib/coupons.functions";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { commerceFromSiteSettings } from "@/lib/commerce";
 import { orderTotals } from "@/lib/money";
@@ -21,7 +21,7 @@ export const Route = createFileRoute("/cart")({
 });
 
 function CartPage() {
-  const { cart, updateQty, promptRemoveFromCart, cartTotal, appliedCoupon, setAppliedCoupon } = useShop();
+  const { cart, updateQty, promptRemoveFromCart, cartTotal, cartCount, appliedCoupon, setAppliedCoupon } = useShop();
   const settings = useSiteSettings();
   const [code, setCode] = useState(appliedCoupon?.code ?? "");
 
@@ -32,22 +32,26 @@ function CartPage() {
   useEffect(() => {
     if (!appliedCoupon?.code) return;
     let cancelled = false;
-    validateCoupon({ data: { code: appliedCoupon.code, subtotal: cartTotal } })
+    const code = appliedCoupon.code;
+    validateCoupon({ data: couponValidationData(code, cartTotal, cart) })
       .then((res) => {
         if (cancelled) return;
         if (res.ok) setAppliedCoupon({ code: res.code!, discount: res.discount! });
-        else setAppliedCoupon(null);
+        else {
+          setAppliedCoupon(null);
+          toast.message(res.error ?? `${code} no longer applies to this cart`);
+        }
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [cartTotal, appliedCoupon?.code, setAppliedCoupon]);
+  }, [cart, cartTotal, appliedCoupon?.code, setAppliedCoupon]);
 
   const apply = async (codeArg?: string) => {
     const normalized = (codeArg ?? code).trim().toUpperCase();
     if (!normalized) return;
     setCode(normalized);
     try {
-      const result = await validateCoupon({ data: { code: normalized, subtotal: cartTotal } });
+      const result = await validateCoupon({ data: couponValidationData(normalized, cartTotal, cart) });
       if (!result.ok) {
         toast.error(result.error);
         return;
@@ -130,7 +134,7 @@ function CartPage() {
             <span>{appliedCoupon.code} · −₹{appliedCoupon.discount.toLocaleString("en-IN")}</span>
             <button onClick={() => { setAppliedCoupon(null); setCode(""); }} className="text-muted-foreground hover:text-destructive">remove</button>
           </div>}
-          <CouponOffers subtotal={cartTotal} activeCode={appliedCoupon?.code} onApply={(c) => apply(c)} />
+          <CouponOffers subtotal={cartTotal} itemCount={cartCount} activeCode={appliedCoupon?.code} onApply={(c) => apply(c)} />
         </div>
 
         <div className="border-t border-border/60 pt-4 space-y-2 text-sm">

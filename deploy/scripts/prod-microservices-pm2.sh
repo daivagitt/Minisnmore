@@ -5,7 +5,7 @@ set -euo pipefail
 
 export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
-REPO_ROOT="${REPO_ROOT:-/var/www/blossom-blueprint-craft}"
+REPO_ROOT="${REPO_ROOT:-/var/www/uat1/mini_ms_test}"
 ENV_FILE="${ENV_FILE:-/etc/mini-and-more/prod.env}"
 
 if [ -f "$ENV_FILE" ]; then
@@ -69,7 +69,7 @@ done
 for app in \
   mini-prod-gateway mini-prod-catalog mini-prod-catalog-core \
   mini-prod-store mini-prod-commerce mini-prod-integration \
-  mini-backend-prod mini-uat mini-uat-backend mini-uat-catalog; do
+  mini-backend-prod mini-uat mini-prod-backend mini-prod-catalog; do
   pm2 delete "$app" >/dev/null 2>&1 || true
 done
 

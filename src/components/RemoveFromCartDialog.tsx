@@ -35,7 +35,7 @@ export function RemoveFromCartDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <Button type="button" variant="outline" onClick={onRemoveOnly}>
-            Remove only
+            Remove
           </Button>
           <AlertDialogAction onClick={onMoveToWishlist}>Save to wishlist</AlertDialogAction>
         </AlertDialogFooter>

@@ -89,7 +89,7 @@ export function PortraitInvoiceDocument({
 
   return (
     <article
-      className={`invoice-document box-border mx-auto flex flex-col bg-white font-sans text-[12px] leading-[1.35] text-black shadow-xl print:shadow-none print:overflow-visible ${compact ? "min-h-[720px] w-full p-4" : "min-h-[297mm] w-[210mm] max-w-full p-[8mm] print:w-[210mm] print:min-h-[297mm]"}`}
+      className={`invoice-document box-border mx-auto flex flex-col bg-white font-sans text-[12px] leading-[1.35] text-black shadow-xl print:shadow-none print:overflow-hidden ${compact ? "min-h-[720px] w-full p-4" : "min-h-[297mm] w-[210mm] max-w-full p-[8mm] print:w-[210mm] print:h-[297mm] print:max-h-[297mm] print:min-h-0 print:p-[6mm]"}`}
     >
       <header className="grid grid-cols-[minmax(0,1fr)_auto_minmax(72px,1fr)] items-start gap-3">
         <div className="min-w-0">

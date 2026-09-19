@@ -1,8 +1,8 @@
 {
   "summary": {
     "strategy": "OpenAPI-driven: payloads from spec/schemas, skip user-interaction endpoints",
-    "openapiSource": "https://uat.minisnmore.com/v3/api-docs",
-    "baseUrl": "https://uat.minisnmore.com",
+    "openapiSource": "https://minisnmore.com/v3/api-docs",
+    "baseUrl": "https://minisnmore.com",
     "skippedUserInteraction": 10,
     "totalOpenApiOps": 172,
     "requestsRun": 156,

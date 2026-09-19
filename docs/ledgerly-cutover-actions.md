@@ -1,7 +1,7 @@
 # Ledgerly Cutover — Action Items for Mini's n More
 
 **Date:** 2026-06-30  
-**Environment:** UAT (`uat.minisnmore.com`, isolated microservices :9180–:9184)  
+**Environment:** UAT (`minisnmore.com`, isolated microservices :9180–:9184)  
 **Status:** Ledgerly-side platform fixes are **deployed**. Items below require Mini's n More team action.
 
 ---
@@ -31,7 +31,7 @@ Response will include `"organizationId": "..."`.
 Then update UAT environment:
 
 ```bash
-sudo nano /etc/mini-and-more/uat.env
+sudo nano /etc/mini-and-more/prod.env
 ```
 
 Set:
@@ -45,8 +45,8 @@ Also set in Admin UI → Integrations → Ledgerly settings panel.
 ### 3. Reload catalog with the updated env
 
 ```bash
-set -a && . /etc/mini-and-more/uat.env && set +a
-pm2 restart mini-uat-ms-catalog-core --update-env
+set -a && . /etc/mini-and-more/prod.env && set +a
+pm2 restart mini-prod-ms-catalog-core --update-env
 ```
 
 > **Note:** `pm2 restart` alone does **not** reload env variables. You must source the file first and pass `--update-env`.
@@ -55,8 +55,8 @@ pm2 restart mini-uat-ms-catalog-core --update-env
 
 In Ledgerly → **Settings → API & Webhooks**, register:
 
-- **URL:** `https://uat.minisnmore.com/internal/v1/ledgerly/webhooks`
-- **Secret:** value of `LEDGERLY_WEBHOOK_SECRET` from `/etc/mini-and-more/uat.env`
+- **URL:** `https://minisnmore.com/internal/v1/ledgerly/webhooks`
+- **Secret:** value of `LEDGERLY_WEBHOOK_SECRET` from `/etc/mini-and-more/prod.env`
 
 ---
 
@@ -108,14 +108,14 @@ cd store
 
 ### 8. Stop the legacy Zoho integration service
 
-`mini-uat-ms-integration` (:9183) is still running.
+`mini-prod-ms-integration` (:9183) is still running.
 
 ```bash
-pm2 stop mini-uat-ms-integration
+pm2 stop mini-prod-ms-integration
 pm2 save
 ```
 
-Remove `APPLICATION_ZOHO_INTEGRATION_BASE_URL` from uat.env after confirming catalog no longer calls it.
+Remove `APPLICATION_ZOHO_INTEGRATION_BASE_URL` from prod.env after confirming catalog no longer calls it.
 
 > Safe to do after Ledgerly smoke tests L-01 to L-61 pass.
 
@@ -144,14 +144,14 @@ pm2 stop mini-uat
 
 ### 10. Document PM2 env reload in deploy runbooks
 
-Every time you add or change env vars in `/etc/mini-and-more/uat.env`, you must:
+Every time you add or change env vars in `/etc/mini-and-more/prod.env`, you must:
 
 ```bash
-set -a && . /etc/mini-and-more/uat.env && set +a
+set -a && . /etc/mini-and-more/prod.env && set +a
 pm2 restart <service> --update-env
 ```
 
-Update `deploy/uat-microservices-isolated-pm2.sh` or add a restart helper script to bake this in.
+Update `deploy/prod-microservices-isolated-pm2.sh` or add a restart helper script to bake this in.
 
 ---
 
@@ -179,12 +179,12 @@ L-55  Webhook retry on transient failure
 
 | Item | Location |
 |------|----------|
-| UAT secrets | `/etc/mini-and-more/uat.env` |
+| UAT secrets | `/etc/mini-and-more/prod.env` |
 | Gateway UAT routes | `gateway/src/main/resources/config/application-uat-isolated.yml` |
 | Ledgerly properties binding | `backend/src/main/java/com/miniandmore/app/config/ApplicationProperties.java` |
 | Nginx UAT config | `/etc/nginx/sites-enabled/mini-frontend-uat` |
 | Test scenarios | `docs/ledgerly-integration-test-scenarios.md` |
-| Migration script | `deploy/scripts/uat-migrate-ledgerly-liquibase.sh` |
+| Migration script | `deploy/scripts/prod-migrate-ledgerly-liquibase.sh` |
 
 ### Current UAT service health (last verified 2026-06-30)
 
@@ -202,4 +202,4 @@ L-55  Webhook retry on transient failure
 
 - Rotate the compromised `lt_live_…` token **immediately** (see item 1)
 - `LEDGERLY_WEBHOOK_SECRET` must match exactly between `uat.env` and Ledgerly webhook config
-- Do **not** commit `/etc/mini-and-more/uat.env` or any token values to git
+- Do **not** commit `/etc/mini-and-more/prod.env` or any token values to git

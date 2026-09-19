@@ -1,4 +1,4 @@
-// Optional Supabase browser client (legacy). UAT/prod use Spring Boot APIs only.
+// Optional Supabase browser client (legacy). Production uses Spring Boot APIs only.
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 

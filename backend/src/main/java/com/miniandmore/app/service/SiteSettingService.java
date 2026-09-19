@@ -4,12 +4,15 @@ import com.miniandmore.app.domain.SiteSetting;
 import com.miniandmore.app.repository.SiteSettingRepository;
 import com.miniandmore.app.service.dto.SiteSettingDTO;
 import com.miniandmore.app.service.mapper.SiteSettingMapper;
+import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Service Implementation for managing {@link com.miniandmore.app.domain.SiteSetting}.
@@ -25,9 +28,20 @@ public class SiteSettingService {
 
     private final SiteSettingMapper siteSettingMapper;
 
-    public SiteSettingService(SiteSettingRepository siteSettingRepository, SiteSettingMapper siteSettingMapper) {
+    private final EntityManager entityManager;
+
+    private final AdminConfigChangeMailService adminConfigChangeMailService;
+
+    public SiteSettingService(
+        SiteSettingRepository siteSettingRepository,
+        SiteSettingMapper siteSettingMapper,
+        EntityManager entityManager,
+        AdminConfigChangeMailService adminConfigChangeMailService
+    ) {
         this.siteSettingRepository = siteSettingRepository;
         this.siteSettingMapper = siteSettingMapper;
+        this.entityManager = entityManager;
+        this.adminConfigChangeMailService = adminConfigChangeMailService;
     }
 
     /**
@@ -38,12 +52,15 @@ public class SiteSettingService {
      */
     public SiteSettingDTO save(SiteSettingDTO siteSettingDTO) {
         LOG.debug("Request to save SiteSetting : {}", siteSettingDTO);
+        SiteSettingDTO previous = snapshotExisting(siteSettingDTO.getId());
         defaultStoreDiscountPercent(siteSettingDTO);
         defaultCodFee(siteSettingDTO);
         defaultDeliveryEtaBufferDays(siteSettingDTO);
         SiteSetting siteSetting = siteSettingMapper.toEntity(siteSettingDTO);
         siteSetting = siteSettingRepository.save(siteSetting);
-        return siteSettingMapper.toDto(siteSetting);
+        SiteSettingDTO saved = siteSettingMapper.toDto(siteSetting);
+        notifyConfigChanged(previous, saved);
+        return saved;
     }
 
     /**
@@ -54,12 +71,15 @@ public class SiteSettingService {
      */
     public SiteSettingDTO update(SiteSettingDTO siteSettingDTO) {
         LOG.debug("Request to update SiteSetting : {}", siteSettingDTO);
+        SiteSettingDTO previous = snapshotExisting(siteSettingDTO.getId());
         defaultStoreDiscountPercent(siteSettingDTO);
         defaultCodFee(siteSettingDTO);
         defaultDeliveryEtaBufferDays(siteSettingDTO);
         SiteSetting siteSetting = siteSettingMapper.toEntity(siteSettingDTO);
         siteSetting = siteSettingRepository.save(siteSetting);
-        return siteSettingMapper.toDto(siteSetting);
+        SiteSettingDTO saved = siteSettingMapper.toDto(siteSetting);
+        notifyConfigChanged(previous, saved);
+        return saved;
     }
 
     /**
@@ -71,6 +91,7 @@ public class SiteSettingService {
     public Optional<SiteSettingDTO> partialUpdate(SiteSettingDTO siteSettingDTO) {
         LOG.debug("Request to partially update SiteSetting : {}", siteSettingDTO);
 
+        SiteSettingDTO previous = snapshotExisting(siteSettingDTO.getId());
         return siteSettingRepository
             .findById(siteSettingDTO.getId())
             .map(existingSiteSetting -> {
@@ -79,7 +100,11 @@ public class SiteSettingService {
                 return existingSiteSetting;
             })
             .map(siteSettingRepository::save)
-            .map(siteSettingMapper::toDto);
+            .map(siteSettingMapper::toDto)
+            .map(saved -> {
+                notifyConfigChanged(previous, saved);
+                return saved;
+            });
     }
 
     /**
@@ -102,6 +127,41 @@ public class SiteSettingService {
     public void delete(Long id) {
         LOG.debug("Request to delete SiteSetting : {}", id);
         siteSettingRepository.deleteById(id);
+    }
+
+    private SiteSettingDTO snapshotExisting(Long id) {
+        Optional<SiteSetting> existing = id != null
+            ? siteSettingRepository.findById(id)
+            : siteSettingRepository.findFirstByOrderByIdAsc();
+        return existing
+            .map(entity -> {
+                SiteSettingDTO dto = siteSettingMapper.toDto(entity);
+                entityManager.detach(entity);
+                return dto;
+            })
+            .orElse(null);
+    }
+
+    private void notifyConfigChanged(SiteSettingDTO previous, SiteSettingDTO current) {
+        Runnable send = () -> {
+            try {
+                adminConfigChangeMailService.notifySiteSettingsChanged(previous, current);
+            } catch (RuntimeException ex) {
+                LOG.warn("Admin configuration email failed", ex);
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        send.run();
+                    }
+                }
+            );
+            return;
+        }
+        send.run();
     }
 
     private void defaultStoreDiscountPercent(SiteSettingDTO dto) {

@@ -1,25 +1,27 @@
 import { useEffect, useState } from "react";
 import { ChevronRight, Loader2, Tag, X } from "lucide-react";
-import { listActiveCoupons, type ActiveCoupon } from "@/lib/coupons.functions";
-
-function formatDiscount(c: ActiveCoupon) {
-  if (c.discount_type === "percent") {
-    const cap = c.max_discount ? ` up to ₹${c.max_discount.toLocaleString("en-IN")}` : "";
-    return `${c.discount_value}% off${cap}`;
-  }
-  return `₹${c.discount_value.toLocaleString("en-IN")} off`;
-}
+import {
+  couponEligibilityHint,
+  formatCouponOffer,
+  listActiveCoupons,
+  type ActiveCoupon,
+} from "@/lib/coupons.functions";
 
 function minOrderLabel(c: ActiveCoupon) {
+  if (c.discount_type === "bogo") {
+    return c.min_order > 0 ? `on orders above ₹${c.min_order.toLocaleString("en-IN")}` : "on qualifying cart items";
+  }
   return c.min_order > 0 ? `on orders above ₹${c.min_order.toLocaleString("en-IN")}` : "on all orders";
 }
 
 export function CouponOffers({
   subtotal,
+  itemCount,
   activeCode,
   onApply,
 }: {
   subtotal: number;
+  itemCount: number;
   activeCode?: string | null;
   onApply: (code: string) => void;
 }) {
@@ -78,7 +80,8 @@ export function CouponOffers({
 
             <div className="space-y-3">
               {coupons?.map((c) => {
-                const eligible = subtotal >= c.min_order;
+                const hint = couponEligibilityHint(c, subtotal, itemCount);
+                const eligible = !hint;
                 const applied = activeCode === c.code;
                 return (
                   <div key={c.code} className="rounded-2xl border border-border bg-muted/40 p-4 flex items-center justify-between gap-3">
@@ -87,11 +90,11 @@ export function CouponOffers({
                         <Tag className="h-3.5 w-3.5 text-primary" /> {c.code}
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5">
-                        {formatDiscount(c)} {minOrderLabel(c)}
+                        {formatCouponOffer(c)} {minOrderLabel(c)}
                       </div>
-                      {!eligible && (
+                      {hint && (
                         <div className="text-[11px] text-destructive mt-1">
-                          Add ₹{(c.min_order - subtotal).toLocaleString("en-IN")} more to unlock
+                          {hint}
                         </div>
                       )}
                     </div>

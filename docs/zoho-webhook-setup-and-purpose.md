@@ -4,7 +4,7 @@ Last updated: 2026-09-02
 
 This document explains how Mini's n More uses Zoho webhooks, what each webhook is for, what to configure in Zoho Workflow Actions and Workflow Rules, and how this differs from the app's own outbound Zoho API calls.
 
-Do not commit real webhook secrets in this file. Use the values configured in the server environment, such as `/etc/mini-and-more/uat.env` on UAT.
+Do not commit real webhook secrets in this file. Use the values configured in the server environment, such as `/etc/mini-and-more/prod.env` on UAT.
 
 ## Mental Model
 
@@ -78,7 +78,7 @@ Create in Zoho:
 Webhook name: MNM Invoice Status Webhook
 Module: Invoices
 Method: POST
-UAT URL: https://uat.minisnmore.com/api/v1/zoho/invoice-webhook
+Production URL: https://minisnmore.com/api/v1/zoho/invoice-webhook
 Production URL: https://minisnmore.com/api/v1/zoho/invoice-webhook
 Content-Type: application/json
 Secure this webhook: Yes
@@ -123,7 +123,7 @@ Create in Zoho:
 Webhook name: MiniMS Shipment Webhook
 Module: Shipment Orders
 Method: POST
-UAT URL: https://uat.minisnmore.com/internal/v1/zoho/shipment-webhook
+Production URL: https://minisnmore.com/internal/v1/zoho/shipment-webhook
 Production URL: https://minisnmore.com/internal/v1/zoho/shipment-webhook
 Content-Type: application/json
 Secure this webhook: Yes
@@ -195,7 +195,7 @@ Create in Zoho:
 Webhook name: MiniMS Sales Order Status Webhook
 Module: Sales Orders
 Method: POST
-UAT URL: https://uat.minisnmore.com/internal/v1/zoho/order-status-webhook
+Production URL: https://minisnmore.com/internal/v1/zoho/order-status-webhook
 Production URL: https://minisnmore.com/internal/v1/zoho/order-status-webhook
 Content-Type: application/json
 Secure this webhook: Yes
@@ -230,7 +230,7 @@ Create in Zoho:
 Webhook name: MiniMS Item Webhook
 Module: Items
 Method: POST
-UAT URL: https://uat.minisnmore.com/internal/v1/zoho/item-webhook
+Production URL: https://minisnmore.com/internal/v1/zoho/item-webhook
 Production URL: https://minisnmore.com/internal/v1/zoho/item-webhook
 Content-Type: application/json
 Secure this webhook: Yes
@@ -254,7 +254,7 @@ Create in Zoho:
 Webhook name: MiniMS Stock Webhook
 Module: Items or Inventory adjustment source
 Method: POST
-UAT URL: https://uat.minisnmore.com/api/v1/zoho/stock-webhook
+Production URL: https://minisnmore.com/api/v1/zoho/stock-webhook
 Production URL: https://minisnmore.com/api/v1/zoho/stock-webhook
 Content-Type: application/json
 Secure this webhook: Yes
@@ -297,9 +297,9 @@ Do not leave trailing commas.
 Use Zoho's placeholder picker when a placeholder name is rejected.
 ```
 
-## UAT Testing Notes
+## Production Testing Notes
 
-For shipment webhook testing, UAT can disable Zoho tracking pulls so webhook behavior is visible in logs:
+For shipment webhook testing, this host can disable Zoho tracking pulls so webhook behavior is visible in logs:
 
 ```text
 ZOHO_AUTO_SYNC_ENABLED=false

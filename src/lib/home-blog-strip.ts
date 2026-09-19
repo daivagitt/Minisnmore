@@ -90,11 +90,10 @@ export function getHomeBlogStripSlugErrors(cards: HomeBlogCardDraft[]): string[]
   return [];
 }
 
-/** Admin-picked slugs first; otherwise latest published posts. */
+/** Admin-picked slugs first; otherwise latest published posts. Empty API lists stay empty. */
 export function resolveHomeBlogStripPosts(
   all: HomeBlogStripPost[],
   slugs: string[],
-  fallback: HomeBlogStripPost[],
   limit = HOME_BLOG_STRIP_LIMIT,
 ): HomeBlogStripPost[] {
   if (slugs.length > 0) {
@@ -104,6 +103,5 @@ export function resolveHomeBlogStripPosts(
       .filter((p): p is HomeBlogStripPost => !!p);
     if (picked.length > 0) return picked.slice(0, limit);
   }
-  if (all.length > 0) return all.slice(0, limit);
-  return fallback.slice(0, limit);
+  return all.slice(0, limit);
 }

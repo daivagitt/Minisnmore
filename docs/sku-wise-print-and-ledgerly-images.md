@@ -70,7 +70,7 @@ Plain string colours (`["Navy","Blush"]`) are supported for simple products with
 
 ## 2. Flow A — SKU-wise print spreadsheet
 
-**Script:** `deploy/scripts/uat-sku-wise-print-import.py`  
+**Script:** `deploy/scripts/prod-sku-wise-print-import.py`  
 **Input:** `SKU WISE PRINT  FINAL DETAILS AS ON 25-07-26.xlsx` (repo root)
 
 This flow is **separate from Ledgerly**. It builds **print names, sizes, stock, and the size×print variant matrix**.
@@ -137,9 +137,9 @@ Re-running the import refreshes **names / stock / variants** but does **not** de
 ### Run on UAT
 
 ```bash
-set -a && source /etc/mini-and-more/uat.env && set +a
+set -a && source /etc/mini-and-more/prod.env && set +a
 GATEWAY_URL=http://127.0.0.1:9180 ADMIN_USER=admin ADMIN_PASS=admin6 \
-  python3 deploy/scripts/uat-sku-wise-print-import.py
+  python3 deploy/scripts/prod-sku-wise-print-import.py
 ```
 
 Optional: `--dry-run` to preview without writing.
@@ -149,7 +149,7 @@ Swatch **names** come from Step 1 above. Swatch **image URLs** (`swatchUrl`) are
 ### Link orphan R2 galleries by filename
 
 ```bash
-python3 deploy/scripts/uat-restore-galleries-from-r2.py
+python3 deploy/scripts/prod-restore-galleries-from-r2.py
 ```
 
 ---
@@ -160,8 +160,8 @@ Swatch mapping is a **two-stage** process:
 
 | Stage | What it does | Script | Output |
 |-------|----------------|--------|--------|
-| **A. Print name resolution** | Main-sheet swatch photo → human print name | `uat-sku-wise-print-import.py` | `colorsJson` names + `variantsJson[].color` |
-| **B. Swatch URL restore** | PRINT NAMES artwork → R2 upload → `swatchUrl` on each print | `uat-restore-print-swatch-images.py` | `colorsJson[].swatchUrl` |
+| **A. Print name resolution** | Main-sheet swatch photo → human print name | `prod-sku-wise-print-import.py` | `colorsJson` names + `variantsJson[].color` |
+| **B. Swatch URL restore** | PRINT NAMES artwork → R2 upload → `swatchUrl` on each print | `prod-restore-print-swatch-images.py` | `colorsJson[].swatchUrl` |
 
 Stage A does **not** upload images. Stage B does **not** change stock or variant SKUs.
 
@@ -229,7 +229,7 @@ For each `(excel_row, print_index)` that has an embedded image, the import scrip
 
 ### 3.4 Image matching algorithm (`build_print_name_map`)
 
-Used by **`uat-sku-wise-print-import.py`** to turn silent swatch photos into print names.
+Used by **`prod-sku-wise-print-import.py`** to turn silent swatch photos into print names.
 
 1. **Build reference index** from PRINT NAMES sheet:
    - For each row with name + image: compute **MD5** of image bytes.
@@ -243,7 +243,7 @@ Used by **`uat-sku-wise-print-import.py`** to turn silent swatch photos into pri
 
 3. **Apply manual overrides** (`PRINT_NAME_MANUAL_OVERRIDES`) — always wins.
 
-Current manual overrides in `uat-sku-wise-print-import.py`:
+Current manual overrides in `prod-sku-wise-print-import.py`:
 
 ```python
 PRINT_NAME_MANUAL_OVERRIDES = {
@@ -266,7 +266,7 @@ Key: `(excel_row_number, print_index_1_to_11)` → `"PRINT NAME"`.
 
 **Adding a new override:** When auto-match picks the wrong name (e.g. `AQUA & BLUE` instead of `PINK & BEE`), add the main-sheet row number and print slot to this dict, then re-run the import.
 
-### 3.5 Swatch URL restore (`uat-restore-print-swatch-images.py`)
+### 3.5 Swatch URL restore (`prod-restore-print-swatch-images.py`)
 
 After print **names** exist on products, this script uploads swatch **files** and sets `swatchUrl`.
 
@@ -349,9 +349,9 @@ Backend rule (`ProductColorImagesSupport`): swatches never enter `color_images_j
 ### 3.7 Run swatch restore
 
 ```bash
-set -a && source /etc/mini-and-more/uat.env && set +a
+set -a && source /etc/mini-and-more/prod.env && set +a
 GATEWAY_URL=http://127.0.0.1:9180 ADMIN_USER=admin ADMIN_PASS=admin6 \
-  python3 deploy/scripts/uat-restore-print-swatch-images.py
+  python3 deploy/scripts/prod-restore-print-swatch-images.py
 ```
 
 Options:
@@ -363,13 +363,13 @@ Options:
 
 ```bash
 # 1. Print names, sizes, stock, variants (preserves existing media)
-python3 deploy/scripts/uat-sku-wise-print-import.py
+python3 deploy/scripts/prod-sku-wise-print-import.py
 
 # 2. Swatch URLs from PRINT NAMES sheet → R2 → swatchUrl
-python3 deploy/scripts/uat-restore-print-swatch-images.py
+python3 deploy/scripts/prod-restore-print-swatch-images.py
 
 # 3. Lifestyle galleries from R2 filenames → imageUrls
-python3 deploy/scripts/uat-restore-galleries-from-r2.py
+python3 deploy/scripts/prod-restore-galleries-from-r2.py
 ```
 
 Run step 2 **after** step 1 whenever Ledgerly pull or xlsx import resets `colorsJson` to plain names (swatches dropped).
@@ -390,7 +390,7 @@ Use when a print has no image in PRINT NAMES sheet or override is not yet in cod
 |-----------|----------|
 | Ledgerly → UAT | **Not supported** — pull sends plain `colors` strings only |
 | UAT → Ledgerly | **Not sent** — `buildPushPayload()` excludes `swatchUrl` |
-| After Ledgerly pull | Re-run `uat-restore-print-swatch-images.py` or admin re-upload |
+| After Ledgerly pull | Re-run `prod-restore-print-swatch-images.py` or admin re-upload |
 
 If you extend Ledgerly later, a sensible field would be `swatchImagesJson: { "PINK & BEE": "https://…" }` — **not implemented today**.
 
@@ -400,7 +400,7 @@ If you extend Ledgerly later, a sensible field would be `swatchImagesJson: { "PI
 |---------|--------------|-----|
 | Print shows as `Print 3` | No swatch photo or no PRINT NAMES match | Add `PRINT_NAME_MANUAL_OVERRIDES` or fix xlsx image |
 | Wrong print name (e.g. AQUA & BLUE vs PINK & BEE) | Perceptual hash matched wrong artwork | Add manual override for `(row, slot)` |
-| Print name OK but no swatch on PDP | Restore script not run, or name missing from PRINT NAMES sheet | Run `uat-restore-print-swatch-images.py` or admin upload |
+| Print name OK but no swatch on PDP | Restore script not run, or name missing from PRINT NAMES sheet | Run `prod-restore-print-swatch-images.py` or admin upload |
 | WHC product missing swatch | Matrix uses `PINK` but sheet has `PINK BUDS` | Covered by `SWATCH_NAME_ALIASES`; add alias if new case |
 | Swatches vanished after Ledgerly pull | Pull overwrites `colorsJson` with plain strings | Re-run swatch restore |
 | Gallery OK but swatch wrong | Swatch and gallery are independent fields | Re-upload swatch only in admin |
@@ -482,8 +482,8 @@ On **pull** or **webhook** (`item.updated`), `LedgerlyProductMergeService.mergeL
 |---------|---------------------|--------------------------|
 | Per-print **lifestyle gallery** | ✅ `colorImagesJson` | Admin upload |
 | Single **listing hero** | ✅ `imageUrl` | Admin / derived from galleries |
-| Per-print **swatch** | ❌ Not in protocol | Admin or `uat-restore-print-swatch-images.py` |
-| Print name from xlsx swatch photo | ❌ | `uat-sku-wise-print-import.py` only |
+| Per-print **swatch** | ❌ Not in protocol | Admin or `prod-restore-print-swatch-images.py` |
+| Print name from xlsx swatch photo | ❌ | `prod-sku-wise-print-import.py` only |
 | Size×print **stock matrix** | ✅ `variantsJson` + inventory pull | xlsx import |
 
 ### Important: print name matching
@@ -503,7 +503,7 @@ Examples that must match character-for-character:
 
 Ledgerly pull sets `colorsJson` to a **plain string array** of print names. Existing `swatchUrl` values are **not** sent from Ledgerly and can be lost unless:
 
-- You re-run `uat-restore-print-swatch-images.py`, or
+- You re-run `prod-restore-print-swatch-images.py`, or
 - Merchandisers re-upload swatches in admin, or
 - You extend Ledgerly to send swatches (not implemented today).
 
@@ -624,7 +624,7 @@ When `LEDGERLY_SYNC_PRODUCT_IMAGES=false`:
 ### Phase 3 — Sync to UAT
 
 1. **Product pull** or **webhook** → merges fields + imports galleries to R2.
-2. Run swatch restore if needed: `uat-restore-print-swatch-images.py`.
+2. Run swatch restore if needed: `prod-restore-print-swatch-images.py`.
 3. **Inventory pull** on schedule → updates `variantsJson` stock only.
 
 ### Phase 4 — Store → Ledgerly push
@@ -643,24 +643,24 @@ After admin uploads galleries, store push sends `colorImagesJson` back to Ledger
 
 | Script | Purpose |
 |--------|---------|
-| `deploy/scripts/uat-sku-wise-print-import.py` | Prints, sizes, stock, variants from xlsx |
-| `deploy/scripts/uat-restore-print-swatch-images.py` | Swatch URLs from xlsx PRINT NAMES → R2 → DB |
-| `deploy/scripts/uat-restore-galleries-from-r2.py` | Link orphan R2 files to prints by filename |
-| `deploy/scripts/uat-realign-print-color-names.py` | Fix `colors_json` vs `color_images_json` name drift |
+| `deploy/scripts/prod-sku-wise-print-import.py` | Prints, sizes, stock, variants from xlsx |
+| `deploy/scripts/prod-restore-print-swatch-images.py` | Swatch URLs from xlsx PRINT NAMES → R2 → DB |
+| `deploy/scripts/prod-restore-galleries-from-r2.py` | Link orphan R2 files to prints by filename |
+| `deploy/scripts/prod-realign-print-color-names.py` | Fix `colors_json` vs `color_images_json` name drift |
 
 Typical refresh sequence after xlsx changes:
 
 ```bash
-python3 deploy/scripts/uat-sku-wise-print-import.py
-python3 deploy/scripts/uat-restore-print-swatch-images.py
-python3 deploy/scripts/uat-restore-galleries-from-r2.py
+python3 deploy/scripts/prod-sku-wise-print-import.py
+python3 deploy/scripts/prod-restore-print-swatch-images.py
+python3 deploy/scripts/prod-restore-galleries-from-r2.py
 ```
 
 ---
 
 ## 9. Environment flags
 
-UAT (`/etc/mini-and-more/uat.env`):
+UAT (`/etc/mini-and-more/prod.env`):
 
 ```bash
 # Ledgerly connection
@@ -688,8 +688,8 @@ S3_SECRET_KEY=…
 | Admin upload UI | `src/components/admin/ColorImagesEditor.tsx` |
 | Admin save + `colorImagesJson` build | `src/lib/backend-data.ts` (`saveProduct`) |
 | Storefront gallery per print | `src/lib/product-gallery.ts` |
-| Swatch restore from xlsx | `deploy/scripts/uat-restore-print-swatch-images.py` |
-| Print name image matching | `deploy/scripts/uat-sku-wise-print-import.py` (`build_print_name_map`) |
+| Swatch restore from xlsx | `deploy/scripts/prod-restore-print-swatch-images.py` |
+| Print name image matching | `deploy/scripts/prod-sku-wise-print-import.py` (`build_print_name_map`) |
 | R2 upload API | `backend/.../InternalStorageUploadResource.java` |
 
 ---
@@ -716,7 +716,7 @@ A: Stock/prints/variants update; existing swatches and galleries are preserved w
 A: Embedded swatch photos matched against the PRINT NAMES sheet (+ manual overrides).
 
 **Q: How do swatch images get onto the website?**  
-A: Either `uat-restore-print-swatch-images.py` (from PRINT NAMES sheet → R2 → `swatchUrl`) or manual upload in Admin → Products. Not from Ledgerly.
+A: Either `prod-restore-print-swatch-images.py` (from PRINT NAMES sheet → R2 → `swatchUrl`) or manual upload in Admin → Products. Not from Ledgerly.
 
 **Q: What's the difference between print name mapping and swatch URL restore?**  
 A: Name mapping (image hash) tells you *which print* a slot is. Swatch restore uploads the master artwork file and sets `swatchUrl`. Run import first, then swatch restore.

@@ -3,7 +3,7 @@
 **Purpose:** Cross-check that every Ledgerly item uses the **exact same print name strings** as the UAT store catalog, so `colors`, `variantsJson[].color`, and `colorImagesJson` keys stay aligned on sync/pull.
 
 **Last updated:** 2026-08-04  
-**Environment:** UAT (`uat.minisnmore.com`)  
+**Environment:** UAT (`minisnmore.com`)  
 **Source of truth for this table:** Live UAT catalog DB (not the raw xlsx alone — some products differ after Ledgerly sync and manual gallery fixes).
 
 **Related docs:**
@@ -56,7 +56,7 @@ SKU WISE PRINT xlsx
         │
         ▼
 Store Admin → SKU-wise Print Import  (or CLI)
-  deploy/scripts/uat-sku-wise-print-import.py
+  deploy/scripts/prod-sku-wise-print-import.py
         │
         ├─ build_print_name_map()
         │     • Extract embedded images from main sheet (drawing anchors)
@@ -72,7 +72,7 @@ Store Admin → SKU-wise Print Import  (or CLI)
         └─ Upsert via Admin API → product.colors_json, product.variants_json
 
 Optional (store only):
-  deploy/scripts/uat-restore-print-swatch-images.py
+  deploy/scripts/prod-restore-print-swatch-images.py
     → PRINT NAMES artwork → R2 → colors_json[].swatchUrl
 
 Ledgerly sync (pull / push / webhook):
@@ -87,19 +87,19 @@ Ledgerly sync (pull / push / webhook):
 
 | Piece | Location |
 |-------|----------|
-| Excel → print names (image hash match) | `deploy/scripts/uat-sku-wise-print-import.py` → `build_print_name_map()` |
+| Excel → print names (image hash match) | `deploy/scripts/prod-sku-wise-print-import.py` → `build_print_name_map()` |
 | Excel → variants/stock | same script → `build_products()` |
 | Admin xlsx upload endpoint | `InternalAdminImportResource.java` → `/internal/v1/admin/import/sku-wise-print` |
 | Admin UI upload button | `src/routes/admin.products.tsx` |
 | Ledgerly pull merge | `LedgerlyProductMergeService.java` → `mergeLedgerlyItem()` |
 | Ledgerly push payload | `LedgerlyProductMergeService.java` → `buildPushPayload()` |
 | Per-print gallery import to R2 | `LedgerlyItemImageSync.java` (when `LEDGERLY_SYNC_PRODUCT_IMAGES=true`) |
-| Swatch restore from PRINT NAMES | `deploy/scripts/uat-restore-print-swatch-images.py` |
+| Swatch restore from PRINT NAMES | `deploy/scripts/prod-restore-print-swatch-images.py` |
 | Storefront merge | `src/lib/product-colors.ts` → `mergeColorImagesIntoColors()` |
 
 ### Manual overrides (when image match fails)
 
-Defined in `PRINT_NAME_MANUAL_OVERRIDES` in `uat-sku-wise-print-import.py`:
+Defined in `PRINT_NAME_MANUAL_OVERRIDES` in `prod-sku-wise-print-import.py`:
 
 | Excel row | Print slot | Resolved name | Reason |
 |-----------|------------|---------------|--------|
@@ -267,7 +267,7 @@ _________________________________________________________________
 | SKU mismatch on inventory pull | Loop-back fleece (`…FULL-SLEEV` vs `…FULL-SLEEVE`) | Align parent SKU with store |
 | Generic print name | Face Napkin `Print 11` | Rename to proper COMBO name when known |
 | xlsx ≠ live UAT (after Ledgerly) | Baby Swaddle, Book Style Jabla, Front Open Vest Half Sleeve | **Trust this doc (live UAT)**, not raw xlsx slots |
-| Swatch URLs | All | Store-only — re-run `uat-restore-print-swatch-images.py` after Ledgerly pull |
+| Swatch URLs | All | Store-only — re-run `prod-restore-print-swatch-images.py` after Ledgerly pull |
 
 ---
 
@@ -285,7 +285,7 @@ ORDER BY sku;"
 Re-run xlsx name resolution (dry-run only):
 
 ```bash
-python3 deploy/scripts/uat-sku-wise-print-import.py --dry-run
+python3 deploy/scripts/prod-sku-wise-print-import.py --dry-run
 ```
 
 ---

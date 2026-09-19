@@ -47,10 +47,33 @@ describe("admin validation helpers", () => {
       discount_value: null,
       min_order: null,
       max_discount: null,
+      bogo_buy_qty: 1,
+      bogo_get_qty: 1,
       expires_at: null,
       active: true,
     });
     expect(errors).toEqual(expect.arrayContaining(["Coupon code is required.", "Discount value is required."]));
+  });
+
+  it("collects BOGO coupon field errors", () => {
+    const errors = getCouponValidationErrors({
+      code: "BOGO1",
+      discount_type: "bogo",
+      discount_value: 150,
+      min_order: null,
+      max_discount: null,
+      bogo_buy_qty: 0,
+      bogo_get_qty: null,
+      expires_at: null,
+      active: true,
+    });
+    expect(errors).toEqual(
+      expect.arrayContaining([
+        "BOGO percent off must be 100 or less.",
+        "BOGO buy quantity must be 1 or greater.",
+        "BOGO get quantity is required.",
+      ]),
+    );
   });
 
   it("collects blog post required field errors", () => {

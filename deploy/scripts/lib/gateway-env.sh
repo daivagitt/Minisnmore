@@ -1,10 +1,10 @@
 # shellcheck shell=bash
-# Shared gateway env for UAT isolated stack. Source after /etc/mini-and-more/uat.env.
+# Shared gateway env for the production isolated stack. Source after /etc/mini-and-more/prod.env.
 #
 # Partial SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES_N_* env vars override YAML route[0]
 # with uri=null and predicates=[] → gateway crash loop. Never set route URIs via env; use MINIANDMORE_*_URI.
 
-uat_gateway_sanitize_env() {
+gateway_sanitize_env() {
   local _var _removed=0
 
   while IFS= read -r _var; do
@@ -21,7 +21,7 @@ uat_gateway_sanitize_env() {
   local _commerce_port="${COMMERCE_PORT:-9182}"
   local _integration_port="${INTEGRATION_PORT:-9183}"
 
-  # Bash ${VAR:-x} does not help once exported empty from uat.env — force non-empty URIs.
+  # Bash ${VAR:-x} does not help once exported empty from prod.env — force non-empty URIs.
   if [ -z "${MINIANDMORE_STORE_URI:-}" ]; then
     export MINIANDMORE_STORE_URI="http://127.0.0.1:${_store_port}"
   fi
@@ -33,7 +33,7 @@ uat_gateway_sanitize_env() {
   fi
   export GATEWAY_RESPONSE_TIMEOUT="${GATEWAY_RESPONSE_TIMEOUT:-600s}"
 
-  uat_gateway_resolve_mail_provider
+  gateway_resolve_mail_provider
 
   # Gmail, Zoho, and most SMTP providers require From to match the authenticated mailbox.
   if [ -z "${JHIPSTER_MAIL_FROM:-}" ] && [ -n "${SPRING_MAIL_USERNAME:-}" ]; then
@@ -41,11 +41,11 @@ uat_gateway_sanitize_env() {
   fi
 }
 
-# Select active SMTP provider without removing alternate credentials from uat.env.
+# Select active SMTP provider without removing alternate credentials from prod.env.
 # SPRING_MAIL_PROVIDER: gmail (default) | zoho
 # Copies GMAIL_MAIL_* or ZOHO_MAIL_* onto SPRING_MAIL_* so leftover values from the
-# other provider (common when uat.env sets SPRING_MAIL_* to Zoho) cannot leak through.
-uat_gateway_resolve_mail_provider() {
+# other provider (common when prod.env sets SPRING_MAIL_* to Zoho) cannot leak through.
+gateway_resolve_mail_provider() {
   local _provider
   _provider="$(printf '%s' "${SPRING_MAIL_PROVIDER:-gmail}" | tr '[:upper:]' '[:lower:]')"
 
@@ -88,7 +88,52 @@ uat_gateway_resolve_mail_provider() {
   esac
 }
 
-uat_gateway_verify_env() {
+load_mini_env() {
+  local f="${PROD_ENV_FILE:-/etc/mini-and-more/prod.env}"
+  if [ ! -f "$f" ]; then
+    echo "ERROR: missing $f (copy from deploy/env/prod.env.example)." >&2
+    return 1
+  fi
+  set -a
+  # shellcheck source=/dev/null
+  . "$f"
+  set +a
+}
+
+legacy_pm2_ms_name() {
+  case "$1" in
+    mini-prod-ms-*) printf '%s\n' "mini-uat-ms-${1#mini-prod-ms-}" ;;
+    mini-prod-frontend) printf '%s\n' "mini-uat-frontend" ;;
+    *) printf '%s\n' "" ;;
+  esac
+}
+
+pm2_delete_ms() {
+  local name="$1"
+  local legacy
+  pm2 delete "$name" >/dev/null 2>&1 || true
+  legacy="$(legacy_pm2_ms_name "$name")"
+  if [ -n "$legacy" ]; then
+    pm2 delete "$legacy" >/dev/null 2>&1 || true
+  fi
+}
+
+pm2_live_ms_name() {
+  local name="$1"
+  local legacy
+  if pm2 describe "$name" >/dev/null 2>&1; then
+    printf '%s\n' "$name"
+    return 0
+  fi
+  legacy="$(legacy_pm2_ms_name "$name")"
+  if [ -n "$legacy" ] && pm2 describe "$legacy" >/dev/null 2>&1; then
+    printf '%s\n' "$legacy"
+    return 0
+  fi
+  return 1
+}
+
+gateway_verify_env() {
   local _bad
   _bad=$(compgen -e | grep -E '^SPRING_CLOUD_GATEWAY(_SERVER_WEBFLUX)?(_ROUTES|\.ROUTES)' || true)
   if [ -n "$_bad" ]; then

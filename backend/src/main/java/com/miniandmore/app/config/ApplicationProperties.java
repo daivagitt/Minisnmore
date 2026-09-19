@@ -29,6 +29,8 @@ public class ApplicationProperties {
 
     private final PostOrder postOrder = new PostOrder();
 
+    private final Mail mail = new Mail();
+
     private String internalApiKey = "";
 
     // jhipster-needle-application-properties-property
@@ -65,6 +67,10 @@ public class ApplicationProperties {
         return postOrder;
     }
 
+    public Mail getMail() {
+        return mail;
+    }
+
     public String getInternalApiKey() {
         return internalApiKey;
     }
@@ -74,6 +80,22 @@ public class ApplicationProperties {
     }
 
     // jhipster-needle-application-properties-property-getter
+
+    public static class Mail {
+
+        /**
+         * Inbox notified when admin site configuration (site settings) changes.
+         */
+        private String configChangeTo = "info@stoltglobal.com";
+
+        public String getConfigChangeTo() {
+            return configChangeTo;
+        }
+
+        public void setConfigChangeTo(String configChangeTo) {
+            this.configChangeTo = configChangeTo;
+        }
+    }
 
     public static class Liquibase {
 

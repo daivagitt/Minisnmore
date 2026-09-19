@@ -250,7 +250,7 @@ def folder_sort_key(tag: str) -> tuple:
 
 def generate(spec: dict) -> tuple[dict, dict]:
     schemas = spec.get("components", {}).get("schemas", {})
-    server_url = spec.get("servers", [{}])[0].get("url", "https://uat.minisnmore.com")
+    server_url = spec.get("servers", [{}])[0].get("url", "https://minisnmore.com")
     collection_vars = {
         "baseUrl": server_url,
         "authToken": "",
@@ -331,7 +331,7 @@ def generate(spec: dict) -> tuple[dict, dict]:
 
     environment = {
         "id": str(uuid.uuid4()),
-        "name": "Minis n More — API testing (UAT)",
+        "name": "Minis n More — API testing (production)",
         "values": [
             {
                 "key": k,
@@ -359,7 +359,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate module-wise Postman collection with 2xx tests")
     parser.add_argument(
         "--spec",
-        default="https://uat.minisnmore.com/v3/api-docs",
+        default="https://minisnmore.com/v3/api-docs",
         help="OpenAPI JSON URL or file path",
     )
     parser.add_argument(

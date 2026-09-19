@@ -1,9 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   STOREFRONT_CARD_SIZES,
   STOREFRONT_HERO_SIZES,
   STOREFRONT_IMAGE_DISPLAY_WIDTH,
   STOREFRONT_IMAGE_ORIGINAL_WIDTH,
+  STOREFRONT_IMAGE_THUMB_WIDTH,
+  prefetchStorefrontImage,
+  resetStorefrontImagePrefetch,
   storefrontImageSrcSet,
   storefrontImageUrl,
 } from "./storefront-image";
@@ -50,10 +53,39 @@ describe("storefrontImageSrcSet", () => {
     );
     expect(STOREFRONT_HERO_SIZES).toContain("1250px");
     expect(STOREFRONT_CARD_SIZES).toContain("280px");
+    expect(STOREFRONT_IMAGE_THUMB_WIDTH).toBe(240);
   });
 
   it("is empty for non-catalog URLs", () => {
     expect(storefrontImageSrcSet("/local.jpg")).toBe("");
     expect(storefrontImageSrcSet("")).toBe("");
+  });
+});
+
+describe("prefetchStorefrontImage", () => {
+  afterEach(() => {
+    resetStorefrontImagePrefetch();
+  });
+
+  it("loads a display sibling once", () => {
+    const created: string[] = [];
+    const OriginalImage = globalThis.Image;
+    class SpyImage {
+      decoding = "";
+      set src(value: string) {
+        created.push(value);
+      }
+      get src() {
+        return created.at(-1) ?? "";
+      }
+    }
+    globalThis.Image = SpyImage as unknown as typeof Image;
+    try {
+      prefetchStorefrontImage("https://cdn.example.com/print.jpg", "display");
+      prefetchStorefrontImage("https://cdn.example.com/print.jpg", "display");
+      expect(created).toEqual(["https://cdn.example.com/print.jpg.display.jpg"]);
+    } finally {
+      globalThis.Image = OriginalImage;
+    }
   });
 });

@@ -24,8 +24,8 @@ for url in \
   "http://127.0.0.1:${CATALOG_PORT}/v3/api-docs/catalog" \
   "http://127.0.0.1:${CATALOG_PORT}/v3/api-docs" \
   "http://127.0.0.1:${GATEWAY_PORT}/v3/api-docs" \
-  "https://uat.minisnmore.com/v3/api-docs/catalog" \
-  "https://uat.minisnmore.com/v3/api-docs"; do
+  "https://minisnmore.com/v3/api-docs/catalog" \
+  "https://minisnmore.com/v3/api-docs"; do
   if curl -fsSL "$url" -o "$TMP" && python3 -c "import json; json.load(open('$TMP'))" 2>/dev/null; then
     mkdir -p "$(dirname "$OUTPUT")"
     cp "$TMP" "$OUTPUT"
@@ -35,6 +35,6 @@ for url in \
   fi
 done
 
-echo "ERROR: could not fetch a valid OpenAPI document from catalog (:${CATALOG_PORT}), gateway (:${GATEWAY_PORT}), or UAT." >&2
+echo "ERROR: could not fetch a valid OpenAPI document from catalog (:${CATALOG_PORT}), gateway (:${GATEWAY_PORT}), or production." >&2
 echo "Ensure catalog-core runs with --spring.profiles.active=prod,api-docs" >&2
 exit 1

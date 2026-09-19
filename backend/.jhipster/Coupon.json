@@ -18,7 +18,7 @@
       "fieldName": "discountType",
       "fieldType": "DiscountType",
       "fieldValidateRules": ["required"],
-      "fieldValues": "PERCENT,FLAT"
+      "fieldValues": "PERCENT,FLAT,BOGO"
     },
     {
       "fieldName": "discountValue",
@@ -37,6 +37,20 @@
       "fieldType": "BigDecimal",
       "fieldValidateRules": ["min"],
       "fieldValidateRulesMin": "0"
+    },
+    {
+      "fieldName": "bogoBuyQty",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["min", "max"],
+      "fieldValidateRulesMin": "1",
+      "fieldValidateRulesMax": "10"
+    },
+    {
+      "fieldName": "bogoGetQty",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["min", "max"],
+      "fieldValidateRulesMin": "1",
+      "fieldValidateRulesMax": "10"
     },
     {
       "fieldName": "expiresAt",

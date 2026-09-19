@@ -24,7 +24,7 @@ import {
   type CheckoutAddressFieldName,
   type SavedAddress,
 } from "@/lib/account.functions";
-import { validateCoupon } from "@/lib/coupons.functions";
+import { validateCoupon, couponValidationData } from "@/lib/coupons.functions";
 import { commerceFromSiteSettings } from "@/lib/commerce";
 import { orderTotals } from "@/lib/money";
 import { DEFAULT_STORE_DISCOUNT_PERCENT } from "@/lib/pricing";
@@ -77,7 +77,7 @@ async function persistCheckoutProfile(fullName: string, phone: string) {
 }
 
 function Checkout() {
-  const { cart, cartTotal, clearCart, updateQty, promptRemoveFromCart, appliedCoupon, setAppliedCoupon, syncCartWithCatalog } = useShop();
+  const { cart, cartTotal, cartCount, clearCart, updateQty, promptRemoveFromCart, appliedCoupon, setAppliedCoupon, syncCartWithCatalog } = useShop();
   const products = useProducts();
   const { user, loading: authLoading } = useAuth();
   const settings = useSiteSettings();
@@ -155,15 +155,19 @@ function Checkout() {
   useEffect(() => {
     if (!appliedCoupon?.code) return;
     let cancelled = false;
-    validateCoupon({ data: { code: appliedCoupon.code, subtotal: cartTotal } })
+    const code = appliedCoupon.code;
+    validateCoupon({ data: couponValidationData(code, cartTotal, cart) })
       .then((res) => {
         if (cancelled) return;
         if (res.ok) setAppliedCoupon({ code: res.code!, discount: res.discount! });
-        else setAppliedCoupon(null);
+        else {
+          setAppliedCoupon(null);
+          toast.message(res.error ?? `${code} no longer applies to this cart`);
+        }
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [cartTotal, appliedCoupon?.code, setAppliedCoupon]);
+  }, [cart, cartTotal, appliedCoupon?.code, setAppliedCoupon]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -344,7 +348,7 @@ function Checkout() {
     if (!raw) return;
     setCouponInput(raw);
     try {
-      const res = await validateCoupon({ data: { code: raw, subtotal: cartTotal } });
+      const res = await validateCoupon({ data: couponValidationData(raw, cartTotal, cart) });
       if (!res.ok) {
         setAppliedCoupon(null);
         toast.error(res.error);
@@ -1000,7 +1004,7 @@ function Checkout() {
                 </button>
               </div>
             )}
-            <CouponOffers subtotal={cartTotal} activeCode={appliedCoupon?.code} onApply={(c) => applyCoupon(c)} />
+            <CouponOffers subtotal={cartTotal} itemCount={cartCount} activeCode={appliedCoupon?.code} onApply={(c) => applyCoupon(c)} />
           </div>
         </div>
         <div className="border-t border-border/60 mt-4 pt-4 space-y-1.5 text-sm">

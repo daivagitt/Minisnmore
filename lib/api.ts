@@ -161,6 +161,8 @@ const FIELD_LABELS: Record<string, string> = {
   discount_value: "Discount value",
   min_order: "Minimum order",
   max_discount: "Maximum discount",
+  bogo_buy_qty: "BOGO buy quantity",
+  bogo_get_qty: "BOGO get quantity",
   expires_at: "Expiry date",
   section_key: "Section key",
   page_key: "Page key",

@@ -1,9 +1,11 @@
 package com.miniandmore.app.service;
 
 import com.miniandmore.app.domain.Coupon;
+import com.miniandmore.app.domain.enumeration.DiscountType;
 import com.miniandmore.app.repository.CouponRepository;
 import com.miniandmore.app.service.dto.CouponDTO;
 import com.miniandmore.app.service.mapper.CouponMapper;
+import java.math.BigDecimal;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +38,7 @@ public class CouponService {
      */
     public CouponDTO save(CouponDTO couponDTO) {
         LOG.debug("Request to save Coupon : {}", couponDTO);
+        normalizeCoupon(couponDTO);
         Coupon coupon = couponMapper.toEntity(couponDTO);
         coupon = couponRepository.save(coupon);
         return couponMapper.toDto(coupon);
@@ -49,6 +52,7 @@ public class CouponService {
      */
     public CouponDTO update(CouponDTO couponDTO) {
         LOG.debug("Request to update Coupon : {}", couponDTO);
+        normalizeCoupon(couponDTO);
         Coupon coupon = couponMapper.toEntity(couponDTO);
         coupon = couponRepository.save(coupon);
         return couponMapper.toDto(coupon);
@@ -66,6 +70,7 @@ public class CouponService {
         return couponRepository
             .findById(couponDTO.getId())
             .map(existingCoupon -> {
+                normalizeCoupon(couponDTO);
                 couponMapper.partialUpdate(existingCoupon, couponDTO);
 
                 return existingCoupon;
@@ -94,5 +99,18 @@ public class CouponService {
     public void delete(Long id) {
         LOG.debug("Request to delete Coupon : {}", id);
         couponRepository.deleteById(id);
+    }
+
+    static void normalizeCoupon(CouponDTO couponDTO) {
+        couponDTO.setBogoBuyQty(BogoDiscountCalculator.clampQty(couponDTO.getBogoBuyQty()));
+        couponDTO.setBogoGetQty(BogoDiscountCalculator.clampQty(couponDTO.getBogoGetQty()));
+        if (couponDTO.getDiscountType() == DiscountType.BOGO && couponDTO.getDiscountValue() != null) {
+            BigDecimal percent = couponDTO.getDiscountValue();
+            if (percent.compareTo(BigDecimal.ONE) < 0) {
+                couponDTO.setDiscountValue(BigDecimal.ONE);
+            } else if (percent.compareTo(BigDecimal.valueOf(100)) > 0) {
+                couponDTO.setDiscountValue(BigDecimal.valueOf(100));
+            }
+        }
     }
 }

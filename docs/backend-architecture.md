@@ -104,7 +104,7 @@ Redis   127.0.0.1:6379
 ```
 
 - Local dev infra: `docker compose -f docker/microservices.yml up -d` — Consul (dev mode), 2× Postgres 18.3, Redis 8.6.1.
-- Production/UAT: each service built via `./mvnw -Pprod -DskipTests clean package`, run under **PM2** (`deploy/scripts/prod-microservices-pm2.sh` / `uat-microservices-pm2.sh`), health-checked via `/management/health/{liveness,readiness}` (`deploy/scripts/health-check-microservices.sh`). Secrets in `/etc/mini-and-more/prod.env` (chmod 600). Nginx config: `deploy/nginx/prod.minisnmore.com.locations.conf`.
+- Production/UAT: each service built via `./mvnw -Pprod -DskipTests clean package`, run under **PM2** (`deploy/scripts/prod-microservices-pm2.sh` / `prod-microservices-pm2.sh`), health-checked via `/management/health/{liveness,readiness}` (`deploy/scripts/health-check-microservices.sh`). Secrets in `/etc/mini-and-more/prod.env` (chmod 600). Nginx config: `deploy/nginx/prod.minisnmore.com.locations.conf`.
 - Profile matrix: local dev = `dev`; UAT = gateway `prod,api-docs,uat`, others `prod,api-docs`; production = `prod` (+`consul` if using the config server).
 - CI: Jenkins jobs `BUILD_GATEWAY`, `BUILD_BACKEND`, `BUILD_STORE`, `BUILD_COMMERCE`, `BUILD_INTEGRATION` (defunct, see below), `DEPLOY_UAT`.
 

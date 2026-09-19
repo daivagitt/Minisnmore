@@ -5,6 +5,52 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 import type { InvoiceOrder } from "@/lib/invoice-breakdown";
 import { isInvoiceAvailable } from "@/lib/invoice-availability";
 
+/** Force a single A4 sheet: hide app chrome from layout and pin the invoice to 210×297mm. */
+export const INVOICE_PRINT_CSS = `@media print {
+  @page { size: 210mm 297mm portrait; margin: 0; }
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    overflow: hidden !important;
+    background: #fff !important;
+  }
+  body * { visibility: hidden !important; }
+  .invoice-document, .invoice-document * { visibility: visible !important; }
+  .invoice-print-root {
+    position: static !important;
+    inset: auto !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: #fff !important;
+    height: 297mm !important;
+  }
+  .invoice-print-root > :not(.invoice-document) { display: none !important; }
+  .invoice-document {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    width: 210mm !important;
+    max-width: 210mm !important;
+    height: 297mm !important;
+    max-height: 297mm !important;
+    min-height: 0 !important;
+    padding: 6mm !important;
+    overflow: hidden !important;
+    box-shadow: none !important;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-after: avoid !important;
+    break-inside: avoid !important;
+  }
+  .invoice-document img { max-height: 40px !important; }
+  .invoice-document table th,
+  .invoice-document table td { padding-top: 2px !important; padding-bottom: 2px !important; }
+}`;
+
 export function InvoiceViewer({
   orderNumber,
   loadOrder,
@@ -41,7 +87,7 @@ export function InvoiceViewer({
 
   return (
     <div className="invoice-print-root fixed inset-0 z-[100] overflow-auto bg-slate-200 px-2 py-4 sm:px-6 print:static print:bg-white print:p-0">
-      <style>{`@media print { html, body { margin: 0 !important; padding: 0 !important; } body * { visibility: hidden !important; } .invoice-document, .invoice-document * { visibility: visible !important; } .invoice-document { position: absolute; left: 0; top: 0; box-sizing: border-box; width: 210mm !important; max-width: none !important; min-height: 297mm !important; height: auto !important; padding: 8mm !important; overflow: visible !important; } .invoice-document tbody tr { break-inside: avoid; page-break-inside: avoid; } @page { size: 210mm 297mm portrait; margin: 0; } }`}</style>
+      <style>{INVOICE_PRINT_CSS}</style>
       <div className="mx-auto mb-3 flex w-full max-w-[794px] items-center justify-between gap-2 sm:gap-3 print:hidden flex-wrap">
         <button
           type="button"

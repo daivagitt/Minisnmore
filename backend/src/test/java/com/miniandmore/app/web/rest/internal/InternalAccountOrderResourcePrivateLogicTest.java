@@ -222,6 +222,8 @@ class InternalAccountOrderResourcePrivateLogicTest {
         Map<String, Object> summary = (Map<String, Object>) ReflectionTestUtils.invokeMethod(resource, "couponSummary", coupon);
         assertThat(summary.get("code")).isEqualTo("FLAT50");
         assertThat(summary.get("discount_type")).isEqualTo("flat");
+        assertThat(summary.get("bogo_buy_qty")).isEqualTo(1);
+        assertThat(summary.get("bogo_get_qty")).isEqualTo(1);
     }
 
     @Test
@@ -437,7 +439,7 @@ class InternalAccountOrderResourcePrivateLogicTest {
             BigDecimal.valueOf(500),
             Optional.of("customer1")
         );
-        assertThat(minResult).isEmpty();
+        assertThat(minResult.orElseThrow().get("error")).isEqualTo("Add ₹500 more to unlock this offer");
     }
 
     @Test
@@ -460,6 +462,108 @@ class InternalAccountOrderResourcePrivateLogicTest {
         );
 
         assertThat((BigDecimal) result.orElseThrow().get("discount")).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void calculateCouponDiscount_bogoUsesCheapestUnits() {
+        Coupon coupon = new Coupon()
+            .code("BOGO1")
+            .active(true)
+            .discountType(DiscountType.BOGO)
+            .discountValue(BigDecimal.valueOf(100))
+            .minOrder(BigDecimal.ZERO)
+            .bogoBuyQty(1)
+            .bogoGetQty(1);
+        when(couponRepository.findOneByCodeIgnoreCase("BOGO1")).thenReturn(Optional.of(coupon));
+
+        List<com.miniandmore.app.service.BogoDiscountCalculator.Line> lines = List.of(
+            new com.miniandmore.app.service.BogoDiscountCalculator.Line(1, BigDecimal.valueOf(1000)),
+            new com.miniandmore.app.service.BogoDiscountCalculator.Line(1, BigDecimal.valueOf(400))
+        );
+        Optional<Map<String, Object>> result = (Optional<Map<String, Object>>) ReflectionTestUtils.invokeMethod(
+            resource,
+            "calculateCouponDiscount",
+            "BOGO1",
+            BigDecimal.valueOf(1400),
+            Optional.of("customer1"),
+            lines
+        );
+
+        assertThat((BigDecimal) result.orElseThrow().get("discount")).isEqualByComparingTo("400.00");
+    }
+
+    @Test
+    void calculateCouponDiscount_bogoUsesLineSubtotalWhenItemsProvided() {
+        Coupon coupon = new Coupon()
+            .code("BOGO1")
+            .active(true)
+            .discountType(DiscountType.BOGO)
+            .discountValue(BigDecimal.valueOf(100))
+            .minOrder(BigDecimal.ZERO)
+            .bogoBuyQty(1)
+            .bogoGetQty(1);
+        when(couponRepository.findOneByCodeIgnoreCase("BOGO1")).thenReturn(Optional.of(coupon));
+
+        List<com.miniandmore.app.service.BogoDiscountCalculator.Line> lines = List.of(
+            new com.miniandmore.app.service.BogoDiscountCalculator.Line(1, BigDecimal.valueOf(1000)),
+            new com.miniandmore.app.service.BogoDiscountCalculator.Line(1, BigDecimal.valueOf(400))
+        );
+        Optional<Map<String, Object>> result = (Optional<Map<String, Object>>) ReflectionTestUtils.invokeMethod(
+            resource,
+            "calculateCouponDiscount",
+            "BOGO1",
+            BigDecimal.valueOf(500),
+            Optional.of("customer1"),
+            lines
+        );
+
+        assertThat((BigDecimal) result.orElseThrow().get("discount")).isEqualByComparingTo("400.00");
+    }
+
+    @Test
+    void calculateCouponDiscount_minOrderReturnsSpecificError() {
+        Coupon coupon = new Coupon()
+            .code("SAVE10")
+            .active(true)
+            .discountType(DiscountType.PERCENT)
+            .discountValue(BigDecimal.TEN)
+            .minOrder(BigDecimal.valueOf(1000));
+        when(couponRepository.findOneByCodeIgnoreCase("SAVE10")).thenReturn(Optional.of(coupon));
+
+        Optional<Map<String, Object>> result = (Optional<Map<String, Object>>) ReflectionTestUtils.invokeMethod(
+            resource,
+            "calculateCouponDiscount",
+            "SAVE10",
+            BigDecimal.valueOf(700),
+            Optional.of("customer1"),
+            List.of()
+        );
+
+        assertThat(result.orElseThrow().get("error")).isEqualTo("Add ₹300 more to unlock this offer");
+    }
+
+    @Test
+    void calculateCouponDiscount_bogoRequiresEnoughItems() {
+        Coupon coupon = new Coupon()
+            .code("BOGO1")
+            .active(true)
+            .discountType(DiscountType.BOGO)
+            .discountValue(BigDecimal.valueOf(100))
+            .minOrder(BigDecimal.ZERO)
+            .bogoBuyQty(1)
+            .bogoGetQty(1);
+        when(couponRepository.findOneByCodeIgnoreCase("BOGO1")).thenReturn(Optional.of(coupon));
+
+        Optional<Map<String, Object>> result = (Optional<Map<String, Object>>) ReflectionTestUtils.invokeMethod(
+            resource,
+            "calculateCouponDiscount",
+            "BOGO1",
+            BigDecimal.valueOf(1000),
+            Optional.of("customer1"),
+            List.of(new com.miniandmore.app.service.BogoDiscountCalculator.Line(1, BigDecimal.valueOf(1000)))
+        );
+
+        assertThat(result.orElseThrow().get("error")).isEqualTo("Add 1 more item to use this BOGO offer");
     }
 
     @Test

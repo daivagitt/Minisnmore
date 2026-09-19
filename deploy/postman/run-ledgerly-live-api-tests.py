@@ -12,7 +12,7 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-BASE = os.environ.get("API_TEST_BASE_URL", "https://uat.minisnmore.com").rstrip("/")
+BASE = os.environ.get("API_TEST_BASE_URL", "https://minisnmore.com").rstrip("/")
 OUT_JSON = Path(
     os.environ.get(
         "LEDGERLY_LIVE_REPORT_JSON",
@@ -26,7 +26,7 @@ OUT_HTML = Path(
     )
 )
 
-ADMIN_USER = os.environ.get("LEDGERLY_TEST_ADMIN_USER", "admin@uat.minisnmore.com")
+ADMIN_USER = os.environ.get("LEDGERLY_TEST_ADMIN_USER", "admin@minisnmore.com")
 ADMIN_PASS = os.environ.get("LEDGERLY_TEST_ADMIN_PASS", "admin6")
 
 CTX = ssl.create_default_context()

@@ -75,11 +75,11 @@ REPO_ROOT=/var/www/uat1/mini_ms_test \
 
 The production frontend uses `https://minisnmore.com` by default and runs as
 `mini-prod-frontend` on localhost port `3000`. UAT frontend scripts retain
-their separate `uat.minisnmore.com` defaults.
+their separate `minisnmore.com` defaults.
 
 **Port layout:** Nginx public → gateway **8080** only. Store **8081**, commerce **8082**, integration **8083**, catalog **8084** are localhost-only. Do not expose edge ports publicly.
 
-UAT1 (`/var/www/uat1/mini_and_more`): Jenkins `DEPLOY_UAT` rsyncs all JARs; on the VPS run `deploy/scripts/uat-microservices-pm2.sh` (see `deploy/env/uat.env.example`). Gateway profile `uat` uses localhost routes to edges.
+UAT1 (`/var/www/uat1/mini_and_more`): Jenkins `DEPLOY_UAT` rsyncs all JARs; on the VPS run `deploy/scripts/prod-microservices-pm2.sh` (see `deploy/env/prod.env.example`). Gateway profile `uat` uses localhost routes to edges.
 
 ## Profiles
 
@@ -102,4 +102,4 @@ After deploy, verify modules in order: [MODULES_TESTING.md](./MODULES_TESTING.md
 
 ## CI
 
-Jenkins: `BUILD_GATEWAY`, `BUILD_BACKEND`, `BUILD_STORE`, `BUILD_COMMERCE`, `BUILD_INTEGRATION`, `DEPLOY_UAT` — see root `Jenkinsfile` (UAT1 → `REMOTE_APP_DIR=/var/www/uat1/mini_and_more`).
+Jenkins: `BUILD_GATEWAY`, `BUILD_BACKEND`, `BUILD_STORE`, `BUILD_COMMERCE`, `BUILD_INTEGRATION`, `DEPLOY_UAT` — see root `Jenkinsfile` (UAT1 → `REMOTE_APP_DIR=/var/www/uat1/mini_ms_test`).

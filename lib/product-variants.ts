@@ -13,7 +13,7 @@ export type ProductVariant = {
   sku: string;
   size?: string;
   color?: string;
-  /** Storefront unit price (after UAT discount when applied server-side). */
+  /** Storefront unit price (after discount when applied server-side). */
   price: number;
   /** Ledgerly rate / MRP (compare-at). Storefront selling price is typically 80% of this. */
   compareAt?: number;
