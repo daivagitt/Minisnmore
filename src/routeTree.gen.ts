@@ -58,6 +58,7 @@ import { Route as AdminInvoicesRouteImport } from './routes/admin.invoices'
 import { Route as AdminHomeRouteImport } from './routes/admin.home'
 import { Route as AdminDiscountRouteImport } from './routes/admin.discount'
 import { Route as AdminCouponsRouteImport } from './routes/admin.coupons'
+import { Route as AdminContactMessagesRouteImport } from './routes/admin.contact-messages'
 import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
 import { Route as AdminCancellationsRouteImport } from './routes/admin.cancellations'
 import { Route as AdminBlogRouteImport } from './routes/admin.blog'
@@ -327,6 +328,11 @@ const AdminCouponsRoute = AdminCouponsRouteImport.update({
   path: '/coupons',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminContactMessagesRoute = AdminContactMessagesRouteImport.update({
+  id: '/contact-messages',
+  path: '/contact-messages',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
   id: '/categories',
   path: '/categories',
@@ -490,6 +496,7 @@ export interface FileRoutesByFullPath {
   '/admin/blog': typeof AdminBlogRoute
   '/admin/cancellations': typeof AdminCancellationsRoute
   '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/contact-messages': typeof AdminContactMessagesRoute
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/discount': typeof AdminDiscountRoute
   '/admin/home': typeof AdminHomeRoute
@@ -560,6 +567,7 @@ export interface FileRoutesByTo {
   '/admin/blog': typeof AdminBlogRoute
   '/admin/cancellations': typeof AdminCancellationsRoute
   '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/contact-messages': typeof AdminContactMessagesRoute
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/discount': typeof AdminDiscountRoute
   '/admin/home': typeof AdminHomeRoute
@@ -635,6 +643,7 @@ export interface FileRoutesById {
   '/admin/blog': typeof AdminBlogRoute
   '/admin/cancellations': typeof AdminCancellationsRoute
   '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/contact-messages': typeof AdminContactMessagesRoute
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/discount': typeof AdminDiscountRoute
   '/admin/home': typeof AdminHomeRoute
@@ -711,6 +720,7 @@ export interface FileRouteTypes {
     | '/admin/blog'
     | '/admin/cancellations'
     | '/admin/categories'
+    | '/admin/contact-messages'
     | '/admin/coupons'
     | '/admin/discount'
     | '/admin/home'
@@ -781,6 +791,7 @@ export interface FileRouteTypes {
     | '/admin/blog'
     | '/admin/cancellations'
     | '/admin/categories'
+    | '/admin/contact-messages'
     | '/admin/coupons'
     | '/admin/discount'
     | '/admin/home'
@@ -855,6 +866,7 @@ export interface FileRouteTypes {
     | '/admin/blog'
     | '/admin/cancellations'
     | '/admin/categories'
+    | '/admin/contact-messages'
     | '/admin/coupons'
     | '/admin/discount'
     | '/admin/home'
@@ -1264,6 +1276,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCouponsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/contact-messages': {
+      id: '/admin/contact-messages'
+      path: '/contact-messages'
+      fullPath: '/admin/contact-messages'
+      preLoaderRoute: typeof AdminContactMessagesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/categories': {
       id: '/admin/categories'
       path: '/categories'
@@ -1483,6 +1502,7 @@ interface AdminRouteChildren {
   AdminBlogRoute: typeof AdminBlogRoute
   AdminCancellationsRoute: typeof AdminCancellationsRoute
   AdminCategoriesRoute: typeof AdminCategoriesRoute
+  AdminContactMessagesRoute: typeof AdminContactMessagesRoute
   AdminCouponsRoute: typeof AdminCouponsRoute
   AdminDiscountRoute: typeof AdminDiscountRoute
   AdminHomeRoute: typeof AdminHomeRoute
@@ -1508,6 +1528,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminBlogRoute: AdminBlogRoute,
   AdminCancellationsRoute: AdminCancellationsRoute,
   AdminCategoriesRoute: AdminCategoriesRoute,
+  AdminContactMessagesRoute: AdminContactMessagesRoute,
   AdminCouponsRoute: AdminCouponsRoute,
   AdminDiscountRoute: AdminDiscountRoute,
   AdminHomeRoute: AdminHomeRoute,

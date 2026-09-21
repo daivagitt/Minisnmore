@@ -3,6 +3,7 @@ package com.miniandmore.app.web.rest.internal;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -12,6 +13,7 @@ import com.miniandmore.app.domain.Policy;
 import com.miniandmore.app.domain.Product;
 import com.miniandmore.app.domain.SiteSetting;
 import com.miniandmore.app.repository.*;
+import com.miniandmore.app.service.ContactMessageService;
 import com.miniandmore.app.service.PincodeLookupService;
 import com.miniandmore.app.service.ProductVariantSupport;
 import com.miniandmore.app.service.dto.*;
@@ -85,6 +87,9 @@ class InternalStorefrontResourceTest {
 
     @MockitoBean
     private ProductVariantSupport productVariantSupport;
+
+    @MockitoBean
+    private ContactMessageService contactMessageService;
 
     @Test
     void categories_returns200() throws Exception {
@@ -213,5 +218,24 @@ class InternalStorefrontResourceTest {
         when(pageVisibilityRepository.findAllByOrderByPageKeyAsc()).thenReturn(List.of());
 
         mockMvc.perform(get("/internal/v1/page-visibility")).andExpect(status().isOk());
+    }
+
+    @Test
+    void createContactMessage_returns200() throws Exception {
+        ContactMessageDTO dto = new ContactMessageDTO();
+        dto.setId(1L);
+        dto.setEmail("care@example.com");
+        when(contactMessageService.submit(any(ContactMessageDTO.class))).thenReturn(dto);
+
+        mockMvc
+            .perform(
+                post("/internal/v1/contact-messages")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"name\":\"Ada\",\"email\":\"care@example.com\",\"phone\":\"9876543210\",\"address\":\"12 Flower Lane\",\"comment\":\"Please call me\"}"
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.email").value("care@example.com"));
     }
 }

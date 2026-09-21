@@ -1,6 +1,7 @@
 package com.miniandmore.app.web.rest.internal;
 
 import com.miniandmore.app.repository.*;
+import com.miniandmore.app.service.ContactMessageService;
 import com.miniandmore.app.service.PincodeLookupService;
 import com.miniandmore.app.service.ProductVariantSupport;
 import com.miniandmore.app.service.dto.*;
@@ -9,6 +10,7 @@ import com.miniandmore.app.web.rest.v1.AboutPageDTO;
 import com.miniandmore.app.web.rest.v1.ApiResponse;
 import com.miniandmore.app.web.rest.v1.SubscribePageDTO;
 import java.util.List;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -35,6 +37,7 @@ public class InternalStorefrontResource {
     private final PolicyMapper policyMapper;
     private final PincodeLookupService pincodeLookupService;
     private final ProductVariantSupport productVariantSupport;
+    private final ContactMessageService contactMessageService;
 
     public InternalStorefrontResource(
         CategoryRepository categoryRepository,
@@ -54,7 +57,8 @@ public class InternalStorefrontResource {
         SiteSettingMapper siteSettingMapper,
         PolicyMapper policyMapper,
         PincodeLookupService pincodeLookupService,
-        ProductVariantSupport productVariantSupport
+        ProductVariantSupport productVariantSupport,
+        ContactMessageService contactMessageService
     ) {
         this.categoryRepository = categoryRepository;
         this.productRepository = productRepository;
@@ -74,6 +78,7 @@ public class InternalStorefrontResource {
         this.policyMapper = policyMapper;
         this.pincodeLookupService = pincodeLookupService;
         this.productVariantSupport = productVariantSupport;
+        this.contactMessageService = contactMessageService;
     }
 
     @GetMapping("/categories")
@@ -170,6 +175,11 @@ public class InternalStorefrontResource {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid pincode format");
         }
         return ApiResponse.ok(pincodeLookupService.lookup(pincode).orElse(null));
+    }
+
+    @PostMapping("/contact-messages")
+    public ApiResponse<ContactMessageDTO> createContactMessage(@Valid @RequestBody ContactMessageDTO dto) {
+        return ApiResponse.ok(contactMessageService.submit(dto));
     }
 
     @GetMapping("/policies/{slug}")

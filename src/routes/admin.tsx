@@ -5,7 +5,7 @@ import { ADMIN_NAV_ITEMS, filterAdminNavItems } from "@/lib/admin-nav";
 import {
   LayoutDashboard, Image as ImgIcon, Tag, BookOpen, FileText, Package, Plug, LogOut, Loader2,
   Folder, Home, EyeOff, Settings as SettingsIcon, ExternalLink, ShoppingCart, ReceiptText, Percent, RotateCcw, XCircle,
-  Users, Search, type LucideIcon,
+  Users, Search, Mail, type LucideIcon,
 } from "lucide-react";
 import { staffHomePath } from "@/lib/staff-roles";
 
@@ -17,6 +17,7 @@ export const Route = createFileRoute("/admin")({
 const NAV_ICONS: Record<string, LucideIcon> = {
   "/admin": LayoutDashboard,
   "/admin/settings": SettingsIcon,
+  "/admin/contact-messages": Mail,
   "/admin/banners": ImgIcon,
   "/admin/categories": Folder,
   "/admin/products": Package,

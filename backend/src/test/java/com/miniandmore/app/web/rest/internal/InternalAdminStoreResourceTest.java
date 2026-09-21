@@ -2,6 +2,7 @@ package com.miniandmore.app.web.rest.internal;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -116,6 +117,9 @@ class InternalAdminStoreResourceTest {
 
     @MockitoBean
     private CouponMapper couponMapper;
+
+    @MockitoBean
+    private ContactMessageService contactMessageService;
 
     @MockitoBean
     private LedgerlySyncService ledgerlySyncService;
@@ -614,6 +618,35 @@ class InternalAdminStoreResourceTest {
         when(productRepository.existsById(404L)).thenReturn(false);
 
         mockMvc.perform(delete("/internal/v1/admin/products/404")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void contactMessages_returns200() throws Exception {
+        ContactMessageDTO dto = new ContactMessageDTO();
+        dto.setId(21L);
+        dto.setEmail("care@example.com");
+        when(contactMessageService.findAllNewestFirst()).thenReturn(List.of(dto));
+
+        mockMvc
+            .perform(get("/internal/v1/admin/contact-messages"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].email").value("care@example.com"));
+    }
+
+    @Test
+    void deleteContactMessage_deletesWhenExists() throws Exception {
+        mockMvc.perform(delete("/internal/v1/admin/contact-messages/21")).andExpect(status().isOk());
+
+        verify(contactMessageService).delete(21L);
+    }
+
+    @Test
+    void deleteContactMessage_whenMissing_returnsNotFound() throws Exception {
+        doThrow(new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Contact message not found"))
+            .when(contactMessageService)
+            .delete(404L);
+
+        mockMvc.perform(delete("/internal/v1/admin/contact-messages/404")).andExpect(status().isNotFound());
     }
 
     private static CategoryDTO categoryDto(Long id, String name) {

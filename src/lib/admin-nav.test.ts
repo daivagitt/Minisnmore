@@ -15,6 +15,9 @@ describe("admin-nav", () => {
 
     const reviews = filterAdminNavItems(ADMIN_NAV_ITEMS, "mom review");
     expect(reviews.map((item) => item.to)).toEqual(["/admin/home"]);
+
+    const messages = filterAdminNavItems(ADMIN_NAV_ITEMS, "write to us");
+    expect(messages.map((item) => item.to)).toEqual(["/admin/contact-messages"]);
   });
 
   it("requires every token to match", () => {

@@ -70,6 +70,7 @@ const LABELS: Record<string, string> = {
   fabric_story: "Fabric story",
   brand_story: "Our story",
   reviews: "Mom reviews",
+  write_to_us: "Write to us",
   journal_strip: "Blog",
   gifts: "Gifts",
   gift_concierge: "Gift (legacy)",
@@ -89,6 +90,7 @@ const SECTION_HINTS: Record<string, string> = {
     "Organic fabric video + copy beside it. Optional title/subtitle override the default “Fabric story” heading.",
   brand_story: "Founders / mission block with photo. Title overrides the default “Our story” heading.",
   reviews: "Scrolling mom reviews. Edit review cards in the editor below — at least one row recommended.",
+  write_to_us: "Homepage contact form with email, phone, address and comments.",
   journal_strip:
     "Blog teaser strip on the homepage. Add up to five blog cards below or leave empty for the latest posts.",
   gifts: "Shows five gift picks on the homepage. Pick up to five below or leave empty for gift-set category items.",

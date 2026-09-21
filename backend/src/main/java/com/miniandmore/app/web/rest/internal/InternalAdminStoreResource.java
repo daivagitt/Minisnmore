@@ -51,6 +51,7 @@ public class InternalAdminStoreResource {
     private final SiteSettingMapper siteSettingMapper;
     private final PolicyMapper policyMapper;
     private final CouponMapper couponMapper;
+    private final ContactMessageService contactMessageService;
     private final LedgerlySyncService ledgerlySyncService;
     private final ZohoSyncService zohoSyncService;
 
@@ -82,6 +83,7 @@ public class InternalAdminStoreResource {
         SiteSettingMapper siteSettingMapper,
         PolicyMapper policyMapper,
         CouponMapper couponMapper,
+        ContactMessageService contactMessageService,
         LedgerlySyncService ledgerlySyncService,
         ZohoSyncService zohoSyncService
     ) {
@@ -112,6 +114,7 @@ public class InternalAdminStoreResource {
         this.siteSettingMapper = siteSettingMapper;
         this.policyMapper = policyMapper;
         this.couponMapper = couponMapper;
+        this.contactMessageService = contactMessageService;
         this.ledgerlySyncService = ledgerlySyncService;
         this.zohoSyncService = zohoSyncService;
     }
@@ -370,6 +373,19 @@ public class InternalAdminStoreResource {
     public ApiResponse<Map<String, Boolean>> deleteCoupon(@PathVariable Long id) {
         requireExists(id, couponRepository::existsById, "Coupon");
         couponService.delete(id);
+        return ApiResponse.ok(Map.of("deleted", true));
+    }
+
+    @GetMapping("/contact-messages")
+    @PreAuthorize(CMS_ADMIN)
+    public ApiResponse<List<ContactMessageDTO>> contactMessages() {
+        return ApiResponse.ok(contactMessageService.findAllNewestFirst());
+    }
+
+    @DeleteMapping("/contact-messages/{id}")
+    @PreAuthorize(CMS_ADMIN)
+    public ApiResponse<Map<String, Boolean>> deleteContactMessage(@PathVariable Long id) {
+        contactMessageService.delete(id);
         return ApiResponse.ok(Map.of("deleted", true));
     }
 
