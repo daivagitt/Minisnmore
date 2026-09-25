@@ -95,6 +95,7 @@ public class OrderMailService {
             extra.put("cancellationNumber", cancellation.getRequestNumber());
             extra.put("cancellationReason", cancellation.getReason());
             extra.put("requestedOn", formatOrderDate(cancellation.getRequestedAt()));
+            extra.put("requestedOnFormatted", formatOrderDate(cancellation.getRequestedAt()));
         }
         sendOrderTemplate(order, "mail/cancellationRequestedEmail", "email.order.cancel.requested.title", extra);
     }
@@ -102,16 +103,24 @@ public class OrderMailService {
     // Trigger 5: Cancellation Accepted
     public void sendCancellationAccepted(CustomerOrder order, OrderCancellationRequest cancellation) {
         Map<String, Object> extra = new LinkedHashMap<>();
+        extra.put("hasRefund", false);
         if (cancellation != null) {
             extra.put("cancellationNumber", cancellation.getRequestNumber());
             extra.put("cancellationReason", cancellation.getReason());
             extra.put("adminNotes", cancellation.getAdminNotes());
+            BigDecimal refund = null;
             if (cancellation.getRefundAmount() != null) {
-                extra.put("refundAmount", formatInr(cancellation.getRefundAmount()));
+                refund = cancellation.getRefundAmount();
             } else if (order != null && "online".equalsIgnoreCase(order.getPaymentMethod())) {
-                extra.put("refundAmount", formatInr(order.getTotal()));
+                refund = order.getTotal();
+            }
+            if (refund != null) {
+                extra.put("refundAmount", formatInr(refund));
+                extra.put("refundAmountFormatted", formatInr(refund));
+                extra.put("hasRefund", isPositive(refund));
             }
             extra.put("resolvedOn", formatOrderDate(cancellation.getResolvedAt()));
+            extra.put("resolvedOnFormatted", formatOrderDate(cancellation.getResolvedAt()));
         }
         sendOrderTemplate(order, "mail/cancellationAcceptedEmail", "email.order.cancel.accepted.title", extra);
     }
@@ -125,6 +134,7 @@ public class OrderMailService {
             extra.put("rejectionReason", cancellation.getRejectionReason());
             extra.put("adminNotes", cancellation.getAdminNotes());
             extra.put("resolvedOn", formatOrderDate(cancellation.getResolvedAt()));
+            extra.put("resolvedOnFormatted", formatOrderDate(cancellation.getResolvedAt()));
         }
         sendOrderTemplate(order, "mail/cancellationRejectedEmail", "email.order.cancel.rejected.title", extra);
     }
@@ -138,9 +148,13 @@ public class OrderMailService {
     public void sendRefundInitiated(CustomerOrder order, BigDecimal refundAmount, String refundId, String paymentMethod) {
         Map<String, Object> extra = new LinkedHashMap<>();
         BigDecimal amount = refundAmount != null ? refundAmount : (order != null ? order.getTotal() : BigDecimal.ZERO);
+        String method = displayPaymentMethod(paymentMethod != null ? paymentMethod : (order != null ? order.getPaymentMethod() : ""));
         extra.put("refundAmount", formatInr(amount));
+        extra.put("refundAmountFormatted", formatInr(amount));
+        extra.put("refundDateFormatted", formatOrderDate(Instant.now()));
         extra.put("refundId", StringUtils.defaultString(refundId));
-        extra.put("paymentMethod", displayPaymentMethod(paymentMethod != null ? paymentMethod : (order != null ? order.getPaymentMethod() : "")));
+        extra.put("paymentMethod", method);
+        extra.put("paymentMethodDisplay", method);
         sendOrderTemplate(order, "mail/refundInitiatedEmail", "email.order.refund.initiated.title", extra);
     }
 
@@ -148,9 +162,13 @@ public class OrderMailService {
     public void sendRefundCompleted(CustomerOrder order, BigDecimal refundAmount, String refundId, String paymentMethod) {
         Map<String, Object> extra = new LinkedHashMap<>();
         BigDecimal amount = refundAmount != null ? refundAmount : (order != null ? order.getTotal() : BigDecimal.ZERO);
+        String method = displayPaymentMethod(paymentMethod != null ? paymentMethod : (order != null ? order.getPaymentMethod() : ""));
         extra.put("refundAmount", formatInr(amount));
+        extra.put("refundAmountFormatted", formatInr(amount));
+        extra.put("refundDateFormatted", formatOrderDate(Instant.now()));
         extra.put("refundId", StringUtils.defaultString(refundId));
-        extra.put("paymentMethod", displayPaymentMethod(paymentMethod != null ? paymentMethod : (order != null ? order.getPaymentMethod() : "")));
+        extra.put("paymentMethod", method);
+        extra.put("paymentMethodDisplay", method);
         sendOrderTemplate(order, "mail/refundCompletedEmail", "email.order.refund.completed.title", extra);
     }
 
@@ -280,7 +298,12 @@ public class OrderMailService {
         extra.put("carrierName", StringUtils.defaultString(orderReturn.getCarrierName()));
         extra.put("trackingUrl", StringUtils.defaultString(orderReturn.getTrackingUrl()));
         extra.put("requestedOn", formatOrderDate(orderReturn.getRequestedAt()));
+        extra.put("requestedOnFormatted", formatOrderDate(orderReturn.getRequestedAt()));
         extra.put("reviewedOn", formatOrderDate(orderReturn.getResolvedAt()));
+        extra.put("resolvedOnFormatted", formatOrderDate(orderReturn.getResolvedAt()));
+        if (orderReturn.getRefundAmount() != null) {
+            extra.put("refundAmountFormatted", formatInr(orderReturn.getRefundAmount()));
+        }
         extra.put("receivedOn", formatOrderDate(orderReturn.getResolvedAt() != null ? orderReturn.getResolvedAt() : Instant.now()));
         String baseUrl = StringUtils.defaultIfBlank(jHipsterProperties.getMail().getBaseUrl(), "https://minisnmore.com");
         String returnNum = StringUtils.defaultString(orderReturn.getReturnNumber());
@@ -289,11 +312,8 @@ public class OrderMailService {
 
         if (orderReturn.getOrderItem() != null) {
             OrderItem oi = orderReturn.getOrderItem();
-            String details = joinNonBlank(" · ", oi.getItemSize(), oi.getColor());
-            Map<String, String> row = new LinkedHashMap<>();
-            row.put("title", StringUtils.defaultString(oi.getProductName()));
-            row.put("details", details);
-            row.put("quantity", oi.getQty() == null ? "1" : String.valueOf(oi.getQty()));
+            extra.put("originalItemName", StringUtils.defaultString(oi.getProductName()));
+            Map<String, String> row = lineItemRow(oi);
             String repl = joinNonBlank(" · ", orderReturn.getReplacementSize(), orderReturn.getReplacementColor(), orderReturn.getReplacementVariantSku());
             if (StringUtils.isNotBlank(repl)) {
                 row.put("exchangeNote", repl);
@@ -453,17 +473,26 @@ public class OrderMailService {
         }
         List<OrderItem> items = orderItemRepository.findAllByOrderId(orderId);
         for (OrderItem item : items) {
-            String details = joinNonBlank(" · ", item.getItemSize(), item.getColor());
-            Map<String, String> row = new LinkedHashMap<>();
-            row.put("name", StringUtils.defaultString(item.getProductName()));
-            row.put("details", details);
-            row.put("qty", item.getQty() == null ? "1" : String.valueOf(item.getQty()));
-            row.put("unitPrice", formatInr(item.getPrice()));
-            row.put("amount", formatInr(lineAmount(item)));
-            row.put("image", StringUtils.defaultString(item.getProductImage()));
-            rows.add(row);
+            rows.add(lineItemRow(item));
         }
         return rows;
+    }
+
+    /** Order and return templates read different keys (name/qty vs title/quantity); SpEL fails on a missing map key. */
+    private Map<String, String> lineItemRow(OrderItem item) {
+        String name = StringUtils.defaultString(item.getProductName());
+        String qty = item.getQty() == null ? "1" : String.valueOf(item.getQty());
+        Map<String, String> row = new LinkedHashMap<>();
+        row.put("name", name);
+        row.put("title", name);
+        row.put("details", joinNonBlank(" · ", item.getItemSize(), item.getColor()));
+        row.put("qty", qty);
+        row.put("quantity", qty);
+        row.put("unitPrice", formatInr(item.getPrice()));
+        row.put("amount", formatInr(lineAmount(item)));
+        row.put("image", StringUtils.defaultString(item.getProductImage()));
+        row.put("exchangeNote", "");
+        return row;
     }
 
     private static BigDecimal lineAmount(OrderItem item) {
