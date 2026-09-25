@@ -387,7 +387,7 @@ public class OrderReturnService {
         orderReturn.setResolvedAt(Instant.now());
         releaseExchangeReservation(orderReturn);
         OrderReturn saved = orderReturnRepository.save(orderReturn);
-        queueReturnEmail(saved.getOrder(), saved);
+        queueReturnEmail(saved.getOrder(), saved, true);
         return saved;
     }
 
@@ -650,13 +650,15 @@ public class OrderReturnService {
     }
 
     public OrderReturn markPickedUp(String returnNumber, String adminNotes) {
-        return transition(
+        OrderReturn saved = transition(
             returnNumber,
             EnumSet.of(OrderReturnStatus.APPROVED, OrderReturnStatus.PICKUP_REQUESTED, OrderReturnStatus.PICKUP_SCHEDULED),
             OrderReturnStatus.PICKED_UP,
             adminNotes,
             "Pickup must be scheduled before marking picked up"
         );
+        queueReturnEmail(saved.getOrder(), saved);
+        return saved;
     }
 
     public OrderReturn markReceived(String returnNumber, String adminNotes) {
@@ -958,7 +960,9 @@ public class OrderReturnService {
         orderReturn.setOutboundLabelUrl(StringUtils.left(StringUtils.trimToNull(labelUrl), 500));
         orderReturn.setStatus(OrderReturnStatus.SHIPPED);
         orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
-        return orderReturnRepository.save(orderReturn);
+        OrderReturn saved = orderReturnRepository.save(orderReturn);
+        queueReturnEmail(saved.getOrder(), saved);
+        return saved;
     }
 
     private OrderReturn bookExpressBeesOutbound(OrderReturn orderReturn, String preAssignedAwb, String adminNotes) {
@@ -981,7 +985,9 @@ public class OrderReturnService {
             orderReturn.setOutboundProviderRequestId(StringUtils.left(StringUtils.trimToNull(result.providerRequestId()), 120));
             orderReturn.setStatus(OrderReturnStatus.SHIPPED);
             orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
-            return orderReturnRepository.save(orderReturn);
+            OrderReturn saved = orderReturnRepository.save(orderReturn);
+            queueReturnEmail(saved.getOrder(), saved);
+            return saved;
         } catch (XpressBeesClient.XpressBeesApiException ex) {
             LOG.warn("ExpressBees forward shipment failed for {}: {}", orderReturn.getReturnNumber(), ex.getMessage());
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, ex.getMessage());
@@ -1044,33 +1050,39 @@ public class OrderReturnService {
     }
 
     public OrderReturn markShipped(String returnNumber, String adminNotes) {
-        return transition(
+        OrderReturn saved = transition(
             returnNumber,
             OrderReturnStatus.READY_TO_SHIP,
             OrderReturnStatus.SHIPPED,
             adminNotes,
             "Item must be ready to ship before marking shipped"
         );
+        queueReturnEmail(saved.getOrder(), saved);
+        return saved;
     }
 
     public OrderReturn markDelivered(String returnNumber, String adminNotes) {
-        return transition(
+        OrderReturn saved = transition(
             returnNumber,
             OrderReturnStatus.SHIPPED,
             OrderReturnStatus.DELIVERED,
             adminNotes,
             "Item must be shipped before marking delivered"
         );
+        queueReturnEmail(saved.getOrder(), saved);
+        return saved;
     }
 
     public OrderReturn completeExchange(String returnNumber, String adminNotes) {
-        return transition(
+        OrderReturn saved = transition(
             returnNumber,
             OrderReturnStatus.DELIVERED,
             OrderReturnStatus.COMPLETED,
             adminNotes,
             "Item must be delivered before completing the exchange"
         );
+        queueReturnEmail(saved.getOrder(), saved);
+        return saved;
     }
 
     // ---------------------------------------------------------------------
@@ -1402,12 +1414,20 @@ public class OrderReturnService {
     }
 
     private void queueReturnEmail(CustomerOrder order, OrderReturn orderReturn) {
+        queueReturnEmail(order, orderReturn, false);
+    }
+
+    private void queueReturnEmail(CustomerOrder order, OrderReturn orderReturn, boolean qcFailed) {
         if (order == null || orderReturn == null) {
             return;
         }
         AfterCommit.run(() -> {
             try {
-                orderMailService.sendReturnUpdate(order, orderReturn);
+                if (qcFailed) {
+                    orderMailService.sendReturnQcFailed(order, orderReturn);
+                } else {
+                    orderMailService.sendReturnUpdate(order, orderReturn);
+                }
                 orderSmsService.sendReturnUpdate(order, orderReturn);
             } catch (RuntimeException ex) {
                 LOG.warn("Return email/SMS failed for {}", orderReturn.getReturnNumber(), ex);

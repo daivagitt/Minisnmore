@@ -1,12 +1,13 @@
 const KEY = "mnm_pending_profile";
 
-export type PendingProfile = { full_name: string; email: string };
+export type PendingProfile = { full_name: string; email: string; subscribed?: boolean };
 
 export type SignupProfileUser = {
   email: string | null;
   login: string;
   firstName?: string | null;
   lastName?: string | null;
+  subscribed?: boolean;
 };
 
 function normalizeEmail(value: string | null | undefined): string {
@@ -24,7 +25,7 @@ function displayNameFromUser(user: SignupProfileUser): string {
 export function resolveSignupProfileSeed(
   user: SignupProfileUser,
   pending: PendingProfile | null,
-): { full_name: string; email: string; stalePending: boolean } | null {
+): { full_name: string; email: string; subscribed: boolean; stalePending: boolean } | null {
   const userEmail = normalizeEmail(user.email ?? user.login);
   const pendingEmail = pending ? normalizeEmail(pending.email) : "";
   const pendingMatchesUser = Boolean(pendingEmail && pendingEmail === userEmail);
@@ -33,9 +34,10 @@ export function resolveSignupProfileSeed(
   const email = pendingMatchesUser ? pendingEmail : userEmail;
   const full_name =
     (pendingMatchesUser ? pending!.full_name.trim() : "") || displayNameFromUser(user);
+  const subscribed = pendingMatchesUser ? pending!.subscribed === true : user.subscribed === true;
 
-  if (!full_name || !email) return stalePending ? { full_name: "", email: "", stalePending: true } : null;
-  return { full_name, email, stalePending };
+  if (!full_name || !email) return stalePending ? { full_name: "", email: "", subscribed: false, stalePending: true } : null;
+  return { full_name, email, subscribed, stalePending };
 }
 
 export function savePendingProfile(profile: PendingProfile) {
@@ -50,7 +52,11 @@ export function readPendingProfile(): PendingProfile | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PendingProfile>;
     if (typeof parsed.full_name === "string" && typeof parsed.email === "string") {
-      return { full_name: parsed.full_name, email: parsed.email };
+      return {
+        full_name: parsed.full_name,
+        email: parsed.email,
+        subscribed: parsed.subscribed === true,
+      };
     }
   } catch {
     // Ignore corrupt session data.

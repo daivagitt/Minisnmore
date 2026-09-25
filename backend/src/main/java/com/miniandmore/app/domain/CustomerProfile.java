@@ -35,6 +35,10 @@ public class CustomerProfile implements Serializable {
     @Column(name = "phone", length = 20)
     private String phone;
 
+    @NotNull
+    @Column(name = "subscribed", nullable = false)
+    private Boolean subscribed = false;
+
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
     public Long getId() {
@@ -87,6 +91,19 @@ public class CustomerProfile implements Serializable {
 
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+
+    public Boolean getSubscribed() {
+        return this.subscribed;
+    }
+
+    public CustomerProfile subscribed(Boolean subscribed) {
+        this.setSubscribed(subscribed);
+        return this;
+    }
+
+    public void setSubscribed(Boolean subscribed) {
+        this.subscribed = subscribed != null ? subscribed : false;
     }
 
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here

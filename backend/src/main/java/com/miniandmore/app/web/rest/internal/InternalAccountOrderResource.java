@@ -183,12 +183,13 @@ public class InternalAccountOrderResource {
     }
 
     @GetMapping("/account/profile")
-    public ApiResponse<Map<String, String>> profile() {
+    public ApiResponse<Map<String, Object>> profile() {
         String login = requireLogin();
         Optional<CustomerProfile> profile = dataAccess.customerProfileRepository().findOneByUserLogin(login);
-        Map<String, String> data = new LinkedHashMap<>();
+        Map<String, Object> data = new LinkedHashMap<>();
         data.put("full_name", profile.map(CustomerProfile::getFullName).map(StringUtils::defaultString).orElse(""));
         data.put(FIELD_PHONE, profile.map(CustomerProfile::getPhone).map(StringUtils::defaultString).orElse(""));
+        data.put("subscribed", profile.map(CustomerProfile::getSubscribed).map(Boolean.TRUE::equals).orElse(false));
         return ApiResponse.ok(data);
     }
 
@@ -212,6 +213,9 @@ public class InternalAccountOrderResource {
             .orElseGet(() -> new CustomerProfile().userLogin(login));
         profile.setFullName(StringUtils.trimToNull(request.full_name()));
         profile.setPhone(StringUtils.trimToNull(request.phone()));
+        if (request.subscribed() != null) {
+            profile.setSubscribed(request.subscribed());
+        }
         dataAccess.customerProfileRepository().save(profile);
         ledgerlySyncService.syncCustomerProfileAsync(login);
         return ApiResponse.ok(Map.of("ok", true));
@@ -233,10 +237,18 @@ public class InternalAccountOrderResource {
             .customerProfileRepository()
             .findOneByUserLogin(login)
             .orElseGet(() -> new CustomerProfile().userLogin(login));
-        if (StringUtils.isNotBlank(profile.getFullName())) {
+        boolean changed = false;
+        if (StringUtils.isBlank(profile.getFullName())) {
+            profile.setFullName(StringUtils.trimToNull(request.full_name()));
+            changed = true;
+        }
+        if (Boolean.TRUE.equals(request.subscribed()) && !Boolean.TRUE.equals(profile.getSubscribed())) {
+            profile.setSubscribed(true);
+            changed = true;
+        }
+        if (!changed) {
             return ApiResponse.ok(Map.of("ok", true));
         }
-        profile.setFullName(StringUtils.trimToNull(request.full_name()));
         dataAccess.customerProfileRepository().save(profile);
         ledgerlySyncService.syncCustomerProfileAsync(login);
         return ApiResponse.ok(Map.of("ok", true));
@@ -1579,7 +1591,8 @@ public class InternalAccountOrderResource {
         @NotBlank
         @Size(max = 20)
         @Pattern(regexp = "^(\\+91[\\s-]?)?[6-9]\\d{4}[\\s-]?\\d{5}$", message = "Enter a valid 10-digit Indian mobile number")
-        String phone
+        String phone,
+        Boolean subscribed
     ) {}
 
     public record ProfileBootstrapRequest(
@@ -1587,7 +1600,8 @@ public class InternalAccountOrderResource {
         @Size(min = 2, max = 120)
         @Pattern(regexp = "^\\p{L}[\\p{L} .'-]*$", message = "Full name may only contain letters, spaces, apostrophes, periods and hyphens")
         String full_name,
-        @NotBlank @Email @Size(max = 160) String email
+        @NotBlank @Email @Size(max = 160) String email,
+        Boolean subscribed
     ) {}
 
     public record AddressRequest(

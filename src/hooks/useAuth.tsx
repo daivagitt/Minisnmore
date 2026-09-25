@@ -18,6 +18,7 @@ export type AuthUser = {
   firstName?: string | null;
   lastName?: string | null;
   activated?: boolean;
+  subscribed?: boolean;
 };
 
 export type AuthSession = {
@@ -38,7 +39,7 @@ type Ctx = {
   isStaff: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, fullName?: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, fullName?: string, subscribed?: boolean) => Promise<{ error: string | null }>;
   signInWithOAuth: (provider: "google" | "apple" | "facebook", redirectPath?: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   completeOAuthSignIn: (token: string) => Promise<{ error: string | null }>;
@@ -58,7 +59,13 @@ async function seedProfileFromSignup(user: AuthUser): Promise<boolean> {
   if (!resolved?.full_name || !resolved.email) return true;
 
   try {
-    await bootstrapProfileFromSignup({ data: { full_name: resolved.full_name, email: resolved.email } });
+    await bootstrapProfileFromSignup({
+      data: {
+        full_name: resolved.full_name,
+        email: resolved.email,
+        ...(resolved.subscribed ? { subscribed: true } : {}),
+      },
+    });
     if (pending && pending.email.trim().toLowerCase() === resolved.email) {
       clearPendingProfile(pending.email);
     }
@@ -87,6 +94,7 @@ async function loadAccountFromToken(
         firstName: account.firstName,
         lastName: account.lastName,
         activated: account.activated,
+        subscribed: account.subscribed === true,
       },
       authorities,
       staffRole,
@@ -239,7 +247,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, fullName?: string) => {
+  const signUp = async (email: string, password: string, fullName?: string, subscribed = false) => {
     const trimmed = email.trim().toLowerCase();
     if (fullName !== undefined) {
       const nameError = fullNameFieldError(fullName);
@@ -258,6 +266,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           firstName,
           lastName,
           langKey: "en",
+          subscribed: Boolean(subscribed),
         },
         { unwrap: false },
       );

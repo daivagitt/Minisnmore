@@ -56,6 +56,16 @@ describe("admin login route", () => {
 
   it("exposes document metadata", () => {
     expect((Route as any).head().meta[0].title).toBe("Staff Login · Mini's n More");
+    expect((Route as any).head().links[0]).toEqual(
+      expect.objectContaining({ rel: "preload", as: "image", fetchPriority: "high" }),
+    );
+  });
+
+  it("renders a motion kids hero from existing store photography", () => {
+    renderAdminLogin();
+    const hero = screen.getByRole("img", { name: /smiling baby/i }) as HTMLImageElement;
+    expect(hero.getAttribute("src")).toMatch(/hero-smiling-baby/i);
+    expect(screen.getAllByText(/minis today, memories forever/i).length).toBeGreaterThan(0);
   });
 
   it("navigates authenticated admins to admin", async () => {

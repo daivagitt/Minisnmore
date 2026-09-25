@@ -32,6 +32,7 @@ public class UserRowMapper implements BiFunction<Row, String, User> {
         entity.setLastName(converter.fromRow(row, prefix + "_last_name", String.class));
         entity.setEmail(converter.fromRow(row, prefix + "_email", String.class));
         entity.setActivated(Boolean.TRUE.equals(converter.fromRow(row, prefix + "_activated", Boolean.class)));
+        entity.setSubscribed(Boolean.TRUE.equals(converter.fromRow(row, prefix + "_subscribed", Boolean.class)));
         entity.setLangKey(converter.fromRow(row, prefix + "_lang_key", String.class));
         entity.setImageUrl(converter.fromRow(row, prefix + "_image_url", String.class));
         entity.setActivationKey(converter.fromRow(row, prefix + "_activation_key", String.class));

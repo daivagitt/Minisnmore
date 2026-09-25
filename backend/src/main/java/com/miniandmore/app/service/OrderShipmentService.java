@@ -63,6 +63,17 @@ public class OrderShipmentService {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * True when Admin booked ExpressBees or a manual AWB. Those orders keep local carrier
+     * status; Zoho shipment/fulfillment updates must not overwrite them.
+     */
+    public static boolean hasLocalForwardShipment(CustomerOrder order) {
+        if (order == null || order.getShipmentCancelledAt() != null) {
+            return false;
+        }
+        return order.getShipmentLogisticsMode() != null && StringUtils.isNotBlank(order.getTrackingNumber());
+    }
+
     public static boolean isShipmentEligible(CustomerOrder order) {
         if (order == null) {
             return false;

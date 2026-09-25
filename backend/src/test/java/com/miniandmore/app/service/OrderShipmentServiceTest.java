@@ -97,6 +97,17 @@ class OrderShipmentServiceTest {
     }
 
     @Test
+    void hasLocalForwardShipment_requiresActiveBookedAwb() {
+        assertThat(OrderShipmentService.hasLocalForwardShipment(confirmedPaid())).isFalse();
+        CustomerOrder booked = confirmedPaid()
+            .trackingNumber("XB-1")
+            .shipmentLogisticsMode(ReturnLogisticsMode.XPRESSBEES);
+        assertThat(OrderShipmentService.hasLocalForwardShipment(booked)).isTrue();
+        booked.setShipmentCancelledAt(Instant.now());
+        assertThat(OrderShipmentService.hasLocalForwardShipment(booked)).isFalse();
+    }
+
+    @Test
     void canBookExpressBees_requiresCompletedPackage() {
         assertThat(orderShipmentService.canBookExpressBees(confirmedPaid())).isFalse();
         assertThat(orderShipmentService.canBookExpressBees(packedConfirmedPaid())).isTrue();

@@ -16,6 +16,13 @@ public final class ZohoOrderStatus {
     private ZohoOrderStatus() {}
 
     public static void applySalesOrderTracking(CustomerOrder order, Map<String, Object> salesOrder) {
+        if (OrderShipmentService.hasLocalForwardShipment(order)) {
+            String status = stringValue(salesOrder.get("status"));
+            if (StringUtils.isNotBlank(status)) {
+                order.setZohoOrderStatus(status);
+            }
+            return;
+        }
         String status = stringValue(salesOrder.get("status"));
         if (StringUtils.isNotBlank(status)) {
             order.setZohoOrderStatus(status);
@@ -55,7 +62,7 @@ public final class ZohoOrderStatus {
 
     @SuppressWarnings("unchecked")
     public static void applyDeliveryChallans(CustomerOrder order, List<Map<String, Object>> challans) {
-        if (challans == null || challans.isEmpty()) {
+        if (challans == null || challans.isEmpty() || OrderShipmentService.hasLocalForwardShipment(order)) {
             return;
         }
         boolean delivered = false;
@@ -87,7 +94,12 @@ public final class ZohoOrderStatus {
 
     /** A Zoho package is the operations-owned proof that wrapping/packing is complete. */
     public static void applyPackages(CustomerOrder order, List<Map<String, Object>> packages) {
-        if (packages == null || packages.isEmpty() || order.getStatus() == OrderStatus.CANCELLED) {
+        if (
+            packages == null ||
+            packages.isEmpty() ||
+            order.getStatus() == OrderStatus.CANCELLED ||
+            OrderShipmentService.hasLocalForwardShipment(order)
+        ) {
             return;
         }
         for (Map<String, Object> pkg : packages) {

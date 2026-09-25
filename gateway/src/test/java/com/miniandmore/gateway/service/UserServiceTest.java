@@ -154,6 +154,7 @@ class UserServiceTest {
     @Test
     void registerUser_createsNewUser() {
         AdminUserDTO dto = adminDto("newuser", "new@localhost");
+        dto.setSubscribed(true);
         Authority authority = new Authority();
         authority.setName(AuthoritiesConstants.USER);
         when(userRepository.findOneByLogin("newuser")).thenReturn(Mono.empty());
@@ -168,7 +169,10 @@ class UserServiceTest {
         when(userRepository.saveUserAuthority(anyLong(), anyString())).thenReturn(Mono.empty());
 
         StepVerifier.create(userService.registerUser(dto, "password").contextWrite(securityContext()))
-            .assertNext(registered -> assertThat(registered.getLogin()).isEqualTo("newuser"))
+            .assertNext(registered -> {
+                assertThat(registered.getLogin()).isEqualTo("newuser");
+                assertThat(registered.isSubscribed()).isTrue();
+            })
             .verifyComplete();
     }
 
@@ -342,7 +346,7 @@ class UserServiceTest {
 
     @Test
     void getAllManagedUsers_mapsToDto() {
-        when(userRepository.findAllStaffUsers(20, 0)).thenReturn(Flux.just(user));
+        when(userRepository.findAllUsersForAdmin(20, 0)).thenReturn(Flux.just(user));
 
         StepVerifier.create(userService.getAllManagedUsers(PageRequest.of(0, 20)))
             .assertNext(dto -> assertThat(dto.getLogin()).isEqualTo("user"))
@@ -365,7 +369,7 @@ class UserServiceTest {
 
     @Test
     void countManagedUsers_delegatesToRepository() {
-        when(userRepository.countStaffUsers()).thenReturn(Mono.just(3L));
+        when(userRepository.count()).thenReturn(Mono.just(3L));
 
         StepVerifier.create(userService.countManagedUsers()).expectNext(3L).verifyComplete();
     }

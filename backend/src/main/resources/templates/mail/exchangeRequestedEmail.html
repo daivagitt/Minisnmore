@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="en">
+<head>
+<meta charset="UTF-8">
+<title th:text="#{email.order.exchange.requested.title(${orderNumber})}">Exchange Requested</title>
+</head>
+<body style="margin:0; padding:0; background-color:#fdf1ec; font-family: Arial, Helvetica, sans-serif;">
+  <span style="display:none !important; visibility:hidden; opacity:0; color:transparent; height:0; width:0; overflow:hidden;" th:text="'Exchange requested for order ' + ${orderNumber}">Exchange requested.</span>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fdf1ec; padding:32px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border:1px solid #f6dce2; border-radius:18px;">
+          <tr>
+            <td style="padding:40px 44px;">
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding-bottom:20px;">
+                    <img src="https://pub-f227d5520be64479a318380ac346334d.r2.dev/prod/home/1789526139661-e9b78d4b-bb41-4129-b569-8a77875247a7-M-logo.png" alt="Mini's n More" width="56" style="display:block; width:56px; max-width:56px; height:auto; border:0;">
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding-bottom:24px;">
+                    <span style="font-family: Georgia, 'Times New Roman', serif; font-size:26px; color:#7a2f3e;">🔄 Exchange Requested</span>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="font-size:15px; color:#333333; line-height:1.6; margin:0 0 16px 0;">
+                Dear <span th:text="${customerName}">Customer</span>,
+              </p>
+              <p style="font-size:15px; color:#333333; line-height:1.6; margin:0 0 16px 0;">
+                Your exchange request for order <b style="color:#c2447a;" th:text="${orderNumber}">MNM-XXXXXXXXX</b> has been initiated. Please keep the item unused, with original tags and packaging, ready for pickup.
+              </p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fdf1ec; border-radius:14px; margin:8px 0 16px 0;">
+                <tr>
+                  <td style="padding:20px 24px;">
+                    <div style="font-size:14px; color:#5a4a4a; margin-bottom:6px;"><b>Order</b> <span style="color:#c2447a;" th:text="${orderNumber}">MNM-XXXXXXXXX</span></div>
+                    <div style="font-size:14px; color:#5a4a4a; margin-bottom:6px;" th:if="${!#strings.isEmpty(returnNumber)}"><b>Exchange ID</b> <span th:text="${returnNumber}">EXG-XXXXXXXXX</span></div>
+                    <div style="font-size:14px; color:#5a4a4a;" th:if="${!#strings.isEmpty(requestedOn)}"><b>Requested on</b> <span th:text="${requestedOn}">Wed, 23 Sep 2026</span></div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Items details if present -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fdf1ec; border-radius:14px; margin:0 0 16px 0;" th:if="${items != null and !items.isEmpty()}">
+                <tr>
+                  <td style="padding:18px 24px;">
+                    <div style="font-size:12px; font-weight:bold; color:#7a2f3e; margin-bottom:12px;">EXCHANGE ITEMS</div>
+                    <div th:each="item : ${items}" style="padding:8px 0; border-bottom:1px dashed #f6dce2;">
+                      <div style="font-size:14px; font-weight:bold; color:#333;" th:text="${item.title}">Product Name</div>
+                      <div style="font-size:13px; color:#8a7472;" th:text="'Qty: ' + ${item.quantity} + (${!#strings.isEmpty(item.details)} ? ' · ' + ${item.details} : '')">Qty: 1 · Size: M</div>
+                      <div th:if="${item.exchangeNote != null}" style="font-size:13px; color:#c2447a; margin-top:2px;" th:text="'Replacement requested: ' + ${item.exchangeNote}">Replacement info</div>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fdf1ec; border-radius:14px; margin:0 0 8px 0;">
+                <tr>
+                  <td style="padding:20px 24px;">
+                    <div style="font-size:14px; color:#5a4a4a; font-weight:bold; margin-bottom:8px;">What happens next</div>
+                    <div style="font-size:13px; color:#5a4a4a; line-height:1.8;">
+                      1. We review your exchange request within 24-48 hours<br>
+                      2. Once approved, our pickup partner collects the item<br>
+                      3. Your replacement item is shipped after inspection
+                    </div>
+                  </td>
+                </tr>
+              </table>
+              <p style="font-size:12px; color:#b79aa0; margin:0 0 28px 0;">&nbsp;</p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding-bottom:16px;">
+                    <a th:href="${exchangeUrl != null ? exchangeUrl : (returnUrl != null ? returnUrl : orderUrl)}" style="background-color:#e87ea0; color:#ffffff; text-decoration:none; font-size:15px; font-weight:bold; padding:14px 32px; border-radius:30px; display:inline-block;">📦 View Exchange Details</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-bottom:28px;">
+                    <a th:href="${exchangeUrl != null ? exchangeUrl : (returnUrl != null ? returnUrl : orderUrl)}" th:text="${exchangeUrl != null ? exchangeUrl : (returnUrl != null ? returnUrl : orderUrl)}" style="color:#d16b87; font-size:13px; text-decoration:underline; word-break:break-all;">https://minisnmore.com/exchanges/EXG-XXXXXXXXX</a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="font-size:14px; color:#333333; margin:0 0 4px 0;">Warm regards,</p>
+              <p style="font-size:14px; color:#333333; font-weight:bold; margin:0 0 24px 0;">Team Minis n More</p>
+              <p style="font-size:12px; color:#c9adb4; margin:0;">Made for little ones. Chosen with love. 🌸</p>
+
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

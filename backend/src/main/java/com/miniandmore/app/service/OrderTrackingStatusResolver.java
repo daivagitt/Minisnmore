@@ -19,22 +19,23 @@ public final class OrderTrackingStatusResolver {
         if (order.getPaymentStatus() != PaymentStatus.PAID && order.getStatus() == OrderStatus.PENDING) {
             return "pending";
         }
-        if (
-            order.getStatus() == OrderStatus.FULFILLED ||
-            LedgerlyOrderStatus.isDelivered(ledgerlyStatus) ||
-            ZohoOrderStatus.isDelivered(order.getZohoOrderStatus())
-        ) {
-            return "delivered";
-        }
         if (isExpressBeesAwaitingPickup(order)) {
             return "awaiting_pickup";
         }
+        boolean localShipment = OrderShipmentService.hasLocalForwardShipment(order);
         if (
-            LedgerlyOrderStatus.isShipped(ledgerlyStatus) ||
-            ZohoOrderStatus.isShipped(order.getZohoOrderStatus()) ||
+            order.getStatus() == OrderStatus.FULFILLED ||
+            (!localShipment && LedgerlyOrderStatus.isDelivered(ledgerlyStatus)) ||
+            (!localShipment && ZohoOrderStatus.isDelivered(order.getZohoOrderStatus()))
+        ) {
+            return "delivered";
+        }
+        if (
             XpressBeesShipmentStatus.isPickedUpOrInTransit(order.getShipmentCarrierStatus()) ||
             StringUtils.isNotBlank(order.getTrackingNumber()) ||
-            StringUtils.isNotBlank(order.getShipmentDate())
+            StringUtils.isNotBlank(order.getShipmentDate()) ||
+            (!localShipment && LedgerlyOrderStatus.isShipped(ledgerlyStatus)) ||
+            (!localShipment && ZohoOrderStatus.isShipped(order.getZohoOrderStatus()))
         ) {
             return "shipped";
         }

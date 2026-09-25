@@ -25,6 +25,11 @@
       "fieldType": "String",
       "fieldValidateRules": ["maxlength"],
       "fieldValidateRulesMaxlength": "20"
+    },
+    {
+      "fieldName": "subscribed",
+      "fieldType": "Boolean",
+      "fieldValidateRules": ["required"]
     }
   ],
   "jpaMetamodelFiltering": true,

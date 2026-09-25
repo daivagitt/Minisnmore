@@ -408,7 +408,7 @@ describe("orders functions", () => {
     getMock.mockResolvedValueOnce({ full_name: "Seed User", phone: "90000" });
 
     const res = await getMyProfile();
-    expect(res.profile).toEqual({ full_name: "Seed User", phone: "90000" });
+    expect(res.profile).toEqual({ full_name: "Seed User", phone: "90000", subscribed: false });
     expect(getMock).toHaveBeenCalledWith("/api/v1/account/profile", { auth: true });
   });
 
@@ -416,7 +416,14 @@ describe("orders functions", () => {
     getMock.mockResolvedValueOnce({});
 
     const res = await getMyProfile();
-    expect(res.profile).toEqual({ full_name: "", phone: "" });
+    expect(res.profile).toEqual({ full_name: "", phone: "", subscribed: false });
+  });
+
+  it("loads a subscribed profile flag", async () => {
+    getMock.mockResolvedValueOnce({ full_name: "Seed User", phone: "90000", subscribed: true });
+
+    const res = await getMyProfile();
+    expect(res.profile).toEqual({ full_name: "Seed User", phone: "90000", subscribed: true });
   });
 
   it("updates profile", async () => {
@@ -429,6 +436,20 @@ describe("orders functions", () => {
     expect(putMock).toHaveBeenCalledWith(
       "/api/v1/account/profile",
       { full_name: "New Name", phone: "9876543210" },
+      { auth: true },
+    );
+  });
+
+  it("updates a subscribe preference with the profile", async () => {
+    putMock.mockResolvedValueOnce({ ok: true });
+
+    const res = await updateMyProfile({
+      data: { full_name: "  New Name  ", phone: "  9876543210  ", subscribed: true },
+    });
+    expect(res.ok).toBe(true);
+    expect(putMock).toHaveBeenCalledWith(
+      "/api/v1/account/profile",
+      { full_name: "New Name", phone: "9876543210", subscribed: true },
       { auth: true },
     );
   });
@@ -518,6 +539,21 @@ describe("orders functions", () => {
     expect(postMock).toHaveBeenCalledWith(
       "/api/v1/account/profile/bootstrap",
       { full_name: "New Parent", email: "parent@example.com" },
+      { auth: true },
+    );
+  });
+
+  it("bootstraps a subscribe preference from signup data", async () => {
+    postMock.mockResolvedValueOnce({ ok: true });
+
+    await expect(
+      bootstrapProfileFromSignup({
+        data: { full_name: "New Parent", email: "Parent@Example.com", subscribed: true },
+      }),
+    ).resolves.toEqual({ ok: true });
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/account/profile/bootstrap",
+      { full_name: "New Parent", email: "parent@example.com", subscribed: true },
       { auth: true },
     );
   });

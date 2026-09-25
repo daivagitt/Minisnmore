@@ -18,6 +18,12 @@ describe("admin-nav", () => {
 
     const messages = filterAdminNavItems(ADMIN_NAV_ITEMS, "write to us");
     expect(messages.map((item) => item.to)).toEqual(["/admin/contact-messages"]);
+
+    const users = filterAdminNavItems(ADMIN_NAV_ITEMS, "joined");
+    expect(users.map((item) => item.to)).toEqual(["/admin/users"]);
+
+    const rbac = filterAdminNavItems(ADMIN_NAV_ITEMS, "rbac");
+    expect(rbac.map((item) => item.to)).toEqual(["/admin/rbac"]);
   });
 
   it("requires every token to match", () => {

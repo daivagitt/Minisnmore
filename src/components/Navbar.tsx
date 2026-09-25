@@ -29,6 +29,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/best-sellers", label: "Collections", key: null as string | null },
   { to: "/gift", label: "Gift", key: "gift" },
   { to: "/about", label: "About", key: null as string | null },
+  { to: "/contact-us", label: "Contact Us", key: "contact" },
   { to: "/blog", label: "Blogs", key: "blog" },
   { to: "/track", label: "Track", key: "track" },
 ];

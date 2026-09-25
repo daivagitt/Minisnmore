@@ -1776,6 +1776,30 @@ class ZohoSyncServiceTest {
     }
 
     @Test
+    void pullOrderTracking_skipsZohoShipmentStatusWhenLocalForwardShipmentExists() {
+        CustomerOrder order = new CustomerOrder()
+            .id(41308L)
+            .orderNumber("MNM-LOCAL-SHIP")
+            .status(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED)
+            .paymentStatus(com.miniandmore.app.domain.enumeration.PaymentStatus.PAID)
+            .trackingNumber("XB-LOCAL")
+            .trackingCarrier("XpressBees")
+            .shipmentCarrierStatus("booked")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .zohoSalesOrderId("so-local-ship");
+        when(customerOrderRepository.findById(41308L)).thenReturn(Optional.of(order));
+
+        service.pullOrderTracking(41308L);
+
+        verify(booksClient, never()).getSalesOrder(any());
+        verify(booksClient, never()).listPackagesForSalesOrder(any(), any());
+        assertThat(order.getStatus()).isEqualTo(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED);
+        assertThat(order.getTrackingNumber()).isEqualTo("XB-LOCAL");
+        assertThat(order.getZohoTrackingLastPulledAt()).isNotNull();
+        verify(customerOrderRepository).save(order);
+    }
+
+    @Test
     void pullOrderTracking_marksHandWrappedWhenZohoPackageExists() {
         CustomerOrder order = new CustomerOrder()
             .id(41304L)

@@ -149,3 +149,7 @@ gateway_verify_env() {
   done
   return 0
 }
+
+# UAT restart scripts still use the older function names.
+uat_gateway_sanitize_env() { gateway_sanitize_env "$@"; }
+uat_gateway_verify_env() { gateway_verify_env "$@"; }

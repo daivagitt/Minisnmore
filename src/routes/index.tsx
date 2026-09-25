@@ -31,7 +31,6 @@ import { parseWatchReels, resolveWatchShopReels } from "@/lib/watch-reels";
 import { parseFabricStoryVideo } from "@/lib/asset-url";
 import { productMatchesCategory } from "@/lib/shop-filters";
 import { toDirectDownloadUrl, triggerPublicFileDownload } from "@/lib/utils";
-import { HomeContactForm } from "@/components/HomeContactForm";
 import heroBaby from "@/assets/hero-smiling-baby.jpg";
 import lifestyle from "@/assets/lifestyle-mother.webp";
 import heroComfort from "@/assets/hero-comfort-carousel.webp";
@@ -470,8 +469,6 @@ function Home() {
         </div>
       </section>
       )}
-
-      {isEnabled("write_to_us") && <HomeContactForm />}
 
     </div>
   );

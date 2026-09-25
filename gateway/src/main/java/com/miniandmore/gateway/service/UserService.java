@@ -168,6 +168,7 @@ public class UserService {
                     newUser.setImageUrl(userDTO.getImageUrl());
                     newUser.setLangKey(userDTO.getLangKey() != null ? userDTO.getLangKey() : Constants.DEFAULT_LANGUAGE);
                     newUser.setActivated(false);
+                    newUser.setSubscribed(Boolean.TRUE.equals(userDTO.getSubscribed()));
                     newUser.setActivationKey(generateActivationKey());
                     newUser.setCreatedBy(Constants.SYSTEM);
                     newUser.setLastModifiedBy(Constants.SYSTEM);
@@ -270,6 +271,9 @@ public class UserService {
         user.setImageUrl(userDTO.getImageUrl());
         user.setActivated(userDTO.isActivated());
         user.setLangKey(userDTO.getLangKey());
+        if (userDTO.getSubscribed() != null) {
+            user.setSubscribed(userDTO.getSubscribed());
+        }
         user.setAuthorities(StaffRoles.toAuthorities(canonical));
         return saveUser(user);
     }
@@ -350,7 +354,7 @@ public class UserService {
         long limit = pageable.getPageSize();
         long offset = pageable.getOffset();
         return userRepository
-            .findAllStaffUsers(limit, offset)
+            .findAllUsersForAdmin(limit, offset)
             .flatMap(userAuthoritiesLoader::withAuthorities)
             .map(AdminUserDTO::new);
     }
@@ -367,7 +371,7 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public Mono<Long> countManagedUsers() {
-        return userRepository.countStaffUsers();
+        return userRepository.count();
     }
 
     @Transactional(readOnly = true)

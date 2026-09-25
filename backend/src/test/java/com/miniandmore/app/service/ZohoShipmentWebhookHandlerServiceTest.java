@@ -90,6 +90,30 @@ class ZohoShipmentWebhookHandlerServiceTest {
     }
 
     @Test
+    void handle_localForwardShipment_doesNotApplyZohoStatus() {
+        String body =
+            "{\"eventId\":\"evt-ship-local\",\"zohoSalesOrderId\":\"so-local\",\"shipment_id\":\"ship-local\",\"status\":\"delivered\"," +
+            "\"tracking_number\":\"ZOHO-AWB\",\"carrier\":\"DTDC\"}";
+        CustomerOrder order = order("MNM-LOCAL", "so-local", OrderStatus.CONFIRMED);
+        order.setTrackingNumber("XB-LOCAL");
+        order.setTrackingCarrier("XpressBees");
+        order.setShipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES);
+        order.setShipmentCarrierStatus("booked");
+        when(webhookEventRepository.existsByEventId("evt-ship-local")).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-local")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(order.getTrackingNumber()).isEqualTo("XB-LOCAL");
+        assertThat(order.getTrackingCarrier()).isEqualTo("XpressBees");
+        assertThat(result).containsEntry("status", "CONFIRMED");
+        verify(orderEventService, never()).syncLifecycleEvents(any());
+        verifySavedEvent("evt-ship-local", "so-local", null, "ship-local", "delivered");
+    }
+
+    @Test
     void handle_deliveredShipment_marksOrderFulfilledAndCopiesTracking() {
         String body =
             "{\"eventId\":\"evt-ship-3\",\"zohoSalesOrderId\":\"so-3\",\"shipment_id\":\"ship-3\",\"status\":\"delivered\"," +

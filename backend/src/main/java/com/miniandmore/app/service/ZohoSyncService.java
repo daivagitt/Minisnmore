@@ -3199,6 +3199,11 @@ public class ZohoSyncService {
                     pullInvoiceStatusOnly(order);
                     return;
                 }
+                if (OrderShipmentService.hasLocalForwardShipment(order)) {
+                    order.setZohoTrackingLastPulledAt(Instant.now());
+                    customerOrderRepository.save(order);
+                    return;
+                }
                 try {
                     OrderStatus statusBeforePull = order.getStatus();
                     String trackingStatusBeforePull = OrderTrackingStatusResolver.resolve(order);

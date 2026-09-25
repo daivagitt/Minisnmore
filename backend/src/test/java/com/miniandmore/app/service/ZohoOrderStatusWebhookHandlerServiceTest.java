@@ -87,6 +87,28 @@ class ZohoOrderStatusWebhookHandlerServiceTest {
     }
 
     @Test
+    void handle_localForwardShipment_ignoresZohoDeliveryStatus() {
+        String body =
+            "{\"eventId\":\"evt-so-local\",\"salesorder\":{\"salesorder_id\":\"so-local\",\"reference_number\":\"MNM-SO-LOCAL\",\"status\":\"delivered\",\"tracking_number\":\"ZOHO-AWB\"}}";
+        CustomerOrder order = order("MNM-SO-LOCAL", "so-local", OrderStatus.CONFIRMED)
+            .trackingNumber("XB-LOCAL")
+            .trackingCarrier("XpressBees")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("booked");
+        when(webhookEventRepository.existsByEventId("evt-so-local")).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-local")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(order.getTrackingNumber()).isEqualTo("XB-LOCAL");
+        assertThat(order.getZohoOrderStatus()).isEqualTo("delivered");
+        assertThat(result).containsEntry("status", "CONFIRMED");
+        verify(orderEventService, never()).syncLifecycleEvents(any());
+    }
+
+    @Test
     void handle_duplicateEventId_isNoOp() {
         String body =
             "{\"eventId\":\"evt-so-dup\",\"salesorder\":{\"salesorder_id\":\"so-dup\",\"reference_number\":\"MNM-SO-DUP\",\"status\":\"invoiced\"}}";

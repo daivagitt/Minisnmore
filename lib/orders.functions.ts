@@ -147,11 +147,14 @@ export async function listMyNotifications(): Promise<{ events: NotificationEvent
   return { events: res?.events ?? [] };
 }
 
-export async function getMyProfile(): Promise<{ profile: { full_name: string; phone: string } }> {
+export type AccountProfile = { full_name: string; phone: string; subscribed: boolean };
+
+export async function getMyProfile(): Promise<{ profile: AccountProfile }> {
   const profile = await api.get("/api/v1/account/profile", { auth: true });
   const full_name = (profile as any)?.full_name ?? "";
   const phone = (profile as any)?.phone ?? "";
-  return { profile: { full_name, phone } };
+  const subscribed = (profile as any)?.subscribed === true;
+  return { profile: { full_name, phone, subscribed } };
 }
 
 const FULL_NAME_PATTERN = /^\p{L}[\p{L} .'-]*$/u;
@@ -181,6 +184,7 @@ export const ProfileUpdate = z.object({
     .min(1, "Phone number is required")
     .max(20, "Phone number is too long")
     .regex(PHONE_PATTERN, "Enter a valid 10-digit Indian mobile number"),
+  subscribed: z.boolean().optional(),
 });
 
 export async function updateMyProfile(input: {
@@ -189,7 +193,11 @@ export async function updateMyProfile(input: {
   const parsed = ProfileUpdate.parse(input.data);
   return api.put(
     "/api/v1/account/profile",
-    { full_name: parsed.full_name, phone: parsed.phone },
+    {
+      full_name: parsed.full_name,
+      phone: parsed.phone,
+      ...(parsed.subscribed !== undefined ? { subscribed: parsed.subscribed } : {}),
+    },
     { auth: true },
   );
 }
@@ -197,6 +205,7 @@ export async function updateMyProfile(input: {
 const ProfileBootstrap = z.object({
   full_name: FullNameSchema,
   email: z.string().trim().email().max(160),
+  subscribed: z.boolean().optional(),
 });
 
 export async function bootstrapProfileFromSignup(input: {
@@ -205,7 +214,11 @@ export async function bootstrapProfileFromSignup(input: {
   const parsed = ProfileBootstrap.parse(input.data);
   return api.post(
     "/api/v1/account/profile/bootstrap",
-    { full_name: parsed.full_name, email: parsed.email.toLowerCase() },
+    {
+      full_name: parsed.full_name,
+      email: parsed.email.toLowerCase(),
+      ...(parsed.subscribed ? { subscribed: true } : {}),
+    },
     { auth: true },
   );
 }

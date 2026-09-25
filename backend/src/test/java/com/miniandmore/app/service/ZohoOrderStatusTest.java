@@ -48,6 +48,51 @@ class ZohoOrderStatusTest {
     }
 
     @Test
+    void applySalesOrderTracking_skipsShipmentFieldsWhenLocalForwardShipmentExists() {
+        CustomerOrder order = paidOrder()
+            .trackingNumber("XB-LOCAL")
+            .trackingCarrier("XpressBees")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("booked");
+
+        ZohoOrderStatus.applySalesOrderTracking(
+            order,
+            Map.of(
+                "status",
+                "delivered",
+                "shipment_date",
+                "2026-09-21",
+                "delivery_method",
+                "DTDC",
+                "tracking_number",
+                "ZOHO-AWB"
+            )
+        );
+
+        assertThat(order.getZohoOrderStatus()).isEqualTo("delivered");
+        assertThat(order.getTrackingNumber()).isEqualTo("XB-LOCAL");
+        assertThat(order.getTrackingCarrier()).isEqualTo("XpressBees");
+        assertThat(order.getShipmentDate()).isNull();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+    }
+
+    @Test
+    void applyPackages_skipsLocalForwardShipment() {
+        CustomerOrder order = paidOrder()
+            .trackingNumber("XB-LOCAL")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("booked");
+
+        ZohoOrderStatus.applyPackages(
+            order,
+            List.of(Map.of("package_id", "pkg-42", "status", "delivered", "tracking_number", "ZOHO-AWB"))
+        );
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(order.getTrackingNumber()).isEqualTo("XB-LOCAL");
+    }
+
+    @Test
     void applySalesOrderTracking_usesShippedStatusWhenShipmentDateMissing() {
         CustomerOrder order = paidOrder();
         Map<String, Object> salesOrder = Map.of(

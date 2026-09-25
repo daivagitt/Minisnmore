@@ -891,18 +891,22 @@ class InternalAccountOrderResourceCoverageTest {
             .perform(get("/internal/v1/account/profile").with(user("customer1")))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.full_name").value("Jane"))
-            .andExpect(jsonPath("$.data.phone").value("9876543210"));
+            .andExpect(jsonPath("$.data.phone").value("9876543210"))
+            .andExpect(jsonPath("$.data.subscribed").value(false));
 
         mockMvc
             .perform(
                 put("/internal/v1/account/profile")
                     .with(user("customer1"))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"full_name\":\"Janet\",\"phone\":\"9000000000\"}")
+                    .content("{\"full_name\":\"Janet\",\"phone\":\"9000000000\",\"subscribed\":true}")
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.ok").value(true));
 
+        ArgumentCaptor<CustomerProfile> updated = ArgumentCaptor.forClass(CustomerProfile.class);
+        verify(customerProfileRepository).save(updated.capture());
+        assertThat(updated.getValue().getSubscribed()).isTrue();
         verify(ledgerlySyncService).syncCustomerProfileAsync("customer1");
     }
 
@@ -924,6 +928,30 @@ class InternalAccountOrderResourceCoverageTest {
         ArgumentCaptor<CustomerProfile> profileCaptor = ArgumentCaptor.forClass(CustomerProfile.class);
         verify(customerProfileRepository).save(profileCaptor.capture());
         assertThat(profileCaptor.getValue().getFullName()).isEqualTo("New Parent");
+        assertThat(profileCaptor.getValue().getSubscribed()).isFalse();
+        verify(ledgerlySyncService).syncCustomerProfileAsync("parent@example.com");
+    }
+
+    @Test
+    void profile_bootstrapAppliesSubscribeWhenNameAlreadySet() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("parent@example.com", "n/a"));
+        CustomerProfile profile = new CustomerProfile().userLogin("parent@example.com").fullName("Jane").subscribed(false);
+        when(customerProfileRepository.findOneByUserLogin("parent@example.com")).thenReturn(Optional.of(profile));
+        when(customerProfileRepository.save(any(CustomerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/account/profile/bootstrap")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"full_name\":\"Other Name\",\"email\":\"parent@example.com\",\"subscribed\":true}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(true));
+
+        ArgumentCaptor<CustomerProfile> profileCaptor = ArgumentCaptor.forClass(CustomerProfile.class);
+        verify(customerProfileRepository).save(profileCaptor.capture());
+        assertThat(profileCaptor.getValue().getFullName()).isEqualTo("Jane");
+        assertThat(profileCaptor.getValue().getSubscribed()).isTrue();
         verify(ledgerlySyncService).syncCustomerProfileAsync("parent@example.com");
     }
 

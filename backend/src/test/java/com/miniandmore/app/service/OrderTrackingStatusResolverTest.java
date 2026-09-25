@@ -80,6 +80,17 @@ class OrderTrackingStatusResolverTest {
     }
 
     @Test
+    void resolve_expressBeesBookedIgnoresZohoShipmentStatus() {
+        CustomerOrder order = paidOrder()
+            .trackingNumber("XB-1")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("booked")
+            .zohoOrderStatus("delivered");
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("awaiting_pickup");
+    }
+
+    @Test
     void resolve_expressBeesPickedUpIsShipped() {
         CustomerOrder order = paidOrder()
             .trackingNumber("XB-1")

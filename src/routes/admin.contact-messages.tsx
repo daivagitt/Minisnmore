@@ -60,7 +60,7 @@ function AdminContactMessagesPage() {
     <AdminPage
       eyebrow="Care"
       title="Contact messages"
-      description="Messages submitted from the homepage Write to us form. Email, phone, address and comments are stored here."
+      description="Messages submitted from the Contact Us page. Email, phone, address and comments are stored here."
     >
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">

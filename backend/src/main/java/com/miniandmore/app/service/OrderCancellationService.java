@@ -14,6 +14,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,18 +26,32 @@ import org.springframework.web.server.ResponseStatusException;
 @Transactional
 public class OrderCancellationService {
 
+    private static final Logger LOG = LoggerFactory.getLogger(OrderCancellationService.class);
+
     private final OrderCancellationRequestRepository cancellationRequestRepository;
     private final CustomerOrderRepository customerOrderRepository;
     private final OrderCancellationExecutor cancellationExecutor;
+    private final OrderMailService orderMailService;
 
     public OrderCancellationService(
         OrderCancellationRequestRepository cancellationRequestRepository,
         CustomerOrderRepository customerOrderRepository,
         OrderCancellationExecutor cancellationExecutor
     ) {
+        this(cancellationRequestRepository, customerOrderRepository, cancellationExecutor, null);
+    }
+
+    @Autowired
+    public OrderCancellationService(
+        OrderCancellationRequestRepository cancellationRequestRepository,
+        CustomerOrderRepository customerOrderRepository,
+        OrderCancellationExecutor cancellationExecutor,
+        @Autowired(required = false) OrderMailService orderMailService
+    ) {
         this.cancellationRequestRepository = cancellationRequestRepository;
         this.customerOrderRepository = customerOrderRepository;
         this.cancellationExecutor = cancellationExecutor;
+        this.orderMailService = orderMailService;
     }
 
     public OrderCancellationRequest submitRequest(String userLogin, String orderNumber, String reason) {
@@ -53,7 +70,17 @@ public class OrderCancellationService {
         request.setRequestedAt(Instant.now());
         request.setOrder(order);
         request.setUserLogin(userLogin);
-        return cancellationRequestRepository.save(request);
+        OrderCancellationRequest saved = cancellationRequestRepository.save(request);
+        if (orderMailService != null) {
+            AfterCommit.run(() -> {
+                try {
+                    orderMailService.sendCancellationRequested(order, saved);
+                } catch (RuntimeException ex) {
+                    LOG.warn("Cancellation requested email failed for {}", saved.getRequestNumber(), ex);
+                }
+            });
+        }
+        return saved;
     }
 
     public OrderCancellationRequest getOpenForUser(String userLogin, String orderNumber) {
@@ -87,7 +114,17 @@ public class OrderCancellationService {
             request.setRefundAmount(money(order.getTotal()));
         }
         request.setResolvedAt(Instant.now());
-        return cancellationRequestRepository.save(request);
+        OrderCancellationRequest saved = cancellationRequestRepository.save(request);
+        if (orderMailService != null) {
+            AfterCommit.run(() -> {
+                try {
+                    orderMailService.sendCancellationAccepted(order, saved);
+                } catch (RuntimeException ex) {
+                    LOG.warn("Cancellation accepted email failed for {}", saved.getRequestNumber(), ex);
+                }
+            });
+        }
+        return saved;
     }
 
     public OrderCancellationRequest recordManualCodRefund(
@@ -119,7 +156,17 @@ public class OrderCancellationService {
         request.setAdminNotes(trimNotes(adminNotes));
         order.setPaymentStatus(PaymentStatus.REFUNDED);
         customerOrderRepository.save(order);
-        return cancellationRequestRepository.save(request);
+        OrderCancellationRequest saved = cancellationRequestRepository.save(request);
+        if (orderMailService != null) {
+            AfterCommit.run(() -> {
+                try {
+                    orderMailService.sendRefundCompleted(order, saved.getRefundAmount(), saved.getManualRefundReference(), "cod");
+                } catch (RuntimeException ex) {
+                    LOG.warn("Cancellation refund completed email failed for {}", saved.getRequestNumber(), ex);
+                }
+            });
+        }
+        return saved;
     }
 
     public OrderCancellationRequest reject(String requestNumber, String rejectionReason, String adminNotes) {
@@ -131,7 +178,18 @@ public class OrderCancellationService {
         request.setRejectionReason(validateRejectionReason(rejectionReason));
         request.setAdminNotes(trimNotes(adminNotes));
         request.setResolvedAt(Instant.now());
-        return cancellationRequestRepository.save(request);
+        OrderCancellationRequest saved = cancellationRequestRepository.save(request);
+        if (orderMailService != null) {
+            CustomerOrder order = request.getOrder();
+            AfterCommit.run(() -> {
+                try {
+                    orderMailService.sendCancellationRejected(order, saved);
+                } catch (RuntimeException ex) {
+                    LOG.warn("Cancellation rejected email failed for {}", saved.getRequestNumber(), ex);
+                }
+            });
+        }
+        return saved;
     }
 
     public OrderCancellationRequest withdrawByCustomer(String userLogin, String orderNumber) {

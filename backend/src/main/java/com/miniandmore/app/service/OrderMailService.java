@@ -32,6 +32,8 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
+import com.miniandmore.app.domain.OrderCancellationRequest;
+import com.miniandmore.app.domain.enumeration.OrderRequestType;
 import tech.jhipster.config.JHipsterProperties;
 
 /**
@@ -71,42 +73,235 @@ public class OrderMailService {
         this.objectMapper = objectMapper;
     }
 
+    // Trigger 1: Order Confirmed
     public void sendOrderConfirmation(CustomerOrder order) {
         sendOrderTemplate(order, "mail/orderConfirmationEmail", "email.order.confirm.title", Map.of());
     }
 
+    // Trigger 2: Out for Delivery
     public void sendOutForDelivery(CustomerOrder order) {
         sendOrderTemplate(order, "mail/orderOutForDeliveryEmail", "email.order.shipped.title", Map.of());
     }
 
+    // Trigger 3: Order Delivered
     public void sendOrderDelivered(CustomerOrder order) {
         sendOrderTemplate(order, "mail/orderDeliveredEmail", "email.order.delivered.title", Map.of());
     }
 
+    // Trigger 4: Cancellation Request Received
+    public void sendCancellationRequested(CustomerOrder order, OrderCancellationRequest cancellation) {
+        Map<String, Object> extra = new LinkedHashMap<>();
+        if (cancellation != null) {
+            extra.put("cancellationNumber", cancellation.getRequestNumber());
+            extra.put("cancellationReason", cancellation.getReason());
+            extra.put("requestedOn", formatOrderDate(cancellation.getRequestedAt()));
+        }
+        sendOrderTemplate(order, "mail/cancellationRequestedEmail", "email.order.cancel.requested.title", extra);
+    }
+
+    // Trigger 5: Cancellation Accepted
+    public void sendCancellationAccepted(CustomerOrder order, OrderCancellationRequest cancellation) {
+        Map<String, Object> extra = new LinkedHashMap<>();
+        if (cancellation != null) {
+            extra.put("cancellationNumber", cancellation.getRequestNumber());
+            extra.put("cancellationReason", cancellation.getReason());
+            extra.put("adminNotes", cancellation.getAdminNotes());
+            if (cancellation.getRefundAmount() != null) {
+                extra.put("refundAmount", formatInr(cancellation.getRefundAmount()));
+            } else if (order != null && "online".equalsIgnoreCase(order.getPaymentMethod())) {
+                extra.put("refundAmount", formatInr(order.getTotal()));
+            }
+            extra.put("resolvedOn", formatOrderDate(cancellation.getResolvedAt()));
+        }
+        sendOrderTemplate(order, "mail/cancellationAcceptedEmail", "email.order.cancel.accepted.title", extra);
+    }
+
+    // Trigger 6: Cancellation Rejected
+    public void sendCancellationRejected(CustomerOrder order, OrderCancellationRequest cancellation) {
+        Map<String, Object> extra = new LinkedHashMap<>();
+        if (cancellation != null) {
+            extra.put("cancellationNumber", cancellation.getRequestNumber());
+            extra.put("cancellationReason", cancellation.getReason());
+            extra.put("rejectionReason", cancellation.getRejectionReason());
+            extra.put("adminNotes", cancellation.getAdminNotes());
+            extra.put("resolvedOn", formatOrderDate(cancellation.getResolvedAt()));
+        }
+        sendOrderTemplate(order, "mail/cancellationRejectedEmail", "email.order.cancel.rejected.title", extra);
+    }
+
+    // Trigger 7: Order Cancelled by Store
     public void sendOrderCancelled(CustomerOrder order) {
         sendOrderTemplate(order, "mail/orderCancelledEmail", "email.order.cancel.title", Map.of());
     }
 
+    // Trigger 8: Refund Initiated
+    public void sendRefundInitiated(CustomerOrder order, BigDecimal refundAmount, String refundId, String paymentMethod) {
+        Map<String, Object> extra = new LinkedHashMap<>();
+        BigDecimal amount = refundAmount != null ? refundAmount : (order != null ? order.getTotal() : BigDecimal.ZERO);
+        extra.put("refundAmount", formatInr(amount));
+        extra.put("refundId", StringUtils.defaultString(refundId));
+        extra.put("paymentMethod", displayPaymentMethod(paymentMethod != null ? paymentMethod : (order != null ? order.getPaymentMethod() : "")));
+        sendOrderTemplate(order, "mail/refundInitiatedEmail", "email.order.refund.initiated.title", extra);
+    }
+
+    // Trigger 9: Refund Completed
+    public void sendRefundCompleted(CustomerOrder order, BigDecimal refundAmount, String refundId, String paymentMethod) {
+        Map<String, Object> extra = new LinkedHashMap<>();
+        BigDecimal amount = refundAmount != null ? refundAmount : (order != null ? order.getTotal() : BigDecimal.ZERO);
+        extra.put("refundAmount", formatInr(amount));
+        extra.put("refundId", StringUtils.defaultString(refundId));
+        extra.put("paymentMethod", displayPaymentMethod(paymentMethod != null ? paymentMethod : (order != null ? order.getPaymentMethod() : "")));
+        sendOrderTemplate(order, "mail/refundCompletedEmail", "email.order.refund.completed.title", extra);
+    }
+
+    // Trigger 10: Return Request Received
+    public void sendReturnRequested(CustomerOrder order, OrderReturn orderReturn) {
+        sendOrderTemplate(order, "mail/orderReturnEmail", "email.order.return.requested.title", buildReturnExtra(orderReturn));
+    }
+
+    // Trigger 11: Return Accepted
+    public void sendReturnAccepted(CustomerOrder order, OrderReturn orderReturn) {
+        sendOrderTemplate(order, "mail/returnApprovedEmail", "email.order.return.approved.title", buildReturnExtra(orderReturn));
+    }
+
+    // Trigger 12: Return Rejected
+    public void sendReturnRejected(CustomerOrder order, OrderReturn orderReturn) {
+        sendOrderTemplate(order, "mail/returnRejectedEmail", "email.order.return.rejected.title", buildReturnExtra(orderReturn));
+    }
+
+    // Trigger 13: Pickup Scheduled
+    public void sendPickupScheduled(CustomerOrder order, OrderReturn orderReturn) {
+        sendOrderTemplate(order, "mail/pickupScheduledEmail", "email.order.return.pickup_scheduled.title", buildReturnExtra(orderReturn));
+    }
+
+    // Trigger 14: Out for Pickup
+    public void sendOutForPickup(CustomerOrder order, OrderReturn orderReturn) {
+        sendOrderTemplate(order, "mail/outForPickupEmail", "email.order.return.out_for_pickup.title", buildReturnExtra(orderReturn));
+    }
+
+    // Trigger 15: Return QC Failed
+    public void sendReturnQcFailed(CustomerOrder order, OrderReturn orderReturn) {
+        sendOrderTemplate(order, "mail/returnQcFailedEmail", "email.order.return.qc_failed.title", buildReturnExtra(orderReturn));
+    }
+
+    // Trigger 16: Exchange Accepted
+    public void sendExchangeAccepted(CustomerOrder order, OrderReturn orderReturn) {
+        sendOrderTemplate(order, "mail/exchangeApprovedEmail", "email.order.exchange.approved.title", buildReturnExtra(orderReturn));
+    }
+
+    // Trigger 17: Exchange Rejected
+    public void sendExchangeRejected(CustomerOrder order, OrderReturn orderReturn) {
+        sendOrderTemplate(order, "mail/exchangeRejectedEmail", "email.order.exchange.rejected.title", buildReturnExtra(orderReturn));
+    }
+
+    // Trigger 18: Exchange Out for Delivery
+    public void sendExchangeOutForDelivery(CustomerOrder order, OrderReturn orderReturn) {
+        sendOrderTemplate(order, "mail/exchangeOutForDeliveryEmail", "email.order.exchange.shipped.title", buildReturnExtra(orderReturn));
+    }
+
+    // Trigger 19: Exchange Delivered
+    public void sendExchangeDelivered(CustomerOrder order, OrderReturn orderReturn) {
+        sendOrderTemplate(order, "mail/exchangeDeliveredEmail", "email.order.exchange.delivered.title", buildReturnExtra(orderReturn));
+    }
+
+    // Exchange Requested
+    public void sendExchangeRequested(CustomerOrder order, OrderReturn orderReturn) {
+        sendOrderTemplate(order, "mail/exchangeRequestedEmail", "email.order.exchange.requested.title", buildReturnExtra(orderReturn));
+    }
+
     public void sendReturnUpdate(CustomerOrder order, OrderReturn orderReturn) {
-        if (orderReturn == null) {
+        if (orderReturn == null || orderReturn.getStatus() == OrderReturnStatus.FAILED) {
             return;
         }
+        boolean isExchange = orderReturn.getRequestType() == OrderRequestType.EXCHANGE;
+        OrderReturnStatus status = orderReturn.getStatus();
+        if (status == null) {
+            status = OrderReturnStatus.REQUESTED;
+        }
+
+        if (isExchange) {
+            switch (status) {
+                case REQUESTED -> sendExchangeRequested(order, orderReturn);
+                case APPROVED -> sendExchangeAccepted(order, orderReturn);
+                case REJECTED -> sendExchangeRejected(order, orderReturn);
+                case PICKUP_SCHEDULED -> sendPickupScheduled(order, orderReturn);
+                case PICKED_UP -> sendOutForPickup(order, orderReturn);
+                case SHIPPED -> sendExchangeOutForDelivery(order, orderReturn);
+                case DELIVERED, COMPLETED -> sendExchangeDelivered(order, orderReturn);
+                default -> sendOrderTemplate(order, "mail/orderReturnEmail", "email.order.return." + returnStatusKey(status) + ".title", buildReturnExtra(orderReturn));
+            }
+        } else {
+            switch (status) {
+                case REQUESTED -> sendOrderTemplate(order, "mail/orderReturnEmail", "email.order.return.requested.title", buildReturnExtra(orderReturn));
+                case APPROVED -> sendReturnAccepted(order, orderReturn);
+                case REJECTED -> {
+                    if (isQcFailure(orderReturn)) {
+                        sendReturnQcFailed(order, orderReturn);
+                    } else {
+                        sendReturnRejected(order, orderReturn);
+                    }
+                }
+                case PICKUP_SCHEDULED -> sendPickupScheduled(order, orderReturn);
+                case PICKED_UP -> sendOutForPickup(order, orderReturn);
+                case RECEIVED -> sendOrderTemplate(order, "mail/returnReceivedEmail", "email.order.return.received.title", buildReturnExtra(orderReturn));
+                case REFUNDED -> {
+                    BigDecimal refundAmt = orderReturn.getRefundAmount() != null ? orderReturn.getRefundAmount() : (order != null ? order.getTotal() : null);
+                    sendRefundCompleted(order, refundAmt, orderReturn.getRazorpayRefundId(), order != null ? order.getPaymentMethod() : null);
+                }
+                default -> sendOrderTemplate(order, "mail/orderReturnEmail", "email.order.return." + returnStatusKey(status) + ".title", buildReturnExtra(orderReturn));
+            }
+        }
+    }
+
+    private boolean isQcFailure(OrderReturn orderReturn) {
+        if (orderReturn == null) {
+            return false;
+        }
+        String notes = StringUtils.defaultString(orderReturn.getAdminNotes()).toLowerCase(Locale.ROOT);
+        String reason = StringUtils.defaultString(orderReturn.getRejectionReason()).toLowerCase(Locale.ROOT);
+        return notes.contains("qc") || notes.contains("quality") || notes.contains("inspect")
+            || reason.contains("qc") || reason.contains("quality") || reason.contains("inspect")
+            || reason.contains("used") || reason.contains("damage") || reason.contains("tag");
+    }
+
+    private Map<String, Object> buildReturnExtra(OrderReturn orderReturn) {
+        if (orderReturn == null) {
+            return Map.of();
+        }
+        Map<String, Object> extra = new LinkedHashMap<>();
         String statusKey = returnStatusKey(orderReturn.getStatus());
-        sendOrderTemplate(
-            order,
-            "mail/orderReturnEmail",
-            "email.order.return." + statusKey + ".title",
-            Map.of(
-                "returnNumber",
-                StringUtils.defaultString(orderReturn.getReturnNumber()),
-                "returnStatus",
-                statusKey,
-                "returnReason",
-                StringUtils.defaultString(orderReturn.getReason()),
-                "rejectionReason",
-                StringUtils.defaultString(orderReturn.getRejectionReason())
-            )
-        );
+        extra.put("returnNumber", StringUtils.defaultString(orderReturn.getReturnNumber()));
+        extra.put("returnStatus", statusKey);
+        extra.put("returnReason", StringUtils.defaultString(orderReturn.getReason()));
+        extra.put("rejectionReason", StringUtils.defaultString(orderReturn.getRejectionReason()));
+        extra.put("qcReason", StringUtils.defaultString(orderReturn.getRejectionReason()));
+        extra.put("pickupWindow", StringUtils.defaultString(orderReturn.getPickupWindow(), "Within 2-3 business days"));
+        extra.put("reverseAwb", StringUtils.defaultString(orderReturn.getReverseAwb()));
+        extra.put("carrierName", StringUtils.defaultString(orderReturn.getCarrierName()));
+        extra.put("trackingUrl", StringUtils.defaultString(orderReturn.getTrackingUrl()));
+        extra.put("requestedOn", formatOrderDate(orderReturn.getRequestedAt()));
+        extra.put("reviewedOn", formatOrderDate(orderReturn.getResolvedAt()));
+        extra.put("receivedOn", formatOrderDate(orderReturn.getResolvedAt() != null ? orderReturn.getResolvedAt() : Instant.now()));
+        String baseUrl = StringUtils.defaultIfBlank(jHipsterProperties.getMail().getBaseUrl(), "https://minisnmore.com");
+        String returnNum = StringUtils.defaultString(orderReturn.getReturnNumber());
+        extra.put("returnUrl", trimTrailingSlash(baseUrl) + "/returns/" + returnNum);
+        extra.put("exchangeUrl", trimTrailingSlash(baseUrl) + "/exchanges/" + returnNum);
+
+        if (orderReturn.getOrderItem() != null) {
+            OrderItem oi = orderReturn.getOrderItem();
+            String details = joinNonBlank(" · ", oi.getItemSize(), oi.getColor());
+            Map<String, String> row = new LinkedHashMap<>();
+            row.put("title", StringUtils.defaultString(oi.getProductName()));
+            row.put("details", details);
+            row.put("quantity", oi.getQty() == null ? "1" : String.valueOf(oi.getQty()));
+            String repl = joinNonBlank(" · ", orderReturn.getReplacementSize(), orderReturn.getReplacementColor(), orderReturn.getReplacementVariantSku());
+            if (StringUtils.isNotBlank(repl)) {
+                row.put("exchangeNote", repl);
+            }
+            extra.put("items", List.of(row));
+        }
+
+        return extra;
     }
 
     public void sendPickupFailedAdminNotice(CustomerOrder order, OrderReturn orderReturn) {
@@ -182,6 +377,7 @@ public class OrderMailService {
             context.setVariable("orderUrl", orderUrl);
             context.setVariable("supportEmail", StringUtils.defaultIfBlank(jHipsterProperties.getMail().getFrom(), "hello@minisnmore.com"));
             context.setVariable("placedOnFormatted", formatOrderDate(order.getPlacedAt()));
+            context.setVariable("orderDate", formatOrderDate(order.getPlacedAt()));
             context.setVariable("totalFormatted", formatInr(order.getTotal()));
             context.setVariable("subtotalFormatted", formatInr(order.getSubtotal()));
             context.setVariable("hasDiscount", isPositive(order.getDiscount()));

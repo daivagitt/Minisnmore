@@ -1,296 +1,146 @@
-<!doctype html>
+<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="en">
-  <head>
-    <title th:text="#{email.order.confirm.title(${orderNumber})}">Order confirmation</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  </head>
-  <body
-    style="
-      margin: 0;
-      padding: 0;
-      background-color: #f4eff1;
-      font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      color: #4a3f45;
-    "
-  >
-    <span
-      th:text="#{email.order.confirm.preheader(${orderNumber})}"
-      style="display: none !important; visibility: hidden; opacity: 0; color: transparent; height: 0; width: 0; overflow: hidden; mso-hide: all;"
-      >Your order is confirmed.</span
-    >
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4eff1; padding: 24px 12px;">
-      <tr>
-        <td align="center">
-          <table
-            role="presentation"
-            width="100%"
-            cellspacing="0"
-            cellpadding="0"
-            border="0"
-            style="max-width: 600px; background-color: #ffffff; border-radius: 12px; border: 1px solid #ece0e4; overflow: hidden;"
-          >
-            <!-- Header -->
-            <tr>
-              <td style="background-color: #1c1417; padding: 22px 26px;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                  <tr>
-                    <td style="font-size: 16px; font-weight: bold; letter-spacing: 0.14em; color: #ffffff; text-transform: uppercase;">
-                      Minis n More
-                    </td>
-                    <td align="right" style="font-size: 13px; color: #ffffff;">
-                      <div style="font-weight: bold;" th:text="#{email.order.confirm.subheading}">Order Confirmation</div>
-                      <div style="color: #cbb9c1; margin-top: 2px;">
-                        <span th:text="#{email.order.label.number}">Order ID</span>
-                        <span style="color: #ffffff; text-decoration: underline;" th:text="${orderNumber}">MNM-000</span>
-                      </div>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
+<head>
+<meta charset="UTF-8">
+<title th:text="#{email.order.confirm.title(${orderNumber})}">Order Confirmation</title>
+</head>
+<body style="margin:0; padding:0; background-color:#fdf1ec; font-family: Arial, Helvetica, sans-serif;">
+  <span style="display:none !important; visibility:hidden; opacity:0; color:transparent; height:0; width:0; overflow:hidden;" th:text="'Your order ' + ${orderNumber} + ' is confirmed.'">Your order is confirmed.</span>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fdf1ec; padding:32px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border:1px solid #f6dce2; border-radius:18px;">
+          <tr>
+            <td style="padding:40px 44px;">
 
-            <!-- Safety notice -->
-            <tr>
-              <td style="background-color: #fdeef3; padding: 14px 26px; font-size: 13px; line-height: 1.6; color: #8a4a63;">
-                <span th:text="#{email.order.confirm.safety}">Your safety matters. We take the utmost care to pack and dispatch every order safely.</span>
-              </td>
-            </tr>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding-bottom:20px;">
+                    <img src="https://pub-f227d5520be64479a318380ac346334d.r2.dev/prod/home/1789526139661-e9b78d4b-bb41-4129-b569-8a77875247a7-M-logo.png" alt="Mini's n More" width="56" style="display:block; width:56px; max-width:56px; height:auto; border:0;">
+                  </td>
+                </tr>
+              </table>
 
-            <!-- Greeting -->
-            <tr>
-              <td style="padding: 26px 26px 4px; font-size: 15px; line-height: 1.7; color: #5f4f56;">
-                <p style="margin: 0 0 14px;" th:text="#{email.order.greeting(${customerName})}">Dear Customer,</p>
-                <p style="margin: 0 0 4px;" th:text="#{email.order.confirm.intro(${orderNumber})}">
-                  We have received your order and we are getting it ready with care.
-                </p>
-              </td>
-            </tr>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding-bottom:24px;">
+                    <span style="font-family: Georgia, 'Times New Roman', serif; font-size:26px; color:#7a2f3e;">🎀 Order Confirmed</span>
+                  </td>
+                </tr>
+              </table>
 
-            <!-- Order details card -->
-            <tr>
-              <td style="padding: 18px 26px 0;">
-                <div style="font-size: 16px; font-weight: bold; color: #3a2e34; margin-bottom: 10px;" th:text="#{email.order.orderDetailsHeading}">
-                  Your Order Details
-                </div>
-                <table
-                  role="presentation"
-                  width="100%"
-                  cellspacing="0"
-                  cellpadding="0"
-                  border="0"
-                  style="background-color: #f7f4f5; border-radius: 10px;"
-                >
-                  <tr>
-                    <td style="padding: 18px 20px; font-size: 13px; line-height: 1.9; color: #5f4f56;">
-                      <div>
-                        <strong th:text="#{email.order.label.number}">Order ID</strong>
-                        <span style="color: #c77d98; font-weight: bold;" th:text="${orderNumber}">MNM-000</span>
-                      </div>
-                      <div th:if="${!#strings.isEmpty(placedOnFormatted)}">
-                        <strong th:text="#{email.order.label.placedOn}">Order placed on</strong>
-                        <span th:text="${placedOnFormatted}">Sat, 11 Jan 2025</span>
-                      </div>
-                      <div>
-                        <strong th:text="#{email.order.label.address}">Delivering to</strong>
-                        <span th:text="${customerName}">Customer</span>
-                      </div>
-                    </td>
-                    <td align="right" style="padding: 18px 20px;">
-                      <a
-                        th:href="${orderUrl}"
-                        th:text="#{email.order.cta.short}"
-                        style="
-                          display: inline-block;
-                          background-color: #1c1417;
-                          color: #ffffff;
-                          text-decoration: none;
-                          font-size: 13px;
-                          font-weight: bold;
-                          padding: 12px 20px;
-                          border-radius: 6px;
-                          white-space: nowrap;
-                        "
-                        >View Order</a
-                      >
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
+              <p style="font-size:15px; color:#333333; line-height:1.6; margin:0 0 16px 0;">
+                Dear <span th:text="${customerName}">Customer</span>,
+              </p>
+              <p style="font-size:15px; color:#333333; line-height:1.6; margin:0 0 16px 0;">
+                We have received order <b style="color:#c2447a;" th:text="${orderNumber}">MNM-XXXXXXXXX</b>. We're packing it with care and will keep you posted.
+              </p>
 
-            <!-- Items purchased -->
-            <tr th:if="${!#lists.isEmpty(items)}">
-              <td style="padding: 22px 26px 0;">
-                <div style="font-size: 16px; font-weight: bold; color: #3a2e34; margin-bottom: 10px;" th:text="#{email.order.itemsHeading}">
-                  Items you have purchased
-                </div>
-                <table
-                  role="presentation"
-                  width="100%"
-                  cellspacing="0"
-                  cellpadding="0"
-                  border="0"
-                  style="background-color: #f7f4f5; border-radius: 10px;"
-                >
-                  <tr th:each="item : ${items}">
-                    <td style="padding: 14px 20px; border-bottom: 1px solid #ece0e4;">
-                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                        <tr>
-                          <td width="56" style="vertical-align: top;">
-                            <img
-                              th:if="${!#strings.isEmpty(item.image)}"
-                              th:src="${item.image}"
-                              width="56"
-                              height="56"
-                              alt=""
-                              style="width: 56px; height: 56px; border-radius: 8px; object-fit: cover; display: block; background-color: #ece0e4;"
-                            />
-                            <div
-                              th:unless="${!#strings.isEmpty(item.image)}"
-                              style="
-                                width: 56px;
-                                height: 56px;
-                                border-radius: 8px;
-                                background-color: #f3dbe4;
-                                color: #c77d98;
-                                font-weight: bold;
-                                font-size: 18px;
-                                text-align: center;
-                                line-height: 56px;
-                              "
-                              th:text="${#strings.isEmpty(item.name)} ? '?' : ${#strings.toUpperCase(#strings.substring(item.name, 0, 1))}"
-                            >
-                              ?
-                            </div>
-                          </td>
-                          <td style="padding-left: 14px; vertical-align: top; font-size: 13px; line-height: 1.6; color: #5f4f56;">
-                            <div style="font-weight: bold; color: #3a2e34;" th:text="${item.name}">Item</div>
-                            <div th:if="${!#strings.isEmpty(item.details)}" style="color: #9a7f8d;" th:text="${item.details}">Size · Color</div>
-                            <div style="color: #9a7f8d;">
-                              <span th:text="#{email.order.qty(${item.qty})}">Qty 1</span>
-                              <span th:text="' · ' + ${item.unitPrice} + ' each'"></span>
-                            </div>
-                          </td>
-                          <td align="right" style="vertical-align: top; font-size: 14px; font-weight: bold; color: #3a2e34; white-space: nowrap;">
-                            <span th:text="${item.amount}">₹0</span>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
+              <!-- Order details card -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fdf1ec; border-radius:14px; margin:8px 0 16px 0;">
+                <tr>
+                  <td style="padding:20px 24px;">
+                    <div style="font-size:14px; color:#5a4a4a; margin-bottom:6px;"><b>Order</b> <span style="color:#c2447a;" th:text="${orderNumber}">MNM-XXXXXXXXX</span></div>
+                    <div style="font-size:14px; color:#5a4a4a; margin-bottom:6px;" th:if="${!#strings.isEmpty(placedOnFormatted)}"><b>Order placed on</b> <span th:text="${placedOnFormatted}">Wed, 23 Sep 2026</span></div>
+                    <div style="font-size:14px; color:#5a4a4a;"><b>Delivering to</b> <span th:text="${customerName}">Partheeban</span></div>
+                  </td>
+                </tr>
+              </table>
 
-            <!-- Totals -->
-            <tr>
-              <td style="padding: 20px 26px 0;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="font-size: 13px; color: #5f4f56;">
-                  <tr>
-                    <td style="padding: 4px 0;" th:text="#{email.order.label.subtotal}">Sub Total</td>
-                    <td align="right" style="padding: 4px 0;" th:text="${subtotalFormatted}">₹0</td>
-                  </tr>
-                  <tr th:if="${hasDiscount}">
-                    <td style="padding: 4px 0;" th:text="#{email.order.label.discount}">Order Savings</td>
-                    <td align="right" style="padding: 4px 0; color: #2e8b57;" th:text="'-' + ${discountFormatted}">-₹0</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 4px 0;" th:text="#{email.order.label.shipping}">Delivery Fee</td>
-                    <td align="right" style="padding: 4px 0;" th:text="${hasShipping} ? ${shippingFormatted} : #{email.order.label.free}">Free</td>
-                  </tr>
-                  <tr th:if="${hasCodFee}">
-                    <td style="padding: 4px 0;" th:text="#{email.order.label.codFee}">COD Handling Fee</td>
-                    <td align="right" style="padding: 4px 0;" th:text="${codFeeFormatted}">₹0</td>
-                  </tr>
-                  <tr th:if="${hasTax}">
-                    <td style="padding: 4px 0;" th:text="#{email.order.label.tax}">Tax</td>
-                    <td align="right" style="padding: 4px 0;" th:text="${taxFormatted}">₹0</td>
-                  </tr>
-                  <tr th:if="${hasDonation}">
-                    <td style="padding: 4px 0;" th:text="#{email.order.label.donation}">Donation</td>
-                    <td align="right" style="padding: 4px 0;" th:text="${donationFormatted}">₹0</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 10px 0 0; border-top: 1px solid #ece0e4; font-size: 15px; font-weight: bold; color: #3a2e34;" th:text="#{email.order.label.orderTotal}">
-                      Order Total
-                    </td>
-                    <td align="right" style="padding: 10px 0 0; border-top: 1px solid #ece0e4; font-size: 15px; font-weight: bold; color: #3a2e34;" th:text="${totalFormatted}">
-                      ₹0
-                    </td>
-                  </tr>
-                </table>
-                <div th:if="${hasDiscount}" style="text-align: right; font-size: 12px; color: #2e8b57; font-weight: bold; padding-top: 6px;" th:text="#{email.order.savings(${discountFormatted})}">
-                  You saved ₹0 on this order
-                </div>
-              </td>
-            </tr>
+              <!-- Items card -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fdf1ec; border-radius:14px; margin:0 0 16px 0;" th:if="${items != null and !items.isEmpty()}">
+                <tr>
+                  <td style="padding:18px 24px;">
+                    <div style="font-size:12px; color:#8a7472; margin-bottom:10px; font-weight:bold; letter-spacing:0.04em;">ITEMS YOU HAVE PURCHASED</div>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" th:each="item, iterStat : ${items}" th:style="${iterStat.last} ? '' : 'margin-bottom:12px; padding-bottom:12px; border-bottom:1px dashed #f0d8de;'">
+                      <tr>
+                        <td width="44" style="vertical-align:top;">
+                          <img th:if="${!#strings.isEmpty(item.image)}" th:src="${item.image}" th:alt="${item.name}" width="40" height="40" style="width:40px; height:40px; object-fit:cover; border-radius:8px; display:block; border:1px solid #f6dce2;" />
+                          <div th:if="${#strings.isEmpty(item.image)}" style="width:40px; height:40px; background-color:#fbdbe5; border-radius:8px; color:#c2447a; font-weight:bold; font-size:18px; text-align:center; line-height:40px;" th:text="${#strings.isEmpty(item.name) ? 'M' : #strings.substring(item.name, 0, 1)}">D</div>
+                        </td>
+                        <td style="padding-left:12px; vertical-align:top;">
+                          <div style="font-size:14px; color:#333; font-weight:bold;" th:text="${item.name}">Floral Cotton Dress</div>
+                          <div style="font-size:13px; color:#8a7472;">
+                            <span th:if="${!#strings.isEmpty(item.details)}" th:text="${item.details} + ' · '">Size: 2-3 yrs · Pink · </span>Qty <span th:text="${item.qty}">1</span>
+                          </div>
+                        </td>
+                        <td align="right" style="vertical-align:top;">
+                          <div style="font-size:14px; color:#333; font-weight:bold;" th:text="${item.amount}">₹499</div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
 
-            <!-- Delivery address + payment -->
-            <tr>
-              <td style="padding: 22px 26px 0;">
-                <table
-                  role="presentation"
-                  width="100%"
-                  cellspacing="0"
-                  cellpadding="0"
-                  border="0"
-                  style="background-color: #f7f4f5; border-radius: 10px;"
-                >
-                  <tr>
-                    <td style="padding: 18px 20px; width: 60%; vertical-align: top; font-size: 13px; line-height: 1.8; color: #5f4f56;">
-                      <div style="font-weight: bold; color: #3a2e34; margin-bottom: 4px;" th:text="#{email.order.label.deliveryAddress}">Delivery Address</div>
-                      <div th:if="${!#strings.isEmpty(addressName)}" style="font-weight: bold;" th:text="${addressName}">Customer</div>
-                      <div th:each="line : ${addressLines}" th:text="${line}">Address line</div>
-                      <div th:if="${!#strings.isEmpty(addressPhone)}">
-                        <span th:text="#{email.order.label.mobile}">Mobile</span>: <span th:text="${addressPhone}">+91 00000 00000</span>
-                      </div>
-                    </td>
-                    <td style="padding: 18px 20px; width: 40%; vertical-align: top; font-size: 13px; line-height: 1.8; color: #5f4f56;">
-                      <div style="font-weight: bold; color: #3a2e34; margin-bottom: 4px;" th:text="#{email.order.label.modeOfPayment}">Mode of Payment</div>
-                      <div th:text="${paymentMethod}">Online payment</div>
-                      <div th:if="${!#strings.isEmpty(couponCode)}">
-                        <span th:text="#{email.order.label.coupon}">Coupon Applied</span>: <span th:text="${couponCode}">CODE</span>
-                      </div>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
+              <!-- Bill summary -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fdf1ec; border-radius:14px; margin:0 0 16px 0;">
+                <tr>
+                  <td style="padding:18px 24px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:13px; color:#5a4a4a;">
+                      <tr><td style="padding:3px 0;">Sub Total</td><td align="right" th:text="${subtotalFormatted}">₹499</td></tr>
+                      <tr th:if="${hasDiscount}"><td style="padding:3px 0; color:#3f8b5c;">Order Savings</td><td align="right" style="color:#3f8b5c;" th:text="'-' + ${discountFormatted}">-₹50</td></tr>
+                      <tr th:if="${hasShipping}"><td style="padding:3px 0;">Delivery Fee</td><td align="right" th:text="${shippingFormatted}">₹99</td></tr>
+                      <tr th:if="${hasCodFee}"><td style="padding:3px 0;">COD Handling Fee</td><td align="right" th:text="${codFeeFormatted}">₹49</td></tr>
+                      <tr th:if="${hasTax}"><td style="padding:3px 0;">Tax</td><td align="right" th:text="${taxFormatted}">₹25</td></tr>
+                      <tr th:if="${hasDonation}"><td style="padding:3px 0;">Donation</td><td align="right" th:text="${donationFormatted}">₹10</td></tr>
+                      <tr>
+                        <td style="padding-top:8px; font-weight:bold; color:#333; border-top:1px solid #f0d8de;">Order Total</td>
+                        <td align="right" style="padding-top:8px; font-weight:bold; color:#333; border-top:1px solid #f0d8de;" th:text="${totalFormatted}">₹623</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
 
-            <!-- Footer note -->
-            <tr>
-              <td style="padding: 22px 26px; font-size: 12px; line-height: 1.7; color: #9a7f8d;">
-                <p style="margin: 0;" th:text="#{email.order.footer.note(${supportEmail})}">
-                  Please do not share your OTP, card, or bank details with anyone. For help, write to us.
-                </p>
-              </td>
-            </tr>
+              <!-- Delivery + payment card -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fdf1ec; border-radius:14px; margin:0 0 8px 0;">
+                <tr>
+                  <td style="padding:20px 24px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td width="55%" style="vertical-align:top;">
+                          <div style="font-size:13px; color:#333; font-weight:bold; margin-bottom:6px;">Delivery Address</div>
+                          <div style="font-size:13px; color:#5a4a4a; line-height:1.6;">
+                            <span th:text="${addressName}">Customer</span><br>
+                            <span th:each="line : ${addressLines}"><span th:text="${line}">38, SLV Layout</span><br></span>
+                            <span th:if="${!#strings.isEmpty(addressPhone)}" th:text="'Mobile: ' + ${addressPhone}">Mobile: 9740199455</span>
+                          </div>
+                        </td>
+                        <td style="vertical-align:top; padding-left:16px;">
+                          <div style="font-size:13px; color:#333; font-weight:bold; margin-bottom:6px;">Mode of Payment</div>
+                          <div style="font-size:13px; color:#5a4a4a;" th:text="${paymentMethod}">Cash on Delivery</div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+              <p style="font-size:12px; color:#b79aa0; margin:0 0 28px 0;">&nbsp;</p>
 
-            <!-- Footer badges -->
-            <tr>
-              <td style="background-color: #1c1417; padding: 22px 26px;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                  <tr>
-                    <td align="center" style="width: 33%; color: #ffffff; font-size: 11px; line-height: 1.8;">
-                      <div style="font-size: 18px;">✔</div>
-                      <span th:text="#{email.order.footer.quality}">Assured Quality</span>
-                    </td>
-                    <td align="center" style="width: 33%; color: #ffffff; font-size: 11px; line-height: 1.8;">
-                      <div style="font-size: 18px;">🤍</div>
-                      <span th:text="#{email.order.footer.handpicked}">Handpicked With Care</span>
-                    </td>
-                    <td align="center" style="width: 33%; color: #ffffff; font-size: 11px; line-height: 1.8;">
-                      <div style="font-size: 18px;">↩</div>
-                      <span th:text="#{email.order.footer.returns}">Easy Returns</span>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding-bottom:16px;">
+                    <a th:href="${orderUrl}" style="background-color:#e87ea0; color:#ffffff; text-decoration:none; font-size:15px; font-weight:bold; padding:14px 32px; border-radius:30px; display:inline-block;">📦 View Order</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-bottom:28px;">
+                    <a th:href="${orderUrl}" th:text="${orderUrl}" style="color:#d16b87; font-size:13px; text-decoration:underline; word-break:break-all;">https://minisnmore.com/account/orders/MNM-XXXXXXXXX</a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="font-size:14px; color:#333333; margin:0 0 4px 0;">Warm regards,</p>
+              <p style="font-size:14px; color:#333333; font-weight:bold; margin:0 0 24px 0;">Team Minis n More</p>
+
+              <p style="font-size:12px; color:#c9adb4; margin:0;">Made for little ones. Chosen with love. 🌸</p>
+
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
 </html>

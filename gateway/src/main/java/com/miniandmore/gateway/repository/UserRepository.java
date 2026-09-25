@@ -63,6 +63,9 @@ public interface UserRepository extends R2dbcRepository<User, Long> {
     )
     Flux<User> findAllStaffUsers(long limit, long offset);
 
+    @Query("SELECT * FROM jhi_user ORDER BY created_date DESC NULLS LAST, id DESC LIMIT :limit OFFSET :offset")
+    Flux<User> findAllUsersForAdmin(long limit, long offset);
+
     @Query("SELECT * FROM jhi_user WHERE activated = true ORDER BY id LIMIT :limit OFFSET :offset")
     Flux<User> findAllByActivatedIsTrue(Pageable pageable);
 

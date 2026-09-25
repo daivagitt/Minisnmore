@@ -31,6 +31,7 @@ class UserRowMapperTest {
         when(columnConverter.fromRow(row, "u_last_name", String.class)).thenReturn("Doe");
         when(columnConverter.fromRow(row, "u_email", String.class)).thenReturn("user@localhost");
         when(columnConverter.fromRow(row, "u_activated", Boolean.class)).thenReturn(true);
+        when(columnConverter.fromRow(row, "u_subscribed", Boolean.class)).thenReturn(true);
         when(columnConverter.fromRow(row, "u_lang_key", String.class)).thenReturn("en");
         when(columnConverter.fromRow(row, "u_image_url", String.class)).thenReturn("img");
         when(columnConverter.fromRow(row, "u_activation_key", String.class)).thenReturn("key");
@@ -46,6 +47,7 @@ class UserRowMapperTest {
         assertThat(user.getLastName()).isEqualTo("Doe");
         assertThat(user.getEmail()).isEqualTo("user@localhost");
         assertThat(user.isActivated()).isTrue();
+        assertThat(user.isSubscribed()).isTrue();
         assertThat(user.getLangKey()).isEqualTo("en");
         assertThat(user.getImageUrl()).isEqualTo("img");
         assertThat(user.getActivationKey()).isEqualTo("key");

@@ -40,6 +40,8 @@ public class AdminUserDTO implements Serializable {
 
     private boolean activated = false;
 
+    private Boolean subscribed;
+
     @Size(min = 2, max = 10)
     private String langKey;
 
@@ -64,6 +66,7 @@ public class AdminUserDTO implements Serializable {
         this.lastName = user.getLastName();
         this.email = user.getEmail();
         this.activated = user.isActivated();
+        this.subscribed = user.isSubscribed();
         this.imageUrl = user.getImageUrl();
         this.langKey = user.getLangKey();
         this.createdBy = user.getCreatedBy();
@@ -129,6 +132,14 @@ public class AdminUserDTO implements Serializable {
         this.activated = activated;
     }
 
+    public Boolean getSubscribed() {
+        return subscribed;
+    }
+
+    public void setSubscribed(Boolean subscribed) {
+        this.subscribed = subscribed;
+    }
+
     public String getLangKey() {
         return langKey;
     }
@@ -187,6 +198,7 @@ public class AdminUserDTO implements Serializable {
             ", email='" + email + '\'' +
             ", imageUrl='" + imageUrl + '\'' +
             ", activated=" + activated +
+            ", subscribed=" + subscribed +
             ", langKey='" + langKey + '\'' +
             ", createdBy=" + createdBy +
             ", createdDate=" + createdDate +

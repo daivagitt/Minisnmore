@@ -25,6 +25,8 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as InviteRouteImport } from './routes/invite'
 import { Route as GiftRouteImport } from './routes/gift'
 import { Route as CustomersupportRouteImport } from './routes/customersupport'
+import { Route as ContactUsRouteImport } from './routes/contact-us'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as CartRouteImport } from './routes/cart'
 import { Route as BlogRouteImport } from './routes/blog'
@@ -49,6 +51,7 @@ import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminSubscribeRouteImport } from './routes/admin.subscribe'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminReturnsRouteImport } from './routes/admin.returns'
+import { Route as AdminRbacRouteImport } from './routes/admin.rbac'
 import { Route as AdminProductsRouteImport } from './routes/admin.products'
 import { Route as AdminPoliciesRouteImport } from './routes/admin.policies'
 import { Route as AdminPagesRouteImport } from './routes/admin.pages'
@@ -161,6 +164,16 @@ const GiftRoute = GiftRouteImport.update({
 const CustomersupportRoute = CustomersupportRouteImport.update({
   id: '/customersupport',
   path: '/customersupport',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactUsRoute = ContactUsRouteImport.update({
+  id: '/contact-us',
+  path: '/contact-us',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CheckoutRoute = CheckoutRouteImport.update({
@@ -281,6 +294,11 @@ const AdminSettingsRoute = AdminSettingsRouteImport.update({
 const AdminReturnsRoute = AdminReturnsRouteImport.update({
   id: '/returns',
   path: '/returns',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminRbacRoute = AdminRbacRouteImport.update({
+  id: '/rbac',
+  path: '/rbac',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminProductsRoute = AdminProductsRouteImport.update({
@@ -465,6 +483,8 @@ export interface FileRoutesByFullPath {
   '/blog': typeof BlogRouteWithChildren
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
+  '/contact': typeof ContactRoute
+  '/contact-us': typeof ContactUsRoute
   '/customersupport': typeof CustomersupportRouteWithChildren
   '/gift': typeof GiftRoute
   '/invite': typeof InviteRoute
@@ -506,6 +526,7 @@ export interface FileRoutesByFullPath {
   '/admin/pages': typeof AdminPagesRoute
   '/admin/policies': typeof AdminPoliciesRoute
   '/admin/products': typeof AdminProductsRoute
+  '/admin/rbac': typeof AdminRbacRoute
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/subscribe': typeof AdminSubscribeRoute
@@ -537,6 +558,8 @@ export interface FileRoutesByTo {
   '/best-sellers': typeof BestSellersRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
+  '/contact': typeof ContactRoute
+  '/contact-us': typeof ContactUsRoute
   '/customersupport': typeof CustomersupportRouteWithChildren
   '/gift': typeof GiftRoute
   '/invite': typeof InviteRoute
@@ -577,6 +600,7 @@ export interface FileRoutesByTo {
   '/admin/pages': typeof AdminPagesRoute
   '/admin/policies': typeof AdminPoliciesRoute
   '/admin/products': typeof AdminProductsRoute
+  '/admin/rbac': typeof AdminRbacRoute
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/subscribe': typeof AdminSubscribeRoute
@@ -612,6 +636,8 @@ export interface FileRoutesById {
   '/blog': typeof BlogRouteWithChildren
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
+  '/contact': typeof ContactRoute
+  '/contact-us': typeof ContactUsRoute
   '/customersupport': typeof CustomersupportRouteWithChildren
   '/gift': typeof GiftRoute
   '/invite': typeof InviteRoute
@@ -653,6 +679,7 @@ export interface FileRoutesById {
   '/admin/pages': typeof AdminPagesRoute
   '/admin/policies': typeof AdminPoliciesRoute
   '/admin/products': typeof AdminProductsRoute
+  '/admin/rbac': typeof AdminRbacRoute
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/subscribe': typeof AdminSubscribeRoute
@@ -689,6 +716,8 @@ export interface FileRouteTypes {
     | '/blog'
     | '/cart'
     | '/checkout'
+    | '/contact'
+    | '/contact-us'
     | '/customersupport'
     | '/gift'
     | '/invite'
@@ -730,6 +759,7 @@ export interface FileRouteTypes {
     | '/admin/pages'
     | '/admin/policies'
     | '/admin/products'
+    | '/admin/rbac'
     | '/admin/returns'
     | '/admin/settings'
     | '/admin/subscribe'
@@ -761,6 +791,8 @@ export interface FileRouteTypes {
     | '/best-sellers'
     | '/cart'
     | '/checkout'
+    | '/contact'
+    | '/contact-us'
     | '/customersupport'
     | '/gift'
     | '/invite'
@@ -801,6 +833,7 @@ export interface FileRouteTypes {
     | '/admin/pages'
     | '/admin/policies'
     | '/admin/products'
+    | '/admin/rbac'
     | '/admin/returns'
     | '/admin/settings'
     | '/admin/subscribe'
@@ -835,6 +868,8 @@ export interface FileRouteTypes {
     | '/blog'
     | '/cart'
     | '/checkout'
+    | '/contact'
+    | '/contact-us'
     | '/customersupport'
     | '/gift'
     | '/invite'
@@ -876,6 +911,7 @@ export interface FileRouteTypes {
     | '/admin/pages'
     | '/admin/policies'
     | '/admin/products'
+    | '/admin/rbac'
     | '/admin/returns'
     | '/admin/settings'
     | '/admin/subscribe'
@@ -911,6 +947,8 @@ export interface RootRouteChildren {
   BlogRoute: typeof BlogRouteWithChildren
   CartRoute: typeof CartRoute
   CheckoutRoute: typeof CheckoutRoute
+  ContactRoute: typeof ContactRoute
+  ContactUsRoute: typeof ContactUsRoute
   CustomersupportRoute: typeof CustomersupportRouteWithChildren
   GiftRoute: typeof GiftRoute
   InviteRoute: typeof InviteRoute
@@ -1043,6 +1081,20 @@ declare module '@tanstack/react-router' {
       path: '/customersupport'
       fullPath: '/customersupport'
       preLoaderRoute: typeof CustomersupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact-us': {
+      id: '/contact-us'
+      path: '/contact-us'
+      fullPath: '/contact-us'
+      preLoaderRoute: typeof ContactUsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/checkout': {
@@ -1211,6 +1263,13 @@ declare module '@tanstack/react-router' {
       path: '/returns'
       fullPath: '/admin/returns'
       preLoaderRoute: typeof AdminReturnsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/rbac': {
+      id: '/admin/rbac'
+      path: '/rbac'
+      fullPath: '/admin/rbac'
+      preLoaderRoute: typeof AdminRbacRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/products': {
@@ -1512,6 +1571,7 @@ interface AdminRouteChildren {
   AdminPagesRoute: typeof AdminPagesRoute
   AdminPoliciesRoute: typeof AdminPoliciesRoute
   AdminProductsRoute: typeof AdminProductsRoute
+  AdminRbacRoute: typeof AdminRbacRoute
   AdminReturnsRoute: typeof AdminReturnsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSubscribeRoute: typeof AdminSubscribeRoute
@@ -1538,6 +1598,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminPagesRoute: AdminPagesRoute,
   AdminPoliciesRoute: AdminPoliciesRoute,
   AdminProductsRoute: AdminProductsRoute,
+  AdminRbacRoute: AdminRbacRoute,
   AdminReturnsRoute: AdminReturnsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminSubscribeRoute: AdminSubscribeRoute,
@@ -1614,6 +1675,8 @@ const rootRouteChildren: RootRouteChildren = {
   BlogRoute: BlogRouteWithChildren,
   CartRoute: CartRoute,
   CheckoutRoute: CheckoutRoute,
+  ContactRoute: ContactRoute,
+  ContactUsRoute: ContactUsRoute,
   CustomersupportRoute: CustomersupportRouteWithChildren,
   GiftRoute: GiftRoute,
   InviteRoute: InviteRoute,

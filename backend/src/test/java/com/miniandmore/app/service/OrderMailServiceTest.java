@@ -11,8 +11,10 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.domain.CustomerOrder;
+import com.miniandmore.app.domain.OrderCancellationRequest;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.OrderReturn;
+import com.miniandmore.app.domain.enumeration.OrderRequestType;
 import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
 import com.miniandmore.app.domain.SiteSetting;
 import com.miniandmore.app.repository.OrderItemRepository;
@@ -272,6 +274,129 @@ class OrderMailServiceTest {
         service.sendPickupFailedAdminNotice(order, orderReturn);
 
         verify(javaMailSender).send(mimeMessage);
+    }
+
+    @Test
+    void cancellationEmails_processTheirTemplates() {
+        CustomerOrder order = orderWithAddress();
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(anyString(), any(Context.class))).thenReturn("content");
+        when(messageSource.getMessage(anyString(), any(), any())).thenReturn("title");
+        when(orderItemRepository.findAllByOrderId(9L)).thenReturn(List.of());
+
+        OrderCancellationRequest req = new OrderCancellationRequest();
+        req.setRequestNumber("CAN-1");
+        req.setReason("Changed mind");
+
+        service.sendCancellationRequested(order, req);
+        verify(templateEngine).process(eq("mail/cancellationRequestedEmail"), any(Context.class));
+
+        service.sendCancellationAccepted(order, req);
+        verify(templateEngine).process(eq("mail/cancellationAcceptedEmail"), any(Context.class));
+
+        service.sendCancellationRejected(order, req);
+        verify(templateEngine).process(eq("mail/cancellationRejectedEmail"), any(Context.class));
+    }
+
+    @Test
+    void refundEmails_processTheirTemplates() {
+        CustomerOrder order = orderWithAddress();
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(anyString(), any(Context.class))).thenReturn("content");
+        when(messageSource.getMessage(anyString(), any(), any())).thenReturn("title");
+        when(orderItemRepository.findAllByOrderId(9L)).thenReturn(List.of());
+
+        service.sendRefundInitiated(order, BigDecimal.valueOf(1299), "rfnd_123", "online");
+        verify(templateEngine).process(eq("mail/refundInitiatedEmail"), any(Context.class));
+
+        service.sendRefundCompleted(order, BigDecimal.valueOf(1299), "rfnd_123", "online");
+        verify(templateEngine).process(eq("mail/refundCompletedEmail"), any(Context.class));
+    }
+
+    @Test
+    void returnAndPickupEmails_processTheirTemplates() {
+        CustomerOrder order = orderWithAddress();
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(anyString(), any(Context.class))).thenReturn("content");
+        when(messageSource.getMessage(anyString(), any(), any())).thenReturn("title");
+        when(orderItemRepository.findAllByOrderId(9L)).thenReturn(List.of());
+
+        OrderReturn orderReturn = new OrderReturn();
+        orderReturn.setReturnNumber("RET-123");
+        orderReturn.setStatus(OrderReturnStatus.APPROVED);
+
+        service.sendReturnAccepted(order, orderReturn);
+        verify(templateEngine).process(eq("mail/returnApprovedEmail"), any(Context.class));
+
+        service.sendReturnRejected(order, orderReturn);
+        verify(templateEngine).process(eq("mail/returnRejectedEmail"), any(Context.class));
+
+        service.sendPickupScheduled(order, orderReturn);
+        verify(templateEngine).process(eq("mail/pickupScheduledEmail"), any(Context.class));
+
+        service.sendOutForPickup(order, orderReturn);
+        verify(templateEngine).process(eq("mail/outForPickupEmail"), any(Context.class));
+
+        service.sendReturnQcFailed(order, orderReturn);
+        verify(templateEngine).process(eq("mail/returnQcFailedEmail"), any(Context.class));
+    }
+
+    @Test
+    void exchangeEmails_processTheirTemplates() {
+        CustomerOrder order = orderWithAddress();
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(anyString(), any(Context.class))).thenReturn("content");
+        when(messageSource.getMessage(anyString(), any(), any())).thenReturn("title");
+        when(orderItemRepository.findAllByOrderId(9L)).thenReturn(List.of());
+
+        OrderReturn exchange = new OrderReturn();
+        exchange.setReturnNumber("EXG-123");
+        exchange.setRequestType(OrderRequestType.EXCHANGE);
+        exchange.setStatus(OrderRequestType.EXCHANGE != null ? OrderReturnStatus.APPROVED : null);
+
+        service.sendExchangeRequested(order, exchange);
+        verify(templateEngine).process(eq("mail/exchangeRequestedEmail"), any(Context.class));
+
+        service.sendExchangeAccepted(order, exchange);
+        verify(templateEngine).process(eq("mail/exchangeApprovedEmail"), any(Context.class));
+
+        service.sendExchangeRejected(order, exchange);
+        verify(templateEngine).process(eq("mail/exchangeRejectedEmail"), any(Context.class));
+
+        service.sendExchangeOutForDelivery(order, exchange);
+        verify(templateEngine).process(eq("mail/exchangeOutForDeliveryEmail"), any(Context.class));
+
+        service.sendExchangeDelivered(order, exchange);
+        verify(templateEngine).process(eq("mail/exchangeDeliveredEmail"), any(Context.class));
+    }
+
+    @Test
+    void sendReturnUpdate_routesExchangesCorrectly() {
+        CustomerOrder order = orderWithAddress();
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(anyString(), any(Context.class))).thenReturn("content");
+        when(messageSource.getMessage(anyString(), any(), any())).thenReturn("title");
+        when(orderItemRepository.findAllByOrderId(9L)).thenReturn(List.of());
+
+        OrderReturn exchange = new OrderReturn();
+        exchange.setReturnNumber("EXG-456");
+        exchange.setRequestType(OrderRequestType.EXCHANGE);
+
+        exchange.setStatus(OrderReturnStatus.APPROVED);
+        service.sendReturnUpdate(order, exchange);
+        verify(templateEngine).process(eq("mail/exchangeApprovedEmail"), any(Context.class));
+
+        exchange.setStatus(OrderReturnStatus.REJECTED);
+        service.sendReturnUpdate(order, exchange);
+        verify(templateEngine).process(eq("mail/exchangeRejectedEmail"), any(Context.class));
+
+        exchange.setStatus(OrderReturnStatus.SHIPPED);
+        service.sendReturnUpdate(order, exchange);
+        verify(templateEngine).process(eq("mail/exchangeOutForDeliveryEmail"), any(Context.class));
+
+        exchange.setStatus(OrderReturnStatus.DELIVERED);
+        service.sendReturnUpdate(order, exchange);
+        verify(templateEngine).process(eq("mail/exchangeDeliveredEmail"), any(Context.class));
     }
 
     private CustomerOrder orderWithAddress() {

@@ -15,6 +15,17 @@ from report_theme import PROJECT_NAME, esc, link_card, page_shell  # noqa: E402
 
 SECTIONS: list[tuple[str, str, list[tuple[str, str, str]]]] = [
     (
+        "Journey wireframes",
+        "Customer, admin, and delivery discussion screens for the call.",
+        [
+            (
+                "./wireframes/index.html",
+                "Open wireframes",
+                "Shop, checkout, cancel/return/exchange, wrap, book shipment, COD, reverse pickup",
+            ),
+        ],
+    ),
+    (
         "Frontend unit tests",
         "Vitest — React storefront test suites.",
         [
@@ -205,6 +216,17 @@ def ensure_brand_assets(out_dir: Path) -> None:
         shutil.copy2(logo_src, out_dir / "daiva-logo.svg")
 
 
+def ensure_wireframes(out_dir: Path) -> None:
+    src = Path(__file__).resolve().parents[2] / "docs" / "wireframes" / "index.html"
+    if not src.is_file():
+        return
+    dest_dir = out_dir / "wireframes"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    html = src.read_text(encoding="utf-8")
+    html = html.replace('href="../../report.html"', 'href="../index.html"')
+    (dest_dir / "index.html").write_text(html, encoding="utf-8")
+
+
 def sonar_dashboard_url(base_url: str, project_key: str) -> str:
     return f"{base_url.rstrip('/')}/dashboard?id={quote(project_key, safe='')}"
 
@@ -246,6 +268,7 @@ def main() -> None:
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     ensure_brand_assets(out_dir)
+    ensure_wireframes(out_dir)
     write_sonar_hub(out_dir, args.sonar_url)
 
     parts: list[str] = []
@@ -292,7 +315,7 @@ def main() -> None:
         page_shell(
             f"{PROJECT_NAME} Reports",
             toc_html + index_body,
-            subtitle="Unit tests, coverage, JavaDoc, API, Ledgerly, and SonarQube — one dashboard.",
+            subtitle="Unit tests, coverage, JavaDoc, API, Ledgerly, SonarQube, and journey wireframes — one dashboard.",
             extra_css=extra_css,
         ),
         encoding="utf-8",

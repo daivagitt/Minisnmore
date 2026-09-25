@@ -5,7 +5,7 @@ import { ADMIN_NAV_ITEMS, filterAdminNavItems } from "@/lib/admin-nav";
 import {
   LayoutDashboard, Image as ImgIcon, Tag, BookOpen, FileText, Package, Plug, LogOut, Loader2,
   Folder, Home, EyeOff, Settings as SettingsIcon, ExternalLink, ShoppingCart, ReceiptText, Percent, RotateCcw, XCircle,
-  Users, Search, Mail, type LucideIcon,
+  Users, Search, Mail, ShieldCheck, type LucideIcon,
 } from "lucide-react";
 import { staffHomePath } from "@/lib/staff-roles";
 
@@ -34,6 +34,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/admin/returns": RotateCcw,
   "/admin/zoho": Plug,
   "/admin/users": Users,
+  "/admin/rbac": ShieldCheck,
 };
 
 function AdminLayout() {

@@ -97,5 +97,7 @@
     <include file="config/liquibase/changelog/20260919120000_add_coupon_bogo_fields.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260921160000_added_entity_ContactMessage.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260921161000_seed_home_section_write_to_us.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260921170000_add_customer_profile_subscribed.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260921193000_add_contact_page_visibility.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>
 

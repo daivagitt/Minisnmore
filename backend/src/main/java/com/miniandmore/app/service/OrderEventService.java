@@ -242,6 +242,14 @@ public class OrderEventService {
                         () -> orderSmsService.sendOrderCancelled(order)
                     );
                     break;
+                case TYPE_REFUNDED:
+                    notifyBothChannels(
+                        eventType,
+                        order,
+                        () -> orderMailService.sendRefundCompleted(order, order.getTotal(), null, order.getPaymentMethod()),
+                        () -> {}
+                    );
+                    break;
                 default:
                     break;
             }
