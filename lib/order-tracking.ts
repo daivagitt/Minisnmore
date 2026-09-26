@@ -1,4 +1,4 @@
-import { CheckCircle2, Home, Package, Truck, type LucideIcon } from "lucide-react";
+import { CheckCircle2, Home, MapPin, Package, Truck, type LucideIcon } from "lucide-react";
 import { needsOnlinePayment } from "@/lib/order-status";
 
 export type TrackingStageState = "current" | "done" | "upcoming";
@@ -36,6 +36,16 @@ export const TRACKING_STAGES = [
     },
   },
   {
+    key: "out_for_delivery",
+    icon: MapPin,
+    label: "Out for delivery",
+    detail: {
+      current: "Your parcel is out for delivery today — please keep your phone handy.",
+      done: "Out for delivery.",
+      upcoming: "The courier will take it out for delivery soon.",
+    },
+  },
+  {
     key: "delivered",
     icon: Home,
     label: "Delivered",
@@ -59,8 +69,10 @@ const STATUS_INDEX: Record<string, number> = {
   wrapped: 1,
   awaiting_pickup: 1,
   shipped: 2,
-  delivered: 3,
-  fulfilled: 3,
+  out_for_delivery: 3,
+  delivery_failed: 3,
+  delivered: 4,
+  fulfilled: 4,
   cancelled: -1,
 };
 
@@ -100,6 +112,7 @@ export function trackingStatusLabel(order: OrderTrackingFields) {
   if (key === "cancelled" || key === "canceled") return "Cancelled";
   if (key === "confirmed") return "Order confirmed";
   if (key === "awaiting_pickup") return "Waiting for pickup";
+  if (key === "delivery_failed") return "Delivery attempt unsuccessful";
   if (isHandWrapped(order)) return "Hand-wrapped";
   const stage = TRACKING_STAGES.find((s) => s.key === key);
   if (stage) return stage.label;
@@ -138,6 +151,9 @@ export function trackingStageDetail(
   if (stageKey === "shipped" && key === "awaiting_pickup" && state === "upcoming") {
     return "Tracking moves to on the way after courier pickup.";
   }
+  if (stageKey === "out_for_delivery" && key === "delivery_failed" && state === "current") {
+    return "Delivery attempt was unsuccessful. A reattempt is scheduled by the courier.";
+  }
   if (stage) return stage.detail[state];
   if (state === "done") return "Completed";
   if (state === "current") return "In progress";
@@ -172,6 +188,7 @@ export function trackingActivityTitle(order: OrderTrackingFields): string {
   if (key === "cancelled" || key === "canceled") return "Order cancelled";
   if (key === "confirmed") return "Order confirmed";
   if (key === "awaiting_pickup") return "Waiting for pickup";
+  if (key === "delivery_failed") return "Delivery attempt unsuccessful";
   if (isHandWrapped(order)) return "Hand-wrapped";
   const stage = TRACKING_STAGES.find((s) => s.key === key);
   if (stage) return stage.label;
@@ -196,7 +213,7 @@ export function trackingActivityDate(order: OrderTrackingFields & { created_at?:
     return { prefix: "Payment pending", value: order.created_at ?? "" };
   }
   const key = normalizedTrackingKey(order);
-  const shipped = key === "shipped" || key === "delivered";
+  const shipped = key === "shipped" || key === "out_for_delivery" || key === "delivery_failed" || key === "delivered";
   if (shipped && order.shipment_date) {
     return { prefix: "Shipped", value: order.shipment_date };
   }

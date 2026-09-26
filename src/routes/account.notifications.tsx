@@ -38,6 +38,8 @@ function iconForEventType(eventType: string): LucideIcon {
     case "refunded":
       return CreditCard;
     case "shipped":
+    case "out_for_delivery":
+    case "delivery_failed":
       return Truck;
     case "delivered":
       return Home;
@@ -58,6 +60,10 @@ function datePrefixForEventType(eventType: string): string {
       return "Wrapped";
     case "shipped":
       return "Shipped";
+    case "out_for_delivery":
+      return "Out for delivery";
+    case "delivery_failed":
+      return "Delivery attempt unsuccessful";
     case "delivered":
       return "Delivered";
     case "refunded":

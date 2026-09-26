@@ -40,6 +40,8 @@ public class AdminUserDTO implements Serializable {
 
     private boolean activated = false;
 
+    private boolean pendingInvite = false;
+
     private Boolean subscribed;
 
     @Size(min = 2, max = 10)
@@ -66,6 +68,7 @@ public class AdminUserDTO implements Serializable {
         this.lastName = user.getLastName();
         this.email = user.getEmail();
         this.activated = user.isActivated();
+        this.pendingInvite = user.getActivationKey() != null && !user.getActivationKey().isBlank();
         this.subscribed = user.isSubscribed();
         this.imageUrl = user.getImageUrl();
         this.langKey = user.getLangKey();
@@ -130,6 +133,14 @@ public class AdminUserDTO implements Serializable {
 
     public void setActivated(boolean activated) {
         this.activated = activated;
+    }
+
+    public boolean isPendingInvite() {
+        return pendingInvite;
+    }
+
+    public void setPendingInvite(boolean pendingInvite) {
+        this.pendingInvite = pendingInvite;
     }
 
     public Boolean getSubscribed() {

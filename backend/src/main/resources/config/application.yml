@@ -325,7 +325,7 @@ application:
     warehouse-line2: ${XPRESSBEES_WAREHOUSE_LINE2:}
     warehouse-city: ${XPRESSBEES_WAREHOUSE_CITY:Bengaluru}
     warehouse-state: ${XPRESSBEES_WAREHOUSE_STATE:Karnataka}
-    tracking-url-template: ${XPRESSBEES_TRACKING_URL_TEMPLATE:https://www.xpressbees.com/track/?awb={awb}}
+    tracking-url-template: ${XPRESSBEES_TRACKING_URL_TEMPLATE:https://shipmentv2.xpressbees.com/orders/tracking/{awb}}
     default-weight-grams: ${XPRESSBEES_DEFAULT_WEIGHT_GRAMS:500}
     volumetric-divisor: ${XPRESSBEES_VOLUMETRIC_DIVISOR:5000}
     pickup-vendor-code: ${XPRESSBEES_PICKUP_VENDOR_CODE:}

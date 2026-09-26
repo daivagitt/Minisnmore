@@ -66,6 +66,21 @@ describe("order-status labels", () => {
         tracking_status: "hand_wrapped",
       }),
     ).toBe("Paid · Hand-wrapped");
+    expect(
+      formatOrderStatusSummary({
+        payment_status: "pending",
+        payment_method: "cod",
+        status: "hand_wrapped",
+        tracking_status: "out_for_delivery",
+      }),
+    ).toBe("Pay on delivery · Out for delivery");
+    expect(
+      formatOrderStatusSummary({
+        payment_status: "paid",
+        status: "hand_wrapped",
+        tracking_status: "delivery_failed",
+      }),
+    ).toBe("Paid · Delivery attempt unsuccessful");
   });
 
   it("detects COD orders", () => {

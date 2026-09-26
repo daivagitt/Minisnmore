@@ -51,7 +51,7 @@ function CouponsPage() {
   const save = async (c: Coupon) => {
     const payload = {
       ...c,
-      code: c.code.toUpperCase(),
+      code: c.code.trim().toUpperCase(),
     };
     const errors = getCouponValidationErrors(payload);
     if (errors.length) {

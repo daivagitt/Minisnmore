@@ -64,11 +64,17 @@
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center" style="padding-bottom:16px;">
-                    <a th:href="${orderUrl}" style="background-color:#e87ea0; color:#ffffff; text-decoration:none; font-size:15px; font-weight:bold; padding:14px 32px; border-radius:30px; display:inline-block;">📦 Track Order</a>
+                    <a th:href="${trackingUrl != null ? trackingUrl : orderUrl}" style="background-color:#e87ea0; color:#ffffff; text-decoration:none; font-size:15px; font-weight:bold; padding:14px 32px; border-radius:30px; display:inline-block;">📦 Track Shipment</a>
+                  </td>
+                </tr>
+                <tr th:if="${trackingUrl != null}">
+                  <td align="center" style="padding-bottom:12px;">
+                    <a th:href="${trackingUrl}" th:text="${trackingUrl}" style="color:#d16b87; font-size:13px; text-decoration:underline; word-break:break-all;">https://shipmentv2.xpressbees.com/orders/tracking/14344950061557</a>
                   </td>
                 </tr>
                 <tr>
-                  <td align="center" style="padding-bottom:28px;">
+                  <td align="center" style="padding-bottom:28px; font-size:13px; color:#5a4a4a;">
+                    <span th:if="${trackingUrl != null}">You can also track it from your account: </span>
                     <a th:href="${orderUrl}" th:text="${orderUrl}" style="color:#d16b87; font-size:13px; text-decoration:underline; word-break:break-all;">https://minisnmore.com/account/orders/MNM-XXXXXXXXX</a>
                   </td>
                 </tr>

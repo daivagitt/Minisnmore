@@ -568,19 +568,21 @@ export function OrdersWorkspace({
             { value: "cod", label: "COD" },
           ]}
         />
-        <FilterSelect
-          label="Zoho"
-          value={zohoSyncStatus}
-          onChange={setZohoSyncStatus}
-          options={[
-            { value: "", label: "All Zoho" },
-            { value: "attention", label: "Needs sync" },
-            { value: "not_synced", label: "Not synced" },
-            { value: "pending", label: "Pending" },
-            { value: "synced", label: "Synced" },
-            { value: "failed", label: "Failed" },
-          ]}
-        />
+        {canSyncZoho && (
+          <FilterSelect
+            label="Zoho"
+            value={zohoSyncStatus}
+            onChange={setZohoSyncStatus}
+            options={[
+              { value: "", label: "All Zoho" },
+              { value: "attention", label: "Needs sync" },
+              { value: "not_synced", label: "Not synced" },
+              { value: "pending", label: "Pending" },
+              { value: "synced", label: "Synced" },
+              { value: "failed", label: "Failed" },
+            ]}
+          />
+        )}
         {filtersActive && (
           <button
             type="button"
@@ -602,7 +604,7 @@ export function OrdersWorkspace({
         </div>
       </div>
 
-      {!loading && rows.length > 0 && (
+      {canSyncZoho && !loading && rows.length > 0 && (
         <div
           className={`mb-5 rounded-2xl border p-4 ${attentionOrders.length === 0 ? "border-emerald-200 bg-emerald-50/80" : "border-amber-200 bg-amber-50/80"}`}
         >
@@ -699,6 +701,43 @@ export function OrdersWorkspace({
                   </div>
                 </div>
 
+                {order.order_items && order.order_items.length > 0 && (
+                  <div className="mt-3 rounded-xl border border-border/70 bg-background/60 p-3">
+                    <p className="text-sm font-semibold mb-2">
+                      Products &amp; Variants ({order.order_items.reduce((acc, it) => acc + (it.qty || 1), 0)} {order.order_items.reduce((acc, it) => acc + (it.qty || 1), 0) === 1 ? "item" : "items"})
+                    </p>
+                    <div className="divide-y divide-border/40 space-y-2">
+                      {order.order_items.map((item, idx) => (
+                        <div key={item.id ?? idx} className="pt-2 first:pt-0 flex items-center justify-between gap-3 text-xs">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {item.product_image && (
+                              <img
+                                src={item.product_image}
+                                alt={item.product_name ?? "Product"}
+                                className="h-9 w-9 rounded-lg object-cover shrink-0 border border-border/50"
+                              />
+                            )}
+                            <div className="min-w-0">
+                              <p className="font-medium text-foreground truncate">{item.product_name || "Product"}</p>
+                              <div className="flex flex-wrap gap-1.5 text-[11px] text-muted-foreground mt-0.5">
+                                {item.sku && <span className="font-mono">SKU: {item.sku}</span>}
+                                {item.size && <span>· Size: {item.size}</span>}
+                                {item.color && <span>· Color: {item.color}</span>}
+                                <span>· Qty: {item.qty || 1}</span>
+                              </div>
+                            </div>
+                          </div>
+                          {item.price != null && (
+                            <span className="font-medium text-foreground shrink-0">
+                              ₹{(Number(item.price) * (item.qty || 1)).toLocaleString("en-IN")}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="mt-3 rounded-xl border border-border/70 bg-background/60 p-3">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-semibold">Shipment</p>
@@ -706,9 +745,13 @@ export function OrdersWorkspace({
                       <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
                         {order.tracking_status === "delivered"
                           ? "Delivered"
-                          : order.tracking_status === "shipped"
-                            ? "In transit"
-                            : "Pickup pending"}
+                          : order.tracking_status === "out_for_delivery"
+                            ? "Out for delivery"
+                            : order.tracking_status === "delivery_failed"
+                              ? "Delivery attempt unsuccessful"
+                              : order.tracking_status === "shipped"
+                                ? "In transit"
+                                : "Pickup pending"}
                       </span>
                     ) : (
                       <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
@@ -734,7 +777,9 @@ export function OrdersWorkspace({
                     </div>
                   ) : (
                     <p className="mt-2 text-xs text-muted-foreground">
-                      Create a package with dimensions to calculate ExpressBees rates, then book a shipment.
+                      {canFulfill
+                        ? "Create a package with dimensions to calculate ExpressBees rates, then book a shipment."
+                        : "Shipment not booked yet."}
                     </p>
                   )}
                   {order.packed_at && !order.tracking_number ? (

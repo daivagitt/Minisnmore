@@ -88,6 +88,11 @@ public class OrderMailService {
         sendOrderTemplate(order, "mail/orderDeliveredEmail", "email.order.delivered.title", Map.of());
     }
 
+    // Trigger 3b: Delivery Failed / Undelivered
+    public void sendDeliveryFailed(CustomerOrder order) {
+        sendOrderTemplate(order, "mail/deliveryFailedEmail", "email.order.delivery_failed.title", Map.of());
+    }
+
     // Trigger 4: Cancellation Request Received
     public void sendCancellationRequested(CustomerOrder order, OrderCancellationRequest cancellation) {
         Map<String, Object> extra = new LinkedHashMap<>();
@@ -212,9 +217,25 @@ public class OrderMailService {
         sendOrderTemplate(order, "mail/exchangeRejectedEmail", "email.order.exchange.rejected.title", buildReturnExtra(orderReturn));
     }
 
+    /** Diagram: pickup failure → Admin → "Exchange cancelled." */
+    public void sendExchangeCancelled(CustomerOrder order, OrderReturn orderReturn) {
+        sendOrderTemplate(
+            order,
+            "mail/exchangeCancelledEmail",
+            "email.order.exchange.cancelled.title",
+            buildReturnExtra(orderReturn)
+        );
+    }
+
     // Trigger 18: Exchange Out for Delivery
     public void sendExchangeOutForDelivery(CustomerOrder order, OrderReturn orderReturn) {
-        sendOrderTemplate(order, "mail/exchangeOutForDeliveryEmail", "email.order.exchange.shipped.title", buildReturnExtra(orderReturn));
+        Map<String, Object> extra = new LinkedHashMap<>(buildReturnExtra(orderReturn));
+        if (orderReturn != null) {
+            extra.put("trackingUrl", StringUtils.trimToNull(orderReturn.getOutboundTrackingUrl()));
+            extra.put("trackingNumber", StringUtils.defaultString(orderReturn.getOutboundAwb()));
+            extra.put("trackingCarrier", StringUtils.defaultString(orderReturn.getOutboundCarrierName()));
+        }
+        sendOrderTemplate(order, "mail/exchangeOutForDeliveryEmail", "email.order.exchange.shipped.title", extra);
     }
 
     // Trigger 19: Exchange Delivered
@@ -242,9 +263,13 @@ public class OrderMailService {
                 case REQUESTED -> sendExchangeRequested(order, orderReturn);
                 case APPROVED -> sendExchangeAccepted(order, orderReturn);
                 case REJECTED -> sendExchangeRejected(order, orderReturn);
+                case CANCELLED -> sendExchangeCancelled(order, orderReturn);
                 case PICKUP_SCHEDULED -> sendPickupScheduled(order, orderReturn);
                 case PICKED_UP -> sendOutForPickup(order, orderReturn);
-                case SHIPPED -> sendExchangeOutForDelivery(order, orderReturn);
+                case SHIPPED -> {
+                    // Exchange OFD mail is owned by OrderReturnService.notifyExchangeOutForDelivery
+                    // (non-XB at markShipped; XB on the carrier OFD webhook) — never from status sync here.
+                }
                 case DELIVERED, COMPLETED -> sendExchangeDelivered(order, orderReturn);
                 default -> sendOrderTemplate(order, "mail/orderReturnEmail", "email.order.return." + returnStatusKey(status) + ".title", buildReturnExtra(orderReturn));
             }
@@ -292,11 +317,12 @@ public class OrderMailService {
         extra.put("returnStatus", statusKey);
         extra.put("returnReason", StringUtils.defaultString(orderReturn.getReason()));
         extra.put("rejectionReason", StringUtils.defaultString(orderReturn.getRejectionReason()));
+        extra.put("adminNotes", StringUtils.defaultString(orderReturn.getAdminNotes()));
         extra.put("qcReason", StringUtils.defaultString(orderReturn.getRejectionReason()));
         extra.put("pickupWindow", StringUtils.defaultString(orderReturn.getPickupWindow(), "Within 2-3 business days"));
         extra.put("reverseAwb", StringUtils.defaultString(orderReturn.getReverseAwb()));
         extra.put("carrierName", StringUtils.defaultString(orderReturn.getCarrierName()));
-        extra.put("trackingUrl", StringUtils.defaultString(orderReturn.getTrackingUrl()));
+        extra.put("trackingUrl", StringUtils.trimToNull(orderReturn.getTrackingUrl()));
         extra.put("requestedOn", formatOrderDate(orderReturn.getRequestedAt()));
         extra.put("requestedOnFormatted", formatOrderDate(orderReturn.getRequestedAt()));
         extra.put("reviewedOn", formatOrderDate(orderReturn.getResolvedAt()));
@@ -414,6 +440,7 @@ public class OrderMailService {
             context.setVariable("paymentMethod", displayPaymentMethod(order.getPaymentMethod()));
             context.setVariable("trackingNumber", StringUtils.defaultString(order.getTrackingNumber()));
             context.setVariable("trackingCarrier", StringUtils.defaultString(order.getTrackingCarrier()));
+            context.setVariable("trackingUrl", StringUtils.trimToNull(order.getTrackingUrl()));
             context.setVariable("shippingAddress", formatAddress(order.getShippingAddressJson()));
             Map<String, Object> address = buildAddress(order.getShippingAddressJson());
             context.setVariable("addressName", address.get("name"));

@@ -3,6 +3,7 @@ package com.miniandmore.app.service;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
+import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.domain.OrderEvent;
 import com.miniandmore.app.repository.OrderEventRepository;
 import java.math.BigDecimal;
@@ -31,9 +32,11 @@ public class OrderEventService {
     public static final String TYPE_PAYMENT_RECEIVED = "payment_received";
     public static final String TYPE_HAND_WRAPPED = "hand_wrapped";
     public static final String TYPE_SHIPPED = "shipped";
+    public static final String TYPE_OUT_FOR_DELIVERY = "out_for_delivery";
     public static final String TYPE_DELIVERED = "delivered";
     public static final String TYPE_CANCELLED = "cancelled";
     public static final String TYPE_REFUNDED = "refunded";
+    public static final String TYPE_DELIVERY_FAILED = "delivery_failed";
 
     private static final Logger LOG = LoggerFactory.getLogger(OrderEventService.class);
     private static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
@@ -141,6 +144,38 @@ public class OrderEventService {
                     shipmentInstant(order).orElse(Instant.now())
                 );
                 break;
+            case "out_for_delivery":
+                recordIfAbsent(
+                    order,
+                    TYPE_SHIPPED,
+                    titleFor(TYPE_SHIPPED),
+                    bodyFor(order, TYPE_SHIPPED),
+                    shipmentInstant(order).orElse(Instant.now())
+                );
+                recordIfAbsent(
+                    order,
+                    TYPE_OUT_FOR_DELIVERY,
+                    titleFor(TYPE_OUT_FOR_DELIVERY),
+                    bodyFor(order, TYPE_OUT_FOR_DELIVERY),
+                    Instant.now()
+                );
+                break;
+            case "delivery_failed":
+                recordIfAbsent(
+                    order,
+                    TYPE_SHIPPED,
+                    titleFor(TYPE_SHIPPED),
+                    bodyFor(order, TYPE_SHIPPED),
+                    shipmentInstant(order).orElse(Instant.now())
+                );
+                recordIfAbsent(
+                    order,
+                    TYPE_DELIVERY_FAILED,
+                    titleFor(TYPE_DELIVERY_FAILED),
+                    bodyFor(order, TYPE_DELIVERY_FAILED),
+                    Instant.now()
+                );
+                break;
             case "shipped":
                 recordIfAbsent(
                     order,
@@ -219,6 +254,17 @@ public class OrderEventService {
                     }
                     break;
                 case TYPE_SHIPPED:
+                    // ExpressBees reports a real OUT FOR DELIVERY scan; notify on that event instead of pickup.
+                    if (!isExpressBeesShipment(order)) {
+                        notifyBothChannels(
+                            eventType,
+                            order,
+                            () -> orderMailService.sendOutForDelivery(order),
+                            () -> orderSmsService.sendOutForDelivery(order)
+                        );
+                    }
+                    break;
+                case TYPE_OUT_FOR_DELIVERY:
                     notifyBothChannels(
                         eventType,
                         order,
@@ -250,6 +296,14 @@ public class OrderEventService {
                         () -> {}
                     );
                     break;
+                case TYPE_DELIVERY_FAILED:
+                    notifyBothChannels(
+                        eventType,
+                        order,
+                        () -> orderMailService.sendDeliveryFailed(order),
+                        () -> {}
+                    );
+                    break;
                 default:
                     break;
             }
@@ -273,6 +327,10 @@ public class OrderEventService {
         return "cod".equalsIgnoreCase(StringUtils.trimToEmpty(order.getPaymentMethod()));
     }
 
+    private static boolean isExpressBeesShipment(CustomerOrder order) {
+        return order.getShipmentLogisticsMode() == ReturnLogisticsMode.XPRESSBEES;
+    }
+
     private String titleFor(String eventType) {
         switch (eventType) {
             case TYPE_ORDER_PLACED:
@@ -285,8 +343,12 @@ public class OrderEventService {
                 return "Hand-wrapped";
             case TYPE_SHIPPED:
                 return "On the way";
+            case TYPE_OUT_FOR_DELIVERY:
+                return "Out for delivery";
             case TYPE_DELIVERED:
                 return "Delivered";
+            case TYPE_DELIVERY_FAILED:
+                return "Delivery attempt unsuccessful";
             case TYPE_CANCELLED:
                 return "Order cancelled";
             case TYPE_REFUNDED:
@@ -302,7 +364,10 @@ public class OrderEventService {
         if (total != null && total.compareTo(BigDecimal.ZERO) > 0) {
             body.append(" · ₹").append(total.setScale(0, java.math.RoundingMode.HALF_UP).toPlainString());
         }
-        if (TYPE_SHIPPED.equals(eventType) && StringUtils.isNotBlank(order.getTrackingNumber())) {
+        if (
+            (TYPE_SHIPPED.equals(eventType) || TYPE_OUT_FOR_DELIVERY.equals(eventType)) &&
+            StringUtils.isNotBlank(order.getTrackingNumber())
+        ) {
             body.append(" · Tracking ").append(order.getTrackingNumber().trim());
         }
         return body.toString();

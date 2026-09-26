@@ -103,7 +103,7 @@ async function fetchAllAdminUsers(): Promise<StaffUser[]> {
   return all;
 }
 
-function AdminUsersPage() {
+export function AdminUsersPage() {
   const [users, setUsers] = useState<StaffUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeline, setTimeline] = useState<"days" | "weeks">("weeks");

@@ -267,6 +267,26 @@ public class UserResource {
             );
     }
 
+    @PostMapping("/users/{login}/resend-invite")
+    @PreAuthorize("hasAnyAuthority(\"" + AuthoritiesConstants.ADMIN + "\", \"" + AuthoritiesConstants.SUPER_ADMIN + "\")")
+    public Mono<ResponseEntity<Void>> resendInvite(@PathVariable("login") @Pattern(regexp = Constants.LOGIN_REGEX) String login) {
+        LOG.debug("REST request to resend invitation for User: {}", login);
+        return currentActorAuthorities()
+            .<ResponseEntity<Void>>flatMap(actor ->
+                userService.getUserWithAuthoritiesByLogin(login.toLowerCase())
+                    .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)))
+                    .flatMap(user -> {
+                        StaffRoles.requireCanManage(actor, StaffRoles.names(user));
+                        if (user.isActivated() || user.getActivationKey() == null || user.getActivationKey().isBlank()) {
+                            return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "User is already activated"));
+                        }
+                        mailService.sendInvitationEmail(user, StaffRoles.displayName(StaffRoles.primaryRole(StaffRoles.names(user))));
+                        ResponseEntity<Void> response = ResponseEntity.noContent().build();
+                        return Mono.just(response);
+                    })
+            );
+    }
+
     private Mono<Set<String>> currentActorAuthorities() {
         return SecurityUtils.getCurrentUserAuthorities()
             .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "Not authenticated")));

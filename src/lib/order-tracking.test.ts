@@ -42,6 +42,27 @@ describe("order-tracking helpers", () => {
     expect(trackingStatusLabel({ tracking_status: "awaiting_pickup" })).toBe("Waiting for pickup");
   });
 
+  it("maps ExpressBees OUT FOR DELIVERY and Delivered to their own stages", () => {
+    expect(resolveTrackingStage({ tracking_status: "out_for_delivery" })).toBe(3);
+    expect(trackingStatusLabel({ tracking_status: "out_for_delivery" })).toBe("Out for delivery");
+    expect(resolveTrackingStage({ tracking_status: "delivered" })).toBe(4);
+    expect(trackingStatusLabel({ tracking_status: "delivered" })).toBe("Delivered");
+    expect(isTerminalTrackingState({ tracking_status: "out_for_delivery" })).toBe(false);
+    expect(
+      trackingActivityDate({ tracking_status: "out_for_delivery", shipment_date: "2026-08-10", created_at: "2026-08-01" }),
+    ).toEqual({ prefix: "Shipped", value: "2026-08-10" });
+  });
+
+  it("maps delivery_failed to out_for_delivery stage with custom label and detail", () => {
+    expect(resolveTrackingStage({ tracking_status: "delivery_failed" })).toBe(3);
+    expect(trackingStatusLabel({ tracking_status: "delivery_failed" })).toBe("Delivery attempt unsuccessful");
+    expect(trackingActivityTitle({ tracking_status: "delivery_failed" })).toBe("Delivery attempt unsuccessful");
+    expect(isTerminalTrackingState({ tracking_status: "delivery_failed" })).toBe(false);
+    expect(
+      trackingActivityDate({ tracking_status: "delivery_failed", shipment_date: "2026-08-10", created_at: "2026-08-01" }),
+    ).toEqual({ prefix: "Shipped", value: "2026-08-10" });
+  });
+
   it("builds activity titles from tracking_status", () => {
     expect(trackingActivityTitle({ tracking_status: "confirmed" })).toBe("Order confirmed");
     expect(trackingActivityTitle({ tracking_status: "hand_wrapped" })).toBe("Hand-wrapped");

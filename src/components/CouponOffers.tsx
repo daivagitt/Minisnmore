@@ -8,7 +8,8 @@ import {
 } from "@/lib/coupons.functions";
 
 function minOrderLabel(c: ActiveCoupon) {
-  if (c.discount_type === "bogo") {
+  const type = String(c.discount_type ?? "").toLowerCase();
+  if (type === "bogo") {
     return c.min_order > 0 ? `on orders above ₹${c.min_order.toLocaleString("en-IN")}` : "on qualifying cart items";
   }
   return c.min_order > 0 ? `on orders above ₹${c.min_order.toLocaleString("en-IN")}` : "on all orders";

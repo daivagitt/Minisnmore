@@ -20,6 +20,7 @@ vi.mock("@/lib/api", () => ({
 }));
 
 import {
+  calculateBogoDiscount,
   couponEligibilityHint,
   couponValidationData,
   formatCouponOffer,
@@ -161,5 +162,95 @@ describe("coupon functions", () => {
         bogo_get_qty: 1,
       }),
     ).toBe("Buy 2 Get 1 at 50% off");
+  });
+
+  it("calculates BOGO discount using greedy descending pairing with monotonicity", () => {
+    // 4 items: [1200, 1000, 500, 400]
+    // Pair 1: (1200, 1000) -> 1000 free
+    // Pair 2: (500, 400) -> 400 free
+    // Total discount: 1400
+    const res = calculateBogoDiscount(1, 1, 100, null, 3100, [
+      { qty: 1, unitPrice: 1200 },
+      { qty: 1, unitPrice: 1000 },
+      { qty: 1, unitPrice: 500 },
+      { qty: 1, unitPrice: 400 },
+    ]);
+    expect(res.eligible).toBe(true);
+    expect(res.discount).toBe(1400);
+    expect(res.appliedGroups).toBe(2);
+    expect(res.nextTierMissing).toBe(0);
+
+    // Monotonicity: adding an inexpensive accessory (200) does not reduce the 1000 discount
+    const withoutAcc = calculateBogoDiscount(1, 1, 100, null, 2200, [
+      { qty: 1, unitPrice: 1200 },
+      { qty: 1, unitPrice: 1000 },
+    ]);
+    expect(withoutAcc.discount).toBe(1000);
+
+    const withAcc = calculateBogoDiscount(1, 1, 100, null, 2400, [
+      { qty: 1, unitPrice: 1200 },
+      { qty: 1, unitPrice: 1000 },
+      { qty: 1, unitPrice: 200 },
+    ]);
+    expect(withAcc.discount).toBe(1000);
+    expect(withAcc.appliedGroups).toBe(1);
+    expect(withAcc.nextTierMissing).toBe(1);
+  });
+
+  it("calculates Buy 2 Get 1 with partial percent off and cap", () => {
+    const res = calculateBogoDiscount(2, 1, 50, 300, 2700, [
+      { qty: 1, unitPrice: 1000 },
+      { qty: 1, unitPrice: 900 },
+      { qty: 1, unitPrice: 800 },
+    ]);
+    // 50% of 800 = 400, but capped at maxDiscount 300
+    expect(res.eligible).toBe(true);
+    expect(res.discount).toBe(300);
+    expect(res.nextTierMissing).toBe(0);
+  });
+
+  it("clamps negative maxDiscount to 0 without producing negative discount", () => {
+    const res = calculateBogoDiscount(1, 1, 100, -100, 2000, [
+      { qty: 1, unitPrice: 1000 },
+      { qty: 1, unitPrice: 1000 },
+    ]);
+    expect(res.discount).toBe(0);
+  });
+
+  it("caps massive cart to MAX_TOTAL_UNITS safely", () => {
+    const res = calculateBogoDiscount(1, 1, 100, null, 500000, [
+      { qty: 500, unitPrice: 100 },
+      { qty: 500, unitPrice: 100 },
+      { qty: 500, unitPrice: 100 },
+      { qty: 500, unitPrice: 100 },
+    ]);
+    expect(res.eligible).toBe(true);
+    expect(res.appliedGroups).toBe(1000); // 2000 / 2 = 1000
+  });
+
+  it("handles BOGO validate response with nudge and bogo_details", async () => {
+    postMock.mockResolvedValueOnce({
+      ok: true,
+      code: "BOGO1",
+      discount: 500,
+      nudge: "Add 1 more item to get 1 more free item!",
+      bogo_details: "Buy 1 Get 1 Free applied (1 free item)",
+    });
+
+    const res = await validateCoupon({
+      data: {
+        code: "BOGO1",
+        subtotal: 1500,
+        items: [{ qty: 3, price: 500 }],
+      },
+    });
+
+    expect(res).toEqual({
+      ok: true,
+      code: "BOGO1",
+      discount: 500,
+      nudge: "Add 1 more item to get 1 more free item!",
+      bogo_details: "Buy 1 Get 1 Free applied (1 free item)",
+    });
   });
 });

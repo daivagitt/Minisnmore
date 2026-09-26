@@ -193,6 +193,16 @@ function ReturnsPage() {
                 {r.rejection_reason ? (
                   <p className="text-xs text-amber-700 mt-1">{r.rejection_reason}</p>
                 ) : null}
+                {r.outbound_tracking_url ? (
+                  <a
+                    href={r.outbound_tracking_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-primary underline mt-1 inline-block"
+                  >
+                    Track replacement shipment{r.outbound_awb ? ` (AWB ${r.outbound_awb})` : ""}
+                  </a>
+                ) : null}
               </div>
               {r.status === "requested" ? (
                 <button

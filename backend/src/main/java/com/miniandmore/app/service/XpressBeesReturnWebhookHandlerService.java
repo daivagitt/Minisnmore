@@ -185,9 +185,19 @@ public class XpressBeesReturnWebhookHandlerService {
         String normalized = normalizeStatus(providerStatus);
         OrderReturnStatus current = orderReturn.getStatus();
         return switch (normalized) {
-            case "shipped", "in_transit", "dispatched", "out_for_delivery", "picked", "manifested" -> {
+            case "shipped", "in_transit", "dispatched", "picked", "manifested" -> {
                 if (current == OrderReturnStatus.READY_TO_SHIP) {
                     orderReturnService.markShipped(orderReturn.getReturnNumber(), "ExpressBees: " + providerStatus);
+                }
+                yield OrderReturnStatus.SHIPPED.name().toLowerCase(Locale.ROOT);
+            }
+            case "out_for_delivery", "ofd" -> {
+                if (current == OrderReturnStatus.READY_TO_SHIP) {
+                    orderReturnService.markShipped(orderReturn.getReturnNumber(), "ExpressBees: " + providerStatus);
+                }
+                // Once-only: prior completed OFD webhooks already notified (mirrors order_event insertIfAbsent).
+                if (!webhookEventRepository.existsCompletedOutForDeliveryEvent(orderReturn.getReturnNumber())) {
+                    orderReturnService.notifyExchangeOutForDelivery(orderReturn.getReturnNumber());
                 }
                 yield OrderReturnStatus.SHIPPED.name().toLowerCase(Locale.ROOT);
             }

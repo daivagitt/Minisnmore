@@ -24,15 +24,15 @@ public class SecurityConfiguration {
                     .requestMatchers(HttpMethod.POST, "/api/v1/coupons/validate").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/coupons/active").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/orders/track/**").permitAll()
-                    .requestMatchers("/api/v1/admin/order-returns/**").hasAuthority(AuthoritiesConstants.ADMIN)
-                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/orders/**")
+                    .requestMatchers("/api/v1/admin/order-returns/**").hasAnyAuthority(AuthoritiesConstants.SUPER_ADMIN, AuthoritiesConstants.ADMIN)
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/orders", "/api/v1/admin/orders/**")
                     .hasAnyAuthority(
                         AuthoritiesConstants.SUPER_ADMIN,
                         AuthoritiesConstants.ADMIN,
                         AuthoritiesConstants.OPERATIONS,
                         AuthoritiesConstants.CUSTOMER_SUPPORT
                     )
-                    .requestMatchers("/api/v1/admin/orders/**")
+                    .requestMatchers("/api/v1/admin/orders", "/api/v1/admin/orders/**")
                     .hasAnyAuthority(
                         AuthoritiesConstants.SUPER_ADMIN,
                         AuthoritiesConstants.ADMIN,

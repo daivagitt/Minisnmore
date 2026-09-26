@@ -484,7 +484,7 @@ function AdminReturnsPage() {
               },
               () => {
                 setBookPickupTarget(r.return_number);
-                setPickupMode("manual");
+                setPickupMode("xpressbees");
                 setPickupCarrier("");
                 setPickupAwb("");
                 setPickupTrackingUrl("");

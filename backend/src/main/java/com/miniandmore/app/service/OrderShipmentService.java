@@ -159,7 +159,7 @@ public class OrderShipmentService {
             XpressBeesClient.ForwardShipmentResult result = xpressBeesClient.createForwardShipment(
                 buildForwardShipmentRequest(order, preAssignedAwb)
             );
-            String tracking = StringUtils.defaultIfBlank(result.trackingUrl(), xpressBeesClient.buildTrackingUrl(result.awb()));
+            String tracking = StringUtils.defaultIfBlank(xpressBeesClient.buildTrackingUrl(result.awb()), result.trackingUrl());
             applyShipment(
                 order,
                 ReturnLogisticsMode.XPRESSBEES,
@@ -292,9 +292,16 @@ public class OrderShipmentService {
         if (order.getStatus() == OrderStatus.CANCELLED || order.getShipmentCancelledAt() != null) {
             return order;
         }
-        String normalized = XpressBeesShipmentStatus.normalize(providerStatus);
+        String incoming = XpressBeesShipmentStatus.normalize(providerStatus);
+        String current = XpressBeesShipmentStatus.normalize(order.getShipmentCarrierStatus());
+        // Keep OFD sticky against weaker hub/in-transit scans so tracking does not regress to "On the way".
+        String normalized = preferCarrierStatus(current, incoming);
         order.setShipmentCarrierStatus(normalized);
-        if (XpressBeesShipmentStatus.isPickedUpOrInTransit(normalized) && StringUtils.isBlank(order.getShipmentDate())) {
+        boolean leftWarehouse =
+            XpressBeesShipmentStatus.isPickedUpOrInTransit(normalized) ||
+            XpressBeesShipmentStatus.isOutForDelivery(normalized) ||
+            XpressBeesShipmentStatus.isUndelivered(normalized);
+        if (leftWarehouse && StringUtils.isBlank(order.getShipmentDate())) {
             order.setShipmentDate(LocalDate.now(INDIA).toString());
         }
         if (XpressBeesShipmentStatus.isDelivered(normalized) && canMarkDelivered(order)) {
@@ -304,6 +311,30 @@ public class OrderShipmentService {
             }
         }
         return persist(order);
+    }
+
+    /**
+     * Carrier scans are not always monotonic. Once the parcel is out for delivery, ignore weaker
+     * in-transit/hub updates so the customer tracker does not fall back to "On the way".
+     * Undelivered and delivered always win; undelivered may later advance to OFD on reattempt.
+     */
+    static String preferCarrierStatus(String current, String incoming) {
+        if (StringUtils.isBlank(incoming)) {
+            return current;
+        }
+        if (XpressBeesShipmentStatus.isDelivered(incoming) || XpressBeesShipmentStatus.isDelivered(current)) {
+            return XpressBeesShipmentStatus.isDelivered(incoming) ? incoming : current;
+        }
+        if (XpressBeesShipmentStatus.isOutForDelivery(current)) {
+            if (
+                XpressBeesShipmentStatus.isOutForDelivery(incoming) ||
+                XpressBeesShipmentStatus.isUndelivered(incoming)
+            ) {
+                return incoming;
+            }
+            return current;
+        }
+        return incoming;
     }
 
     public boolean isExpressBeesTrackingFresh(CustomerOrder order) {

@@ -299,6 +299,25 @@ class OrderShipmentServiceTest {
     }
 
     @Test
+    void applyProviderStatus_outForDeliveryStaysStickyAgainstWeakerScans() {
+        CustomerOrder order = confirmedPaid()
+            .trackingNumber("XB-1")
+            .shipmentLogisticsMode(ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("out_for_delivery")
+            .shipmentDate("2026-09-20");
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        CustomerOrder afterHub = orderShipmentService.applyProviderStatus(order, "Reached at nearest hub");
+        assertThat(afterHub.getShipmentCarrierStatus()).isEqualTo("out_for_delivery");
+
+        CustomerOrder afterFail = orderShipmentService.applyProviderStatus(order, "undelivered");
+        assertThat(afterFail.getShipmentCarrierStatus()).isEqualTo("undelivered");
+
+        CustomerOrder afterReattempt = orderShipmentService.applyProviderStatus(order, "OUT FOR DELIVERY");
+        assertThat(afterReattempt.getShipmentCarrierStatus()).isEqualTo("out_for_delivery");
+    }
+
+    @Test
     void applyProviderStatus_pickupSetsShipmentDateWithoutFulfilling() {
         CustomerOrder order = confirmedPaid()
             .trackingNumber("XB-1")

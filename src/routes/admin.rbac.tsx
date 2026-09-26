@@ -30,6 +30,7 @@ type StaffUser = {
   lastName?: string | null;
   email?: string | null;
   activated: boolean;
+  pendingInvite?: boolean;
   authorities?: string[];
   createdDate?: string | null;
 };
@@ -121,10 +122,23 @@ function AdminRbacPage() {
         },
         { auth: true, unwrap: false },
       );
-      toast.success("User updated");
+      if (patch.activated !== undefined) {
+        toast.success(patch.activated ? "User activated" : "User deactivated");
+      } else {
+        toast.success("User updated");
+      }
       await load();
     } catch (error) {
-      showApiError(error, "Could not update user");
+      showApiError(error, patch.activated !== undefined ? (patch.activated ? "Could not activate user" : "Could not deactivate user") : "Could not update user");
+    }
+  };
+
+  const resendInvite = async (user: StaffUser) => {
+    try {
+      await api.post(`/api/admin/users/${encodeURIComponent(user.login)}/resend-invite`, {}, { auth: true, unwrap: false });
+      toast.success(`Invitation resent to ${user.email}`);
+    } catch (error) {
+      showApiError(error, "Could not resend invitation");
     }
   };
 
@@ -216,18 +230,48 @@ function AdminRbacPage() {
                           )}
                         </td>
                         <td className="px-3 py-2">{formatOrderDate(user.createdDate)}</td>
-                        <td className="px-3 py-2">{user.activated ? "Active" : "Pending"}</td>
                         <td className="px-3 py-2">
-                          {manageable && user.activated ? (
-                            <button
-                              type="button"
-                              className="rounded-full border border-border px-3 py-1 text-xs"
-                              onClick={() => void saveUser(user, { activated: false })}
-                            >
-                              Deactivate
-                            </button>
-                          ) : manageable ? (
-                            <span className="text-xs text-muted-foreground">Waiting for invite</span>
+                          {user.activated ? (
+                            <span className="rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 px-2.5 py-0.5 text-xs font-semibold">
+                              Active
+                            </span>
+                          ) : user.pendingInvite ? (
+                            <span className="rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 px-2.5 py-0.5 text-xs font-semibold">
+                              Pending invite
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-red-100 text-red-800 dark:bg-red-950/80 dark:text-red-300 px-2.5 py-0.5 text-xs font-semibold">
+                              Deactivated
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          {manageable ? (
+                            user.activated ? (
+                              <button
+                                type="button"
+                                className="rounded-full border border-red-200 dark:border-red-900/60 bg-red-50/60 dark:bg-red-950/30 text-red-700 dark:text-red-300 hover:bg-red-100 px-3 py-1 text-xs font-medium transition"
+                                onClick={() => void saveUser(user, { activated: false })}
+                              >
+                                Deactivate
+                              </button>
+                            ) : user.pendingInvite ? (
+                              <button
+                                type="button"
+                                className="rounded-full border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-200 hover:bg-amber-50 dark:hover:bg-amber-950/40 px-3 py-1 text-xs font-medium transition"
+                                onClick={() => void resendInvite(user)}
+                              >
+                                Resend invite
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="rounded-full border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 px-3 py-1 text-xs font-medium transition"
+                                onClick={() => void saveUser(user, { activated: true })}
+                              >
+                                Activate
+                              </button>
+                            )
                           ) : (
                             "—"
                           )}

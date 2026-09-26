@@ -136,8 +136,7 @@ public final class ZohoOrderStatus {
         if (order.getStatus() != OrderStatus.CONFIRMED) {
             return;
         }
-        String trackingStatus = OrderTrackingStatusResolver.resolve(order);
-        if ("shipped".equals(trackingStatus) || "delivered".equals(trackingStatus)) {
+        if (OrderTrackingStatusResolver.isDispatched(OrderTrackingStatusResolver.resolve(order))) {
             return;
         }
         order.setStatus(OrderStatus.HAND_WRAPPED);

@@ -559,6 +559,16 @@ function OrderDetail() {
                     <span className="font-medium">{r.request_type === "exchange" ? "Exchange" : "Return"}</span>{" "}
                     <span className="text-muted-foreground">{r.return_number}</span>
                     {r.product_name ? <span className="text-muted-foreground"> · {r.product_name}</span> : null}
+                    {r.outbound_tracking_url ? (
+                      <a
+                        href={r.outbound_tracking_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block text-xs text-primary underline mt-1"
+                      >
+                        Track replacement shipment
+                      </a>
+                    ) : null}
                   </div>
                   <span className="self-start sm:self-auto shrink-0 text-[10px] uppercase tracking-wider rounded-full px-3 py-1 bg-amber-500/15 text-amber-700">
                     {r.status.replace(/_/g, " ")}

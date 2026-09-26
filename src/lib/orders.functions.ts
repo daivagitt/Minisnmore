@@ -246,6 +246,8 @@ export type OrderReturnRow = {
   replacement_item_amount?: number | null;
   price_difference?: number | null;
   settlement_status?: string | null;
+  outbound_awb?: string | null;
+  outbound_tracking_url?: string | null;
   items?: OrderReturnLine[];
 };
 
@@ -647,6 +649,20 @@ export type AdminCodOrderRow = {
   city?: string;
 };
 
+export type AdminOrderItem = {
+  id?: number;
+  product_id?: string | number;
+  product_slug?: string;
+  product_name?: string;
+  product_image?: string;
+  size?: string;
+  color?: string;
+  sku?: string;
+  qty?: number;
+  price?: number;
+  mrp?: number;
+};
+
 export type AdminOrderRow = AdminCodOrderRow & {
   tracking_status?: string;
   tracking_number?: string;
@@ -686,6 +702,7 @@ export type AdminOrderRow = AdminCodOrderRow & {
   ledgerly_sales_order_id: string;
   ledgerly_invoice_id: string;
   ledgerly_sync_eligible: boolean;
+  order_items?: AdminOrderItem[];
 };
 
 export type AdminOrderList = {

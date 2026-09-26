@@ -14,6 +14,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { SubscribeOptIn } from "@/components/SubscribeOptIn";
 import loginHero from "@/assets/hero-smiling-baby.jpg";
 
+
 const Search = z.object({
   redirect: z.string().optional(),
   error: z.string().optional(),
@@ -55,7 +56,9 @@ export function LoginPage() {
   const oauthErrorShown = useRef(false);
 
   useEffect(() => {
-    if (!loading && user) nav({ to: afterLogin as any });
+    if (!loading && user) {
+      void nav({ to: afterLogin as any });
+    }
   }, [user, loading, nav, afterLogin]);
 
   useEffect(() => {

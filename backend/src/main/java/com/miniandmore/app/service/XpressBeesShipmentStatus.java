@@ -51,13 +51,30 @@ public final class XpressBeesShipmentStatus {
         return DELIVERED.contains(normalize(status));
     }
 
+    public static boolean isOutForDelivery(String status) {
+        String normalized = normalize(status);
+        return normalized.equals("ofd") || normalized.contains("out_for_delivery");
+    }
+
+    public static boolean isUndelivered(String status) {
+        String normalized = normalize(status);
+        return normalized.contains("undelivered")
+            || normalized.contains("not_delivered")
+            || normalized.contains("delivery_failed")
+            || normalized.contains("failed_delivery");
+    }
+
     public static boolean isPickedUpOrInTransit(String status) {
         String normalized = normalize(status);
-        if (normalized.isBlank() || isAwaitingPickup(normalized) || isDelivered(normalized)) {
+        // Exclusive buckets: OFD / undelivered / delivered are never "in transit".
+        if (
+            normalized.isBlank() ||
+            isAwaitingPickup(normalized) ||
+            isDelivered(normalized) ||
+            isOutForDelivery(normalized) ||
+            isUndelivered(normalized)
+        ) {
             return false;
-        }
-        if (normalized.contains("undelivered") || normalized.contains("failed")) {
-            return true;
         }
         return (
             normalized.contains("picked") ||
@@ -65,8 +82,6 @@ public final class XpressBeesShipmentStatus {
             normalized.contains("hub") ||
             normalized.contains("dispatched") ||
             normalized.contains("shipped") ||
-            normalized.contains("ofd") ||
-            normalized.contains("out_for_delivery") ||
             normalized.contains("manifested") ||
             normalized.contains("rto")
         );

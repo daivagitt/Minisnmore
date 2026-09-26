@@ -49,7 +49,12 @@ export type CartItem = {
   unitPrice: number;
 };
 
-export type AppliedCoupon = { code: string; discount: number };
+export type AppliedCoupon = {
+  code: string;
+  discount: number;
+  nudge?: string | null;
+  bogoDetails?: string | null;
+};
 
 type ShopState = {
   cart: CartItem[];
@@ -118,7 +123,9 @@ function coerceCoupon(raw: unknown): AppliedCoupon | null {
   const row = raw as Partial<AppliedCoupon>;
   if (typeof row.code !== "string" || !row.code.trim()) return null;
   const discount = typeof row.discount === "number" && Number.isFinite(row.discount) ? row.discount : 0;
-  return { code: row.code, discount };
+  const nudge = typeof row.nudge === "string" && row.nudge.trim() ? row.nudge.trim() : undefined;
+  const bogoDetails = typeof row.bogoDetails === "string" && row.bogoDetails.trim() ? row.bogoDetails.trim() : undefined;
+  return { code: row.code, discount, nudge, bogoDetails };
 }
 
 function normalizeCartItem(raw: CartItem): CartItem {

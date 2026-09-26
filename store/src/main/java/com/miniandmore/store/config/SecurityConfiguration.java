@@ -26,8 +26,8 @@ public class SecurityConfiguration {
                 auth
                     .requestMatchers("/management/health", "/management/health/**", "/management/info").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/admin/products", "/api/v1/admin/products/**")
-                    .hasAnyAuthority(AuthoritiesConstants.ADMIN, AuthoritiesConstants.SALES)
-                    .requestMatchers("/api/v1/admin/**").hasAuthority(AuthoritiesConstants.ADMIN)
+                    .hasAnyAuthority(AuthoritiesConstants.ADMIN, AuthoritiesConstants.SUPER_ADMIN, AuthoritiesConstants.SALES)
+                    .requestMatchers("/api/v1/admin/**").hasAnyAuthority(AuthoritiesConstants.ADMIN, AuthoritiesConstants.SUPER_ADMIN)
                     .requestMatchers("/api/v1/**").permitAll()
                     .anyRequest().authenticated()
             )

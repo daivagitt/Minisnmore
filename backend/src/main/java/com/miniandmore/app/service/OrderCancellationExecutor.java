@@ -85,8 +85,7 @@ public class OrderCancellationExecutor {
         if (order.getStatus() == OrderStatus.FULFILLED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This order has already been dispatched and can no longer be cancelled");
         }
-        String trackingStatus = OrderTrackingStatusResolver.resolve(order);
-        if ("shipped".equals(trackingStatus) || "delivered".equals(trackingStatus)) {
+        if (OrderTrackingStatusResolver.isDispatched(OrderTrackingStatusResolver.resolve(order))) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This order has already been dispatched and can no longer be cancelled");
         }
     }

@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mini's n More — Customer, Admin & Delivery wireframes</title>
+  <style>
+    :root {
+      --ink: #2b2428;
+      --muted: #6d6468;
+      --line: #d8d0d3;
+      --paper: #f6f2f0;
+      --white: #fff;
+      --accent: #8b4557;
+      --accent-soft: #f3e6ea;
+      --ok: #2f6b4f;
+      --ok-soft: #e6f3ec;
+      --warn: #8a5a16;
+      --warn-soft: #f8eedd;
+      --info: #3d5a73;
+      --info-soft: #e7eef4;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 14px/1.45 "Segoe UI", system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+    }
+    header.app {
+      position: sticky; top: 0; z-index: 20;
+      background: var(--white);
+      border-bottom: 1px solid var(--line);
+      padding: 12px 20px;
+      display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+    }
+    header.app h1 { font-size: 16px; margin: 0; font-weight: 650; }
+    header.app p { margin: 0; color: var(--muted); font-size: 12px; }
+    .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+    .tabs button, .flow-nav button, .screen-nav button {
+      border: 1px solid var(--line);
+      background: var(--white);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font: inherit;
+    }
+    .tabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    main { display: grid; grid-template-columns: 280px 1fr 300px; min-height: calc(100vh - 58px); }
+    @media (max-width: 1100px) { main { grid-template-columns: 1fr; } .aside { border-right: 0; border-bottom: 1px solid var(--line); } }
+    .aside, .notes {
+      background: var(--white);
+      padding: 16px;
+    }
+    .aside { border-right: 1px solid var(--line); }
+    .notes { border-left: 1px solid var(--line); }
+    .aside h2, .notes h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; }
+    .flow-nav, .screen-nav { display: flex; flex-direction: column; gap: 6px; }
+    .flow-nav button, .screen-nav button { border-radius: 8px; text-align: left; }
+    .flow-nav button.active, .screen-nav button.active { border-color: var(--accent); background: var(--accent-soft); }
+    .stage { padding: 24px; display: flex; flex-direction: column; gap: 16px; align-items: center; }
+    .caption { width: min(920px, 100%); }
+    .caption h3 { margin: 0 0 4px; font-size: 18px; }
+    .caption p { margin: 0; color: var(--muted); }
+    .frame-phone {
+      width: 360px; min-height: 640px;
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      padding: 12px 12px 20px;
+      box-shadow: 0 0 0 8px #efe8ea;
+    }
+    .frame-desk {
+      width: min(920px, 100%);
+      min-height: 560px;
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+    }
+    .chrome {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 4px 12px; font-size: 12px; color: var(--muted);
+    }
+    .logo { font-weight: 700; color: var(--accent); letter-spacing: .04em; }
+    .block { border: 1px dashed var(--line); border-radius: 10px; padding: 10px; margin: 8px 0; }
+    .hero { height: 120px; background: var(--accent-soft); border-radius: 12px; display: grid; place-items: center; color: var(--accent); font-weight: 600; }
+    .row { display: flex; gap: 8px; }
+    .row > * { flex: 1; }
+    .tile { height: 72px; background: #f3eeef; border-radius: 10px; display: grid; place-items: center; font-size: 12px; text-align: center; padding: 6px; }
+    .btn {
+      display: block; width: 100%; text-align: center; border: 0; border-radius: 999px;
+      padding: 10px; margin-top: 8px; background: var(--accent); color: #fff; cursor: pointer; font: inherit;
+    }
+    .btn.ghost { background: var(--white); color: var(--ink); border: 1px solid var(--line); }
+    .btn.warn { background: var(--warn); }
+    .btn.ok { background: var(--ok); }
+    .pill { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--info-soft); color: var(--info); }
+    .pill.ok { background: var(--ok-soft); color: var(--ok); }
+    .pill.warn { background: var(--warn-soft); color: var(--warn); }
+    .pill.accent { background: var(--accent-soft); color: var(--accent); }
+    .list { display: flex; flex-direction: column; gap: 8px; }
+    .item { border: 1px solid var(--line); border-radius: 10px; padding: 10px; cursor: pointer; }
+    .item:hover { border-color: var(--accent); }
+    .muted { color: var(--muted); font-size: 12px; }
+    .steps { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin: 10px 0 16px; }
+    .steps span { flex: 1; text-align: center; position: relative; }
+    .steps span.on { color: var(--accent); font-weight: 650; }
+    .desk-bar { display: flex; border-bottom: 1px solid var(--line); }
+    .desk-nav { width: 180px; border-right: 1px solid var(--line); padding: 12px; font-size: 12px; }
+    .desk-nav div { padding: 6px 8px; border-radius: 6px; margin-bottom: 2px; }
+    .desk-nav .on { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+    .desk-body { flex: 1; padding: 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 550; }
+    .notes ul { margin: 0; padding-left: 16px; color: var(--muted); }
+    .notes li { margin: 0 0 8px; }
+    .hidden { display: none; }
+    .callout { background: var(--warn-soft); border-radius: 8px; padding: 8px 10px; font-size: 12px; }
+    .timeline { border-left: 2px solid var(--line); margin: 8px 0 0 8px; padding-left: 12px; }
+    .timeline div { margin: 0 0 10px; }
+    .timeline .now { color: var(--accent); font-weight: 650; }
+    a.link { color: var(--accent); cursor: pointer; text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header class="app">
+    <div>
+      <h1>Journey wireframes for the call</h1>
+      <p>Discussion deck · Mini's n More · Customer · Admin · Delivery · lo-fi, not visual design · <a href="/reports/">UAT reports</a> · <a href="../../report.html">Repo dashboard</a></p>
+    </div>
+    <div class="tabs" id="journeyTabs"></div>
+  </header>
+  <main>
+    <aside class="aside">
+      <h2>Screens</h2>
+      <div class="screen-nav" id="screenNav"></div>
+    </aside>
+    <section class="stage">
+      <div class="caption">
+        <h3 id="screenTitle"></h3>
+        <p id="screenBlurb"></p>
+      </div>
+      <div id="canvas"></div>
+    </section>
+    <aside class="notes">
+      <h2>Talking points</h2>
+      <div id="talking"></div>
+    </aside>
+  </main>
+
+  <script>
+    const journeys = {
+      customer: {
+        label: "Customer",
+        screens: [
+          {
+            id: "c-home",
+            title: "Shop home",
+            blurb: "Discover → shop. Entry to browse, gift, and track.",
+            talk: ["Keep this as current storefront; no ops actions here.", "Track order is public (no login)."],
+            html: phone(`
+              <div class="chrome"><span class="logo">MINI'S N MORE</span><span>Bag (0)</span></div>
+              <div class="hero">Newborn edit</div>
+              <div class="row">
+                <div class="tile">0–3 m</div><div class="tile">3–6 m</div><div class="tile">Gifts</div>
+              </div>
+              <div class="block">Featured product · From ₹1,890</div>
+              <button class="btn" data-go="c-pdp">Shop the look</button>
+              <button class="btn ghost" data-go="c-track">Track an order</button>
+            `)
+          },
+          {
+            id: "c-pdp",
+            title: "Product detail",
+            blurb: "Choose size/colour, add to bag. Stock shown locally.",
+            talk: ["Out of stock blocks add-to-cart.", "Pre-order products (if enabled) show promised window."],
+            html: phone(`
+              <div class="chrome"><span data-go="c-home" class="link">← Shop</span><span>Bag (1)</span></div>
+              <div class="hero">Product photo</div>
+              <strong>Hand-block muslin wrap</strong>
+              <div class="muted">₹2,490 · Size 0–3m · Ivory</div>
+              <div class="row" style="margin-top:8px"><div class="tile">0–3m</div><div class="tile">3–6m</div></div>
+              <button class="btn" data-go="c-cart">Add to bag</button>
+            `)
+          },
+          {
+            id: "c-cart",
+            title: "Bag",
+            blurb: "Review items, coupon, gift wrap intent, go to checkout.",
+            talk: ["Coupon / storewide discount applied here.", "Address collected at checkout."],
+            html: phone(`
+              <div class="chrome"><span class="logo">Your bag</span><span>1 item</span></div>
+              <div class="item"><strong>Muslin wrap</strong><div class="muted">Ivory · 0–3m · ₹2,490</div></div>
+              <div class="block muted">Coupon code</div>
+              <div class="muted">Subtotal ₹2,490 · Shipping calculated next</div>
+              <button class="btn" data-go="c-checkout">Checkout</button>
+            `)
+          },
+          {
+            id: "c-checkout",
+            title: "Checkout",
+            blurb: "Address, prepaid Razorpay or COD. Place order creates the local order.",
+            talk: ["Online: status PENDING until payment verified.", "COD: CONFIRMED immediately; payment stays Pay on delivery.", "Inventory hold ~30 min for unpaid online."],
+            html: phone(`
+              <div class="chrome"><span class="logo">Checkout</span></div>
+              <div class="block"><strong>Deliver to</strong><div class="muted">Priya · Indiranagar, Bengaluru 560038</div></div>
+              <div class="item"><span class="pill accent">Prepaid</span> Razorpay</div>
+              <div class="item"><span class="pill warn">COD</span> Pay on delivery + fee</div>
+              <div class="muted">Total ₹2,490</div>
+              <button class="btn" data-go="c-confirm">Pay & place order</button>
+              <button class="btn ghost" data-go="c-confirm">Place COD order</button>
+            `)
+          },
+          {
+            id: "c-confirm",
+            title: "Order placed",
+            blurb: "Confirmation + what happens next. Email/SMS fired.",
+            talk: ["Customer-facing label: Paid · Order confirmed (prepaid) or Pay on delivery · Order confirmed (COD)."],
+            html: phone(`
+              <div class="chrome"><span class="logo">Thank you</span></div>
+              <div class="hero">Order MNM-10482</div>
+              <span class="pill ok">Paid · Order confirmed</span>
+              <p class="muted">We'll hand-wrap this and share tracking once the courier picks up.</p>
+              <button class="btn" data-go="c-order">View order</button>
+              <button class="btn ghost" data-go="c-track">Track</button>
+            `)
+          },
+          {
+            id: "c-order",
+            title: "Account · order detail",
+            blurb: "Status, items, cancel (pre-dispatch), return/exchange (after delivery).",
+            talk: ["Cancel only before courier handover.", "Return/exchange after Delivered, within 7 days, paid orders.", "Pending cancellation shows as a banner; customer can withdraw."],
+            html: phone(`
+              <div class="chrome"><span class="logo">Order MNM-10482</span></div>
+              <span class="pill">Hand-wrapped</span>
+              <div class="timeline">
+                <div>Confirmed</div>
+                <div class="now">Hand-wrapped</div>
+                <div class="muted">Waiting for pickup</div>
+                <div class="muted">On the way</div>
+                <div class="muted">Delivered</div>
+              </div>
+              <div class="item">Muslin wrap · ₹2,490</div>
+              <button class="btn ghost" data-go="c-cancel">Request cancellation</button>
+              <p class="muted">Return & exchange unlock after delivery.</p>
+              <button class="btn" data-go="c-track">Open tracking</button>
+            `)
+          },
+          {
+            id: "c-track",
+            title: "Track order (public)",
+            blurb: "Order number only. Delivery progress, not integration health.",
+            talk: ["Labels: Awaiting payment → Confirmed → Hand-wrapped → Waiting for pickup → On the way → Delivered.", "Booked AWB is not yet On the way — pickup scan is."],
+            html: phone(`
+              <div class="chrome"><span class="logo">Track</span></div>
+              <div class="block">Order ID MNM-10482</div>
+              <span class="pill accent">On the way</span>
+              <div class="muted">XpressBees · AWB XB123456789</div>
+              <div class="timeline">
+                <div>Confirmed</div>
+                <div>Hand-wrapped</div>
+                <div>Picked up</div>
+                <div class="now">Out for delivery</div>
+                <div class="muted">Delivered</div>
+              </div>
+              <button class="btn ghost" data-go="c-order">Open in account</button>
+            `)
+          },
+          {
+            id: "c-cancel",
+            title: "Cancel request",
+            blurb: "Reason required. Goes to admin queue unless auto-approve is later enabled.",
+            talk: ["If shipped/delivered: block and point to return.", "Notify: requested / approved+refund / rejected."],
+            html: phone(`
+              <div class="chrome"><span data-go="c-order" class="link">← Order</span></div>
+              <strong>Request cancellation</strong>
+              <p class="muted">We'll pause dispatch until the team reviews.</p>
+              <div class="block">Reason (required)<br/>Changed my mind</div>
+              <button class="btn warn" data-go="c-cancel-pending">Submit request</button>
+            `)
+          },
+          {
+            id: "c-cancel-pending",
+            title: "Cancellation pending",
+            blurb: "Customer waits. Can withdraw before admin acts.",
+            talk: ["Admin: approve → stop fulfilment, refund prepaid, release stock.", "Reject → order continues."],
+            html: phone(`
+              <div class="chrome"><span class="logo">MNM-10482</span></div>
+              <span class="pill warn">Cancellation requested</span>
+              <p class="muted">We'll email you when it's approved or if we need to keep preparing the gift.</p>
+              <button class="btn ghost">Withdraw request</button>
+            `)
+          },
+          {
+            id: "c-delivered",
+            title: "Order detail · Returns & exchange",
+            blurb: "This is how it shows today on /account/orders/{order}. Only if the order is Paid.",
+            talk: [
+              "Built in the live storefront — not a future mock.",
+              "Hidden until payment_status is paid (COD must be collected first).",
+              "If eligible (delivered + return window): Start a return. Per-line Exchange sits on each item.",
+              "If not eligible: grey copy from the API, e.g. not delivered yet / window closed.",
+            ],
+            html: phone(`
+              <div class="chrome"><span class="logo">MNM-10482</span></div>
+              <span class="pill ok">Paid · Delivered</span>
+              <div class="block" style="margin-top:10px"><strong>Delivery tracking</strong><div class="muted">Delivered</div></div>
+              <div class="block">
+                <strong>Returns &amp; exchange</strong>
+                <p class="muted">Shows only on paid orders. Window is the configured days from delivery (docs: 7; UI reads the server value).</p>
+                <button class="btn" data-go="c-return">Start a return</button>
+              </div>
+              <div class="item">Muslin wrap · 0–3m Ivory · ×1
+                <button class="btn ghost" data-go="c-exchange">Exchange</button>
+              </div>
+            `)
+          },
+          {
+            id: "c-return",
+            title: "Return dialog",
+            blurb: "Modal on the order: qty per line + reason (min 10 characters).",
+            talk: [
+              "Qty 0–ordered quantity per line. Whole-order or partial.",
+              "Submit creates a return case (RET-…) at status requested.",
+              "No refund, restock, or pickup yet — admin must approve first.",
+            ],
+            html: phone(`
+              <div class="chrome"><span data-go="c-delivered" class="link">← Order</span></div>
+              <strong>Request a return</strong>
+              <div class="item">Muslin wrap · 0–3m Ivory <span class="muted">Qty 1</span></div>
+              <div class="block">Why are you returning this order?<br/><span class="muted">Size too small for the baby</span></div>
+              <button class="btn" data-go="c-return-on-order">Submit return request</button>
+            `)
+          },
+          {
+            id: "c-return-on-order",
+            title: "After submit · on the order",
+            blurb: "Start a return is replaced by a case card + status pill.",
+            talk: [
+              "Pill is the raw status with underscores turned into spaces, uppercase: REQUESTED, APPROVED, PICKUP SCHEDULED…",
+              "No separate reverse-tracking timeline on the order yet — customer is pointed to My returns.",
+              "Friendly labels from the spec (Pickup scheduled, Item collected) are not wired in the customer UI yet. Call item if we want that polish.",
+            ],
+            html: phone(`
+              <div class="chrome"><span class="logo">MNM-10482</span></div>
+              <div class="block">
+                <strong>Returns &amp; exchange</strong>
+                <div class="item">
+                  Return RET-2201 · Muslin wrap
+                  <span class="pill warn">REQUESTED</span>
+                </div>
+                <span class="link" data-go="c-return-status">Manage your return &amp; exchange requests</span>
+              </div>
+            `)
+          },
+          {
+            id: "c-return-status",
+            title: "Account · My returns",
+            blurb: "/account/returns — list of cases, then eligible orders to start another.",
+            talk: [
+              "Card: Return or Exchange · RET-… · order number · date · STATUS.",
+              "Cancel request only while status is requested.",
+              "Rejection reason shows in amber if admin declined.",
+              "Eligible orders section: Eligible / Not eligible / open status badge. Reason box + Request return if eligible.",
+              "Copy in the page: window days, 5–7 business days after we receive items, free reverse pickup.",
+            ],
+            html: phone(`
+              <div class="chrome"><span class="logo">Returns &amp; refunds</span></div>
+              <p class="muted">Eligible within 7 days of delivery. Refunds in 5–7 business days after we receive the items.</p>
+              <strong>Your return &amp; exchange requests</strong>
+              <div class="item">
+                <strong>Return · RET-2201</strong>
+                <div class="muted">MNM-10482 · 21/09/2026 · PICKUP SCHEDULED</div>
+                <div class="muted">Muslin wrap</div>
+              </div>
+              <div class="item">
+                <strong>Exchange · EXC-441</strong>
+                <div class="muted">MNM-10471 · REQUESTED</div>
+                <div class="muted">Muslin wrap → 3–6m · Ivory</div>
+                <button class="btn ghost">Cancel request</button>
+              </div>
+              <div class="block"><strong>Eligible orders</strong><div class="muted">MNM-10490 · Eligible</div></div>
+            `)
+          },
+          {
+            id: "c-return-labels",
+            title: "What each status shows the customer",
+            blurb: "Today the storefront prints the internal status. Spec wanted friendlier copy — decide on the call.",
+            talk: [
+              "Customer never sees Zoho/Ledgerly sync on this card.",
+              "Pickup window / AWB is on admin; customer list does not yet show the scheduled slot as a headline.",
+            ],
+            html: desk("Customer status", `
+              <table>
+                <tr><th>Internal</th><th>Shows today</th><th>Spec / nicer label</th></tr>
+                <tr><td>requested</td><td>REQUESTED</td><td>Return requested</td></tr>
+                <tr><td>approved</td><td>APPROVED</td><td>Return approved</td></tr>
+                <tr><td>pickup_scheduled</td><td>PICKUP SCHEDULED</td><td>Pickup scheduled</td></tr>
+                <tr><td>picked_up</td><td>PICKED UP</td><td>Item collected</td></tr>
+                <tr><td>received</td><td>RECEIVED</td><td>Item at warehouse</td></tr>
+                <tr><td>inspected</td><td>INSPECTED</td><td>Under review</td></tr>
+                <tr><td>accepted</td><td>ACCEPTED</td><td>Return accepted</td></tr>
+                <tr><td>refunded</td><td>REFUNDED</td><td>Refunded</td></tr>
+                <tr><td>pickup_failed</td><td>PICKUP FAILED</td><td>Pickup issue</td></tr>
+                <tr><td>rejected</td><td>REJECTED</td><td>Return declined</td></tr>
+              </table>
+            `)
+          },
+          {
+            id: "c-exchange",
+            title: "Exchange on the line item",
+            blurb: "Exchange button on each eligible item. Picker for size/colour still in stock.",
+            talk: [
+              "Blocked if a whole-order return is already open on that order.",
+              "Creates request_type = exchange. Same My returns list, labelled Exchange.",
+              "Replacement ships only after inbound inspect + admin allocate/pack/book outbound.",
+            ],
+            html: phone(`
+              <div class="chrome"><span data-go="c-delivered" class="link">← Order</span></div>
+              <strong>Exchange muslin wrap</strong>
+              <div class="muted">From 0–3m Ivory → 3–6m Ivory</div>
+              <div class="block">Reason (min 10 characters)</div>
+              <div class="callout">We'll collect the original, then send the new size after inspection.</div>
+              <button class="btn" data-go="c-return-status">Submit exchange</button>
+            `)
+          }
+        ]
+      },
+      admin: {
+        label: "Admin",
+        screens: [
+          {
+            id: "a-dash",
+            title: "Admin / Operations home",
+            blurb: "Queues, not CMS. Next actions for orders, cancels, returns.",
+            talk: ["Roles: Super Admin, Admin, Sales, Operations, Customer Support.", "Ops: dashboard + orders. CS: orders + invoice. CMS stays Admin."],
+            html: desk("Dashboard", `
+              <div class="row">
+                <div class="block"><strong>12</strong><div class="muted">To wrap</div></div>
+                <div class="block"><strong>4</strong><div class="muted">Ready to book</div></div>
+                <div class="block"><strong>2</strong><div class="muted">Cancel requests</div></div>
+                <div class="block"><strong>3</strong><div class="muted">Returns / exchanges</div></div>
+              </div>
+              <p class="muted">Zoho/Ledgerly warnings sit here — they never block local work.</p>
+              <button class="btn" data-go="a-orders" style="width:auto;padding:8px 16px">Open orders</button>
+            `)
+          },
+          {
+            id: "a-orders",
+            title: "Orders queue",
+            blurb: "Filter by payment, tracking, COD. Open an order to wrap or ship.",
+            talk: ["Local status is source of truth.", "COD filter for cash not yet collected."],
+            html: desk("Orders", `
+              <div class="muted" style="margin-bottom:8px">Filters: All · To wrap · Packed · In transit · COD pending · Cancel hold</div>
+              <table>
+                <tr><th>Order</th><th>Pay</th><th>Fulfilment</th><th>Next</th></tr>
+                <tr class="item" data-go="a-wrap"><td>MNM-10482</td><td>Paid</td><td>Confirmed</td><td>Create package</td></tr>
+                <tr data-go="a-book"><td>MNM-10471</td><td>COD</td><td>Hand-wrapped</td><td>Book shipment</td></tr>
+                <tr data-go="a-cod"><td>MNM-10460</td><td>Pay on delivery</td><td>Out for delivery</td><td>Mark COD collected</td></tr>
+                <tr data-go="a-cancel"><td>MNM-10455</td><td>Paid</td><td>Cancel hold</td><td>Review cancel</td></tr>
+              </table>
+            `)
+          },
+          {
+            id: "a-wrap",
+            title: "Create package / hand-wrap",
+            blurb: "Local wrap: weight (default 500g × qty), L×B×H, rate preview, complete wrap.",
+            talk: ["Does not wait on Zoho package.", "Sets HAND_WRAPPED. Booking is a separate step.", "Chargeable weight = max(actual, L×B×H/5000)."],
+            html: desk("Orders › MNM-10482", `
+              <strong>Create package</strong>
+              <div class="row">
+                <div class="block">Weight 500 g</div>
+                <div class="block">L 30 · B 20 · H 8 cm</div>
+              </div>
+              <div class="item">XpressBees Surface · ETA 2–4 days · preferred</div>
+              <div class="item">XpressBees Air · ETA 1–2 days</div>
+              <button class="btn ok" data-go="a-book" style="width:auto;padding:8px 16px">Complete wrap</button>
+            `)
+          },
+          {
+            id: "a-book",
+            title: "Book shipment",
+            blurb: "Forward AWB via XpressBees, or manual carrier fallback.",
+            talk: ["Pending cancellation blocks booking unless audited override.", "After book: Waiting for pickup (not On the way).", "Sync Zoho asynchronously."],
+            html: desk("Orders › MNM-10471", `
+              <span class="pill">Hand-wrapped</span>
+              <p>Package 500g · 30×20×8 · saved courier slab</p>
+              <div class="row">
+                <div class="block">Book XpressBees</div>
+                <div class="block">Manual AWB</div>
+              </div>
+              <button class="btn" data-go="d-pickup" style="width:auto;padding:8px 16px">Book shipment</button>
+              <p class="muted">Override hold only if a cancellation is pending and ops must still ship.</p>
+            `)
+          },
+          {
+            id: "a-cod",
+            title: "COD collected",
+            blurb: "Cash/UPI at door. Admin (or later carrier webhook) marks PAID.",
+            talk: ["Do not treat invoice paid as delivered.", "Returns require payment PAID."],
+            html: desk("Orders › MNM-10460", `
+              <span class="pill warn">Pay on delivery · Out for delivery</span>
+              <p>Collect ₹2,640 (incl. COD fee). Record method: cash / UPI.</p>
+              <button class="btn ok" style="width:auto;padding:8px 16px">Mark COD collected</button>
+            `)
+          },
+          {
+            id: "a-cancel",
+            title: "Cancellation queue",
+            blurb: "Approve (refund + release stock) or reject with reason.",
+            talk: ["Prepaid: one Razorpay refund, retryable.", "Unpaid COD: no gateway refund.", "If label exists but not handed over: attempt carrier cancel."],
+            html: desk("Cancellations", `
+              <table>
+                <tr><th>Case</th><th>Order</th><th>Reason</th><th></th></tr>
+                <tr>
+                  <td>CAN-88</td><td>MNM-10455</td><td>Changed mind</td>
+                  <td>
+                    <button class="btn ok" style="width:auto;display:inline-block;padding:6px 10px">Approve</button>
+                    <button class="btn ghost" style="width:auto;display:inline-block;padding:6px 10px">Reject</button>
+                  </td>
+                </tr>
+              </table>
+            `)
+          },
+          {
+            id: "a-returns",
+            title: "Admin · Order returns",
+            blurb: "/admin/returns — live queue. Filter chips + one next button per case.",
+            talk: [
+              "This screen is implemented: Approve/Reject, Book pickup, Mark picked up, Received, Inspected, Accept + disposition, Issue refund, COD refund, pickup failed/reschedule.",
+              "Approve does not refund or restock. Restock only after accept + restockable.",
+              "Customer still only sees the status string until refunded.",
+            ],
+            html: desk("Order returns", `
+              <div class="muted" style="margin-bottom:8px">All · requested · approved · pickup scheduled · received · inspected · refunded…</div>
+              <div class="item" data-go="a-pickup">
+                <strong>Return · RET-2201</strong>
+                <div class="muted">Order MNM-10482 · priya@… · ₹2,490</div>
+                <div class="muted">Muslin wrap · 1 requested · refund ₹2,490</div>
+                <div>Status: APPROVED · 4h old</div>
+                <button class="btn" style="width:auto;padding:6px 12px;margin-top:8px">Book pickup</button>
+              </div>
+              <div class="item" data-go="a-inspect">
+                <strong>Return · RET-2194</strong>
+                <div>Status: RECEIVED</div>
+                <button class="btn ghost" style="width:auto;padding:6px 12px">Mark inspected</button>
+              </div>
+              <div class="item" data-go="a-exchange">
+                <strong>Exchange · EXC-441</strong>
+                <div class="muted">0–3m Ivory → 3–6m Ivory</div>
+                <div>Status: ACCEPTED</div>
+                <button class="btn" style="width:auto;padding:6px 12px">Allocate replacement</button>
+              </div>
+            `)
+          },
+          {
+            id: "a-pickup",
+            title: "Book reverse pickup",
+            blurb: "XpressBees reverse AWB from customer address, or manual/self-ship.",
+            talk: ["Failure reasons: customer NA / no product / changed mind → reschedule or close.", "Customer notified of window."],
+            html: desk("RET-2201", `
+              <p>Pickup from Indiranagar · 1 unit muslin wrap</p>
+              <div class="row">
+                <div class="block">XpressBees reverse</div>
+                <div class="block">Manual / self-ship</div>
+              </div>
+              <button class="btn" data-go="d-reverse" style="width:auto;padding:8px 16px">Book pickup</button>
+            `)
+          },
+          {
+            id: "a-inspect",
+            title: "Receive & inspect",
+            blurb: "Warehouse receipt, then disposition per unit.",
+            talk: ["Sellable stock only after restockable.", "Then refund breakdown before confirm."],
+            html: desk("RET-2194", `
+              <span class="pill">Received</span>
+              <div class="item">Qty received 1 · Condition good</div>
+              <div class="item">Disposition: restockable / quarantine / discard / vendor</div>
+              <div class="block">Refund ₹2,490 · Razorpay original method</div>
+              <button class="btn ok" style="width:auto;padding:8px 16px">Accept & issue refund</button>
+            `)
+          },
+          {
+            id: "a-exchange",
+            title: "Exchange — replacement",
+            blurb: "After accepted inbound: settle price, pack, book outbound delivery.",
+            talk: ["Close only after replacement delivered (or refund conversion).", "Same wrap → book path as a new outbound."],
+            html: desk("EXC-441", `
+              <p>Inbound accepted · restock original if eligible</p>
+              <div class="block">Replacement: 3–6m Ivory · reserved</div>
+              <div class="block">Price difference: none / collect / refund / waive</div>
+              <button class="btn" data-go="a-wrap" style="width:auto;padding:8px 16px">Create replacement package</button>
+            `)
+          }
+        ]
+      },
+      delivery: {
+        label: "Delivery",
+        screens: [
+          {
+            id: "d-flow",
+            title: "Forward delivery map",
+            blurb: "How a parcel moves. Customer sees tracking_status; admin sees the same plus AWB.",
+            talk: ["Delivered requires an explicit delivery signal (shipment fulfilled / challan delivered / carrier delivered).", "Zoho sales-order fulfilled is not delivery."],
+            html: desk("Delivery journey", `
+              <div class="steps">
+                <span class="on">Confirmed</span><span class="on">Wrapped</span><span class="on">AWB</span><span>Pickup</span><span>OFD</span><span>Delivered</span>
+              </div>
+              <table>
+                <tr><th>Event</th><th>Customer sees</th><th>Who / what</th></tr>
+                <tr><td>Wrap complete</td><td>Hand-wrapped</td><td>Admin</td></tr>
+                <tr><td>Label booked</td><td>Waiting for pickup</td><td>XpressBees AWB</td></tr>
+                <tr><td>Pickup scan</td><td>On the way</td><td>Carrier webhook / poll</td></tr>
+                <tr><td>Out for delivery</td><td>On the way</td><td>Carrier</td></tr>
+                <tr><td>Delivered scan</td><td>Delivered</td><td>Carrier / shipment fulfilled</td></tr>
+                <tr><td>Failed attempt / RTO</td><td>On the way / exception</td><td>Ops next action</td></tr>
+              </table>
+              <button class="btn ghost" data-go="d-pickup" style="width:auto;padding:8px 16px">Pickup scan</button>
+            `)
+          },
+          {
+            id: "d-pickup",
+            title: "Waiting for pickup",
+            blurb: "AWB exists; courier has not scanned. Customer is not yet On the way.",
+            talk: ["Avoid calling this shipped in emails until pickup.", "Ops can reprint label / cancel AWB if still in warehouse."],
+            html: phone(`
+              <div class="chrome"><span class="logo">MNM-10471</span></div>
+              <span class="pill warn">Waiting for pickup</span>
+              <div class="muted">XpressBees · AWB XB123456789</div>
+              <div class="timeline">
+                <div>Confirmed</div>
+                <div>Hand-wrapped</div>
+                <div class="now">Label created — courier not yet collected</div>
+                <div class="muted">On the way</div>
+              </div>
+            `)
+          },
+          {
+            id: "d-transit",
+            title: "On the way / out for delivery",
+            blurb: "Pickup or in-transit signal. Tracking link for customer.",
+            talk: ["Email: Out for delivery when carrier says OFD.", "COD still unpaid until collected."],
+            html: phone(`
+              <div class="chrome"><span class="logo">Tracking</span></div>
+              <span class="pill accent">On the way</span>
+              <div class="muted">Out for delivery today</div>
+              <button class="btn ghost">Open XpressBees</button>
+              <p class="muted">COD: please keep ₹2,640 ready.</p>
+            `)
+          },
+          {
+            id: "d-delivered",
+            title: "Delivered",
+            blurb: "Order FULFILLED. Return window starts (7 days).",
+            talk: ["Start return clock from reliable local delivery timestamp.", "Optional: admin mark delivered only as exception, with reason."],
+            html: phone(`
+              <div class="chrome"><span class="logo">MNM-10471</span></div>
+              <span class="pill ok">Delivered</span>
+              <p>Gift arrived. Return or exchange within 7 days.</p>
+              <button class="btn ghost" data-go="c-delivered">Return or exchange</button>
+            `)
+          },
+          {
+            id: "d-fail",
+            title: "Failed delivery / RTO",
+            blurb: "Attempt history, reason, next: reattempt, reship, cancel, refund.",
+            talk: ["Must not infer delivery from paid invoice.", "Stock: RTO receipt + inspect before restock.", "Confirm how many attempts before RTO."],
+            html: desk("Exception · MNM-10490", `
+              <span class="pill warn">Failed attempt 1 · customer unavailable</span>
+              <div class="list">
+                <div class="item">Reattempt (carrier)</div>
+                <div class="item">RTO to warehouse</div>
+                <div class="item">Reship new AWB</div>
+                <div class="item">Cancel & refund</div>
+              </div>
+            `)
+          },
+          {
+            id: "d-reverse",
+            title: "Reverse pickup (returns)",
+            blurb: "Mirror of forward tracking, inbound to warehouse.",
+            talk: ["Customer labels: pickup scheduled / collected / at warehouse.", "Webhook maps NA / no product / cancelled."],
+            html: phone(`
+              <div class="chrome"><span class="logo">RET-2201</span></div>
+              <span class="pill">Pickup scheduled</span>
+              <div class="muted">10:00–14:00 · keep original packing</div>
+              <div class="timeline">
+                <div>Approved</div>
+                <div class="now">Courier visiting you</div>
+                <div class="muted">Collected</div>
+                <div class="muted">At warehouse</div>
+              </div>
+            `)
+          },
+          {
+            id: "d-replace",
+            title: "Replacement delivery",
+            blurb: "Second outbound after exchange inspect. New AWB, same delivery rules.",
+            talk: ["Do not close exchange on inbound receipt.", "Customer gets tracking for the new parcel."],
+            html: phone(`
+              <div class="chrome"><span class="logo">EXC-441</span></div>
+              <span class="pill accent">Replacement on the way</span>
+              <div class="muted">AWB XB998877 · 3–6m Ivory</div>
+              <p class="muted">We'll close the exchange when this is delivered.</p>
+            `)
+          }
+        ]
+      }
+    };
+
+    function phone(inner) {
+      return `<div class="frame-phone"><div class="muted" style="text-align:center">9:41</div>${inner}</div>`;
+    }
+    function desk(navOn, inner) {
+      const items = ["Dashboard","Orders","Cancellations","Order returns","Users"];
+      const nav = items.map(i => `<div class="${i===navOn || (navOn||'').startsWith(i) ? 'on':''}">${i}</div>`).join("");
+      return `<div class="frame-desk"><div class="desk-bar"><div class="desk-nav"><div class="logo">Admin</div>${nav}</div><div class="desk-body">${inner}</div></div></div>`;
+    }
+
+    let journey = "customer";
+    let screenId = journeys.customer.screens[0].id;
+
+    function renderTabs() {
+      document.getElementById("journeyTabs").innerHTML = Object.entries(journeys).map(([k,v]) =>
+        `<button class="${k===journey?'active':''}" data-j="${k}">${v.label}</button>`
+      ).join("");
+    }
+    function currentScreens() { return journeys[journey].screens; }
+    function currentScreen() { return currentScreens().find(s => s.id === screenId) || currentScreens()[0]; }
+
+    function renderNav() {
+      document.getElementById("screenNav").innerHTML = currentScreens().map(s =>
+        `<button class="${s.id===screenId?'active':''}" data-s="${s.id}">${s.title}</button>`
+      ).join("");
+    }
+    function renderScreen() {
+      const s = currentScreen();
+      screenId = s.id;
+      document.getElementById("screenTitle").textContent = s.title;
+      document.getElementById("screenBlurb").textContent = s.blurb;
+      document.getElementById("canvas").innerHTML = s.html;
+      document.getElementById("talking").innerHTML = "<ul>" + s.talk.map(t => `<li>${t}</li>`).join("") + "</ul>";
+    }
+    function go(id) {
+      for (const [jk, j] of Object.entries(journeys)) {
+        if (j.screens.some(s => s.id === id)) { journey = jk; screenId = id; break; }
+      }
+      paint();
+    }
+    function paint() {
+      renderTabs(); renderNav(); renderScreen();
+    }
+
+    document.body.addEventListener("click", (e) => {
+      const t = e.target.closest("[data-j],[data-s],[data-go]");
+      if (!t) return;
+      if (t.dataset.j) { journey = t.dataset.j; screenId = journeys[journey].screens[0].id; paint(); }
+      if (t.dataset.s) { screenId = t.dataset.s; paint(); }
+      if (t.dataset.go) go(t.dataset.go);
+    });
+
+    paint();
+  </script>
+</body>
+</html>

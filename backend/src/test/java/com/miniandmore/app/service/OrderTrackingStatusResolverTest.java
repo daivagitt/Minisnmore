@@ -69,6 +69,31 @@ class OrderTrackingStatusResolverTest {
     }
 
     @Test
+    void resolve_expressBeesOutForDeliveryAndDelivered() {
+        CustomerOrder order = paidOrder()
+            .trackingNumber("14344950061557")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("out_for_delivery");
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("out_for_delivery");
+        assertThat(OrderTrackingStatusResolver.isDispatched("out_for_delivery")).isTrue();
+
+        order.shipmentCarrierStatus("delivered").status(OrderStatus.FULFILLED);
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivered");
+    }
+
+    @Test
+    void resolve_expressBeesDeliveryFailed() {
+        CustomerOrder order = paidOrder()
+            .trackingNumber("14344950061557")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("delivery_failed");
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivery_failed");
+        assertThat(OrderTrackingStatusResolver.isDispatched("delivery_failed")).isTrue();
+    }
+
+    @Test
     void resolve_expressBeesBookedAwbIsAwaitingPickup() {
         CustomerOrder order = paidOrder()
             .trackingNumber("XB-1")

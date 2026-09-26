@@ -33,6 +33,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/admin/cancellations": XCircle,
   "/admin/returns": RotateCcw,
   "/admin/zoho": Plug,
+  "/admin/customers": Users,
   "/admin/users": Users,
   "/admin/rbac": ShieldCheck,
 };
@@ -56,16 +57,26 @@ function AdminLayout() {
   // login route renders standalone
   if (path === "/admin/login") return <Outlet />;
 
-  if (!loading && user && !isAdmin) {
+  // Do not render admin sidebar or outlet while checking auth or unauthenticated
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen grid place-items-center py-24">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Non-admins must never see admin sidebar or child routes
+  if (!isAdmin) {
     if (staffRole) {
       return (
-        <div className="grid place-items-center py-24">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <div className="min-h-screen grid place-items-center py-24">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       );
     }
     return (
-      <div className="px-4 max-w-md mx-auto">
+      <div className="px-4 max-w-md mx-auto pt-24">
         <div className="glass-strong rounded-[2rem] p-8 text-center">
           <h1 className="font-display text-3xl">Not authorised</h1>
           <p className="text-sm text-muted-foreground mt-2">Your account is signed in but doesn&rsquo;t have admin access.</p>
@@ -186,13 +197,7 @@ function AdminLayout() {
       </aside>
 
       <section className="min-w-0 w-full pb-8">
-        {loading || !user ? (
-          <div className="grid place-items-center py-24">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          </div>
-        ) : (
-          <Outlet />
-        )}
+        <Outlet />
       </section>
     </div>
   );

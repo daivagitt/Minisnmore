@@ -146,6 +146,12 @@ public class InternalAccountOrderResource {
         data.put("ok", true);
         data.put("code", request.code().trim().toUpperCase(Locale.ROOT));
         data.put(FIELD_DISCOUNT, result.get(FIELD_DISCOUNT));
+        if (result.containsKey("nudge")) {
+            data.put("nudge", result.get("nudge"));
+        }
+        if (result.containsKey("bogo_details")) {
+            data.put("bogo_details", result.get("bogo_details"));
+        }
         return ApiResponse.ok(data);
     }
 
@@ -690,7 +696,7 @@ public class InternalAccountOrderResource {
         if (!isWelcome10Coupon(code)) {
             return Optional.empty();
         }
-        if (!SecurityUtils.isAuthenticated()) {
+        if (userLogin == null || userLogin.isEmpty() || !SecurityUtils.isAuthenticated()) {
             return Optional.of("Sign in to use WELCOME10 on your first order");
         }
         if (!isFirstOrderEligible(userLogin.orElseThrow())) {
@@ -728,8 +734,9 @@ public class InternalAccountOrderResource {
             return Optional.empty();
         }
         BigDecimal effectiveSubtotal = couponSubtotal(subtotal, lines);
-        if (effectiveSubtotal.compareTo(coupon.getMinOrder()) < 0) {
-            return Optional.of(Map.of(FIELD_ERROR, minOrderEligibilityMessage(coupon.getMinOrder(), effectiveSubtotal)));
+        BigDecimal minOrder = coupon.getMinOrder() != null ? coupon.getMinOrder() : BigDecimal.ZERO;
+        if (effectiveSubtotal.compareTo(minOrder) < 0) {
+            return Optional.of(Map.of(FIELD_ERROR, minOrderEligibilityMessage(minOrder, effectiveSubtotal)));
         }
         BigDecimal discount;
         if (coupon.getDiscountType() == DiscountType.BOGO) {
@@ -744,7 +751,14 @@ public class InternalAccountOrderResource {
             if (!bogo.eligible()) {
                 return Optional.of(Map.of(FIELD_ERROR, bogoEligibilityMessage(bogo.missingItems())));
             }
-            discount = bogo.discount();
+            discount = roundInr(bogo.discount().max(BigDecimal.ZERO).min(effectiveSubtotal));
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put(FIELD_DISCOUNT, discount);
+            if (bogo.nextTierMissing() > 0) {
+                map.put("nudge", bogoNextTierMessage(bogo.nextTierMissing(), coupon.getBogoGetQty(), coupon.getDiscountValue()));
+            }
+            map.put("bogo_details", bogoSummaryMessage(bogo.appliedGroups(), coupon.getBogoBuyQty(), coupon.getBogoGetQty(), coupon.getDiscountValue()));
+            return Optional.of(map);
         } else if (coupon.getDiscountType() == DiscountType.PERCENT) {
             discount = effectiveSubtotal
                 .multiply(coupon.getDiscountValue())
@@ -770,6 +784,39 @@ public class InternalAccountOrderResource {
             return "Add 1 more item to use this BOGO offer";
         }
         return "Add " + missingItems + " more items to use this BOGO offer";
+    }
+
+    private static String bogoNextTierMessage(int nextTierMissing, Integer getQty, BigDecimal discountValue) {
+        int get = BogoDiscountCalculator.clampQty(getQty);
+        boolean isFree = discountValue == null || discountValue.compareTo(BigDecimal.valueOf(100)) >= 0;
+        String reward = isFree
+            ? (get == 1 ? "1 more free item" : get + " more free items")
+            : (get == 1 ? "the next item at " + formatPercent(discountValue) + "% off" : get + " more items at " + formatPercent(discountValue) + "% off");
+        if (nextTierMissing <= 1) {
+            return "Add 1 more item to get " + reward + "!";
+        }
+        return "Add " + nextTierMissing + " more items to get " + reward + "!";
+    }
+
+    private static String bogoSummaryMessage(int appliedGroups, Integer buyQty, Integer getQty, BigDecimal discountValue) {
+        int buy = BogoDiscountCalculator.clampQty(buyQty);
+        int get = BogoDiscountCalculator.clampQty(getQty);
+        boolean isFree = discountValue == null || discountValue.compareTo(BigDecimal.valueOf(100)) >= 0;
+        int totalDiscountedItems = appliedGroups * get;
+        if (isFree) {
+            return totalDiscountedItems <= 1
+                ? "Buy " + buy + " Get " + get + " Free applied (1 free item)"
+                : "Buy " + buy + " Get " + get + " Free applied (" + totalDiscountedItems + " free items)";
+        }
+        return "Buy " + buy + " Get " + get + " at " + formatPercent(discountValue) + "% off applied (" + totalDiscountedItems + " items discounted)";
+    }
+
+    private static String formatPercent(BigDecimal value) {
+        if (value == null) return "100";
+        if (value.scale() <= 0 || value.remainder(BigDecimal.ONE).compareTo(BigDecimal.ZERO) == 0) {
+            return value.setScale(0, RoundingMode.HALF_UP).toPlainString();
+        }
+        return value.stripTrailingZeros().toPlainString();
     }
 
     private static String minOrderEligibilityMessage(BigDecimal minOrder, BigDecimal subtotal) {
@@ -1289,8 +1336,7 @@ public class InternalAccountOrderResource {
         if (orderCancellationService.hasPendingRequest(order.getId())) {
             return false;
         }
-        String trackingStatus = OrderTrackingStatusResolver.resolve(order);
-        return !"shipped".equals(trackingStatus) && !"delivered".equals(trackingStatus);
+        return !OrderTrackingStatusResolver.isDispatched(OrderTrackingStatusResolver.resolve(order));
     }
 
     Map<String, Object> orderDetail(CustomerOrder order) {
@@ -1428,7 +1474,7 @@ public class InternalAccountOrderResource {
         return data;
     }
 
-    private Map<String, Object> orderItem(OrderItem item) {
+    Map<String, Object> orderItem(OrderItem item) {
         Map<String, Object> data = new LinkedHashMap<>();
         Product product = orderItemProduct(item).orElse(null);
         data.put("id", item.getId());

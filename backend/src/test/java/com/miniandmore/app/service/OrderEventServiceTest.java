@@ -95,6 +95,57 @@ class OrderEventServiceTest {
     }
 
     @Test
+    void syncLifecycleEvents_expressBeesPickupDoesNotSendOutForDelivery() {
+        CustomerOrder order = baseOrder()
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .trackingNumber("14344950061557")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("in_transit");
+        stubInsertSucceeds();
+
+        service.syncLifecycleEvents(order);
+
+        assertThat(capturedEventTypes()).contains(OrderEventService.TYPE_SHIPPED).doesNotContain(OrderEventService.TYPE_OUT_FOR_DELIVERY);
+        verify(orderMailService, never()).sendOutForDelivery(any());
+    }
+
+    @Test
+    void syncLifecycleEvents_expressBeesOutForDeliverySendsOutForDelivery() {
+        CustomerOrder order = baseOrder()
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .trackingNumber("14344950061557")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("out_for_delivery");
+        stubInsertSucceeds();
+
+        service.syncLifecycleEvents(order);
+
+        assertThat(capturedEventTypes()).contains(OrderEventService.TYPE_SHIPPED, OrderEventService.TYPE_OUT_FOR_DELIVERY);
+        assertThat(capturedTitles()).contains("Out for delivery");
+        verify(orderMailService).sendOutForDelivery(order);
+        verify(orderSmsService).sendOutForDelivery(order);
+    }
+
+    @Test
+    void syncLifecycleEvents_deliveryFailed_sendsDeliveryFailedEmail() {
+        CustomerOrder order = baseOrder()
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .trackingNumber("14344950061557")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("delivery_failed");
+        stubInsertSucceeds();
+
+        service.syncLifecycleEvents(order);
+
+        assertThat(capturedEventTypes()).contains(OrderEventService.TYPE_SHIPPED, OrderEventService.TYPE_DELIVERY_FAILED);
+        assertThat(capturedTitles()).contains("Delivery attempt unsuccessful");
+        verify(orderMailService).sendDeliveryFailed(order);
+    }
+
+    @Test
     void syncLifecycleEvents_cancelled_sendsCancelEmail() {
         CustomerOrder order = baseOrder().status(OrderStatus.CANCELLED).paymentStatus(PaymentStatus.PAID);
         stubInsertSucceeds();

@@ -59,8 +59,27 @@ COD orders are `CONFIRMED` at placement but `payment_status` stays `PENDING` unt
 | `hand_wrapped` | Hand-wrapped | A package was created for the linked Zoho sales order |
 | `awaiting_pickup` | Waiting for pickup | ExpressBees AWB/label exists, but the courier has not scanned pickup yet |
 | `shipped` | On the way | Courier pickup / in-transit, manual AWB, shipment date, or Zoho/Ledgerly shipped signal |
+| `out_for_delivery` | Out for delivery | ExpressBees reports `OUT FOR DELIVERY` (or `OFD`) for the booked AWB |
+| `delivery_failed` | Delivery attempt unsuccessful | ExpressBees reports undelivered / delivery failed (reattempt expected) |
 | `delivered` | Delivered | Order `FULFILLED` or an explicit Zoho/Ledgerly delivered signal |
 | `cancelled` | Cancelled | Order `CANCELLED` or cancelled in external system |
+
+### ExpressBees → customer update
+
+| ExpressBees status | Customer sees | Customer notification |
+|--------------------|---------------|-----------------------|
+| Pickup / in-transit | On the way | None for ExpressBees (manual carriers still email on ship) |
+| `OUT FOR DELIVERY` | Out for delivery | Out-for-delivery email with the ExpressBees tracking link and the account order link |
+| Undelivered / failed delivery | Delivery attempt unsuccessful | Delivery-failed email (once) |
+| `Delivered` | Delivered | Delivered email |
+
+The tracking link is only available once an AWB exists and always uses
+`https://shipmentv2.xpressbees.com/orders/tracking/{AWB}` (override with `XPRESSBEES_TRACKING_URL_TEMPLATE`).
+Pickup / in-transit scans move the tracker to "On the way" without emailing; manual (non-ExpressBees)
+shipments still send the out-for-delivery email when they ship because no OFD scan is available.
+Once a shipment reaches OFD, later weaker hub/in-transit scans do not regress the customer status.
+Exchange replacements booked through ExpressBees follow the same OFD email rule using the outbound AWB
+(webhook must deliver an OFD scan; there is no booking-time fallback for XB outbound).
 
 ### Inputs to tracking status
 
@@ -135,6 +154,10 @@ ExpressBees label booked
 Courier pickup / in-transit
   tracking_status: shipped
   (+ shipment_date from pickup scan, manual AWB, Zoho, or Ledgerly)
+
+ExpressBees OUT FOR DELIVERY
+  tracking_status: out_for_delivery
+  (out-for-delivery email sent with https://shipmentv2.xpressbees.com/orders/tracking/{AWB})
 
 Delivered
   status: FULFILLED

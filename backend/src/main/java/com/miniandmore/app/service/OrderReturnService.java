@@ -387,7 +387,9 @@ public class OrderReturnService {
         orderReturn.setResolvedAt(Instant.now());
         releaseExchangeReservation(orderReturn);
         OrderReturn saved = orderReturnRepository.save(orderReturn);
-        queueReturnEmail(saved.getOrder(), saved, true);
+        // Route via sendReturnUpdate: EXCHANGE → exchangeRejected; RETURN → QC-failed or returnRejected.
+        // Do not force QC-failed — that breaks diagram "Reject return → Inform Customer" for exchanges.
+        queueReturnEmail(saved.getOrder(), saved);
         return saved;
     }
 
@@ -455,7 +457,7 @@ public class OrderReturnService {
             orderReturn.setLogisticsMode(ReturnLogisticsMode.XPRESSBEES);
             orderReturn.setCarrierName("XpressBees");
             orderReturn.setReverseAwb(StringUtils.left(result.awb(), 80));
-            String tracking = StringUtils.defaultIfBlank(result.trackingUrl(), xpressBeesClient.buildTrackingUrl(result.awb()));
+            String tracking = StringUtils.defaultIfBlank(xpressBeesClient.buildTrackingUrl(result.awb()), result.trackingUrl());
             orderReturn.setTrackingUrl(StringUtils.left(StringUtils.trimToNull(tracking), 500));
             orderReturn.setPickupWindow(StringUtils.left(StringUtils.trimToNull(result.pickupWindow()), 200));
             orderReturn.setProviderRequestId(StringUtils.left(StringUtils.trimToNull(result.providerRequestId()), 120));
@@ -631,6 +633,9 @@ public class OrderReturnService {
         releaseExchangeReservation(orderReturn);
         orderReturn.setStatus(OrderReturnStatus.CANCELLED);
         orderReturn.setResolvedAt(Instant.now());
+        if (StringUtils.isBlank(orderReturn.getRejectionReason()) && StringUtils.isNotBlank(orderReturn.getPickupFailureReason())) {
+            orderReturn.setRejectionReason(StringUtils.left(orderReturn.getPickupFailureReason(), 1000));
+        }
         orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
         OrderReturn saved = orderReturnRepository.save(orderReturn);
         queueReturnEmail(saved.getOrder(), saved);
@@ -979,7 +984,7 @@ public class OrderReturnService {
             orderReturn.setOutboundLogisticsMode(ReturnLogisticsMode.XPRESSBEES);
             orderReturn.setOutboundCarrierName("XpressBees");
             orderReturn.setOutboundAwb(StringUtils.left(result.awb(), 80));
-            String tracking = StringUtils.defaultIfBlank(result.trackingUrl(), xpressBeesClient.buildTrackingUrl(result.awb()));
+            String tracking = StringUtils.defaultIfBlank(xpressBeesClient.buildTrackingUrl(result.awb()), result.trackingUrl());
             orderReturn.setOutboundTrackingUrl(StringUtils.left(StringUtils.trimToNull(tracking), 500));
             orderReturn.setOutboundLabelUrl(StringUtils.left(StringUtils.trimToNull(result.labelUrl()), 500));
             orderReturn.setOutboundProviderRequestId(StringUtils.left(StringUtils.trimToNull(result.providerRequestId()), 120));
@@ -1057,8 +1062,33 @@ public class OrderReturnService {
             adminNotes,
             "Item must be ready to ship before marking shipped"
         );
-        queueReturnEmail(saved.getOrder(), saved);
+        if (saved.getRequestType() == OrderRequestType.EXCHANGE) {
+            // Non-XB has no carrier OFD scan — notify at ship. XB waits for notifyExchangeOutForDelivery.
+            if (saved.getOutboundLogisticsMode() != ReturnLogisticsMode.XPRESSBEES) {
+                notifyExchangeOutForDelivery(saved.getReturnNumber());
+            }
+        } else {
+            queueReturnEmail(saved.getOrder(), saved);
+        }
         return saved;
+    }
+
+    public void notifyExchangeOutForDelivery(String returnNumber) {
+        OrderReturn orderReturn = loadReturn(returnNumber);
+        if (orderReturn.getRequestType() != OrderRequestType.EXCHANGE || orderReturn.getStatus() != OrderReturnStatus.SHIPPED) {
+            return;
+        }
+        CustomerOrder order = orderReturn.getOrder();
+        if (order == null) {
+            return;
+        }
+        AfterCommit.run(() -> {
+            try {
+                orderMailService.sendExchangeOutForDelivery(order, orderReturn);
+            } catch (RuntimeException ex) {
+                LOG.warn("Exchange out-for-delivery email failed for {}", orderReturn.getReturnNumber(), ex);
+            }
+        });
     }
 
     public OrderReturn markDelivered(String returnNumber, String adminNotes) {

@@ -1,8 +1,8 @@
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { LayoutDashboard, Loader2, LogOut, Package, ShoppingCart } from "lucide-react";
+import { ArrowLeft, LayoutDashboard, Loader2, LogOut, Package, ShoppingCart } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { staffHomePath, type StaffRole } from "@/lib/staff-roles";
+import { isCmsAdminRole, staffHomePath, type StaffRole } from "@/lib/staff-roles";
 
 type StaffNavItem = { to: string; label: string; exact?: boolean };
 
@@ -29,6 +29,8 @@ export function StaffShell({ allowedRole }: { allowedRole: StaffRole }) {
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const nav = ROLE_NAV[allowedRole];
+  const isCmsAdmin = isCmsAdminRole(staffRole);
+  const canAccess = Boolean(staffRole === allowedRole || isCmsAdmin);
 
   useEffect(() => {
     if (loading) return;
@@ -36,13 +38,13 @@ export function StaffShell({ allowedRole }: { allowedRole: StaffRole }) {
       void navigate({ to: "/admin/login" });
       return;
     }
-    if (staffRole !== allowedRole) {
+    if (!canAccess) {
       const home = staffHomePath(staffRole);
       void navigate({ to: (home === "/" ? "/admin/login" : home) as never });
     }
-  }, [user, staffRole, loading, allowedRole, navigate]);
+  }, [user, staffRole, loading, canAccess, navigate]);
 
-  if (loading || !user || staffRole !== allowedRole) {
+  if (loading || !user || !canAccess) {
     return (
       <div className="grid place-items-center py-24">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -77,6 +79,14 @@ export function StaffShell({ allowedRole }: { allowedRole: StaffRole }) {
             </Link>
           );
         })}
+        {isCmsAdmin && (
+          <Link
+            to="/admin"
+            className="flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm text-amber-100/90 hover:bg-white/10 hover:text-white transition"
+          >
+            <ArrowLeft className="h-4 w-4" /> Admin Console
+          </Link>
+        )}
         <button
           type="button"
           onClick={() => signOut()}
@@ -89,6 +99,14 @@ export function StaffShell({ allowedRole }: { allowedRole: StaffRole }) {
         className="lg:hidden rounded-[1.5rem] p-2 mb-4 flex flex-wrap gap-2 text-white"
         style={{ backgroundImage: "linear-gradient(160deg, #6b3a1f 0%, #8a4a26 38%, #b56b3a 72%, #7a3f22 100%)" }}
       >
+        {isCmsAdmin && (
+          <Link
+            to="/admin"
+            className="px-3 py-2 rounded-xl text-sm text-amber-100 font-medium"
+          >
+            ← Admin
+          </Link>
+        )}
         {nav.items.map((item) => (
           <Link
             key={item.to}

@@ -30,6 +30,12 @@ public final class OrderTrackingStatusResolver {
         ) {
             return "delivered";
         }
+        if (localShipment && XpressBeesShipmentStatus.isOutForDelivery(order.getShipmentCarrierStatus())) {
+            return "out_for_delivery";
+        }
+        if (localShipment && XpressBeesShipmentStatus.isUndelivered(order.getShipmentCarrierStatus())) {
+            return "delivery_failed";
+        }
         if (
             XpressBeesShipmentStatus.isPickedUpOrInTransit(order.getShipmentCarrierStatus()) ||
             StringUtils.isNotBlank(order.getTrackingNumber()) ||
@@ -50,6 +56,11 @@ public final class OrderTrackingStatusResolver {
         return "pending";
     }
 
+    /** True once the parcel has left the warehouse (shipped, out for delivery, delivery failed, or delivered). */
+    public static boolean isDispatched(String trackingStatus) {
+        return "shipped".equals(trackingStatus) || "out_for_delivery".equals(trackingStatus) || "delivery_failed".equals(trackingStatus) || "delivered".equals(trackingStatus);
+    }
+
     /**
      * ExpressBees AWB generation only prints a label. Customer "shipped" waits for a pickup scan.
      */
@@ -60,7 +71,10 @@ public final class OrderTrackingStatusResolver {
         if (StringUtils.isBlank(order.getTrackingNumber()) || order.getShipmentCancelledAt() != null) {
             return false;
         }
-        return !XpressBeesShipmentStatus.isPickedUpOrInTransit(order.getShipmentCarrierStatus()) &&
-            !XpressBeesShipmentStatus.isDelivered(order.getShipmentCarrierStatus());
+        String carrierStatus = order.getShipmentCarrierStatus();
+        return !XpressBeesShipmentStatus.isPickedUpOrInTransit(carrierStatus) &&
+            !XpressBeesShipmentStatus.isOutForDelivery(carrierStatus) &&
+            !XpressBeesShipmentStatus.isUndelivered(carrierStatus) &&
+            !XpressBeesShipmentStatus.isDelivered(carrierStatus);
     }
 }

@@ -114,6 +114,7 @@ class OrderMailServiceTest {
 
         service.sendOutForDelivery(order);
         service.sendOrderDelivered(order);
+        service.sendDeliveryFailed(order);
         service.sendOrderCancelled(order);
         OrderReturn requested = new OrderReturn();
         requested.setReturnNumber("RET-1");
@@ -123,6 +124,7 @@ class OrderMailServiceTest {
 
         verify(templateEngine).process(eq("mail/orderOutForDeliveryEmail"), any(Context.class));
         verify(templateEngine).process(eq("mail/orderDeliveredEmail"), any(Context.class));
+        verify(templateEngine).process(eq("mail/deliveryFailedEmail"), any(Context.class));
         verify(templateEngine).process(eq("mail/orderCancelledEmail"), any(Context.class));
         verify(templateEngine).process(eq("mail/orderReturnEmail"), any(Context.class));
     }
@@ -392,11 +394,15 @@ class OrderMailServiceTest {
 
         exchange.setStatus(OrderReturnStatus.SHIPPED);
         service.sendReturnUpdate(order, exchange);
-        verify(templateEngine).process(eq("mail/exchangeOutForDeliveryEmail"), any(Context.class));
+        verify(templateEngine, org.mockito.Mockito.never()).process(eq("mail/exchangeOutForDeliveryEmail"), any(Context.class));
 
         exchange.setStatus(OrderReturnStatus.DELIVERED);
         service.sendReturnUpdate(order, exchange);
         verify(templateEngine).process(eq("mail/exchangeDeliveredEmail"), any(Context.class));
+
+        exchange.setStatus(OrderReturnStatus.CANCELLED);
+        service.sendReturnUpdate(order, exchange);
+        verify(templateEngine).process(eq("mail/exchangeCancelledEmail"), any(Context.class));
     }
 
     private CustomerOrder orderWithAddress() {

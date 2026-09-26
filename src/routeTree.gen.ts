@@ -60,6 +60,7 @@ import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminInvoicesRouteImport } from './routes/admin.invoices'
 import { Route as AdminHomeRouteImport } from './routes/admin.home'
 import { Route as AdminDiscountRouteImport } from './routes/admin.discount'
+import { Route as AdminCustomersRouteImport } from './routes/admin.customers'
 import { Route as AdminCouponsRouteImport } from './routes/admin.coupons'
 import { Route as AdminContactMessagesRouteImport } from './routes/admin.contact-messages'
 import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
@@ -341,6 +342,11 @@ const AdminDiscountRoute = AdminDiscountRouteImport.update({
   path: '/discount',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminCustomersRoute = AdminCustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminCouponsRoute = AdminCouponsRouteImport.update({
   id: '/coupons',
   path: '/coupons',
@@ -518,6 +524,7 @@ export interface FileRoutesByFullPath {
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/contact-messages': typeof AdminContactMessagesRoute
   '/admin/coupons': typeof AdminCouponsRoute
+  '/admin/customers': typeof AdminCustomersRoute
   '/admin/discount': typeof AdminDiscountRoute
   '/admin/home': typeof AdminHomeRoute
   '/admin/invoices': typeof AdminInvoicesRoute
@@ -592,6 +599,7 @@ export interface FileRoutesByTo {
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/contact-messages': typeof AdminContactMessagesRoute
   '/admin/coupons': typeof AdminCouponsRoute
+  '/admin/customers': typeof AdminCustomersRoute
   '/admin/discount': typeof AdminDiscountRoute
   '/admin/home': typeof AdminHomeRoute
   '/admin/invoices': typeof AdminInvoicesRoute
@@ -671,6 +679,7 @@ export interface FileRoutesById {
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/contact-messages': typeof AdminContactMessagesRoute
   '/admin/coupons': typeof AdminCouponsRoute
+  '/admin/customers': typeof AdminCustomersRoute
   '/admin/discount': typeof AdminDiscountRoute
   '/admin/home': typeof AdminHomeRoute
   '/admin/invoices': typeof AdminInvoicesRoute
@@ -751,6 +760,7 @@ export interface FileRouteTypes {
     | '/admin/categories'
     | '/admin/contact-messages'
     | '/admin/coupons'
+    | '/admin/customers'
     | '/admin/discount'
     | '/admin/home'
     | '/admin/invoices'
@@ -825,6 +835,7 @@ export interface FileRouteTypes {
     | '/admin/categories'
     | '/admin/contact-messages'
     | '/admin/coupons'
+    | '/admin/customers'
     | '/admin/discount'
     | '/admin/home'
     | '/admin/invoices'
@@ -903,6 +914,7 @@ export interface FileRouteTypes {
     | '/admin/categories'
     | '/admin/contact-messages'
     | '/admin/coupons'
+    | '/admin/customers'
     | '/admin/discount'
     | '/admin/home'
     | '/admin/invoices'
@@ -1328,6 +1340,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminDiscountRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/customers': {
+      id: '/admin/customers'
+      path: '/customers'
+      fullPath: '/admin/customers'
+      preLoaderRoute: typeof AdminCustomersRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/coupons': {
       id: '/admin/coupons'
       path: '/coupons'
@@ -1563,6 +1582,7 @@ interface AdminRouteChildren {
   AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminContactMessagesRoute: typeof AdminContactMessagesRoute
   AdminCouponsRoute: typeof AdminCouponsRoute
+  AdminCustomersRoute: typeof AdminCustomersRoute
   AdminDiscountRoute: typeof AdminDiscountRoute
   AdminHomeRoute: typeof AdminHomeRoute
   AdminInvoicesRoute: typeof AdminInvoicesRoute
@@ -1590,6 +1610,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCategoriesRoute: AdminCategoriesRoute,
   AdminContactMessagesRoute: AdminContactMessagesRoute,
   AdminCouponsRoute: AdminCouponsRoute,
+  AdminCustomersRoute: AdminCustomersRoute,
   AdminDiscountRoute: AdminDiscountRoute,
   AdminHomeRoute: AdminHomeRoute,
   AdminInvoicesRoute: AdminInvoicesRoute,

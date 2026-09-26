@@ -27,6 +27,7 @@ import jakarta.validation.constraints.Size;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.domain.Page;
@@ -48,7 +49,7 @@ import org.springframework.web.server.ResponseStatusException;
  */
 @RestController
 @RequestMapping("/internal/v1/admin/orders")
-@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_OPERATIONS','ROLE_CUSTOMER_SUPPORT')")
+@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_OPERATIONS','ROLE_CUSTOMER_SUPPORT')")
 public class InternalAdminOrderResource {
 
     private static final Duration MAX_ORDER_RANGE = Duration.ofDays(31);
@@ -183,7 +184,7 @@ public class InternalAdminOrderResource {
     }
 
     @PostMapping("/{orderNumber}/mark-cod-collected")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_OPERATIONS')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_OPERATIONS')")
     @Transactional
     public ApiResponse<Map<String, Object>> markCodCollected(@PathVariable String orderNumber) {
         CustomerOrder order = dataAccess
@@ -222,7 +223,7 @@ public class InternalAdminOrderResource {
     }
 
     @PostMapping("/{orderNumber}/book-shipment")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_OPERATIONS')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_OPERATIONS')")
     public ApiResponse<Map<String, Object>> bookShipment(
         @PathVariable String orderNumber,
         @Valid @RequestBody BookShipmentRequest body
@@ -242,7 +243,7 @@ public class InternalAdminOrderResource {
     }
 
     @PostMapping("/{orderNumber}/package-rates")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_OPERATIONS')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_OPERATIONS')")
     public ApiResponse<Map<String, Object>> packageRates(
         @PathVariable String orderNumber,
         @Valid @RequestBody PackageRatesRequest body
@@ -259,7 +260,7 @@ public class InternalAdminOrderResource {
     }
 
     @PostMapping("/{orderNumber}/complete-package")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_OPERATIONS')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_OPERATIONS')")
     public ApiResponse<Map<String, Object>> completePackage(
         @PathVariable String orderNumber,
         @Valid @RequestBody CompletePackageRequest body
@@ -277,7 +278,7 @@ public class InternalAdminOrderResource {
     }
 
     @PostMapping("/{orderNumber}/cancel-shipment")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_OPERATIONS')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_OPERATIONS')")
     public ApiResponse<Map<String, Object>> cancelShipment(
         @PathVariable String orderNumber,
         @Valid @RequestBody CancelShipmentRequest body
@@ -349,6 +350,14 @@ public class InternalAdminOrderResource {
         data.put("package_courier_id", StringUtils.defaultString(order.getPackageCourierId()));
         data.put("package_courier_name", StringUtils.defaultString(order.getPackageCourierName()));
         data.put("packed_at", instant(order.getPackedAt()));
+        if (order.getId() != null) {
+            data.put(
+                "order_items",
+                dataAccess.orderItemRepository().findAllByOrderId(order.getId()).stream().map(accountOrders::orderItem).toList()
+            );
+        } else {
+            data.put("order_items", List.of());
+        }
         return data;
     }
 

@@ -1572,6 +1572,8 @@ class InternalAccountOrderResourceCoverageTest {
             .ledgerlyOrderStatus("shipped")
             .total(BigDecimal.valueOf(500));
         when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-SHIPPED", "customer1")).thenReturn(Optional.of(order));
+        when(orderCancellationService.submitRequest(eq("customer1"), eq("MNM-SHIPPED"), any()))
+            .thenThrow(new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "Order has already been dispatched"));
 
         mockMvc
             .perform(

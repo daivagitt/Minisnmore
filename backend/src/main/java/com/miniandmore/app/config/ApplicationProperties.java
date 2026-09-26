@@ -681,7 +681,7 @@ public class ApplicationProperties {
 
         private String warehouseState = "Karnataka";
 
-        private String trackingUrlTemplate = "https://www.xpressbees.com/track/?awb={awb}";
+        private String trackingUrlTemplate = "https://shipmentv2.xpressbees.com/orders/tracking/{awb}";
 
         private int defaultWeightGrams = 500;
 

@@ -2,6 +2,7 @@ package com.miniandmore.app.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -178,6 +179,52 @@ class XpressBeesReturnWebhookHandlerServiceTest {
         verify(orderReturnService).markShipped("RET-ORD-1", "ExpressBees: delivered");
         verify(orderReturnService).markDelivered("RET-ORD-1", "ExpressBees: delivered");
         verify(orderReturnService).completeExchange("RET-ORD-1", "ExpressBees: delivered");
+    }
+
+    @Test
+    void handle_outboundOutForDelivery_notifiesCustomer() {
+        OrderReturn orderReturn = new OrderReturn();
+        orderReturn.setReturnNumber("RET-ORD-1");
+        orderReturn.setStatus(OrderReturnStatus.SHIPPED);
+        orderReturn.setOutboundAwb("OUT-AWB-9");
+        orderReturn.setRequestType(OrderRequestType.EXCHANGE);
+        when(orderReturnRepository.findFirstByOutboundAwbOrderByRequestedAtDesc("OUT-AWB-9")).thenReturn(Optional.of(orderReturn));
+        when(webhookEventRepository.existsByEventId(any())).thenReturn(false);
+        when(webhookEventRepository.existsCompletedOutForDeliveryEvent("RET-ORD-1")).thenReturn(false);
+        when(webhookEventRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(webhookEventRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = handlerService.handle(
+            "{\"event_id\":\"evt-out-ofd\",\"awb\":\"OUT-AWB-9\",\"status\":\"OUT FOR DELIVERY\"}",
+            null,
+            "secret-123"
+        );
+
+        assertThat(result.get("ok")).isEqualTo(true);
+        verify(orderReturnService).notifyExchangeOutForDelivery("RET-ORD-1");
+    }
+
+    @Test
+    void handle_outboundOutForDelivery_skipsDuplicateNotification() {
+        OrderReturn orderReturn = new OrderReturn();
+        orderReturn.setReturnNumber("RET-ORD-1");
+        orderReturn.setStatus(OrderReturnStatus.SHIPPED);
+        orderReturn.setOutboundAwb("OUT-AWB-9");
+        orderReturn.setRequestType(OrderRequestType.EXCHANGE);
+        when(orderReturnRepository.findFirstByOutboundAwbOrderByRequestedAtDesc("OUT-AWB-9")).thenReturn(Optional.of(orderReturn));
+        when(webhookEventRepository.existsByEventId(any())).thenReturn(false);
+        when(webhookEventRepository.existsCompletedOutForDeliveryEvent("RET-ORD-1")).thenReturn(true);
+        when(webhookEventRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(webhookEventRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = handlerService.handle(
+            "{\"event_id\":\"evt-out-ofd-2\",\"awb\":\"OUT-AWB-9\",\"status\":\"OUT FOR DELIVERY\"}",
+            null,
+            "secret-123"
+        );
+
+        assertThat(result.get("ok")).isEqualTo(true);
+        verify(orderReturnService, never()).notifyExchangeOutForDelivery("RET-ORD-1");
     }
 
     @Test

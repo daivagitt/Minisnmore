@@ -355,7 +355,7 @@ public class XpressBeesClient {
         if (StringUtils.isBlank(awb)) {
             return null;
         }
-        String template = StringUtils.defaultIfBlank(config.getTrackingUrlTemplate(), "https://www.xpressbees.com/track/?awb={awb}");
+        String template = StringUtils.defaultIfBlank(config.getTrackingUrlTemplate(), "https://shipmentv2.xpressbees.com/orders/tracking/{awb}");
         return template.replace("{awb}", awb.trim());
     }
 

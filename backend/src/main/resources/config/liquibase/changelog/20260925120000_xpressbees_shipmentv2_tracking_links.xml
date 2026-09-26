@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+    <changeSet id="20260925120000-1" author="miniandmore">
+        <sql dbms="postgresql">
+            UPDATE customer_order
+            SET tracking_url = 'https://shipmentv2.xpressbees.com/orders/tracking/' || TRIM(tracking_number)
+            WHERE shipment_logistics_mode = 'XPRESSBEES'
+              AND tracking_number IS NOT NULL
+              AND TRIM(tracking_number) &lt;&gt; ''
+              AND (
+                tracking_url IS NULL
+                OR tracking_url ILIKE '%xpressbees.com/track%'
+                OR tracking_url NOT ILIKE '%shipmentv2.xpressbees.com/orders/tracking/%'
+              );
+
+            UPDATE order_return
+            SET tracking_url = 'https://shipmentv2.xpressbees.com/orders/tracking/' || TRIM(reverse_awb)
+            WHERE logistics_mode = 'XPRESSBEES'
+              AND reverse_awb IS NOT NULL
+              AND TRIM(reverse_awb) &lt;&gt; ''
+              AND (
+                tracking_url IS NULL
+                OR tracking_url ILIKE '%xpressbees.com/track%'
+                OR tracking_url NOT ILIKE '%shipmentv2.xpressbees.com/orders/tracking/%'
+              );
+
+            UPDATE order_return
+            SET outbound_tracking_url = 'https://shipmentv2.xpressbees.com/orders/tracking/' || TRIM(outbound_awb)
+            WHERE outbound_logistics_mode = 'XPRESSBEES'
+              AND outbound_awb IS NOT NULL
+              AND TRIM(outbound_awb) &lt;&gt; ''
+              AND (
+                outbound_tracking_url IS NULL
+                OR outbound_tracking_url ILIKE '%xpressbees.com/track%'
+                OR outbound_tracking_url NOT ILIKE '%shipmentv2.xpressbees.com/orders/tracking/%'
+              );
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

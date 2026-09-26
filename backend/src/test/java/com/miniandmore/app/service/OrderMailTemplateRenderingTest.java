@@ -176,4 +176,15 @@ class OrderMailTemplateRenderingTest {
         orderReturn.setReplacementColor("Baby Blue");
         return orderReturn;
     }
+
+    @Test
+    void deliveryFailedTemplateRenders() throws Exception {
+        CustomerOrder cod = order("cod");
+        service.sendDeliveryFailed(cod);
+
+        ArgumentCaptor<MimeMessage> sent = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(javaMailSender, atLeastOnce()).send(sent.capture());
+        MimeMessage message = sent.getValue();
+        assertThat((String) message.getContent()).contains("MNM-TEST-1").contains("Delivery Update");
+    }
 }

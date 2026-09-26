@@ -74,7 +74,7 @@ export function OrderTrackingCard({ order, showHeader = true }: Props) {
             </div>
           )}
           {order.shipment_date &&
-            ["shipped", "delivered", "fulfilled"].includes((order.tracking_status ?? "").toLowerCase()) && (
+            ["shipped", "out_for_delivery", "delivery_failed", "delivered", "fulfilled"].includes((order.tracking_status ?? "").toLowerCase()) && (
             <div>
               <span className="text-muted-foreground">Shipped on:</span> {order.shipment_date}
             </div>
