@@ -1,8 +1,11 @@
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import { Send } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { normalizeAddressPhone } from "@/lib/account.functions";
 import { submitContactMessage } from "@/lib/contact-messages";
+import { getMyProfile } from "@/lib/orders.functions";
 import { showApiError } from "@/lib/ui-errors";
 
 const fieldCls =
@@ -12,9 +15,79 @@ const empty = { name: "", email: "", phone: "", address: "", comment: "" };
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
+function displayNameFromAuth(user: {
+  firstName?: string | null;
+  lastName?: string | null;
+}): string {
+  return [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+}
+
 export function ContactForm() {
+  const { user, loading: authLoading } = useAuth();
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
+  const prefilledForUser = useRef<string | null>(null);
+  /** Snapshot of login-derived fields so a successful submit can clear message fields only. */
+  const loginDefaults = useRef(empty);
+
+  useEffect(() => {
+    // Wait for session hydrate so we do not treat "loading" as logged-out and later clobber typed fields.
+    if (authLoading) return;
+
+    if (!user) {
+      // Clear PII when the session ends so the next visitor never sees prior account details.
+      if (prefilledForUser.current !== null) {
+        prefilledForUser.current = null;
+        loginDefaults.current = empty;
+        setForm(empty);
+      }
+      return;
+    }
+
+    const accountKey = String(user.id);
+    if (prefilledForUser.current === accountKey) return;
+    const switchingAccounts = prefilledForUser.current !== null;
+    prefilledForUser.current = accountKey;
+
+    const email = (user.email ?? user.login ?? "").trim();
+    const authName = displayNameFromAuth(user);
+    loginDefaults.current = { ...empty, email, name: authName };
+    // On account switch, replace identity fields. On first session hydrate, keep anything the
+    // visitor already typed during auth loading so we do not clobber in-progress input.
+    setForm((current) => ({
+      ...current,
+      email: switchingAccounts || !current.email.trim() ? email : current.email,
+      name: switchingAccounts || !current.name.trim() ? authName : current.name,
+      phone: switchingAccounts ? "" : current.phone,
+    }));
+
+    let cancelled = false;
+    getMyProfile()
+      .then((r) => {
+        if (cancelled || prefilledForUser.current !== accountKey) return;
+        const phone = normalizeAddressPhone(r.profile?.phone ?? "");
+        const fullName = (r.profile?.full_name ?? "").trim();
+        const resolvedName = fullName || authName;
+        loginDefaults.current = {
+          ...loginDefaults.current,
+          name: resolvedName,
+          phone,
+        };
+        setForm((current) => ({
+          ...current,
+          // Keep in-progress edits; only fill blanks left after the auth seed above.
+          phone: current.phone || phone,
+          name: current.name === authName || !current.name.trim() ? resolvedName : current.name,
+        }));
+      })
+      .catch(() => {
+        /* Keep auth email/name if profile fetch fails. */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, authLoading]);
 
   const set = (key: keyof typeof empty) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((current) => ({ ...current, [key]: e.target.value }));
@@ -25,7 +98,12 @@ export function ContactForm() {
     try {
       await submitContactMessage(form);
       toast.success("Thanks — we have saved your message.");
-      setForm(empty);
+      setForm({
+        ...empty,
+        name: loginDefaults.current.name,
+        email: loginDefaults.current.email,
+        phone: loginDefaults.current.phone,
+      });
     } catch (error) {
       showApiError(error, "Could not send your message");
     } finally {
@@ -86,7 +164,9 @@ export function ContactForm() {
             className={`${fieldCls} mt-2`}
             type="tel"
             value={form.phone}
-            onChange={set("phone")}
+            onChange={(e) =>
+              setForm((current) => ({ ...current, phone: normalizeAddressPhone(e.target.value) }))
+            }
             autoComplete="tel"
             maxLength={15}
             required
