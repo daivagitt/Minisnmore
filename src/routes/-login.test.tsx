@@ -139,10 +139,33 @@ describe("login route", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Create account$/ }));
 
     await waitFor(() =>
-      expect(authMock.signUp).toHaveBeenCalledWith("new@example.com", "secret1", "New Parent", false),
+      expect(authMock.signUp).toHaveBeenCalledWith("new@example.com", "secret1", "New Parent", true),
     );
     expect(toastMock.success).toHaveBeenCalledWith(
       "Almost there — check your inbox and open the activation link to finish.",
+    );
+    expect(JSON.parse(sessionStorage.getItem("mnm_pending_profile") ?? "{}")).toEqual({
+      full_name: "New Parent",
+      email: "new@example.com",
+      subscribed: true,
+    });
+  });
+
+  it("saves an opt-out subscribe preference during sign up", async () => {
+    authMock.signUp.mockResolvedValueOnce({ error: null });
+    renderLogin();
+
+    await userEvent.click(screen.getByRole("button", { name: "New here? Create an account" }));
+    const checkbox = screen.getByRole("checkbox", { name: /subscribe to emails and offers/i }) as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
+    await userEvent.type(screen.getByPlaceholderText("Full name"), "New Parent");
+    await userEvent.type(screen.getByPlaceholderText("you@email.com"), "new@example.com");
+    await userEvent.type(screen.getByPlaceholderText("Password (min 6)"), "secret1");
+    await userEvent.click(screen.getByRole("checkbox", { name: /subscribe to emails and offers/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^Create account$/ }));
+
+    await waitFor(() =>
+      expect(authMock.signUp).toHaveBeenCalledWith("new@example.com", "secret1", "New Parent", false),
     );
     expect(JSON.parse(sessionStorage.getItem("mnm_pending_profile") ?? "{}")).toEqual({
       full_name: "New Parent",
@@ -151,26 +174,16 @@ describe("login route", () => {
     });
   });
 
-  it("saves a subscribe preference during sign up", async () => {
-    authMock.signUp.mockResolvedValueOnce({ error: null });
+  it("keeps an unticked subscribe choice when toggling between sign in and sign up", async () => {
     renderLogin();
 
     await userEvent.click(screen.getByRole("button", { name: "New here? Create an account" }));
-    expect(screen.getByRole("checkbox", { name: /subscribe to emails and offers/i })).toBeTruthy();
-    await userEvent.type(screen.getByPlaceholderText("Full name"), "New Parent");
-    await userEvent.type(screen.getByPlaceholderText("you@email.com"), "new@example.com");
-    await userEvent.type(screen.getByPlaceholderText("Password (min 6)"), "secret1");
     await userEvent.click(screen.getByRole("checkbox", { name: /subscribe to emails and offers/i }));
-    await userEvent.click(screen.getByRole("button", { name: /^Create account$/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Have an account? Sign in" }));
+    await userEvent.click(screen.getByRole("button", { name: "New here? Create an account" }));
 
-    await waitFor(() =>
-      expect(authMock.signUp).toHaveBeenCalledWith("new@example.com", "secret1", "New Parent", true),
-    );
-    expect(JSON.parse(sessionStorage.getItem("mnm_pending_profile") ?? "{}")).toEqual({
-      full_name: "New Parent",
-      email: "new@example.com",
-      subscribed: true,
-    });
+    const checkbox = screen.getByRole("checkbox", { name: /subscribe to emails and offers/i }) as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
   });
 
   it("rejects an invalid full name during sign up", async () => {

@@ -140,6 +140,8 @@ public class SiteSettingDTO implements Serializable {
 
     private String aboutPageJson;
 
+    private String giftPageJson;
+
     public Long getId() {
         return id;
     }
@@ -474,6 +476,14 @@ public class SiteSettingDTO implements Serializable {
 
     public void setAboutPageJson(String aboutPageJson) {
         this.aboutPageJson = aboutPageJson;
+    }
+
+    public String getGiftPageJson() {
+        return giftPageJson;
+    }
+
+    public void setGiftPageJson(String giftPageJson) {
+        this.giftPageJson = giftPageJson;
     }
 
     @Override

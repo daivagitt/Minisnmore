@@ -93,6 +93,35 @@ public class ZohoBooksClient {
         return requireItem(get("/items/" + itemId + "?" + orgIdParam()), itemId, null);
     }
 
+    /**
+     * Retrieves a Zoho item group, including all of its sellable variant rows. Zoho Books exposes
+     * this endpoint for organisations with Inventory item groups enabled.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getItemGroup(String itemGroupId) {
+        String requestedId = StringUtils.trimToNull(itemGroupId);
+        if (requestedId == null) {
+            throw new IllegalArgumentException("Zoho item group id is required");
+        }
+        Map<String, Object> response = requireSuccess(get("/itemgroups/" + encode(requestedId) + "?" + orgIdParam()));
+        Object wrapped = response.get("item_group");
+        Map<String, Object> group = wrapped instanceof Map<?, ?> ? (Map<String, Object>) wrapped : response;
+        String returnedId = StringUtils.firstNonBlank(
+            itemIdentifier(group.get("group_id")),
+            itemIdentifier(group.get("itemgroup_id"))
+        );
+        if (returnedId == null) {
+            throw new IllegalStateException("Zoho returned an item group without a valid group_id");
+        }
+        if (!requestedId.equals(returnedId)) {
+            throw new IllegalStateException("Zoho returned an item group identity mismatch");
+        }
+        if (!(group.get("items") instanceof List<?> items) || items.stream().anyMatch(item -> !(item instanceof Map))) {
+            throw new IllegalStateException("Zoho returned missing or invalid item group items");
+        }
+        return group;
+    }
+
     public Map<String, Object> createItem(Map<String, Object> payload) {
         return requireItem(post("/items?" + orgIdParam(), payload), null, payload.get("sku"));
     }

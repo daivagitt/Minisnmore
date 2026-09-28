@@ -59,6 +59,7 @@ import {
   listMyOrderReturns,
   listMyOrders,
   listMyPayments,
+  listOrderedCustomerLogins,
   markCodCollected,
   bookAdminOrderShipment,
   previewAdminOrderPackageRates,
@@ -723,6 +724,15 @@ describe("orders functions", () => {
       undefined,
       { auth: true },
     );
+  });
+
+  it("lists ordered customer logins for the admin users table", async () => {
+    getMock.mockResolvedValueOnce({ logins: ["Today.Customer", "  ", "week.customer"] });
+    await expect(listOrderedCustomerLogins()).resolves.toEqual(["today.customer", "week.customer"]);
+    expect(getMock).toHaveBeenCalledWith("/api/v1/admin/orders/ordered-logins", { auth: true });
+
+    getMock.mockResolvedValueOnce({});
+    await expect(listOrderedCustomerLogins()).resolves.toEqual([]);
   });
 
   it("books an admin forward shipment", async () => {

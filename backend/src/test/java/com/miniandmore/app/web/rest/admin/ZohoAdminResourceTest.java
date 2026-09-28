@@ -21,6 +21,7 @@ import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.ProductRepository;
 import com.miniandmore.app.repository.ZohoSettingRepository;
 import com.miniandmore.app.service.ZohoOAuthService;
+import com.miniandmore.app.service.ZohoSettingsService;
 import com.miniandmore.app.service.ZohoSyncService;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -53,6 +54,9 @@ class ZohoAdminResourceTest {
 
     @MockitoBean
     private ZohoSyncService syncService;
+
+    @MockitoBean
+    private ZohoSettingsService zohoSettingsService;
 
     @MockitoBean
     private CustomerOrderRepository customerOrderRepository;
@@ -267,6 +271,24 @@ class ZohoAdminResourceTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.successCount").value(1));
+    }
+
+    @Test
+    void pullItemGroup_delegatesParentIdToSyncService() throws Exception {
+        when(syncService.pullProductGroup("3624052000000394593")).thenReturn(Map.of("success", 2));
+
+        mockMvc
+            .perform(post("/api/v1/admin/zoho/pull-item-groups/3624052000000394593"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(2));
+
+        verify(syncService).pullProductGroup("3624052000000394593");
+    }
+
+    @Test
+    void pullItemGroup_rejectsNonNumericParentId() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/zoho/pull-item-groups/not-a-group")).andExpect(status().isBadRequest());
+        verify(syncService, never()).pullProductGroup(any());
     }
 
     @Test

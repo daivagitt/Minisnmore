@@ -53,6 +53,16 @@
       "fieldValidateRulesMax": "10"
     },
     {
+      "fieldName": "eligibilityScope",
+      "fieldType": "CouponEligibilityScope",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "ALL,SAME_SKU,CATEGORY"
+    },
+    {
+      "fieldName": "eligibilityCategoryId",
+      "fieldType": "Long"
+    },
+    {
       "fieldName": "expiresAt",
       "fieldType": "Instant"
     },

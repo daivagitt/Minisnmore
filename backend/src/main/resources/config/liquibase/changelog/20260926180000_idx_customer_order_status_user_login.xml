@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260926180000-1" author="miniandmore">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists indexName="idx_customer_order__status_user_login"/>
+            </not>
+        </preConditions>
+        <comment>Speed up admin ordered-logins distinct query (filter by status, group by user_login).</comment>
+        <createIndex indexName="idx_customer_order__status_user_login" tableName="customer_order">
+            <column name="status"/>
+            <column name="user_login"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

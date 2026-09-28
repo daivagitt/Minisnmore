@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import type { AdminSections } from "@/hooks/useAdminSections";
 import { ChevronDown } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -49,34 +50,105 @@ export function inputCls() {
   return "w-full rounded-2xl glass px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40";
 }
 
+const COLLAPSIBLE_VARIANTS = {
+  nested: {
+    root: "rounded-2xl ring-1 ring-border/60 bg-white/30",
+    header: "flex flex-wrap items-center hover:bg-white/25",
+    trigger: "px-4 py-3",
+    actions: "px-4 pb-3 sm:py-3 sm:pl-0",
+    title: "text-sm font-medium",
+    hint: "text-[11px] text-muted-foreground mt-0.5 leading-snug",
+    chevron: "h-4 w-4",
+    body: "space-y-4 px-4 pb-4",
+  },
+  panel: {
+    root: "glass-strong rounded-2xl sm:rounded-3xl",
+    header: "flex flex-wrap items-center",
+    trigger: "p-4 sm:p-5",
+    actions: "px-4 pb-4 sm:py-5 sm:pl-0 sm:pr-5",
+    title: "font-display text-base sm:text-lg",
+    hint: "text-[11px] text-muted-foreground mt-1 max-w-xl leading-snug",
+    chevron: "h-5 w-5",
+    body: "space-y-3 sm:space-y-4 px-4 pb-4 sm:px-5 sm:pb-5",
+  },
+} as const;
+
+type AdminCollapsibleSectionProps = {
+  title: ReactNode;
+  hint?: ReactNode;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** Header controls (e.g. a visibility checkbox) rendered outside the toggle so they stay clickable. */
+  actions?: ReactNode;
+  children: ReactNode;
+};
+
+/** Collapsible block: `nested` sits inside a card (product editor); `panel` is a top-level glass card. */
 export function AdminCollapsibleSection({
+  variant = "nested",
   title,
   hint,
   open,
   onOpenChange,
+  actions,
   children,
-}: {
-  title: string;
-  hint?: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  children: ReactNode;
-}) {
+}: AdminCollapsibleSectionProps & { variant?: keyof typeof COLLAPSIBLE_VARIANTS }) {
+  const cls = COLLAPSIBLE_VARIANTS[variant];
   return (
-    <Collapsible open={open} onOpenChange={onOpenChange} className="rounded-2xl ring-1 ring-border/60 bg-white/30">
-      <CollapsibleTrigger
-        type="button"
-        className="group flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-white/25"
-      >
-        <div className="min-w-0">
-          <div className="text-sm font-medium">{title}</div>
-          {hint ? <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{hint}</p> : null}
-        </div>
-        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="space-y-4 px-4 pb-4">{children}</div>
+    <Collapsible open={open} onOpenChange={onOpenChange} className={cls.root}>
+      <div className={cls.header}>
+        <CollapsibleTrigger
+          type="button"
+          className={`group flex min-w-[12rem] flex-1 items-center justify-between gap-3 text-left ${cls.trigger}`}
+        >
+          <span className="block min-w-0">
+            <span className={`block ${cls.title}`}>{title}</span>
+            {hint ? <span className={`block ${cls.hint}`}>{hint}</span> : null}
+          </span>
+          <ChevronDown
+            className={`${cls.chevron} shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180`}
+          />
+        </CollapsibleTrigger>
+        {actions ? <div className={`shrink-0 ${cls.actions}`}>{actions}</div> : null}
+      </div>
+      {/* Kept mounted while closed so child state (e.g. an upload in progress) survives collapsing. */}
+      <CollapsibleContent forceMount hidden={!open}>
+        <div className={cls.body}>{children}</div>
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+export function AdminPanelSection(props: AdminCollapsibleSectionProps) {
+  return <AdminCollapsibleSection variant="panel" {...props} />;
+}
+
+export function AdminSectionToggles({
+  sections,
+  children,
+}: {
+  sections: Pick<AdminSections, "expandAll" | "collapseAll">;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="min-w-0">{children}</div>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={sections.expandAll}
+          className="text-xs text-primary story-link"
+        >
+          Expand all
+        </button>
+        <button
+          type="button"
+          onClick={sections.collapseAll}
+          className="text-xs text-primary story-link"
+        >
+          Collapse all
+        </button>
+      </div>
+    </div>
   );
 }

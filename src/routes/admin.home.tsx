@@ -1,6 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { AdminPage, Field, inputCls } from "@/components/admin/AdminPage";
+import {
+  AdminPage,
+  AdminPanelSection,
+  AdminSectionToggles,
+  Field,
+  inputCls,
+} from "@/components/admin/AdminPage";
+import { useAdminSections } from "@/hooks/useAdminSections";
 import { NumberField } from "@/components/admin/NumberField";
 import { HomeByAgeCardsEditor } from "@/components/admin/HomeByAgeCardsEditor";
 import { HomeHeroBannersPanel } from "@/components/admin/HomeHeroBannersPanel";
@@ -102,6 +109,7 @@ function HomePage() {
   const [products, setProducts] = useState<{ slug: string; name: string; sku: string }[]>([]);
   const [blogPosts, setBlogPosts] = useState<{ slug: string; title: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const sections = useAdminSections();
 
   const load = async () => {
     setLoading(true);
@@ -240,31 +248,32 @@ function HomePage() {
               initialize default homepage blocks.
             </div>
           )}
+          {rows.length > 0 && <AdminSectionToggles sections={sections} />}
           {rows.map((s, i) => {
             const slugs = pruneHomeSectionProductSlugs(
               sectionProductSlugs(s.payload),
               products.map((p) => p.slug),
             );
             return (
-              <div key={s.id} className="glass-strong rounded-2xl sm:rounded-3xl p-4 sm:p-5 space-y-3 sm:space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-display text-base sm:text-lg">{LABELS[s.key] ?? s.key}</div>
-                    {SECTION_HINTS[s.key] ? (
-                      <p className="text-[11px] text-muted-foreground mt-1.5 max-w-xl leading-snug">
-                        {SECTION_HINTS[s.key]}
-                      </p>
-                    ) : null}
-                  </div>
-                  <label className="flex items-center gap-2 text-sm shrink-0 self-start sm:self-auto">
+              <AdminPanelSection
+                key={s.id}
+                title={LABELS[s.key] ?? s.key}
+                hint={SECTION_HINTS[s.key]}
+                {...sections.panel(s.id)}
+                actions={
+                  <label className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
                       checked={s.enabled}
-                      onChange={(e) => update(i, { enabled: e.target.checked })}
+                      onChange={(e) => {
+                        update(i, { enabled: e.target.checked });
+                        sections.setOpen(s.id, true);
+                      }}
                     />
                     Show on homepage
                   </label>
-                </div>
+                }
+              >
                 <div className="grid sm:grid-cols-2 gap-3">
                   <Field
                     label="Title"
@@ -363,7 +372,7 @@ function HomePage() {
                 >
                   <Save className="h-4 w-4" /> Save
                 </button>
-              </div>
+              </AdminPanelSection>
             );
           })}
         </div>

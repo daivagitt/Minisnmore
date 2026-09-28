@@ -48,7 +48,7 @@ describe("admin coupons page", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /new coupon/i })).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: /new coupon/i }));
 
-    const typeSelect = screen.getByRole("combobox");
+    const typeSelect = screen.getAllByRole("combobox")[0];
     expect(screen.getByRole("option", { name: /bogo \(buy x get y\)/i })).toBeInTheDocument();
 
     await user.selectOptions(typeSelect, "bogo");

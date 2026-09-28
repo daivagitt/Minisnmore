@@ -6,6 +6,7 @@ import { ListPagination } from "@/components/ListPagination";
 import { useListPagination } from "@/hooks/useListPagination";
 import { api } from "@/lib/api";
 import { formatOrderDate } from "@/lib/dates";
+import { listOrderedCustomerLogins } from "@/lib/orders.functions";
 import { LIST_PAGE_SIZE } from "@/lib/pagination";
 import {
   adminUserListFiltersActive,
@@ -45,6 +46,7 @@ type StaffUser = {
   subscribed?: boolean | null;
   authorities?: string[];
   createdDate?: string | null;
+  hasOrdered?: boolean;
 };
 
 const USERS_PAGE_SIZE = 1000;
@@ -64,6 +66,16 @@ const SUBSCRIBED_FILTERS: { value: UserSubscribedFilter; label: string }[] = [
 
 function displayName(user: StaffUser) {
   return [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || user.login;
+}
+
+function withOrderedFlag(users: StaffUser[], orderedLogins: Iterable<string>): StaffUser[] {
+  const ordered = new Set(
+    [...orderedLogins].map((login) => login.trim().toLowerCase()).filter(Boolean),
+  );
+  return users.map((user) => {
+    const login = user.login?.trim().toLowerCase() ?? "";
+    return { ...user, hasOrdered: Boolean(login && ordered.has(login)) };
+  });
 }
 
 function listFilterSummary(filters: AdminUserListFilters): string[] {
@@ -113,9 +125,21 @@ export function AdminUsersPage() {
   const load = async () => {
     setLoading(true);
     try {
-      setUsers(await fetchAllAdminUsers());
-    } catch (error) {
-      showApiError(error, "Could not load users");
+      // Keep user list independent of ordered-logins so a missing/failed order
+      // endpoint cannot blank the entire Users page.
+      const [usersResult, orderedResult] = await Promise.allSettled([
+        fetchAllAdminUsers(),
+        listOrderedCustomerLogins(),
+      ]);
+      if (usersResult.status === "fulfilled") {
+        const orderedLogins = orderedResult.status === "fulfilled" ? orderedResult.value : [];
+        setUsers(withOrderedFlag(usersResult.value, orderedLogins));
+        if (orderedResult.status === "rejected") {
+          showApiError(orderedResult.reason, "Could not load who has ordered");
+        }
+      } else {
+        showApiError(usersResult.reason, "Could not load users");
+      }
     } finally {
       setLoading(false);
     }
@@ -403,6 +427,7 @@ export function AdminUsersPage() {
                     <th className="px-3 py-2">Email</th>
                     <th className="px-3 py-2">Joined</th>
                     <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Ordered</th>
                     <th className="px-3 py-2">Newsletter</th>
                   </tr>
                 </thead>
@@ -413,6 +438,7 @@ export function AdminUsersPage() {
                       <td className="px-3 py-2">{user.email}</td>
                       <td className="px-3 py-2">{formatOrderDate(user.createdDate)}</td>
                       <td className="px-3 py-2">{user.activated ? "Active" : "Pending"}</td>
+                      <td className="px-3 py-2">{user.hasOrdered ? "Yes" : "No"}</td>
                       <td className="px-3 py-2">{user.subscribed === true ? "Subscribed" : "—"}</td>
                     </tr>
                   ))}

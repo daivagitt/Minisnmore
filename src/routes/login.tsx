@@ -52,7 +52,7 @@ export function LoginPage() {
   const [googleBusy, setGoogleBusy] = useState(false);
   const [signInError, setSignInError] = useState<string | null>(null);
   const [resendBusy, setResendBusy] = useState(false);
-  const [subscribed, setSubscribed] = useState(false);
+  const [subscribed, setSubscribed] = useState(true);
   const oauthErrorShown = useRef(false);
 
   useEffect(() => {
@@ -329,7 +329,11 @@ export function LoginPage() {
               ) : null}
             </div>
             {mode === "signup" && (
-              <SubscribeOptIn checked={subscribed} onChange={setSubscribed} />
+              <SubscribeOptIn
+                checked={subscribed}
+                onChange={setSubscribed}
+                checkedHint="We'll send occasional emails and offers. Untick if you'd rather not."
+              />
             )}
             {mode === "signin" && (
               <div className="text-right -mt-1 space-y-1">
@@ -398,7 +402,6 @@ export function LoginPage() {
               setEmailTouched(false);
               setPasswordError(undefined);
               setPasswordTouched(false);
-              setSubscribed(false);
             }} className="story-link text-primary">
               {mode === "signin" ? "New here? Create an account" : "Have an account? Sign in"}
             </button>

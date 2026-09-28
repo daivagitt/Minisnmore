@@ -3,6 +3,7 @@ package com.miniandmore.commerce.config;
 import static org.springframework.security.config.Customizer.withDefaults;
 
 import com.miniandmore.commerce.security.AuthoritiesConstants;
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -21,6 +22,8 @@ public class SecurityConfiguration {
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(authz ->
                 authz
+                    .dispatcherTypeMatchers(DispatcherType.ERROR)
+                    .permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/coupons/validate").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/coupons/active").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/orders/track/**").permitAll()

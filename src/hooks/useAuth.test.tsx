@@ -35,7 +35,7 @@ function Harness() {
       <span data-testid="admin">{String(auth.isAdmin)}</span>
       <span data-testid="session">{auth.session?.access_token ?? "none"}</span>
       <button onClick={() => auth.signIn("admin@example.com", "secret")}>sign in</button>
-      <button onClick={() => auth.signUp("new@example.com", "secret", "New Parent")}>sign up</button>
+      <button onClick={() => auth.signUp("new@example.com", "secret", "New Parent", false)}>sign up</button>
       <button onClick={() => auth.signOut()}>sign out</button>
       <button onClick={() => auth.signInWithOAuth("google", "/account")}>oauth</button>
       <button onClick={() => auth.completeOAuthSignIn("oauth-token")}>complete oauth</button>
@@ -246,7 +246,7 @@ describe("useAuth", () => {
     const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    await expect(result.current.signUp("taken@example.com", "secret")).resolves.toEqual({
+    await expect(result.current.signUp("taken@example.com", "secret", undefined, false)).resolves.toEqual({
       error: "Email taken",
     });
 
@@ -285,7 +285,7 @@ describe("useAuth", () => {
     });
 
     apiMock.post.mockResolvedValueOnce(null);
-    await expect(result.current.signUp("solo@example.com", "secret")).resolves.toEqual({ error: null });
+    await expect(result.current.signUp("solo@example.com", "secret", undefined, false)).resolves.toEqual({ error: null });
     expect(apiMock.post).toHaveBeenCalledWith(
       "/api/register",
       expect.objectContaining({ firstName: "", lastName: "", subscribed: false }),
@@ -670,7 +670,7 @@ describe("useAuth", () => {
     const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    await expect(result.current.signUp("solo@example.com", "secret", "Madonna")).resolves.toEqual({
+    await expect(result.current.signUp("solo@example.com", "secret", "Madonna", false)).resolves.toEqual({
       error: null,
     });
     expect(apiMock.post).toHaveBeenCalledWith(
@@ -711,7 +711,7 @@ describe("useAuth", () => {
     const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    await expect(result.current.signUp("new@example.com", "secret", "A")).resolves.toEqual({
+    await expect(result.current.signUp("new@example.com", "secret", "A", false)).resolves.toEqual({
       error: expect.stringMatching(/at least 2 characters/i),
     });
     await expect(result.current.requestPasswordReset("   ")).resolves.toEqual({

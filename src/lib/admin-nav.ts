@@ -16,6 +16,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { to: "/admin/products", label: "Products", keywords: "catalog sku inventory stock" },
   { to: "/admin/home", label: "Home sections", keywords: "mom reviews reviews carousel featured watch shop reels" },
   { to: "/admin/about", label: "About page", keywords: "story founders" },
+  { to: "/admin/gift", label: "Gift page", keywords: "gifting occasions budgets wrapping" },
   { to: "/admin/pages", label: "Page visibility", keywords: "hide show navigation" },
   { to: "/admin/coupons", label: "Coupons", keywords: "promo codes voucher bogo buy one get one offers" },
   { to: "/admin/discount", label: "Discount", keywords: "storewide percent sale" },

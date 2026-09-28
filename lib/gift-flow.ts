@@ -1,10 +1,11 @@
-/** Occasions shown in the gift flow — milestone-focused, baby-first. */
+/** Occasions shown in the gift flow — milestone-focused, baby-first.
+ * Keep in sync with DEFAULT_GIFT_PAGE.occasions in gift-page.ts.
+ */
 export const GIFT_OCCASIONS = [
   "Naming Ceremony",
   "First Birthday",
   "Welcome Baby",
   "Annaprashan",
-  "Baby Shower",
 ] as const;
 
 export type GiftOccasion = (typeof GIFT_OCCASIONS)[number];

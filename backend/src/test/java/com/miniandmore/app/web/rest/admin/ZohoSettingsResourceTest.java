@@ -11,18 +11,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.miniandmore.app.domain.ZohoSetting;
 import com.miniandmore.app.repository.ZohoSettingRepository;
+import com.miniandmore.app.service.AdminConfigChangeMailService;
+import com.miniandmore.app.service.ZohoSettingsService;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 @WebMvcTest(ZohoSettingsResource.class)
+@Import(ZohoSettingsService.class)
 @AutoConfigureMockMvc(addFilters = false)
 class ZohoSettingsResourceTest {
 
@@ -31,6 +35,9 @@ class ZohoSettingsResourceTest {
 
     @MockitoBean
     private ZohoSettingRepository settingRepository;
+
+    @MockitoBean
+    private AdminConfigChangeMailService adminConfigChangeMailService;
 
     @Test
     void getSettings_whenMissing_returnsNullBody() throws Exception {
@@ -66,7 +73,7 @@ class ZohoSettingsResourceTest {
     }
 
     @Test
-    void saveSettings_persistsProvidedFields() throws Exception {
+    void saveSettings_persistsProvidedFieldsAndNotifies() throws Exception {
         ZohoSetting setting = new ZohoSetting();
         when(settingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
         when(settingRepository.save(any(ZohoSetting.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -91,6 +98,15 @@ class ZohoSettingsResourceTest {
         assertThat(saved.getRefreshToken()).isEqualTo("refresh-99");
         assertThat(saved.getDataCenter()).isEqualTo("eu");
         assertThat(saved.getConnected()).isTrue();
+
+        ArgumentCaptor<ZohoSetting> previousCaptor = ArgumentCaptor.forClass(ZohoSetting.class);
+        ArgumentCaptor<ZohoSetting> currentCaptor = ArgumentCaptor.forClass(ZohoSetting.class);
+        verify(adminConfigChangeMailService).notifyZohoSettingsChangedAfterCommit(
+            previousCaptor.capture(),
+            currentCaptor.capture()
+        );
+        assertThat(currentCaptor.getValue().getClientSecret()).isEqualTo("secret-99");
+        assertThat(previousCaptor.getValue().getClientSecret()).isNull();
     }
 
     @Test

@@ -26,8 +26,6 @@ python3 jenkins/scripts/generate-lifecycle-api-report.py \
   --input "$API_LIFECYCLE_REPORT" \
   --output artifacts/api-tests/lifecycle-report.html
 
-cp -f deploy/postman/api-run-report.md artifacts/api-tests/lifecycle-report.md 2>/dev/null || true
-
 echo "Lifecycle report: ${API_LIFECYCLE_REPORT}"
 echo "HTML report: artifacts/api-tests/lifecycle-report.html"
 echo "JUnit: artifacts/api-tests/lifecycle-junit.xml"

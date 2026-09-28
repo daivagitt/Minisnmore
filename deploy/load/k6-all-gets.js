@@ -17,10 +17,20 @@ const payload = new SharedArray('k6-payload', function () {
 const endpoints = payload[0].endpoints || [];
 const defaultBase = payload[0].baseUrl || __ENV.BASE_URL || '';
 
+// k6 only exports tagged sub-metrics that have a threshold, so each endpoint gets an always-true one.
+const endpointThresholds = {};
+for (const ep of endpoints) {
+  const label = endpointLabel(ep);
+  endpointThresholds[`http_req_duration{endpoint:${label}}`] = ['max>=0'];
+  endpointThresholds[`http_req_failed{endpoint:${label}}`] = ['rate>=0'];
+  endpointThresholds[`http_reqs{endpoint:${label}}`] = ['count>=0'];
+}
+
 export const options = {
   thresholds: {
     http_req_failed: ['rate<0.05'],
     http_req_duration: [`p(95)<${maxMs}`],
+    ...endpointThresholds,
   },
 };
 

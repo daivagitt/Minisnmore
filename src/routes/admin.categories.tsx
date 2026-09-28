@@ -1,6 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { AdminPage, Field, inputCls } from "@/components/admin/AdminPage";
+import {
+  AdminPage,
+  AdminPanelSection,
+  AdminSectionToggles,
+  Field,
+  inputCls,
+} from "@/components/admin/AdminPage";
+import { useAdminSections } from "@/hooks/useAdminSections";
+import {
+  adminRowKey,
+  savedAdminRows,
+  useEditableAdminRows,
+  type AdminDraftRow,
+  type SettledAdminRow,
+} from "@/hooks/useEditableAdminRows";
 import { NumberField } from "@/components/admin/NumberField";
 import { ImageUploadField } from "@/components/admin/ImageUploadField";
 import { BulkImport } from "@/components/admin/BulkImport";
@@ -25,7 +39,7 @@ const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export const Route = createFileRoute("/admin/categories")({ component: CategoriesPage });
 
-type Cat = CategoryRow;
+type Cat = CategoryRow & AdminDraftRow;
 const empty: Cat = {
   slug: "",
   name: "",
@@ -42,13 +56,13 @@ const slugify = (s: string) =>
     .replace(/^-|-$/g, "");
 
 function CategoriesPage() {
-  const [rows, setRows] = useState<Cat[]>([]);
+  const { rows, reload, beginSave, addDraft, updateRow, removeDraft } = useEditableAdminRows<Cat>();
   const [loading, setLoading] = useState(true);
+  const sections = useAdminSections();
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (settled?: SettledAdminRow[]) => {
     try {
-      setRows(await listCategories(true));
+      await reload(() => listCategories(true), settled);
     } catch (error) {
       showApiError(error, "Could not load categories");
     }
@@ -68,24 +82,27 @@ function CategoriesPage() {
       return;
     }
     try {
-      await saveCategory(payload);
+      const settle = beginSave(adminRowKey(c));
+      const saved = await saveCategory(payload);
       invalidateCategories();
       invalidateProducts();
       toast.success("Saved");
-      load();
+      if (saved?.id) sections.setOpen(saved.id, true);
+      load([settle(saved?.id)]);
     } catch (error) {
       showApiError(error, "Could not save category");
     }
   };
-  const remove = async (id?: string) => {
-    if (!id) return setRows((r) => r.filter((x) => x.id));
+  const remove = async (row: Cat) => {
+    const id = row.id;
+    if (!id) return removeDraft(adminRowKey(row));
     if (!confirm("Delete this category?")) return;
     try {
       await deleteCategory(id);
       invalidateCategories();
       invalidateProducts();
       toast.success("Deleted");
-      load();
+      load([{ key: id }]);
     } catch (error) {
       showApiError(error, "Could not delete category");
     }
@@ -139,7 +156,12 @@ function CategoriesPage() {
             }}
             persist={async (payloads) => {
               try {
-                return await bulkSave(payloads as Cat[], rows, "slug", saveCategory);
+                return await bulkSave(
+                  payloads as Cat[],
+                  savedAdminRows(rows),
+                  "slug",
+                  saveCategory,
+                );
               } catch (error) {
                 return {
                   inserted: 0,
@@ -159,7 +181,9 @@ function CategoriesPage() {
             }}
           />
           <button
-            onClick={() => setRows((r) => [{ ...empty }, ...r])}
+            onClick={() => {
+              sections.setOpen(addDraft({ ...empty }), true);
+            }}
             className="rounded-full bg-primary text-primary-foreground px-4 py-2.5 text-sm flex items-center gap-2"
           >
             <Plus className="h-4 w-4" /> New category
@@ -176,92 +200,85 @@ function CategoriesPage() {
               No categories yet.
             </div>
           )}
-          {rows.map((c, i) => (
-            <div key={c.id ?? `new-${i}`} className="glass-strong rounded-3xl p-5 space-y-3">
-              <div className="grid sm:grid-cols-3 gap-3">
-                <Field label="Name">
-                  <input
-                    className={inputCls()}
-                    maxLength={ADMIN_NAME_MAX_LEN}
-                    value={c.name}
-                    onChange={(e) =>
-                      setRows((r) =>
-                        r.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)),
-                      )
-                    }
-                  />
-                </Field>
-                <Field label="Slug">
-                  <input
-                    className={inputCls()}
-                    value={c.slug}
-                    placeholder="auto from name"
-                    onChange={(e) =>
-                      setRows((r) =>
-                        r.map((x, j) => (j === i ? { ...x, slug: e.target.value } : x)),
-                      )
-                    }
-                  />
-                </Field>
-                <NumberField
-                  label="Sort order"
-                  value={c.sort_order}
-                  onChange={(sort_order) =>
-                    setRows((r) => r.map((x, j) => (j === i ? { ...x, sort_order } : x)))
-                  }
-                  min={0}
-                  required
-                />
-              </div>
-              <Field label="Description">
-                <textarea
-                  rows={2}
-                  className={inputCls()}
-                  value={c.description ?? ""}
-                  onChange={(e) =>
-                    setRows((r) =>
-                      r.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)),
-                    )
-                  }
-                />
-              </Field>
-              <ImageUploadField
-                label="Category image (optional)"
-                folder="categories"
-                spec="categoryMenu"
-                value={c.image_url ?? ""}
-                onChange={(image_url) =>
-                  setRows((r) => r.map((x, j) => (j === i ? { ...x, image_url } : x)))
+          {rows.length > 0 && <AdminSectionToggles sections={sections} />}
+          {rows.map((c) => {
+            const rowKey = adminRowKey(c);
+            return (
+              <AdminPanelSection
+                key={rowKey}
+                title={c.name.trim() || "New category"}
+                hint={
+                  c.id
+                    ? `${c.active ? "Active" : "Hidden"}${c.slug ? ` · ${c.slug}` : ""}`
+                    : undefined
                 }
-              />
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={c.active}
-                  onChange={(e) =>
-                    setRows((r) =>
-                      r.map((x, j) => (j === i ? { ...x, active: e.target.checked } : x)),
-                    )
-                  }
-                />{" "}
-                Active
-              </label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => save(c)}
-                  className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm flex items-center gap-2"
-                >
-                  <Save className="h-4 w-4" /> Save
-                </button>
-                <button
-                  onClick={() => remove(c.id)}
-                  className="rounded-full glass px-4 py-2 text-sm flex items-center gap-2 text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" /> Delete
-                </button>
-              </div>
-            </div>
-          ))}
+                {...sections.panel(rowKey, !c.id)}
+              >
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <Field label="Name">
+                    <input
+                      className={inputCls()}
+                      maxLength={ADMIN_NAME_MAX_LEN}
+                      value={c.name}
+                      onChange={(e) => updateRow(rowKey, { name: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Slug">
+                    <input
+                      className={inputCls()}
+                      value={c.slug}
+                      placeholder="auto from name"
+                      onChange={(e) => updateRow(rowKey, { slug: e.target.value })}
+                    />
+                  </Field>
+                  <NumberField
+                    label="Sort order"
+                    value={c.sort_order}
+                    onChange={(sort_order) => updateRow(rowKey, { sort_order })}
+                    min={0}
+                    required
+                  />
+                </div>
+                <Field label="Description">
+                  <textarea
+                    rows={2}
+                    className={inputCls()}
+                    value={c.description ?? ""}
+                    onChange={(e) => updateRow(rowKey, { description: e.target.value })}
+                  />
+                </Field>
+                <ImageUploadField
+                  label="Category image (optional)"
+                  folder="categories"
+                  spec="categoryMenu"
+                  value={c.image_url ?? ""}
+                  onChange={(image_url) => updateRow(rowKey, { image_url })}
+                />
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={c.active}
+                    onChange={(e) => updateRow(rowKey, { active: e.target.checked })}
+                  />{" "}
+                  Active
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => save(c)}
+                    className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm flex items-center gap-2"
+                  >
+                    <Save className="h-4 w-4" /> Save
+                  </button>
+                  <button
+                    onClick={() => remove(c)}
+                    className="rounded-full glass px-4 py-2 text-sm flex items-center gap-2 text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" /> Delete
+                  </button>
+                </div>
+              </AdminPanelSection>
+            );
+          })}
         </div>
       )}
     </AdminPage>

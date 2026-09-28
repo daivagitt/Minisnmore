@@ -103,6 +103,23 @@ class ZohoBooksClientTest {
         server.verify();
     }
 
+    @Test
+    void getItemGroup_returnsAllVariantsFromBooksEndpoint() {
+        server
+            .expect(requestTo("https://www.zohoapis.in/books/v3/itemgroups/3624052000000394593?organization_id=org-1"))
+            .andRespond(
+                withSuccess(
+                    "{\"code\":0,\"group_id\":\"3624052000000394593\",\"group_name\":\"Jabla\",\"items\":[{\"item_id\":\"1\",\"sku\":\"JABLA-S\"},{\"item_id\":\"2\",\"sku\":\"JABLA-M\"}]}",
+                    MediaType.APPLICATION_JSON
+                )
+            );
+
+        assertThat(client.getItemGroup("3624052000000394593").get("items"))
+            .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+            .hasSize(2);
+        server.verify();
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {
         "{}", "{\"code\":0,\"page_context\":{\"has_more_page\":true}}",
@@ -549,7 +566,7 @@ class ZohoBooksClientTest {
             .expect(requestTo("https://www.zohoapis.in/books/v3/items/gallery-1?organization_id=org-1"))
             .andRespond(
                 withSuccess(
-                    "{\"item\":{\"documents\":[{\"document_id\":\"doc-1\"},{\"document_id\":\"doc-2\"}]}}",
+                    "{\"item\":{\"item_id\":\"gallery-1\",\"documents\":[{\"document_id\":\"doc-1\"},{\"document_id\":\"doc-2\"}]}}",
                     MediaType.APPLICATION_JSON
                 )
             );

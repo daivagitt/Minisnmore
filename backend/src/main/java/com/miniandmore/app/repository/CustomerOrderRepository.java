@@ -6,6 +6,7 @@ import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -123,6 +124,16 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
         "select (count(customerOrder) > 0) from CustomerOrder customerOrder where lower(customerOrder.userLogin) = lower(:login) and customerOrder.status <> :status"
     )
     boolean existsByUserLoginAndStatusNot(@Param("login") String login, @Param("status") OrderStatus status);
+
+    /**
+     * Distinct lowercased logins that have at least one order whose status is not in {@code statuses}
+     * (admin users “Ordered” column). Callers typically exclude CANCELLED and unpaid PENDING.
+     */
+    @Query(
+        "select distinct lower(customerOrder.userLogin) from CustomerOrder customerOrder " +
+        "where customerOrder.userLogin is not null and customerOrder.userLogin <> '' and customerOrder.status not in :statuses"
+    )
+    List<String> findDistinctUserLoginsWithStatusNotIn(@Param("statuses") Collection<OrderStatus> statuses);
 
     @Query(
         value = "select customerOrder from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +

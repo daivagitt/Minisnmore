@@ -42,6 +42,19 @@ class AdminOrdersProxyResourceTest {
     }
 
     @Test
+    void orderedLogins_delegatesToCatalog() throws Exception {
+        when(catalog.get("/internal/v1/admin/orders/ordered-logins"))
+            .thenReturn(ResponseEntity.ok("{\"logins\":[\"today.customer\"]}"));
+
+        mockMvc
+            .perform(get("/api/v1/admin/orders/ordered-logins"))
+            .andExpect(status().isOk())
+            .andExpect(content().string("{\"logins\":[\"today.customer\"]}"));
+
+        verify(catalog).get("/internal/v1/admin/orders/ordered-logins");
+    }
+
+    @Test
     void listOrders_forwardsDateRangeToCatalog() throws Exception {
         String internalPath =
             "/internal/v1/admin/orders?from=2026-08-01T00:00:00Z&to=2026-08-08T00:00:00Z";

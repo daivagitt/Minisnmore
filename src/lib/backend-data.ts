@@ -362,6 +362,13 @@ export function getCouponValidationErrors(row: CouponRow): string[] {
     const getError = requireNumberField(row.bogo_get_qty, "BOGO get quantity", { min: 1, max: 10 });
     if (getError) errors.push(getError);
   }
+  const scope = String(row.eligibility_scope ?? "all").toLowerCase();
+  if (!["all", "same_sku", "category"].includes(scope)) {
+    errors.push("Eligibility scope must be all, same_sku, or category.");
+  }
+  if (scope === "category" && !row.eligibility_category_id) {
+    errors.push("Category is required when eligibility scope is category.");
+  }
   return errors;
 }
 
@@ -1046,6 +1053,8 @@ export type CouponRow = {
   max_discount: number | null;
   bogo_buy_qty: number | null;
   bogo_get_qty: number | null;
+  eligibility_scope: "all" | "same_sku" | "category" | string;
+  eligibility_category_id: string | null;
   expires_at: string | null;
   active: boolean;
 };
@@ -1058,6 +1067,8 @@ type CouponDto = {
   maxDiscount?: number | null;
   bogoBuyQty?: number | null;
   bogoGetQty?: number | null;
+  eligibilityScope?: "ALL" | "SAME_SKU" | "CATEGORY" | null;
+  eligibilityCategoryId?: number | null;
   expiresAt?: string | null;
   active: boolean;
 };
@@ -1072,23 +1083,36 @@ export const fromCouponDto = (dto: CouponDto): CouponRow => ({
   max_discount: dto.maxDiscount == null ? null : Number(dto.maxDiscount),
   bogo_buy_qty: dto.bogoBuyQty == null ? 1 : Number(dto.bogoBuyQty),
   bogo_get_qty: dto.bogoGetQty == null ? 1 : Number(dto.bogoGetQty),
+  eligibility_scope: String(dto.eligibilityScope ?? "ALL").toLowerCase(),
+  eligibility_category_id:
+    dto.eligibilityCategoryId == null ? null : String(dto.eligibilityCategoryId),
   expires_at: dto.expiresAt ?? null,
   active: !!dto.active,
 });
 
-const toCouponDto = (row: CouponRow): CouponDto => ({
-  id: idValue(row.id),
-  code: row.code,
-  discountType:
-    row.discount_type === "flat" ? "FLAT" : row.discount_type === "bogo" ? "BOGO" : "PERCENT",
-  discountValue: row.discount_value as number,
-  minOrder: numberFieldOr(row.min_order, 0),
-  maxDiscount: row.max_discount == null ? null : Number(row.max_discount),
-  bogoBuyQty: numberFieldOr(row.bogo_buy_qty, 1),
-  bogoGetQty: numberFieldOr(row.bogo_get_qty, 1),
-  expiresAt: row.expires_at,
-  active: !!row.active,
-});
+const toCouponDto = (row: CouponRow): CouponDto => {
+  const scope = String(row.eligibility_scope ?? "all").toLowerCase();
+  const eligibilityScope =
+    scope === "same_sku" ? "SAME_SKU" : scope === "category" ? "CATEGORY" : "ALL";
+  return {
+    id: idValue(row.id),
+    code: row.code,
+    discountType:
+      row.discount_type === "flat" ? "FLAT" : row.discount_type === "bogo" ? "BOGO" : "PERCENT",
+    discountValue: row.discount_value as number,
+    minOrder: numberFieldOr(row.min_order, 0),
+    maxDiscount: row.max_discount == null ? null : Number(row.max_discount),
+    bogoBuyQty: numberFieldOr(row.bogo_buy_qty, 1),
+    bogoGetQty: numberFieldOr(row.bogo_get_qty, 1),
+    eligibilityScope,
+    eligibilityCategoryId:
+      eligibilityScope === "CATEGORY" && row.eligibility_category_id
+        ? Number(row.eligibility_category_id)
+        : null,
+    expiresAt: row.expires_at,
+    active: !!row.active,
+  };
+};
 
 export const listCoupons = () =>
   listAdmin<CouponDto>("coupons").then((rows) => rows.map(fromCouponDto));
@@ -1116,6 +1140,7 @@ export type SiteSettingsRow = Record<string, string | number | boolean | null | 
   delivery_eta_buffer_days?: number | null;
   store_discount_percent?: number | null;
   about_page_json?: string | null;
+  gift_page_json?: string | null;
 };
 
 const siteStringMap: Record<string, string> = {
@@ -1151,6 +1176,7 @@ const siteStringMap: Record<string, string> = {
   subscribe_plans_json: "subscribePlansJson",
   subscribe_features_json: "subscribeFeaturesJson",
   about_page_json: "aboutPageJson",
+  gift_page_json: "giftPageJson",
 };
 
 function fromSiteSettingDto(dto: Record<string, unknown> | null): SiteSettingsRow | null {
@@ -1221,6 +1247,13 @@ export type AboutPageApiContent = {
 
 export const getAboutPage = () =>
   api.get<AboutPageApiContent | null>("/api/v1/about-page").then((row) => row ?? {});
+
+export type GiftPageApiContent = {
+  gift_page_json?: string;
+};
+
+export const getGiftPage = () =>
+  api.get<GiftPageApiContent | null>("/api/v1/gift-page").then((row) => row ?? {});
 
 export const getAdminSiteSettings = () =>
   api
@@ -1732,6 +1765,13 @@ export const pullZohoInventory = () =>
 export const pullZohoProducts = (options?: { full?: boolean }) =>
   api.post<ZohoSyncSummary>(
     `/api/v1/admin/zoho/pull-products${options?.full ? "?full=true" : ""}`,
+    undefined,
+    { auth: true },
+  );
+
+export const pullZohoProductGroup = (itemGroupId: string) =>
+  api.post<ZohoSyncSummary>(
+    `/api/v1/admin/zoho/pull-item-groups/${encodeURIComponent(itemGroupId.trim())}`,
     undefined,
     { auth: true },
   );

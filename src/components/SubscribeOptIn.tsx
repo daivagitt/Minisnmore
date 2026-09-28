@@ -3,11 +3,18 @@ type SubscribeOptInProps = {
   onChange: (next: boolean) => void;
   /** Optional hint under the label. When omitted, only a short uncheck hint is shown while checked. */
   helper?: string;
+  /** Hint shown while checked. Defaults to the unsubscribe hint used for existing subscribers. */
+  checkedHint?: string;
 };
 
-export function SubscribeOptIn({ checked, onChange, helper }: SubscribeOptInProps) {
+export function SubscribeOptIn({
+  checked,
+  onChange,
+  helper,
+  checkedHint = "Uncheck to unsubscribe from emails and offers.",
+}: SubscribeOptInProps) {
   const hint = checked
-    ? "Uncheck to unsubscribe from emails and offers."
+    ? checkedHint
     : helper?.trim() || null;
 
   return (

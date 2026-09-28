@@ -769,6 +769,16 @@ export async function listCodPendingOrders(): Promise<{ orders: AdminCodOrderRow
   return { orders: res.orders ?? [] };
 }
 
+/** Lowercased logins with at least one placed (non-cancelled, non-pending) order. */
+export async function listOrderedCustomerLogins(): Promise<string[]> {
+  const res = await api.get<{ logins?: string[] }>("/api/v1/admin/orders/ordered-logins", {
+    auth: true,
+  });
+  return (res.logins ?? [])
+    .map((login) => String(login ?? "").trim().toLowerCase())
+    .filter(Boolean);
+}
+
 export async function markCodCollected(orderNumber: string) {
   return api.post(
     `/api/v1/admin/orders/${encodeURIComponent(orderNumber)}/mark-cod-collected`,

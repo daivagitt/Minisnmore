@@ -1,5 +1,6 @@
 package com.miniandmore.app.domain;
 
+import com.miniandmore.app.domain.enumeration.CouponEligibilityScope;
 import com.miniandmore.app.domain.enumeration.DiscountType;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
@@ -58,6 +59,14 @@ public class Coupon implements Serializable {
     @Max(10)
     @Column(name = "bogo_get_qty", nullable = false)
     private Integer bogoGetQty = 1;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "eligibility_scope", length = 32, nullable = false)
+    private CouponEligibilityScope eligibilityScope = CouponEligibilityScope.ALL;
+
+    @Column(name = "eligibility_category_id")
+    private Long eligibilityCategoryId;
 
     @Column(name = "expires_at")
     private Instant expiresAt;
@@ -172,6 +181,32 @@ public class Coupon implements Serializable {
         this.bogoGetQty = bogoGetQty;
     }
 
+    public CouponEligibilityScope getEligibilityScope() {
+        return this.eligibilityScope;
+    }
+
+    public Coupon eligibilityScope(CouponEligibilityScope eligibilityScope) {
+        this.setEligibilityScope(eligibilityScope);
+        return this;
+    }
+
+    public void setEligibilityScope(CouponEligibilityScope eligibilityScope) {
+        this.eligibilityScope = eligibilityScope == null ? CouponEligibilityScope.ALL : eligibilityScope;
+    }
+
+    public Long getEligibilityCategoryId() {
+        return this.eligibilityCategoryId;
+    }
+
+    public Coupon eligibilityCategoryId(Long eligibilityCategoryId) {
+        this.setEligibilityCategoryId(eligibilityCategoryId);
+        return this;
+    }
+
+    public void setEligibilityCategoryId(Long eligibilityCategoryId) {
+        this.eligibilityCategoryId = eligibilityCategoryId;
+    }
+
     public Instant getExpiresAt() {
         return this.expiresAt;
     }
@@ -229,6 +264,8 @@ public class Coupon implements Serializable {
             ", maxDiscount=" + getMaxDiscount() +
             ", bogoBuyQty=" + getBogoBuyQty() +
             ", bogoGetQty=" + getBogoGetQty() +
+            ", eligibilityScope='" + getEligibilityScope() + "'" +
+            ", eligibilityCategoryId=" + getEligibilityCategoryId() +
             ", expiresAt='" + getExpiresAt() + "'" +
             ", active='" + getActive() + "'" +
             "}";

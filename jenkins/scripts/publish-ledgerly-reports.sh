@@ -42,17 +42,8 @@ API_TEST_BASE_URL="${API_TEST_BASE_URL:-http://127.0.0.1:9180}" \
 mkdir -p "$PKG/backend/ledgerly-live"
 cp -a artifacts/ledgerly-live/. "$PKG/backend/ledgerly-live/"
 
-echo "=== 5b. Ledgerly scenario integration tests ==="
-API_TEST_BASE_URL="${API_TEST_BASE_URL:-http://127.0.0.1:9180}" \
-  bash jenkins/scripts/run-ledgerly-scenario-integration-tests.sh || true
-mkdir -p "$PKG/backend/ledgerly-scenario-integration"
-cp -a artifacts/ledgerly-scenario-integration/. "$PKG/backend/ledgerly-scenario-integration/"
-
-echo "=== 5c. Scenario integration tests ==="
-API_TEST_BASE_URL="${API_TEST_BASE_URL:-http://127.0.0.1:9180}" \
-  bash jenkins/scripts/run-scenario-integration-tests.sh || true
-mkdir -p "$PKG/backend/scenario-integration"
-cp -a artifacts/scenario-integration/. "$PKG/backend/scenario-integration/"
+rm -rf "$PKG/backend/scenario-integration" "$PKG/backend/ledgerly-scenario-integration" \
+  "$PKG/backend/zoho-live" "$PKG/backend/coverage/integration" "$PKG/backend/javadoc/integration"
 
 echo "=== 6. Ledgerly indices ==="
 python3 jenkins/scripts/generate-ledgerly-unit-tests-index.py \

@@ -2,5 +2,5 @@ projectKey=frontend
 serverUrl=http://127.0.0.1:9000/sonar
 serverVersion=25.5.0.107428
 dashboardUrl=http://127.0.0.1:9000/sonar/dashboard?id=frontend
-ceTaskId=81c2fa09-74f7-41d0-9d45-6b3c95aec396
-ceTaskUrl=http://127.0.0.1:9000/sonar/api/ce/task?id=81c2fa09-74f7-41d0-9d45-6b3c95aec396
+ceTaskId=c813e658-7205-4c4d-aafc-416d6fac54d9
+ceTaskUrl=http://127.0.0.1:9000/sonar/api/ce/task?id=c813e658-7205-4c4d-aafc-416d6fac54d9

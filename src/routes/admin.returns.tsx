@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -54,27 +54,92 @@ function formatCaseAge(row: { case_age_hours?: number; sla_due_at?: string | nul
   return row.sla_overdue ? `${ageLabel} · overdue (due ${due})` : `${ageLabel} · due ${due}`;
 }
 
-const STATUS_FILTERS = [
-  "",
-  "requested",
-  "approved",
-  "pickup_requested",
-  "pickup_scheduled",
-  "pickup_failed",
-  "picked_up",
-  "received",
-  "inspected",
-  "accepted",
-  "item_allocated",
-  "repacking",
-  "ready_to_ship",
-  "shipped",
-  "delivered",
-  "refunded",
-  "completed",
-  "rejected",
-  "failed",
-] as const;
+type StageId = "all" | "request" | "pickup" | "inspection" | "exchange" | "closed";
+
+const STAGE_FILTERS: { id: StageId; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "request", label: "Request" },
+  { id: "pickup", label: "Pickup" },
+  { id: "inspection", label: "Inspection" },
+  { id: "exchange", label: "Exchange" },
+  { id: "closed", label: "Closed" },
+];
+
+const STATUS_FILTER_GROUPS: {
+  id: Exclude<StageId, "all">;
+  label: string;
+  options: { value: string; label: string }[];
+}[] = [
+  {
+    id: "request",
+    label: "Request",
+    options: [
+      { value: "requested", label: "Requested" },
+      { value: "approved", label: "Approved" },
+    ],
+  },
+  {
+    id: "pickup",
+    label: "Pickup",
+    options: [
+      { value: "pickup_requested", label: "Pickup requested" },
+      { value: "pickup_scheduled", label: "Pickup scheduled" },
+      { value: "pickup_failed", label: "Pickup failed" },
+      { value: "picked_up", label: "Picked up" },
+    ],
+  },
+  {
+    id: "inspection",
+    label: "Inspection",
+    options: [
+      { value: "received", label: "Received" },
+      { value: "inspected", label: "Inspected" },
+      { value: "accepted", label: "Accepted" },
+    ],
+  },
+  {
+    id: "exchange",
+    label: "Exchange",
+    options: [
+      { value: "item_allocated", label: "Item allocated" },
+      { value: "repacking", label: "Repacking" },
+      { value: "ready_to_ship", label: "Ready to ship" },
+      { value: "shipped", label: "Shipped" },
+      { value: "delivered", label: "Delivered" },
+    ],
+  },
+  {
+    id: "closed",
+    label: "Closed",
+    options: [
+      { value: "refunded", label: "Refunded" },
+      { value: "completed", label: "Completed" },
+      { value: "rejected", label: "Rejected" },
+      { value: "failed", label: "Failed" },
+    ],
+  },
+];
+
+const STAGE_STATUS_SET: Record<Exclude<StageId, "all">, Set<string>> = Object.fromEntries(
+  STATUS_FILTER_GROUPS.map((group) => [group.id, new Set(group.options.map((o) => o.value))]),
+) as Record<Exclude<StageId, "all">, Set<string>>;
+
+function statusesForStage(stage: StageId): { value: string; label: string }[] {
+  if (stage === "all") {
+    return STATUS_FILTER_GROUPS.flatMap((group) => group.options);
+  }
+  return STATUS_FILTER_GROUPS.find((group) => group.id === stage)?.options ?? [];
+}
+
+function stageFilterPillClass(selected: boolean): string {
+  return [
+    "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1",
+    selected
+      ? "border-primary bg-primary text-primary-foreground shadow-sm"
+      : "border-border/80 bg-background/70 text-foreground/80 hover:border-border hover:bg-muted/70 hover:text-foreground",
+  ].join(" ");
+}
 
 /** One primary next-step action (plus an optional secondary one) per current status. */
 function nextActions(
@@ -251,6 +316,7 @@ function nextActions(
 function AdminReturnsPage() {
   if (!RETURNS_UI_ENABLED) return null;
 
+  const [stage, setStage] = useState<StageId>("request");
   const [status, setStatus] = useState<string>("requested");
   const [rows, setRows] = useState<AdminOrderReturnRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -283,9 +349,12 @@ function AdminReturnsPage() {
   const [codRefundMethod, setCodRefundMethod] = useState<"upi" | "bank_transfer" | "cash" | "other">("upi");
   const [codRefundReference, setCodRefundReference] = useState("");
 
+  const stageStatusOptions = useMemo(() => statusesForStage(stage), [stage]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      // Exact status → API filter. Stage-only / All → fetch all, filter client-side.
       const res = await listAdminOrderReturns(status || undefined);
       setRows(res.returns ?? []);
     } catch (error) {
@@ -299,7 +368,22 @@ function AdminReturnsPage() {
     void load();
   }, [load]);
 
-  const paging = useListPagination(rows, { pageSize: LIST_PAGE_SIZE, resetKey: status });
+  const filteredRows = useMemo(() => {
+    if (status) return rows;
+    if (stage === "all") return rows;
+    const allowed = STAGE_STATUS_SET[stage];
+    return rows.filter((row) => allowed.has(row.status));
+  }, [rows, stage, status]);
+
+  const paging = useListPagination(filteredRows, {
+    pageSize: LIST_PAGE_SIZE,
+    resetKey: `${stage}|${status}`,
+  });
+
+  const selectStage = (next: StageId) => {
+    setStage(next);
+    setStatus("");
+  };
 
   const run = async (returnNumber: string, action: () => Promise<unknown>, label: string) => {
     setBusy(returnNumber);
@@ -453,26 +537,93 @@ function AdminReturnsPage() {
       title="Order returns & exchanges"
       description="Review customer return/exchange requests, walk them through pickup, inspection, and refund or replacement."
     >
-      <div className="flex flex-wrap gap-2 mb-4">
-        {STATUS_FILTERS.map((s) => (
-          <button
-            key={s || "all"}
-            type="button"
-            onClick={() => setStatus(s)}
-            className={`text-xs rounded-full px-3 py-1.5 border ${
-              status === s ? "bg-primary text-primary-foreground border-primary" : "border-border"
-            }`}
-          >
-            {s ? s.replace(/_/g, " ") : "All"}
-          </button>
-        ))}
-      </div>
+      <section
+        className="glass-strong mb-5 space-y-4 rounded-3xl p-4 sm:p-5"
+        aria-label="Filter returns"
+      >
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            Stage
+          </p>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by stage">
+            {STAGE_FILTERS.map((option) => {
+              const selected = stage === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => selectStage(option.id)}
+                  className={stageFilterPillClass(selected)}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="block min-w-[14rem] flex-1 sm:max-w-xs">
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+              Status
+            </span>
+            <select
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+              aria-label="Filter by return status"
+              className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:ring-2 focus:ring-primary/30"
+            >
+              <option value="">
+                {stage === "all" ? "All statuses" : `All ${STAGE_FILTERS.find((s) => s.id === stage)?.label.toLowerCase()} statuses`}
+              </option>
+              {stage === "all"
+                ? STATUS_FILTER_GROUPS.map((group) => (
+                    <optgroup key={group.id} label={group.label}>
+                      {group.options.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))
+                : stageStatusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+            </select>
+          </label>
+          {(stage !== "all" || status !== "") && (
+            <button
+              type="button"
+              onClick={() => {
+                setStage("all");
+                setStatus("");
+              }}
+              className="inline-flex h-10 items-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Clear
+            </button>
+          )}
+          {!loading && (
+            <p className="ml-auto text-xs text-muted-foreground" aria-live="polite">
+              {paging.totalItems === 0
+                ? "0 returns"
+                : paging.totalPages > 1
+                  ? `Showing ${paging.rangeStart}–${paging.rangeEnd} of ${paging.totalItems}`
+                  : `${paging.totalItems} return${paging.totalItems === 1 ? "" : "s"}`}
+            </p>
+          )}
+        </div>
+      </section>
 
       {loading ? (
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      ) : rows.length === 0 ? (
+      ) : filteredRows.length === 0 ? (
         <p className="text-sm text-muted-foreground">No returns in this filter.</p>
       ) : (
+        <>
         <ul id="admin-returns-list" className="space-y-4">
           {paging.pageItems.map((r) => {
             const { primary, secondary } = nextActions(
@@ -642,8 +793,6 @@ function AdminReturnsPage() {
             );
           })}
         </ul>
-      )}
-      {!loading && rows.length > 0 && (
         <ListPagination
           page={paging.page}
           totalPages={paging.totalPages}
@@ -652,6 +801,7 @@ function AdminReturnsPage() {
           scrollToId="admin-returns-list"
           onPageChange={paging.setPage}
         />
+        </>
       )}
 
       <Dialog open={!!rejectTarget} onOpenChange={(open) => !open && setRejectTarget(null)}>

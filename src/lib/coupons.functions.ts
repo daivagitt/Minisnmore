@@ -4,6 +4,9 @@ import { z } from "zod";
 const Line = z.object({
   qty: z.number().int().min(1).max(50),
   price: z.number().min(0).max(10_000_000),
+  product_id: z.string().trim().max(120).optional(),
+  sku: z.string().trim().max(120).optional(),
+  category_id: z.number().int().positive().optional(),
 });
 
 const Input = z.object({
@@ -12,7 +15,14 @@ const Input = z.object({
   items: z.array(Line).max(50).optional(),
 });
 
-export type CouponCartLine = { qty: number; unitPrice: number };
+export type CouponCartLine = {
+  qty: number;
+  unitPrice: number;
+  productId?: string | null;
+  variantSku?: string | null;
+  categoryId?: string | number | null;
+  product?: { id?: string | null; categoryId?: string | number | null } | null;
+};
 
 export type CouponValidationResponse = {
   ok: boolean;
@@ -27,7 +37,21 @@ export function couponValidationData(code: string, subtotal: number, cart: Coupo
   return {
     code,
     subtotal,
-    items: cart.map((item) => ({ qty: item.qty, price: item.unitPrice })),
+    items: cart.map((item) => {
+      const productId = item.productId ?? item.product?.id ?? undefined;
+      const categoryRaw = item.categoryId ?? item.product?.categoryId ?? undefined;
+      const categoryId =
+        categoryRaw == null || categoryRaw === ""
+          ? undefined
+          : Number(categoryRaw);
+      return {
+        qty: item.qty,
+        price: item.unitPrice,
+        ...(productId ? { product_id: String(productId) } : {}),
+        ...(item.variantSku ? { sku: String(item.variantSku) } : {}),
+        ...(categoryId != null && Number.isFinite(categoryId) ? { category_id: categoryId } : {}),
+      };
+    }),
   };
 }
 
@@ -48,6 +72,8 @@ export type ActiveCoupon = {
   max_discount: number | null;
   bogo_buy_qty?: number | null;
   bogo_get_qty?: number | null;
+  eligibility_scope?: "all" | "same_sku" | "category" | string | null;
+  eligibility_category_id?: number | null;
 };
 
 const BOGO_QTY_MIN = 1;
@@ -70,7 +96,8 @@ export type BogoCalculationResult = {
 };
 
 /**
- * Standard e-commerce greedy descending pairing algorithm matching backend BogoDiscountCalculator.
+ * Client-side BOGO estimate for offer cards only. Checkout/cart validation uses the backend
+ * calculator (eligibility scopes, line allocations). Do not treat this as full parity.
  */
 export function calculateBogoDiscount(
   buyQty: number | null | undefined,
@@ -159,11 +186,16 @@ export function formatCouponOffer(c: ActiveCoupon) {
 
 export function couponEligibilityHint(c: ActiveCoupon, subtotal: number, itemCount: number): string | null {
   const type = String(c.discount_type ?? "").toLowerCase();
+  const scope = String(c.eligibility_scope ?? "all").toLowerCase();
   if (type === "bogo") {
-    const { groupSize } = resolveBogoQuantities(c);
-    if (itemCount < groupSize) {
-      const missing = groupSize - itemCount;
-      return missing === 1 ? "Add 1 more item to unlock" : `Add ${missing} more items to unlock`;
+    // SAME_SKU / CATEGORY eligibility is enforced by the backend validate API; this hint only
+    // covers the whole-cart item-count case used on offer cards.
+    if (scope === "all" || !scope) {
+      const { groupSize } = resolveBogoQuantities(c);
+      if (itemCount < groupSize) {
+        const missing = groupSize - itemCount;
+        return missing === 1 ? "Add 1 more item to unlock" : `Add ${missing} more items to unlock`;
+      }
     }
   }
   if (subtotal < c.min_order) {

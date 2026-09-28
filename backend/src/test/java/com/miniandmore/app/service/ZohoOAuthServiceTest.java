@@ -33,6 +33,9 @@ class ZohoOAuthServiceTest {
     @Mock
     private ZohoSettingRepository settingRepository;
 
+    @Mock
+    private ZohoSettingsService zohoSettingsService;
+
     private ApplicationProperties applicationProperties;
     private MockRestServiceServer server;
     private ZohoOAuthService service;
@@ -51,7 +54,7 @@ class ZohoOAuthServiceTest {
 
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        service = new ZohoOAuthService(settingRepository, applicationProperties, builder);
+        service = new ZohoOAuthService(settingRepository, applicationProperties, builder, zohoSettingsService);
     }
 
     @Test

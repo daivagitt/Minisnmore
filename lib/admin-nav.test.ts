@@ -19,6 +19,9 @@ describe("admin-nav", () => {
     const messages = filterAdminNavItems(ADMIN_NAV_ITEMS, "write to us");
     expect(messages.map((item) => item.to)).toEqual(["/admin/contact-messages"]);
 
+    const gift = filterAdminNavItems(ADMIN_NAV_ITEMS, "gifting occasions");
+    expect(gift.map((item) => item.to)).toEqual(["/admin/gift"]);
+
     const users = filterAdminNavItems(ADMIN_NAV_ITEMS, "joined");
     expect(users.map((item) => item.to)).toEqual(["/admin/users"]);
 

@@ -10,6 +10,9 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.config.ApplicationProperties;
+import com.miniandmore.app.domain.ZohoSetting;
+import com.miniandmore.app.domain.enumeration.DiscountType;
+import com.miniandmore.app.service.dto.CouponDTO;
 import com.miniandmore.app.service.dto.SiteSettingDTO;
 import jakarta.mail.internet.MimeMessage;
 import java.math.BigDecimal;
@@ -79,7 +82,13 @@ class AdminConfigChangeMailServiceTest {
         when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
         when(templateEngine.process(eq("mail/adminConfigChangeEmail"), any(Context.class))).thenReturn("<html>ok</html>");
         when(messageSource.getMessage(eq("email.admin.config.title"), any(), eq(Locale.ENGLISH))).thenReturn(
-            "Minis n More admin configuration changed"
+            "Minis n More admin configuration changed (Site settings)"
+        );
+        when(messageSource.getMessage(eq("email.admin.config.intro.saved"), any(), eq(Locale.ENGLISH))).thenReturn(
+            "Site settings were saved"
+        );
+        when(messageSource.getMessage(eq("email.admin.config.preheader.saved"), any(), eq(Locale.ENGLISH))).thenReturn(
+            "Site settings were updated"
         );
 
         SiteSettingDTO previous = new SiteSettingDTO();
@@ -96,6 +105,7 @@ class AdminConfigChangeMailServiceTest {
         verify(templateEngine).process(eq("mail/adminConfigChangeEmail"), contextCaptor.capture());
         Context context = contextCaptor.getValue();
         assertThat(context.getVariable("changedBy")).isEqualTo("admin.user");
+        assertThat(context.getVariable("area")).isEqualTo("Site settings");
         assertThat(context.getVariable("hasChanges")).isEqualTo(true);
         @SuppressWarnings("unchecked")
         List<Map<String, String>> changes = (List<Map<String, String>>) context.getVariable("changes");
@@ -110,6 +120,89 @@ class AdminConfigChangeMailServiceTest {
                 assertThat(row.get("from")).isEqualTo("5");
                 assertThat(row.get("to")).isEqualTo("12");
             });
+    }
+
+    @Test
+    void notifyCouponChanged_includesCouponFields() {
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(eq("mail/adminConfigChangeEmail"), any(Context.class))).thenReturn("content");
+        when(messageSource.getMessage(any(), any(), any())).thenReturn("text");
+
+        CouponDTO previous = new CouponDTO();
+        previous.setCode("OLD10");
+        previous.setDiscountType(DiscountType.PERCENT);
+        previous.setDiscountValue(new BigDecimal("10"));
+        previous.setMinOrder(BigDecimal.ZERO);
+        previous.setActive(true);
+        CouponDTO current = new CouponDTO();
+        current.setCode("NEW20");
+        current.setDiscountType(DiscountType.PERCENT);
+        current.setDiscountValue(new BigDecimal("20"));
+        current.setMinOrder(BigDecimal.ZERO);
+        current.setActive(true);
+
+        service.notifyCouponChanged(previous, current);
+
+        ArgumentCaptor<Context> contextCaptor = ArgumentCaptor.forClass(Context.class);
+        verify(templateEngine).process(eq("mail/adminConfigChangeEmail"), contextCaptor.capture());
+        assertThat(contextCaptor.getValue().getVariable("area")).isEqualTo("Coupons");
+        @SuppressWarnings("unchecked")
+        List<Map<String, String>> changes = (List<Map<String, String>>) contextCaptor.getValue().getVariable("changes");
+        assertThat(changes)
+            .anySatisfy(row -> {
+                assertThat(row.get("field")).isEqualTo("Code");
+                assertThat(row.get("from")).isEqualTo("OLD10");
+                assertThat(row.get("to")).isEqualTo("NEW20");
+            });
+        verify(javaMailSender).send(mimeMessage);
+    }
+
+    @Test
+    void notifyZohoSettingsChanged_masksSecretsAndShowsUpdates() {
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(eq("mail/adminConfigChangeEmail"), any(Context.class))).thenReturn("content");
+        when(messageSource.getMessage(any(), any(), any())).thenReturn("text");
+
+        ZohoSetting previous = new ZohoSetting()
+            .orgId("org-1")
+            .clientId("client-1")
+            .clientSecret("secret-old")
+            .refreshToken("refresh-old")
+            .dataCenter("in")
+            .connected(true);
+        ZohoSetting current = new ZohoSetting()
+            .orgId("org-2")
+            .clientId("client-1")
+            .clientSecret("secret-new")
+            .refreshToken("refresh-old")
+            .dataCenter("eu")
+            .connected(true);
+
+        service.notifyZohoSettingsChanged(previous, current);
+
+        ArgumentCaptor<Context> contextCaptor = ArgumentCaptor.forClass(Context.class);
+        verify(templateEngine).process(eq("mail/adminConfigChangeEmail"), contextCaptor.capture());
+        assertThat(contextCaptor.getValue().getVariable("area")).isEqualTo("Zoho settings");
+        @SuppressWarnings("unchecked")
+        List<Map<String, String>> changes = (List<Map<String, String>>) contextCaptor.getValue().getVariable("changes");
+        assertThat(changes)
+            .anySatisfy(row -> {
+                assertThat(row.get("field")).isEqualTo("Org Id");
+                assertThat(row.get("from")).isEqualTo("org-1");
+                assertThat(row.get("to")).isEqualTo("org-2");
+            })
+            .anySatisfy(row -> {
+                assertThat(row.get("field")).isEqualTo("Client Secret");
+                assertThat(row.get("from")).isEqualTo("(set)");
+                assertThat(row.get("to")).isEqualTo("(updated)");
+            })
+            .anySatisfy(row -> {
+                assertThat(row.get("field")).isEqualTo("Data Center");
+                assertThat(row.get("from")).isEqualTo("in");
+                assertThat(row.get("to")).isEqualTo("eu");
+            })
+            .noneSatisfy(row -> assertThat(row.get("from")).contains("secret-"))
+            .noneSatisfy(row -> assertThat(row.get("to")).contains("secret-"));
     }
 
     @Test
@@ -129,9 +222,40 @@ class AdminConfigChangeMailServiceTest {
     }
 
     @Test
-    void notifySiteSettingsChanged_skipsWhenCurrentMissing() {
-        service.notifySiteSettingsChanged(new SiteSettingDTO(), null);
+    void notifyConfigChanged_skipsWhenBothMissing() {
+        service.notifyCouponChanged(null, null);
         verify(javaMailSender, never()).createMimeMessage();
+    }
+
+    @Test
+    void notifyCouponChanged_deleteUsesDeletedCopy() {
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(eq("mail/adminConfigChangeEmail"), any(Context.class))).thenReturn("content");
+        when(messageSource.getMessage(eq("email.admin.config.title.deleted"), any(), eq(Locale.ENGLISH))).thenReturn(
+            "deleted title"
+        );
+        when(messageSource.getMessage(eq("email.admin.config.intro.deleted"), any(), eq(Locale.ENGLISH))).thenReturn(
+            "deleted intro"
+        );
+        when(messageSource.getMessage(eq("email.admin.config.preheader.deleted"), any(), eq(Locale.ENGLISH))).thenReturn(
+            "deleted preheader"
+        );
+
+        CouponDTO previous = new CouponDTO();
+        previous.setCode("GONE");
+        previous.setDiscountType(DiscountType.FLAT);
+        previous.setDiscountValue(new BigDecimal("50"));
+        previous.setMinOrder(BigDecimal.ZERO);
+        previous.setActive(true);
+
+        service.notifyCouponChanged(previous, null);
+
+        verify(javaMailSender).send(mimeMessage);
+        ArgumentCaptor<Context> contextCaptor = ArgumentCaptor.forClass(Context.class);
+        verify(templateEngine).process(eq("mail/adminConfigChangeEmail"), contextCaptor.capture());
+        assertThat(contextCaptor.getValue().getVariable("intro")).isEqualTo("deleted intro");
+        assertThat(contextCaptor.getValue().getVariable("subject")).isEqualTo("deleted title");
+        assertThat(contextCaptor.getValue().getVariable("hasChanges")).isEqualTo(true);
     }
 
     @Test
@@ -173,5 +297,6 @@ class AdminConfigChangeMailServiceTest {
         assertThat(AdminConfigChangeMailService.display(null)).isEqualTo("(empty)");
         assertThat(AdminConfigChangeMailService.display(new BigDecimal("20.00"))).isEqualTo("20");
         assertThat(AdminConfigChangeMailService.display("x".repeat(300))).endsWith("...");
+        assertThat(AdminConfigChangeMailService.display(DiscountType.BOGO)).isEqualTo("BOGO");
     }
 }

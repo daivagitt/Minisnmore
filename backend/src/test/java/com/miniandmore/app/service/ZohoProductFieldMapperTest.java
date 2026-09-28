@@ -135,6 +135,35 @@ class ZohoProductFieldMapperTest {
     }
 
     @Test
+    void enrichPushPayload_prefersEntityCustomFieldIdWhenZohoReturnsBothIds() {
+        Map<String, Object> categoryField = new LinkedHashMap<>(sampleFields().get(5));
+        categoryField.put("field_id", "generic-settings-field");
+        categoryField.put("customfield_id", "item-custom-field");
+        when(booksClient.listItemFields()).thenReturn(List.of(categoryField));
+        Product product = new Product().category(new Category().name("Bodysuits"));
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        mapper.enrichPushPayload(product, payload);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> customFields = (List<Map<String, Object>>) payload.get("custom_fields");
+        assertThat(customFields).containsExactly(Map.of("customfield_id", "item-custom-field", "value", "Bodysuits"));
+    }
+
+    @Test
+    void enrichPushPayload_prefersNativeZohoCategoryIdOverCategoryCustomField() {
+        Product product = new Product().category(new Category().name("Bodysuits").zohoCategoryId("zoho-category-1"));
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        mapper.enrichPushPayload(product, payload);
+
+        assertThat(payload).containsEntry("category_id", "zoho-category-1");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> customFields = (List<Map<String, Object>>) payload.get("custom_fields");
+        assertThat(customFields).noneMatch(field -> "4063993000000072096".equals(field.get("customfield_id")));
+    }
+
+    @Test
     void applyPulledItem_mapsCategoryWhenAutoCreateEnabled() {
         Product product = new Product();
         Category category = new Category().name("Swaddles");
@@ -160,6 +189,45 @@ class ZohoProductFieldMapperTest {
 
         assertThat(product.getCategory()).isEqualTo(category);
         assertThat(notice).contains("Assigned category Swaddles");
+    }
+
+    @Test
+    void applyPulledItem_mapsNativeZohoCategoryNameWhenCustomFieldIsAbsent() {
+        Product product = new Product();
+        Category category = new Category().name("Jablas");
+        when(categoryResolver.resolve("Jablas", true)).thenReturn(Optional.of(category));
+
+        Optional<String> notice = mapper.applyPulledItem(product, Map.of("category_name", "Jablas"), true);
+
+        assertThat(product.getCategory()).isEqualTo(category);
+        assertThat(notice).contains("Assigned category Jablas");
+    }
+
+    @Test
+    void applyPulledItem_retainsNativeZohoCategoryId() {
+        Product product = new Product();
+        Category category = new Category().name("Jablas");
+        when(categoryResolver.resolve("Jablas", true)).thenReturn(Optional.of(category));
+
+        mapper.applyPulledItem(
+            product,
+            Map.of("category_id", "zoho-category-2", "category_name", "Jablas"),
+            true
+        );
+
+        assertThat(product.getCategory()).isEqualTo(category);
+        assertThat(category.getZohoCategoryId()).isEqualTo("zoho-category-2");
+    }
+
+    @Test
+    void applyPulledItem_mapsNestedNativeZohoCategory() {
+        Product product = new Product();
+        Category category = new Category().name("Rompers");
+        when(categoryResolver.resolve("Rompers", false)).thenReturn(Optional.of(category));
+
+        mapper.applyPulledItem(product, Map.of("category", Map.of("name", "Rompers")), false);
+
+        assertThat(product.getCategory()).isEqualTo(category);
     }
 
     @Test

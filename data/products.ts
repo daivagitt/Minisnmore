@@ -17,6 +17,7 @@ export type Product = {
   colors: { name: string; hex: string; swatchUrl?: string; imageUrl?: string; imageUrls?: string[] }[]; sizes: string[];
   rating: number; reviewCount: number;
   category: "Newborn" | "Infant" | "Toddler";
+  categoryId?: string;
   categorySlug?: string;
   categoryName?: string;
   sku?: string;

@@ -83,7 +83,6 @@ def main() -> None:
         <h2>Related</h2>
         <div class="links">
           {link_card('../ledgerly-live/index.html', 'Live API integration tests', 'Admin JWT + live Ledgerly API on UAT')}
-          {link_card('../ledgerly-scenario-integration/index.html', 'Scenario integration tests', 'Checkout, sync, inventory, tracking flows')}
           {link_card('../unit-tests/index.html', 'All backend unit tests', 'Gateway, catalog, store, commerce')}
           {link_card('../../index.html', 'Reports home', 'Unified dashboard')}
         </div>

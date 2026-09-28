@@ -13,6 +13,9 @@ PERF_DELAY_REQUEST_MS="${PERF_DELAY_REQUEST_MS:-100}"
 PERF_MAX_RESPONSE_MS="${PERF_MAX_RESPONSE_MS:-3000}"
 PERF_MAX_RESPONSE_MS_25="${PERF_MAX_RESPONSE_MS_25:-6000}"
 NEWMAN_VERSION="${NEWMAN_VERSION:-6.2.1}"
+# true = GET-only collections (drops POST /api/register etc.) so no run emails via Care@minisnmore.com.
+API_TEST_NO_MAIL="${API_TEST_NO_MAIL:-true}"
+export API_TEST_NO_MAIL
 
 perf_max_ms_for_users() {
   local users="$1"
@@ -129,11 +132,21 @@ out = Path(sys.argv[2])
 product_slug = sys.argv[3]
 blog_slug = sys.argv[4]
 doc = json.loads(src.read_text(encoding="utf-8"))
+import os
+no_mail = os.environ.get("API_TEST_NO_MAIL", "true").lower() not in ("0", "false", "no")
+
+def is_write_request(item):
+    req = item.get("request") if isinstance(item, dict) else None
+    if not isinstance(req, dict):
+        return False
+    return str(req.get("method") or "GET").upper() not in ("GET", "HEAD", "OPTIONS")
 
 def walk_items(items):
     kept = []
     for item in items or []:
         if isinstance(item, dict) and item.get("name") == "GET blog-posts by slug" and not blog_slug:
+            continue
+        if no_mail and is_write_request(item):
             continue
         nested = item.get("item") if isinstance(item, dict) else None
         if isinstance(nested, list):

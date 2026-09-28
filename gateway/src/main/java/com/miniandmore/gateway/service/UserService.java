@@ -361,7 +361,9 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public Flux<com.miniandmore.gateway.service.dto.UserDTO> getAllPublicUsers(Pageable pageable) {
-        return userRepository.findAllByActivatedIsTrue(pageable).map(com.miniandmore.gateway.service.dto.UserDTO::new);
+        return userRepository
+            .findAllActivatedUsers(pageable.getPageSize(), pageable.getOffset())
+            .map(com.miniandmore.gateway.service.dto.UserDTO::new);
     }
 
     @Transactional(readOnly = true)

@@ -1,6 +1,327 @@
 {
   "vus": 15,
   "duration": "45s",
-  "endpointCount": 0,
-  "endpoints": []
+  "endpointCount": 40,
+  "endpoints": [
+    {
+      "endpoint": "GET /api/v1/about-page",
+      "requests": 165,
+      "avgMs": 16,
+      "p95Ms": 37,
+      "maxMs": 153,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/account/addresses",
+      "requests": 166,
+      "avgMs": 15,
+      "p95Ms": 35,
+      "maxMs": 140,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/account/cart",
+      "requests": 166,
+      "avgMs": 15,
+      "p95Ms": 30,
+      "maxMs": 128,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/account/notifications",
+      "requests": 167,
+      "avgMs": 38,
+      "p95Ms": 74,
+      "maxMs": 111,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/account/profile",
+      "requests": 168,
+      "avgMs": 13,
+      "p95Ms": 28,
+      "maxMs": 54,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/account/wishlist",
+      "requests": 169,
+      "avgMs": 14,
+      "p95Ms": 32,
+      "maxMs": 57,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/banners",
+      "requests": 170,
+      "avgMs": 14,
+      "p95Ms": 31,
+      "maxMs": 42,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/blog-posts",
+      "requests": 171,
+      "avgMs": 15,
+      "p95Ms": 36,
+      "maxMs": 56,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/cancellation-requests",
+      "requests": 172,
+      "avgMs": 16,
+      "p95Ms": 40,
+      "maxMs": 52,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/categories",
+      "requests": 172,
+      "avgMs": 13,
+      "p95Ms": 24,
+      "maxMs": 42,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/contact-messages",
+      "requests": 173,
+      "avgMs": 15,
+      "p95Ms": 37,
+      "maxMs": 55,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/coupons",
+      "requests": 174,
+      "avgMs": 12,
+      "p95Ms": 24,
+      "maxMs": 49,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/dashboard",
+      "requests": 175,
+      "avgMs": 23,
+      "p95Ms": 40,
+      "maxMs": 96,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/home-sections",
+      "requests": 176,
+      "avgMs": 13,
+      "p95Ms": 29,
+      "maxMs": 66,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/ledgerly/integration-status",
+      "requests": 177,
+      "avgMs": 14,
+      "p95Ms": 31,
+      "maxMs": 55,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/ledgerly/settings",
+      "requests": 177,
+      "avgMs": 13,
+      "p95Ms": 27,
+      "maxMs": 57,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/ledgerly/test",
+      "requests": 177,
+      "avgMs": 424,
+      "p95Ms": 4525,
+      "maxMs": 5086,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/order-returns",
+      "requests": 177,
+      "avgMs": 67,
+      "p95Ms": 128,
+      "maxMs": 219,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/orders",
+      "requests": 177,
+      "avgMs": 67,
+      "p95Ms": 118,
+      "maxMs": 193,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/orders/cod-pending",
+      "requests": 177,
+      "avgMs": 375,
+      "p95Ms": 649,
+      "maxMs": 865,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/orders/ordered-logins",
+      "requests": 177,
+      "avgMs": 15,
+      "p95Ms": 28,
+      "maxMs": 54,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/page-visibility",
+      "requests": 177,
+      "avgMs": 14,
+      "p95Ms": 28,
+      "maxMs": 43,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/policies",
+      "requests": 177,
+      "avgMs": 19,
+      "p95Ms": 38,
+      "maxMs": 76,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/products",
+      "requests": 177,
+      "avgMs": 27,
+      "p95Ms": 58,
+      "maxMs": 103,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/site-settings",
+      "requests": 177,
+      "avgMs": 14,
+      "p95Ms": 28,
+      "maxMs": 67,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/admin/zoho-settings",
+      "requests": 177,
+      "avgMs": 15,
+      "p95Ms": 33,
+      "maxMs": 79,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/banners",
+      "requests": 176,
+      "avgMs": 13,
+      "p95Ms": 31,
+      "maxMs": 90,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/blog-posts",
+      "requests": 176,
+      "avgMs": 14,
+      "p95Ms": 31,
+      "maxMs": 79,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/categories",
+      "requests": 176,
+      "avgMs": 18,
+      "p95Ms": 51,
+      "maxMs": 103,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/coupons/active",
+      "requests": 176,
+      "avgMs": 20,
+      "p95Ms": 62,
+      "maxMs": 91,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/gift-page",
+      "requests": 176,
+      "avgMs": 19,
+      "p95Ms": 46,
+      "maxMs": 103,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/home-sections",
+      "requests": 176,
+      "avgMs": 21,
+      "p95Ms": 52,
+      "maxMs": 372,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/order-returns",
+      "requests": 176,
+      "avgMs": 35,
+      "p95Ms": 81,
+      "maxMs": 188,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/order-returns/config",
+      "requests": 176,
+      "avgMs": 19,
+      "p95Ms": 46,
+      "maxMs": 319,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/orders",
+      "requests": 176,
+      "avgMs": 76,
+      "p95Ms": 176,
+      "maxMs": 479,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/page-visibility",
+      "requests": 175,
+      "avgMs": 21,
+      "p95Ms": 42,
+      "maxMs": 269,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/payments",
+      "requests": 175,
+      "avgMs": 31,
+      "p95Ms": 82,
+      "maxMs": 292,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/products",
+      "requests": 172,
+      "avgMs": 55,
+      "p95Ms": 165,
+      "maxMs": 523,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/site-settings",
+      "requests": 169,
+      "avgMs": 18,
+      "p95Ms": 38,
+      "maxMs": 220,
+      "failRatePct": 0
+    },
+    {
+      "endpoint": "GET /api/v1/subscribe-page",
+      "requests": 165,
+      "avgMs": 17,
+      "p95Ms": 35,
+      "maxMs": 206,
+      "failRatePct": 0
+    }
+  ]
 }

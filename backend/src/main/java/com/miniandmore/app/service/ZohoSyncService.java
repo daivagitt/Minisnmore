@@ -502,19 +502,29 @@ public class ZohoSyncService {
         try {
             return openingStock ? createItemSelfHealing(payload) : booksClient.updateItem(itemId, payload);
         } catch (RestClientResponseException e) {
+            if (isInvalidCustomFields(e) && payload.containsKey("custom_fields")) {
+                productFieldMapper.invalidateFieldCache();
+                Map<String, Object> withoutCustomFields = new LinkedHashMap<>(payload);
+                withoutCustomFields.remove("custom_fields");
+                LOG.warn(
+                    "Zoho rejected one or more product custom fields (code 120100); retrying item {} without custom fields",
+                    StringUtils.firstNonBlank(stringValue(payload.get("sku")), itemId, "create")
+                );
+                return saveZohoItem(openingStock, itemId, withoutCustomFields);
+            }
             if (!openingStock && isItemNotFound(e)) {
                 // The stored zohoItemId points at an item that no longer exists in this Zoho org
                 // (deleted in Zoho, org changed, or the id was never actually created). Re-create it
                 // instead of failing the whole sync; stock is reconciled separately after push, so a
                 // fresh create without initial-stock fields is safe.
                 LOG.warn("Zoho item {} no longer exists; re-creating instead of updating: {}", itemId, e.getMessage());
-                return createItemSelfHealing(payload);
+                return saveZohoItem(true, null, payload);
             }
             if (!openingStock && isDestinationGroupMissingAttributes(e)) {
                 Map<String, Object> withExistingAttributes = copyExistingGroupAttributes(itemId, payload);
                 if (!withExistingAttributes.equals(payload)) {
                     LOG.warn("Zoho item {} requires its destination-group attributes; retrying update with existing attributes", itemId);
-                    return booksClient.updateItem(itemId, withExistingAttributes);
+                    return saveZohoItem(false, itemId, withExistingAttributes);
                 }
             }
             if (
@@ -526,7 +536,7 @@ public class ZohoSyncService {
                 LOG.warn("Zoho rejected variant group/attribute fields; retrying as a plain item: {}", e.getMessage());
                 Map<String, Object> plain = new LinkedHashMap<>(payload);
                 stripExtraVariantFields(plain);
-                return openingStock ? createItemSelfHealing(plain) : booksClient.updateItem(itemId, plain);
+                return saveZohoItem(openingStock, itemId, plain);
             }
             throw e;
         }
@@ -591,6 +601,16 @@ public class ZohoSyncService {
             return false;
         }
         return body.contains("\"code\":1001") || body.contains("already exists");
+    }
+
+    private static boolean isInvalidCustomFields(RestClientResponseException exception) {
+        String body = StringUtils.defaultString(exception.getResponseBodyAsString()).toLowerCase();
+        if (exception.getStatusCode().value() != 400) {
+            return false;
+        }
+        return body.contains("\"code\":120100") ||
+            body.contains("\"code\": 120100") ||
+            (body.contains("custom field") && body.contains("does not exist"));
     }
 
     private static boolean isDestinationGroupMissingAttributes(RestClientResponseException exception) {
@@ -900,6 +920,101 @@ public class ZohoSyncService {
         attachVariantParent(parent, variantParents);
         pullSingleZohoItem(itemId, sku, autoCreateCategory, builder, variantParents, label, parent);
         return builder.build().toMap();
+    }
+
+    public Map<String, Object> pullProductGroup(String itemGroupId) {
+        itemImageSync.beginImageImportPass();
+        ZohoSyncSummary.Builder builder = ZohoSyncSummary.builder();
+        String requestedGroupId = StringUtils.trimToNull(itemGroupId);
+        if (requestedGroupId == null) {
+            builder.failure("Zoho item group", "Zoho item group id is required");
+            return builder.build().toMap();
+        }
+
+        Optional<ZohoSetting> setting = zohoSettingRepository.findActiveOrLatest();
+        boolean autoCreateCategory = setting
+            .map(s -> Boolean.TRUE.equals(s.getPullProductsAutoCreateCategory()))
+            .orElse(applicationProperties.getZoho().isPullProductsAutoCreateCategory());
+        List<Product> variantParents = new ArrayList<>(
+            productRepository.findAll().stream().filter(variantSupport::isVariants).toList()
+        );
+
+        try {
+            Map<String, Object> group = booksClient.getItemGroup(requestedGroupId);
+            List<Map<String, Object>> items = itemGroupItems(group);
+            if (items.isEmpty()) {
+                builder.failure(requestedGroupId, "Zoho item group has no variants");
+                return builder.build().toMap();
+            }
+            for (Map<String, Object> item : items) {
+                Map<String, Object> variant = itemGroupVariant(group, item, requestedGroupId);
+                String sku = StringUtils.trimToNull(stringValue(variant.get("sku")));
+                if (sku == null) {
+                    builder.failure(requestedGroupId, "Zoho item group contains a variant without a SKU");
+                    continue;
+                }
+                upsertPulledProduct(variant, autoCreateCategory, builder, variantParents, null, true);
+            }
+        } catch (RestClientResponseException e) {
+            builder.failure(requestedGroupId, exceptionMessage(e));
+        } catch (ResourceAccessException e) {
+            builder.failure(requestedGroupId, "Zoho unreachable while reading item group: " + exceptionMessage(e));
+        } catch (Exception e) {
+            LOG.warn("Zoho item group pull failed for {}: {}", requestedGroupId, exceptionMessage(e), e);
+            builder.failure(requestedGroupId, exceptionMessage(e));
+        }
+        return builder.build().toMap();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> itemGroupItems(Map<String, Object> group) {
+        Object raw = group == null ? null : group.get("items");
+        if (!(raw instanceof List<?> items)) {
+            throw new IllegalStateException("Zoho returned missing or invalid item group items");
+        }
+        return (List<Map<String, Object>>) items;
+    }
+
+    private Map<String, Object> itemGroupVariant(
+        Map<String, Object> group,
+        Map<String, Object> item,
+        String requestedGroupId
+    ) {
+        Object groupCustomFields = group.get("custom_fields");
+        Object itemCustomFields = item.get("custom_fields");
+        Map<String, Object> variant = new LinkedHashMap<>(group);
+        variant.remove("items");
+        variant.remove("attributes");
+        variant.putAll(item);
+        List<Object> combinedCustomFields = new ArrayList<>();
+        if (groupCustomFields instanceof List<?> fields) {
+            combinedCustomFields.addAll(fields);
+        }
+        if (itemCustomFields instanceof List<?> fields) {
+            combinedCustomFields.addAll(fields);
+        }
+        if (!combinedCustomFields.isEmpty()) {
+            variant.put("custom_fields", combinedCustomFields);
+        }
+        variant.put("group_id", StringUtils.firstNonBlank(
+            stringValue(group.get("group_id")),
+            stringValue(group.get("itemgroup_id")),
+            requestedGroupId
+        ));
+        String groupName = StringUtils.firstNonBlank(
+            stringValue(group.get("group_name")),
+            stringValue(group.get("itemgroup_name"))
+        );
+        if (groupName != null) {
+            variant.put("group_name", groupName);
+        }
+        if (!variant.containsKey("item_id") && variant.containsKey("variant_id")) {
+            variant.put("item_id", variant.get("variant_id"));
+        }
+        if (!variant.containsKey("name") && variant.containsKey("variant_name")) {
+            variant.put("name", variant.get("variant_name"));
+        }
+        return variant;
     }
 
     public Map<String, Object> pullExternalProduct(String sku, String zohoItemId) {
@@ -2310,7 +2425,7 @@ public class ZohoSyncService {
             );
             return Map.of("salesorder", existing);
         }
-        return createSalesOrderSelfHealing(order, customerId, true, true, false);
+        return createSalesOrderSelfHealing(order, customerId, true, true, true, false);
     }
 
     private void reconcileOrderStockAfterDocumentSync(CustomerOrder order) {
@@ -2325,13 +2440,34 @@ public class ZohoSyncService {
         String customerId,
         boolean includeGstTreatment,
         boolean includePlaceOfSupply,
+        boolean includeChannelCustomField,
         boolean itemsRepaired
     ) {
         try {
             Map<String, Object> payload = buildSalesOrderPayload(order, customerId, includeGstTreatment, includePlaceOfSupply);
-            applyOnlineChannelCustomField(payload);
+            if (includeChannelCustomField) {
+                applyOnlineChannelCustomField(payload);
+            }
             return booksClient.createSalesOrder(payload);
         } catch (RestClientResponseException e) {
+            if (includeChannelCustomField && isInvalidCustomFields(e)) {
+                Map<String, Object> createdAnyway = booksClient.findSalesOrderByReferenceNumber(order.getOrderNumber());
+                if (createdAnyway != null && StringUtils.isNotBlank(stringValue(createdAnyway.get("salesorder_id")))) {
+                    return Map.of("salesorder", createdAnyway);
+                }
+                LOG.warn(
+                    "Zoho rejected the Online sales-order custom field (code 120100) for order {}; retrying without it",
+                    order.getOrderNumber()
+                );
+                return createSalesOrderSelfHealing(
+                    order,
+                    customerId,
+                    includeGstTreatment,
+                    includePlaceOfSupply,
+                    false,
+                    itemsRepaired
+                );
+            }
             if (includeGstTreatment && isInvalidGstTreatment(e)) {
                 Map<String, Object> createdAnyway = booksClient.findSalesOrderByReferenceNumber(order.getOrderNumber());
                 if (createdAnyway != null && StringUtils.isNotBlank(stringValue(createdAnyway.get("salesorder_id")))) {
@@ -2341,7 +2477,14 @@ public class ZohoSyncService {
                     "Zoho organization does not accept gst_treatment for order {}; retrying without that field",
                     order.getOrderNumber()
                 );
-                return createSalesOrderSelfHealing(order, customerId, false, includePlaceOfSupply, itemsRepaired);
+                return createSalesOrderSelfHealing(
+                    order,
+                    customerId,
+                    false,
+                    includePlaceOfSupply,
+                    includeChannelCustomField,
+                    itemsRepaired
+                );
             }
             if (includePlaceOfSupply && isInvalidPlaceOfSupply(e)) {
                 Map<String, Object> createdAnyway = booksClient.findSalesOrderByReferenceNumber(order.getOrderNumber());
@@ -2352,14 +2495,28 @@ public class ZohoSyncService {
                     "Zoho organization does not accept place_of_supply for order {}; retrying without that field",
                     order.getOrderNumber()
                 );
-                return createSalesOrderSelfHealing(order, customerId, includeGstTreatment, false, itemsRepaired);
+                return createSalesOrderSelfHealing(
+                    order,
+                    customerId,
+                    includeGstTreatment,
+                    false,
+                    includeChannelCustomField,
+                    itemsRepaired
+                );
             }
             if (itemsRepaired || !isUnavailableSalesOrderItem(e)) {
                 throw e;
             }
             LOG.warn("Zoho rejected stale/inactive items for order {}; repairing order-line mappings and retrying", order.getOrderNumber());
             repairOrderLineZohoItems(order);
-            return createSalesOrderSelfHealing(order, customerId, includeGstTreatment, includePlaceOfSupply, true);
+            return createSalesOrderSelfHealing(
+                order,
+                customerId,
+                includeGstTreatment,
+                includePlaceOfSupply,
+                includeChannelCustomField,
+                true
+            );
         }
     }
 

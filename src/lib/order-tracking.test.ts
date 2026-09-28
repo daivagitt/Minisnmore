@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  TRACKING_STAGES,
   isTerminalTrackingState,
   resolveTrackingStage,
   shouldShowOrderTrackingLink,
@@ -11,6 +12,17 @@ import {
 } from "@/lib/order-tracking";
 
 describe("order-tracking helpers", () => {
+  it("renders the complete six-stage delivery timeline in order", () => {
+    expect(TRACKING_STAGES.map((stage) => stage.key)).toEqual([
+      "pending",
+      "processing",
+      "awaiting_pickup",
+      "shipped",
+      "out_for_delivery",
+      "delivered",
+    ]);
+  });
+
   it("detects terminal delivery states", () => {
     expect(isTerminalTrackingState({ status: "fulfilled" })).toBe(true);
     expect(isTerminalTrackingState({ tracking_status: "delivered" })).toBe(true);
@@ -35,17 +47,21 @@ describe("order-tracking helpers", () => {
     expect(trackingStageLabel({ tracking_status: "hand_wrapped" }, "processing")).toBe("Hand-wrapped");
   });
 
-  it("marks Hand-wrapped complete only once shipped", () => {
-    expect(resolveTrackingStage({ tracking_status: "shipped" })).toBe(2);
-    expect(resolveTrackingStage({ status: "confirmed", tracking_status: "shipped" })).toBe(2);
-    expect(resolveTrackingStage({ tracking_status: "awaiting_pickup" })).toBe(1);
+  it("shows Waiting for pickup as a distinct stage before shipping", () => {
+    expect(resolveTrackingStage({ tracking_status: "shipped" })).toBe(3);
+    expect(resolveTrackingStage({ status: "confirmed", tracking_status: "shipped" })).toBe(3);
+    expect(resolveTrackingStage({ tracking_status: "awaiting_pickup" })).toBe(2);
     expect(trackingStatusLabel({ tracking_status: "awaiting_pickup" })).toBe("Waiting for pickup");
+    expect(trackingStageLabel({ tracking_status: "confirmed" }, "awaiting_pickup")).toBe("Waiting for pickup");
+    expect(trackingStageDetail({ tracking_status: "awaiting_pickup" }, "awaiting_pickup", "current")).toMatch(
+      /courier collects/i,
+    );
   });
 
   it("maps ExpressBees OUT FOR DELIVERY and Delivered to their own stages", () => {
-    expect(resolveTrackingStage({ tracking_status: "out_for_delivery" })).toBe(3);
+    expect(resolveTrackingStage({ tracking_status: "out_for_delivery" })).toBe(4);
     expect(trackingStatusLabel({ tracking_status: "out_for_delivery" })).toBe("Out for delivery");
-    expect(resolveTrackingStage({ tracking_status: "delivered" })).toBe(4);
+    expect(resolveTrackingStage({ tracking_status: "delivered" })).toBe(5);
     expect(trackingStatusLabel({ tracking_status: "delivered" })).toBe("Delivered");
     expect(isTerminalTrackingState({ tracking_status: "out_for_delivery" })).toBe(false);
     expect(
@@ -54,7 +70,7 @@ describe("order-tracking helpers", () => {
   });
 
   it("maps delivery_failed to out_for_delivery stage with custom label and detail", () => {
-    expect(resolveTrackingStage({ tracking_status: "delivery_failed" })).toBe(3);
+    expect(resolveTrackingStage({ tracking_status: "delivery_failed" })).toBe(4);
     expect(trackingStatusLabel({ tracking_status: "delivery_failed" })).toBe("Delivery attempt unsuccessful");
     expect(trackingActivityTitle({ tracking_status: "delivery_failed" })).toBe("Delivery attempt unsuccessful");
     expect(isTerminalTrackingState({ tracking_status: "delivery_failed" })).toBe(false);

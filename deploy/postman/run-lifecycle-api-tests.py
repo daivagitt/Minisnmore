@@ -61,6 +61,37 @@ SKIP_PAYMENT_EXACT = {
 # Legacy alias used below
 SKIP_EXACT = SKIP_USER_INTERACTION_EXACT
 
+# Every UAT/prod email goes out through the Care@minisnmore.com mailbox (order, cancel/return,
+# coupon / site-settings / Zoho-settings change alerts, account + invite mails). In no-mail mode
+# only GETs and writes to resources whose services never send mail are allowed.
+NO_MAIL = os.environ.get("API_TEST_NO_MAIL", "true").lower() not in ("0", "false", "no")
+NO_MAIL_WRITE_EXACT = {
+    ("POST", "/api/authenticate"),
+    ("POST", "/api/v1/coupons/validate"),
+    ("POST", "/api/v1/admin/ledgerly/pull-inventory"),
+}
+NO_MAIL_WRITE_PREFIXES = (
+    "/api/v1/account",
+    "/api/v1/admin/banners",
+    "/api/v1/admin/categories",
+    "/api/v1/admin/policies",
+    "/api/v1/admin/products",
+    "/api/v1/admin/blog-posts",
+    "/api/v1/admin/home-sections",
+    "/api/v1/admin/page-visibility",
+)
+NO_MAIL_SKIP_NOTE = "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)"
+
+
+def blocked_by_no_mail(method: str, path: str) -> bool:
+    m = method.upper()
+    if not NO_MAIL or m in ("GET", "HEAD", "OPTIONS"):
+        return False
+    bare = path.split("?", 1)[0]
+    if (m, bare) in NO_MAIL_WRITE_EXACT:
+        return False
+    return not any(bare == p or bare.startswith(p + "/") for p in NO_MAIL_WRITE_PREFIXES)
+
 PUBLIC_GET_PREFIXES = (
     "/api/v1/categories",
     "/api/v1/products",
@@ -277,6 +308,8 @@ def login_user(username, password):
 
 
 def request(method, path, token, body=None, content_type="application/json"):
+    if blocked_by_no_mail(method, path):
+        return 0, NO_MAIL_SKIP_NOTE, 0
     headers = {"Accept": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
@@ -511,7 +544,7 @@ class Runner:
 
     def call(self, module, method, path, token, body=None, content_type="application/json", note=""):
         st, raw, elapsed_ms = request(method, path, token, body, content_type)
-        self.record(module, method, path, st, raw if st >= 400 else note, response_time_ms=elapsed_ms)
+        self.record(module, method, path, st, raw if st >= 400 or st == 0 else note, response_time_ms=elapsed_ms)
         return st, raw
 
     def cache_id(self, base: str, entity_id, raw: str = ""):
@@ -895,6 +928,8 @@ class Runner:
                     continue
 
                 skip = skip_user_interaction(m, path, op)
+                if not skip and blocked_by_no_mail(m, path):
+                    skip = NO_MAIL_SKIP_NOTE
                 if skip:
                     module = ((op.get("tags") or ["misc"])[0]).replace("-resource", "").replace("-controller", "")
                     self.record(module, m, path, 0, skip)
@@ -964,7 +999,7 @@ class Runner:
                         self.executed.add(key)
                         continue
 
-                self.record(module, m, resolved, st, raw if st >= 400 else "", response_time_ms=elapsed_ms)
+                self.record(module, m, resolved, st, raw if st >= 400 or st == 0 else "", response_time_ms=elapsed_ms)
 
     def run_customer_flows(self, customer_tok, product_id, product_slug):
         if not customer_tok:
@@ -1198,6 +1233,8 @@ def main():
         "strategy": "OpenAPI-driven: payloads from spec/schemas, skip user-interaction endpoints",
         "openapiSource": OPENAPI_URL,
         "baseUrl": BASE,
+        "noMailMode": NO_MAIL,
+        "skippedNoMail": sum(1 for x in skip if "no-mail mode" in (x.get("note") or "")),
         "skippedUserInteraction": len(skipped_user),
         "totalOpenApiOps": sum(
             1 for p, pi in spec["paths"].items() for m in pi if m.lower() in HTTP

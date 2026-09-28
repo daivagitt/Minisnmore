@@ -97,20 +97,29 @@ SECTIONS: list[tuple[str, str, list[tuple[str, str, str]]]] = [
         [
             ("./backend/ledgerly-live/index.html", "Live API test report", "Admin JWT + catalog core → Ledgerly commerce API"),
             ("./backend/ledgerly-unit-tests/index.html", "Ledgerly unit tests", "Surefire — catalog core (50+ tests)"),
-            (
-                "./backend/ledgerly-scenario-integration/index.html",
-                "Scenario integration tests",
-                "Coupon checkout, Ledgerly sync, inventory pull, shipment tracking (UAT flows)",
-            ),
         ],
     ),
     (
-        "Live Zoho integration tests",
-        "Legacy Zoho Books integration (deprecated — replaced by Ledgerly).",
+        "Zoho unit tests",
+        "Legacy Zoho Books client and sync unit tests in the catalog service (replaced by Ledgerly).",
         [
-            ("./backend/zoho-live/index.html", "Live API test report", "Admin JWT + legacy integration service → Zoho Books"),
-            ("./backend/zoho-unit-tests/index.html", "Zoho unit tests", "Surefire — legacy integration module"),
-            ("./backend/coverage/integration/index.html", "Zoho JaCoCo coverage", "Integration service only"),
+            ("./backend/zoho-unit-tests/index.html", "Zoho unit tests", "Surefire — Zoho classes in catalog core"),
+        ],
+    ),
+    (
+        "End-to-end test scenarios",
+        "Positive and negative scenarios across auth, storefront, account, checkout, cancel/return/exchange, admin, RBAC, webhooks and pages.",
+        [
+            (
+                "./backend/e2e-scenarios/index.html",
+                "E2E scenario report",
+                "Every scenario with expected vs actual — split into positive and negative, grouped by module",
+            ),
+            (
+                "./backend/e2e-scenarios/e2e-scenarios-report.json",
+                "E2E scenario results (JSON)",
+                "Machine-readable results for dashboards",
+            ),
         ],
     ),
     (
@@ -119,7 +128,6 @@ SECTIONS: list[tuple[str, str, list[tuple[str, str, str]]]] = [
         [
             ("./backend/api/index.html", "API test dashboard", "Lifecycle runner — all routable endpoints"),
             ("./backend/api/lifecycle-report.html", "Lifecycle HTML report", "Per-endpoint status and response time"),
-            ("./backend/scenario-integration/index.html", "Scenario integration tests", "Legacy Zoho + general UAT flows"),
         ],
     ),
     (

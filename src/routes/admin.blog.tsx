@@ -1,6 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { AdminPage, Field, inputCls } from "@/components/admin/AdminPage";
+import {
+  AdminPage,
+  AdminPanelSection,
+  AdminSectionToggles,
+  Field,
+  inputCls,
+} from "@/components/admin/AdminPage";
+import { useAdminSections } from "@/hooks/useAdminSections";
+import {
+  adminRowKey,
+  savedAdminRows,
+  useEditableAdminRows,
+  type AdminDraftRow,
+  type SettledAdminRow,
+} from "@/hooks/useEditableAdminRows";
 import { ImageUploadField } from "@/components/admin/ImageUploadField";
 import { BulkImport } from "@/components/admin/BulkImport";
 import { toast } from "sonner";
@@ -22,7 +36,7 @@ export const Route = createFileRoute("/admin/blog")({
   component: BlogPage,
 });
 
-type Post = BlogPostRow;
+type Post = BlogPostRow & AdminDraftRow;
 const empty: Post = {
   slug: "",
   title: "",
@@ -41,13 +55,14 @@ const slugify = (s: string) =>
     .replace(/^-|-$/g, "");
 
 function BlogPage() {
-  const [rows, setRows] = useState<Post[]>([]);
+  const { rows, reload, beginSave, addDraft, updateRow, removeDraft } =
+    useEditableAdminRows<Post>();
   const [loading, setLoading] = useState(true);
+  const sections = useAdminSections();
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (settled?: SettledAdminRow[]) => {
     try {
-      setRows(await listBlogPosts(true));
+      await reload(() => listBlogPosts(true), settled);
     } catch (error) {
       showApiError(error, "Could not load blog posts");
     }
@@ -75,22 +90,25 @@ function BlogPage() {
       return;
     }
     try {
-      await saveBlogPost(payload);
+      const settle = beginSave(adminRowKey(p));
+      const saved = await saveBlogPost(payload);
       invalidateBlogPosts();
       toast.success("Saved");
-      load();
+      if (saved?.id) sections.setOpen(saved.id, true);
+      load([settle(saved?.id)]);
     } catch (error) {
       showApiError(error, "Could not save blog post");
     }
   };
-  const remove = async (id?: string) => {
-    if (!id) return setRows((r) => r.filter((x) => x.id));
+  const remove = async (row: Post) => {
+    const id = row.id;
+    if (!id) return removeDraft(adminRowKey(row));
     if (!confirm("Delete this post?")) return;
     try {
       await deleteBlogPost(id);
       invalidateBlogPosts();
       toast.success("Deleted");
-      load();
+      load([{ key: id }]);
     } catch (error) {
       showApiError(error, "Could not delete blog post");
     }
@@ -154,7 +172,12 @@ function BlogPage() {
             }}
             persist={async (payloads) => {
               try {
-                const result = await bulkSave(payloads as Post[], rows, "slug", saveBlogPost);
+                const result = await bulkSave(
+                  payloads as Post[],
+                  savedAdminRows(rows),
+                  "slug",
+                  saveBlogPost,
+                );
                 if (result.inserted > 0) invalidateBlogPosts();
                 return result;
               } catch (error) {
@@ -172,7 +195,9 @@ function BlogPage() {
             onDone={load}
           />
           <button
-            onClick={() => setRows((r) => [{ ...empty }, ...r])}
+            onClick={() => {
+              sections.setOpen(addDraft({ ...empty }), true);
+            }}
             className="rounded-full bg-primary text-primary-foreground px-4 py-2.5 text-sm flex items-center gap-2"
           >
             <Plus className="h-4 w-4" /> New post
@@ -189,95 +214,86 @@ function BlogPage() {
               No posts yet.
             </div>
           )}
-          {rows.map((p, i) => (
-            <div key={p.id ?? `new-${i}`} className="glass-strong rounded-3xl p-5 space-y-3">
-              <div className="grid sm:grid-cols-2 gap-3">
-                <Field label="Title">
-                  <input
-                    className={inputCls()}
-                    maxLength={ADMIN_NAME_MAX_LEN}
-                    value={p.title}
-                    onChange={(e) =>
-                      setRows((r) =>
-                        r.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)),
-                      )
-                    }
-                  />
-                </Field>
-                <Field label="Slug">
-                  <input
-                    className={inputCls()}
-                    value={p.slug}
-                    onChange={(e) =>
-                      setRows((r) =>
-                        r.map((x, j) => (j === i ? { ...x, slug: e.target.value } : x)),
-                      )
-                    }
-                    placeholder="auto from title"
-                  />
-                </Field>
-              </div>
-              <ImageUploadField
-                label="Cover image"
-                folder="blog"
-                spec="blogCover"
-                value={p.cover_url ?? ""}
-                onChange={(cover_url) =>
-                  setRows((r) => r.map((x, j) => (j === i ? { ...x, cover_url } : x)))
+          {rows.length > 0 && <AdminSectionToggles sections={sections} />}
+          {rows.map((p) => {
+            const rowKey = adminRowKey(p);
+            return (
+              <AdminPanelSection
+                key={rowKey}
+                title={p.title.trim() || "New post"}
+                hint={
+                  p.id
+                    ? `${p.published ? "Published" : "Draft"}${p.slug ? ` · ${p.slug}` : ""}`
+                    : undefined
                 }
-              />
-              <Field label="Excerpt">
-                <textarea
-                  rows={2}
-                  className={inputCls()}
-                  value={p.excerpt ?? ""}
-                  onChange={(e) =>
-                    setRows((r) =>
-                      r.map((x, j) => (j === i ? { ...x, excerpt: e.target.value } : x)),
-                    )
-                  }
+                {...sections.panel(rowKey, !p.id)}
+              >
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <Field label="Title">
+                    <input
+                      className={inputCls()}
+                      maxLength={ADMIN_NAME_MAX_LEN}
+                      value={p.title}
+                      onChange={(e) => updateRow(rowKey, { title: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Slug">
+                    <input
+                      className={inputCls()}
+                      value={p.slug}
+                      onChange={(e) => updateRow(rowKey, { slug: e.target.value })}
+                      placeholder="auto from title"
+                    />
+                  </Field>
+                </div>
+                <ImageUploadField
+                  label="Cover image"
+                  folder="blog"
+                  spec="blogCover"
+                  value={p.cover_url ?? ""}
+                  onChange={(cover_url) => updateRow(rowKey, { cover_url })}
                 />
-              </Field>
-              <Field label="Content (markdown)">
-                <textarea
-                  rows={8}
-                  className={inputCls() + " font-mono text-xs"}
-                  value={p.content ?? ""}
-                  onChange={(e) =>
-                    setRows((r) =>
-                      r.map((x, j) => (j === i ? { ...x, content: e.target.value } : x)),
-                    )
-                  }
-                />
-              </Field>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={p.published}
-                  onChange={(e) =>
-                    setRows((r) =>
-                      r.map((x, j) => (j === i ? { ...x, published: e.target.checked } : x)),
-                    )
-                  }
-                />{" "}
-                Published
-              </label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => save(p)}
-                  className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm flex items-center gap-2"
-                >
-                  <Save className="h-4 w-4" /> Save
-                </button>
-                <button
-                  onClick={() => remove(p.id)}
-                  className="rounded-full glass px-4 py-2 text-sm flex items-center gap-2 text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" /> Delete
-                </button>
-              </div>
-            </div>
-          ))}
+                <Field label="Excerpt">
+                  <textarea
+                    rows={2}
+                    className={inputCls()}
+                    value={p.excerpt ?? ""}
+                    onChange={(e) => updateRow(rowKey, { excerpt: e.target.value })}
+                  />
+                </Field>
+                <Field label="Content (markdown)">
+                  <textarea
+                    rows={8}
+                    className={inputCls() + " font-mono text-xs"}
+                    value={p.content ?? ""}
+                    onChange={(e) => updateRow(rowKey, { content: e.target.value })}
+                  />
+                </Field>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={p.published}
+                    onChange={(e) => updateRow(rowKey, { published: e.target.checked })}
+                  />{" "}
+                  Published
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => save(p)}
+                    className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm flex items-center gap-2"
+                  >
+                    <Save className="h-4 w-4" /> Save
+                  </button>
+                  <button
+                    onClick={() => remove(p)}
+                    className="rounded-full glass px-4 py-2 text-sm flex items-center gap-2 text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" /> Delete
+                  </button>
+                </div>
+              </AdminPanelSection>
+            );
+          })}
         </div>
       )}
     </AdminPage>

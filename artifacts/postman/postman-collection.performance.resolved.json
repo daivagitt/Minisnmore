@@ -10,7 +10,7 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "https://uat.minisnmore.com"
+      "value": "https://minisnmore.com"
     },
     {
       "key": "workerSeed",
@@ -769,91 +769,7 @@
     },
     {
       "name": "account",
-      "item": [
-        {
-          "name": "POST /api/register",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const seed = parseInt(pm.environment.get('workerSeed') || '0', 10);",
-                  "const waitMs = seed * 120;",
-                  "const until = Date.now() + waitMs;",
-                  "while (Date.now() < until) {}",
-                  "const login = `perf${Date.now()}w${seed}r${Math.floor(Math.random() * 1e7)}`;",
-                  "pm.variables.set('registerLogin', login);",
-                  "pm.variables.set('registerEmail', `${login}@uat.test`);"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 201 Created', function (done) {",
-                  "  const assertCreated = (code) => { pm.expect(code).to.eql(201); done(); };",
-                  "  if (pm.response.code === 201) { assertCreated(201); return; }",
-                  "  const attemptRegister = (attempt) => {",
-                  "    const seed = pm.environment.get('workerSeed') || '0';",
-                  "    const login = `perf${Date.now()}w${seed}r${attempt}${Math.floor(Math.random() * 1e6)}`;",
-                  "    const body = {",
-                  "      login,",
-                  "      email: `${login}@uat.test`,",
-                  "      password: pm.collectionVariables.get('registerPassword') || 'Zero@1234',",
-                  "      firstName: 'Perf',",
-                  "      lastName: 'Test',",
-                  "      langKey: 'en',",
-                  "    };",
-                  "    pm.sendRequest({",
-                  "      url: `${pm.environment.get('baseUrl')}/api/register`,",
-                  "      method: 'POST',",
-                  "      header: { 'Content-Type': 'application/json', Accept: 'application/json' },",
-                  "      body: { mode: 'raw', raw: JSON.stringify(body) },",
-                  "    }, (err, res) => {",
-                  "      if (!err && res && res.code === 201) { assertCreated(201); return; }",
-                  "      if (attempt < 4) {",
-                  "        setTimeout(() => attemptRegister(attempt + 1), 250 * attempt);",
-                  "        return;",
-                  "      }",
-                  "      assertCreated(pm.response.code);",
-                  "    });",
-                  "  };",
-                  "  if (pm.response.code === 500 || pm.response.code === 409) {",
-                  "    attemptRegister(1);",
-                  "  } else {",
-                  "    assertCreated(pm.response.code);",
-                  "  }",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "auth": {
-              "type": "noauth"
-            },
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"login\": \"{{registerLogin}}\",\n  \"email\": \"{{registerEmail}}\",\n  \"password\": \"{{registerPassword}}\",\n  \"firstName\": \"Perf\",\n  \"lastName\": \"Test\",\n  \"langKey\": \"en\"\n}"
-            },
-            "url": "{{baseUrl}}/api/register"
-          }
-        }
-      ]
+      "item": []
     }
   ]
 }

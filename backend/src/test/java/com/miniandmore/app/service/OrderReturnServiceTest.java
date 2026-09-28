@@ -1519,6 +1519,93 @@ class OrderReturnServiceTest {
     }
 
     @Test
+    void requestReturn_usesStoredBogoLineAllocationInsteadOfGrossRatio() {
+        CustomerOrder order = eligibleOrder().subtotal(new BigDecimal("1500.00")).discount(new BigDecimal("500.00")).total(new BigDecimal("1000.00"));
+        OrderItem paid = new OrderItem()
+            .id(77L)
+            .order(order)
+            .productId("1")
+            .productName("Shirt")
+            .qty(1)
+            .price(new BigDecimal("1000.00"))
+            .discountAllocation(BigDecimal.ZERO);
+        OrderItem free = new OrderItem()
+            .id(78L)
+            .order(order)
+            .productId("2")
+            .productName("Tee")
+            .qty(1)
+            .price(new BigDecimal("500.00"))
+            .discountAllocation(new BigDecimal("500.00"));
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin(ORDER_NUMBER, USER)).thenReturn(Optional.of(order));
+        when(orderReturnRepository.existsByOrderIdAndStatusIn(eq(10L), any())).thenReturn(false);
+        when(orderReturnRepository.save(any(OrderReturn.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(paid, free));
+        when(orderReturnItemRepository.save(any(OrderReturnItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OrderReturn returningPaid = orderReturnService.requestReturn(
+            USER,
+            ORDER_NUMBER,
+            "The selected item is the wrong size",
+            List.of(new OrderReturnService.ReturnLineSelection(77L, 1))
+        );
+        assertThat(returningPaid.getRefundAmount()).isEqualByComparingTo("1000.00");
+
+        OrderReturn returningFree = orderReturnService.requestReturn(
+            USER,
+            ORDER_NUMBER,
+            "The selected item is the wrong size",
+            List.of(new OrderReturnService.ReturnLineSelection(78L, 1))
+        );
+        assertThat(returningFree.getRefundAmount()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void approveExchange_paidBogoLineWithZeroAllocation_creditsFullGrossNotGrossRatio() {
+        CustomerOrder order = eligibleOrder()
+            .subtotal(new BigDecimal("1500.00"))
+            .discount(new BigDecimal("500.00"))
+            .total(new BigDecimal("1000.00"));
+        OrderItem paid = new OrderItem()
+            .id(77L)
+            .order(order)
+            .productId("2")
+            .productName("Shirt")
+            .qty(1)
+            .price(new BigDecimal("1000.00"))
+            .discountAllocation(BigDecimal.ZERO);
+        OrderItem free = new OrderItem()
+            .id(78L)
+            .order(order)
+            .productId("3")
+            .productName("Tee")
+            .qty(1)
+            .price(new BigDecimal("500.00"))
+            .discountAllocation(new BigDecimal("500.00"));
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.REQUESTED, "TEE-M-BLUE", "M", "Blue");
+        orderReturn.setOrder(order);
+        orderReturn.setOrderItem(paid);
+        Product product = new Product()
+            .id(2L)
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                "[{\"sku\":\"TEE-M-BLUE\",\"size\":\"M\",\"color\":\"Blue\",\"rate\":1000,\"price\":1000,\"stock\":2,\"active\":true}]"
+            );
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(paid, free));
+        when(productRepository.findOneForInventoryUpdate(2L)).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.approve("RET-1", null);
+
+        // Paid line had ₹0 BOGO allocation — credit full ₹1000, not ~₹666.67 gross-ratio.
+        assertThat(result.getOriginalItemAmount()).isEqualByComparingTo("1000.00");
+        assertThat(result.getReplacementItemAmount()).isEqualByComparingTo("1000.00");
+        assertThat(result.getPriceDifference()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
     void approveExchangeReservesReplacementAndSnapshotsPriceDifference() {
         OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.REQUESTED, "TEE-M-BLUE", "M", "Blue");
         orderReturn.getOrderItem().price(new BigDecimal("100.00"));

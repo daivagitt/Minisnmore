@@ -55,6 +55,7 @@ class SiteSettingMapperFullTest {
         entity.setSubscribePlansJson("[{\"name\":\"Basic\"}]");
         entity.setSubscribeFeaturesJson("[\"Feature\"]");
         entity.setAboutPageJson("{\"hero_title\":\"About us\"}");
+        entity.setGiftPageJson("{\"hero_title\":\"Gift journey\"}");
 
         SiteSettingDTO dto = mapper.toDto(entity);
         SiteSetting roundTrip = mapper.toEntity(dto);
@@ -73,6 +74,8 @@ class SiteSettingMapperFullTest {
         assertThat(dto.getSubscribeHeroTitle()).isEqualTo("Subscribe");
         assertThat(dto.getAboutPageJson()).isEqualTo("{\"hero_title\":\"About us\"}");
         assertThat(roundTrip.getAboutPageJson()).isEqualTo("{\"hero_title\":\"About us\"}");
+        assertThat(dto.getGiftPageJson()).isEqualTo("{\"hero_title\":\"Gift journey\"}");
+        assertThat(roundTrip.getGiftPageJson()).isEqualTo("{\"hero_title\":\"Gift journey\"}");
         assertThat(dto.getFreeShippingMinInr()).isEqualTo(2500);
         assertThat(roundTrip.getCodFeeInr()).isEqualTo(149);
         assertThat(roundTrip.getDeliveryEtaBufferDays()).isEqualTo(3);

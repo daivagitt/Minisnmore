@@ -1,5 +1,6 @@
 package com.miniandmore.app.service.dto;
 
+import com.miniandmore.app.domain.enumeration.CouponEligibilityScope;
 import com.miniandmore.app.domain.enumeration.DiscountType;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
@@ -40,6 +41,11 @@ public class CouponDTO implements Serializable {
     @Min(1)
     @Max(10)
     private Integer bogoGetQty = 1;
+
+    @NotNull
+    private CouponEligibilityScope eligibilityScope = CouponEligibilityScope.ALL;
+
+    private Long eligibilityCategoryId;
 
     private Instant expiresAt;
 
@@ -110,6 +116,22 @@ public class CouponDTO implements Serializable {
         this.bogoGetQty = bogoGetQty;
     }
 
+    public CouponEligibilityScope getEligibilityScope() {
+        return eligibilityScope;
+    }
+
+    public void setEligibilityScope(CouponEligibilityScope eligibilityScope) {
+        this.eligibilityScope = eligibilityScope == null ? CouponEligibilityScope.ALL : eligibilityScope;
+    }
+
+    public Long getEligibilityCategoryId() {
+        return eligibilityCategoryId;
+    }
+
+    public void setEligibilityCategoryId(Long eligibilityCategoryId) {
+        this.eligibilityCategoryId = eligibilityCategoryId;
+    }
+
     public Instant getExpiresAt() {
         return expiresAt;
     }
@@ -159,6 +181,8 @@ public class CouponDTO implements Serializable {
             ", maxDiscount=" + getMaxDiscount() +
             ", bogoBuyQty=" + getBogoBuyQty() +
             ", bogoGetQty=" + getBogoGetQty() +
+            ", eligibilityScope='" + getEligibilityScope() + "'" +
+            ", eligibilityCategoryId=" + getEligibilityCategoryId() +
             ", expiresAt='" + getExpiresAt() + "'" +
             ", active='" + getActive() + "'" +
             "}";

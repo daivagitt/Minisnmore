@@ -10,7 +10,7 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "https://uat.minisnmore.com"
+      "value": "https://minisnmore.com"
     },
     {
       "key": "productSlug",

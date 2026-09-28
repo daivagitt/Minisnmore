@@ -32,6 +32,11 @@ public class AdminOrdersProxyResource {
         return catalog.get("/internal/v1/admin/orders/cod-pending");
     }
 
+    @GetMapping("/ordered-logins")
+    public ResponseEntity<String> orderedLogins() {
+        return catalog.get("/internal/v1/admin/orders/ordered-logins");
+    }
+
     @GetMapping("/{orderNumber}")
     public ResponseEntity<String> getOrder(@PathVariable String orderNumber) {
         return catalog.get(CatalogInternalClient.encodedPath("/internal/v1/admin/orders/{orderNumber}", orderNumber));

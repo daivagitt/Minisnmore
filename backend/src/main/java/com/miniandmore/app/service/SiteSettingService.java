@@ -11,8 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Service Implementation for managing {@link com.miniandmore.app.domain.SiteSetting}.
@@ -143,25 +141,7 @@ public class SiteSettingService {
     }
 
     private void notifyConfigChanged(SiteSettingDTO previous, SiteSettingDTO current) {
-        Runnable send = () -> {
-            try {
-                adminConfigChangeMailService.notifySiteSettingsChanged(previous, current);
-            } catch (RuntimeException ex) {
-                LOG.warn("Admin configuration email failed", ex);
-            }
-        };
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(
-                new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        send.run();
-                    }
-                }
-            );
-            return;
-        }
-        send.run();
+        adminConfigChangeMailService.notifySiteSettingsChangedAfterCommit(previous, current);
     }
 
     private void defaultStoreDiscountPercent(SiteSettingDTO dto) {

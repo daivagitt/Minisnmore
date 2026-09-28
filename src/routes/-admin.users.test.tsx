@@ -40,56 +40,68 @@ function renderUsers() {
   return render(<Component />);
 }
 
+const defaultUsers = [
+  {
+    id: 1,
+    login: "today.customer",
+    firstName: "Today",
+    lastName: "Customer",
+    email: "today@example.com",
+    activated: true,
+    subscribed: true,
+    authorities: ["ROLE_USER"],
+    createdDate: daysAgo(0),
+  },
+  {
+    id: 2,
+    login: "week.customer",
+    firstName: "Week",
+    lastName: "Customer",
+    email: "week@example.com",
+    activated: true,
+    subscribed: false,
+    authorities: ["ROLE_USER"],
+    createdDate: daysAgo(3),
+  },
+  {
+    id: 3,
+    login: "older.customer",
+    firstName: "Older",
+    lastName: "Customer",
+    email: "older@example.com",
+    activated: false,
+    subscribed: false,
+    authorities: ["ROLE_USER"],
+    createdDate: daysAgo(40),
+  },
+  {
+    id: 4,
+    login: "staff.admin",
+    firstName: "Staff",
+    lastName: "Admin",
+    email: "staff@example.com",
+    activated: true,
+    subscribed: true,
+    authorities: ["ROLE_ADMIN"],
+    createdDate: daysAgo(0),
+  },
+];
+
+function mockAdminApis(users = defaultUsers, orderedLogins: string[] = ["today.customer"]) {
+  apiMock.get.mockImplementation((url: unknown) => {
+    const path = String(url);
+    if (path.includes("/ordered-logins")) {
+      return Promise.resolve({ logins: orderedLogins });
+    }
+    return Promise.resolve(users);
+  });
+}
+
 describe("admin users route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Element.prototype.scrollIntoView = vi.fn();
-    apiMock.get.mockResolvedValue([
-      {
-        id: 1,
-        login: "today.customer",
-        firstName: "Today",
-        lastName: "Customer",
-        email: "today@example.com",
-        activated: true,
-        subscribed: true,
-        authorities: ["ROLE_USER"],
-        createdDate: daysAgo(0),
-      },
-      {
-        id: 2,
-        login: "week.customer",
-        firstName: "Week",
-        lastName: "Customer",
-        email: "week@example.com",
-        activated: true,
-        subscribed: false,
-        authorities: ["ROLE_USER"],
-        createdDate: daysAgo(3),
-      },
-      {
-        id: 3,
-        login: "older.customer",
-        firstName: "Older",
-        lastName: "Customer",
-        email: "older@example.com",
-        activated: false,
-        subscribed: false,
-        authorities: ["ROLE_USER"],
-        createdDate: daysAgo(40),
-      },
-      {
-        id: 4,
-        login: "staff.admin",
-        firstName: "Staff",
-        lastName: "Admin",
-        email: "staff@example.com",
-        activated: true,
-        subscribed: true,
-        authorities: ["ROLE_ADMIN"],
-        createdDate: daysAgo(0),
-      },
-    ]);
+    mockAdminApis();
   });
 
   it("shows customer join stats and keeps staff out of the customer counts", async () => {
@@ -101,7 +113,37 @@ describe("admin users route", () => {
     expect(screen.getByText("today@example.com")).toBeInTheDocument();
     expect(screen.queryByText("staff@example.com")).toBeNull();
     expect(screen.getByRole("heading", { name: "Join timeline" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Ordered" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "RBAC" })).toHaveAttribute("href", "/admin/rbac");
+  });
+
+  it("shows whether each customer has previously ordered", async () => {
+    renderUsers();
+
+    await waitFor(() => expect(screen.getByText("today@example.com")).toBeInTheDocument());
+    const rows = screen.getAllByRole("row");
+    const todayRow = rows.find((row) => row.textContent?.includes("today@example.com"));
+    const weekRow = rows.find((row) => row.textContent?.includes("week@example.com"));
+    expect(todayRow?.textContent).toMatch(/Yes/);
+    expect(weekRow?.textContent).toMatch(/No/);
+  });
+
+  it("still loads customers when ordered-logins fails", async () => {
+    apiMock.get.mockImplementation((url: unknown) => {
+      const path = String(url);
+      if (path.includes("/ordered-logins")) {
+        return Promise.reject(new Error("ordered-logins unavailable"));
+      }
+      return Promise.resolve(defaultUsers);
+    });
+
+    renderUsers();
+
+    await waitFor(() => expect(screen.getByText("today@example.com")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Customers: 3" })).toBeInTheDocument();
+    const rows = screen.getAllByRole("row");
+    const todayRow = rows.find((row) => row.textContent?.includes("today@example.com"));
+    expect(todayRow?.textContent).toMatch(/No/);
   });
 
   it("filters the customer list when a join window is selected", async () => {
@@ -220,7 +262,7 @@ describe("admin users route", () => {
       authorities: ["ROLE_USER"],
       createdDate: daysAgo(index),
     }));
-    apiMock.get.mockResolvedValueOnce([
+    mockAdminApis([
       ...manyCustomers,
       {
         id: 99,
@@ -235,12 +277,12 @@ describe("admin users route", () => {
     ]);
 
     renderUsers();
-    await waitFor(() => expect(screen.getByText("Showing 1–10 of 12")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Showing 1–10 of 12/)).toBeInTheDocument());
     expect(screen.getByText("customer0@example.com")).toBeInTheDocument();
     expect(screen.queryByText("customer11@example.com")).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "Go to page 2" }));
-    await waitFor(() => expect(screen.getByText("Showing 11–12 of 12")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Showing 11–12 of 12/)).toBeInTheDocument());
     expect(screen.getByText("customer11@example.com")).toBeInTheDocument();
     expect(screen.queryByText("customer0@example.com")).toBeNull();
   });

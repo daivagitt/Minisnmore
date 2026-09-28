@@ -1,6 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { AdminCollapsibleSection, AdminPage, Field, inputCls } from "@/components/admin/AdminPage";
+import {
+  AdminCollapsibleSection,
+  AdminPage,
+  AdminSectionToggles,
+  Field,
+  inputCls,
+} from "@/components/admin/AdminPage";
+import { useAdminSections } from "@/hooks/useAdminSections";
 import { AgeRangeField } from "@/components/admin/AgeRangeField";
 import { CommaListField } from "@/components/admin/CommaListField";
 import { NumberField } from "@/components/admin/NumberField";
@@ -76,15 +83,7 @@ import { DEFAULT_STORE_DISCOUNT_PERCENT, sellingFromMrp } from "@/lib/pricing";
 
 export const Route = createFileRoute("/admin/products")({ component: ProductsPage });
 
-const PRODUCT_EDITOR_SECTIONS = ["merch", "copy", "notes", "chart", "gallery"] as const;
-type ProductEditorSection = (typeof PRODUCT_EDITOR_SECTIONS)[number];
-const DEFAULT_PRODUCT_EDITOR_SECTIONS: Record<ProductEditorSection, boolean> = {
-  merch: false,
-  copy: false,
-  notes: false,
-  chart: false,
-  gallery: false,
-};
+type ProductEditorSection = "merch" | "copy" | "notes" | "chart" | "gallery";
 
 type Product = ProductRow;
 const empty: Product = {
@@ -185,14 +184,8 @@ function ProductsPage() {
   const [clearingVariantPhotos, setClearingVariantPhotos] = useState<Set<number>>(() => new Set());
   const [imageUploading, setImageUploading] = useState<number | null>(null);
   const [skuWiseImporting, setSkuWiseImporting] = useState(false);
-  const [editorSections, setEditorSections] = useState(DEFAULT_PRODUCT_EDITOR_SECTIONS);
-
-  const setEditorSection = (id: ProductEditorSection, open: boolean) =>
-    setEditorSections((prev) => ({ ...prev, [id]: open }));
-  const expandAllEditorSections = () =>
-    setEditorSections(Object.fromEntries(PRODUCT_EDITOR_SECTIONS.map((id) => [id, true])) as Record<ProductEditorSection, boolean>);
-  const collapseAllEditorSections = () =>
-    setEditorSections(Object.fromEntries(PRODUCT_EDITOR_SECTIONS.map((id) => [id, false])) as Record<ProductEditorSection, boolean>);
+  const editorSections = useAdminSections<ProductEditorSection>();
+  const resetEditorSections = editorSections.reset;
 
   const load = async () => {
     setLoading(true);
@@ -228,8 +221,8 @@ function ProductsPage() {
   }, []);
 
   useEffect(() => {
-    setEditorSections(DEFAULT_PRODUCT_EDITOR_SECTIONS);
-  }, [editing]);
+    resetEditorSections();
+  }, [editing, resetEditorSections]);
 
   const upload = async (files: FileList, i: number) => {
     const accepted: File[] = [];
@@ -737,25 +730,9 @@ function ProductsPage() {
                 </button>
                 {isOpen && (
                   <div className="p-5 border-t border-white/40 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                    <AdminSectionToggles sections={editorSections}>
                       <p className="text-xs text-muted-foreground">Fields marked with * are required.</p>
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={expandAllEditorSections}
-                          className="text-xs text-primary story-link"
-                        >
-                          Expand all
-                        </button>
-                        <button
-                          type="button"
-                          onClick={collapseAllEditorSections}
-                          className="text-xs text-primary story-link"
-                        >
-                          Collapse all
-                        </button>
-                      </div>
-                    </div>
+                    </AdminSectionToggles>
                     <div className="grid sm:grid-cols-3 gap-3">
                       <Field label="Name" required>
                         <input
@@ -941,8 +918,7 @@ function ProductsPage() {
                     <AdminCollapsibleSection
                       title="Sizes, colours & variants"
                       hint="Size list, colour galleries, display image, and the variants matrix."
-                      open={editorSections.merch}
-                      onOpenChange={(open) => setEditorSection("merch", open)}
+                      {...editorSections.panel("merch")}
                     >
                     {(p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS" ? (
                       <>
@@ -1014,8 +990,7 @@ function ProductsPage() {
                     <AdminCollapsibleSection
                       title="Description & story"
                       hint="Storefront copy. Closed by default to keep the editor shorter."
-                      open={editorSections.copy}
-                      onOpenChange={(open) => setEditorSection("copy", open)}
+                      {...editorSections.panel("copy")}
                     >
                     <Field label="Description">
                       <textarea
@@ -1038,8 +1013,7 @@ function ProductsPage() {
                     <AdminCollapsibleSection
                       title="Size callouts"
                       hint="Short notes shown on the product photo for a chosen size."
-                      open={editorSections.notes}
-                      onOpenChange={(open) => setEditorSection("notes", open)}
+                      {...editorSections.panel("notes")}
                     >
                     <SizeNotesEditor
                       sizes={catalogSizesForProduct({
@@ -1057,8 +1031,7 @@ function ProductsPage() {
                     <AdminCollapsibleSection
                       title="Size chart"
                       hint="Measurement table shown on the product page."
-                      open={editorSections.chart}
-                      onOpenChange={(open) => setEditorSection("chart", open)}
+                      {...editorSections.panel("chart")}
                     >
                     <SizeChartEditor
                       value={p.size_chart ?? null}
@@ -1073,8 +1046,7 @@ function ProductsPage() {
                     <AdminCollapsibleSection
                       title="Gallery images"
                       hint="Main product photos used on shop cards when a display image is not set."
-                      open={editorSections.gallery}
-                      onOpenChange={(open) => setEditorSection("gallery", open)}
+                      {...editorSections.panel("gallery")}
                     >
                     <Field label="Images">
                       <ImageSpecHint spec={ADMIN_IMAGE_SPECS.productGallery} className="mb-2" />

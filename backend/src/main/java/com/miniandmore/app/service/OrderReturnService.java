@@ -193,6 +193,7 @@ public class OrderReturnService {
             .map(item -> money(item.getPrice()).multiply(BigDecimal.valueOf(Optional.ofNullable(item.getQty()).orElse(0))))
             .reduce(BigDecimal.ZERO, BigDecimal::add));
         BigDecimal discount = money(order.getDiscount());
+        boolean hasPersistedLineAllocations = orderHasPersistedLineAllocations(orderItems);
         BigDecimal totalRefund = BigDecimal.ZERO;
         for (Map.Entry<Long, Integer> selected : requestedByItem.entrySet()) {
             OrderItem item = orderItems
@@ -205,9 +206,14 @@ public class OrderReturnService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return quantity exceeds the ordered quantity");
             }
             BigDecimal gross = money(item.getPrice()).multiply(BigDecimal.valueOf(selected.getValue())).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal discountAllocation = subtotal.signum() == 0
-                ? BigDecimal.ZERO
-                : discount.multiply(gross).divide(subtotal, 2, RoundingMode.HALF_UP).min(gross);
+            BigDecimal discountAllocation = allocatedDiscountFor(
+                item,
+                selected.getValue(),
+                orderedQty,
+                subtotal,
+                discount,
+                hasPersistedLineAllocations
+            );
             BigDecimal refund = gross.subtract(discountAllocation).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
             OrderReturnItem returnItem = new OrderReturnItem();
             returnItem.setOrderReturn(orderReturn);
@@ -330,11 +336,23 @@ public class OrderReturnService {
         }
         productRepository.save(product);
         BigDecimal originalGross = money(item.getPrice()).multiply(BigDecimal.valueOf(qty)).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal orderSubtotal = positiveOrFallback(orderReturn.getOrder().getSubtotal(), originalGross);
-        BigDecimal allocatedDiscount = money(orderReturn.getOrder().getDiscount())
-            .multiply(originalGross)
-            .divide(orderSubtotal, 2, RoundingMode.HALF_UP)
-            .min(originalGross);
+        int orderedQty = Math.max(1, Optional.ofNullable(item.getQty()).orElse(1));
+        CustomerOrder order = orderReturn.getOrder();
+        BigDecimal orderSubtotal = positiveOrFallback(order.getSubtotal(), originalGross);
+        List<OrderItem> siblings = order.getId() == null
+            ? List.of(item)
+            : orderItemRepository.findAllByOrderId(order.getId());
+        if (siblings.isEmpty()) {
+            siblings = List.of(item);
+        }
+        BigDecimal allocatedDiscount = allocatedDiscountFor(
+            item,
+            qty,
+            orderedQty,
+            orderSubtotal,
+            money(order.getDiscount()),
+            orderHasPersistedLineAllocations(siblings)
+        ).min(originalGross);
         BigDecimal originalAmount = originalGross.subtract(allocatedDiscount).max(BigDecimal.ZERO);
         BigDecimal replacementAmount = money(variantSupport.variantSellingPrice(replacement))
             .multiply(BigDecimal.valueOf(qty))
@@ -1701,6 +1719,35 @@ public class OrderReturnService {
 
     private static BigDecimal money(BigDecimal value) {
         return value == null ? BigDecimal.ZERO.setScale(2) : value.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * New orders persist per-line {@code discountAllocation}; legacy orders keep zeros and fall back
+     * to proportional share of the order discount.
+     */
+    private static boolean orderHasPersistedLineAllocations(List<OrderItem> orderItems) {
+        return orderItems.stream().anyMatch(item -> money(item.getDiscountAllocation()).signum() > 0);
+    }
+
+    private static BigDecimal allocatedDiscountFor(
+        OrderItem item,
+        int requestedQty,
+        int orderedQty,
+        BigDecimal orderSubtotal,
+        BigDecimal orderDiscount,
+        boolean usePersistedLineAllocation
+    ) {
+        BigDecimal gross = money(item.getPrice()).multiply(BigDecimal.valueOf(requestedQty)).setScale(2, RoundingMode.HALF_UP);
+        if (usePersistedLineAllocation) {
+            return money(item.getDiscountAllocation())
+                .multiply(BigDecimal.valueOf(requestedQty))
+                .divide(BigDecimal.valueOf(Math.max(1, orderedQty)), 2, RoundingMode.HALF_UP)
+                .min(gross);
+        }
+        if (orderSubtotal.signum() == 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        return orderDiscount.multiply(gross).divide(orderSubtotal, 2, RoundingMode.HALF_UP).min(gross);
     }
 
     private static BigDecimal positiveOrFallback(BigDecimal preferred, BigDecimal fallback) {

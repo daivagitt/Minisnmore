@@ -6,6 +6,7 @@ import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.ProductRepository;
 import com.miniandmore.app.repository.ZohoSettingRepository;
 import com.miniandmore.app.service.ZohoOAuthService;
+import com.miniandmore.app.service.ZohoSettingsService;
 import com.miniandmore.app.service.ZohoSyncService;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -23,6 +24,7 @@ public class ZohoAdminResource {
     private final ZohoSettingRepository settingRepository;
     private final ZohoOAuthService oauthService;
     private final ZohoSyncService syncService;
+    private final ZohoSettingsService zohoSettingsService;
     private final CustomerOrderRepository customerOrderRepository;
     private final ProductRepository productRepository;
 
@@ -30,12 +32,14 @@ public class ZohoAdminResource {
         ZohoSettingRepository settingRepository,
         ZohoOAuthService oauthService,
         ZohoSyncService syncService,
+        ZohoSettingsService zohoSettingsService,
         CustomerOrderRepository customerOrderRepository,
         ProductRepository productRepository
     ) {
         this.settingRepository = settingRepository;
         this.oauthService = oauthService;
         this.syncService = syncService;
+        this.zohoSettingsService = zohoSettingsService;
         this.customerOrderRepository = customerOrderRepository;
         this.productRepository = productRepository;
     }
@@ -75,11 +79,13 @@ public class ZohoAdminResource {
     @PutMapping("/pull-products-auto-create-category")
     public Map<String, Object> setPullProductsAutoCreateCategory(@RequestBody Map<String, Boolean> body) {
         ZohoSetting setting = settingRepository.findActiveOrLatest().orElseGet(ZohoSetting::new);
+        ZohoSetting previous = ZohoSettingsService.copyForEmail(setting);
         if (setting.getConnected() == null) {
             setting.setConnected(false);
         }
         setting.setPullProductsAutoCreateCategory(Boolean.TRUE.equals(body.get("enabled")));
         settingRepository.save(setting);
+        zohoSettingsService.notifyChanged(previous, setting);
         return integrationStatus();
     }
 
@@ -162,8 +168,10 @@ public class ZohoAdminResource {
             .findActiveOrLatest()
             .ifPresent(setting -> {
                 if (!java.util.Objects.equals(setting.getConnected(), connected)) {
+                    ZohoSetting previous = ZohoSettingsService.copyForEmail(setting);
                     setting.setConnected(connected);
                     settingRepository.save(setting);
+                    zohoSettingsService.notifyChanged(previous, setting);
                 }
             });
     }
@@ -243,6 +251,24 @@ public class ZohoAdminResource {
     }
 
     public record ZohoVariantPullRequest(String sku, String zohoItemId) {}
+
+    @PostMapping("/pull-item-groups/{itemGroupId}")
+    public Map<String, Object> pullItemGroup(@PathVariable String itemGroupId) {
+        if (StringUtils.isBlank(itemGroupId) || !itemGroupId.matches("\\d+")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Zoho item group id must contain only digits");
+        }
+        try {
+            return syncService.pullProductGroup(itemGroupId);
+        } catch (RestClientResponseException ex) {
+            int status = ex.getStatusCode().value();
+            String message = status == 429
+                ? "Zoho API rate limit reached. Retry once the limit resets."
+                : "Zoho item group pull failed: HTTP " + status + ".";
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, message, ex);
+        } catch (ResourceAccessException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Could not reach Zoho. Check network access.", ex);
+        }
+    }
 
     @PostMapping("/pull-product")
     public Map<String, Object> pullExternalProduct(@RequestBody ZohoItemPullRequest request) {

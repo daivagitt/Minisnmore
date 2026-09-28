@@ -147,6 +147,16 @@ class InternalAccountOrderResourceCoverageTest {
     }
 
     @Test
+    void getCancelRequest_withoutOpenRequest_returnsNull() throws Exception {
+        when(orderCancellationService.getOpenForUser("customer1", "MNM-NO-CANCEL")).thenReturn(null);
+
+        mockMvc
+            .perform(get("/internal/v1/orders/MNM-NO-CANCEL/cancel-request").with(user("customer1")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.cancellation_request").doesNotExist());
+    }
+
+    @Test
     void verifyPayment_validSignature_confirmsOrder() throws Exception {
         String razorpayOrderId = "order_live_ok";
         String razorpayPaymentId = "pay_live_ok";
@@ -933,11 +943,31 @@ class InternalAccountOrderResourceCoverageTest {
     }
 
     @Test
-    void profile_bootstrapAppliesSubscribeWhenNameAlreadySet() throws Exception {
+    void profile_bootstrapAppliesSubscribeToNewProfile() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("parent@example.com", "n/a"));
+        when(customerProfileRepository.findOneByUserLogin("parent@example.com")).thenReturn(Optional.empty());
+        when(customerProfileRepository.save(any(CustomerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/account/profile/bootstrap")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"full_name\":\"New Parent\",\"email\":\"parent@example.com\",\"subscribed\":true}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(true));
+
+        ArgumentCaptor<CustomerProfile> profileCaptor = ArgumentCaptor.forClass(CustomerProfile.class);
+        verify(customerProfileRepository).save(profileCaptor.capture());
+        assertThat(profileCaptor.getValue().getSubscribed()).isTrue();
+        verify(ledgerlySyncService).syncCustomerProfileAsync("parent@example.com");
+    }
+
+    @Test
+    void profile_bootstrapDoesNotResubscribeExistingProfile() throws Exception {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("parent@example.com", "n/a"));
         CustomerProfile profile = new CustomerProfile().userLogin("parent@example.com").fullName("Jane").subscribed(false);
         when(customerProfileRepository.findOneByUserLogin("parent@example.com")).thenReturn(Optional.of(profile));
-        when(customerProfileRepository.save(any(CustomerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
 
         mockMvc
             .perform(
@@ -948,11 +978,9 @@ class InternalAccountOrderResourceCoverageTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.ok").value(true));
 
-        ArgumentCaptor<CustomerProfile> profileCaptor = ArgumentCaptor.forClass(CustomerProfile.class);
-        verify(customerProfileRepository).save(profileCaptor.capture());
-        assertThat(profileCaptor.getValue().getFullName()).isEqualTo("Jane");
-        assertThat(profileCaptor.getValue().getSubscribed()).isTrue();
-        verify(ledgerlySyncService).syncCustomerProfileAsync("parent@example.com");
+        assertThat(profile.getSubscribed()).isFalse();
+        verify(customerProfileRepository, never()).save(any());
+        verify(ledgerlySyncService, never()).syncCustomerProfileAsync(any());
     }
 
     @Test

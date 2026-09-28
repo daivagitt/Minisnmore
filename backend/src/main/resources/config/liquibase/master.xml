@@ -100,5 +100,8 @@
     <include file="config/liquibase/changelog/20260921170000_add_customer_profile_subscribed.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260921193000_add_contact_page_visibility.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260925120000_xpressbees_shipmentv2_tracking_links.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260926140000_add_gift_page_json.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260926160000_bogo_line_allocation_and_eligibility.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260926180000_idx_customer_order_status_user_login.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>
 

@@ -1,6 +1,7 @@
 package com.miniandmore.app.service;
 
 import com.miniandmore.app.domain.Coupon;
+import com.miniandmore.app.domain.enumeration.CouponEligibilityScope;
 import com.miniandmore.app.domain.enumeration.DiscountType;
 import com.miniandmore.app.repository.CouponRepository;
 import com.miniandmore.app.service.dto.CouponDTO;
@@ -25,9 +26,16 @@ public class CouponService {
 
     private final CouponMapper couponMapper;
 
-    public CouponService(CouponRepository couponRepository, CouponMapper couponMapper) {
+    private final AdminConfigChangeMailService adminConfigChangeMailService;
+
+    public CouponService(
+        CouponRepository couponRepository,
+        CouponMapper couponMapper,
+        AdminConfigChangeMailService adminConfigChangeMailService
+    ) {
         this.couponRepository = couponRepository;
         this.couponMapper = couponMapper;
+        this.adminConfigChangeMailService = adminConfigChangeMailService;
     }
 
     /**
@@ -38,10 +46,13 @@ public class CouponService {
      */
     public CouponDTO save(CouponDTO couponDTO) {
         LOG.debug("Request to save Coupon : {}", couponDTO);
+        CouponDTO previous = snapshotExisting(couponDTO.getId());
         normalizeCoupon(couponDTO);
         Coupon coupon = couponMapper.toEntity(couponDTO);
         coupon = couponRepository.save(coupon);
-        return couponMapper.toDto(coupon);
+        CouponDTO saved = couponMapper.toDto(coupon);
+        notifyConfigChanged(previous, saved);
+        return saved;
     }
 
     /**
@@ -52,10 +63,13 @@ public class CouponService {
      */
     public CouponDTO update(CouponDTO couponDTO) {
         LOG.debug("Request to update Coupon : {}", couponDTO);
+        CouponDTO previous = snapshotExisting(couponDTO.getId());
         normalizeCoupon(couponDTO);
         Coupon coupon = couponMapper.toEntity(couponDTO);
         coupon = couponRepository.save(coupon);
-        return couponMapper.toDto(coupon);
+        CouponDTO saved = couponMapper.toDto(coupon);
+        notifyConfigChanged(previous, saved);
+        return saved;
     }
 
     /**
@@ -67,6 +81,7 @@ public class CouponService {
     public Optional<CouponDTO> partialUpdate(CouponDTO couponDTO) {
         LOG.debug("Request to partially update Coupon : {}", couponDTO);
 
+        CouponDTO previous = snapshotExisting(couponDTO.getId());
         return couponRepository
             .findById(couponDTO.getId())
             .map(existingCoupon -> {
@@ -76,7 +91,11 @@ public class CouponService {
                 return existingCoupon;
             })
             .map(couponRepository::save)
-            .map(couponMapper::toDto);
+            .map(couponMapper::toDto)
+            .map(saved -> {
+                notifyConfigChanged(previous, saved);
+                return saved;
+            });
     }
 
     /**
@@ -98,12 +117,31 @@ public class CouponService {
      */
     public void delete(Long id) {
         LOG.debug("Request to delete Coupon : {}", id);
+        CouponDTO previous = snapshotExisting(id);
         couponRepository.deleteById(id);
+        notifyConfigChanged(previous, null);
+    }
+
+    private CouponDTO snapshotExisting(Long id) {
+        if (id == null) {
+            return null;
+        }
+        return couponRepository.findById(id).map(couponMapper::toDto).orElse(null);
+    }
+
+    private void notifyConfigChanged(CouponDTO previous, CouponDTO current) {
+        adminConfigChangeMailService.notifyCouponChangedAfterCommit(previous, current);
     }
 
     static void normalizeCoupon(CouponDTO couponDTO) {
         couponDTO.setBogoBuyQty(BogoDiscountCalculator.clampQty(couponDTO.getBogoBuyQty()));
         couponDTO.setBogoGetQty(BogoDiscountCalculator.clampQty(couponDTO.getBogoGetQty()));
+        couponDTO.setEligibilityScope(BogoDiscountCalculator.resolveScope(couponDTO.getEligibilityScope()));
+        if (couponDTO.getEligibilityScope() != CouponEligibilityScope.CATEGORY) {
+            couponDTO.setEligibilityCategoryId(null);
+        } else if (couponDTO.getEligibilityCategoryId() == null) {
+            throw new IllegalArgumentException("eligibilityCategoryId is required when eligibilityScope is CATEGORY");
+        }
         if (couponDTO.getDiscountType() == DiscountType.BOGO && couponDTO.getDiscountValue() != null) {
             BigDecimal percent = couponDTO.getDiscountValue();
             if (percent.compareTo(BigDecimal.ONE) < 0) {

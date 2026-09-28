@@ -175,6 +175,8 @@ def main() -> None:
         op = path_item.get("get")
         if not op:
             continue
+        if any(p.get("in") == "query" and p.get("required") for p in op.get("parameters") or []):
+            continue
         resolved = resolve_path(path, cache)
         if resolved is None and "{" in path:
             base = re.sub(r"/\{[^}]+\}$", "", path)

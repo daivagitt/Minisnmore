@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -28,6 +29,7 @@ import com.miniandmore.app.repository.ZohoSettingRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -801,6 +803,46 @@ class ZohoSyncServiceTest {
     }
 
     @Test
+    void syncProduct_retriesWithoutCustomFieldsWhenZohoReturns120100() {
+        Product product = new Product()
+            .id(42L)
+            .sku("SKU-42")
+            .name("Jabla")
+            .price(BigDecimal.valueOf(499))
+            .active(true);
+        when(productRepository.findOneWithEagerRelationships(42L)).thenReturn(Optional.of(product));
+        when(booksClient.findItemBySku("SKU-42")).thenReturn(null);
+        doAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payload = invocation.getArgument(1);
+            payload.put("custom_fields", List.of(Map.of("customfield_id", "deleted-field", "value", "Jablas")));
+            return null;
+        }).when(productFieldMapper).enrichPushPayload(eq(product), any());
+        when(booksClient.createItem(any()))
+            .thenThrow(
+                new RestClientResponseException(
+                    "One or more custom field(s) does not exist.",
+                    400,
+                    "Bad Request",
+                    null,
+                    "{\"code\":120100,\"message\":\"One or more custom field(s) does not exist.\"}".getBytes(),
+                    null
+                )
+            )
+            .thenReturn(Map.of("item", Map.of("item_id", "zoho-42")));
+
+        service.syncProduct(42L);
+
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(booksClient, times(2)).createItem(payloadCaptor.capture());
+        assertThat(payloadCaptor.getAllValues().get(0)).containsKey("custom_fields");
+        assertThat(payloadCaptor.getAllValues().get(1)).doesNotContainKey("custom_fields");
+        verify(productFieldMapper).invalidateFieldCache();
+        verify(productRepository).updateZohoSyncSuccess(eq(42L), eq("zoho-42"), eq(ZohoSyncStatus.SYNCED), any());
+        verify(productRepository, never()).updateZohoSyncFailure(eq(42L), any(), any());
+    }
+
+    @Test
     void syncOrder_includesCheckoutShippingAddressOnSalesOrder() {
         Product product = new Product().id(10L).sku("SKU-10").zohoItemId("zoho-item-10");
         OrderItem line = new OrderItem()
@@ -961,6 +1003,50 @@ class ZohoSyncServiceTest {
         assertThat(customFields).containsExactly(
             Map.of("customfield_id", "3624052000000835002", "value", "Online")
         );
+    }
+
+    @Test
+    void syncOrder_retriesWithoutOnlineChannelCustomFieldWhenZohoReturns120100() {
+        Product product = new Product().id(10L).sku("SKU-10").zohoItemId("zoho-item-10");
+        OrderItem line = new OrderItem()
+            .productId("10")
+            .productName("Dress")
+            .qty(1)
+            .price(BigDecimal.valueOf(499));
+        CustomerOrder order = new CustomerOrder().id(127L).orderNumber("MNM-STALE-CF").userLogin("buyer@example.com");
+        order.addItems(line);
+        line.setOrder(order);
+
+        when(customerOrderRepository.findById(127L)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(127L)).thenReturn(List.of(line));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(booksClient.findSalesOrderByReferenceNumber("MNM-STALE-CF"))
+            .thenReturn(null)
+            .thenReturn(null);
+        when(booksClient.createSalesOrder(any()))
+            .thenThrow(
+                new RestClientResponseException(
+                    "One or more custom field(s) does not exist.",
+                    400,
+                    "Bad Request",
+                    null,
+                    "{\"code\":120100,\"message\":\"One or more custom field(s) does not exist.\"}".getBytes(),
+                    null
+                )
+            )
+            .thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-retry")));
+        when(booksClient.createInvoiceFromSalesOrder("so-retry"))
+            .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-retry")));
+        when(productRepository.findById(10L)).thenReturn(Optional.of(product));
+
+        service.syncOrder(127L);
+
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(booksClient, times(2)).createSalesOrder(payloadCaptor.capture());
+        assertThat(payloadCaptor.getAllValues().get(0)).containsKey("custom_fields");
+        assertThat(payloadCaptor.getAllValues().get(1)).doesNotContainKey("custom_fields");
+        assertThat(order.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.SYNCED);
+        assertThat(order.getZohoSyncError()).isNull();
     }
 
     @Test
@@ -3866,6 +3952,60 @@ class ZohoSyncServiceTest {
         assertThat(parent.getZohoItemId()).isEqualTo("zoho-group-708");
         verify(productRepository).save(parent);
         verify(zohoSettingRepository, never()).save(any());
+    }
+
+    @Test
+    void pullProductGroup_mergesAllVariantsAndPropagatesParentCategory() {
+        String groupId = "3624052000000394593";
+        Product parent = new Product()
+            .id(708L)
+            .sku("JABLA")
+            .name("Jabla")
+            .active(true)
+            .zohoItemId(groupId)
+            .itemStructure("VARIANTS")
+            .variantsJson("[]");
+        Map<String, Object> group = new LinkedHashMap<>();
+        group.put("group_id", groupId);
+        group.put("group_name", "Jabla");
+        group.put("category_name", "Jablas");
+        group.put("attribute_name1", "Size");
+        group.put("attribute_name2", "Color");
+        group.put(
+            "items",
+            List.of(
+                Map.of(
+                    "item_id", "zoho-jabla-s", "sku", "JABLA-S-AQUA", "attribute_option_name1", "S",
+                    "attribute_option_name2", "Aqua", "rate", 499, "stock_on_hand", 3
+                ),
+                Map.of(
+                    "item_id", "zoho-jabla-m", "sku", "JABLA-M-AQUA", "attribute_option_name1", "M",
+                    "attribute_option_name2", "Aqua", "rate", 549, "stock_on_hand", 4
+                )
+            )
+        );
+        when(zohoSettingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(productRepository.findAll()).thenReturn(List.of(parent));
+        when(variantSupport.isVariants(parent)).thenReturn(true);
+        when(booksClient.getItemGroup(groupId)).thenReturn(group);
+        when(variantSupport.findProductContainingVariantZohoItemId(any(), any())).thenReturn(Optional.empty());
+        when(variantSupport.findProductContainingVariantSku(any(), any())).thenReturn(Optional.empty());
+        when(variantSupport.upsertPulledVariantFromZoho(eq(parent), any(), any(), any(), any(), any(), any(), any(), eq(true)))
+            .thenReturn(true);
+        when(productRepository.findOneBySku(any())).thenReturn(Optional.empty());
+        when(productRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = service.pullProductGroup(groupId);
+
+        assertThat(result.get("success")).isEqualTo(2);
+        assertThat(result.get("failed")).isEqualTo(0);
+        verify(booksClient).getItemGroup(groupId);
+        verify(productFieldMapper, times(2)).applyPulledItem(
+            eq(parent),
+            argThat(item -> "Jablas".equals(item.get("category_name")) && groupId.equals(item.get("group_id"))),
+            anyBoolean()
+        );
+        verify(productRepository, times(2)).save(parent);
     }
 
     @Test

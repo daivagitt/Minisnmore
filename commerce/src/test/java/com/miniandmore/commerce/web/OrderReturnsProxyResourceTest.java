@@ -83,6 +83,11 @@ class OrderReturnsProxyResourceTest {
     }
 
     @Test
+    void checkExchangeAvailability_withoutRequiredOptions_returnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/order-returns/exchange-availability/5")).andExpect(status().isBadRequest());
+    }
+
+    @Test
     void config_delegates() throws Exception {
         when(catalog.get("/internal/v1/order-returns/config")).thenReturn(ResponseEntity.ok("{}"));
 

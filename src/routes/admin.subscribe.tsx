@@ -2,7 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
-import { AdminPage, Field, inputCls } from "@/components/admin/AdminPage";
+import {
+  AdminPage,
+  AdminPanelSection,
+  AdminSectionToggles,
+  Field,
+  inputCls,
+} from "@/components/admin/AdminPage";
+import { useAdminSections } from "@/hooks/useAdminSections";
 import {
   getAdminSiteSettings,
   getSiteSettingsValidationErrors,
@@ -45,6 +52,7 @@ function SubscribeAdminPage() {
   const [row, setRow] = useState<SiteSettingsRow>(DEFAULT_ROW);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const sections = useAdminSections<"hero" | "badges" | "plans" | "features">();
 
   useEffect(() => {
     (async () => {
@@ -70,6 +78,7 @@ function SubscribeAdminPage() {
     ];
     if (errors.length) {
       showValidationErrors(errors);
+      sections.expandAll();
       setSaving(false);
       return;
     }
@@ -79,6 +88,7 @@ function SubscribeAdminPage() {
       toast.success("Subscription page settings saved");
     } catch (error) {
       showApiError(error, "Could not save subscription settings");
+      sections.expandAll();
     } finally {
       setSaving(false);
     }
@@ -103,8 +113,8 @@ function SubscribeAdminPage() {
         <div className="text-sm text-muted-foreground">Loading…</div>
       ) : (
         <div className="space-y-4">
-          <div className="glass-strong rounded-3xl p-5 space-y-3">
-            <div className="font-display text-lg">Hero</div>
+          <AdminSectionToggles sections={sections} />
+          <AdminPanelSection title="Hero" {...sections.panel("hero", true)}>
             <Field label="Hero title">
               <input
                 className={inputCls()}
@@ -127,31 +137,28 @@ function SubscribeAdminPage() {
                 onChange={(e) => up("subscribe_testimonial", e.target.value)}
               />
             </Field>
-          </div>
+          </AdminPanelSection>
 
-          <div className="glass-strong rounded-3xl p-5 space-y-3">
-            <div className="font-display text-lg">Badges</div>
+          <AdminPanelSection title="Badges" {...sections.panel("badges")}>
             <SubscribeBadgesEditor
               badges={parseJsonArray(String(row.subscribe_badges_json ?? "[]"))}
               onChange={(badges) => up("subscribe_badges_json", toJson(badges))}
             />
-          </div>
+          </AdminPanelSection>
 
-          <div className="glass-strong rounded-3xl p-5 space-y-3">
-            <div className="font-display text-lg">Plans</div>
+          <AdminPanelSection title="Plans" {...sections.panel("plans")}>
             <SubscribePlansEditor
               plans={parseJsonArray(String(row.subscribe_plans_json ?? "[]"))}
               onChange={(plans) => up("subscribe_plans_json", toJson(plans))}
             />
-          </div>
+          </AdminPanelSection>
 
-          <div className="glass-strong rounded-3xl p-5 space-y-3">
-            <div className="font-display text-lg">Bottom features</div>
+          <AdminPanelSection title="Bottom features" {...sections.panel("features")}>
             <SubscribeFeaturesEditor
               features={parseJsonArray(String(row.subscribe_features_json ?? "[]"))}
               onChange={(features) => up("subscribe_features_json", toJson(features))}
             />
-          </div>
+          </AdminPanelSection>
         </div>
       )}
     </AdminPage>

@@ -355,7 +355,7 @@ class UserServiceTest {
 
     @Test
     void getAllPublicUsers_mapsToDto() {
-        when(userRepository.findAllByActivatedIsTrue(PageRequest.of(0, 20))).thenReturn(Flux.just(user));
+        when(userRepository.findAllActivatedUsers(20, 0)).thenReturn(Flux.just(user));
 
         StepVerifier.create(userService.getAllPublicUsers(PageRequest.of(0, 20))).expectNextCount(1).verifyComplete();
     }

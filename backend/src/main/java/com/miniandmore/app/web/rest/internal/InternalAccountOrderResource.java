@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.*;
+import com.miniandmore.app.domain.enumeration.CouponEligibilityScope;
 import com.miniandmore.app.domain.enumeration.DiscountType;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
@@ -18,6 +19,8 @@ import com.miniandmore.app.service.OrderShipmentService;
 import com.miniandmore.app.service.OrderEventService;
 import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.service.BogoDiscountCalculator;
+import com.miniandmore.app.service.CouponDiscountOutcome;
+import com.miniandmore.app.service.DiscountLineAllocator;
 import com.miniandmore.app.service.OrderCancellationService;
 import com.miniandmore.app.service.OrderTrackingStatusResolver;
 import com.miniandmore.app.service.ProductVariantSupport;
@@ -129,7 +132,7 @@ public class InternalAccountOrderResource {
     @PostMapping("/coupons/validate")
     public ApiResponse<Map<String, Object>> validateCoupon(@Valid @RequestBody CouponValidationRequest request) {
         Optional<String> login = SecurityUtils.getCurrentUserLogin();
-        Optional<Map<String, Object>> discount = calculateCouponDiscount(
+        Optional<CouponDiscountOutcome> discount = calculateCouponDiscount(
             request.code(),
             request.subtotal(),
             login,
@@ -138,19 +141,19 @@ public class InternalAccountOrderResource {
         if (discount.isEmpty()) {
             return ApiResponse.ok(Map.of("ok", false, FIELD_ERROR, "Invalid or expired coupon"));
         }
-        Map<String, Object> result = discount.orElseThrow();
-        if (result.containsKey(FIELD_ERROR)) {
-            return ApiResponse.ok(Map.of("ok", false, FIELD_ERROR, result.get(FIELD_ERROR)));
+        CouponDiscountOutcome result = discount.orElseThrow();
+        if (result.hasError()) {
+            return ApiResponse.ok(Map.of("ok", false, FIELD_ERROR, result.error()));
         }
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("ok", true);
         data.put("code", request.code().trim().toUpperCase(Locale.ROOT));
-        data.put(FIELD_DISCOUNT, result.get(FIELD_DISCOUNT));
-        if (result.containsKey("nudge")) {
-            data.put("nudge", result.get("nudge"));
+        data.put(FIELD_DISCOUNT, result.discount());
+        if (result.nudge() != null) {
+            data.put("nudge", result.nudge());
         }
-        if (result.containsKey("bogo_details")) {
-            data.put("bogo_details", result.get("bogo_details"));
+        if (result.bogoDetails() != null) {
+            data.put("bogo_details", result.bogoDetails());
         }
         return ApiResponse.ok(data);
     }
@@ -185,6 +188,11 @@ public class InternalAccountOrderResource {
         data.put("max_discount", coupon.getMaxDiscount());
         data.put("bogo_buy_qty", BogoDiscountCalculator.clampQty(coupon.getBogoBuyQty()));
         data.put("bogo_get_qty", BogoDiscountCalculator.clampQty(coupon.getBogoGetQty()));
+        data.put(
+            "eligibility_scope",
+            BogoDiscountCalculator.resolveScope(coupon.getEligibilityScope()).name().toLowerCase(Locale.ROOT)
+        );
+        data.put("eligibility_category_id", coupon.getEligibilityCategoryId());
         return data;
     }
 
@@ -239,16 +247,16 @@ public class InternalAccountOrderResource {
         if (!login.equalsIgnoreCase(email)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email does not match signed-in account");
         }
-        CustomerProfile profile = dataAccess
-            .customerProfileRepository()
-            .findOneByUserLogin(login)
-            .orElseGet(() -> new CustomerProfile().userLogin(login));
+        Optional<CustomerProfile> existing = dataAccess.customerProfileRepository().findOneByUserLogin(login);
+        boolean isNew = existing.isEmpty();
+        CustomerProfile profile = existing.orElseGet(() -> new CustomerProfile().userLogin(login));
         boolean changed = false;
         if (StringUtils.isBlank(profile.getFullName())) {
             profile.setFullName(StringUtils.trimToNull(request.full_name()));
             changed = true;
         }
-        if (Boolean.TRUE.equals(request.subscribed()) && !Boolean.TRUE.equals(profile.getSubscribed())) {
+        // Signup opt-in only seeds a new profile; later opt-outs from the profile page must not be undone.
+        if (isNew && Boolean.TRUE.equals(request.subscribed())) {
             profile.setSubscribed(true);
             changed = true;
         }
@@ -334,8 +342,11 @@ public class InternalAccountOrderResource {
             .placedAt(Instant.now());
         CustomerOrder saved = dataAccess.customerOrderRepository().save(order);
         List<OrderItem> orderItems = new ArrayList<>();
-        for (ReservedOrderItem reservedItem : reserved) {
+        List<BigDecimal> lineDiscounts = totals.lineDiscounts();
+        for (int i = 0; i < reserved.size(); i++) {
+            ReservedOrderItem reservedItem = reserved.get(i);
             OrderItemRequest itemRequest = reservedItem.request();
+            BigDecimal lineDiscount = i < lineDiscounts.size() ? lineDiscounts.get(i) : BigDecimal.ZERO;
             OrderItem item = new OrderItem()
                 .order(saved)
                 .productId(itemRequest.product_id())
@@ -349,7 +360,8 @@ public class InternalAccountOrderResource {
                 .price(reservedItem.unitPrice())
                 .mrp(reservedItem.mrp())
                 .hsn(StringUtils.trimToNull(reservedItem.product().getHsn()))
-                .taxPct(reservedItem.product().getTaxPct());
+                .taxPct(reservedItem.product().getTaxPct())
+                .discountAllocation(roundInr(lineDiscount));
             orderItems.add(item);
         }
         dataAccess.orderItemRepository().saveAll(orderItems);
@@ -430,7 +442,7 @@ public class InternalAccountOrderResource {
     }
 
     @PostMapping("/orders/verify-payment")
-    @Transactional
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public ApiResponse<Map<String, Object>> verifyPayment(@Valid @RequestBody VerifyPaymentRequest request) {
         String login = requireLogin();
         CustomerOrder order = requireOwnedOrder(request.orderId(), login);
@@ -551,7 +563,9 @@ public class InternalAccountOrderResource {
         String login = requireLogin();
         var cancellationRequest = orderCancellationService.getOpenForUser(login, orderNumber);
         if (cancellationRequest == null) {
-            return ApiResponse.ok(Map.of("cancellation_request", null));
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("cancellation_request", null);
+            return ApiResponse.ok(data);
         }
         return ApiResponse.ok(Map.of("cancellation_request", orderCancellationService.toDto(cancellationRequest)));
     }
@@ -705,11 +719,11 @@ public class InternalAccountOrderResource {
         return Optional.empty();
     }
 
-    private Optional<Map<String, Object>> calculateCouponDiscount(String code, BigDecimal subtotal, Optional<String> userLogin) {
+    private Optional<CouponDiscountOutcome> calculateCouponDiscount(String code, BigDecimal subtotal, Optional<String> userLogin) {
         return calculateCouponDiscount(code, subtotal, userLogin, List.of());
     }
 
-    private Optional<Map<String, Object>> calculateCouponDiscount(
+    private Optional<CouponDiscountOutcome> calculateCouponDiscount(
         String code,
         BigDecimal subtotal,
         Optional<String> userLogin,
@@ -720,7 +734,7 @@ public class InternalAccountOrderResource {
         }
         Optional<String> welcome10Error = welcome10EligibilityError(code, userLogin);
         if (welcome10Error.isPresent()) {
-            return Optional.of(Map.of(FIELD_ERROR, welcome10Error.orElseThrow()));
+            return Optional.of(CouponDiscountOutcome.error(welcome10Error.orElseThrow()));
         }
         Optional<Coupon> couponOpt = dataAccess.couponRepository().findOneByCodeIgnoreCase(code.trim());
         if (couponOpt.isEmpty()) {
@@ -733,12 +747,16 @@ public class InternalAccountOrderResource {
         if (coupon.getExpiresAt() != null && coupon.getExpiresAt().isBefore(Instant.now())) {
             return Optional.empty();
         }
-        BigDecimal effectiveSubtotal = couponSubtotal(subtotal, lines);
+        BigDecimal effectiveSubtotal = couponSubtotal(
+            subtotal,
+            lines,
+            coupon.getEligibilityScope(),
+            coupon.getEligibilityCategoryId()
+        );
         BigDecimal minOrder = coupon.getMinOrder() != null ? coupon.getMinOrder() : BigDecimal.ZERO;
         if (effectiveSubtotal.compareTo(minOrder) < 0) {
-            return Optional.of(Map.of(FIELD_ERROR, minOrderEligibilityMessage(minOrder, effectiveSubtotal)));
+            return Optional.of(CouponDiscountOutcome.error(minOrderEligibilityMessage(minOrder, effectiveSubtotal)));
         }
-        BigDecimal discount;
         if (coupon.getDiscountType() == DiscountType.BOGO) {
             BogoDiscountCalculator.Result bogo = BogoDiscountCalculator.calculate(
                 coupon.getBogoBuyQty(),
@@ -746,20 +764,27 @@ public class InternalAccountOrderResource {
                 coupon.getDiscountValue(),
                 coupon.getMaxDiscount(),
                 effectiveSubtotal,
-                lines
+                lines,
+                coupon.getEligibilityScope(),
+                coupon.getEligibilityCategoryId()
             );
             if (!bogo.eligible()) {
-                return Optional.of(Map.of(FIELD_ERROR, bogoEligibilityMessage(bogo.missingItems())));
+                return Optional.of(CouponDiscountOutcome.error(bogoEligibilityMessage(bogo.missingItems())));
             }
-            discount = roundInr(bogo.discount().max(BigDecimal.ZERO).min(effectiveSubtotal));
-            Map<String, Object> map = new LinkedHashMap<>();
-            map.put(FIELD_DISCOUNT, discount);
-            if (bogo.nextTierMissing() > 0) {
-                map.put("nudge", bogoNextTierMessage(bogo.nextTierMissing(), coupon.getBogoGetQty(), coupon.getDiscountValue()));
-            }
-            map.put("bogo_details", bogoSummaryMessage(bogo.appliedGroups(), coupon.getBogoBuyQty(), coupon.getBogoGetQty(), coupon.getDiscountValue()));
-            return Optional.of(map);
-        } else if (coupon.getDiscountType() == DiscountType.PERCENT) {
+            BigDecimal discount = roundInr(bogo.discount().max(BigDecimal.ZERO).min(effectiveSubtotal));
+            String nudge = bogo.nextTierMissing() > 0
+                ? bogoNextTierMessage(bogo.nextTierMissing(), coupon.getBogoGetQty(), coupon.getDiscountValue())
+                : null;
+            String details = bogoSummaryMessage(
+                bogo.appliedGroups(),
+                coupon.getBogoBuyQty(),
+                coupon.getBogoGetQty(),
+                coupon.getDiscountValue()
+            );
+            return Optional.of(CouponDiscountOutcome.ok(discount, bogo.discountByLineIndex(), nudge, details));
+        }
+        BigDecimal discount;
+        if (coupon.getDiscountType() == DiscountType.PERCENT) {
             discount = effectiveSubtotal
                 .multiply(coupon.getDiscountValue())
                 .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
@@ -776,7 +801,13 @@ public class InternalAccountOrderResource {
         // Preserve paise: the invoice workbook applies percentage discounts to two decimals
         // (for example, 10% of ₹279.20 is ₹27.92).
         discount = roundInr(discount);
-        return Optional.of(Map.of(FIELD_DISCOUNT, discount));
+        Map<Integer, BigDecimal> lineAllocations = DiscountLineAllocator.allocateProportionally(
+            discount,
+            lines,
+            coupon.getEligibilityScope(),
+            coupon.getEligibilityCategoryId()
+        );
+        return Optional.of(CouponDiscountOutcome.ok(discount, lineAllocations, null, null));
     }
 
     private static String bogoEligibilityMessage(int missingItems) {
@@ -827,25 +858,62 @@ public class InternalAccountOrderResource {
         return "Add ₹" + shortfall.setScale(0, RoundingMode.CEILING).toPlainString() + " more to unlock this offer";
     }
 
-    private static BigDecimal couponSubtotal(BigDecimal requestSubtotal, List<BogoDiscountCalculator.Line> lines) {
+    private static BigDecimal couponSubtotal(
+        BigDecimal requestSubtotal,
+        List<BogoDiscountCalculator.Line> lines,
+        CouponEligibilityScope scope,
+        Long eligibilityCategoryId
+    ) {
         if (lines == null || lines.isEmpty()) {
             return requestSubtotal == null ? BigDecimal.ZERO : requestSubtotal;
         }
-        return lines
-            .stream()
-            .map(line -> line.unitPrice().multiply(BigDecimal.valueOf(line.qty())))
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return BogoDiscountCalculator.qualifyingSubtotal(lines, scope, eligibilityCategoryId);
     }
 
-    private static List<BogoDiscountCalculator.Line> couponLines(List<CouponLineRequest> items) {
+    private List<BogoDiscountCalculator.Line> couponLines(List<CouponLineRequest> items) {
         if (items == null || items.isEmpty()) {
             return List.of();
         }
-        return items
-            .stream()
-            .filter(item -> item != null && item.qty() != null && item.price() != null)
-            .map(item -> new BogoDiscountCalculator.Line(item.qty(), item.price()))
-            .toList();
+        List<BogoDiscountCalculator.Line> lines = new ArrayList<>();
+        for (int i = 0; i < items.size(); i++) {
+            CouponLineRequest item = items.get(i);
+            if (item == null || item.qty() == null || item.price() == null) {
+                continue;
+            }
+            Long categoryId = null;
+            if (StringUtils.isNotBlank(item.product_id())) {
+                // Prefer server category so validate matches checkout (never trust client category alone).
+                categoryId = lookupProductCategoryId(item.product_id());
+            }
+            if (categoryId == null) {
+                categoryId = item.category_id();
+            }
+            lines.add(
+                new BogoDiscountCalculator.Line(
+                    item.qty(),
+                    item.price(),
+                    i,
+                    blankToNull(item.product_id()),
+                    blankToNull(item.sku()),
+                    categoryId
+                )
+            );
+        }
+        return lines;
+    }
+
+    private Long lookupProductCategoryId(String productIdRaw) {
+        try {
+            Long productId = Long.parseLong(StringUtils.trimToEmpty(productIdRaw));
+            return dataAccess
+                .productRepository()
+                .findById(productId)
+                .map(Product::getCategory)
+                .map(Category::getId)
+                .orElse(null);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private Totals calculateTotals(
@@ -860,20 +928,38 @@ public class InternalAccountOrderResource {
             .stream()
             .map(item -> item.unitPrice().multiply(BigDecimal.valueOf(item.request().qty())))
             .reduce(BigDecimal.ZERO, BigDecimal::add);
-        List<BogoDiscountCalculator.Line> lines = items
-            .stream()
-            .map(item -> new BogoDiscountCalculator.Line(item.request().qty(), item.unitPrice()))
-            .toList();
-        Optional<Map<String, Object>> couponResult = calculateCouponDiscount(
+        List<BogoDiscountCalculator.Line> lines = new ArrayList<>();
+        for (int i = 0; i < items.size(); i++) {
+            ReservedOrderItem item = items.get(i);
+            Long categoryId = item.product().getCategory() != null ? item.product().getCategory().getId() : null;
+            lines.add(
+                new BogoDiscountCalculator.Line(
+                    item.request().qty(),
+                    item.unitPrice(),
+                    i,
+                    item.request().product_id(),
+                    blankToNull(item.variantSku()),
+                    categoryId
+                )
+            );
+        }
+        Optional<CouponDiscountOutcome> couponResult = calculateCouponDiscount(
             couponCode,
             subtotal,
             Optional.ofNullable(login),
             lines
         );
-        if (couponResult.map(m -> m.containsKey(FIELD_ERROR)).orElse(false)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, couponResult.orElseThrow().get(FIELD_ERROR).toString());
+        if (couponResult.map(CouponDiscountOutcome::hasError).orElse(false)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, couponResult.orElseThrow().error());
         }
-        BigDecimal discount = couponResult.map(m -> (BigDecimal) m.get(FIELD_DISCOUNT)).orElse(BigDecimal.ZERO);
+        BigDecimal discount = couponResult.map(CouponDiscountOutcome::discount).orElse(BigDecimal.ZERO);
+        Map<Integer, BigDecimal> allocations = couponResult
+            .map(CouponDiscountOutcome::lineAllocations)
+            .orElse(Map.of());
+        List<BigDecimal> lineDiscounts = new ArrayList<>(items.size());
+        for (int i = 0; i < items.size(); i++) {
+            lineDiscounts.add(roundInr(allocations.getOrDefault(i, BigDecimal.ZERO)));
+        }
         BigDecimal afterDiscount = roundInr(subtotal.subtract(discount).max(BigDecimal.ZERO));
         CommerceSettings commerce = commerceSettings();
         BigDecimal shipping = calculateShipping(afterDiscount, shippingMode, commerce);
@@ -895,7 +981,7 @@ public class InternalAccountOrderResource {
                 .add(roundedDonation)
                 .add(commerce.pricesIncludeGst() ? BigDecimal.ZERO : productTax)
         );
-        return new Totals(subtotal, discount, shipping, codFee, tax, total);
+        return new Totals(subtotal, discount, shipping, codFee, tax, total, List.copyOf(lineDiscounts));
     }
 
     /** INR rounded to paise — mirrors src/lib/money.ts#roundInr. */
@@ -1626,7 +1712,10 @@ public class InternalAccountOrderResource {
 
     public record CouponLineRequest(
         @NotNull @Min(1) @Max(50) Integer qty,
-        @NotNull @DecimalMin("0") BigDecimal price
+        @NotNull @DecimalMin("0") BigDecimal price,
+        @Size(max = 120) String product_id,
+        @Size(max = 120) String sku,
+        Long category_id
     ) {}
 
     public record ProfileUpdateRequest(
@@ -1712,7 +1801,8 @@ public class InternalAccountOrderResource {
         BigDecimal shipping,
         BigDecimal codFee,
         BigDecimal tax,
-        BigDecimal total
+        BigDecimal total,
+        List<BigDecimal> lineDiscounts
     ) {}
 
     private record ReservedOrderItem(Product product, OrderItemRequest request, String variantSku, BigDecimal unitPrice, BigDecimal mrp) {}

@@ -26,15 +26,18 @@ public class ZohoOAuthService {
     private final ApplicationProperties.Zoho.OAuth serverOAuth;
     private final RestClient restClient;
     private final Map<String, CachedToken> accessTokenCache = new ConcurrentHashMap<>();
+    private final ZohoSettingsService zohoSettingsService;
 
     public ZohoOAuthService(
         ZohoSettingRepository settingRepository,
         ApplicationProperties applicationProperties,
-        RestClient.Builder restClientBuilder
+        RestClient.Builder restClientBuilder,
+        ZohoSettingsService zohoSettingsService
     ) {
         this.settingRepository = settingRepository;
         this.serverOAuth = applicationProperties.getZoho().getOauth();
         this.restClient = restClientBuilder.build();
+        this.zohoSettingsService = zohoSettingsService;
     }
 
     /** Server-side OAuth app is configured when an admin never has to paste client id/secret. */
@@ -161,6 +164,7 @@ public class ZohoOAuthService {
         String accessToken = response.get("access_token") != null ? String.valueOf(response.get("access_token")) : null;
 
         ZohoSetting setting = settingRepository.findActiveOrLatest().orElseGet(ZohoSetting::new);
+        ZohoSetting previous = ZohoSettingsService.copyForEmail(setting);
         setting.setRefreshToken(refreshToken);
         setting.setDataCenter(dataCenter);
 
@@ -183,6 +187,7 @@ public class ZohoOAuthService {
 
         setting.setConnected(true);
         settingRepository.save(setting);
+        zohoSettingsService.notifyChanged(previous, setting);
     }
 
     @SuppressWarnings("unchecked")

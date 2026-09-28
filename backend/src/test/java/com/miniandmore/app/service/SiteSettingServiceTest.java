@@ -55,7 +55,7 @@ class SiteSettingServiceTest {
         verify(siteSettingMapper).toEntity(input);
         verify(siteSettingRepository).save(entity);
         verify(siteSettingMapper).toDto(saved);
-        verify(adminConfigChangeMailService).notifySiteSettingsChanged(null, expected);
+        verify(adminConfigChangeMailService).notifySiteSettingsChangedAfterCommit(null, expected);
     }
 
     @Test
@@ -82,7 +82,7 @@ class SiteSettingServiceTest {
         verify(entityManager).detach(existing);
         verify(siteSettingMapper).toEntity(input);
         verify(siteSettingRepository).save(entity);
-        verify(adminConfigChangeMailService).notifySiteSettingsChanged(previous, expected);
+        verify(adminConfigChangeMailService).notifySiteSettingsChangedAfterCommit(previous, expected);
     }
 
     @Test
@@ -141,7 +141,7 @@ class SiteSettingServiceTest {
         verify(entityManager).detach(existing);
         verify(siteSettingMapper).partialUpdate(existing, input);
         verify(siteSettingRepository).save(existing);
-        verify(adminConfigChangeMailService).notifySiteSettingsChanged(previous, expected);
+        verify(adminConfigChangeMailService).notifySiteSettingsChangedAfterCommit(previous, expected);
     }
 
     @Test

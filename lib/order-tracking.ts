@@ -1,4 +1,4 @@
-import { CheckCircle2, Home, MapPin, Package, Truck, type LucideIcon } from "lucide-react";
+import { CheckCircle2, Clock3, Home, MapPin, Package, Truck, type LucideIcon } from "lucide-react";
 import { needsOnlinePayment } from "@/lib/order-status";
 
 export type TrackingStageState = "current" | "done" | "upcoming";
@@ -23,6 +23,16 @@ export const TRACKING_STAGES = [
         "Your order has been hand-wrapped with tissue, twine, and a tiny note — it's waiting for dispatch.",
       done: "Hand-wrapped with care.",
       upcoming: "We'll hand-wrap yours with tissue, twine, and a tiny note before dispatch.",
+    },
+  },
+  {
+    key: "awaiting_pickup",
+    icon: Clock3,
+    label: "Waiting for pickup",
+    detail: {
+      current: "The shipping label is ready. We'll mark it on the way when the courier collects the parcel.",
+      done: "Collected by the courier.",
+      upcoming: "After packing, we'll prepare the shipping label and wait for courier collection.",
     },
   },
   {
@@ -59,7 +69,7 @@ export const TRACKING_STAGES = [
 
 /**
  * Confirmed orders stay at stage 0 until a package is created for the Zoho sales order.
- * The Hand-wrapped phase completes once the order ships.
+ * Waiting for pickup is a distinct stage after hand-wrapping and before physical dispatch.
  */
 const STATUS_INDEX: Record<string, number> = {
   pending: 0,
@@ -67,12 +77,12 @@ const STATUS_INDEX: Record<string, number> = {
   processing: 1,
   hand_wrapped: 1,
   wrapped: 1,
-  awaiting_pickup: 1,
-  shipped: 2,
-  out_for_delivery: 3,
-  delivery_failed: 3,
-  delivered: 4,
-  fulfilled: 4,
+  awaiting_pickup: 2,
+  shipped: 3,
+  out_for_delivery: 4,
+  delivery_failed: 4,
+  delivered: 5,
+  fulfilled: 5,
   cancelled: -1,
 };
 
@@ -125,7 +135,6 @@ export function trackingStageLabel(order: OrderTrackingFields, stageKey: string)
   if (stageKey === "pending" && (key === "confirmed" || isHandWrapped(order) || key === "awaiting_pickup")) {
     return "Order confirmed";
   }
-  if (stageKey === "processing" && key === "awaiting_pickup") return "Waiting for pickup";
   return TRACKING_STAGES.find((s) => s.key === stageKey)?.label ?? stageKey;
 }
 
@@ -142,15 +151,6 @@ export function trackingStageDetail(
     if (state === "done") return "Order confirmed.";
   }
   const stage = TRACKING_STAGES.find((s) => s.key === stageKey);
-  if (stageKey === "processing" && key === "awaiting_pickup") {
-    if (state === "current") {
-      return "The shipping label is ready. We'll mark it on the way when ExpressBees collects the parcel.";
-    }
-    if (state === "done") return "Hand-wrapped with care.";
-  }
-  if (stageKey === "shipped" && key === "awaiting_pickup" && state === "upcoming") {
-    return "Tracking moves to on the way after courier pickup.";
-  }
   if (stageKey === "out_for_delivery" && key === "delivery_failed" && state === "current") {
     return "Delivery attempt was unsuccessful. A reattempt is scheduled by the courier.";
   }

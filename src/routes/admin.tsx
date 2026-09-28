@@ -5,7 +5,7 @@ import { ADMIN_NAV_ITEMS, filterAdminNavItems } from "@/lib/admin-nav";
 import {
   LayoutDashboard, Image as ImgIcon, Tag, BookOpen, FileText, Package, Plug, LogOut, Loader2,
   Folder, Home, EyeOff, Settings as SettingsIcon, ExternalLink, ShoppingCart, ReceiptText, Percent, RotateCcw, XCircle,
-  Users, Search, Mail, ShieldCheck, type LucideIcon,
+  Users, Search, Mail, ShieldCheck, Gift, type LucideIcon,
 } from "lucide-react";
 import { staffHomePath } from "@/lib/staff-roles";
 
@@ -23,6 +23,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/admin/products": Package,
   "/admin/home": Home,
   "/admin/about": Users,
+  "/admin/gift": Gift,
   "/admin/pages": EyeOff,
   "/admin/coupons": Tag,
   "/admin/discount": Percent,

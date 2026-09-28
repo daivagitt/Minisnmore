@@ -67,7 +67,7 @@ public interface UserRepository extends R2dbcRepository<User, Long> {
     Flux<User> findAllUsersForAdmin(long limit, long offset);
 
     @Query("SELECT * FROM jhi_user WHERE activated = true ORDER BY id LIMIT :limit OFFSET :offset")
-    Flux<User> findAllByActivatedIsTrue(Pageable pageable);
+    Flux<User> findAllActivatedUsers(long limit, long offset);
 
     @Query("DELETE FROM jhi_user WHERE activated = false AND login = :login")
     Mono<Void> deleteInactiveByLogin(String login);

@@ -39,7 +39,7 @@ type Ctx = {
   isStaff: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, fullName?: string, subscribed?: boolean) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, fullName: string | undefined, subscribed: boolean) => Promise<{ error: string | null }>;
   signInWithOAuth: (provider: "google" | "apple" | "facebook", redirectPath?: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   completeOAuthSignIn: (token: string) => Promise<{ error: string | null }>;
@@ -247,7 +247,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, fullName?: string, subscribed = false) => {
+  const signUp = async (email: string, password: string, fullName: string | undefined, subscribed: boolean) => {
     const trimmed = email.trim().toLowerCase();
     if (fullName !== undefined) {
       const nameError = fullNameFieldError(fullName);
@@ -266,7 +266,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           firstName,
           lastName,
           langKey: "en",
-          subscribed: Boolean(subscribed),
+          subscribed,
         },
         { unwrap: false },
       );

@@ -4,7 +4,9 @@ import { GIFT_OCCASIONS, validateGiftStep, validateRecipientName } from "./gift-
 describe("gift-flow", () => {
   it("lists milestone occasions without Just Because", () => {
     expect(GIFT_OCCASIONS).not.toContain("Just Because");
-    expect(GIFT_OCCASIONS).toContain("Baby Shower");
+    expect(GIFT_OCCASIONS).toContain("Naming Ceremony");
+    expect(GIFT_OCCASIONS).toContain("Annaprashan");
+    expect(GIFT_OCCASIONS).not.toContain("Baby Shower");
   });
 
   it("requires a recipient name with at least one letter", () => {

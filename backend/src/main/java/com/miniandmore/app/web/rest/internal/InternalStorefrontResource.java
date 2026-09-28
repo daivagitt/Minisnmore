@@ -8,6 +8,7 @@ import com.miniandmore.app.service.dto.*;
 import com.miniandmore.app.service.mapper.*;
 import com.miniandmore.app.web.rest.v1.AboutPageDTO;
 import com.miniandmore.app.web.rest.v1.ApiResponse;
+import com.miniandmore.app.web.rest.v1.GiftPageDTO;
 import com.miniandmore.app.web.rest.v1.SubscribePageDTO;
 import java.util.List;
 import jakarta.validation.Valid;
@@ -166,6 +167,17 @@ public class InternalStorefrontResource {
                 .map(siteSettingMapper::toDto)
                 .map(AboutPageDTO::from)
                 .orElseGet(AboutPageDTO::new)
+        );
+    }
+
+    @GetMapping("/gift-page")
+    public ApiResponse<GiftPageDTO> giftPage() {
+        return ApiResponse.ok(
+            siteSettingRepository
+                .findFirstByOrderByIdAsc()
+                .map(siteSettingMapper::toDto)
+                .map(GiftPageDTO::from)
+                .orElseGet(GiftPageDTO::new)
         );
     }
 

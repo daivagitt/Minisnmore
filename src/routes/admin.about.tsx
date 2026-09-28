@@ -2,7 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
-import { AdminPage, Field, inputCls } from "@/components/admin/AdminPage";
+import {
+  AdminPage,
+  AdminPanelSection,
+  AdminSectionToggles,
+  Field,
+  inputCls,
+} from "@/components/admin/AdminPage";
+import { useAdminSections } from "@/hooks/useAdminSections";
 import { ImageUploadField } from "@/components/admin/ImageUploadField";
 import {
   AboutFeaturesEditor,
@@ -41,6 +48,7 @@ function AboutAdminPage() {
   const [content, setContent] = useState<AboutPageContent>(DEFAULT_ABOUT_PAGE);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const sections = useAdminSections<"hero" | "story" | "why" | "vision" | "founders" | "cta">();
 
   useEffect(() => {
     (async () => {
@@ -66,6 +74,7 @@ function AboutAdminPage() {
     const errors = [...getSiteSettingsValidationErrors(payload), ...getAboutPageValidationErrors(content)];
     if (errors.length) {
       showValidationErrors(errors);
+      sections.expandAll();
       setSaving(false);
       return;
     }
@@ -75,6 +84,7 @@ function AboutAdminPage() {
       toast.success("About page saved");
     } catch (error) {
       showApiError(error, "Could not save about page");
+      sections.expandAll();
     } finally {
       setSaving(false);
     }
@@ -99,8 +109,8 @@ function AboutAdminPage() {
         <div className="text-sm text-muted-foreground">Loading…</div>
       ) : (
         <div className="space-y-4">
-          <div className="glass-strong rounded-3xl p-5 space-y-3">
-            <div className="font-display text-lg">Hero</div>
+          <AdminSectionToggles sections={sections} />
+          <AdminPanelSection title="Hero" {...sections.panel("hero", true)}>
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label="Eyebrow">
                 <input
@@ -139,10 +149,9 @@ function AboutAdminPage() {
               value={content.hero_image_url}
               onChange={(hero_image_url) => setContent((c) => patchAbout(c, "hero_image_url", hero_image_url))}
             />
-          </div>
+          </AdminPanelSection>
 
-          <div className="glass-strong rounded-3xl p-5 space-y-3">
-            <div className="font-display text-lg">Why we exist</div>
+          <AdminPanelSection title="Why we exist" {...sections.panel("story")}>
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label="Eyebrow">
                 <input
@@ -197,10 +206,9 @@ function AboutAdminPage() {
                 onChange={(e) => setContent((c) => patchAbout(c, "story_quote", e.target.value))}
               />
             </Field>
-          </div>
+          </AdminPanelSection>
 
-          <div className="glass-strong rounded-3xl p-5 space-y-3">
-            <div className="font-display text-lg">Why choose us</div>
+          <AdminPanelSection title="Why choose us" {...sections.panel("why")}>
             <Field label="Eyebrow">
               <input
                 className={inputCls()}
@@ -227,10 +235,9 @@ function AboutAdminPage() {
                 onChange={(e) => setContent((c) => patchAbout(c, "why_footer", e.target.value))}
               />
             </Field>
-          </div>
+          </AdminPanelSection>
 
-          <div className="glass-strong rounded-3xl p-5 space-y-3">
-            <div className="font-display text-lg">Vision &amp; mission</div>
+          <AdminPanelSection title="Vision & mission" {...sections.panel("vision")}>
             <Field label="Vision title">
               <input
                 className={inputCls()}
@@ -274,10 +281,9 @@ function AboutAdminPage() {
                 setContent((c) => patchAbout(c, "mission_paragraphs", mission_paragraphs))
               }
             />
-          </div>
+          </AdminPanelSection>
 
-          <div className="glass-strong rounded-3xl p-5 space-y-3">
-            <div className="font-display text-lg">Founders</div>
+          <AdminPanelSection title="Founders" {...sections.panel("founders")}>
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label="Eyebrow">
                 <input
@@ -305,10 +311,9 @@ function AboutAdminPage() {
               founders={content.founders}
               onChange={(founders) => setContent((c) => patchAbout(c, "founders", founders))}
             />
-          </div>
+          </AdminPanelSection>
 
-          <div className="glass-strong rounded-3xl p-5 space-y-3">
-            <div className="font-display text-lg">Bottom call to action</div>
+          <AdminPanelSection title="Bottom call to action" {...sections.panel("cta")}>
             <Field label="Title">
               <input
                 className={inputCls()}
@@ -331,7 +336,7 @@ function AboutAdminPage() {
                 onChange={(e) => setContent((c) => patchAbout(c, "cta_button", e.target.value))}
               />
             </Field>
-          </div>
+          </AdminPanelSection>
         </div>
       )}
     </AdminPage>

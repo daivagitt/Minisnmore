@@ -160,6 +160,7 @@ def base_css() -> str:
       }
       .status.pass { background: var(--pass); }
       .status.fail { background: var(--fail); }
+      .status.skip { background: #64748b; }
       table {
         width: 100%;
         border-collapse: collapse;
@@ -267,7 +268,7 @@ def page_shell(
 
 def status_pill(status: str) -> str:
     normalized = status.upper()
-    css = "pass" if normalized == "PASS" else "fail"
+    css = {"PASS": "pass", "SKIP": "skip"}.get(normalized, "fail")
     return f'<span class="status {css}">{esc(normalized)}</span>'
 
 

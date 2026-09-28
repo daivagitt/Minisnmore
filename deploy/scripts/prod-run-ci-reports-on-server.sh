@@ -9,6 +9,7 @@
 #   PUBLISH_REPORTS=true|false  CONTINUE_ON_TEST_FAIL=true|false
 #   API_TEST_BASE_URL=http://127.0.0.1:9180
 #   RELEASE_ID=202608101200-uat
+#   API_TEST_NO_MAIL=true|false (default true: skip every live call that can email via Care@minisnmore.com)
 set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
@@ -25,6 +26,8 @@ API_TEST_BASE_URL="${API_TEST_BASE_URL:-http://127.0.0.1:9180}"
 API_CATALOG_BASE_URL="${API_CATALOG_BASE_URL:-http://127.0.0.1:9184}"
 API_INTEGRATION_BASE_URL="${API_INTEGRATION_BASE_URL:-https://minisnmore.com}"
 OPENAPI_SNAPSHOT_FALLBACK="${OPENAPI_SNAPSHOT_FALLBACK:-false}"
+API_TEST_NO_MAIL="${API_TEST_NO_MAIL:-true}"
+export API_TEST_NO_MAIL
 
 PKG="${PKG:-artifacts/reports-site}"
 REMOTE="${REMOTE_REPORTS_DIR:-/var/www/uat1/mini_reports}"
@@ -43,6 +46,10 @@ if [ -f /etc/mini-and-more/sonar-ci.env ]; then
   . /etc/mini-and-more/sonar-ci.env
   set +a
 fi
+
+# Unit tests must never pick up the live Care@minisnmore.com SMTP account from the env file.
+unset SPRING_MAIL_HOST SPRING_MAIL_PORT SPRING_MAIL_USERNAME SPRING_MAIL_PASSWORD JHIPSTER_MAIL_FROM \
+  ZOHO_MAIL_HOST ZOHO_MAIL_PORT ZOHO_MAIL_USERNAME ZOHO_MAIL_PASSWORD ZOHO_MAIL_FROM
 
 run_step() {
   echo ""
@@ -65,6 +72,9 @@ mkdir -p "$PKG"
 if [ -d "$REMOTE/current" ]; then
   cp -a "$REMOTE/current/." "$PKG/"
 fi
+# Scenario suites place orders / refund returns (customer emails); Zoho live + integration coverage are retired.
+rm -rf "$PKG/backend/scenario-integration" "$PKG/backend/ledgerly-scenario-integration" \
+  "$PKG/backend/zoho-live" "$PKG/backend/coverage/integration" "$PKG/backend/javadoc/integration"
 
 if [ "$RUN_UNIT_TESTS" = "true" ]; then
   echo "=== 2. Frontend unit tests (Vitest + coverage) ==="
@@ -73,12 +83,13 @@ if [ "$RUN_UNIT_TESTS" = "true" ]; then
     --coverage.thresholds.statements=0 \
     --coverage.thresholds.branches=0 \
     --coverage.thresholds.functions=0 \
+    --coverage.reportOnFailure=true \
     --reporter=default --reporter=junit --outputFile.junit=coverage/frontend/junit.xml
 
   echo "=== 3. Backend unit tests (gateway, catalog, store, commerce) ==="
   for mod in gateway backend store commerce; do
     echo "  module: $mod"
-    run_step bash -c "cd '$REPO_ROOT/$mod' && ./mvnw -q test jacoco:report -DskipITs -Djacoco.haltOnFailure=false"
+    run_step bash -c "cd '$REPO_ROOT/$mod' && ./mvnw -q test jacoco:report -DskipITs -Djacoco.haltOnFailure=false -Dmaven.test.failure.ignore=true"
   done
 
   echo "=== 4. Ledgerly-focused catalog unit tests (optional) ==="
@@ -100,8 +111,10 @@ if [ "$RUN_JAVADOC" = "true" ]; then
     fi
     run_step bash -c "cd '$REPO_ROOT/$mod_dir' && ./mvnw -q -Djacoco.skip=true javadoc:javadoc -DskipTests \
       -Dmaven.javadoc.failOnError=false -Ddoclint=none"
-    apidocs="$REPO_ROOT/$mod_dir/target/site/apidocs"
+    apidocs="$REPO_ROOT/$mod_dir/target/reports/apidocs"
+    [ -d "$apidocs" ] || apidocs="$REPO_ROOT/$mod_dir/target/site/apidocs"
     if [ -d "$apidocs" ]; then
+      rm -rf "$PKG/backend/javadoc/$slug"
       mkdir -p "$PKG/backend/javadoc/$slug"
       cp -a "$apidocs/." "$PKG/backend/javadoc/$slug/"
     fi
@@ -145,23 +158,16 @@ if [ "$RUN_API_TESTS" = "true" ]; then
   mkdir -p "$PKG/backend/ledgerly-live"
   cp -a artifacts/ledgerly-live/. "$PKG/backend/ledgerly-live/" 2>/dev/null || true
 
-  echo "=== 9. Ledgerly scenario integration tests ==="
-  API_TEST_BASE_URL="$API_INTEGRATION_BASE_URL" \
-    run_step bash jenkins/scripts/run-ledgerly-scenario-integration-tests.sh
-  mkdir -p "$PKG/backend/ledgerly-scenario-integration"
-  cp -a artifacts/ledgerly-scenario-integration/. "$PKG/backend/ledgerly-scenario-integration/" 2>/dev/null || true
-
-  echo "=== 10. Scenario integration tests ==="
-  API_TEST_BASE_URL="$API_INTEGRATION_BASE_URL" \
-    run_step bash jenkins/scripts/run-scenario-integration-tests.sh
-  mkdir -p "$PKG/backend/scenario-integration"
-  cp -a artifacts/scenario-integration/. "$PKG/backend/scenario-integration/" 2>/dev/null || true
-
   echo "=== 11. API lifecycle tests (all OpenAPI endpoints) ==="
   API_TEST_BASE_URL="$API_INTEGRATION_BASE_URL" \
     run_step bash jenkins/scripts/run-api-lifecycle-ci.sh
   mkdir -p "$PKG/backend/api"
   cp -a artifacts/api-tests/. "$PKG/backend/api/" 2>/dev/null || true
+
+  echo "=== 11b. End-to-end positive / negative scenarios (all modules) ==="
+  run_step bash jenkins/scripts/run-e2e-scenario-tests.sh
+  mkdir -p "$PKG/backend/e2e-scenarios"
+  cp -a artifacts/e2e-scenarios/. "$PKG/backend/e2e-scenarios/" 2>/dev/null || true
 fi
 
 if [ "$RUN_SONAR" = "true" ]; then

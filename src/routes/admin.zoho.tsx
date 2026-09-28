@@ -22,6 +22,7 @@ import {
   getZohoIntegrationStatus,
   getZohoOAuthSetup,
   pullZohoProducts,
+  pullZohoProductGroup,
   setZohoPullProductsAutoCreateCategory,
   getZohoSettings,
   pullZohoInventory,
@@ -61,7 +62,7 @@ type ZohoSettings = {
   hasRefreshToken?: boolean;
 };
 
-type SyncAction = "products" | "productsPull" | "inventory" | "orders" | "tracking";
+type SyncAction = "products" | "productsPull" | "productGroup" | "inventory" | "orders" | "tracking";
 
 function ZohoPage() {
   const [integration, setIntegration] = useState<ZohoIntegrationStatus | null>(null);
@@ -329,6 +330,7 @@ function ZohoSyncPanel({
   const [busy, setBusy] = useState<SyncAction | null>(null);
   const [lastResult, setLastResult] = useState<{ label: string; summary: ZohoSyncSummary } | null>(null);
   const [orderNumber, setOrderNumber] = useState("");
+  const [itemGroupId, setItemGroupId] = useState("");
   const [syncingOrder, setSyncingOrder] = useState(false);
 
   const run = async (action: SyncAction, label: string, fn: () => Promise<ZohoSyncSummary>) => {
@@ -463,6 +465,43 @@ function ZohoSyncPanel({
           })}
         </ul>
       )}
+
+      {connected ? (
+        <div className="rounded-2xl border border-border/60 bg-background/40 p-4 space-y-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">Pull variant group from Zoho</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Enter the Zoho parent/item-group ID. All child variants and the parent category are pulled in one API call.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={itemGroupId}
+              onChange={(e) => setItemGroupId(e.target.value.replace(/\D/g, ""))}
+              placeholder="Item group ID"
+              className={inputCls}
+              disabled={busy !== null}
+            />
+            <button
+              type="button"
+              disabled={busy !== null || !itemGroupId.trim()}
+              onClick={() => run("productGroup", "Variant group pull", () => pullZohoProductGroup(itemGroupId))}
+              className="shrink-0 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 min-w-36"
+            >
+              {busy === "productGroup" ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Pulling…
+                </>
+              ) : (
+                "Pull group"
+              )}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {connected ? (
         <div className="rounded-2xl border border-border/60 bg-background/40 p-4 space-y-3">

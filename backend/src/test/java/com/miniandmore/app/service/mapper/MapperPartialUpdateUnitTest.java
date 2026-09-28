@@ -194,9 +194,11 @@ class MapperPartialUpdateUnitTest {
         entity.setSubscribePlansJson("[]");
         entity.setSubscribeFeaturesJson("[]");
         entity.setAboutPageJson("{}");
+        entity.setGiftPageJson("{\"hero_title\":\"Gift\"}");
         var dto = mapper.toDto(entity);
         assertThat(dto.getSubscribeHeroTitle()).isEqualTo("Hero");
         assertThat(dto.getAboutPageJson()).isEqualTo("{}");
+        assertThat(dto.getGiftPageJson()).isEqualTo("{\"hero_title\":\"Gift\"}");
         var copy = mapper.toEntity(dto);
         SiteSettingDTO patch = new SiteSettingDTO();
         patch.setBrandName("Updated Brand");

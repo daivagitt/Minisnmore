@@ -164,6 +164,18 @@ public class InternalAdminOrderResource {
         return ApiResponse.ok(Map.of("orders", orders));
     }
 
+    /**
+     * Logins with at least one real placed order (excludes cancelled carts and unpaid PENDING checkouts).
+     * Used by the admin users table Ordered column.
+     */
+    @GetMapping("/ordered-logins")
+    public ApiResponse<Map<String, Object>> orderedLogins() {
+        List<String> logins = dataAccess
+            .customerOrderRepository()
+            .findDistinctUserLoginsWithStatusNotIn(List.of(OrderStatus.CANCELLED, OrderStatus.PENDING));
+        return ApiResponse.ok(Map.of("logins", logins));
+    }
+
     @GetMapping("/{orderNumber}")
     public ApiResponse<Map<String, Object>> getOrder(@PathVariable String orderNumber) {
         CustomerOrder order = dataAccess

@@ -1,6 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { AdminPage, Field, inputCls } from "@/components/admin/AdminPage";
+import {
+  AdminPage,
+  AdminPanelSection,
+  AdminSectionToggles,
+  Field,
+  inputCls,
+} from "@/components/admin/AdminPage";
+import { useAdminSections } from "@/hooks/useAdminSections";
 import { NumberField } from "@/components/admin/NumberField";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
@@ -76,6 +83,7 @@ function SettingsPage() {
   const [s, setS] = useState<SettingsForm>(empty);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const sections = useAdminSections<"brand" | "contact" | "footer" | "pricing" | "ecatalogue">();
 
   useEffect(() => {
     (async () => {
@@ -114,6 +122,7 @@ function SettingsPage() {
     const errors = getSiteSettingsValidationErrors(payload);
     if (errors.length) {
       showValidationErrors(errors);
+      sections.expandAll();
       setSaving(false);
       return;
     }
@@ -123,6 +132,7 @@ function SettingsPage() {
       invalidateSiteSettings();
     } catch (error) {
       showApiError(error, "Could not save settings");
+      sections.expandAll();
     } finally {
       setSaving(false);
     }
@@ -147,8 +157,8 @@ function SettingsPage() {
         <div className="text-sm text-muted-foreground">Loading…</div>
       ) : (
         <div className="space-y-4">
-          <div className="glass-strong rounded-3xl p-5 space-y-3">
-            <div className="font-display text-lg">Brand</div>
+          <AdminSectionToggles sections={sections} />
+          <AdminPanelSection title="Brand" {...sections.panel("brand", true)}>
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label="Brand name">
                 <input
@@ -206,10 +216,9 @@ function SettingsPage() {
                 </div>
               )}
             </div>
-          </div>
+          </AdminPanelSection>
 
-          <div className="glass-strong rounded-3xl p-5 space-y-3">
-            <div className="font-display text-lg">Contact &amp; social</div>
+          <AdminPanelSection title="Contact & social" {...sections.panel("contact")}>
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label="Contact email">
                 <input
@@ -273,10 +282,9 @@ function SettingsPage() {
                 />
               </Field>
             </div>
-          </div>
+          </AdminPanelSection>
 
-          <div className="glass-strong rounded-3xl p-5 space-y-3">
-            <div className="font-display text-lg">Footer</div>
+          <AdminPanelSection title="Footer" {...sections.panel("footer")}>
             <Field label="Tagline">
               <textarea
                 rows={3}
@@ -293,10 +301,9 @@ function SettingsPage() {
                 placeholder="© 2026 Mini's n More · Made with love in India"
               />
             </Field>
-          </div>
+          </AdminPanelSection>
 
-          <div className="glass-strong rounded-3xl p-5 space-y-3">
-            <div className="font-display text-lg">Pricing &amp; delivery</div>
+          <AdminPanelSection title="Pricing & delivery" {...sections.panel("pricing")}>
             <p className="text-sm text-muted-foreground">
               Set one total GST rate; CGST/SGST or IGST is derived later from the delivery state and does not need
               separate admin fields. Product prices should match whether GST is included or added at checkout.
@@ -367,10 +374,9 @@ function SettingsPage() {
               Pincode lookup ETAs (e.g. 2–3 days) get this many extra days before showing on product and checkout.
               Set 0 for no buffer.
             </p>
-          </div>
+          </AdminPanelSection>
 
-          <div className="glass-strong rounded-3xl p-5 space-y-3">
-            <div className="font-display text-lg">E-Catalogue</div>
+          <AdminPanelSection title="E-Catalogue" {...sections.panel("ecatalogue")}>
             <div className="grid sm:grid-cols-2 gap-3">
               <PdfUploadField
                 label="Catalogue PDF"
@@ -385,7 +391,7 @@ function SettingsPage() {
                 />
               </Field>
             </div>
-          </div>
+          </AdminPanelSection>
         </div>
       )}
     </AdminPage>

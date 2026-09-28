@@ -130,6 +130,23 @@ class InternalAdminOrderResourceTest {
 
     @Test
     @WithMockUser(authorities = "ROLE_ADMIN")
+    void orderedLogins_returnsDistinctPlacedOrderCustomerLogins() throws Exception {
+        when(
+            customerOrderRepository.findDistinctUserLoginsWithStatusNotIn(
+                List.of(OrderStatus.CANCELLED, OrderStatus.PENDING)
+            )
+        )
+            .thenReturn(List.of("today.customer", "week.customer"));
+
+        mockMvc
+            .perform(get("/internal/v1/admin/orders/ordered-logins"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.logins[0]").value("today.customer"))
+            .andExpect(jsonPath("$.data.logins[1]").value("week.customer"));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
     void listOrders_returnsSyncVisibilityForRequestedRange() throws Exception {
         CustomerOrder order = codOrder()
             .status(OrderStatus.CONFIRMED)

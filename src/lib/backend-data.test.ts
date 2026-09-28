@@ -20,6 +20,7 @@ import {
   getAdminSiteSettings,
   getSiteSettings,
   getAboutPage,
+  getGiftPage,
   getLedgerlyIntegrationStatus,
   getLedgerlySettings,
   pullLedgerlyInventory,
@@ -288,7 +289,15 @@ describe("backend data mappers", () => {
         minOrder: 500,
         active: true,
       }),
-    ).toMatchObject({ id: "8", discount_type: "flat", max_discount: null, bogo_buy_qty: 1, bogo_get_qty: 1 });
+    ).toMatchObject({
+      id: "8",
+      discount_type: "flat",
+      max_discount: null,
+      bogo_buy_qty: 1,
+      bogo_get_qty: 1,
+      eligibility_scope: "all",
+      eligibility_category_id: null,
+    });
   });
 
   it("maps BOGO coupon DTOs", () => {
@@ -301,6 +310,7 @@ describe("backend data mappers", () => {
         minOrder: 0,
         bogoBuyQty: 1,
         bogoGetQty: 1,
+        eligibilityScope: "SAME_SKU",
         active: true,
       }),
     ).toMatchObject({
@@ -309,6 +319,7 @@ describe("backend data mappers", () => {
       discount_value: 100,
       bogo_buy_qty: 1,
       bogo_get_qty: 1,
+      eligibility_scope: "same_sku",
     });
   });
 });
@@ -474,6 +485,8 @@ describe("backend data API calls", () => {
       max_discount: null,
       bogo_buy_qty: 1,
       bogo_get_qty: 1,
+      eligibility_scope: "all",
+      eligibility_category_id: null,
       expires_at: null,
       active: true,
     });
@@ -605,6 +618,10 @@ describe("backend data API calls", () => {
     mockedApi.get.mockResolvedValueOnce({ about_page_json: "{\"hero_title\":\"Hi\"}" });
     await expect(getAboutPage()).resolves.toEqual({ about_page_json: "{\"hero_title\":\"Hi\"}" });
     expect(mockedApi.get).toHaveBeenLastCalledWith("/api/v1/about-page");
+
+    mockedApi.get.mockResolvedValueOnce({ gift_page_json: "{\"hero_title\":\"Gift\"}" });
+    await expect(getGiftPage()).resolves.toEqual({ gift_page_json: "{\"hero_title\":\"Gift\"}" });
+    expect(mockedApi.get).toHaveBeenLastCalledWith("/api/v1/gift-page");
 
     mockedApi.put.mockResolvedValueOnce({ ok: true });
     await saveSiteSettings({

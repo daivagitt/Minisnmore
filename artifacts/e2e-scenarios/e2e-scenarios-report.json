@@ -1,0 +1,5182 @@
+{
+  "baseUrl": "http://127.0.0.1:9180",
+  "frontendUrl": "http://127.0.0.1:3000",
+  "startedAt": "2026-09-28T09:39:08.534127+00:00",
+  "finishedAt": "2026-09-28T09:39:21.594767+00:00",
+  "noMailMode": true,
+  "orderWrites": true,
+  "credentials": {
+    "customer": "irfanpatan9948@gmail.com",
+    "admin": "admin@uat.minisnmore.com"
+  },
+  "summary": {
+    "total": 313,
+    "passed": 287,
+    "failed": 0,
+    "skipped": 26,
+    "positive": {
+      "total": 131,
+      "passed": 107,
+      "failed": 0,
+      "skipped": 24
+    },
+    "negative": {
+      "total": 182,
+      "passed": 180,
+      "failed": 0,
+      "skipped": 2
+    },
+    "modules": {
+      "Authentication & accounts (gateway)": {
+        "positive": {
+          "total": 9,
+          "passed": 6,
+          "failed": 0,
+          "skipped": 3
+        },
+        "negative": {
+          "total": 20,
+          "passed": 20,
+          "failed": 0,
+          "skipped": 0
+        }
+      },
+      "Storefront catalogue (public)": {
+        "positive": {
+          "total": 15,
+          "passed": 15,
+          "failed": 0,
+          "skipped": 0
+        },
+        "negative": {
+          "total": 15,
+          "passed": 15,
+          "failed": 0,
+          "skipped": 0
+        }
+      },
+      "Contact us / Write to us": {
+        "positive": {
+          "total": 3,
+          "passed": 3,
+          "failed": 0,
+          "skipped": 0
+        },
+        "negative": {
+          "total": 7,
+          "passed": 7,
+          "failed": 0,
+          "skipped": 0
+        }
+      },
+      "Customer account": {
+        "positive": {
+          "total": 13,
+          "passed": 13,
+          "failed": 0,
+          "skipped": 0
+        },
+        "negative": {
+          "total": 11,
+          "passed": 11,
+          "failed": 0,
+          "skipped": 0
+        }
+      },
+      "Cart, checkout & payment": {
+        "positive": {
+          "total": 10,
+          "passed": 8,
+          "failed": 0,
+          "skipped": 2
+        },
+        "negative": {
+          "total": 21,
+          "passed": 21,
+          "failed": 0,
+          "skipped": 0
+        }
+      },
+      "Order cancellation (M2)": {
+        "positive": {
+          "total": 7,
+          "passed": 2,
+          "failed": 0,
+          "skipped": 5
+        },
+        "negative": {
+          "total": 14,
+          "passed": 13,
+          "failed": 0,
+          "skipped": 1
+        }
+      },
+      "Returns & exchanges (M2)": {
+        "positive": {
+          "total": 14,
+          "passed": 4,
+          "failed": 0,
+          "skipped": 10
+        },
+        "negative": {
+          "total": 31,
+          "passed": 30,
+          "failed": 0,
+          "skipped": 1
+        }
+      },
+      "Admin catalogue & operations": {
+        "positive": {
+          "total": 37,
+          "passed": 33,
+          "failed": 0,
+          "skipped": 4
+        },
+        "negative": {
+          "total": 26,
+          "passed": 26,
+          "failed": 0,
+          "skipped": 0
+        }
+      },
+      "RBAC & security": {
+        "positive": {
+          "total": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "negative": {
+          "total": 33,
+          "passed": 33,
+          "failed": 0,
+          "skipped": 0
+        }
+      },
+      "Storefront & admin pages (frontend)": {
+        "positive": {
+          "total": 22,
+          "passed": 22,
+          "failed": 0,
+          "skipped": 0
+        },
+        "negative": {
+          "total": 4,
+          "passed": 4,
+          "failed": 0,
+          "skipped": 0
+        }
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "E2E-AUTH-P01",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Customer logs in with valid credentials",
+      "expected": "200 + JWT id_token",
+      "status": "pass",
+      "actual": "JWT issued",
+      "ms": 0,
+      "request": "POST /api/authenticate",
+      "steps": [
+        "Execute POST /api/authenticate.",
+        "Verify 200 + JWT id_token."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-P02",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Admin logs in with valid credentials",
+      "expected": "200 + JWT id_token",
+      "status": "pass",
+      "actual": "JWT available",
+      "ms": 0,
+      "request": "POST /api/authenticate",
+      "steps": [
+        "Execute POST /api/authenticate.",
+        "Verify 200 + JWT id_token."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-P03",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Signed-in customer can read own account",
+      "expected": "200 with matching email",
+      "status": "pass",
+      "actual": "HTTP 200 · login=dev1",
+      "ms": 20,
+      "request": "GET /api/account",
+      "steps": [
+        "As an authenticated user, send GET /api/account.",
+        "Verify 200 with matching email."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-P04",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Token check endpoint returns current login",
+      "expected": "200/204",
+      "status": "pass",
+      "actual": "HTTP 204",
+      "ms": 7,
+      "request": "GET /api/authenticate",
+      "steps": [
+        "As an authenticated user, send GET /api/authenticate.",
+        "Verify 200/204."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-P05",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin lists users",
+      "expected": "200 list",
+      "status": "pass",
+      "actual": "HTTP 200 · 20 users",
+      "ms": 94,
+      "request": "GET /api/admin/users",
+      "steps": [
+        "As an authenticated user, send GET /api/admin/users.",
+        "Verify 200 list."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-P06",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin lists authorities (roles)",
+      "expected": "200 includes ROLE_ADMIN",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 56,
+      "request": "GET /api/authorities",
+      "steps": [
+        "As an authenticated user, send GET /api/authorities.",
+        "Verify 200 includes ROLE_ADMIN."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N01",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Login with wrong password rejected",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401 · Invalid credentials",
+      "ms": 123,
+      "request": "POST /api/authenticate",
+      "steps": [
+        "As an anonymous client, send POST /api/authenticate.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N02",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Login with unknown user rejected",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401 · Invalid credentials",
+      "ms": 15,
+      "request": "POST /api/authenticate",
+      "steps": [
+        "As an anonymous client, send POST /api/authenticate.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N03",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Login with empty credentials rejected",
+      "expected": "400/401",
+      "status": "pass",
+      "actual": "HTTP 400 · Unexpected runtime exception",
+      "ms": 12,
+      "request": "POST /api/authenticate",
+      "steps": [
+        "As an anonymous client, send POST /api/authenticate.",
+        "Verify 400/401."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N04",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Login with malformed JSON rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · JSON decoding error: Unexpected character ('n' (code 110)): was expecting double-quote to start field name",
+      "ms": 9,
+      "request": "POST /api/authenticate",
+      "steps": [
+        "As an anonymous client, send POST /api/authenticate.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N05",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Account without token rejected",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401",
+      "ms": 7,
+      "request": "GET /api/account",
+      "steps": [
+        "As an anonymous client, send GET /api/account.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N06",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Account with garbage bearer token rejected",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401",
+      "ms": 8,
+      "request": "GET /api/account",
+      "steps": [
+        "As an authenticated user, send GET /api/account.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N07",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Forged JWT (payload edited to ROLE_ADMIN) rejected",
+      "expected": "401 on admin API",
+      "status": "pass",
+      "actual": "HTTP 401",
+      "ms": 8,
+      "request": "GET /api/v1/admin/dashboard",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/dashboard.",
+        "Verify 401 on admin API."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N08",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Unsigned JWT (alg=none) rejected",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401",
+      "ms": 6,
+      "request": "GET /api/account",
+      "steps": [
+        "As an authenticated user, send GET /api/account.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N09",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Register with too-short password rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Unexpected runtime exception",
+      "ms": 8,
+      "request": "POST /api/register",
+      "steps": [
+        "As an anonymous client, send POST /api/register.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N10",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Register with invalid email rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Unexpected runtime exception",
+      "ms": 10,
+      "request": "POST /api/register",
+      "steps": [
+        "As an anonymous client, send POST /api/register.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N11",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Register with an email already in use rejected",
+      "expected": "400 (email/login already used)",
+      "status": "pass",
+      "actual": "HTTP 400 · Email is already in use!",
+      "ms": 17,
+      "request": "POST /api/register",
+      "steps": [
+        "As an anonymous client, send POST /api/register.",
+        "Verify 400 (email/login already used)."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N12",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Activate with invalid key rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · 400 BAD_REQUEST, ProblemDetailWithCause[type='https://www.jhipster.tech/problem/problem-with-message', title='This activation link is invalid or has already bee",
+      "ms": 14,
+      "request": "GET /api/activate?key=invalid-1790588348",
+      "steps": [
+        "As an anonymous client, send GET /api/activate?key=invalid-1790588348.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N13",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Password reset finish with invalid key rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · 400 BAD_REQUEST, ProblemDetailWithCause[type='https://www.jhipster.tech/problem/problem-with-message', title='Invalid reset key', status=400, detail='null', ins",
+      "ms": 16,
+      "request": "POST /api/account/reset-password/finish",
+      "steps": [
+        "As an anonymous client, send POST /api/account/reset-password/finish.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N14",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Password reset finish with short password rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · 400 BAD_REQUEST, ProblemDetailWithCause[type='https://www.jhipster.tech/problem/invalid-password', title='Bad Request', status=400, detail='null', instance='nul",
+      "ms": 10,
+      "request": "POST /api/account/reset-password/finish",
+      "steps": [
+        "As an anonymous client, send POST /api/account/reset-password/finish.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N15",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Staff invite finish with invalid key rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · 400 BAD_REQUEST, ProblemDetailWithCause[type='https://www.jhipster.tech/problem/problem-with-message', title='Invalid invitation key', status=400, detail='null'",
+      "ms": 28,
+      "request": "POST /api/account/invite/finish",
+      "steps": [
+        "As an anonymous client, send POST /api/account/invite/finish.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N16",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Change password with wrong current password rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Incorrect password",
+      "ms": 85,
+      "request": "POST /api/account/change-password",
+      "steps": [
+        "As an authenticated user, send POST /api/account/change-password.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N17",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Change password to a too-short password rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · 400 BAD_REQUEST, ProblemDetailWithCause[type='https://www.jhipster.tech/problem/invalid-password', title='Bad Request', status=400, detail='null', instance='nul",
+      "ms": 11,
+      "request": "POST /api/account/change-password",
+      "steps": [
+        "As an authenticated user, send POST /api/account/change-password.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N18",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Customer cannot list users (admin API)",
+      "expected": "403",
+      "status": "pass",
+      "actual": "HTTP 403",
+      "ms": 6,
+      "request": "GET /api/admin/users",
+      "steps": [
+        "As an authenticated user, send GET /api/admin/users.",
+        "Verify 403."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N19",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Customer cannot list authorities",
+      "expected": "403",
+      "status": "pass",
+      "actual": "HTTP 403",
+      "ms": 7,
+      "request": "GET /api/authorities",
+      "steps": [
+        "As an authenticated user, send GET /api/authorities.",
+        "Verify 403."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-N20",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Anonymous public users endpoint does not error or leak emails",
+      "expected": "200 without email fields, or 401",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 32,
+      "request": "GET /api/users",
+      "steps": [
+        "As an anonymous client, send GET /api/users.",
+        "Verify 200 without email fields, or 401."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-P07",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "New customer registers and activates account",
+      "expected": "201 + activation email",
+      "status": "skip",
+      "actual": "no-mail mode: this step emails the customer/staff via Care@minisnmore.com",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: New customer registers and activates account.",
+        "Verify 201 + activation email."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-P08",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Customer requests password reset",
+      "expected": "200 + reset email",
+      "status": "skip",
+      "actual": "no-mail mode: this step emails the customer/staff via Care@minisnmore.com",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Customer requests password reset.",
+        "Verify 200 + reset email."
+      ]
+    },
+    {
+      "id": "E2E-AUTH-P09",
+      "module": "Authentication & accounts (gateway)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin invites a staff user",
+      "expected": "201 + invite email",
+      "status": "skip",
+      "actual": "no-mail mode: this step emails the customer/staff via Care@minisnmore.com",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Admin invites a staff user.",
+        "Verify 201 + invite email."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-P01",
+      "module": "Storefront catalogue (public)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Categories list loads",
+      "expected": "200, at least one category",
+      "status": "pass",
+      "actual": "HTTP 200 · 8 categories",
+      "ms": 31,
+      "request": "GET /api/v1/categories",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/categories.",
+        "Verify 200, at least one category."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-P02",
+      "module": "Storefront catalogue (public)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Products list loads",
+      "expected": "200, at least one product",
+      "status": "pass",
+      "actual": "HTTP 200 · 18 products",
+      "ms": 53,
+      "request": "GET /api/v1/products",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/products.",
+        "Verify 200, at least one product."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-P03",
+      "module": "Storefront catalogue (public)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Product detail page data by slug",
+      "expected": "200, same slug",
+      "status": "pass",
+      "actual": "HTTP 200 · slug=api-test-seed-1789016908",
+      "ms": 26,
+      "request": "GET /api/v1/products/api-test-seed-1789016908",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/products/api-test-seed-1789016908.",
+        "Verify 200, same slug."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-P04",
+      "module": "Storefront catalogue (public)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Blog list loads",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 28,
+      "request": "GET /api/v1/blog-posts",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/blog-posts.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-P05",
+      "module": "Storefront catalogue (public)",
+      "kind": "positive",
+      "priority": "P2",
+      "title": "Blog post detail by slug",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 23,
+      "request": "GET /api/v1/blog-posts/a-cozy-nest-for-sweet-dreams",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/blog-posts/a-cozy-nest-for-sweet-dreams.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-P06",
+      "module": "Storefront catalogue (public)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Home banners load",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 22,
+      "request": "GET /api/v1/banners",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/banners.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-P07",
+      "module": "Storefront catalogue (public)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Home sections load",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 22,
+      "request": "GET /api/v1/home-sections",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/home-sections.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-P08",
+      "module": "Storefront catalogue (public)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Page visibility flags load",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 28,
+      "request": "GET /api/v1/page-visibility",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/page-visibility.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-P09",
+      "module": "Storefront catalogue (public)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Site settings load",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 20,
+      "request": "GET /api/v1/site-settings",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/site-settings.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-P10",
+      "module": "Storefront catalogue (public)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Subscribe page content loads",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 18,
+      "request": "GET /api/v1/subscribe-page",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/subscribe-page.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-P11",
+      "module": "Storefront catalogue (public)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "About page content loads",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 19,
+      "request": "GET /api/v1/about-page",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/about-page.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-P12",
+      "module": "Storefront catalogue (public)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Gift page content loads",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 21,
+      "request": "GET /api/v1/gift-page",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/gift-page.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-P13",
+      "module": "Storefront catalogue (public)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Active coupon offers load",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 33,
+      "request": "GET /api/v1/coupons/active",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/coupons/active.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-P14",
+      "module": "Storefront catalogue (public)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Serviceable pincode returns city/state/ETA",
+      "expected": "200, Hyderabad / Telangana",
+      "status": "pass",
+      "actual": "HTTP 200 · {'city': 'Hyderabad', 'state': 'Telangana', 'eta': '5 days'}",
+      "ms": 128,
+      "request": "GET /api/v1/pincode/500001",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/pincode/500001.",
+        "Verify 200, Hyderabad / Telangana."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-P15",
+      "module": "Storefront catalogue (public)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Valid coupon KEDAR applies a discount",
+      "expected": "200 ok=true, discount>0",
+      "status": "pass",
+      "actual": "HTTP 200 · discount=500.0",
+      "ms": 43,
+      "request": "POST /api/v1/coupons/validate",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/coupons/validate.",
+        "Verify 200 ok=true, discount>0."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-N01",
+      "module": "Storefront catalogue (public)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "BOGO coupon KEDAR with a single item rejected",
+      "expected": "ok=false (add more items)",
+      "status": "pass",
+      "actual": "HTTP 200 · Add 1 more item to use this BOGO offer · Add 1 more item to use this BOGO offer",
+      "ms": 36,
+      "request": "POST /api/v1/coupons/validate",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/coupons/validate.",
+        "Verify ok=false (add more items)."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-N02",
+      "module": "Storefront catalogue (public)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "First-order coupon requires sign-in",
+      "expected": "ok=false (sign in)",
+      "status": "pass",
+      "actual": "HTTP 200 · Sign in to use WELCOME10 on your first order · Sign in to use WELCOME10 on your first order",
+      "ms": 27,
+      "request": "POST /api/v1/coupons/validate",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/coupons/validate.",
+        "Verify ok=false (sign in)."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-N03",
+      "module": "Storefront catalogue (public)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "First-order coupon refused for a repeat customer",
+      "expected": "ok=false (first order only)",
+      "status": "pass",
+      "actual": "HTTP 200 · WELCOME10 is only valid on your first order · WELCOME10 is only valid on your first order",
+      "ms": 37,
+      "request": "POST /api/v1/coupons/validate",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/coupons/validate.",
+        "Verify ok=false (first order only)."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-N04",
+      "module": "Storefront catalogue (public)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Unknown product slug",
+      "expected": "404 Product not found",
+      "status": "pass",
+      "actual": "HTTP 404 · Product not found",
+      "ms": 25,
+      "request": "GET /api/v1/products/does-not-exist-e2e",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/products/does-not-exist-e2e.",
+        "Verify 404 Product not found."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-N05",
+      "module": "Storefront catalogue (public)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Unknown blog slug",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Blog post not found",
+      "ms": 28,
+      "request": "GET /api/v1/blog-posts/does-not-exist-e2e",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/blog-posts/does-not-exist-e2e.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-N06",
+      "module": "Storefront catalogue (public)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Unknown policy slug",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Policy not found",
+      "ms": 23,
+      "request": "GET /api/v1/policies/does-not-exist-e2e",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/policies/does-not-exist-e2e.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-N07",
+      "module": "Storefront catalogue (public)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "SQL-injection style slug handled safely",
+      "expected": "404, no 5xx",
+      "status": "pass",
+      "actual": "HTTP 404 · Product not found",
+      "ms": 28,
+      "request": "GET /api/v1/products/%27%20OR%201%3D1--",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/products/%27%20OR%201%3D1--.",
+        "Verify 404, no 5xx."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-N08",
+      "module": "Storefront catalogue (public)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Pincode all zeros rejected",
+      "expected": "400 Invalid pincode format",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid pincode format",
+      "ms": 20,
+      "request": "GET /api/v1/pincode/000000",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/pincode/000000.",
+        "Verify 400 Invalid pincode format."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-N09",
+      "module": "Storefront catalogue (public)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Non-numeric pincode rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid pincode format",
+      "ms": 22,
+      "request": "GET /api/v1/pincode/abcdef",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/pincode/abcdef.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-N10",
+      "module": "Storefront catalogue (public)",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Five-digit pincode rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid pincode format",
+      "ms": 20,
+      "request": "GET /api/v1/pincode/50000",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/pincode/50000.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-N11",
+      "module": "Storefront catalogue (public)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Unknown coupon code rejected",
+      "expected": "200 ok=false",
+      "status": "pass",
+      "actual": "HTTP 200 · Invalid or expired coupon · Invalid or expired coupon",
+      "ms": 25,
+      "request": "POST /api/v1/coupons/validate",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/coupons/validate.",
+        "Verify 200 ok=false."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-N12",
+      "module": "Storefront catalogue (public)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Blank coupon code rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 23,
+      "request": "POST /api/v1/coupons/validate",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/coupons/validate.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-N13",
+      "module": "Storefront catalogue (public)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Negative subtotal rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 24,
+      "request": "POST /api/v1/coupons/validate",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/coupons/validate.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-N14",
+      "module": "Storefront catalogue (public)",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Coupon code longer than 64 chars rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 21,
+      "request": "POST /api/v1/coupons/validate",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/coupons/validate.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-SHOP-N15",
+      "module": "Storefront catalogue (public)",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Coupon line quantity above 50 rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 24,
+      "request": "POST /api/v1/coupons/validate",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/coupons/validate.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-CONTACT-P01",
+      "module": "Contact us / Write to us",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Visitor submits a valid contact message",
+      "expected": "200, message stored",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 34,
+      "request": "POST /api/v1/contact-messages",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/contact-messages.",
+        "Verify 200, message stored."
+      ]
+    },
+    {
+      "id": "E2E-CONTACT-N01",
+      "module": "Contact us / Write to us",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Rapid second message from same email is rate-limited",
+      "expected": "429",
+      "status": "pass",
+      "actual": "HTTP 429 · Please wait a moment before sending another message.",
+      "ms": 25,
+      "request": "POST /api/v1/contact-messages",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/contact-messages.",
+        "Verify 429."
+      ]
+    },
+    {
+      "id": "E2E-CONTACT-P02",
+      "module": "Contact us / Write to us",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin sees the new contact message",
+      "expected": "200, message listed",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 59,
+      "request": "GET /api/v1/admin/contact-messages",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/contact-messages.",
+        "Verify 200, message listed."
+      ]
+    },
+    {
+      "id": "E2E-CONTACT-P03",
+      "module": "Contact us / Write to us",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin deletes the contact message",
+      "expected": "200/204",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 46,
+      "request": "DELETE /api/v1/admin/contact-messages/3875552",
+      "steps": [
+        "As an authenticated user, send DELETE /api/v1/admin/contact-messages/3875552.",
+        "Verify 200/204."
+      ]
+    },
+    {
+      "id": "E2E-CONTACT-N02",
+      "module": "Contact us / Write to us",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Admin deletes a non-existent contact message",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Contact message not found",
+      "ms": 31,
+      "request": "DELETE /api/v1/admin/contact-messages/999999999",
+      "steps": [
+        "As an authenticated user, send DELETE /api/v1/admin/contact-messages/999999999.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-CONTACT-N03",
+      "module": "Contact us / Write to us",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Invalid mobile number rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Enter a valid 10-digit Indian mobile number",
+      "ms": 21,
+      "request": "POST /api/v1/contact-messages",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/contact-messages.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-CONTACT-N04",
+      "module": "Contact us / Write to us",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Missing name rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 24,
+      "request": "POST /api/v1/contact-messages",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/contact-messages.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-CONTACT-N05",
+      "module": "Contact us / Write to us",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Invalid email rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 24,
+      "request": "POST /api/v1/contact-messages",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/contact-messages.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-CONTACT-N06",
+      "module": "Contact us / Write to us",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Comment shorter than 4 chars rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 22,
+      "request": "POST /api/v1/contact-messages",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/contact-messages.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-CONTACT-N07",
+      "module": "Contact us / Write to us",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Address shorter than 4 chars rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 22,
+      "request": "POST /api/v1/contact-messages",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/contact-messages.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-P01",
+      "module": "Customer account",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Customer views profile",
+      "expected": "200 with full_name/phone",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 29,
+      "request": "GET /api/v1/account/profile",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/account/profile.",
+        "Verify 200 with full_name/phone."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-P02",
+      "module": "Customer account",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Customer saves profile (unchanged values)",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 29,
+      "request": "PUT /api/v1/account/profile",
+      "steps": [
+        "As an authenticated user, send PUT /api/v1/account/profile.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-P03",
+      "module": "Customer account",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Customer views notifications",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 88,
+      "request": "GET /api/v1/account/notifications",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/account/notifications.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-P04",
+      "module": "Customer account",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Customer views saved cart",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 26,
+      "request": "GET /api/v1/account/cart",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/account/cart.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-P05",
+      "module": "Customer account",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Customer views wishlist",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 31,
+      "request": "GET /api/v1/account/wishlist",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/account/wishlist.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-P06",
+      "module": "Customer account",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Customer views payment history",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 28,
+      "request": "GET /api/v1/payments",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/payments.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-P07",
+      "module": "Customer account",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Customer views order history",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 156,
+      "request": "GET /api/v1/orders",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/orders.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-P08",
+      "module": "Customer account",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Customer views returns / exchanges",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 57,
+      "request": "GET /api/v1/order-returns",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/order-returns.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-P09",
+      "module": "Customer account",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Customer adds a shipping address",
+      "expected": "200 with id",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 38,
+      "request": "POST /api/v1/account/addresses",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/account/addresses.",
+        "Verify 200 with id."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-P10",
+      "module": "Customer account",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Customer edits the address",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 39,
+      "request": "PUT /api/v1/account/addresses/3876752",
+      "steps": [
+        "As an authenticated user, send PUT /api/v1/account/addresses/3876752.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-P11",
+      "module": "Customer account",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Customer deletes the address",
+      "expected": "200/204",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 33,
+      "request": "DELETE /api/v1/account/addresses/3876752",
+      "steps": [
+        "As an authenticated user, send DELETE /api/v1/account/addresses/3876752.",
+        "Verify 200/204."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-P12",
+      "module": "Customer account",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Customer adds a product to wishlist",
+      "expected": "200, product listed",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 38,
+      "request": "POST /api/v1/account/wishlist/items",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/account/wishlist/items.",
+        "Verify 200, product listed."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-P13",
+      "module": "Customer account",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Customer removes the product from wishlist",
+      "expected": "200/204",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 30,
+      "request": "DELETE /api/v1/account/wishlist/items/70251",
+      "steps": [
+        "As an authenticated user, send DELETE /api/v1/account/wishlist/items/70251.",
+        "Verify 200/204."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-N01",
+      "module": "Customer account",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Profile without login rejected",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401",
+      "ms": 12,
+      "request": "GET /api/v1/account/profile",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/account/profile.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-N02",
+      "module": "Customer account",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Order history without login rejected",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401",
+      "ms": 12,
+      "request": "GET /api/v1/orders",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/orders.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-N03",
+      "module": "Customer account",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Profile with invalid mobile rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 23,
+      "request": "PUT /api/v1/account/profile",
+      "steps": [
+        "As an authenticated user, send PUT /api/v1/account/profile.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-N04",
+      "module": "Customer account",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Profile name with digits rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 28,
+      "request": "PUT /api/v1/account/profile",
+      "steps": [
+        "As an authenticated user, send PUT /api/v1/account/profile.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-N05",
+      "module": "Customer account",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Profile with blank name rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 31,
+      "request": "PUT /api/v1/account/profile",
+      "steps": [
+        "As an authenticated user, send PUT /api/v1/account/profile.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-N06",
+      "module": "Customer account",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Address with 5-digit pincode rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 29,
+      "request": "POST /api/v1/account/addresses",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/account/addresses.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-N07",
+      "module": "Customer account",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Address without line1 rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 30,
+      "request": "POST /api/v1/account/addresses",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/account/addresses.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-N08",
+      "module": "Customer account",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Edit a non-existent address",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Address not found",
+      "ms": 31,
+      "request": "PUT /api/v1/account/addresses/999999999",
+      "steps": [
+        "As an authenticated user, send PUT /api/v1/account/addresses/999999999.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-N09",
+      "module": "Customer account",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Delete a non-existent address",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Address not found",
+      "ms": 29,
+      "request": "DELETE /api/v1/account/addresses/999999999",
+      "steps": [
+        "As an authenticated user, send DELETE /api/v1/account/addresses/999999999.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-N10",
+      "module": "Customer account",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Wishlist add with blank product id rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 29,
+      "request": "POST /api/v1/account/wishlist/items",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/account/wishlist/items.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ACCT-N11",
+      "module": "Customer account",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Cart replace without items rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 29,
+      "request": "PUT /api/v1/account/cart",
+      "steps": [
+        "As an authenticated user, send PUT /api/v1/account/cart.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-P01",
+      "module": "Cart, checkout & payment",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Customer opens own order detail",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 40,
+      "request": "GET /api/v1/orders/MNM-2A151FF9055F",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/orders/MNM-2A151FF9055F.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-P02",
+      "module": "Cart, checkout & payment",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Public order tracking by order number",
+      "expected": "200, no personal data",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 23,
+      "request": "GET /api/v1/orders/track/MNM-2A151FF9055F",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/orders/track/MNM-2A151FF9055F.",
+        "Verify 200, no personal data."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N01",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Customer cannot open another customer's order",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Order not found",
+      "ms": 25,
+      "request": "GET /api/v1/orders/MNM-14155B1A24DF",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/orders/MNM-14155B1A24DF.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N02",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Order with no items rejected",
+      "expected": "4xx, no order created",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 23,
+      "request": "POST /api/v1/orders",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders.",
+        "Verify 4xx, no order created."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N03",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Order line with quantity 0 rejected",
+      "expected": "4xx, no order created",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 29,
+      "request": "POST /api/v1/orders",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders.",
+        "Verify 4xx, no order created."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N04",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Order line with quantity above 50 rejected",
+      "expected": "4xx, no order created",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 30,
+      "request": "POST /api/v1/orders",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders.",
+        "Verify 4xx, no order created."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N05",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Order without shipping address rejected",
+      "expected": "4xx, no order created",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 23,
+      "request": "POST /api/v1/orders",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders.",
+        "Verify 4xx, no order created."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N06",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Order with invalid pincode rejected",
+      "expected": "4xx, no order created",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 26,
+      "request": "POST /api/v1/orders",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders.",
+        "Verify 4xx, no order created."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N07",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Order with invalid shipping email rejected",
+      "expected": "4xx, no order created",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 31,
+      "request": "POST /api/v1/orders",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders.",
+        "Verify 4xx, no order created."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N08",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Order with unsupported payment method rejected",
+      "expected": "4xx, no order created",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 29,
+      "request": "POST /api/v1/orders",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders.",
+        "Verify 4xx, no order created."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N09",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Order with negative donation rejected",
+      "expected": "4xx, no order created",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 31,
+      "request": "POST /api/v1/orders",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders.",
+        "Verify 4xx, no order created."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N10",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Order for a non-existent product rejected",
+      "expected": "4xx, no order created",
+      "status": "pass",
+      "actual": "HTTP 409 · Product unavailable",
+      "ms": 27,
+      "request": "POST /api/v1/orders",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders.",
+        "Verify 4xx, no order created."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N11",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Order quantity above available stock (10) rejected",
+      "expected": "4xx, no order created",
+      "status": "pass",
+      "actual": "HTTP 409 · Only 10 items available for Api Test Product seed-1789016908",
+      "ms": 31,
+      "request": "POST /api/v1/orders",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders.",
+        "Verify 4xx, no order created."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N12",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Place order without login rejected",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401",
+      "ms": 11,
+      "request": "POST /api/v1/orders",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/orders.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N13",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Verify payment with missing fields rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 22,
+      "request": "POST /api/v1/orders/verify-payment",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders/verify-payment.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-P03",
+      "module": "Cart, checkout & payment",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Customer places an online order (api-test-seed-1789016908)",
+      "expected": "200, order number, Razorpay order, total > 0",
+      "status": "pass",
+      "actual": "HTTP 200 · MNM-1B0C138B0295 total ₹289.99",
+      "ms": 172,
+      "request": "POST /api/v1/orders",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders.",
+        "Verify 200, order number, Razorpay order, total > 0."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-P04",
+      "module": "Cart, checkout & payment",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "New order appears in order history as pending",
+      "expected": "listed, payment pending",
+      "status": "pass",
+      "actual": "HTTP 200 · MNM-1B0C138B0295",
+      "ms": 147,
+      "request": "GET /api/v1/orders",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/orders.",
+        "Verify listed, payment pending."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-P05",
+      "module": "Cart, checkout & payment",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Public tracking works for the new order",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 35,
+      "request": "GET /api/v1/orders/track/MNM-1B0C138B0295",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/orders/track/MNM-1B0C138B0295.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-P06",
+      "module": "Cart, checkout & payment",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Customer resumes payment on the unpaid order",
+      "expected": "200, same Razorpay order",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 34,
+      "request": "POST /api/v1/orders/retry-payment",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders/retry-payment.",
+        "Verify 200, same Razorpay order."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-P07",
+      "module": "Cart, checkout & payment",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Checking an unpaid order's payment status leaves it unpaid",
+      "expected": "200, not paid",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 92,
+      "request": "POST /api/v1/orders/sync-payment",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders/sync-payment.",
+        "Verify 200, not paid."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N14",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Cancel request with a 1-char reason rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 38,
+      "request": "POST /api/v1/orders/MNM-1B0C138B0295/cancel-request",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders/MNM-1B0C138B0295/cancel-request.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N15",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Cancel request with reason over 500 chars rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 29,
+      "request": "POST /api/v1/orders/MNM-1B0C138B0295/cancel-request",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders/MNM-1B0C138B0295/cancel-request.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-P08",
+      "module": "Cart, checkout & payment",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Customer checks for an open cancel request (none)",
+      "expected": "200, cancellation_request=null",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 33,
+      "request": "GET /api/v1/orders/MNM-1B0C138B0295/cancel-request",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/orders/MNM-1B0C138B0295/cancel-request.",
+        "Verify 200, cancellation_request=null."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N16",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Withdraw a cancel request when none is pending",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · No pending cancellation request found",
+      "ms": 37,
+      "request": "POST /api/v1/orders/MNM-1B0C138B0295/cancel-request/withdraw",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders/MNM-1B0C138B0295/cancel-request/withdraw.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N17",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Return on an unpaid order rejected",
+      "expected": "400 Only paid orders",
+      "status": "pass",
+      "actual": "HTTP 400 · Only paid orders are eligible for return",
+      "ms": 31,
+      "request": "POST /api/v1/order-returns",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/order-returns.",
+        "Verify 400 Only paid orders."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N18",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Client-side price tampering (₹1) is ignored",
+      "expected": "4xx, or totals use catalogue price",
+      "status": "pass",
+      "actual": "HTTP 200 · subtotal ₹199.99 vs catalogue ₹199.99",
+      "ms": 133,
+      "request": "POST /api/v1/orders",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders.",
+        "Verify 4xx, or totals use catalogue price."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N19",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Forged Razorpay signature rejected (MNM-1B0C138B0295)",
+      "expected": "400 Invalid payment signature, order not paid",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid payment signature · order stays unpaid",
+      "ms": 39,
+      "request": "POST /api/v1/orders/verify-payment",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders/verify-payment.",
+        "Verify 400 Invalid payment signature, order not paid."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N20",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Forged Razorpay signature rejected (MNM-DD69CF124F12)",
+      "expected": "400 Invalid payment signature, order not paid",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid payment signature · order stays unpaid",
+      "ms": 43,
+      "request": "POST /api/v1/orders/verify-payment",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders/verify-payment.",
+        "Verify 400 Invalid payment signature, order not paid."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-N21",
+      "module": "Cart, checkout & payment",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Failed payment signature is recorded (payment FAILED, stock released)",
+      "expected": "payment_status=failed after the rejected verify-payment",
+      "status": "pass",
+      "actual": "MNM-1B0C138B0295 payment_status=failed",
+      "ms": 0,
+      "request": "GET /api/v1/orders",
+      "steps": [
+        "Execute GET /api/v1/orders.",
+        "Verify payment_status=failed after the rejected verify-payment."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-P09",
+      "module": "Cart, checkout & payment",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Customer pays online and order is confirmed",
+      "expected": "PAID + confirmation email",
+      "status": "skip",
+      "actual": "moves money (live Razorpay refund / capture) — manual UAT only",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Customer pays online and order is confirmed.",
+        "Verify PAID + confirmation email."
+      ]
+    },
+    {
+      "id": "E2E-ORDER-P10",
+      "module": "Cart, checkout & payment",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Customer places a COD order",
+      "expected": "CONFIRMED + order email + Ledgerly sync",
+      "status": "skip",
+      "actual": "no-mail mode: this step emails the customer/staff via Care@minisnmore.com",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Customer places a COD order.",
+        "Verify CONFIRMED + order email + Ledgerly sync."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-N01",
+      "module": "Order cancellation (M2)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Cancel after dispatch blocked",
+      "expected": "409 already dispatched",
+      "status": "pass",
+      "actual": "HTTP 409 · This order has already been dispatched and can no longer be cancelled",
+      "ms": 25,
+      "request": "POST /api/v1/orders/MNM-0B0F69E301F9/cancel-request",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders/MNM-0B0F69E301F9/cancel-request.",
+        "Verify 409 already dispatched."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-N02",
+      "module": "Order cancellation (M2)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Cancel a non-existent order",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Order not found",
+      "ms": 30,
+      "request": "POST /api/v1/orders/MNM-NOPE1790588348/cancel-request",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders/MNM-NOPE1790588348/cancel-request.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-N03",
+      "module": "Order cancellation (M2)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Cancel another customer's order",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Order not found",
+      "ms": 31,
+      "request": "POST /api/v1/orders/MNM-14155B1A24DF/cancel-request",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders/MNM-14155B1A24DF/cancel-request.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-N04",
+      "module": "Order cancellation (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Cancel with empty reason rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 23,
+      "request": "POST /api/v1/orders/MNM-0B0F69E301F9/cancel-request",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/orders/MNM-0B0F69E301F9/cancel-request.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-N05",
+      "module": "Order cancellation (M2)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Cancel without login rejected",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401",
+      "ms": 11,
+      "request": "POST /api/v1/orders/MNM-X/cancel-request",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/orders/MNM-X/cancel-request.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-P01",
+      "module": "Order cancellation (M2)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Admin views cancellation requests",
+      "expected": "200 list",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 35,
+      "request": "GET /api/v1/admin/cancellation-requests",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/cancellation-requests.",
+        "Verify 200 list."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-P02",
+      "module": "Order cancellation (M2)",
+      "kind": "positive",
+      "priority": "P2",
+      "title": "Admin filters cancellation requests by status",
+      "expected": "only approved rows",
+      "status": "pass",
+      "actual": "HTTP 200 · 4 rows",
+      "ms": 35,
+      "request": "GET /api/v1/admin/cancellation-requests?status=APPROVED",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/cancellation-requests?status=APPROVED.",
+        "Verify only approved rows."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-N06",
+      "module": "Order cancellation (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Approve an already-approved request blocked",
+      "expected": "400 not awaiting approval",
+      "status": "pass",
+      "actual": "HTTP 400 · Cancellation request is not awaiting approval",
+      "ms": 35,
+      "request": "POST /api/v1/admin/cancellation-requests/CAN-MNME16C60FC3B7E-73F826/approve",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/cancellation-requests/CAN-MNME16C60FC3B7E-73F826/approve.",
+        "Verify 400 not awaiting approval."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-N07",
+      "module": "Order cancellation (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Reject an already-approved request blocked",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Cancellation request is not awaiting approval",
+      "ms": 46,
+      "request": "POST /api/v1/admin/cancellation-requests/CAN-MNME16C60FC3B7E-73F826/reject",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/cancellation-requests/CAN-MNME16C60FC3B7E-73F826/reject.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-N08",
+      "module": "Order cancellation (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Approve an already-rejected request blocked",
+      "expected": "400 not awaiting approval",
+      "status": "pass",
+      "actual": "HTTP 400 · Cancellation request is not awaiting approval",
+      "ms": 31,
+      "request": "POST /api/v1/admin/cancellation-requests/CAN-MNMF944927C627A-8EFC1B/approve",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/cancellation-requests/CAN-MNMF944927C627A-8EFC1B/approve.",
+        "Verify 400 not awaiting approval."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-N09",
+      "module": "Order cancellation (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Reject an already-rejected request blocked",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Cancellation request is not awaiting approval",
+      "ms": 29,
+      "request": "POST /api/v1/admin/cancellation-requests/CAN-MNMF944927C627A-8EFC1B/reject",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/cancellation-requests/CAN-MNMF944927C627A-8EFC1B/reject.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-N10",
+      "module": "Order cancellation (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Reject reason shorter than 5 chars rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 24,
+      "request": "POST /api/v1/admin/cancellation-requests/CAN-MNME16C60FC3B7E-73F826/reject",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/cancellation-requests/CAN-MNME16C60FC3B7E-73F826/reject.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-N11",
+      "module": "Order cancellation (M2)",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Record COD refund without method / reference rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 30,
+      "request": "POST /api/v1/admin/cancellation-requests/CAN-MNME16C60FC3B7E-73F826/record-cod-refund",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/cancellation-requests/CAN-MNME16C60FC3B7E-73F826/record-cod-refund.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-N12",
+      "module": "Order cancellation (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Approve a non-existent cancellation request",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Cancellation request not found",
+      "ms": 39,
+      "request": "POST /api/v1/admin/cancellation-requests/CAN-NOPE-1790588348/approve",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/cancellation-requests/CAN-NOPE-1790588348/approve.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-N13",
+      "module": "Order cancellation (M2)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Customer cannot approve cancellations",
+      "expected": "403",
+      "status": "pass",
+      "actual": "HTTP 403",
+      "ms": 17,
+      "request": "POST /api/v1/admin/cancellation-requests/CAN-X/approve",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/cancellation-requests/CAN-X/approve.",
+        "Verify 403."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-P03",
+      "module": "Order cancellation (M2)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Customer submits cancel with valid reason (M2-C-P01)",
+      "expected": "REQUESTED + email + admin queue",
+      "status": "skip",
+      "actual": "no-mail mode: this step emails the customer/staff via Care@minisnmore.com",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Customer submits cancel with valid reason (M2-C-P01).",
+        "Verify REQUESTED + email + admin queue."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-P04",
+      "module": "Order cancellation (M2)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Admin approves online cancel → Razorpay refund (M2-C-P02)",
+      "expected": "CANCELLED, refund id, stock restored, email",
+      "status": "skip",
+      "actual": "moves money (live Razorpay refund / capture) — manual UAT only",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Admin approves online cancel → Razorpay refund (M2-C-P02).",
+        "Verify CANCELLED, refund id, stock restored, email."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-P05",
+      "module": "Order cancellation (M2)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Admin approves COD cancel + records manual refund (M2-C-P03)",
+      "expected": "refund recorded once, customer informed",
+      "status": "skip",
+      "actual": "moves money (live Razorpay refund / capture) — manual UAT only",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Admin approves COD cancel + records manual refund (M2-C-P03).",
+        "Verify refund recorded once, customer informed."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-P06",
+      "module": "Order cancellation (M2)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Admin rejects cancel (M2-C-P04)",
+      "expected": "REJECTED + email",
+      "status": "skip",
+      "actual": "no-mail mode: this step emails the customer/staff via Care@minisnmore.com",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Admin rejects cancel (M2-C-P04).",
+        "Verify REJECTED + email."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-P07",
+      "module": "Order cancellation (M2)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Customer withdraws pending cancel (M2-C-P05)",
+      "expected": "request cleared",
+      "status": "skip",
+      "actual": "no-mail mode: this step emails the customer/staff via Care@minisnmore.com",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Customer withdraws pending cancel (M2-C-P05).",
+        "Verify request cleared."
+      ]
+    },
+    {
+      "id": "E2E-CANCEL-N14",
+      "module": "Order cancellation (M2)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Duplicate pending cancel blocked (M2-C-N03)",
+      "expected": "409 already pending — needs a pending request",
+      "status": "skip",
+      "actual": "no-mail mode: this step emails the customer/staff via Care@minisnmore.com",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Duplicate pending cancel blocked (M2-C-N03).",
+        "Verify 409 already pending — needs a pending request."
+      ]
+    },
+    {
+      "id": "E2E-RET-P01",
+      "module": "Returns & exchanges (M2)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Returns config exposes 3-day window",
+      "expected": "enabled=true, window_days=3",
+      "status": "pass",
+      "actual": "HTTP 200 · {'enabled': True, 'window_days': 3}",
+      "ms": 26,
+      "request": "GET /api/v1/order-returns/config",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/order-returns/config.",
+        "Verify enabled=true, window_days=3."
+      ]
+    },
+    {
+      "id": "E2E-RET-P02",
+      "module": "Returns & exchanges (M2)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Eligibility check explains why an order can/can't be returned",
+      "expected": "200 with eligible flag + message",
+      "status": "pass",
+      "actual": "HTTP 200 · Only paid orders are eligible for return · eligible=False Only paid orders are eligible for return",
+      "ms": 22,
+      "request": "GET /api/v1/order-returns/eligibility/MNM-2A151FF9055F",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/order-returns/eligibility/MNM-2A151FF9055F.",
+        "Verify 200 with eligible flag + message."
+      ]
+    },
+    {
+      "id": "E2E-RET-P03",
+      "module": "Returns & exchanges (M2)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Exchange availability for an ordered item",
+      "expected": "200 with sellable flag",
+      "status": "pass",
+      "actual": "HTTP 200 · sellable=False",
+      "ms": 35,
+      "request": "GET /api/v1/order-returns/exchange-availability/3876902?size=M&color=Red",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/order-returns/exchange-availability/3876902?size=M&color=Red.",
+        "Verify 200 with sellable flag."
+      ]
+    },
+    {
+      "id": "E2E-RET-N01",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Exchange availability without size/colour rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Bad Request",
+      "ms": 22,
+      "request": "GET /api/v1/order-returns/exchange-availability/3876902",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/order-returns/exchange-availability/3876902.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-RET-N02",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Exchange availability for someone else's / unknown item reveals nothing",
+      "expected": "sellable=false or 404",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 30,
+      "request": "GET /api/v1/order-returns/exchange-availability/999999999?size=M&color=Red",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/order-returns/exchange-availability/999999999?size=M&color=Red.",
+        "Verify sellable=false or 404."
+      ]
+    },
+    {
+      "id": "E2E-RET-N03",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Return on unpaid order rejected (M2-R-N03)",
+      "expected": "400 Only paid orders",
+      "status": "pass",
+      "actual": "HTTP 400 · Only paid orders are eligible for return",
+      "ms": 29,
+      "request": "POST /api/v1/order-returns",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/order-returns.",
+        "Verify 400 Only paid orders."
+      ]
+    },
+    {
+      "id": "E2E-RET-N04",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Exchange on unpaid order rejected (M2-E-N09)",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Only paid orders are eligible for return",
+      "ms": 28,
+      "request": "POST /api/v1/order-returns/exchange",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/order-returns/exchange.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-RET-N05",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Return on an already-refunded order rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Only paid orders are eligible for return",
+      "ms": 27,
+      "request": "POST /api/v1/order-returns",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/order-returns.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-RET-N06",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Return reason under 10 characters rejected (M2-R-N08)",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 27,
+      "request": "POST /api/v1/order-returns",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/order-returns.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-RET-N07",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Return reason over 4000 characters rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 31,
+      "request": "POST /api/v1/order-returns",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/order-returns.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-RET-N08",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Return without order number rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 32,
+      "request": "POST /api/v1/order-returns",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/order-returns.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-RET-N09",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Return line with quantity 0 rejected (M2-R-N07)",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 26,
+      "request": "POST /api/v1/order-returns",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/order-returns.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-RET-N10",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Return on a non-existent order",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Order not found",
+      "ms": 25,
+      "request": "POST /api/v1/order-returns",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/order-returns.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-RET-N11",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Return on another customer's order (M2-R-N15)",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Order not found",
+      "ms": 28,
+      "request": "POST /api/v1/order-returns",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/order-returns.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-RET-N12",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Eligibility of another customer's order hidden",
+      "expected": "404, or eligible=false 'Order not found'",
+      "status": "pass",
+      "actual": "HTTP 200 · Order not found · Order not found",
+      "ms": 23,
+      "request": "GET /api/v1/order-returns/eligibility/MNM-14155B1A24DF",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/order-returns/eligibility/MNM-14155B1A24DF.",
+        "Verify 404, or eligible=false 'Order not found'."
+      ]
+    },
+    {
+      "id": "E2E-RET-N13",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Exchange reason under 10 characters rejected (M2-E-N10)",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 25,
+      "request": "POST /api/v1/order-returns/exchange",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/order-returns/exchange.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-RET-N14",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Exchange without replacement size rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 28,
+      "request": "POST /api/v1/order-returns/exchange",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/order-returns/exchange.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-RET-N15",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Cancel a non-existent return",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Return request not found",
+      "ms": 35,
+      "request": "POST /api/v1/order-returns/RET-NOPE-1790588348/cancel",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/order-returns/RET-NOPE-1790588348/cancel.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-RET-N16",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Return request without login rejected",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401",
+      "ms": 10,
+      "request": "POST /api/v1/order-returns",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/order-returns.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-RET-P04",
+      "module": "Returns & exchanges (M2)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Admin views return / exchange desk",
+      "expected": "200 list",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 152,
+      "request": "GET /api/v1/admin/order-returns",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/order-returns.",
+        "Verify 200 list."
+      ]
+    },
+    {
+      "id": "E2E-RET-N17",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Approve a refunded return blocked (M2-R-N09)",
+      "expected": "400 not awaiting approval",
+      "status": "pass",
+      "actual": "HTTP 400 · Return is not awaiting approval",
+      "ms": 29,
+      "request": "POST /api/v1/admin/order-returns/RET-MNM-15A785EAF4E4-29E20A/approve",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/order-returns/RET-MNM-15A785EAF4E4-29E20A/approve.",
+        "Verify 400 not awaiting approval."
+      ]
+    },
+    {
+      "id": "E2E-RET-N18",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Reject a refunded return blocked",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Return cannot be rejected from its current status",
+      "ms": 36,
+      "request": "POST /api/v1/admin/order-returns/RET-MNM-15A785EAF4E4-29E20A/reject",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/order-returns/RET-MNM-15A785EAF4E4-29E20A/reject.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-RET-N19",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Book pickup before approval blocked (M2-X-N01)",
+      "expected": "400 must be approved",
+      "status": "pass",
+      "actual": "HTTP 400 · Return must be approved before booking pickup",
+      "ms": 41,
+      "request": "POST /api/v1/admin/order-returns/RET-MNM-15A785EAF4E4-29E20A/book-pickup",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/order-returns/RET-MNM-15A785EAF4E4-29E20A/book-pickup.",
+        "Verify 400 must be approved."
+      ]
+    },
+    {
+      "id": "E2E-RET-N20",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Accept before inspection blocked",
+      "expected": "400 must be inspected",
+      "status": "pass",
+      "actual": "HTTP 400 · Return must be inspected before accepting",
+      "ms": 51,
+      "request": "POST /api/v1/admin/order-returns/RET-MNM-15A785EAF4E4-29E20A/accept",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/order-returns/RET-MNM-15A785EAF4E4-29E20A/accept.",
+        "Verify 400 must be inspected."
+      ]
+    },
+    {
+      "id": "E2E-RET-N21",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Mark pickup failed before scheduling blocked (M2-X-N07)",
+      "expected": "400 pickup must be scheduled",
+      "status": "pass",
+      "actual": "HTTP 400 · Pickup must be scheduled before marking a failure",
+      "ms": 37,
+      "request": "POST /api/v1/admin/order-returns/RET-MNM-15A785EAF4E4-29E20A/pickup-failed",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/order-returns/RET-MNM-15A785EAF4E4-29E20A/pickup-failed.",
+        "Verify 400 pickup must be scheduled."
+      ]
+    },
+    {
+      "id": "E2E-RET-N22",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Close pickup-failed on a non-failed case blocked",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Only a failed pickup can be closed",
+      "ms": 43,
+      "request": "POST /api/v1/admin/order-returns/RET-MNM-15A785EAF4E4-29E20A/close-pickup-failed",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/order-returns/RET-MNM-15A785EAF4E4-29E20A/close-pickup-failed.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-RET-N23",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Settle price difference on a return blocked (M2-E-N11)",
+      "expected": "400 Not an exchange request",
+      "status": "pass",
+      "actual": "HTTP 400 · Not an exchange request",
+      "ms": 45,
+      "request": "POST /api/v1/admin/order-returns/RET-MNM-15A785EAF4E4-29E20A/settle-price-difference",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/order-returns/RET-MNM-15A785EAF4E4-29E20A/settle-price-difference.",
+        "Verify 400 Not an exchange request."
+      ]
+    },
+    {
+      "id": "E2E-RET-N24",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Refund API on an exchange blocked (M2-R-N11)",
+      "expected": "400 use convert-to-refund",
+      "status": "pass",
+      "actual": "HTTP 400 · Use convert-to-refund for exchange requests",
+      "ms": 38,
+      "request": "POST /api/v1/admin/order-returns/RET-MNM-E34E60D6F495-AF7DDC/refund",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/order-returns/RET-MNM-E34E60D6F495-AF7DDC/refund.",
+        "Verify 400 use convert-to-refund."
+      ]
+    },
+    {
+      "id": "E2E-RET-N25",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Allocate replacement on a closed exchange blocked",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Exchange must be accepted before allocating the replacement",
+      "ms": 38,
+      "request": "POST /api/v1/admin/order-returns/RET-MNM-E34E60D6F495-AF7DDC/allocate-replacement",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/order-returns/RET-MNM-E34E60D6F495-AF7DDC/allocate-replacement.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-RET-N26",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Book outbound before ready-to-ship blocked (M2-E-N06)",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Exchange replacement must be ready to ship before booking outbound",
+      "ms": 40,
+      "request": "POST /api/v1/admin/order-returns/RET-MNM-E34E60D6F495-AF7DDC/book-outbound",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/order-returns/RET-MNM-E34E60D6F495-AF7DDC/book-outbound.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-RET-N27",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Reject reason shorter than 5 chars rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 30,
+      "request": "POST /api/v1/admin/order-returns/RET-MNM-15A785EAF4E4-29E20A/reject",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/order-returns/RET-MNM-15A785EAF4E4-29E20A/reject.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-RET-N28",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Approve a non-existent return",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Return request not found",
+      "ms": 33,
+      "request": "POST /api/v1/admin/order-returns/RET-NOPE-1790588348/approve",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/order-returns/RET-NOPE-1790588348/approve.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-RET-N29",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Customer cannot cancel another customer's return (M2-R-N15)",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Return request not found",
+      "ms": 24,
+      "request": "POST /api/v1/order-returns/RET-MNM-E34E60D6F495-AF7DDC/cancel",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/order-returns/RET-MNM-E34E60D6F495-AF7DDC/cancel.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-RET-N30",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Customer cannot use admin return desk (M2-B-N02)",
+      "expected": "403",
+      "status": "pass",
+      "actual": "HTTP 403",
+      "ms": 11,
+      "request": "GET /api/v1/admin/order-returns",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/order-returns.",
+        "Verify 403."
+      ]
+    },
+    {
+      "id": "E2E-RET-P05",
+      "module": "Returns & exchanges (M2)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Customer return within 3-day window (M2-R-P01)",
+      "expected": "REQUESTED + email",
+      "status": "skip",
+      "actual": "needs a delivered, paid order inside the 3-day window — manual UAT only",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Customer return within 3-day window (M2-R-P01).",
+        "Verify REQUESTED + email."
+      ]
+    },
+    {
+      "id": "E2E-RET-P06",
+      "module": "Returns & exchanges (M2)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Full return path approve → pickup → receive → inspect → accept → refund (M2-R-P02)",
+      "expected": "REFUNDED + Razorpay + CN",
+      "status": "skip",
+      "actual": "moves money (live Razorpay refund / capture) — manual UAT only",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Full return path approve → pickup → receive → inspect → accept → refund (M2-R-P02).",
+        "Verify REFUNDED + Razorpay + CN."
+      ]
+    },
+    {
+      "id": "E2E-RET-P07",
+      "module": "Returns & exchanges (M2)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Admin rejects return at REQUESTED / after inspection (M2-R-P03/P04)",
+      "expected": "REJECTED + email",
+      "status": "skip",
+      "actual": "no-mail mode: this step emails the customer/staff via Care@minisnmore.com",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Admin rejects return at REQUESTED / after inspection (M2-R-P03/P04).",
+        "Verify REJECTED + email."
+      ]
+    },
+    {
+      "id": "E2E-RET-P08",
+      "module": "Returns & exchanges (M2)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Pickup fail → reschedule / close (M2-R-P05/P06)",
+      "expected": "pickup rescheduled or case closed",
+      "status": "skip",
+      "actual": "needs a delivered, paid order inside the 3-day window — manual UAT only",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Pickup fail → reschedule / close (M2-R-P05/P06).",
+        "Verify pickup rescheduled or case closed."
+      ]
+    },
+    {
+      "id": "E2E-RET-P09",
+      "module": "Returns & exchanges (M2)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Partial-quantity accept with mixed disposition (M2-R-P08)",
+      "expected": "refund accepted units only",
+      "status": "skip",
+      "actual": "moves money (live Razorpay refund / capture) — manual UAT only",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Partial-quantity accept with mixed disposition (M2-R-P08).",
+        "Verify refund accepted units only."
+      ]
+    },
+    {
+      "id": "E2E-RET-P10",
+      "module": "Returns & exchanges (M2)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Customer requests size/colour exchange (M2-E-P01)",
+      "expected": "EXCHANGE REQUESTED + email",
+      "status": "skip",
+      "actual": "needs a delivered, paid order inside the 3-day window — manual UAT only",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Customer requests size/colour exchange (M2-E-P01).",
+        "Verify EXCHANGE REQUESTED + email."
+      ]
+    },
+    {
+      "id": "E2E-RET-P11",
+      "module": "Returns & exchanges (M2)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Exchange happy path to COMPLETED (M2-E-P02)",
+      "expected": "COMPLETED + tracking emails",
+      "status": "skip",
+      "actual": "needs a delivered, paid order inside the 3-day window — manual UAT only",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Exchange happy path to COMPLETED (M2-E-P02).",
+        "Verify COMPLETED + tracking emails."
+      ]
+    },
+    {
+      "id": "E2E-RET-P12",
+      "module": "Returns & exchanges (M2)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Settle exchange price difference (M2-E-P05)",
+      "expected": "COLLECTED / REFUNDED / WAIVED",
+      "status": "skip",
+      "actual": "moves money (live Razorpay refund / capture) — manual UAT only",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Settle exchange price difference (M2-E-P05).",
+        "Verify COLLECTED / REFUNDED / WAIVED."
+      ]
+    },
+    {
+      "id": "E2E-RET-P13",
+      "module": "Returns & exchanges (M2)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Convert exchange to refund (M2-E-P08)",
+      "expected": "REFUNDED",
+      "status": "skip",
+      "actual": "moves money (live Razorpay refund / capture) — manual UAT only",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Convert exchange to refund (M2-E-P08).",
+        "Verify REFUNDED."
+      ]
+    },
+    {
+      "id": "E2E-RET-N31",
+      "module": "Returns & exchanges (M2)",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Return window expired (>3 days) blocked (M2-R-N02)",
+      "expected": "400 window expired",
+      "status": "skip",
+      "actual": "needs a delivered, paid order inside the 3-day window — manual UAT only",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Return window expired (>3 days) blocked (M2-R-N02).",
+        "Verify 400 window expired."
+      ]
+    },
+    {
+      "id": "E2E-RET-P14",
+      "module": "Returns & exchanges (M2)",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Open return blocks second request (M2-R-N06)",
+      "expected": "409 already open",
+      "status": "skip",
+      "actual": "needs a delivered, paid order inside the 3-day window — manual UAT only",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Open return blocks second request (M2-R-N06).",
+        "Verify 409 already open."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P01",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin dashboard loads",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 44,
+      "request": "GET /api/v1/admin/dashboard",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/dashboard.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P02",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin order list loads",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 205,
+      "request": "GET /api/v1/admin/orders?size=20",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/orders?size=20.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P03",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "COD pending collection list loads",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 1049,
+      "request": "GET /api/v1/admin/orders/cod-pending",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/orders/cod-pending.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P04",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Ordered-customer list loads",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 34,
+      "request": "GET /api/v1/admin/orders/ordered-logins",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/orders/ordered-logins.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P05",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin categories list",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 34,
+      "request": "GET /api/v1/admin/categories",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/categories.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P06",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin products list",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 57,
+      "request": "GET /api/v1/admin/products",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/products.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P07",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin banners list",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 32,
+      "request": "GET /api/v1/admin/banners",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/banners.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P08",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin blog posts list",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 31,
+      "request": "GET /api/v1/admin/blog-posts",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/blog-posts.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P09",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin policies list",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 42,
+      "request": "GET /api/v1/admin/policies",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/policies.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P10",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin coupons list",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 34,
+      "request": "GET /api/v1/admin/coupons",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/coupons.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P11",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin site settings",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 25,
+      "request": "GET /api/v1/admin/site-settings",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/site-settings.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P12",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin contact messages",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 24,
+      "request": "GET /api/v1/admin/contact-messages",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/contact-messages.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P13",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Ledgerly integration status",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 25,
+      "request": "GET /api/v1/admin/ledgerly/integration-status",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/ledgerly/integration-status.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P14",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Ledgerly settings",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 21,
+      "request": "GET /api/v1/admin/ledgerly/settings",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/ledgerly/settings.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P15",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin opens an order detail",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 67,
+      "request": "GET /api/v1/admin/orders/MNM-DD69CF124F12",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/orders/MNM-DD69CF124F12.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P16",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Integration secrets are never returned to the browser",
+      "expected": "no clientSecret/refreshToken values",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 37,
+      "request": "GET /api/v1/admin/zoho-settings",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/zoho-settings.",
+        "Verify no clientSecret/refreshToken values."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P17",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Admin creates a category",
+      "expected": "200 with id",
+      "status": "pass",
+      "actual": "HTTP 200 · id=3878301",
+      "ms": 54,
+      "request": "POST /api/v1/admin/categories",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/categories.",
+        "Verify 200 with id."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N01",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Duplicate category slug rejected",
+      "expected": "4xx",
+      "status": "pass",
+      "actual": "HTTP 409 · A category with this URL slug already exists. Choose a different slug.",
+      "ms": 62,
+      "request": "POST /api/v1/admin/categories",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/categories.",
+        "Verify 4xx."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P18",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin updates the category",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 54,
+      "request": "PUT /api/v1/admin/categories/3878301",
+      "steps": [
+        "As an authenticated user, send PUT /api/v1/admin/categories/3878301.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P19",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin deletes the category",
+      "expected": "200/204",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 50,
+      "request": "DELETE /api/v1/admin/categories/3878301",
+      "steps": [
+        "As an authenticated user, send DELETE /api/v1/admin/categories/3878301.",
+        "Verify 200/204."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N02",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Update a non-existent category",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Category not found",
+      "ms": 24,
+      "request": "PUT /api/v1/admin/categories/999999999",
+      "steps": [
+        "As an authenticated user, send PUT /api/v1/admin/categories/999999999.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N03",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Delete a non-existent category",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Category not found",
+      "ms": 26,
+      "request": "DELETE /api/v1/admin/categories/999999999",
+      "steps": [
+        "As an authenticated user, send DELETE /api/v1/admin/categories/999999999.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N04",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Create category without required name rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 26,
+      "request": "POST /api/v1/admin/categories",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/categories.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P20",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Admin creates a banner",
+      "expected": "200 with id",
+      "status": "pass",
+      "actual": "HTTP 200 · id=3878351",
+      "ms": 49,
+      "request": "POST /api/v1/admin/banners",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/banners.",
+        "Verify 200 with id."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P21",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin updates the banner",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 43,
+      "request": "PUT /api/v1/admin/banners/3878351",
+      "steps": [
+        "As an authenticated user, send PUT /api/v1/admin/banners/3878351.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P22",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin deletes the banner",
+      "expected": "200/204",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 35,
+      "request": "DELETE /api/v1/admin/banners/3878351",
+      "steps": [
+        "As an authenticated user, send DELETE /api/v1/admin/banners/3878351.",
+        "Verify 200/204."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N05",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Update a non-existent banner",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Banner not found",
+      "ms": 34,
+      "request": "PUT /api/v1/admin/banners/999999999",
+      "steps": [
+        "As an authenticated user, send PUT /api/v1/admin/banners/999999999.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N06",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Delete a non-existent banner",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Banner not found",
+      "ms": 27,
+      "request": "DELETE /api/v1/admin/banners/999999999",
+      "steps": [
+        "As an authenticated user, send DELETE /api/v1/admin/banners/999999999.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N07",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Create banner without required title rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 27,
+      "request": "POST /api/v1/admin/banners",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/banners.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P23",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Admin creates a policy",
+      "expected": "200 with id",
+      "status": "pass",
+      "actual": "HTTP 200 · id=3878401",
+      "ms": 48,
+      "request": "POST /api/v1/admin/policies",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/policies.",
+        "Verify 200 with id."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N08",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Duplicate policy slug rejected",
+      "expected": "4xx",
+      "status": "pass",
+      "actual": "HTTP 409 · A policy page with this URL slug already exists.",
+      "ms": 28,
+      "request": "POST /api/v1/admin/policies",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/policies.",
+        "Verify 4xx."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P24",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin updates the policy",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 51,
+      "request": "PUT /api/v1/admin/policies/3878401",
+      "steps": [
+        "As an authenticated user, send PUT /api/v1/admin/policies/3878401.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P25",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin deletes the policy",
+      "expected": "200/204",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 36,
+      "request": "DELETE /api/v1/admin/policies/3878401",
+      "steps": [
+        "As an authenticated user, send DELETE /api/v1/admin/policies/3878401.",
+        "Verify 200/204."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N09",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Update a non-existent policy",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Policy not found",
+      "ms": 39,
+      "request": "PUT /api/v1/admin/policies/999999999",
+      "steps": [
+        "As an authenticated user, send PUT /api/v1/admin/policies/999999999.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N10",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Delete a non-existent policy",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Policy not found",
+      "ms": 50,
+      "request": "DELETE /api/v1/admin/policies/999999999",
+      "steps": [
+        "As an authenticated user, send DELETE /api/v1/admin/policies/999999999.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N11",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Create policy without required title rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 30,
+      "request": "POST /api/v1/admin/policies",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/policies.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P26",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Admin creates a blog post",
+      "expected": "200 with id",
+      "status": "pass",
+      "actual": "HTTP 200 · id=3878451",
+      "ms": 44,
+      "request": "POST /api/v1/admin/blog-posts",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/blog-posts.",
+        "Verify 200 with id."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N12",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Duplicate blog post slug rejected",
+      "expected": "4xx",
+      "status": "pass",
+      "actual": "HTTP 409 · A blog post with this URL slug already exists. Choose a different slug.",
+      "ms": 29,
+      "request": "POST /api/v1/admin/blog-posts",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/blog-posts.",
+        "Verify 4xx."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P27",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin updates the blog post",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 39,
+      "request": "PUT /api/v1/admin/blog-posts/3878451",
+      "steps": [
+        "As an authenticated user, send PUT /api/v1/admin/blog-posts/3878451.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P28",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin deletes the blog post",
+      "expected": "200/204",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 36,
+      "request": "DELETE /api/v1/admin/blog-posts/3878451",
+      "steps": [
+        "As an authenticated user, send DELETE /api/v1/admin/blog-posts/3878451.",
+        "Verify 200/204."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N13",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Update a non-existent blog post",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Blog post not found",
+      "ms": 30,
+      "request": "PUT /api/v1/admin/blog-posts/999999999",
+      "steps": [
+        "As an authenticated user, send PUT /api/v1/admin/blog-posts/999999999.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N14",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Delete a non-existent blog post",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Blog post not found",
+      "ms": 22,
+      "request": "DELETE /api/v1/admin/blog-posts/999999999",
+      "steps": [
+        "As an authenticated user, send DELETE /api/v1/admin/blog-posts/999999999.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N15",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Create blog post without required title rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 20,
+      "request": "POST /api/v1/admin/blog-posts",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/blog-posts.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P29",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Admin creates a product",
+      "expected": "200 with id",
+      "status": "pass",
+      "actual": "HTTP 200 · id=3878501",
+      "ms": 47,
+      "request": "POST /api/v1/admin/products",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/products.",
+        "Verify 200 with id."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N16",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Duplicate product slug rejected",
+      "expected": "4xx",
+      "status": "pass",
+      "actual": "HTTP 409 · A product with this URL slug already exists. Choose a different slug.",
+      "ms": 24,
+      "request": "POST /api/v1/admin/products",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/products.",
+        "Verify 4xx."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P30",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin updates the product",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 29,
+      "request": "PUT /api/v1/admin/products/3878501",
+      "steps": [
+        "As an authenticated user, send PUT /api/v1/admin/products/3878501.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P31",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin deletes the product",
+      "expected": "200/204",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 38,
+      "request": "DELETE /api/v1/admin/products/3878501",
+      "steps": [
+        "As an authenticated user, send DELETE /api/v1/admin/products/3878501.",
+        "Verify 200/204."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N17",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Update a non-existent product",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Product not found",
+      "ms": 28,
+      "request": "PUT /api/v1/admin/products/999999999",
+      "steps": [
+        "As an authenticated user, send PUT /api/v1/admin/products/999999999.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N18",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Delete a non-existent product",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Product not found",
+      "ms": 29,
+      "request": "DELETE /api/v1/admin/products/999999999",
+      "steps": [
+        "As an authenticated user, send DELETE /api/v1/admin/products/999999999.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N19",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Create product without required name rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 26,
+      "request": "POST /api/v1/admin/products",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/products.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P32",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin saves a home section (unchanged)",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 33,
+      "request": "PUT /api/v1/admin/home-sections/30400",
+      "steps": [
+        "As an authenticated user, send PUT /api/v1/admin/home-sections/30400.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P33",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin saves a page visibility flag (unchanged)",
+      "expected": "200",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 27,
+      "request": "PUT /api/v1/admin/page-visibility/26350",
+      "steps": [
+        "As an authenticated user, send PUT /api/v1/admin/page-visibility/26350.",
+        "Verify 200."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N20",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Product with negative price rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 18,
+      "request": "POST /api/v1/admin/products",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/products.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N21",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Product with 4-letter currency rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 20,
+      "request": "POST /api/v1/admin/products",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/products.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N22",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Category name over 160 chars rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 29,
+      "request": "POST /api/v1/admin/categories",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/categories.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N23",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Coupon with unknown discount type rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Failed to read request",
+      "ms": 41,
+      "request": "POST /api/v1/admin/coupons",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/coupons.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N24",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Coupon without code rejected",
+      "expected": "400",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 36,
+      "request": "POST /api/v1/admin/coupons",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/coupons.",
+        "Verify 400."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N25",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Book shipment for a non-existent order",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 400 · Invalid request content.",
+      "ms": 33,
+      "request": "POST /api/v1/admin/orders/MNM-NOPE1790588348/book-shipment",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/orders/MNM-NOPE1790588348/book-shipment.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-N26",
+      "module": "Admin catalogue & operations",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Admin opens a non-existent order",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · Order not found",
+      "ms": 27,
+      "request": "GET /api/v1/admin/orders/MNM-NOPE1790588348",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/orders/MNM-NOPE1790588348.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P34",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin creates / edits a coupon",
+      "expected": "200 + config-change alert email",
+      "status": "skip",
+      "actual": "no-mail mode: this step emails the customer/staff via Care@minisnmore.com",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Admin creates / edits a coupon.",
+        "Verify 200 + config-change alert email."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P35",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin updates site settings",
+      "expected": "200 + config-change alert email",
+      "status": "skip",
+      "actual": "no-mail mode: this step emails the customer/staff via Care@minisnmore.com",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Admin updates site settings.",
+        "Verify 200 + config-change alert email."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P36",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin pulls inventory / products from Ledgerly",
+      "expected": "stock refreshed",
+      "status": "skip",
+      "actual": "mutates live catalogue stock — run from the Ledgerly live suite",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Admin pulls inventory / products from Ledgerly.",
+        "Verify stock refreshed."
+      ]
+    },
+    {
+      "id": "E2E-ADMIN-P37",
+      "module": "Admin catalogue & operations",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Admin books forward shipment with ExpressBees (M2-X-P03)",
+      "expected": "AWB created",
+      "status": "skip",
+      "actual": "books a real courier pickup — manual UAT only",
+      "ms": 0,
+      "request": "",
+      "steps": [
+        "Perform the manual scenario: Admin books forward shipment with ExpressBees (M2-X-P03).",
+        "Verify AWB created."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N01",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Anonymous call to /api/v1/admin/dashboard",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401",
+      "ms": 13,
+      "request": "GET /api/v1/admin/dashboard",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/admin/dashboard.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N02",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Customer JWT on /api/v1/admin/dashboard",
+      "expected": "403",
+      "status": "pass",
+      "actual": "HTTP 403",
+      "ms": 14,
+      "request": "GET /api/v1/admin/dashboard",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/dashboard.",
+        "Verify 403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N03",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Anonymous call to /api/v1/admin/orders",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401",
+      "ms": 8,
+      "request": "GET /api/v1/admin/orders",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/admin/orders.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N04",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Customer JWT on /api/v1/admin/orders",
+      "expected": "403",
+      "status": "pass",
+      "actual": "HTTP 403",
+      "ms": 11,
+      "request": "GET /api/v1/admin/orders",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/orders.",
+        "Verify 403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N05",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Anonymous call to /api/v1/admin/products",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401",
+      "ms": 11,
+      "request": "GET /api/v1/admin/products",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/admin/products.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N06",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Customer JWT on /api/v1/admin/products",
+      "expected": "403",
+      "status": "pass",
+      "actual": "HTTP 403",
+      "ms": 10,
+      "request": "GET /api/v1/admin/products",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/products.",
+        "Verify 403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N07",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Anonymous call to /api/v1/admin/coupons",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401",
+      "ms": 13,
+      "request": "GET /api/v1/admin/coupons",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/admin/coupons.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N08",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Customer JWT on /api/v1/admin/coupons",
+      "expected": "403",
+      "status": "pass",
+      "actual": "HTTP 403",
+      "ms": 12,
+      "request": "GET /api/v1/admin/coupons",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/coupons.",
+        "Verify 403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N09",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Anonymous call to /api/v1/admin/site-settings",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401",
+      "ms": 9,
+      "request": "GET /api/v1/admin/site-settings",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/admin/site-settings.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N10",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Customer JWT on /api/v1/admin/site-settings",
+      "expected": "403",
+      "status": "pass",
+      "actual": "HTTP 403",
+      "ms": 16,
+      "request": "GET /api/v1/admin/site-settings",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/site-settings.",
+        "Verify 403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N11",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Anonymous call to /api/v1/admin/contact-messages",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401",
+      "ms": 15,
+      "request": "GET /api/v1/admin/contact-messages",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/admin/contact-messages.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N12",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Customer JWT on /api/v1/admin/contact-messages",
+      "expected": "403",
+      "status": "pass",
+      "actual": "HTTP 403",
+      "ms": 17,
+      "request": "GET /api/v1/admin/contact-messages",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/contact-messages.",
+        "Verify 403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N13",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Anonymous call to /api/v1/admin/cancellation-requests",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401",
+      "ms": 11,
+      "request": "GET /api/v1/admin/cancellation-requests",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/admin/cancellation-requests.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N14",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Customer JWT on /api/v1/admin/cancellation-requests",
+      "expected": "403",
+      "status": "pass",
+      "actual": "HTTP 403",
+      "ms": 14,
+      "request": "GET /api/v1/admin/cancellation-requests",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/cancellation-requests.",
+        "Verify 403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N15",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Anonymous call to /api/v1/admin/ledgerly/settings",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401",
+      "ms": 11,
+      "request": "GET /api/v1/admin/ledgerly/settings",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/admin/ledgerly/settings.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N16",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Customer JWT on /api/v1/admin/ledgerly/settings",
+      "expected": "403",
+      "status": "pass",
+      "actual": "HTTP 403",
+      "ms": 12,
+      "request": "GET /api/v1/admin/ledgerly/settings",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/ledgerly/settings.",
+        "Verify 403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N17",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Anonymous call to /api/v1/admin/zoho-settings",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401",
+      "ms": 12,
+      "request": "GET /api/v1/admin/zoho-settings",
+      "steps": [
+        "As an anonymous client, send GET /api/v1/admin/zoho-settings.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N18",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Customer JWT on /api/v1/admin/zoho-settings",
+      "expected": "403",
+      "status": "pass",
+      "actual": "HTTP 403",
+      "ms": 13,
+      "request": "GET /api/v1/admin/zoho-settings",
+      "steps": [
+        "As an authenticated user, send GET /api/v1/admin/zoho-settings.",
+        "Verify 403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N19",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Customer cannot create a product",
+      "expected": "403",
+      "status": "pass",
+      "actual": "HTTP 403",
+      "ms": 13,
+      "request": "POST /api/v1/admin/products",
+      "steps": [
+        "As an authenticated user, send POST /api/v1/admin/products.",
+        "Verify 403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N20",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Customer cannot delete a category",
+      "expected": "403",
+      "status": "pass",
+      "actual": "HTTP 403",
+      "ms": 13,
+      "request": "DELETE /api/v1/admin/categories/1",
+      "steps": [
+        "As an authenticated user, send DELETE /api/v1/admin/categories/1.",
+        "Verify 403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N21",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Customer cannot read management env",
+      "expected": "403",
+      "status": "pass",
+      "actual": "HTTP 403",
+      "ms": 6,
+      "request": "GET /management/env",
+      "steps": [
+        "As an authenticated user, send GET /management/env.",
+        "Verify 403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N22",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Anonymous management env blocked",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401",
+      "ms": 6,
+      "request": "GET /management/env",
+      "steps": [
+        "As an anonymous client, send GET /management/env.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N23",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Internal service routes not exposed through gateway",
+      "expected": "401/403/404",
+      "status": "pass",
+      "actual": "HTTP 404 · 404 NOT_FOUND \"No static resource internal/v1/admin/orders.\"",
+      "ms": 12,
+      "request": "GET /internal/v1/admin/orders",
+      "steps": [
+        "As an anonymous client, send GET /internal/v1/admin/orders.",
+        "Verify 401/403/404."
+      ]
+    },
+    {
+      "id": "E2E-SEC-P01",
+      "module": "RBAC & security",
+      "kind": "positive",
+      "priority": "P0",
+      "title": "Health endpoint is up",
+      "expected": "200 status=UP",
+      "status": "pass",
+      "actual": "HTTP 200",
+      "ms": 14,
+      "request": "GET /management/health",
+      "steps": [
+        "As an anonymous client, send GET /management/health.",
+        "Verify 200 status=UP."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N24",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "CORS does not trust an arbitrary origin",
+      "expected": "no Access-Control-Allow-Origin for evil origin",
+      "status": "pass",
+      "actual": "HTTP 403 · ACAO=None",
+      "ms": 5,
+      "request": "OPTIONS /api/v1/products",
+      "steps": [
+        "As an anonymous client, send OPTIONS /api/v1/products.",
+        "Verify no Access-Control-Allow-Origin for evil origin."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N25",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Unsigned ExpressBees returns webhook rejected",
+      "expected": "401/403",
+      "status": "pass",
+      "actual": "HTTP 401 · Missing ExpressBees webhook authentication",
+      "ms": 14,
+      "request": "POST /api/v1/webhooks/xpressbees/returns",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/webhooks/xpressbees/returns.",
+        "Verify 401/403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N26",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Unsigned ExpressBees shipments webhook rejected",
+      "expected": "401/403",
+      "status": "pass",
+      "actual": "HTTP 401 · Missing ExpressBees webhook authentication",
+      "ms": 11,
+      "request": "POST /api/v1/webhooks/xpressbees/shipments",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/webhooks/xpressbees/shipments.",
+        "Verify 401/403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N27",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Unsigned Ledgerly webhook rejected",
+      "expected": "401/403",
+      "status": "pass",
+      "actual": "HTTP 401 · Missing X-Ledgerly-Signature",
+      "ms": 21,
+      "request": "POST /api/v1/ledgerly/webhooks",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/ledgerly/webhooks.",
+        "Verify 401/403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N28",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Unsigned Zoho stock webhook rejected",
+      "expected": "401/403",
+      "status": "pass",
+      "actual": "HTTP 401 · Missing stock webhook authentication",
+      "ms": 13,
+      "request": "POST /api/v1/zoho/stock-webhook",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/zoho/stock-webhook.",
+        "Verify 401/403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N29",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Unsigned Zoho order status webhook rejected",
+      "expected": "401/403",
+      "status": "pass",
+      "actual": "HTTP 401 · Missing order status webhook authentication",
+      "ms": 14,
+      "request": "POST /api/v1/zoho/order-status-webhook",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/zoho/order-status-webhook.",
+        "Verify 401/403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N30",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Unsigned Zoho shipment webhook rejected",
+      "expected": "401/403",
+      "status": "pass",
+      "actual": "HTTP 401 · Missing shipment webhook authentication",
+      "ms": 14,
+      "request": "POST /api/v1/zoho/shipment-webhook",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/zoho/shipment-webhook.",
+        "Verify 401/403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N31",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Unsigned Zoho invoice webhook rejected",
+      "expected": "401/403",
+      "status": "pass",
+      "actual": "HTTP 401 · Missing invoice webhook authentication",
+      "ms": 11,
+      "request": "POST /api/v1/zoho/invoice-webhook",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/zoho/invoice-webhook.",
+        "Verify 401/403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N32",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Unsigned Zoho item webhook rejected",
+      "expected": "401/403",
+      "status": "pass",
+      "actual": "HTTP 401 · Missing item webhook authentication",
+      "ms": 11,
+      "request": "POST /api/v1/zoho/item-webhook",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/zoho/item-webhook.",
+        "Verify 401/403."
+      ]
+    },
+    {
+      "id": "E2E-SEC-N33",
+      "module": "RBAC & security",
+      "kind": "negative",
+      "priority": "P0",
+      "title": "Ledgerly webhook with forged signature rejected",
+      "expected": "401",
+      "status": "pass",
+      "actual": "HTTP 401 · Missing X-Ledgerly-Signature",
+      "ms": 25,
+      "request": "POST /api/v1/ledgerly/webhooks",
+      "steps": [
+        "As an anonymous client, send POST /api/v1/ledgerly/webhooks.",
+        "Verify 401."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P01",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Home page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 44,
+      "request": "GET /",
+      "steps": [
+        "As an anonymous client, send GET /.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P02",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Product page page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 11,
+      "request": "GET /product/basic-shorts",
+      "steps": [
+        "As an anonymous client, send GET /product/basic-shorts.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P03",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Blog page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 12,
+      "request": "GET /blog",
+      "steps": [
+        "As an anonymous client, send GET /blog.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P04",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Cart page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 13,
+      "request": "GET /cart",
+      "steps": [
+        "As an anonymous client, send GET /cart.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P05",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Checkout page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 10,
+      "request": "GET /checkout",
+      "steps": [
+        "As an anonymous client, send GET /checkout.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P06",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Customer login page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 12,
+      "request": "GET /login",
+      "steps": [
+        "As an anonymous client, send GET /login.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P07",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Account page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 9,
+      "request": "GET /account",
+      "steps": [
+        "As an anonymous client, send GET /account.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P08",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Wishlist page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 8,
+      "request": "GET /wishlist",
+      "steps": [
+        "As an anonymous client, send GET /wishlist.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P09",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Contact us page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 7,
+      "request": "GET /contact-us",
+      "steps": [
+        "As an anonymous client, send GET /contact-us.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P10",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "About page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 109,
+      "request": "GET /about",
+      "steps": [
+        "As an anonymous client, send GET /about.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P11",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Gift page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 35,
+      "request": "GET /gift",
+      "steps": [
+        "As an anonymous client, send GET /gift.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P12",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Subscribe page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 26,
+      "request": "GET /subscribe",
+      "steps": [
+        "As an anonymous client, send GET /subscribe.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P13",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "New arrivals page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 6,
+      "request": "GET /new-arrivals",
+      "steps": [
+        "As an anonymous client, send GET /new-arrivals.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P14",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Best sellers page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 7,
+      "request": "GET /best-sellers",
+      "steps": [
+        "As an anonymous client, send GET /best-sellers.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P15",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Trending page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 6,
+      "request": "GET /trending",
+      "steps": [
+        "As an anonymous client, send GET /trending.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P16",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Privacy policy page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 8,
+      "request": "GET /privacy",
+      "steps": [
+        "As an anonymous client, send GET /privacy.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P17",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Terms page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 6,
+      "request": "GET /terms",
+      "steps": [
+        "As an anonymous client, send GET /terms.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P18",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Shipping policy page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 8,
+      "request": "GET /shipping",
+      "steps": [
+        "As an anonymous client, send GET /shipping.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P19",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin login page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 5,
+      "request": "GET /admin/login",
+      "steps": [
+        "As an anonymous client, send GET /admin/login.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P20",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Admin shell page renders",
+      "expected": "200 HTML",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 4,
+      "request": "GET /admin",
+      "steps": [
+        "As an anonymous client, send GET /admin.",
+        "Verify 200 HTML."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P21",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Shop route redirects to its canonical page",
+      "expected": "3xx / 200",
+      "status": "pass",
+      "actual": "HTTP 307",
+      "ms": 3,
+      "request": "GET /shop",
+      "steps": [
+        "As an anonymous client, send GET /shop.",
+        "Verify 3xx / 200."
+      ]
+    },
+    {
+      "id": "E2E-WEB-P22",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "positive",
+      "priority": "P1",
+      "title": "Track order route redirects to its canonical page",
+      "expected": "3xx / 200",
+      "status": "pass",
+      "actual": "HTTP 307",
+      "ms": 4,
+      "request": "GET /track",
+      "steps": [
+        "As an anonymous client, send GET /track.",
+        "Verify 3xx / 200."
+      ]
+    },
+    {
+      "id": "E2E-WEB-N01",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Unknown route shows not-found page",
+      "expected": "404",
+      "status": "pass",
+      "actual": "HTTP 404 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 6,
+      "request": "GET /this-route-does-not-exist-e2e",
+      "steps": [
+        "As an anonymous client, send GET /this-route-does-not-exist-e2e.",
+        "Verify 404."
+      ]
+    },
+    {
+      "id": "E2E-WEB-N02",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Unknown product page does not crash",
+      "expected": "no 5xx",
+      "status": "pass",
+      "actual": "HTTP 200 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 9,
+      "request": "GET /product/does-not-exist-e2e",
+      "steps": [
+        "As an anonymous client, send GET /product/does-not-exist-e2e.",
+        "Verify no 5xx."
+      ]
+    },
+    {
+      "id": "E2E-WEB-N03",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "negative",
+      "priority": "P1",
+      "title": "Path traversal attempt does not leak files",
+      "expected": "404/400, no /etc/passwd",
+      "status": "pass",
+      "actual": "HTTP 404 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 7,
+      "request": "GET /..%2f..%2f..%2fetc%2fpasswd",
+      "steps": [
+        "As an anonymous client, send GET /..%2f..%2f..%2fetc%2fpasswd.",
+        "Verify 404/400, no /etc/passwd."
+      ]
+    },
+    {
+      "id": "E2E-WEB-N04",
+      "module": "Storefront & admin pages (frontend)",
+      "kind": "negative",
+      "priority": "P2",
+      "title": "Very long URL handled",
+      "expected": "no 5xx",
+      "status": "pass",
+      "actual": "HTTP 404 · <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-s",
+      "ms": 6,
+      "request": "GET /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "steps": [
+        "As an anonymous client, send GET /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.",
+        "Verify no 5xx."
+      ]
+    }
+  ]
+}
