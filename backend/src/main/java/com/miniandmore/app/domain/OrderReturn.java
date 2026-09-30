@@ -39,6 +39,9 @@ public class OrderReturn implements Serializable {
     @Column(name = "reason", columnDefinition = "text", nullable = false)
     private String reason;
 
+    @Column(name = "image_urls_json", columnDefinition = "text")
+    private String imageUrlsJson;
+
     @Size(max = 2000)
     @Column(name = "admin_notes", length = 2000)
     private String adminNotes;
@@ -240,6 +243,14 @@ public class OrderReturn implements Serializable {
 
     public void setReason(String reason) {
         this.reason = reason;
+    }
+
+    public String getImageUrlsJson() {
+        return imageUrlsJson;
+    }
+
+    public void setImageUrlsJson(String imageUrlsJson) {
+        this.imageUrlsJson = imageUrlsJson;
     }
 
     public String getAdminNotes() {

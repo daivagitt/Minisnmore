@@ -32,7 +32,7 @@ const navGroups: { label: string; items: { to: string; label: string; icon: any;
     label: "Orders",
     items: [
       { to: "/account/orders", label: "My Orders", icon: Package },
-      { to: "/account/returns", label: "Returns & refunds", icon: RotateCcw },
+      { to: "/account/returns", label: "Returns & exchanges", icon: RotateCcw },
       { to: "/account/track", label: "Track Order", icon: Truck },
     ],
   },

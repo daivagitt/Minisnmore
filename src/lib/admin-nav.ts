@@ -25,7 +25,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { to: "/admin/invoices", label: "Invoices", keywords: "gst billing cin" },
   { to: "/admin/orders", label: "Orders", keywords: "sales customers checkout" },
   { to: "/admin/cancellations", label: "Cancellations", keywords: "cancel request refund" },
-  { to: "/admin/returns", label: "Order returns", keywords: "exchange refund pickup" },
+  { to: "/admin/returns", label: "Returns & exchanges", keywords: "order returns exchange refund pickup" },
   { to: "/admin/zoho", label: "Zoho settings", keywords: "ledgerly erp integration" },
   { to: "/admin/customers", label: "Customers", keywords: "accounts registered buyers patrons shoppers" },
   { to: "/admin/users", label: "Users", keywords: "customers joined timeline week" },

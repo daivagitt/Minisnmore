@@ -40,6 +40,7 @@ import {
   approveOrderReturn,
   bootstrapProfileFromSignup,
   cancelOrder,
+  cancelAdminOrder,
   cancelAdminOrderShipment,
   cancelOrderReturn,
   checkExchangeReplacementAvailability,
@@ -52,7 +53,9 @@ import {
   getAdminOrder,
   getOrder,
   getReturnsConfig,
+  getAdminOrderReturnsSummary,
   listAdminOrderReturns,
+  normalizeAdminOrderReturnsSummary,
   listAdminOrders,
   listCodPendingOrders,
   listMyNotifications,
@@ -81,6 +84,7 @@ import {
   settleOrderReturnPriceDifference,
   trackOrderPublic,
   updateMyProfile,
+  uploadReturnImage,
   verifyPayment,
 } from "./orders.functions";
 
@@ -257,6 +261,15 @@ describe("orders functions", () => {
     );
   });
 
+  it("forwards trackingStatus for fulfillment filters", async () => {
+    getMock.mockResolvedValueOnce({ orders: [], page: 1, pageSize: 10, totalItems: 0, totalPages: 1 });
+    await listAdminOrders(undefined, undefined, { trackingStatus: "shipped", page: 1 });
+    expect(getMock).toHaveBeenCalledWith(
+      "/api/v1/admin/orders?trackingStatus=shipped&page=1&size=10",
+      { auth: true },
+    );
+  });
+
   it("encodes search text and omits blank filters", async () => {
     getMock.mockResolvedValueOnce({ orders: [], page: 1, pageSize: 10, totalItems: 0, totalPages: 1 });
 
@@ -316,6 +329,24 @@ describe("orders functions", () => {
       requestOrderReturn({ data: { order_number: "MNM-9", reason: "Wrong size received" } }),
     ).resolves.toEqual({ return_number: "RET-2" });
 
+    postMock.mockResolvedValueOnce({ return_number: "RET-9" });
+    await expect(
+      requestOrderReturn({
+        data: {
+          order_number: "MNM-9",
+          reason: "Wrong size received",
+          image_urls: ["https://cdn.example/returns/damage.jpg"],
+        },
+      }),
+    ).resolves.toEqual({ return_number: "RET-9" });
+    expect(postMock).toHaveBeenLastCalledWith(
+      "/api/v1/order-returns",
+      expect.objectContaining({
+        image_urls: ["https://cdn.example/returns/damage.jpg"],
+      }),
+      { auth: true },
+    );
+
     postMock.mockResolvedValueOnce({ return_number: "RET-2", status: "cancelled" });
     await expect(cancelOrderReturn("RET-2")).resolves.toEqual({
       return_number: "RET-2",
@@ -337,6 +368,46 @@ describe("orders functions", () => {
 
     getMock.mockResolvedValueOnce(null);
     await expect(listAdminOrderReturns("closed")).resolves.toEqual({ returns: [] });
+
+    getMock.mockResolvedValueOnce({
+      total: 12,
+      returns: 8,
+      exchanges: 4,
+      open: 7,
+      closed: 5,
+      overdue: 2,
+      stages: { request: 3, pickup: 2, inspection: 1, exchange: 1, closed: 5 },
+    });
+    await expect(getAdminOrderReturnsSummary()).resolves.toEqual({
+      total: 12,
+      returns: 8,
+      exchanges: 4,
+      open: 7,
+      closed: 5,
+      overdue: 2,
+      stages: { request: 3, pickup: 2, inspection: 1, exchange: 1, closed: 5 },
+    });
+    expect(getMock).toHaveBeenCalledWith("/api/v1/admin/order-returns/summary", { auth: true });
+
+    getMock.mockResolvedValueOnce(null);
+    await expect(getAdminOrderReturnsSummary()).resolves.toEqual({
+      total: 0,
+      returns: 0,
+      exchanges: 0,
+      open: 0,
+      closed: 0,
+      overdue: 0,
+      stages: { request: 0, pickup: 0, inspection: 0, exchange: 0, closed: 0 },
+    });
+    expect(normalizeAdminOrderReturnsSummary({ total: "3" as never, stages: { request: 2 } as never })).toEqual({
+      total: 3,
+      returns: 0,
+      exchanges: 0,
+      open: 0,
+      closed: 0,
+      overdue: 0,
+      stages: { request: 2, pickup: 0, inspection: 0, exchange: 0, closed: 0 },
+    });
 
     postMock.mockResolvedValueOnce({ return_number: "RET-3", status: "approved" });
     await expect(approveOrderReturn("RET-3", "ok")).resolves.toEqual({
@@ -604,6 +675,55 @@ describe("orders functions", () => {
       }),
       { auth: true },
     );
+
+    postMock.mockResolvedValueOnce({ return_number: "EXC-2", request_type: "exchange" });
+    await expect(
+      requestOrderExchange({
+        data: {
+          order_number: "MNM-9",
+          order_item_id: 3,
+          reason: "Need a larger size for my baby",
+          replacement_size: "6-9m",
+          replacement_color: "Cream",
+          image_urls: ["https://cdn.example/returns/fit.jpg"],
+        },
+      }),
+    ).resolves.toMatchObject({ return_number: "EXC-2" });
+    expect(postMock).toHaveBeenLastCalledWith(
+      "/api/v1/order-returns/exchange",
+      expect.objectContaining({ image_urls: ["https://cdn.example/returns/fit.jpg"] }),
+      { auth: true },
+    );
+  });
+
+  it("uploads a return image via multipart", async () => {
+    postMock.mockResolvedValueOnce({ publicUrl: "https://cdn.example/returns/damage.jpg" });
+    const file = new File(["photo"], "damage.jpg", { type: "image/jpeg" });
+    await expect(uploadReturnImage(file)).resolves.toBe("https://cdn.example/returns/damage.jpg");
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/order-returns/uploads",
+      expect.any(FormData),
+      { auth: true },
+    );
+  });
+
+  it("rejects return payloads with invalid image_urls before calling the API", async () => {
+    await expect(
+      requestOrderReturn({
+        data: {
+          order_number: "MNM-20260818-ABC",
+          reason: "Product arrived damaged in transit",
+          image_urls: ["not-a-url"],
+        },
+      }),
+    ).rejects.toThrow();
+    expect(postMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects upload responses missing publicUrl", async () => {
+    postMock.mockResolvedValueOnce({});
+    const file = new File(["photo"], "damage.jpg", { type: "image/jpeg" });
+    await expect(uploadReturnImage(file)).rejects.toThrow();
   });
 
   it("rejects invalid exchange payloads before calling the API", async () => {
@@ -698,6 +818,29 @@ describe("orders functions", () => {
     expect(postMock).toHaveBeenCalledWith(
       "/api/v1/admin/orders/MNM-9/cancel-shipment",
       { mode: "manual", reason: "Carrier confirmed cancellation" },
+      { auth: true },
+    );
+  });
+
+  it("cancels an unshipped order as admin", async () => {
+    postMock.mockResolvedValueOnce({ order: { order_number: "MNM-10", status: "cancelled" } });
+    await cancelAdminOrder("MNM-10", { reason: "Item is out of stock" });
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/admin/orders/MNM-10/cancel",
+      { reason: "Item is out of stock" },
+      { auth: true },
+    );
+  });
+
+  it("cancels an order with a booked label and shipment mode", async () => {
+    postMock.mockResolvedValueOnce({ order: { order_number: "MNM-11", status: "cancelled" } });
+    await cancelAdminOrder("MNM-11", {
+      reason: "Unable to fulfil",
+      shipment_mode: "manual",
+    });
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/admin/orders/MNM-11/cancel",
+      { reason: "Unable to fulfil", shipment_mode: "manual" },
       { auth: true },
     );
   });

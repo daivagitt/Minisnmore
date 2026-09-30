@@ -103,5 +103,6 @@
     <include file="config/liquibase/changelog/20260926140000_add_gift_page_json.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260926160000_bogo_line_allocation_and_eligibility.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260926180000_idx_customer_order_status_user_login.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260929180000_backfill_shipment_delivered_at.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260930140000_add_order_return_image_urls.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>
-

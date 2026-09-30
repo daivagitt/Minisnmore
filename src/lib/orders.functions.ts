@@ -1,5 +1,6 @@
 import { api } from "@/lib/api";
 import { LIST_PAGE_SIZE } from "@/lib/pagination";
+import type { FulfillmentAddress } from "@/lib/fulfillment-docs";
 import { z } from "zod";
 
 const AddressSchema = z.object({
@@ -238,8 +239,11 @@ export type OrderReturnRow = {
   order_item_id?: number;
   product_name?: string;
   product_slug?: string;
+  product_image?: string | null;
   original_size?: string | null;
   original_color?: string | null;
+  sku?: string | null;
+  variant_sku?: string | null;
   replacement_size?: string | null;
   replacement_color?: string | null;
   original_item_amount?: number | null;
@@ -248,15 +252,27 @@ export type OrderReturnRow = {
   settlement_status?: string | null;
   outbound_awb?: string | null;
   outbound_tracking_url?: string | null;
+  outbound_carrier_name?: string | null;
+  reverse_awb?: string | null;
+  tracking_url?: string | null;
+  carrier_name?: string | null;
+  pickup_window?: string | null;
+  pickup_failure_reason?: string | null;
+  tracking_status?: string;
+  shipment_delivered_at?: string | null;
   items?: OrderReturnLine[];
+  image_urls?: string[];
 };
 
 export type OrderReturnLine = {
   id: number;
   order_item_id: number;
   product_name: string;
+  product_image?: string | null;
   size?: string | null;
   color?: string | null;
+  sku?: string | null;
+  variant_sku?: string | null;
   requested_qty: number;
   received_qty?: number | null;
   accepted_qty?: number | null;
@@ -272,9 +288,18 @@ export async function listMyOrderReturns(): Promise<{ returns: OrderReturnRow[] 
   return { returns: returns ?? [] };
 }
 
-export async function checkReturnEligibility(
-  orderNumber: string,
-): Promise<{ eligible: boolean; message?: string; order_number: string }> {
+export type ReturnEligibility = {
+  eligible: boolean;
+  message?: string;
+  order_number: string;
+  tracking_status?: string;
+  delivered_at?: string | null;
+  return_deadline?: string | null;
+  window_days?: number;
+  enabled?: boolean;
+};
+
+export async function checkReturnEligibility(orderNumber: string): Promise<ReturnEligibility> {
   return api.get(`/api/v1/order-returns/eligibility/${encodeURIComponent(orderNumber)}`, {
     auth: true,
   });
@@ -283,6 +308,8 @@ export async function checkReturnEligibility(
 export async function getReturnsConfig(): Promise<{ enabled: boolean; window_days: number }> {
   return api.get("/api/v1/order-returns/config", { auth: true });
 }
+
+const returnImageUrlSchema = z.string().trim().url().max(600);
 
 const CreateReturnInput = z.object({
   order_number: z.string().min(3).max(40),
@@ -296,6 +323,7 @@ const CreateReturnInput = z.object({
     )
     .min(1)
     .optional(),
+  image_urls: z.array(returnImageUrlSchema).max(5).optional(),
 });
 
 export async function requestOrderReturn(input: {
@@ -311,6 +339,7 @@ const CreateExchangeInput = z.object({
   reason: z.string().min(10).max(4000),
   replacement_size: z.string().min(1).max(40),
   replacement_color: z.string().min(1).max(40),
+  image_urls: z.array(returnImageUrlSchema).max(5).optional(),
 });
 
 export async function requestOrderExchange(input: {
@@ -318,6 +347,28 @@ export async function requestOrderExchange(input: {
 }): Promise<OrderReturnRow> {
   const parsed = CreateExchangeInput.parse(input.data);
   return api.post("/api/v1/order-returns/exchange", parsed, { auth: true });
+}
+
+export const MAX_RETURN_IMAGES = 5;
+
+const ReturnImageUploadResponse = z.object({
+  publicUrl: z.string().url(),
+});
+
+export async function uploadReturnImage(file: File): Promise<string> {
+  const form = new FormData();
+  const filename =
+    file.name?.trim() ||
+    (file.type === "image/png"
+      ? "return.png"
+      : file.type === "image/webp"
+        ? "return.webp"
+        : file.type === "image/gif"
+          ? "return.gif"
+          : "return.jpg");
+  form.append("file", file, filename);
+  const uploaded = await api.post<unknown>("/api/v1/order-returns/uploads", form, { auth: true });
+  return ReturnImageUploadResponse.parse(uploaded).publicUrl;
 }
 
 export async function checkExchangeReplacementAvailability(
@@ -366,6 +417,7 @@ export type AdminOrderReturnRow = OrderReturnRow & {
   replacement_reserved_at?: string | null;
   payment_method?: string | null;
   payment_status?: string | null;
+  shipment_date?: string | null;
   cod_refund_pending?: boolean;
   manual_refund_method?: string | null;
   manual_refund_reference?: string | null;
@@ -377,6 +429,60 @@ export type AdminOrderReturnRow = OrderReturnRow & {
   sla_limit_hours?: number;
 };
 
+export type AdminOrderReturnsStageCounts = {
+  request: number;
+  pickup: number;
+  inspection: number;
+  exchange: number;
+  closed: number;
+};
+
+export type AdminOrderReturnsSummary = {
+  total: number;
+  returns: number;
+  exchanges: number;
+  open: number;
+  closed: number;
+  overdue: number;
+  stages: AdminOrderReturnsStageCounts;
+};
+
+export const EMPTY_ADMIN_RETURNS_SUMMARY: AdminOrderReturnsSummary = {
+  total: 0,
+  returns: 0,
+  exchanges: 0,
+  open: 0,
+  closed: 0,
+  overdue: 0,
+  stages: { request: 0, pickup: 0, inspection: 0, exchange: 0, closed: 0 },
+};
+
+function numberOrZero(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export function normalizeAdminOrderReturnsSummary(
+  raw?: Partial<AdminOrderReturnsSummary> | null,
+): AdminOrderReturnsSummary {
+  const stages = raw?.stages ?? EMPTY_ADMIN_RETURNS_SUMMARY.stages;
+  return {
+    total: numberOrZero(raw?.total),
+    returns: numberOrZero(raw?.returns),
+    exchanges: numberOrZero(raw?.exchanges),
+    open: numberOrZero(raw?.open),
+    closed: numberOrZero(raw?.closed),
+    overdue: numberOrZero(raw?.overdue),
+    stages: {
+      request: numberOrZero(stages.request),
+      pickup: numberOrZero(stages.pickup),
+      inspection: numberOrZero(stages.inspection),
+      exchange: numberOrZero(stages.exchange),
+      closed: numberOrZero(stages.closed),
+    },
+  };
+}
+
 export async function listAdminOrderReturns(
   status?: string,
 ): Promise<{ returns: AdminOrderReturnRow[] }> {
@@ -385,6 +491,14 @@ export async function listAdminOrderReturns(
     auth: true,
   });
   return { returns: returns ?? [] };
+}
+
+export async function getAdminOrderReturnsSummary(): Promise<AdminOrderReturnsSummary> {
+  const data = await api.get<Partial<AdminOrderReturnsSummary> | null>(
+    "/api/v1/admin/order-returns/summary",
+    { auth: true },
+  );
+  return normalizeAdminOrderReturnsSummary(data);
 }
 
 function adminReturnAction(returnNumber: string, action: string, adminNotes?: string) {
@@ -674,6 +788,8 @@ export type AdminOrderRow = AdminCodOrderRow & {
   shipment_carrier_status?: string;
   shipment_delivered_at?: string;
   pending_cancellation?: boolean;
+  can_cancel?: boolean;
+  can_admin_cancel?: boolean;
   can_book_shipment?: boolean;
   can_book_shipment_with_override?: boolean;
   can_book_expressbees_shipment?: boolean;
@@ -688,6 +804,10 @@ export type AdminOrderRow = AdminCodOrderRow & {
   package_courier_id?: string;
   package_courier_name?: string;
   packed_at?: string;
+  package_slip_number?: string;
+  shipment_order_number?: string;
+  shipping_address?: FulfillmentAddress;
+  dispatch_address?: FulfillmentAddress;
   payment_status: string;
   payment_method: string;
   zoho_sync_status: string;
@@ -718,6 +838,7 @@ export type AdminOrderListFilters = {
   size?: number;
   q?: string;
   status?: string;
+  trackingStatus?: string;
   paymentStatus?: string;
   paymentMethod?: string;
   zohoSyncStatus?: string;
@@ -735,6 +856,7 @@ export async function listAdminOrders(
   const q = options?.q?.trim();
   if (q) query.set("q", q);
   if (options?.status) query.set("status", options.status);
+  if (options?.trackingStatus) query.set("trackingStatus", options.trackingStatus);
   if (options?.paymentStatus) query.set("paymentStatus", options.paymentStatus);
   if (options?.paymentMethod) query.set("paymentMethod", options.paymentMethod);
   if (options?.zohoSyncStatus) query.set("zohoSyncStatus", options.zohoSyncStatus);
@@ -797,6 +919,8 @@ export async function bookAdminOrderShipment(
     label_url?: string;
     override_fulfillment_hold?: boolean;
     override_reason?: string;
+    courier_id?: string;
+    courier_name?: string;
   },
 ) {
   return api.post(
@@ -823,6 +947,7 @@ export type PackageRatesResult = {
   preferred_courier_id?: string | null;
   preferred_courier_name?: string;
   couriers: PackageCourierOption[];
+  rates_warning?: string;
 };
 
 export async function previewAdminOrderPackageRates(
@@ -865,6 +990,17 @@ export async function cancelAdminOrderShipment(
 ) {
   return api.post(
     `/api/v1/admin/orders/${encodeURIComponent(orderNumber)}/cancel-shipment`,
+    payload,
+    { auth: true },
+  );
+}
+
+export async function cancelAdminOrder(
+  orderNumber: string,
+  payload: { reason: string; shipment_mode?: "manual" | "xpressbees" },
+) {
+  return api.post(
+    `/api/v1/admin/orders/${encodeURIComponent(orderNumber)}/cancel`,
     payload,
     { auth: true },
   );

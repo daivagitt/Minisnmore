@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { RotateCcw, Loader2, ShieldCheck } from "lucide-react";
+import { RotateCcw, ArrowLeftRight, Loader2, ShieldCheck } from "lucide-react";
 import { useAccountData } from "@/lib/account";
 import {
   cancelOrderReturn,
@@ -9,16 +9,20 @@ import {
   listMyOrderReturns,
   requestOrderReturn,
   type OrderReturnRow,
+  type ReturnEligibility,
 } from "@/lib/orders.functions";
 import { showApiError } from "@/lib/ui-errors";
 import { formatOrderDate } from "@/lib/dates";
 import { toast } from "sonner";
 import { ListPagination } from "@/components/ListPagination";
+import { ReturnConditionNotice } from "@/components/ReturnConditionNotice";
+import { ReturnImageGallery } from "@/components/ReturnImageGallery";
+import { ReturnImageUpload } from "@/components/ReturnImageUpload";
 import { useListPagination } from "@/hooks/useListPagination";
 import { LIST_PAGE_SIZE } from "@/lib/pagination";
 
 export const Route = createFileRoute("/account/returns")({
-  head: () => ({ meta: [{ title: "Your account · Mini's n More" }] }),
+  head: () => ({ meta: [{ title: "Returns & exchanges · Mini's n More" }] }),
   component: ReturnsPage,
 });
 
@@ -32,8 +36,10 @@ function ReturnsPage() {
   const [config, setConfig] = useState<{ enabled: boolean; window_days: number } | null>(null);
   const [returns, setReturns] = useState<OrderReturnRow[]>([]);
   const [loadingReturns, setLoadingReturns] = useState(true);
-  const [eligibility, setEligibility] = useState<Record<string, { eligible: boolean; message?: string }>>({});
+  const [eligibility, setEligibility] = useState<Record<string, ReturnEligibility>>({});
   const [reasonByOrder, setReasonByOrder] = useState<Record<string, string>>({});
+  const [imagesByOrder, setImagesByOrder] = useState<Record<string, string[]>>({});
+  const [imagesUploadingByOrder, setImagesUploadingByOrder] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState<string | null>(null);
 
   useEffect(() => {
@@ -84,15 +90,18 @@ function ReturnsPage() {
     if (config && !config.enabled) return;
     if (!paidOrders.length) return;
     void (async () => {
-      const next: Record<string, { eligible: boolean; message?: string }> = {};
+      const next: Record<string, ReturnEligibility> = {};
       await Promise.all(
         paidOrders.map(async (o: { order_number: string }) => {
           if (openReturnByOrder.has(o.order_number)) return;
           try {
-            const res = await checkReturnEligibility(o.order_number);
-            next[o.order_number] = { eligible: res.eligible, message: res.message };
+            next[o.order_number] = await checkReturnEligibility(o.order_number);
           } catch {
-            next[o.order_number] = { eligible: false, message: "Could not check eligibility" };
+            next[o.order_number] = {
+              eligible: false,
+              message: "Could not check eligibility",
+              order_number: o.order_number,
+            };
           }
         }),
       );
@@ -108,9 +117,12 @@ function ReturnsPage() {
     }
     setSubmitting(orderNumber);
     try {
-      await requestOrderReturn({ data: { order_number: orderNumber, reason } });
+      await requestOrderReturn({
+        data: { order_number: orderNumber, reason, image_urls: imagesByOrder[orderNumber] ?? [] },
+      });
       toast.success("Return request submitted");
       setReasonByOrder((prev) => ({ ...prev, [orderNumber]: "" }));
+      setImagesByOrder((prev) => ({ ...prev, [orderNumber]: [] }));
       await loadReturns();
     } catch (error) {
       showApiError(error, "Could not submit return request");
@@ -137,10 +149,11 @@ function ReturnsPage() {
       <div className="space-y-4">
         <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 md:p-8">
           <h1 className="font-display text-3xl mb-1 flex items-center gap-2">
-            <RotateCcw className="h-6 w-6 text-primary" /> Returns & refunds
+            <RotateCcw className="h-6 w-6 text-primary" /> Returns &amp; exchanges
           </h1>
           <p className="text-sm text-muted-foreground">
-            Returns & refunds are temporarily unavailable. Please reach out to support if you need help with an order.
+            Returns &amp; exchanges are temporarily unavailable. Please reach out to support if you need help with an
+            order.
           </p>
         </div>
       </div>
@@ -153,13 +166,14 @@ function ReturnsPage() {
     <div className="space-y-4">
       <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 md:p-8">
         <h1 className="font-display text-3xl mb-1 flex items-center gap-2">
-          <RotateCcw className="h-6 w-6 text-primary" /> Returns & refunds
+          <RotateCcw className="h-6 w-6 text-primary" /> Returns &amp; exchanges
         </h1>
         <p className="text-sm text-muted-foreground">
           Eligible within {windowDays} day{windowDays === 1 ? "" : "s"} of delivery. Exchanges depend on stock
           availability — if the size you want isn't available, you can convert to a refund instead. Refunds reach
           you in 5–7 business days after we receive the items.
         </p>
+        <ReturnConditionNotice className="mt-4" />
         <div className="mt-4 glass rounded-2xl p-3 inline-flex items-center gap-2 text-xs text-muted-foreground">
           <ShieldCheck className="h-4 w-4 text-primary" /> Free reverse pickup across India.
         </div>
@@ -185,20 +199,41 @@ function ReturnsPage() {
                 {r.product_name ? (
                   <div className="text-xs text-muted-foreground mt-0.5">
                     {r.product_name}
+                    {r.original_size || r.original_color || r.sku
+                      ? ` (${[r.original_size, r.original_color, r.sku].filter(Boolean).join(" · ")})`
+                      : ""}
                     {r.replacement_size || r.replacement_color
                       ? ` → ${[r.replacement_size, r.replacement_color].filter(Boolean).join(" · ")}`
+                      : ""}
+                    {r.items?.[0]?.requested_qty
+                      ? ` · Qty ${r.items.reduce((sum, line) => sum + (line.requested_qty ?? 0), 0)}`
                       : ""}
                   </div>
                 ) : null}
                 {r.rejection_reason ? (
                   <p className="text-xs text-amber-700 mt-1">{r.rejection_reason}</p>
                 ) : null}
+                <ReturnImageGallery urls={r.image_urls} className="mt-2 flex flex-wrap gap-2" />
+                {r.reverse_awb || r.tracking_url ? (
+                  r.tracking_url ? (
+                    <a
+                      href={r.tracking_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-primary underline mt-1 inline-block"
+                    >
+                      Track pickup{r.reverse_awb ? ` (AWB ${r.reverse_awb})` : ""}
+                    </a>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-1">Pickup AWB {r.reverse_awb}</p>
+                  )
+                ) : null}
                 {r.outbound_tracking_url ? (
                   <a
                     href={r.outbound_tracking_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs text-primary underline mt-1 inline-block"
+                    className="text-xs text-primary underline mt-1 inline-block sm:ml-3"
                   >
                     Track replacement shipment{r.outbound_awb ? ` (AWB ${r.outbound_awb})` : ""}
                   </a>
@@ -269,6 +304,12 @@ function ReturnsPage() {
                 </div>
                 {!open && elig?.eligible ? (
                   <>
+                    {elig.return_deadline ? (
+                      <p className="text-xs text-muted-foreground">
+                        Return or exchange by {formatOrderDate(elig.return_deadline)}.
+                      </p>
+                    ) : null}
+                    <ReturnConditionNotice />
                     <textarea
                       className="w-full rounded-xl border border-border bg-background/60 px-3 py-2 text-sm min-h-[80px]"
                       placeholder="Why are you returning this order?"
@@ -277,14 +318,35 @@ function ReturnsPage() {
                         setReasonByOrder((prev) => ({ ...prev, [o.order_number]: e.target.value }))
                       }
                     />
-                    <button
-                      type="button"
+                    <ReturnImageUpload
+                      urls={imagesByOrder[o.order_number] ?? []}
+                      onChange={(urls) => setImagesByOrder((prev) => ({ ...prev, [o.order_number]: urls }))}
                       disabled={submitting === o.order_number}
-                      onClick={() => submitReturn(o.order_number)}
-                      className="text-xs rounded-full bg-primary text-primary-foreground px-4 py-2"
-                    >
-                      {submitting === o.order_number ? "Submitting…" : "Request return"}
-                    </button>
+                      onUploadingChange={(uploading) =>
+                        setImagesUploadingByOrder((prev) => ({ ...prev, [o.order_number]: uploading }))
+                      }
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={
+                          submitting === o.order_number || imagesUploadingByOrder[o.order_number]
+                        }
+                        onClick={() => submitReturn(o.order_number)}
+                        className="inline-flex items-center gap-1.5 text-xs rounded-full bg-primary text-primary-foreground px-4 py-2 disabled:opacity-50"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+                        {submitting === o.order_number ? "Submitting…" : "Submit return"}
+                      </button>
+                      <Link
+                        to="/account/orders/$orderNumber"
+                        params={{ orderNumber: o.order_number }}
+                        className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border px-4 py-2 hover:bg-white/60 transition"
+                      >
+                        <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden />
+                        Exchange
+                      </Link>
+                    </div>
                   </>
                 ) : null}
                 {!open && elig && !elig.eligible && elig.message ? (

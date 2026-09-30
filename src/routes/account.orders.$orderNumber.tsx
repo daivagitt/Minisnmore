@@ -11,20 +11,25 @@ import {
   requestOrderReturn,
   requestOrderExchange,
   type OrderReturnRow,
+  type ReturnEligibility,
 } from "@/lib/orders.functions";
 import { openRazorpayCheckout } from "@/lib/razorpay";
 import { isInvoiceAvailable } from "@/lib/invoice-availability";
 import { formatOrderDate } from "@/lib/dates";
-import { formatOrderStatusSummary, formatPaymentStatusLabel } from "@/lib/order-status";
+import { formatOrderStatusSummary, formatPaymentStatusLabel, shouldContactCareToCancel } from "@/lib/order-status";
 import { useOrderTracking } from "@/hooks/useOrderTracking";
-import { shouldShowOrderTrackingLink } from "@/lib/order-tracking";
+import { shouldShowOrderTrackingLink, trackingStatusLabel } from "@/lib/order-tracking";
+import { returnStatusLabel } from "@/lib/return-tracking";
 import { useProduct } from "@/hooks/useProducts";
 import { defaultSellableSelection } from "@/lib/product-variants";
 import { ExchangeReplacementPicker } from "@/components/ExchangeReplacementPicker";
+import { ReturnConditionNotice } from "@/components/ReturnConditionNotice";
+import { ReturnImageUpload } from "@/components/ReturnImageUpload";
 import { showApiError } from "@/lib/ui-errors";
 import {
   Loader2,
   ArrowLeft,
+  ArrowLeftRight,
   MapPin,
   CreditCard,
   Package2,
@@ -40,6 +45,8 @@ import { toast } from "sonner";
 import { LazyImage } from "@/components/LazyImage";
 import { CopyButton } from "@/components/CopyButton";
 import { OrderTrackingCard } from "@/components/OrderTrackingCard";
+import { ReturnTrackingCard } from "@/components/ReturnTrackingCard";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,6 +60,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -101,23 +109,29 @@ function OrderDetail() {
   );
 
   const [orderReturns, setOrderReturns] = useState<OrderReturnRow[]>([]);
-  const [eligibility, setEligibility] = useState<{ eligible: boolean; message?: string } | null>(null);
+  const [eligibility, setEligibility] = useState<ReturnEligibility | null>(null);
 
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [returnReason, setReturnReason] = useState("");
   const [returnQuantities, setReturnQuantities] = useState<Record<number, number>>({});
+  const [returnImages, setReturnImages] = useState<string[]>([]);
+  const [returnImagesUploading, setReturnImagesUploading] = useState(false);
   const [submittingReturn, setSubmittingReturn] = useState(false);
 
   const [exchangeItem, setExchangeItem] = useState<{
     id: number;
     product_slug?: string;
     product_name?: string;
+    product_image?: string;
     size?: string;
     color?: string;
+    qty?: number;
   } | null>(null);
   const [exchangeSize, setExchangeSize] = useState<string | null>(null);
   const [exchangeColor, setExchangeColor] = useState<string | null>(null);
   const [exchangeReason, setExchangeReason] = useState("");
+  const [exchangeImages, setExchangeImages] = useState<string[]>([]);
+  const [exchangeImagesUploading, setExchangeImagesUploading] = useState(false);
   const [submittingExchange, setSubmittingExchange] = useState(false);
   const exchangeProduct = useProduct(exchangeItem?.product_slug);
 
@@ -129,7 +143,7 @@ function OrderDetail() {
         checkReturnEligibility(orderNumber),
       ]);
       setOrderReturns((returnsRes.returns ?? []).filter((r) => r.order_number === orderNumber));
-      setEligibility({ eligible: eligRes.eligible, message: eligRes.message });
+      setEligibility(eligRes);
     } catch {
       // non-fatal — the returns card just won't render actions
     }
@@ -140,7 +154,10 @@ function OrderDetail() {
   }, [loadReturnsInfo]);
 
   const openWholeOrderReturn = useMemo(
-    () => orderReturns.find((r) => OPEN_RETURN_STATUSES.has(r.status)),
+    () =>
+      orderReturns.find(
+        (r) => r.request_type === "return" && OPEN_RETURN_STATUSES.has(r.status),
+      ),
     [orderReturns],
   );
 
@@ -154,11 +171,34 @@ function OrderDetail() {
     return map;
   }, [orderReturns]);
 
-  const openExchangeDialog = (item: { id: number; product_slug?: string; product_name?: string; size?: string; color?: string }) => {
+  const openReturnDialog = (focusItemId?: number) => {
+    setReturnQuantities(
+      Object.fromEntries(
+        (order?.order_items ?? []).map((item) => [
+          item.id,
+          focusItemId == null || item.id === focusItemId ? Number(item.qty ?? 1) : 0,
+        ]),
+      ),
+    );
+    setReturnReason("");
+    setReturnImages([]);
+    setReturnDialogOpen(true);
+  };
+
+  const openExchangeDialog = (item: {
+    id: number;
+    product_slug?: string;
+    product_name?: string;
+    product_image?: string;
+    size?: string;
+    color?: string;
+    qty?: number;
+  }) => {
     setExchangeItem(item);
     setExchangeSize(item.size ?? null);
     setExchangeColor(item.color ?? null);
     setExchangeReason("");
+    setExchangeImages([]);
   };
 
   useEffect(() => {
@@ -185,11 +225,12 @@ function OrderDetail() {
     setSubmittingReturn(true);
     try {
       await requestOrderReturn({
-        data: { order_number: order.order_number, reason: returnReason.trim(), items },
+        data: { order_number: order.order_number, reason: returnReason.trim(), items, image_urls: returnImages },
       });
       toast.success("Return request submitted");
       setReturnDialogOpen(false);
       setReturnReason("");
+      setReturnImages([]);
       await loadReturnsInfo();
     } catch (e) {
       showApiError(e, "Could not submit return request");
@@ -217,10 +258,12 @@ function OrderDetail() {
           reason: exchangeReason.trim(),
           replacement_size: exchangeSize,
           replacement_color: exchangeColor,
+          image_urls: exchangeImages,
         },
       });
       toast.success("Exchange request submitted");
       setExchangeItem(null);
+      setExchangeImages([]);
       await loadReturnsInfo();
     } catch (e) {
       showApiError(e, "Could not submit exchange request");
@@ -433,6 +476,26 @@ function OrderDetail() {
         </div>
       )}
 
+      {shouldContactCareToCancel(order) && (
+        <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-5 md:p-6 border border-border bg-muted/40">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold flex items-center gap-2">
+                <XCircle className="h-4 w-4 shrink-0" />
+                Need to cancel this order?
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">Please contact Customer Care</p>
+            </div>
+            <Link
+              to="/contact-us"
+              className="rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm font-medium inline-flex items-center justify-center hover:bg-primary/90 transition shadow-sm w-full sm:w-auto shrink-0"
+            >
+              Contact Customer Care
+            </Link>
+          </div>
+        </div>
+      )}
+
       {order.pending_cancellation && order.cancellation_request?.status === "requested" && (
         <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-5 md:p-6 border border-amber-500/30 bg-amber-500/10">
           <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-3 sm:gap-4">
@@ -538,63 +601,78 @@ function OrderDetail() {
         )}
 
       {order.payment_status === "paid" && (
-        <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 md:p-8">
-          <h2 className="font-display text-lg sm:text-xl mb-4 flex items-center gap-2">
-            <Truck className="h-5 w-5 text-primary shrink-0" /> Delivery tracking
-          </h2>
-          <OrderTrackingCard order={order} showHeader={false} />
-        </div>
+        <Accordion
+          type="single"
+          collapsible
+          className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 md:p-8"
+        >
+          <AccordionItem value="delivery" className="border-0">
+            <AccordionTrigger className="py-1 hover:no-underline">
+              <span className="flex min-w-0 flex-1 items-center gap-2 pr-2 text-left">
+                <Truck className="h-5 w-5 text-primary shrink-0" />
+                <span className="font-display text-lg sm:text-xl">Delivery tracking</span>
+                <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wider rounded-full px-3 py-1 bg-amber-500/15 text-amber-700">
+                  {trackingStatusLabel(order)}
+                </span>
+              </span>
+            </AccordionTrigger>
+            <AccordionContent className="pt-4 pb-0">
+              <OrderTrackingCard order={order} showHeader={false} />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       )}
 
       {RETURNS_UI_ENABLED && order.payment_status === "paid" && (
         <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 md:p-8">
           <h2 className="font-display text-lg sm:text-xl mb-3 flex items-center gap-2">
-            <RotateCcw className="h-5 w-5 text-primary shrink-0" /> Returns &amp; exchange
+            <RotateCcw className="h-5 w-5 text-primary shrink-0" /> Returns &amp; exchanges
           </h2>
           {orderReturns.length > 0 ? (
-            <div className="space-y-2">
-              {orderReturns.map((r) => (
-                <div key={r.return_number} className="glass rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 min-w-0">
-                  <div className="text-sm min-w-0 break-words">
-                    <span className="font-medium">{r.request_type === "exchange" ? "Exchange" : "Return"}</span>{" "}
-                    <span className="text-muted-foreground">{r.return_number}</span>
-                    {r.product_name ? <span className="text-muted-foreground"> · {r.product_name}</span> : null}
-                    {r.outbound_tracking_url ? (
-                      <a
-                        href={r.outbound_tracking_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block text-xs text-primary underline mt-1"
-                      >
-                        Track replacement shipment
-                      </a>
-                    ) : null}
-                  </div>
-                  <span className="self-start sm:self-auto shrink-0 text-[10px] uppercase tracking-wider rounded-full px-3 py-1 bg-amber-500/15 text-amber-700">
-                    {r.status.replace(/_/g, " ")}
-                  </span>
-                </div>
-              ))}
+            <div className="space-y-3">
+              <Accordion type="multiple" className="space-y-2">
+                {orderReturns.map((r) => (
+                  <AccordionItem
+                    key={r.return_number}
+                    value={r.return_number}
+                    className="glass rounded-2xl border-0 px-3 sm:px-4"
+                  >
+                    <AccordionTrigger className="py-3 hover:no-underline">
+                      <span className="flex min-w-0 flex-1 items-center gap-2 pr-2 text-left">
+                        <span className="min-w-0 truncate font-medium text-sm">
+                          {r.request_type === "exchange" ? "Exchange" : "Return"} {r.return_number}
+                        </span>
+                        <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wider rounded-full px-3 py-1 bg-amber-500/15 text-amber-700">
+                          {returnStatusLabel(r)}
+                        </span>
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionContent className="pb-3">
+                      <ReturnTrackingCard item={r} showHeader={false} />
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
               <Link to="/account/returns" className="text-xs text-primary hover:underline">
                 Manage your return &amp; exchange requests
               </Link>
             </div>
           ) : eligibility?.eligible ? (
-            <button
-              type="button"
-              onClick={() => {
-                setReturnQuantities(
-                  Object.fromEntries((order.order_items ?? []).map((item) => [item.id, Number(item.qty ?? 1)])),
-                );
-                setReturnDialogOpen(true);
-              }}
-              className="text-xs rounded-full bg-primary text-primary-foreground px-4 py-2"
-            >
-              Start a return
-            </button>
+            <div className="space-y-3">
+              {eligibility.return_deadline ? (
+                <p className="text-sm text-muted-foreground">
+                  Return and exchange window is open until {formatOrderDate(eligibility.return_deadline)}.
+                </p>
+              ) : null}
+              <ReturnConditionNotice />
+              <p className="text-sm text-muted-foreground">
+                Choose <span className="font-medium text-foreground">Return</span> or{" "}
+                <span className="font-medium text-foreground">Exchange</span> next to an item below.
+              </p>
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              {eligibility?.message ?? "Returns aren't available for this order right now."}
+              {eligibility?.message ?? "Returns and exchanges aren't available for this order right now."}
             </p>
           )}
         </div>
@@ -610,7 +688,7 @@ function OrderDetail() {
           <div className="space-y-3">
             {order.order_items?.map((it: any) => {
               const openExchange = it.id != null ? openExchangeByItemId.get(it.id) : undefined;
-              const canExchange =
+              const canAct =
                 RETURNS_UI_ENABLED &&
                 order.payment_status === "paid" &&
                 eligibility?.eligible &&
@@ -631,7 +709,8 @@ function OrderDetail() {
                     <div className="flex-1 min-w-0">
                       <div className="font-medium break-words">{it.product_name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {[it.size, it.color].filter(Boolean).join(" · ")} · ×{it.qty}
+                        {[it.size, it.color].filter(Boolean).join(" · ")}
+                        {it.qty != null ? ` · Qty ${it.qty}` : ""}
                       </div>
                     </div>
                     <div className="text-sm font-medium shrink-0 tabular-nums">
@@ -642,22 +721,35 @@ function OrderDetail() {
                     <span className="self-start text-[10px] uppercase tracking-wider rounded-full px-3 py-1 bg-amber-500/15 text-amber-700">
                       Exchange {openExchange.status.replace(/_/g, " ")}
                     </span>
-                  ) : canExchange ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        openExchangeDialog({
-                          id: it.id,
-                          product_slug: it.product_slug,
-                          product_name: it.product_name,
-                          size: it.size,
-                          color: it.color,
-                        })
-                      }
-                      className="self-start text-xs rounded-full border border-border px-3 py-1.5 hover:bg-white/60 transition"
-                    >
-                      Request exchange
-                    </button>
+                  ) : canAct ? (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openReturnDialog(it.id)}
+                        className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border px-3 py-1.5 hover:bg-white/60 transition"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+                        Return
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openExchangeDialog({
+                            id: it.id,
+                            product_slug: it.product_slug,
+                            product_name: it.product_name,
+                            product_image: it.product_image,
+                            size: it.size,
+                            color: it.color,
+                            qty: Number(it.qty ?? 1),
+                          })
+                        }
+                        className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border px-3 py-1.5 hover:bg-white/60 transition"
+                      >
+                        <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden />
+                        Exchange
+                      </button>
+                    </div>
                   ) : null}
                 </div>
               );
@@ -838,13 +930,20 @@ function OrderDetail() {
         open={returnDialogOpen}
         onOpenChange={(open) => {
           setReturnDialogOpen(open);
-          if (!open) setReturnReason("");
+          if (!open) {
+            setReturnReason("");
+            setReturnImages([]);
+          }
         }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Request a return</DialogTitle>
+            <DialogTitle>Return items</DialogTitle>
+            <DialogDescription>
+              Choose how many pieces to send back, tell us why, and attach photos if you can.
+            </DialogDescription>
           </DialogHeader>
+          <ReturnConditionNotice />
           <div className="space-y-2">
             <p className="text-sm font-medium">Items and quantities</p>
             {(order.order_items ?? []).map((item) => {
@@ -854,11 +953,13 @@ function OrderDetail() {
                   key={item.id}
                   className="flex items-center justify-between gap-3 rounded-xl border border-border p-3 text-sm"
                 >
-                  <span>
-                    {item.product_name}
-                    {item.size || item.color
-                      ? ` · ${[item.size, item.color].filter(Boolean).join(" / ")}`
-                      : ""}
+                  <span className="min-w-0">
+                    <span className="block font-medium break-words">{item.product_name}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {[item.size, item.color].filter(Boolean).join(" · ")}
+                      {item.size || item.color ? " · " : ""}
+                      Ordered qty {max}
+                    </span>
                   </span>
                   <select
                     value={returnQuantities[item.id] ?? 0}
@@ -895,14 +996,30 @@ function OrderDetail() {
               disabled={submittingReturn}
             />
           </div>
+          <ReturnImageUpload
+            urls={returnImages}
+            onChange={setReturnImages}
+            disabled={submittingReturn}
+            onUploadingChange={setReturnImagesUploading}
+          />
           <DialogFooter>
             <button
               type="button"
+              onClick={() => setReturnDialogOpen(false)}
+              disabled={submittingReturn || returnImagesUploading}
+              className="rounded-full border border-border px-4 py-2 text-sm disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
               onClick={submitReturn}
-              disabled={submittingReturn || returnReason.trim().length < 10}
+              disabled={
+                submittingReturn || returnImagesUploading || returnReason.trim().length < 10
+              }
               className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm disabled:opacity-50"
             >
-              {submittingReturn ? "Submitting…" : "Submit return request"}
+              {submittingReturn ? "Submitting…" : "Submit return"}
             </button>
           </DialogFooter>
         </DialogContent>
@@ -910,11 +1027,49 @@ function OrderDetail() {
       )}
 
       {RETURNS_UI_ENABLED && (
-      <Dialog open={!!exchangeItem} onOpenChange={(open) => !open && setExchangeItem(null)}>
+      <Dialog
+        open={!!exchangeItem}
+        onOpenChange={(open) => {
+          if (!open) {
+            setExchangeItem(null);
+            setExchangeImages([]);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Exchange {exchangeItem?.product_name ?? "item"}</DialogTitle>
+            <DialogTitle>Exchange item</DialogTitle>
+            <DialogDescription>
+              Choose a replacement size or colour. Photos help us review your request faster.
+            </DialogDescription>
           </DialogHeader>
+          <ReturnConditionNotice />
+          {exchangeItem ? (
+            <div className="flex gap-3 rounded-xl border border-border p-3">
+              {exchangeItem.product_image ? (
+                <LazyImage
+                  src={exchangeItem.product_image}
+                  className="h-14 w-14 rounded-xl object-cover shrink-0"
+                  alt=""
+                  priority="auto"
+                />
+              ) : null}
+              <div className="min-w-0">
+                <p className="font-medium text-sm break-words">{exchangeItem.product_name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {[exchangeItem.size, exchangeItem.color].filter(Boolean).join(" · ")}
+                </p>
+                <p className="mt-1 text-sm">
+                  Quantity:{" "}
+                  <span className="font-semibold tabular-nums">{exchangeItem.qty ?? 1}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {" "}
+                    · entire quantity will be exchanged
+                  </span>
+                </p>
+              </div>
+            </div>
+          ) : null}
           <ExchangeReplacementPicker
             product={exchangeProduct}
             originalSize={exchangeItem?.size}
@@ -937,14 +1092,34 @@ function OrderDetail() {
               disabled={submittingExchange}
             />
           </div>
+          <ReturnImageUpload
+            urls={exchangeImages}
+            onChange={setExchangeImages}
+            disabled={submittingExchange}
+            onUploadingChange={setExchangeImagesUploading}
+          />
           <DialogFooter>
             <button
               type="button"
+              onClick={() => setExchangeItem(null)}
+              disabled={submittingExchange || exchangeImagesUploading}
+              className="rounded-full border border-border px-4 py-2 text-sm disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
               onClick={submitExchange}
-              disabled={submittingExchange || exchangeReason.trim().length < 10 || !exchangeSize || !exchangeColor}
+              disabled={
+                submittingExchange ||
+                exchangeImagesUploading ||
+                exchangeReason.trim().length < 10 ||
+                !exchangeSize ||
+                !exchangeColor
+              }
               className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm disabled:opacity-50"
             >
-              {submittingExchange ? "Submitting…" : "Submit exchange request"}
+              {submittingExchange ? "Submitting…" : "Submit exchange"}
             </button>
           </DialogFooter>
         </DialogContent>

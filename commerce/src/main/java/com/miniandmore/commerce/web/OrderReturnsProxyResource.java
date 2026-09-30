@@ -1,8 +1,10 @@
 package com.miniandmore.commerce.web;
 
 import com.miniandmore.commerce.client.CatalogInternalClient;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @RestController
@@ -28,6 +30,11 @@ public class OrderReturnsProxyResource {
     @PostMapping("/exchange")
     public ResponseEntity<String> requestExchange(@RequestBody Object body) {
         return catalog.post("/internal/v1/order-returns/exchange", body);
+    }
+
+    @PostMapping(value = "/uploads", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<String> uploadImage(@RequestPart("file") MultipartFile file) {
+        return catalog.postMultipart("/internal/v1/order-returns/uploads", file);
     }
 
     @GetMapping("/exchange-availability/{orderItemId}")

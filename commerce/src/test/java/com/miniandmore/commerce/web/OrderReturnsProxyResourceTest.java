@@ -71,6 +71,22 @@ class OrderReturnsProxyResourceTest {
     }
 
     @Test
+    void uploadImage_delegatesMultipart() throws Exception {
+        when(catalog.postMultipart(eq("/internal/v1/order-returns/uploads"), any())).thenReturn(ResponseEntity.ok("{}"));
+        org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
+            "file",
+            "damage.jpg",
+            "image/jpeg",
+            "bytes".getBytes()
+        );
+
+        mockMvc
+            .perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/v1/order-returns/uploads").file(file))
+            .andExpect(status().isOk());
+        verify(catalog).postMultipart(eq("/internal/v1/order-returns/uploads"), any());
+    }
+
+    @Test
     void checkExchangeAvailability_delegates() throws Exception {
         when(catalog.get(any())).thenReturn(ResponseEntity.ok("{}"));
 

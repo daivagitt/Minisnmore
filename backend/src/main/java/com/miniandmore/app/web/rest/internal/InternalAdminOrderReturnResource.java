@@ -1,8 +1,6 @@
 package com.miniandmore.app.web.rest.internal;
 
-import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.OrderReturn;
-import com.miniandmore.app.domain.OrderReturnItem;
 import com.miniandmore.app.domain.enumeration.ExchangeSettlementStatus;
 import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
 import com.miniandmore.app.domain.enumeration.ManualRefundMethod;
@@ -10,6 +8,7 @@ import com.miniandmore.app.domain.enumeration.ReturnDisposition;
 import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.service.CaseSlaSupport;
 import com.miniandmore.app.service.OrderReturnService;
+import com.miniandmore.app.service.OrderTrackingStatusResolver;
 import com.miniandmore.app.security.SecurityUtils;
 import com.miniandmore.app.web.rest.v1.ApiResponse;
 import jakarta.validation.Valid;
@@ -51,6 +50,11 @@ public class InternalAdminOrderReturnResource {
             }
         }
         return ApiResponse.ok(orderReturnService.listForAdmin(filter).stream().map(this::toDto).toList());
+    }
+
+    @GetMapping("/summary")
+    public ApiResponse<Map<String, Object>> summary() {
+        return ApiResponse.ok(orderReturnService.adminSummary()); // counts by type, stage, and SLA
     }
 
     @PostMapping("/{returnNumber}/approve")
@@ -312,6 +316,7 @@ public class InternalAdminOrderReturnResource {
         data.put("status", orderReturn.getStatus().name().toLowerCase());
         data.put("request_type", orderReturn.getRequestType().name().toLowerCase());
         data.put("reason", orderReturn.getReason());
+        data.put("image_urls", orderReturnService.imageUrls(orderReturn));
         data.put("admin_notes", orderReturn.getAdminNotes());
         data.put("rejection_reason", orderReturn.getRejectionReason());
         data.put("refund_amount", orderReturn.getRefundAmount());
@@ -327,6 +332,9 @@ public class InternalAdminOrderReturnResource {
             data.put("customer_login", orderReturn.getUserLogin());
             data.put("payment_method", order.getPaymentMethod());
             data.put("payment_status", order.getPaymentStatus() != null ? order.getPaymentStatus().name().toLowerCase() : null);
+            data.put("tracking_status", OrderTrackingStatusResolver.resolve(order));
+            data.put("shipment_date", StringUtils.defaultString(order.getShipmentDate()));
+            data.put("shipment_delivered_at", order.getShipmentDeliveredAt());
             data.put(
                 "cod_refund_pending",
                 OrderReturnService.isCollectedCod(order) &&
@@ -341,14 +349,8 @@ public class InternalAdminOrderReturnResource {
         data.put("manual_refund_reference", orderReturn.getManualRefundReference());
         data.put("manual_refund_recorded_at", orderReturn.getManualRefundRecordedAt());
         data.put("manual_refund_recorded_by", orderReturn.getManualRefundRecordedBy());
-        OrderItem item = orderReturn.getOrderItem();
-        if (item != null) {
-            data.put("order_item_id", item.getId());
-            data.put("product_name", item.getProductName());
-            data.put("product_slug", item.getProductSlug());
-            data.put("original_size", item.getItemSize());
-            data.put("original_color", item.getColor());
-        }
+        List<Map<String, Object>> lines = orderReturnService.returnLineBreakdown(orderReturn).stream().map(OrderReturnDtoSupport::toLineDto).toList();
+        OrderReturnDtoSupport.putOriginalItemFields(data, orderReturn, lines);
         data.put("replacement_size", orderReturn.getReplacementSize());
         data.put("replacement_color", orderReturn.getReplacementColor());
         data.put("disposition", orderReturn.getDisposition() != null ? orderReturn.getDisposition().name().toLowerCase() : null);
@@ -381,26 +383,8 @@ public class InternalAdminOrderReturnResource {
         data.put("settled_at", orderReturn.getSettledAt());
         data.put("settled_by", orderReturn.getSettledBy());
         data.put("replacement_reserved_at", orderReturn.getReplacementReservedAt());
-        data.put("items", orderReturnService.returnLineBreakdown(orderReturn).stream().map(this::toLineDto).toList());
+        data.put("items", lines);
         caseSlaSupport.enrichReturnCase(data);
-        return data;
-    }
-
-    private Map<String, Object> toLineDto(OrderReturnItem line) {
-        var data = new LinkedHashMap<String, Object>();
-        data.put("id", line.getId());
-        data.put("order_item_id", line.getOrderItem().getId());
-        data.put("product_name", line.getOrderItem().getProductName());
-        data.put("size", line.getOrderItem().getItemSize());
-        data.put("color", line.getOrderItem().getColor());
-        data.put("requested_qty", line.getRequestedQty());
-        data.put("received_qty", line.getReceivedQty());
-        data.put("accepted_qty", line.getAcceptedQty());
-        data.put("unit_amount", line.getUnitAmount());
-        data.put("gross_amount", line.getGrossAmount());
-        data.put("discount_allocation", line.getDiscountAllocation());
-        data.put("refund_amount", line.getRefundAmount());
-        data.put("disposition", line.getDisposition() == null ? null : line.getDisposition().name().toLowerCase());
         return data;
     }
 

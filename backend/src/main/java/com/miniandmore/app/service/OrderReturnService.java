@@ -3,6 +3,7 @@ package com.miniandmore.app.service;
 import com.miniandmore.app.client.LedgerlyIntegrationClient;
 import com.miniandmore.app.client.XpressBeesClient;
 import com.miniandmore.app.client.ZohoBooksIntegrationClient;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.config.ApplicationProperties;
@@ -27,10 +28,6 @@ import com.miniandmore.app.repository.ProductRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -54,12 +51,14 @@ import org.springframework.web.server.ResponseStatusException;
 public class OrderReturnService {
 
     private static final Logger LOG = LoggerFactory.getLogger(OrderReturnService.class);
-    private static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
     private static final int RETURN_WINDOW_DAYS = 3;
 
-    /** Feature switch: returns & refunds. Flip to false to disable; no other code needs to change. */
+    /** Feature switch: returns & exchanges. Flip to false to disable; no other code needs to change. */
     private static final boolean RETURNS_REFUNDS_ENABLED = true;
-    private static final String RETURNS_DISABLED_MESSAGE = "Returns & refunds are currently unavailable. Please contact support.";
+    private static final String RETURNS_DISABLED_MESSAGE = "Returns & exchanges are currently unavailable. Please contact support.";
+    private static final int MAX_RETURN_IMAGES = 5;
+    private static final int MAX_IMAGE_URL_LENGTH = 600;
+    private static final ObjectMapper IMAGE_URLS_JSON = new ObjectMapper();
 
     private static final EnumSet<OrderReturnStatus> TERMINAL_RETURN_STATUSES = EnumSet.of(
         OrderReturnStatus.REJECTED,
@@ -85,6 +84,15 @@ public class OrderReturnService {
     private final ApplicationProperties applicationProperties;
     private final XpressBeesClient xpressBeesClient;
     private final ObjectMapper objectMapper;
+    private final CaseSlaSupport caseSlaSupport;
+
+    private static final EnumSet<OrderReturnStatus> SUMMARY_CLOSED_STATUSES = EnumSet.of(
+        OrderReturnStatus.REJECTED,
+        OrderReturnStatus.REFUNDED,
+        OrderReturnStatus.COMPLETED,
+        OrderReturnStatus.CANCELLED,
+        OrderReturnStatus.FAILED
+    );
 
     public OrderReturnService(
         OrderReturnRepository orderReturnRepository,
@@ -100,7 +108,8 @@ public class OrderReturnService {
         OrderSmsService orderSmsService,
         ApplicationProperties applicationProperties,
         XpressBeesClient xpressBeesClient,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        CaseSlaSupport caseSlaSupport
     ) {
         this.orderReturnRepository = orderReturnRepository;
         this.orderReturnItemRepository = orderReturnItemRepository;
@@ -116,6 +125,7 @@ public class OrderReturnService {
         this.applicationProperties = applicationProperties;
         this.xpressBeesClient = xpressBeesClient;
         this.objectMapper = objectMapper;
+        this.caseSlaSupport = caseSlaSupport;
     }
 
     public List<OrderReturn> listForUser(String login) {
@@ -130,6 +140,72 @@ public class OrderReturnService {
     }
 
     @Transactional(readOnly = true)
+    public Map<String, Object> adminSummary() {
+        long returns = 0;
+        long exchanges = 0;
+        for (Object[] row : orderReturnRepository.countGroupedByRequestType()) {
+            if (row == null || row.length < 2 || row[0] == null || row[1] == null) {
+                continue;
+            }
+            long count = ((Number) row[1]).longValue();
+            if (row[0] == OrderRequestType.EXCHANGE) {
+                exchanges += count;
+            } else {
+                returns += count;
+            }
+        }
+
+        Map<String, Long> stages = new LinkedHashMap<>();
+        stages.put("request", 0L);
+        stages.put("pickup", 0L);
+        stages.put("inspection", 0L);
+        stages.put("exchange", 0L);
+        stages.put("closed", 0L);
+        long total = 0;
+        for (Object[] row : orderReturnRepository.countGroupedByStatus()) {
+            if (row == null || row.length < 2 || !(row[0] instanceof OrderReturnStatus status) || row[1] == null) {
+                continue;
+            }
+            long count = ((Number) row[1]).longValue();
+            total += count;
+            String stage = stageForSummary(status);
+            stages.put(stage, stages.getOrDefault(stage, 0L) + count);
+        }
+
+        long closed = stages.getOrDefault("closed", 0L);
+        long open = Math.max(0, total - closed);
+        long overdue = 0;
+        for (Object[] row : orderReturnRepository.findStatusAndRequestedAtByStatusNotIn(SUMMARY_CLOSED_STATUSES)) {
+            if (row == null || row.length < 2 || !(row[0] instanceof OrderReturnStatus status) || !(row[1] instanceof Instant requestedAt)) {
+                continue;
+            }
+            if (caseSlaSupport.isReturnOverdue(status.name().toLowerCase(), requestedAt)) {
+                overdue++;
+            }
+        }
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("total", total);
+        summary.put("returns", returns);
+        summary.put("exchanges", exchanges);
+        summary.put("open", open);
+        summary.put("closed", closed);
+        summary.put("overdue", overdue);
+        summary.put("stages", stages);
+        return summary;
+    }
+
+    private static String stageForSummary(OrderReturnStatus status) {
+        return switch (status) {
+            case REQUESTED, APPROVED -> "request";
+            case PICKUP_REQUESTED, PICKUP_SCHEDULED, PICKUP_FAILED, PICKED_UP -> "pickup";
+            case RECEIVED, INSPECTED, ACCEPTED -> "inspection";
+            case ITEM_ALLOCATED, REPACKING, READY_TO_SHIP, SHIPPED, DELIVERED -> "exchange";
+            case REFUNDED, COMPLETED, REJECTED, FAILED, CANCELLED -> "closed";
+        };
+    }
+
+    @Transactional(readOnly = true)
     public List<OrderReturnItem> returnLineBreakdown(OrderReturn orderReturn) {
         return orderReturn == null || orderReturn.getId() == null
             ? List.of()
@@ -141,10 +217,20 @@ public class OrderReturnService {
     // ---------------------------------------------------------------------
 
     public OrderReturn requestReturn(String userLogin, String orderNumber, String reason) {
-        return requestReturn(userLogin, orderNumber, reason, List.of());
+        return requestReturn(userLogin, orderNumber, reason, List.of(), List.of());
     }
 
     public OrderReturn requestReturn(String userLogin, String orderNumber, String reason, List<ReturnLineSelection> requestedLines) {
+        return requestReturn(userLogin, orderNumber, reason, requestedLines, List.of());
+    }
+
+    public OrderReturn requestReturn(
+        String userLogin,
+        String orderNumber,
+        String reason,
+        List<ReturnLineSelection> requestedLines,
+        List<String> imageUrls
+    ) {
         assertFeatureEnabled();
         String normalizedReason = normalizeReason(reason, "return");
         CustomerOrder order = customerOrderRepository
@@ -159,6 +245,7 @@ public class OrderReturnService {
         orderReturn.setStatus(OrderReturnStatus.REQUESTED);
         orderReturn.setRequestType(OrderRequestType.RETURN);
         orderReturn.setReason(normalizedReason);
+        orderReturn.setImageUrlsJson(serializeReturnImageUrls(imageUrls));
         orderReturn.setRequestedAt(Instant.now());
         orderReturn.setOrder(order);
         orderReturn.setUserLogin(userLogin);
@@ -225,8 +312,12 @@ public class OrderReturnService {
             returnItem.setRefundAmount(refund);
             orderReturnItemRepository.save(returnItem);
             totalRefund = totalRefund.add(refund);
+            if (orderReturn.getOrderItem() == null) {
+                orderReturn.setOrderItem(item);
+            }
         }
         orderReturn.setRefundAmount(totalRefund.setScale(2, RoundingMode.HALF_UP));
+        orderReturnRepository.save(orderReturn);
     }
 
     public OrderReturn requestExchange(
@@ -236,6 +327,18 @@ public class OrderReturnService {
         String reason,
         String replacementSize,
         String replacementColor
+    ) {
+        return requestExchange(userLogin, orderNumber, orderItemId, reason, replacementSize, replacementColor, List.of());
+    }
+
+    public OrderReturn requestExchange(
+        String userLogin,
+        String orderNumber,
+        Long orderItemId,
+        String reason,
+        String replacementSize,
+        String replacementColor,
+        List<String> imageUrls
     ) {
         assertFeatureEnabled();
         String normalizedReason = normalizeReason(reason, "exchange");
@@ -266,6 +369,7 @@ public class OrderReturnService {
         orderReturn.setStatus(OrderReturnStatus.REQUESTED);
         orderReturn.setRequestType(OrderRequestType.EXCHANGE);
         orderReturn.setReason(normalizedReason);
+        orderReturn.setImageUrlsJson(serializeReturnImageUrls(imageUrls));
         orderReturn.setRequestedAt(Instant.now());
         orderReturn.setOrder(order);
         orderReturn.setUserLogin(userLogin);
@@ -816,9 +920,14 @@ public class OrderReturnService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Price difference can only be settled for an approved exchange");
         }
         BigDecimal difference = money(orderReturn.getPriceDifference());
-        ExchangeSettlementStatus expected = difference.signum() > 0
-            ? ExchangeSettlementStatus.COLLECTED
-            : difference.signum() < 0 ? ExchangeSettlementStatus.REFUNDED : ExchangeSettlementStatus.NOT_REQUIRED;
+        ExchangeSettlementStatus expected;
+        if (difference.signum() > 0) {
+            expected = ExchangeSettlementStatus.COLLECTED;
+        } else if (difference.signum() < 0) {
+            expected = ExchangeSettlementStatus.REFUNDED;
+        } else {
+            expected = ExchangeSettlementStatus.NOT_REQUIRED;
+        }
         if (settlementStatus == null || (settlementStatus != expected && settlementStatus != ExchangeSettlementStatus.WAIVED)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Settlement action does not match the exchange price difference");
         }
@@ -1059,7 +1168,10 @@ public class OrderReturnService {
             orderReturn.getReplacementVariantSku(),
             item != null ? StringUtils.defaultIfBlank(item.getVariantSku(), item.getProductSlug()) : orderReturn.getReturnNumber()
         );
-        int qty = item != null ? Math.max(1, item.getQty() == null ? 1 : item.getQty()) : 1;
+        int qty = 1;
+        if (item != null && item.getQty() != null) {
+            qty = Math.max(1, item.getQty());
+        }
         BigDecimal price = item != null ? item.getPrice() : orderReturn.getOrder().getTotal();
         return List.of(
             new XpressBeesClient.ReversePickupLine(
@@ -1233,9 +1345,14 @@ public class OrderReturnService {
         CustomerOrder order = orderReturn.getOrder();
         orderReturn.setRefundAmount(refundAmount);
         if (orderReturn.getRequestType() == OrderRequestType.RETURN && order.getPaymentStatus() != PaymentStatus.REFUNDED) {
-            PaymentStatus nextPaymentStatus = isUncollectedCod(order)
-                ? order.getPaymentStatus()
-                : refundAmount.compareTo(money(order.getTotal())) >= 0 ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED;
+            PaymentStatus nextPaymentStatus;
+            if (isUncollectedCod(order)) {
+                nextPaymentStatus = order.getPaymentStatus();
+            } else if (refundAmount.compareTo(money(order.getTotal())) >= 0) {
+                nextPaymentStatus = PaymentStatus.REFUNDED;
+            } else {
+                nextPaymentStatus = PaymentStatus.PARTIALLY_REFUNDED;
+            }
             if (nextPaymentStatus != order.getPaymentStatus()) {
                 order.setPaymentStatus(nextPaymentStatus);
                 customerOrderRepository.save(order);
@@ -1278,7 +1395,8 @@ public class OrderReturnService {
                 try {
                     Optional<String> zohoCreditNoteId = zohoBooksIntegrationClient.createCreditNote(
                         order.getId(),
-                        orderReturn.getReturnNumber()
+                        orderReturn.getReturnNumber(),
+                        returnedQuantitiesForZoho(orderReturn)
                     );
                     if (zohoCreditNoteId.isPresent()) {
                         orderReturn.setZohoCreditNoteId(zohoCreditNoteId.orElseThrow());
@@ -1370,6 +1488,10 @@ public class OrderReturnService {
                 result.put("order_number", orderNumber);
                 result.put("enabled", true);
                 result.put("window_days", RETURN_WINDOW_DAYS);
+                result.put("tracking_status", OrderTrackingStatusResolver.resolve(order));
+                Instant deliveryAnchor = resolveDeliveryAnchor(order);
+                result.put("delivered_at", deliveryAnchor);
+                result.put("return_deadline", deliveryAnchor != null ? deliveryAnchor.plus(RETURN_WINDOW_DAYS, ChronoUnit.DAYS) : null);
                 try {
                     assertReturnEligible(order);
                     result.put("eligible", true);
@@ -1433,30 +1555,17 @@ public class OrderReturnService {
     }
 
     Instant resolveDeliveryAnchor(CustomerOrder order) {
-        LocalDate shipment = parseShipmentDate(order.getShipmentDate());
-        if (shipment != null) {
-            return shipment.atStartOfDay(INDIA).toInstant();
+        if (order == null) {
+            return null;
         }
-        if (order.getStatus() == OrderStatus.FULFILLED) {
-            if (order.getLedgerlyTrackingLastPulledAt() != null) {
-                return order.getLedgerlyTrackingLastPulledAt();
-            }
-            if (order.getLedgerlyLastSyncedAt() != null) {
-                return order.getLedgerlyLastSyncedAt();
-            }
+        if (order.getShipmentDeliveredAt() != null) {
+            return order.getShipmentDeliveredAt();
         }
-        String trackingStatus = OrderTrackingStatusResolver.resolve(order);
-        if ("delivered".equalsIgnoreCase(trackingStatus) && order.getLedgerlyTrackingLastPulledAt() != null) {
+        if (LedgerlyOrderStatus.isDelivered(order.getLedgerlyOrderStatus())) {
             return order.getLedgerlyTrackingLastPulledAt();
         }
-        if (StringUtils.isNotBlank(order.getTrackingNumber())) {
-            LocalDate trackedShipment = parseShipmentDate(order.getShipmentDate());
-            if (trackedShipment != null) {
-                return trackedShipment.atStartOfDay(INDIA).toInstant();
-            }
-        }
-        if (StringUtils.isNotBlank(order.getTrackingNumber()) && order.getLedgerlyTrackingLastPulledAt() != null) {
-            return order.getLedgerlyTrackingLastPulledAt();
+        if (!OrderShipmentService.hasLocalForwardShipment(order) && ZohoOrderStatus.isDelivered(order.getZohoOrderStatus())) {
+            return order.getZohoTrackingLastPulledAt();
         }
         return null;
     }
@@ -1517,7 +1626,7 @@ public class OrderReturnService {
                     if (qty <= 0) {
                         return;
                     }
-                    if (StringUtils.isNotBlank(item.getVariantSku()) && variantSupport.isVariants(product)) {
+                    if (variantSupport.isVariants(product)) {
                         if (!variantSupport.incrementVariantStock(
                             product,
                             item.getVariantSku(),
@@ -1541,6 +1650,30 @@ public class OrderReturnService {
         orderItemRepository.findAllByOrderId(order.getId()).forEach(this::restoreItemStock);
     }
 
+    private Map<Long, Integer> returnedQuantitiesForZoho(OrderReturn orderReturn) {
+        Map<Long, Integer> qtyByItemId = new LinkedHashMap<>();
+        if (orderReturn.getId() != null) {
+            for (OrderReturnItem line : orderReturnItemRepository.findAllByOrderReturnIdOrderById(orderReturn.getId())) {
+                if (line.getOrderItem() == null || line.getOrderItem().getId() == null) {
+                    continue;
+                }
+                int qty = Optional.ofNullable(line.getAcceptedQty()).orElse(0);
+                if (qty > 0) {
+                    qtyByItemId.merge(line.getOrderItem().getId(), qty, Integer::sum);
+                }
+            }
+        }
+        if (qtyByItemId.isEmpty() && orderReturn.getOrderItem() != null && orderReturn.getOrderItem().getId() != null) {
+            if (orderReturn.getId() == null || orderReturnItemRepository.findAllByOrderReturnIdOrderById(orderReturn.getId()).isEmpty()) {
+                qtyByItemId.put(
+                    orderReturn.getOrderItem().getId(),
+                    Math.max(1, Optional.ofNullable(orderReturn.getOrderItem().getQty()).orElse(1))
+                );
+            }
+        }
+        return qtyByItemId;
+    }
+
     /**
      * Reverses a previously-restored item's stock (used when a return/exchange is rejected after
      * inspection, undoing the credit given at approval). Best-effort: if the stock has already been
@@ -1562,7 +1695,7 @@ public class OrderReturnService {
                 return true;
             }
             boolean ok;
-            if (StringUtils.isNotBlank(item.getVariantSku()) && variantSupport.isVariants(product)) {
+            if (variantSupport.isVariants(product)) {
                 ok = variantSupport.decrementVariantStock(product, item.getVariantSku(), item.getItemSize(), item.getColor(), qty);
             } else {
                 int current = Optional.ofNullable(product.getStock()).orElse(0);
@@ -1574,16 +1707,6 @@ public class OrderReturnService {
         } catch (NumberFormatException ignored) {
             return true;
         }
-    }
-
-    private boolean reverseInventoryForOrder(CustomerOrder order) {
-        boolean allOk = true;
-        for (OrderItem item : orderItemRepository.findAllByOrderId(order.getId())) {
-            if (!reverseItemStock(item)) {
-                allOk = false;
-            }
-        }
-        return allOk;
     }
 
     private Product resolveProduct(String productIdStr) {
@@ -1685,21 +1808,6 @@ public class OrderReturnService {
         return "RET-" + safeOrderNumber + "-" + suffix;
     }
 
-    private static LocalDate parseShipmentDate(String shipmentDate) {
-        if (StringUtils.isBlank(shipmentDate)) {
-            return null;
-        }
-        String trimmed = shipmentDate.trim();
-        for (DateTimeFormatter formatter : List.of(DateTimeFormatter.ISO_LOCAL_DATE, DateTimeFormatter.ofPattern("yyyy-MM-dd"))) {
-            try {
-                return LocalDate.parse(trimmed, formatter);
-            } catch (DateTimeParseException ignored) {
-                // try next
-            }
-        }
-        return null;
-    }
-
     private static String trimNotes(String notes) {
         String value = StringUtils.normalizeSpace(StringUtils.defaultString(notes)).trim();
         return value.length() <= 2000 ? value : value.substring(0, 2000);
@@ -1753,6 +1861,82 @@ public class OrderReturnService {
     private static BigDecimal positiveOrFallback(BigDecimal preferred, BigDecimal fallback) {
         BigDecimal value = money(preferred);
         return value.signum() > 0 ? value : money(fallback);
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> imageUrls(OrderReturn orderReturn) {
+        return parseImageUrls(orderReturn == null ? null : orderReturn.getImageUrlsJson());
+    }
+
+    private String serializeReturnImageUrls(List<String> imageUrls) {
+        List<String> normalized = normalizeReturnImageUrls(imageUrls);
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        try {
+            return IMAGE_URLS_JSON.writeValueAsString(normalized);
+        } catch (JsonProcessingException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Could not save return images");
+        }
+    }
+
+    private static List<String> parseImageUrls(String json) {
+        if (StringUtils.isBlank(json)) {
+            return List.of();
+        }
+        try {
+            JsonNode node = IMAGE_URLS_JSON.readTree(json);
+            if (node == null || !node.isArray()) {
+                return List.of();
+            }
+            List<String> urls = new ArrayList<>();
+            node.forEach(item -> {
+                if (item != null && item.isTextual() && StringUtils.isNotBlank(item.asText())) {
+                    urls.add(item.asText().trim());
+                }
+            });
+            return List.copyOf(urls);
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    private List<String> normalizeReturnImageUrls(List<String> imageUrls) {
+        if (imageUrls == null || imageUrls.isEmpty()) {
+            return List.of();
+        }
+        String publicBase = null;
+        if (applicationProperties.getStorage() != null && applicationProperties.getStorage().getS3() != null) {
+            publicBase = applicationProperties.getStorage().getS3().getPublicBaseUrl();
+        }
+        List<String> normalized = new ArrayList<>();
+        for (String raw : imageUrls) {
+            if (StringUtils.isBlank(raw)) {
+                continue;
+            }
+            String url = raw.trim();
+            if (url.length() > MAX_IMAGE_URL_LENGTH) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return image URL is too long");
+            }
+            String lower = url.toLowerCase(Locale.ROOT);
+            if (!lower.startsWith("https://") && !lower.startsWith("http://")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return image URL must be http or https");
+            }
+            if (StringUtils.isNotBlank(publicBase)) {
+                var objectKey = ImagePreviewSupport.objectKeyFromPublicUrl(publicBase, url);
+                String key = objectKey.orElse("");
+                if (key.isEmpty() || !(key.startsWith("returns/") || key.contains("/returns/"))) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return image must be uploaded for this request");
+                }
+            }
+            if (!normalized.contains(url)) {
+                normalized.add(url);
+            }
+            if (normalized.size() > MAX_RETURN_IMAGES) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You can attach up to " + MAX_RETURN_IMAGES + " images");
+            }
+        }
+        return normalized;
     }
 
     public record ReturnLineSelection(Long orderItemId, Integer quantity) {}

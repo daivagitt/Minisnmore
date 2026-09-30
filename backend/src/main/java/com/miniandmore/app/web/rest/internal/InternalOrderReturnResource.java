@@ -1,21 +1,24 @@
 package com.miniandmore.app.web.rest.internal;
 
-import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.OrderReturn;
-import com.miniandmore.app.domain.OrderReturnItem;
 import com.miniandmore.app.security.SecurityUtils;
 import com.miniandmore.app.service.OrderReturnService;
+import com.miniandmore.app.service.OrderTrackingStatusResolver;
+import com.miniandmore.app.service.S3StorageService;
 import com.miniandmore.app.web.rest.v1.ApiResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
+import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -23,9 +26,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class InternalOrderReturnResource {
 
     private final OrderReturnService orderReturnService;
+    private final S3StorageService s3StorageService;
 
-    public InternalOrderReturnResource(OrderReturnService orderReturnService) {
+    public InternalOrderReturnResource(OrderReturnService orderReturnService, S3StorageService s3StorageService) {
         this.orderReturnService = orderReturnService;
+        this.s3StorageService = s3StorageService;
     }
 
     @GetMapping
@@ -40,9 +45,13 @@ public class InternalOrderReturnResource {
         List<OrderReturnService.ReturnLineSelection> lines = request.items() == null
             ? List.of()
             : request.items().stream().map(item -> new OrderReturnService.ReturnLineSelection(item.order_item_id(), item.quantity())).toList();
-        OrderReturn orderReturn = lines.isEmpty()
-            ? orderReturnService.requestReturn(login, request.order_number(), request.reason())
-            : orderReturnService.requestReturn(login, request.order_number(), request.reason(), lines);
+        OrderReturn orderReturn = orderReturnService.requestReturn(
+            login,
+            request.order_number(),
+            request.reason(),
+            lines,
+            request.image_urls()
+        );
         return ApiResponse.ok(toDto(orderReturn));
     }
 
@@ -55,9 +64,27 @@ public class InternalOrderReturnResource {
             request.order_item_id(),
             request.reason(),
             request.replacement_size(),
-            request.replacement_color()
+            request.replacement_color(),
+            request.image_urls()
         );
         return ApiResponse.ok(toDto(orderReturn));
+    }
+
+    @PostMapping(value = "/uploads", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<Map<String, Object>> uploadImage(@RequestPart("file") MultipartFile file) throws IOException {
+        requireLogin();
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image file is required");
+        }
+        String publicUrl = s3StorageService.uploadObject(
+            "returns",
+            file.getOriginalFilename(),
+            file.getBytes(),
+            file.getContentType()
+        );
+        var result = new LinkedHashMap<String, Object>();
+        result.put("publicUrl", publicUrl);
+        return ApiResponse.ok(result);
     }
 
     @GetMapping("/exchange-availability/{orderItemId}")
@@ -101,26 +128,30 @@ public class InternalOrderReturnResource {
         data.put("status", orderReturn.getStatus().name().toLowerCase());
         data.put("request_type", orderReturn.getRequestType().name().toLowerCase());
         data.put("reason", orderReturn.getReason());
+        data.put("image_urls", orderReturnService.imageUrls(orderReturn));
         data.put("rejection_reason", orderReturn.getRejectionReason());
         data.put("refund_amount", orderReturn.getRefundAmount());
         data.put("requested_at", orderReturn.getRequestedAt());
         data.put("resolved_at", orderReturn.getResolvedAt());
         if (orderReturn.getOrder() != null) {
-            data.put("order_number", orderReturn.getOrder().getOrderNumber());
-            data.put("order_total", orderReturn.getOrder().getTotal());
+            var order = orderReturn.getOrder();
+            data.put("order_number", order.getOrderNumber());
+            data.put("order_total", order.getTotal());
+            data.put("tracking_status", OrderTrackingStatusResolver.resolve(order));
+            data.put("shipment_delivered_at", order.getShipmentDeliveredAt());
         }
-        OrderItem item = orderReturn.getOrderItem();
-        if (item != null) {
-            data.put("order_item_id", item.getId());
-            data.put("product_name", item.getProductName());
-            data.put("product_slug", item.getProductSlug());
-            data.put("original_size", item.getItemSize());
-            data.put("original_color", item.getColor());
-        }
+        data.put("carrier_name", orderReturn.getCarrierName());
+        data.put("reverse_awb", orderReturn.getReverseAwb());
+        data.put("tracking_url", orderReturn.getTrackingUrl());
+        data.put("pickup_window", orderReturn.getPickupWindow());
+        data.put("pickup_failure_reason", orderReturn.getPickupFailureReason());
+        List<Map<String, Object>> lines = orderReturnService.returnLineBreakdown(orderReturn).stream().map(OrderReturnDtoSupport::toLineDto).toList();
+        OrderReturnDtoSupport.putOriginalItemFields(data, orderReturn, lines);
         data.put("replacement_size", orderReturn.getReplacementSize());
         data.put("replacement_color", orderReturn.getReplacementColor());
         data.put("outbound_awb", orderReturn.getOutboundAwb());
         data.put("outbound_tracking_url", orderReturn.getOutboundTrackingUrl());
+        data.put("outbound_carrier_name", orderReturn.getOutboundCarrierName());
         data.put("original_item_amount", orderReturn.getOriginalItemAmount());
         data.put("replacement_item_amount", orderReturn.getReplacementItemAmount());
         data.put("price_difference", orderReturn.getPriceDifference());
@@ -128,34 +159,23 @@ public class InternalOrderReturnResource {
             "settlement_status",
             orderReturn.getSettlementStatus() == null ? null : orderReturn.getSettlementStatus().name().toLowerCase()
         );
-        data.put("items", orderReturnService.returnLineBreakdown(orderReturn).stream().map(this::toLineDto).toList());
-        return data;
-    }
-
-    private Map<String, Object> toLineDto(OrderReturnItem line) {
-        var data = new LinkedHashMap<String, Object>();
-        data.put("id", line.getId());
-        data.put("order_item_id", line.getOrderItem().getId());
-        data.put("product_name", line.getOrderItem().getProductName());
-        data.put("size", line.getOrderItem().getItemSize());
-        data.put("color", line.getOrderItem().getColor());
-        data.put("requested_qty", line.getRequestedQty());
-        data.put("accepted_qty", line.getAcceptedQty());
-        data.put("unit_amount", line.getUnitAmount());
-        data.put("gross_amount", line.getGrossAmount());
-        data.put("discount_allocation", line.getDiscountAllocation());
-        data.put("refund_amount", line.getRefundAmount());
-        data.put("disposition", line.getDisposition() == null ? null : line.getDisposition().name().toLowerCase());
+        data.put("items", lines);
         return data;
     }
 
     public record CreateReturnRequest(
         @NotBlank @Size(max = 40) String order_number,
         @NotBlank @Size(min = 10, max = 4000) String reason,
-        @Valid List<ReturnLineRequest> items
+        @Valid List<ReturnLineRequest> items,
+        @Size(max = 5) List<@NotBlank @Size(max = 600) String> image_urls
     ) {
+        public CreateReturnRequest {
+            items = items == null ? List.of() : items;
+            image_urls = image_urls == null ? List.of() : image_urls;
+        }
+
         public CreateReturnRequest(String order_number, String reason) {
-            this(order_number, reason, List.of());
+            this(order_number, reason, List.of(), List.of());
         }
     }
 
@@ -166,6 +186,11 @@ public class InternalOrderReturnResource {
         @NotNull Long order_item_id,
         @NotBlank @Size(min = 10, max = 4000) String reason,
         @NotBlank @Size(max = 40) String replacement_size,
-        @NotBlank @Size(max = 40) String replacement_color
-    ) {}
+        @NotBlank @Size(max = 40) String replacement_color,
+        @Size(max = 5) List<@NotBlank @Size(max = 600) String> image_urls
+    ) {
+        public CreateExchangeRequest {
+            image_urls = image_urls == null ? List.of() : image_urls;
+        }
+    }
 }

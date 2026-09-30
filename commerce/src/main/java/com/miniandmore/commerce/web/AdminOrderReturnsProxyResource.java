@@ -24,6 +24,11 @@ public class AdminOrderReturnsProxyResource {
         return catalog.get(builder.build(true).toUriString());
     }
 
+    @GetMapping("/summary")
+    public ResponseEntity<String> summary() {
+        return catalog.get("/internal/v1/admin/order-returns/summary");
+    }
+
     @PostMapping("/{returnNumber}/approve")
     public ResponseEntity<String> approve(@PathVariable String returnNumber, @RequestBody(required = false) Object body) {
         return catalog.post(CatalogInternalClient.encodedPath("/internal/v1/admin/order-returns/{returnNumber}/approve", returnNumber), body);

@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AdminPage } from "@/components/admin/AdminPage";
-import { Loader2 } from "lucide-react";
+import { ReturnsSummaryCards } from "@/components/admin/ReturnsSummaryCards";
+import { ReturnImageGallery } from "@/components/ReturnImageGallery";
+import { ArrowRight, Loader2, Printer } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   acceptOrderReturnAfterInspection,
@@ -12,6 +15,7 @@ import {
   completeOrderReturnExchange,
   closeFailedOrderReturnPickup,
   convertOrderReturnToRefund,
+  getAdminOrderReturnsSummary,
   listAdminOrderReturns,
   markOrderReturnDelivered,
   markOrderReturnInspected,
@@ -28,6 +32,7 @@ import {
   rescheduleOrderReturnPickup,
   settleOrderReturnPriceDifference,
   type AdminOrderReturnRow,
+  type AdminOrderReturnsSummary,
 } from "@/lib/orders.functions";
 import { showApiError } from "@/lib/ui-errors";
 import { ListPagination } from "@/components/ListPagination";
@@ -40,6 +45,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { formatReturnVariant } from "@/lib/return-variant";
 
 export const Route = createFileRoute("/admin/returns")({ component: AdminReturnsPage });
 const RETURNS_UI_ENABLED = true;
@@ -139,6 +145,114 @@ function stageFilterPillClass(selected: boolean): string {
       ? "border-primary bg-primary text-primary-foreground shadow-sm"
       : "border-border/80 bg-background/70 text-foreground/80 hover:border-border hover:bg-muted/70 hover:text-foreground",
   ].join(" ");
+}
+
+function formatInr(amount: number | null | undefined): string {
+  return `₹${Number(amount ?? 0).toLocaleString("en-IN")}`;
+}
+
+function returnStatusPillClass(status: string, overdue?: boolean): string {
+  if (overdue) return "bg-amber-500/15 text-amber-800 ring-1 ring-amber-500/25";
+  switch (status) {
+    case "rejected":
+    case "failed":
+    case "pickup_failed":
+      return "bg-destructive/15 text-destructive ring-1 ring-destructive/20";
+    case "requested":
+    case "inspected":
+    case "pickup_requested":
+      return "bg-amber-500/15 text-amber-800 ring-1 ring-amber-500/25";
+    case "refunded":
+    case "completed":
+    case "accepted":
+    case "delivered":
+      return "bg-emerald-500/15 text-emerald-800 ring-1 ring-emerald-500/20";
+    default:
+      return "bg-primary/15 text-primary ring-1 ring-primary/20";
+  }
+}
+
+function priceDifferenceClass(diff: number): string {
+  if (diff > 0) return "border-amber-200/80 bg-amber-50/90 text-amber-950";
+  if (diff < 0) return "border-emerald-200/80 bg-emerald-50/90 text-emerald-950";
+  return "border-border/70 bg-muted/50 text-foreground";
+}
+
+function HighlightBlock({
+  label,
+  children,
+  className,
+  labelClassName,
+}: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+  labelClassName?: string;
+}) {
+  return (
+    <div className={cn("rounded-xl border px-3 py-2", className)}>
+      <p className={cn("text-[10px] font-semibold uppercase tracking-[0.16em]", labelClassName)}>{label}</p>
+      <div className="mt-0.5 text-sm leading-relaxed">{children}</div>
+    </div>
+  );
+}
+
+function ProductHighlight({
+  name,
+  imageUrl,
+  variant,
+  replacement,
+  qty,
+  acceptedQty,
+  refundAmount,
+  disposition,
+}: {
+  name: string;
+  imageUrl?: string | null;
+  variant?: string;
+  replacement?: string;
+  qty?: number;
+  acceptedQty?: number | null;
+  refundAmount?: number;
+  disposition?: string | null;
+}) {
+  return (
+    <div className="flex gap-3">
+      {imageUrl ? (
+        <a href={imageUrl} target="_blank" rel="noreferrer" className="shrink-0">
+          <img
+            src={imageUrl}
+            alt={name}
+            referrerPolicy="no-referrer"
+            className="h-16 w-16 rounded-xl object-cover border border-border"
+          />
+        </a>
+      ) : null}
+      <div className="min-w-0 space-y-1">
+        <p className="text-sm font-semibold text-foreground">{name}</p>
+        {variant ? <p className="text-xs text-muted-foreground">{variant}</p> : null}
+        {replacement ? (
+          <p className="inline-flex items-center gap-1 text-xs font-medium text-primary">
+            <ArrowRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Exchange for {replacement}
+          </p>
+        ) : null}
+        {qty != null ? (
+          <p className="text-xs text-muted-foreground">
+            Qty {qty} requested
+            {acceptedQty != null ? ` · ${acceptedQty} accepted` : ""}
+            {refundAmount != null ? (
+              <>
+                {" · "}
+                <span className="font-semibold text-foreground">refund {formatInr(refundAmount)}</span>
+              </>
+            ) : null}
+            {disposition ? ` · ${disposition.replace(/_/g, " ")}` : ""}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 /** One primary next-step action (plus an optional secondary one) per current status. */
@@ -348,8 +462,21 @@ function AdminReturnsPage() {
   const [codRefundTarget, setCodRefundTarget] = useState<string | null>(null);
   const [codRefundMethod, setCodRefundMethod] = useState<"upi" | "bank_transfer" | "cash" | "other">("upi");
   const [codRefundReference, setCodRefundReference] = useState("");
+  const [summary, setSummary] = useState<AdminOrderReturnsSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
 
   const stageStatusOptions = useMemo(() => statusesForStage(stage), [stage]);
+
+  const loadSummary = useCallback(async () => {
+    setSummaryLoading(true);
+    try {
+      setSummary(await getAdminOrderReturnsSummary());
+    } catch (error) {
+      showApiError(error, "Could not load returns summary");
+    } finally {
+      setSummaryLoading(false);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -367,6 +494,10 @@ function AdminReturnsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void loadSummary();
+  }, [loadSummary]);
 
   const filteredRows = useMemo(() => {
     if (status) return rows;
@@ -390,7 +521,7 @@ function AdminReturnsPage() {
     try {
       await action();
       toast.success(label);
-      await load();
+      await Promise.all([load(), loadSummary()]);
     } catch (error) {
       showApiError(error, label + " failed");
     } finally {
@@ -534,9 +665,11 @@ function AdminReturnsPage() {
   return (
     <AdminPage
       eyebrow="Fulfilment"
-      title="Order returns & exchanges"
-      description="Review customer return/exchange requests, walk them through pickup, inspection, and refund or replacement."
+      title="Returns & exchanges"
+      description="Review customer photos, then walk each case through pickup, inspection, and refund or replacement."
     >
+      <ReturnsSummaryCards summary={summary} loading={summaryLoading} onSelectStage={selectStage} />
+
       <section
         className="glass-strong mb-5 space-y-4 rounded-3xl p-4 sm:p-5"
         aria-label="Filter returns"
@@ -557,6 +690,11 @@ function AdminReturnsPage() {
                   className={stageFilterPillClass(selected)}
                 >
                   {option.label}
+                  {summary ? (
+                    <span className="ml-1 tabular-nums opacity-80">
+                      {option.id === "all" ? summary.total : summary.stages[option.id]}
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
@@ -675,53 +813,36 @@ function AdminReturnsPage() {
                 setCodRefundReference("");
               },
             );
+            const items = r.items ?? [];
+            const headerVariant =
+              items.length === 1 ? formatReturnVariant(items[0]) : formatReturnVariant(r);
+            const replacement = [r.replacement_size, r.replacement_color].filter(Boolean).join(" · ");
+            const priceDiff = r.price_difference == null ? null : Number(r.price_difference);
             return (
               <li key={r.return_number} className="glass-strong rounded-2xl p-4 space-y-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="font-medium">
-                      {r.request_type === "exchange" ? "Exchange" : "Return"} · {r.return_number}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Order {r.order_number} · {r.customer_login} · ₹
-                      {Number(r.order_total ?? 0).toLocaleString("en-IN")}
-                    </p>
-                    {r.product_name ? (
-                      <p className="text-xs text-muted-foreground">
-                        {r.product_name}
-                        {r.original_size || r.original_color
-                          ? ` (${[r.original_size, r.original_color].filter(Boolean).join(" · ")})`
-                          : ""}
-                        {r.replacement_size || r.replacement_color
-                          ? ` → ${[r.replacement_size, r.replacement_color].filter(Boolean).join(" · ")}`
-                          : ""}
+                  <div className="min-w-0 space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">
+                        {r.request_type === "exchange" ? "Exchange" : "Return"} · {r.return_number}
                       </p>
-                    ) : null}
-                    {(r.items ?? []).length > 0 ? (
-                      <div className="mt-2 space-y-1 rounded-xl border border-border/70 p-2">
-                        {r.items!.map((line) => (
-                          <p key={line.id} className="text-xs text-muted-foreground">
-                            {line.product_name} · {line.requested_qty} requested
-                            {line.accepted_qty != null ? ` · ${line.accepted_qty} accepted` : ""}
-                            {" · "}refund ₹{Number(line.refund_amount).toLocaleString("en-IN")}
-                            {line.disposition ? ` · ${line.disposition.replace(/_/g, " ")}` : ""}
-                          </p>
-                        ))}
-                      </div>
-                    ) : null}
-                    {r.request_type === "exchange" && r.price_difference != null ? (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Price difference: ₹{Math.abs(Number(r.price_difference)).toLocaleString("en-IN")}{" "}
-                        {Number(r.price_difference) > 0 ? "to collect" : Number(r.price_difference) < 0 ? "to refund" : ""}
-                        {" · "}
-                        {r.settlement_status?.replace(/_/g, " ")}
-                      </p>
-                    ) : null}
-                    <p className="text-xs mt-1">
-                      Status: <span className="uppercase tracking-wide">{r.status.replace(/_/g, " ")}</span>
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                          returnStatusPillClass(r.status, r.sla_overdue),
+                        )}
+                      >
+                        {r.status.replace(/_/g, " ")}
+                      </span>
                       {r.cod_refund_pending ? (
-                        <span className="ml-2 text-amber-700">· COD refund pending</span>
+                        <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-500/25">
+                          COD refund pending
+                        </span>
                       ) : null}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Order {r.order_number} · {r.customer_login} ·{" "}
+                      <span className="font-medium text-foreground">{formatInr(r.order_total)}</span>
                     </p>
                   </div>
                   <div className="text-xs text-right">
@@ -733,18 +854,121 @@ function AdminReturnsPage() {
                     </p>
                   </div>
                 </div>
-                <p className="text-sm">{r.reason}</p>
-                {r.admin_notes ? <p className="text-xs text-muted-foreground whitespace-pre-wrap">{r.admin_notes}</p> : null}
-                {r.rejection_reason ? <p className="text-xs text-amber-700">{r.rejection_reason}</p> : null}
-                {r.reverse_awb ? (
+                {items.length > 0 || r.product_name ? (
+                  <div className="space-y-2.5 rounded-xl border border-primary/15 bg-primary/5 p-3">
+                    {items.length > 0
+                      ? items.map((line, index) => (
+                          <div
+                            key={line.id}
+                            className={index > 0 ? "border-t border-primary/10 pt-2.5" : undefined}
+                          >
+                            <ProductHighlight
+                              name={line.product_name}
+                              imageUrl={line.product_image}
+                              variant={formatReturnVariant(line)}
+                              replacement={items.length === 1 ? replacement : undefined}
+                              qty={line.requested_qty}
+                              acceptedQty={line.accepted_qty}
+                              refundAmount={line.refund_amount}
+                              disposition={line.disposition}
+                            />
+                          </div>
+                        ))
+                      : r.product_name ? (
+                          <ProductHighlight
+                            name={r.product_name}
+                            imageUrl={r.product_image}
+                            variant={headerVariant}
+                            replacement={replacement}
+                          />
+                        ) : null}
+                  </div>
+                ) : null}
+                {r.request_type === "exchange" && priceDiff != null ? (
+                  <HighlightBlock
+                    label="Price difference"
+                    className={priceDifferenceClass(priceDiff)}
+                    labelClassName="opacity-80"
+                  >
+                    <p className="font-semibold">
+                      {formatInr(Math.abs(priceDiff))}
+                      {priceDiff > 0 ? " to collect" : priceDiff < 0 ? " to refund" : ""}
+                      {r.settlement_status ? (
+                        <span className="ml-1.5 text-xs font-medium opacity-80">
+                          · {r.settlement_status.replace(/_/g, " ")}
+                        </span>
+                      ) : null}
+                    </p>
+                  </HighlightBlock>
+                ) : null}
+                {r.reason ? (
+                  <HighlightBlock
+                    label="Customer reason"
+                    className="border-primary/20 bg-primary/8 text-foreground"
+                    labelClassName="text-primary"
+                  >
+                    {r.reason}
+                  </HighlightBlock>
+                ) : null}
+                <HighlightBlock
+                  label="Customer photos"
+                  className="border-border/70 bg-muted/30 text-foreground"
+                  labelClassName="text-muted-foreground"
+                >
+                  {r.image_urls && r.image_urls.length > 0 ? (
+                    <ReturnImageGallery
+                      urls={r.image_urls}
+                      thumbClassName="h-20 w-20"
+                      alt={r.request_type === "exchange" ? "Customer exchange photo" : "Customer return photo"}
+                    />
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No photos attached</p>
+                  )}
+                </HighlightBlock>
+                {r.admin_notes ? (
+                  <HighlightBlock
+                    label="Admin notes"
+                    className="border-border/70 bg-muted/40 text-foreground"
+                    labelClassName="text-muted-foreground"
+                  >
+                    <p className="whitespace-pre-wrap text-xs">{r.admin_notes}</p>
+                  </HighlightBlock>
+                ) : null}
+                {r.rejection_reason ? (
+                  <HighlightBlock
+                    label="Rejection reason"
+                    className="border-amber-200/80 bg-amber-50/90 text-amber-950"
+                    labelClassName="text-amber-800"
+                  >
+                    {r.rejection_reason}
+                  </HighlightBlock>
+                ) : null}
+                {r.pickup_failure_reason ? (
+                  <HighlightBlock
+                    label="Pickup failed"
+                    className="border-amber-200/80 bg-amber-50/90 text-amber-950"
+                    labelClassName="text-amber-800"
+                  >
+                    {r.pickup_failure_reason}
+                  </HighlightBlock>
+                ) : null}
+                {r.reverse_awb || r.tracking_url ? (
                   <p className="text-xs text-muted-foreground">
-                    Pickup AWB: {r.reverse_awb}
+                    Pickup AWB: {r.reverse_awb ?? "—"}
                     {r.pickup_window ? ` · ${r.pickup_window}` : ""}
+                    {r.tracking_url ? (
+                      <>
+                        {" · "}
+                        <a href={r.tracking_url} target="_blank" rel="noreferrer" className="underline">
+                          Track pickup
+                        </a>
+                      </>
+                    ) : null}
                   </p>
                 ) : null}
-                {r.outbound_awb ? (
+                {r.outbound_awb || r.outbound_tracking_url || r.outbound_label_url ? (
                   <p className="text-xs text-muted-foreground">
-                    Outbound AWB: {r.outbound_awb}
+                    Outbound AWB: {r.outbound_awb ?? "—"}
                     {r.outbound_tracking_url ? (
                       <>
                         {" · "}
@@ -754,9 +978,6 @@ function AdminReturnsPage() {
                       </>
                     ) : null}
                   </p>
-                ) : null}
-                {r.pickup_failure_reason ? (
-                  <p className="text-xs text-amber-700">{r.pickup_failure_reason}</p>
                 ) : null}
                 {r.razorpay_refund_id ? (
                   <p className="text-xs text-muted-foreground">Razorpay refund: {r.razorpay_refund_id}</p>
@@ -787,6 +1008,16 @@ function AdminReturnsPage() {
                     >
                       {secondary.label}
                     </button>
+                  ) : null}
+                  {r.outbound_label_url ? (
+                    <a
+                      href={r.outbound_label_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border px-3 py-1.5"
+                    >
+                      <Printer className="h-3.5 w-3.5" /> Print label
+                    </a>
                   ) : null}
                 </div>
               </li>
@@ -1022,6 +1253,9 @@ function AdminReturnsPage() {
             <div key={line.id} className="grid grid-cols-[1fr_auto_auto] items-end gap-2 rounded-xl border border-border p-3">
               <span className="text-sm">
                 {line.product_name}
+                {formatReturnVariant(line) ? (
+                  <span className="block text-xs text-muted-foreground">{formatReturnVariant(line)}</span>
+                ) : null}
                 <span className="block text-xs text-muted-foreground">
                   Requested: {line.requested_qty} · estimated refund ₹
                   {Number(line.refund_amount).toLocaleString("en-IN")}
