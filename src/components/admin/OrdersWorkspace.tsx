@@ -1,17 +1,17 @@
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminPage } from "@/components/admin/AdminPage";
-import { AlertCircle, CheckCircle2, CloudUpload, FileText, Loader2, Package, Printer, RefreshCw, Search, Truck, X } from "lucide-react";
+import { AdminReasonDialog, type ShipmentCancelMode } from "@/components/admin/AdminReasonDialog";
+import { BookShipmentDialog } from "@/components/admin/BookShipmentDialog";
+import { CreatePackageDialog } from "@/components/admin/CreatePackageDialog";
+import { AlertCircle, Ban, CheckCircle2, CloudUpload, FileText, Loader2, Package, Printer, RefreshCw, Search, Truck, X } from "lucide-react";
 import { toast } from "sonner";
 import {
-  bookAdminOrderShipment,
+  cancelAdminOrder,
   cancelAdminOrderShipment,
-  completeAdminOrderPackage,
   listAdminOrders,
   markCodCollected,
-  previewAdminOrderPackageRates,
   type AdminOrderRow,
-  type PackageRatesResult,
 } from "@/lib/orders.functions";
 import {
   formatZohoSyncFailures,
@@ -22,34 +22,28 @@ import {
 import { showApiError } from "@/lib/ui-errors";
 import { ListPagination } from "@/components/ListPagination";
 import { LIST_PAGE_SIZE } from "@/lib/pagination";
+import { SHOW_M2_POST_ORDER_UI } from "@/lib/feature-flags";
 import { isInvoiceAvailable } from "@/lib/invoice-availability";
-import {
-  convertLengthInput,
-  convertWeightInput,
-  LENGTH_UNITS,
-  parsePackageDimensionCm,
-  parsePackageWeightGrams,
-  WEIGHT_UNITS,
-  type LengthUnit,
-  type WeightUnit,
-} from "@/lib/package-units";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { isPackageReady } from "@/lib/fulfillment-docs";
+import { trackingStatusLabel } from "@/lib/order-tracking";
+import { formatAdminPaymentStatusLabel } from "@/lib/order-status";
 
 export type OrdersWorkspaceMode = "admin" | "operations" | "support";
 
 type Period = "all" | "day" | "week";
+
+const ORDER_STATUS_VALUES = new Set(["pending", "confirmed", "hand_wrapped", "fulfilled", "cancelled"]);
+const TRACKING_STATUS_VALUES = new Set(["awaiting_pickup", "shipped", "out_for_delivery", "delivery_failed"]);
 
 const ORDER_STATUS_FILTERS = [
   { value: "", label: "All" },
   { value: "pending", label: "Pending" },
   { value: "confirmed", label: "Confirmed" },
   { value: "hand_wrapped", label: "Hand-wrapped" },
+  { value: "awaiting_pickup", label: "Waiting for pickup" },
+  { value: "shipped", label: "Shipped" },
+  { value: "out_for_delivery", label: "Out for delivery" },
+  { value: "delivery_failed", label: "Delivery failed" },
   { value: "fulfilled", label: "Delivered" },
   { value: "cancelled", label: "Cancelled" },
 ] as const;
@@ -87,10 +81,6 @@ function selectedRange(value: string, period: Period) {
 
 function normalizedStatus(value: string | null | undefined) {
   return value?.trim().toLowerCase() || "not_synced";
-}
-
-function displayPaymentStatus(value: string | null | undefined) {
-  return value?.trim().toLowerCase() === "refunded" ? "settled" : value || "pending";
 }
 
 function SyncBadge({ status, eligible }: { status: string; eligible: boolean }) {
@@ -158,26 +148,15 @@ export function OrdersWorkspace({
   const [rows, setRows] = useState<AdminOrderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
-  const [bookTarget, setBookTarget] = useState<string | null>(null);
-  const [bookMode, setBookMode] = useState<"xpressbees" | "manual">("xpressbees");
-  const [bookCarrier, setBookCarrier] = useState("");
-  const [bookAwb, setBookAwb] = useState("");
-  const [bookTrackingUrl, setBookTrackingUrl] = useState("");
-  const [bookLabelUrl, setBookLabelUrl] = useState("");
+  const [packageOrder, setPackageOrder] = useState<AdminOrderRow | null>(null);
+  const [shipmentOrder, setShipmentOrder] = useState<AdminOrderRow | null>(null);
   const [bookRequiresOverride, setBookRequiresOverride] = useState(false);
-  const [bookOverrideReason, setBookOverrideReason] = useState("");
-  const [packageTarget, setPackageTarget] = useState<AdminOrderRow | null>(null);
-  const [packageWeight, setPackageWeight] = useState("500");
-  const [packageWeightUnit, setPackageWeightUnit] = useState<WeightUnit>("g");
-  const [packageLength, setPackageLength] = useState("");
-  const [packageBreadth, setPackageBreadth] = useState("");
-  const [packageHeight, setPackageHeight] = useState("");
-  const [packageLengthUnit, setPackageLengthUnit] = useState<LengthUnit>("cm");
-  const [packageRates, setPackageRates] = useState<PackageRatesResult | null>(null);
-  const [selectedCourierId, setSelectedCourierId] = useState("");
   const [cancelShipmentTarget, setCancelShipmentTarget] = useState<AdminOrderRow | null>(null);
   const [cancelShipmentMode, setCancelShipmentMode] = useState<"xpressbees" | "manual">("xpressbees");
   const [cancelShipmentReason, setCancelShipmentReason] = useState("");
+  const [cancelOrderTarget, setCancelOrderTarget] = useState<AdminOrderRow | null>(null);
+  const [cancelOrderReason, setCancelOrderReason] = useState("");
+  const [cancelOrderShipmentMode, setCancelOrderShipmentMode] = useState<ShipmentCancelMode>("xpressbees");
   const [period, setPeriod] = useState<Period>("all");
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -213,7 +192,8 @@ export function OrdersWorkspace({
         page,
         size: LIST_PAGE_SIZE,
         q,
-        status,
+        status: ORDER_STATUS_VALUES.has(status) ? status : undefined,
+        trackingStatus: TRACKING_STATUS_VALUES.has(status) ? status : undefined,
         paymentStatus,
         paymentMethod,
         zohoSyncStatus,
@@ -249,132 +229,13 @@ export function OrdersWorkspace({
     }
   };
 
-  const submitBookShipment = async () => {
-    if (!bookTarget) return;
-    if (bookMode !== "xpressbees" && bookAwb.trim().length < 3) {
-      toast.error("AWB or tracking reference is required");
+  const openBookShipment = (order: AdminOrderRow, requiresOverride: boolean) => {
+    if (!isPackageReady(order)) {
+      toast.error("Create a package before booking a shipment");
       return;
     }
-    if (bookRequiresOverride && bookOverrideReason.trim().length < 5) {
-      toast.error("Override reason must be at least 5 characters");
-      return;
-    }
-    setBusy(`ship:${bookTarget}`);
-    try {
-      await bookAdminOrderShipment(bookTarget, {
-        mode: bookMode,
-        carrier_name: bookCarrier.trim() || undefined,
-        awb: bookAwb.trim() || undefined,
-        tracking_url: bookTrackingUrl.trim() || undefined,
-        label_url: bookLabelUrl.trim() || undefined,
-        override_fulfillment_hold: bookRequiresOverride || undefined,
-        override_reason: bookRequiresOverride ? bookOverrideReason.trim() : undefined,
-      });
-      toast.success(bookMode === "xpressbees" ? `${bookTarget} booked with ExpressBees` : `${bookTarget} shipment recorded`);
-      setBookTarget(null);
-      setBookCarrier("");
-      setBookAwb("");
-      setBookTrackingUrl("");
-      setBookLabelUrl("");
-      setBookRequiresOverride(false);
-      setBookOverrideReason("");
-      await load();
-    } catch (error) {
-      showApiError(error, "Could not book shipment");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const openPackageDialog = (order: AdminOrderRow) => {
-    setPackageTarget(order);
-    setPackageWeight(String(order.package_weight_grams || order.default_package_weight_grams || 500));
-    setPackageWeightUnit("g");
-    setPackageLength(order.package_length_cm ? String(order.package_length_cm) : "");
-    setPackageBreadth(order.package_breadth_cm ? String(order.package_breadth_cm) : "");
-    setPackageHeight(order.package_height_cm ? String(order.package_height_cm) : "");
-    setPackageLengthUnit("cm");
-    setPackageRates(null);
-    setSelectedCourierId(order.package_courier_id || "");
-  };
-
-  const parsedPackageDims = () => {
-    const weight = parsePackageWeightGrams(packageWeight, packageWeightUnit);
-    if (!weight.ok) {
-      toast.error(weight.message);
-      return null;
-    }
-    const length = parsePackageDimensionCm(packageLength, packageLengthUnit);
-    const breadth = parsePackageDimensionCm(packageBreadth, packageLengthUnit);
-    const height = parsePackageDimensionCm(packageHeight, packageLengthUnit);
-    if (!length.ok || !breadth.ok || !height.ok) {
-      toast.error(
-        (!length.ok && length.message) ||
-          (!breadth.ok && breadth.message) ||
-          (!height.ok && height.message) ||
-          "Enter length, breadth and height greater than 0",
-      );
-      return null;
-    }
-    return { weight_grams: weight.grams, length_cm: length.cm, breadth_cm: breadth.cm, height_cm: height.cm };
-  };
-
-  const packageExpressBeesPreview = useMemo(() => {
-    if (packageWeightUnit === "g" && packageLengthUnit === "cm") return null;
-    const weight = parsePackageWeightGrams(packageWeight, packageWeightUnit);
-    const length = parsePackageDimensionCm(packageLength, packageLengthUnit);
-    const breadth = parsePackageDimensionCm(packageBreadth, packageLengthUnit);
-    const height = parsePackageDimensionCm(packageHeight, packageLengthUnit);
-    if (!weight.ok || !length.ok || !breadth.ok || !height.ok) return null;
-    return `${weight.grams} g · ${length.cm}×${breadth.cm}×${height.cm} cm`;
-  }, [packageWeight, packageWeightUnit, packageLength, packageBreadth, packageHeight, packageLengthUnit]);
-
-  const submitPackageRates = async () => {
-    if (!packageTarget) return;
-    const dims = parsedPackageDims();
-    if (!dims) return;
-    setBusy(`package-rates:${packageTarget.order_number}`);
-    try {
-      const result = await previewAdminOrderPackageRates(packageTarget.order_number, dims);
-      setPackageRates(result);
-      const preferred =
-        result.couriers?.find((option) => option.preferred)?.id ||
-        result.preferred_courier_id ||
-        result.couriers?.[0]?.id ||
-        "";
-      setSelectedCourierId(preferred);
-    } catch (error) {
-      showApiError(error, "Could not calculate ExpressBees rates");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const submitCompletePackage = async () => {
-    if (!packageTarget) return;
-    const dims = parsedPackageDims();
-    if (!dims) return;
-    if (!packageRates) {
-      toast.error("Calculate rates before completing wrap");
-      return;
-    }
-    const selected = packageRates.couriers?.find((option) => option.id === selectedCourierId);
-    setBusy(`package:${packageTarget.order_number}`);
-    try {
-      await completeAdminOrderPackage(packageTarget.order_number, {
-        ...dims,
-        courier_id: selected?.id || packageRates.preferred_courier_id || undefined,
-        courier_name: selected?.name || packageRates.preferred_courier_name,
-      });
-      toast.success(`${packageTarget.order_number} marked hand-wrapped`);
-      setPackageTarget(null);
-      setPackageRates(null);
-      await load();
-    } catch (error) {
-      showApiError(error, "Could not complete package");
-    } finally {
-      setBusy(null);
-    }
+    setBookRequiresOverride(requiresOverride);
+    setShipmentOrder(order);
   };
 
   const submitCancelShipment = async () => {
@@ -391,6 +252,27 @@ export function OrdersWorkspace({
       await load();
     } catch (error) {
       showApiError(error, "Could not cancel shipment");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const submitCancelOrder = async () => {
+    if (!cancelOrderTarget || cancelOrderReason.trim().length < 5) return;
+    setBusy(`cancel-order:${cancelOrderTarget.order_number}`);
+    try {
+      await cancelAdminOrder(cancelOrderTarget.order_number, {
+        reason: cancelOrderReason.trim(),
+        ...(cancelOrderTarget.tracking_number
+          ? { shipment_mode: cancelOrderShipmentMode }
+          : {}),
+      });
+      toast.success(`${cancelOrderTarget.order_number} cancelled`);
+      setCancelOrderTarget(null);
+      setCancelOrderReason("");
+      await load();
+    } catch (error) {
+      showApiError(error, "Could not cancel order");
     } finally {
       setBusy(null);
     }
@@ -448,7 +330,7 @@ export function OrdersWorkspace({
       description={
         mode === "support"
           ? "View and filter orders, inspect details, and print available invoices."
-          : "Search orders, mark wrapping complete, book ExpressBees or a manual AWB, and sync with Zoho Books."
+          : "Create a package first, then book an XpressBees or manual shipment, and sync with Zoho Books."
       }
     >
       <div className="mb-5 flex flex-wrap items-end gap-3 rounded-2xl border border-border/70 bg-card/70 p-4">
@@ -646,10 +528,10 @@ export function OrdersWorkspace({
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-semibold">{order.order_number}</p>
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium uppercase">
-                        {(order.tracking_status || order.status || "pending").replaceAll("_", " ")}
+                        {trackingStatusLabel(order)}
                       </span>
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium uppercase">
-                        {displayPaymentStatus(order.payment_status)}
+                        {formatAdminPaymentStatusLabel(order.payment_status)}
                       </span>
                       <span className="text-[11px] font-medium uppercase text-muted-foreground">
                         {order.payment_method}
@@ -778,7 +660,9 @@ export function OrdersWorkspace({
                   ) : (
                     <p className="mt-2 text-xs text-muted-foreground">
                       {canFulfill
-                        ? "Create a package with dimensions to calculate ExpressBees rates, then book a shipment."
+                        ? isPackageReady(order)
+                          ? "Package created. Book a shipment to generate the AWB and label."
+                          : "Create a package first. Booking a shipment is blocked until the package exists."
                         : "Shipment not booked yet."}
                     </p>
                   )}
@@ -791,7 +675,7 @@ export function OrdersWorkspace({
                       {order.package_courier_name ? ` · ${order.package_courier_name}` : ""}
                     </p>
                   ) : null}
-                  {order.pending_cancellation && !order.tracking_number && mode === "admin" && (
+                  {SHOW_M2_POST_ORDER_UI && order.pending_cancellation && !order.tracking_number && mode === "admin" && (
                     <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900">
                       <p className="font-semibold">Cancellation requested — shipment on hold</p>
                       <p className="mt-1">
@@ -809,38 +693,43 @@ export function OrdersWorkspace({
                       <button
                         type="button"
                         disabled={busy !== null}
-                        onClick={() => openPackageDialog(order)}
+                        onClick={() => setPackageOrder(order)}
                         className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium disabled:opacity-60"
                       >
                         <Package className="h-3.5 w-3.5" />
                         {order.packed_at ? "Update package" : "Create package"}
                       </button>
                     )}
-                    {(order.can_book_expressbees_shipment || order.can_book_shipment) && (
+                    {order.can_complete_package &&
+                    !isPackageReady(order) &&
+                    !order.tracking_number &&
+                    !(order.can_book_expressbees_shipment || order.can_book_shipment) ? (
+                      <button
+                        type="button"
+                        disabled
+                        title="Create a package before booking a shipment"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium disabled:opacity-60"
+                      >
+                        <Truck className="h-3.5 w-3.5" /> Book shipment
+                      </button>
+                    ) : null}
+                    {(order.can_book_expressbees_shipment || order.can_book_shipment) && isPackageReady(order) && (
                       <button
                         type="button"
                         disabled={busy !== null}
-                        onClick={() => {
-                          setBookMode(order.can_book_expressbees_shipment ? "xpressbees" : "manual");
-                          setBookRequiresOverride(false);
-                          setBookOverrideReason("");
-                          setBookTarget(order.order_number);
-                        }}
+                        onClick={() => openBookShipment(order, false)}
                         className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium disabled:opacity-60"
                       >
                         <Truck className="h-3.5 w-3.5" /> Book shipment
                       </button>
                     )}
-                    {(order.can_book_expressbees_shipment_with_override || order.can_book_shipment_with_override) && (
+                    {SHOW_M2_POST_ORDER_UI &&
+                    (order.can_book_expressbees_shipment_with_override || order.can_book_shipment_with_override) &&
+                    isPackageReady(order) && (
                       <button
                         type="button"
                         disabled={busy !== null}
-                        onClick={() => {
-                          setBookMode("xpressbees");
-                          setBookRequiresOverride(true);
-                          setBookOverrideReason("");
-                          setBookTarget(order.order_number);
-                        }}
+                        onClick={() => openBookShipment(order, true)}
                         className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 disabled:opacity-60"
                       >
                         <Truck className="h-3.5 w-3.5" /> Override hold & book
@@ -872,6 +761,23 @@ export function OrdersWorkspace({
                         <X className="h-3.5 w-3.5" /> Cancel shipment
                       </button>
                     ) : null}
+                    {SHOW_M2_POST_ORDER_UI &&
+                    mode === "admin" &&
+                    (order.can_admin_cancel ?? order.can_cancel) &&
+                    order.status !== "cancelled" ? (
+                      <button
+                        type="button"
+                        disabled={busy !== null}
+                        onClick={() => {
+                          setCancelOrderTarget(order);
+                          setCancelOrderReason("");
+                          setCancelOrderShipmentMode("xpressbees");
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-destructive/40 px-3 py-1.5 text-xs font-medium text-destructive"
+                      >
+                        <Ban className="h-3.5 w-3.5" /> Cancel order
+                      </button>
+                    ) : null}
                   </div>
                   ) : null}
                 </div>
@@ -897,10 +803,12 @@ export function OrdersWorkspace({
                     disabled={busy !== null || !canSync}
                     title={
                       canSync
-                        ? alreadySynced
-                          ? "Push this order to Zoho Books again"
-                          : "Create the sales order and invoice in Zoho Books"
-                        : "Available after payment (or once a COD order is confirmed)"
+                        ? order.status === "cancelled"
+                          ? "Void the Zoho sales order and invoice for this cancelled order"
+                          : alreadySynced
+                            ? "Push this order to Zoho Books again"
+                            : "Create the sales order and invoice in Zoho Books"
+                        : "Available after payment (or once a COD order is confirmed). Cancellation voids Zoho automatically — this button is only for creating or retrying a sync."
                     }
                     onClick={() => void sync(order.order_number)}
                     className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium disabled:opacity-60"
@@ -912,9 +820,13 @@ export function OrdersWorkspace({
                     )}
                     {busy === `zoho:${order.order_number}`
                       ? "Syncing…"
-                      : alreadySynced
-                        ? "Re-sync to Zoho"
-                        : "Sync to Zoho"}
+                      : order.status === "cancelled"
+                        ? alreadySynced
+                          ? "Re-void in Zoho"
+                          : "Void in Zoho"
+                        : alreadySynced
+                          ? "Re-sync to Zoho"
+                          : "Sync to Zoho"}
                   </button>
                 </div>
                 ) : null}
@@ -933,345 +845,59 @@ export function OrdersWorkspace({
           onPageChange={setPage}
         />
       )}
-      <Dialog
-        open={!!bookTarget}
+      <CreatePackageDialog
+        order={packageOrder}
+        open={!!packageOrder}
+        onOpenChange={(open) => {
+          if (!open) setPackageOrder(null);
+        }}
+        onSaved={load}
+      />
+      <BookShipmentDialog
+        order={shipmentOrder}
+        open={!!shipmentOrder}
+        requiresOverride={bookRequiresOverride}
         onOpenChange={(open) => {
           if (!open) {
-            setBookTarget(null);
-            setBookCarrier("");
-            setBookAwb("");
-            setBookTrackingUrl("");
-            setBookLabelUrl("");
+            setShipmentOrder(null);
             setBookRequiresOverride(false);
-            setBookOverrideReason("");
           }
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {bookRequiresOverride ? "Override hold & book" : "Book shipment"}
-              {bookTarget ? ` · ${bookTarget}` : ""}
-            </DialogTitle>
-          </DialogHeader>
-          {bookRequiresOverride && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900">
-              This order has a pending cancellation request. Provide a reason — it is logged server-side.
-            </div>
-          )}
-          <div className="space-y-3">
-            <label className="block text-sm font-medium">
-              Mode
-              <select
-                className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                value={bookMode}
-                onChange={(event) => setBookMode(event.target.value as "xpressbees" | "manual")}
-              >
-                <option value="xpressbees">ExpressBees</option>
-                <option value="manual">Manual carrier</option>
-              </select>
-            </label>
-            {bookMode !== "xpressbees" ? (
-              <>
-                <label className="block text-sm font-medium">
-                  Carrier name
-                  <input
-                    className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                    value={bookCarrier}
-                    onChange={(event) => setBookCarrier(event.target.value)}
-                    placeholder="e.g. Delhivery"
-                  />
-                </label>
-                <label className="block text-sm font-medium">
-                  AWB / reference *
-                  <input
-                    className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                    value={bookAwb}
-                    onChange={(event) => setBookAwb(event.target.value)}
-                  />
-                </label>
-                <label className="block text-sm font-medium">
-                  Tracking URL
-                  <input
-                    className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                    value={bookTrackingUrl}
-                    onChange={(event) => setBookTrackingUrl(event.target.value)}
-                  />
-                </label>
-                <label className="block text-sm font-medium">
-                  Label URL
-                  <input
-                    className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                    value={bookLabelUrl}
-                    onChange={(event) => setBookLabelUrl(event.target.value)}
-                    placeholder="Optional printable label link"
-                  />
-                </label>
-              </>
-            ) : (
-              <label className="block text-sm font-medium">
-                Pre-assigned AWB (optional)
-                <input
-                  className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                  value={bookAwb}
-                  onChange={(event) => setBookAwb(event.target.value)}
-                  placeholder="Leave blank if ExpressBees generates the AWB"
-                />
-              </label>
-            )}
-            {bookRequiresOverride && (
-              <label className="block text-sm font-medium">
-                Override reason *
-                <textarea
-                  className="mt-1 min-h-20 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
-                  value={bookOverrideReason}
-                  onChange={(event) => setBookOverrideReason(event.target.value)}
-                  placeholder="Why is this order shipping while cancellation is pending?"
-                />
-              </label>
-            )}
-          </div>
-          <DialogFooter>
-            <button
-              type="button"
-              onClick={() => void submitBookShipment()}
-              disabled={
-                busy === `ship:${bookTarget}` ||
-                (bookMode !== "xpressbees" && bookAwb.trim().length < 3) ||
-                (bookRequiresOverride && bookOverrideReason.trim().length < 5)
-              }
-              className="rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50"
-            >
-              {busy === `ship:${bookTarget}` ? "Booking…" : bookRequiresOverride ? "Override & book" : "Book shipment"}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onSaved={load}
+      />
 
-      <Dialog
-        open={!!packageTarget}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPackageTarget(null);
-            setPackageRates(null);
-            setSelectedCourierId("");
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {packageTarget?.packed_at ? "Update package" : "Create package"}
-              {packageTarget ? ` · ${packageTarget.order_number}` : ""}
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Default ExpressBees weight is prefilled. Enter the box size in cm, inches or metres, calculate rates, then
-            complete wrap. ExpressBees still receives grams and centimetres.
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="col-span-2 block text-sm font-medium">
-              Weight
-              <span className="mt-1 flex gap-2">
-                <input
-                  type="number"
-                  min={0}
-                  step="any"
-                  className="h-10 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-sm"
-                  value={packageWeight}
-                  onChange={(event) => {
-                    setPackageWeight(event.target.value);
-                    setPackageRates(null);
-                  }}
-                />
-                <select
-                  aria-label="Weight unit"
-                  className="h-10 w-[5.5rem] shrink-0 rounded-xl border border-border bg-background px-2 text-sm"
-                  value={packageWeightUnit}
-                  onChange={(event) => {
-                    const next = event.target.value as WeightUnit;
-                    setPackageWeight(convertWeightInput(packageWeight, packageWeightUnit, next));
-                    setPackageWeightUnit(next);
-                    setPackageRates(null);
-                  }}
-                >
-                  {WEIGHT_UNITS.map((unit) => (
-                    <option key={unit.value} value={unit.value}>
-                      {unit.label}
-                    </option>
-                  ))}
-                </select>
-              </span>
-            </label>
-            <div className="col-span-2 flex items-center justify-between gap-3">
-              <span className="text-sm font-medium">Box size</span>
-              <label className="flex items-center gap-2 text-sm font-medium">
-                Units
-                <select
-                  aria-label="Box size unit"
-                  className="h-10 w-[5.5rem] rounded-xl border border-border bg-background px-2 text-sm"
-                  value={packageLengthUnit}
-                  onChange={(event) => {
-                    const next = event.target.value as LengthUnit;
-                    setPackageLength(convertLengthInput(packageLength, packageLengthUnit, next));
-                    setPackageBreadth(convertLengthInput(packageBreadth, packageLengthUnit, next));
-                    setPackageHeight(convertLengthInput(packageHeight, packageLengthUnit, next));
-                    setPackageLengthUnit(next);
-                    setPackageRates(null);
-                  }}
-                >
-                  {LENGTH_UNITS.map((unit) => (
-                    <option key={unit.value} value={unit.value}>
-                      {unit.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <label className="block text-sm font-medium">
-              Length ({packageLengthUnit})
-              <input
-                type="number"
-                min={0}
-                step="any"
-                className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                value={packageLength}
-                onChange={(event) => {
-                  setPackageLength(event.target.value);
-                  setPackageRates(null);
-                }}
-              />
-            </label>
-            <label className="block text-sm font-medium">
-              Breadth ({packageLengthUnit})
-              <input
-                type="number"
-                min={0}
-                step="any"
-                className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                value={packageBreadth}
-                onChange={(event) => {
-                  setPackageBreadth(event.target.value);
-                  setPackageRates(null);
-                }}
-              />
-            </label>
-            <label className="block text-sm font-medium">
-              Height ({packageLengthUnit})
-              <input
-                type="number"
-                min={0}
-                step="any"
-                className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                value={packageHeight}
-                onChange={(event) => {
-                  setPackageHeight(event.target.value);
-                  setPackageRates(null);
-                }}
-              />
-            </label>
-          </div>
-          {packageExpressBeesPreview ? (
-              <p className="text-xs text-muted-foreground">Sends to ExpressBees as {packageExpressBeesPreview}</p>
-            ) : null}
-          {packageRates ? (
-            <div className="space-y-2 rounded-xl border border-border/70 bg-muted/40 p-3 text-sm">
-              <p>
-                Chargeable {packageRates.chargeable_weight_grams} g
-                {packageRates.actual_weight_grams !== packageRates.chargeable_weight_grams
-                  ? ` (actual ${packageRates.actual_weight_grams} g, volumetric ${packageRates.volumetric_weight_grams} g)`
-                  : ""}
-              </p>
-              {packageRates.couriers?.length ? (
-                <div className="space-y-1">
-                  {packageRates.couriers.map((option) => (
-                    <label
-                      key={option.id}
-                      className="flex cursor-pointer items-start gap-2 rounded-lg border border-transparent px-2 py-1.5 has-[:checked]:border-border has-[:checked]:bg-background"
-                    >
-                      <input
-                        type="radio"
-                        name="package-courier"
-                        className="mt-1"
-                        checked={selectedCourierId === option.id}
-                        onChange={() => setSelectedCourierId(option.id)}
-                      />
-                      <span>
-                        <span className="font-medium">{option.name}</span>
-                        {option.preferred ? " · preferred" : ""}
-                        {option.eta ? ` · ${option.eta}` : ""}
-                        {option.rate != null && option.rate !== "" ? ` · ₹${option.rate}` : ""}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground">
-                  Preferred slab: {packageRates.preferred_courier_name}. Live courier options were not returned.
-                </p>
-              )}
-            </div>
-          ) : null}
-          <DialogFooter>
-            <button
-              type="button"
-              onClick={() => void submitPackageRates()}
-              disabled={busy === `package-rates:${packageTarget?.order_number}`}
-              className="rounded-full border border-border bg-background px-4 py-2 text-sm disabled:opacity-50"
-            >
-              {busy === `package-rates:${packageTarget?.order_number}` ? "Calculating…" : "Calculate rates"}
-            </button>
-            <button
-              type="button"
-              onClick={() => void submitCompletePackage()}
-              disabled={busy === `package:${packageTarget?.order_number}` || !packageRates}
-              className="rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50"
-            >
-              {busy === `package:${packageTarget?.order_number}` ? "Saving…" : "Complete wrap"}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AdminReasonDialog
+        open={!!cancelShipmentTarget}
+        onOpenChange={(open) => !open && setCancelShipmentTarget(null)}
+        title={`Cancel shipment · ${cancelShipmentTarget?.order_number ?? ""}`}
+        description="Use ExpressBees to cancel the AWB, or choose manual after confirming cancellation directly with the carrier."
+        reason={cancelShipmentReason}
+        onReasonChange={setCancelShipmentReason}
+        submitLabel="Cancel shipment"
+        onSubmit={() => void submitCancelShipment()}
+        submitDisabled={busy !== null}
+        showShipmentMode
+        shipmentMode={cancelShipmentMode}
+        onShipmentModeChange={setCancelShipmentMode}
+      />
 
-      <Dialog open={!!cancelShipmentTarget} onOpenChange={(open) => !open && setCancelShipmentTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Cancel shipment · {cancelShipmentTarget?.order_number}</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Use ExpressBees to cancel the AWB, or choose manual after confirming cancellation directly with the carrier.
-          </p>
-          <label className="block text-sm font-medium">
-            Mode
-            <select
-              value={cancelShipmentMode}
-              onChange={(event) => setCancelShipmentMode(event.target.value as "xpressbees" | "manual")}
-              className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3"
-            >
-              <option value="xpressbees">ExpressBees API</option>
-              <option value="manual">Manual carrier confirmation</option>
-            </select>
-          </label>
-          <label className="block text-sm font-medium">
-            Reason
-            <textarea
-              value={cancelShipmentReason}
-              onChange={(event) => setCancelShipmentReason(event.target.value)}
-              className="mt-1 min-h-20 w-full rounded-xl border border-border bg-background px-3 py-2"
-            />
-          </label>
-          <DialogFooter>
-            <button
-              type="button"
-              onClick={() => void submitCancelShipment()}
-              disabled={busy !== null || cancelShipmentReason.trim().length < 5}
-              className="rounded-full bg-destructive px-4 py-2 text-sm text-destructive-foreground disabled:opacity-50"
-            >
-              Cancel shipment
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {SHOW_M2_POST_ORDER_UI ? (
+      <AdminReasonDialog
+        open={!!cancelOrderTarget}
+        onOpenChange={(open) => !open && setCancelOrderTarget(null)}
+        title={`Cancel order · ${cancelOrderTarget?.order_number ?? ""}`}
+        description="Cancels this order before dispatch. Stock is restored, and a Razorpay refund is initiated automatically for online payments. If a label was already booked, we void the AWB with the carrier first, then cancel the order and initiate any refund."
+        reason={cancelOrderReason}
+        onReasonChange={setCancelOrderReason}
+        reasonPlaceholder="Why is this order being cancelled?"
+        submitLabel="Cancel order"
+        onSubmit={() => void submitCancelOrder()}
+        submitDisabled={busy !== null}
+        showShipmentMode={Boolean(cancelOrderTarget?.tracking_number)}
+        shipmentMode={cancelOrderShipmentMode}
+        onShipmentModeChange={setCancelOrderShipmentMode}
+      />
+      ) : null}
     </AdminPage>
   );
 }

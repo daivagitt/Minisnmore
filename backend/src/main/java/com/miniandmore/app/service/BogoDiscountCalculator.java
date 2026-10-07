@@ -105,6 +105,7 @@ public final class BogoDiscountCalculator {
         return calculate(buyQty, getQty, percentOff, maxDiscount, subtotal, lines, CouponEligibilityScope.ALL, null);
     }
 
+    @SuppressWarnings("java:S107")
     public static Result calculate(
         Integer buyQty,
         Integer getQty,

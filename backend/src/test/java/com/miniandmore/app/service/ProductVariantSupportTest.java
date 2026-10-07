@@ -987,6 +987,128 @@ class ProductVariantSupportTest {
         assertThat(support.hasActiveVariants(product)).isFalse();
     }
 
+    @Test
+    void setVariantImageUrl_mergesExistingAndNewImages() {
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":1,"active":true,"imageUrl":"https://cdn.example.com/old1.jpg","imageUrls":["https://cdn.example.com/old2.jpg"]}]
+            """
+        );
+        assertThat(support.setVariantImageUrl(null, "SKU", "https://cdn.example.com/new.jpg")).isFalse();
+        assertThat(support.setVariantImageUrl(product, " ", "https://cdn.example.com/new.jpg")).isFalse();
+        assertThat(support.setVariantImageUrl(product, "HORIZON-S-NAVY", " ")).isFalse();
+
+        assertThat(support.setVariantImageUrl(product, "HORIZON-S-NAVY", "https://cdn.example.com/new.jpg")).isTrue();
+        VariantRow row = support.parseProduct(product).get(0);
+        assertThat(row.imageUrl()).isEqualTo("https://cdn.example.com/new.jpg");
+        assertThat(row.imageUrls()).contains("https://cdn.example.com/old2.jpg");
+    }
+
+    @Test
+    void clearVariantImages_removesImages() {
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":1,"active":true,"imageUrl":"https://cdn.example.com/old1.jpg"}]
+            """
+        );
+        assertThat(support.clearVariantImages(null, "SKU")).isFalse();
+        assertThat(support.clearVariantImages(product, " ")).isFalse();
+        assertThat(support.clearVariantImages(product, "NON-EXISTENT")).isFalse();
+        assertThat(support.clearVariantImages(product, "HORIZON-S-NAVY")).isTrue();
+        assertThat(support.parseProduct(product).get(0).imageUrl()).isNull();
+    }
+
+    @Test
+    void zohoItemIdForSku_and_setVariantZohoItemId() {
+        Product simple = new Product().itemStructure("SIMPLE");
+        assertThat(support.zohoItemIdForSku(simple, "SKU")).isEmpty();
+        assertThat(support.setVariantZohoItemId(simple, "SKU", "Z-1")).isFalse();
+
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":1,"active":true,"zohoItemId":"Z-100"}]
+            """
+        );
+        assertThat(support.zohoItemIdForSku(product, "HORIZON-S-NAVY")).contains("Z-100");
+        assertThat(support.zohoItemIdForSku(product, "UNKNOWN")).isEmpty();
+
+        assertThat(support.setVariantZohoItemId(product, " ", "Z-200")).isFalse();
+        assertThat(support.setVariantZohoItemId(product, "HORIZON-S-NAVY", " ")).isFalse();
+        assertThat(support.setVariantZohoItemId(product, "UNKNOWN", "Z-200")).isFalse();
+        assertThat(support.setVariantZohoItemId(product, "HORIZON-S-NAVY", "Z-200")).isTrue();
+        assertThat(support.zohoItemIdForSku(product, "HORIZON-S-NAVY")).contains("Z-200");
+    }
+
+    @Test
+    void upsertPulledVariantFromZoho_edgeCases() {
+        Product product = variantProduct(
+            """
+            [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":1,"active":true,"zohoItemId":"Z-1"},
+             {"sku":"HORIZON-M-NAVY","size":"M","color":"Navy","rate":999,"stock":1,"active":true,"zohoItemId":"Z-2"}]
+            """
+        );
+
+        // Null or blank SKU
+        assertThat(support.upsertPulledVariantFromZoho(null, "SKU", "S", "Navy", BigDecimal.TEN, null, 1, "Z-1", false)).isFalse();
+        assertThat(support.upsertPulledVariantFromZoho(product, " ", "S", "Navy", BigDecimal.TEN, null, 1, "Z-1", false)).isFalse();
+
+        // Identity conflict: Zoho item ID matches Z-1 (HORIZON-S-NAVY), but variantSku matches HORIZON-M-NAVY
+        assertThatThrownBy(() -> support.upsertPulledVariantFromZoho(product, "HORIZON-M-NAVY", "S", "Navy", BigDecimal.TEN, null, 1, "Z-1", false))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Variant identity conflict");
+
+        // Size/color collision
+        assertThatThrownBy(() -> support.upsertPulledVariantFromZoho(product, "HORIZON-M-NAVY", "S", "Navy", BigDecimal.TEN, null, 1, "Z-2", false))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Variant size/color conflict");
+
+        // Missing match, addIfMissing false
+        assertThat(support.upsertPulledVariantFromZoho(product, "NEW-SKU", "L", "Navy", BigDecimal.TEN, null, 1, "Z-3", false)).isFalse();
+
+        // Missing match, addIfMissing true -> adds
+        assertThat(support.upsertPulledVariantFromZoho(product, "NEW-SKU", "L", "Navy", new BigDecimal("800"), new BigDecimal("1000"), 5, "Z-3", true)).isTrue();
+        assertThat(support.findBySku(support.parseProduct(product), "NEW-SKU")).isPresent();
+    }
+
+    @Test
+    void anyVariantSkuInSet_emptyOrNonVariants() {
+        Product simple = new Product().itemStructure("SIMPLE");
+        assertThat(support.anyVariantSkuInSet(simple, Set.of("SKU"))).isFalse();
+        Product product = variantProduct("[{\"sku\":\"SKU-1\",\"size\":\"S\",\"color\":\"Red\",\"rate\":100,\"stock\":1,\"active\":true}]");
+        assertThat(support.anyVariantSkuInSet(product, null)).isFalse();
+        assertThat(support.anyVariantSkuInSet(product, Set.of())).isFalse();
+    }
+
+    @Test
+    void variantRow_withMethods() {
+        VariantRow row = new VariantRow(
+            "id-1",
+            "SKU-1",
+            "S",
+            "Red",
+            BigDecimal.valueOf(100),
+            BigDecimal.valueOf(120),
+            BigDecimal.valueOf(50),
+            5,
+            true,
+            "swatch.jpg",
+            "z-1",
+            "img.jpg",
+            List.of("extra.jpg")
+        );
+
+        assertThat(row.withColor("Blue").color()).isEqualTo("Blue");
+        assertThat(row.withSize("M").size()).isEqualTo("M");
+        assertThat(row.withStock(10).stock()).isEqualTo(10);
+        assertThat(row.withPricing(BigDecimal.valueOf(200), BigDecimal.valueOf(250)).rate()).isEqualTo(BigDecimal.valueOf(200));
+        assertThat(row.withZohoItemId("z-2").zohoItemId()).isEqualTo("z-2");
+        assertThat(row.withActive(false).active()).isFalse();
+        assertThat(row.withSku("SKU-2").sku()).isEqualTo("SKU-2");
+        assertThat(row.withImageUrl("new.jpg").imageUrl()).isEqualTo("new.jpg");
+        assertThat(row.withImageUrls(List.of("a.jpg", "b.jpg")).imageUrls()).containsExactly("a.jpg", "b.jpg");
+        assertThat(row.toMap()).containsKey("sku");
+    }
+
     private Product variantProduct(String json) {
         Product product = new Product().sku("HORIZON").price(BigDecimal.ZERO).stock(0);
         support.applyMatrixToProduct(product, "VARIANTS", json);

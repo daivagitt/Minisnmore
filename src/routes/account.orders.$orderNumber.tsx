@@ -16,11 +16,29 @@ import {
 import { openRazorpayCheckout } from "@/lib/razorpay";
 import { isInvoiceAvailable } from "@/lib/invoice-availability";
 import { formatOrderDate } from "@/lib/dates";
-import { formatOrderStatusSummary, formatPaymentStatusLabel, shouldContactCareToCancel } from "@/lib/order-status";
+import {
+  formatOrderStatusSummary,
+  formatAccountOrderPaymentLabel,
+  isCancelledOrder,
+  isCodCancelledUncollected,
+  isOnlineRefundAwaitingBank,
+  isOnlineRefundFailed,
+  isOnlineRefundProcessedAwaitingBank,
+  isPrepaidCancelledPaymentOnlySummary,
+  shouldShowAccountDeliveryTracking,
+  shouldShowContactCareBanner,
+} from "@/lib/order-status";
+import { refundProcessedMessage } from "@/lib/refund-policy";
 import { useOrderTracking } from "@/hooks/useOrderTracking";
 import { shouldShowOrderTrackingLink, trackingStatusLabel } from "@/lib/order-tracking";
-import { returnStatusLabel } from "@/lib/return-tracking";
+import {
+  closedReturnMessage,
+  isOpenReturnForOrderUi,
+  isRejectedReturn,
+  returnStatusLabel,
+} from "@/lib/return-tracking";
 import { useProduct } from "@/hooks/useProducts";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { defaultSellableSelection } from "@/lib/product-variants";
 import { ExchangeReplacementPicker } from "@/components/ExchangeReplacementPicker";
 import { ReturnConditionNotice } from "@/components/ReturnConditionNotice";
@@ -42,10 +60,11 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
-import { LazyImage } from "@/components/LazyImage";
+import { OrderProductThumb } from "@/components/OrderProductThumb";
 import { CopyButton } from "@/components/CopyButton";
 import { OrderTrackingCard } from "@/components/OrderTrackingCard";
 import { ReturnTrackingCard } from "@/components/ReturnTrackingCard";
+import { RefundFailedNotice, RefundInitiatedNotice } from "@/components/RefundInitiatedNotice";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   AlertDialog,
@@ -65,26 +84,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
-const OPEN_RETURN_STATUSES = new Set([
-  "requested",
-  "approved",
-  "pickup_requested",
-  "pickup_scheduled",
-  "pickup_failed",
-  "picked_up",
-  "received",
-  "inspected",
-  "accepted",
-  "item_allocated",
-  "repacking",
-  "ready_to_ship",
-  "shipped",
-  "delivered",
-  "failed",
-]);
-
-const RETURNS_UI_ENABLED = true;
+import { SHOW_M2_POST_ORDER_UI } from "@/lib/feature-flags";
 
 export const Route = createFileRoute("/account/orders/$orderNumber")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -107,9 +107,18 @@ function OrderDetail() {
     orderNumber,
     "authenticated",
   );
+  const settings = useSiteSettings();
+  const refundTimeline = {
+    min: settings.refund_min_business_days,
+    max: settings.refund_max_business_days,
+  };
 
   const [orderReturns, setOrderReturns] = useState<OrderReturnRow[]>([]);
+  const [returnsLoadError, setReturnsLoadError] = useState(false);
+  const [eligibilityLoadError, setEligibilityLoadError] = useState(false);
   const [eligibility, setEligibility] = useState<ReturnEligibility | null>(null);
+  const returnsLoadGen = useRef(0);
+  const hasFailedReturnRefund = orderReturns.some((row) => row.status === "failed");
 
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [returnReason, setReturnReason] = useState("");
@@ -126,6 +135,7 @@ function OrderDetail() {
     size?: string;
     color?: string;
     qty?: number;
+    price?: number;
   } | null>(null);
   const [exchangeSize, setExchangeSize] = useState<string | null>(null);
   const [exchangeColor, setExchangeColor] = useState<string | null>(null);
@@ -136,17 +146,35 @@ function OrderDetail() {
   const exchangeProduct = useProduct(exchangeItem?.product_slug);
 
   const loadReturnsInfo = useCallback(async () => {
-    if (!RETURNS_UI_ENABLED || !orderNumber) return;
-    try {
-      const [returnsRes, eligRes] = await Promise.all([
-        listMyOrderReturns(),
-        checkReturnEligibility(orderNumber),
-      ]);
-      setOrderReturns((returnsRes.returns ?? []).filter((r) => r.order_number === orderNumber));
-      setEligibility(eligRes);
-    } catch {
-      // non-fatal — the returns card just won't render actions
+    if (!SHOW_M2_POST_ORDER_UI || !orderNumber) return;
+    const gen = returnsLoadGen.current;
+    setReturnsLoadError(false);
+    setEligibilityLoadError(false);
+    const [returnsResult, eligResult] = await Promise.allSettled([
+      listMyOrderReturns(),
+      checkReturnEligibility(orderNumber),
+    ]);
+    if (gen !== returnsLoadGen.current) return;
+    if (returnsResult.status === "fulfilled") {
+      setOrderReturns((returnsResult.value.returns ?? []).filter((r) => r.order_number === orderNumber));
+    } else {
+      setOrderReturns([]);
+      setReturnsLoadError(true);
     }
+    if (eligResult.status === "fulfilled") {
+      setEligibility(eligResult.value);
+    } else {
+      setEligibility(null);
+      setEligibilityLoadError(true);
+    }
+  }, [orderNumber]);
+
+  useEffect(() => {
+    returnsLoadGen.current += 1;
+    setOrderReturns([]);
+    setReturnsLoadError(false);
+    setEligibilityLoadError(false);
+    setEligibility(null);
   }, [orderNumber]);
 
   useEffect(() => {
@@ -156,7 +184,7 @@ function OrderDetail() {
   const openWholeOrderReturn = useMemo(
     () =>
       orderReturns.find(
-        (r) => r.request_type === "return" && OPEN_RETURN_STATUSES.has(r.status),
+        (r) => r.request_type === "return" && isOpenReturnForOrderUi(r),
       ),
     [orderReturns],
   );
@@ -164,7 +192,7 @@ function OrderDetail() {
   const openExchangeByItemId = useMemo(() => {
     const map = new Map<number, OrderReturnRow>();
     for (const r of orderReturns) {
-      if (r.request_type === "exchange" && r.order_item_id != null && OPEN_RETURN_STATUSES.has(r.status)) {
+      if (r.request_type === "exchange" && r.order_item_id != null && isOpenReturnForOrderUi(r)) {
         map.set(r.order_item_id, r);
       }
     }
@@ -193,6 +221,7 @@ function OrderDetail() {
     size?: string;
     color?: string;
     qty?: number;
+    price?: number;
   }) => {
     setExchangeItem(item);
     setExchangeSize(item.size ?? null);
@@ -367,7 +396,7 @@ function OrderDetail() {
   useEffect(() => {
     if (!autoPay || autoPayStarted.current || !order) return;
     if (
-      order.status === "cancelled" ||
+      isCancelledOrder(order) ||
       order.payment_status !== "pending" ||
       order.payment_method === "cod"
     )
@@ -387,12 +416,12 @@ function OrderDetail() {
     );
   }
 
+  const paymentOrder = { ...order, has_failed_refund: hasFailedReturnRefund || undefined };
   const addr = order.shipping_address || {};
   const itemCount = (order.order_items ?? []).reduce((sum, it) => sum + Number(it.qty ?? 0), 0);
-  const StatusIcon =
-    order.status === "cancelled"
-      ? XCircle
-      : order.payment_status === "paid"
+  const StatusIcon = isCancelledOrder(order)
+    ? XCircle
+    : order.payment_status === "paid"
         ? CheckCircle2
         : order.payment_status === "failed"
           ? XCircle
@@ -446,13 +475,13 @@ function OrderDetail() {
           <div className="flex items-center gap-2 flex-wrap">
             <div className="inline-flex items-center gap-2 glass rounded-full px-4 py-2 text-sm">
               <StatusIcon className="h-4 w-4 text-primary" />
-              <span>{formatOrderStatusSummary(order)}</span>
+              <span>{formatOrderStatusSummary(paymentOrder)}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {order.can_cancel && (
+      {SHOW_M2_POST_ORDER_UI && order.can_cancel && (
         <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-5 md:p-6 border-2 border-destructive/50 bg-destructive/10">
           <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-3 sm:gap-4">
             <div className="min-w-0">
@@ -476,7 +505,7 @@ function OrderDetail() {
         </div>
       )}
 
-      {shouldContactCareToCancel(order) && (
+      {(shouldShowContactCareBanner(order, { m2PostOrderUi: SHOW_M2_POST_ORDER_UI })) && (
         <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-5 md:p-6 border border-border bg-muted/40">
           <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-3 sm:gap-4">
             <div className="min-w-0">
@@ -496,7 +525,7 @@ function OrderDetail() {
         </div>
       )}
 
-      {order.pending_cancellation && order.cancellation_request?.status === "requested" && (
+      {SHOW_M2_POST_ORDER_UI && order.pending_cancellation && order.cancellation_request?.status === "requested" && (
         <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-5 md:p-6 border border-amber-500/30 bg-amber-500/10">
           <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-3 sm:gap-4">
             <div className="min-w-0">
@@ -529,28 +558,34 @@ function OrderDetail() {
         </div>
       )}
 
-      {order.cancellation_request?.status === "rejected" && order.status !== "cancelled" && (
+      {SHOW_M2_POST_ORDER_UI && order.cancellation_request?.status === "rejected" && !isCancelledOrder(order) && (
         <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-5 md:p-6 border border-muted bg-muted/30">
           <div className="text-sm font-medium">Cancellation request declined</div>
-          {order.cancellation_request.rejection_reason ? (
-            <p className="text-sm text-muted-foreground mt-1">
-              {order.cancellation_request.rejection_reason}
-            </p>
-          ) : null}
+          <p className="text-sm text-muted-foreground mt-1">
+            {order.cancellation_request.rejection_reason?.trim()
+              ? `Reason: ${order.cancellation_request.rejection_reason.trim()}`
+              : "We could not approve this cancellation request."}
+          </p>
         </div>
       )}
 
-      {order.status === "cancelled" && (
+      {isCancelledOrder(order) && (
         <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-5 md:p-6 border border-muted bg-muted/30">
           <div className="flex items-start gap-3">
             <XCircle className="h-5 w-5 text-muted-foreground mt-0.5" />
             <div>
               <div className="text-sm font-medium">This order has been cancelled</div>
-              <p className="text-sm text-muted-foreground mt-1">
-                {order.payment_status === "refunded"
-                  ? "No payment is due for this order."
-                  : "No payment is due for this order."}
-              </p>
+              {isOnlineRefundFailed(paymentOrder) ? (
+                <RefundFailedNotice className="mt-3" />
+              ) : isPrepaidCancelledPaymentOnlySummary(order) ? (
+                <RefundInitiatedNotice
+                  className="mt-3"
+                  orderPaymentStatus={order.payment_status}
+                  timeline={refundTimeline}
+                />
+              ) : isCodCancelledUncollected(order) ? null : (
+                <p className="text-sm text-muted-foreground mt-1">No payment is due for this order.</p>
+              )}
               {order.cancellation_reason && (
                 <p className="text-sm text-muted-foreground mt-1">Reason: {order.cancellation_reason}</p>
               )}
@@ -559,7 +594,7 @@ function OrderDetail() {
         </div>
       )}
 
-      {order.status !== "cancelled" &&
+      {!isCancelledOrder(order) &&
         order.payment_status === "pending" &&
         order.payment_method === "cod" && (
           <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-5 md:p-6 border border-primary/20 bg-primary/5">
@@ -571,7 +606,13 @@ function OrderDetail() {
           </div>
         )}
 
-      {order.status !== "cancelled" &&
+      {!isCancelledOrder(order) && isOnlineRefundFailed(paymentOrder) && <RefundFailedNotice />}
+
+      {!isCancelledOrder(order) && isOnlineRefundAwaitingBank(order) && !isOnlineRefundFailed(paymentOrder) && (
+        <RefundInitiatedNotice orderPaymentStatus={order.payment_status} timeline={refundTimeline} />
+      )}
+
+      {!isCancelledOrder(order) &&
         order.payment_status === "pending" &&
         order.payment_method !== "cod" && (
           <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-5 md:p-6 border border-amber-500/30 bg-amber-500/10">
@@ -600,7 +641,7 @@ function OrderDetail() {
           </div>
         )}
 
-      {order.payment_status === "paid" && (
+      {shouldShowAccountDeliveryTracking(order) && (
         <Accordion
           type="single"
           collapsible
@@ -623,11 +664,26 @@ function OrderDetail() {
         </Accordion>
       )}
 
-      {RETURNS_UI_ENABLED && order.payment_status === "paid" && (
+      {SHOW_M2_POST_ORDER_UI && shouldShowAccountDeliveryTracking(order) && (
         <div className="glass-strong rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 md:p-8">
           <h2 className="font-display text-lg sm:text-xl mb-3 flex items-center gap-2">
             <RotateCcw className="h-5 w-5 text-primary shrink-0" /> Returns &amp; exchanges
           </h2>
+          {returnsLoadError ? (
+            <p className="text-sm text-amber-800 mb-3">
+              We couldn&apos;t load your return history right now. Refresh the page or visit{" "}
+              <Link to="/account/returns" className="text-primary hover:underline">
+                Returns &amp; exchanges
+              </Link>{" "}
+              to see open requests before starting a new one.
+            </p>
+          ) : null}
+          {eligibilityLoadError && !returnsLoadError ? (
+            <p className="text-sm text-amber-800 mb-3">
+              We couldn&apos;t confirm return eligibility right now. Refresh the page before starting a return or
+              exchange.
+            </p>
+          ) : null}
           {orderReturns.length > 0 ? (
             <div className="space-y-3">
               <Accordion type="multiple" className="space-y-2">
@@ -638,17 +694,24 @@ function OrderDetail() {
                     className="glass rounded-2xl border-0 px-3 sm:px-4"
                   >
                     <AccordionTrigger className="py-3 hover:no-underline">
-                      <span className="flex min-w-0 flex-1 items-center gap-2 pr-2 text-left">
-                        <span className="min-w-0 truncate font-medium text-sm">
-                          {r.request_type === "exchange" ? "Exchange" : "Return"} {r.return_number}
+                      <span className="flex min-w-0 flex-1 flex-col items-stretch gap-1 pr-2 text-left">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="min-w-0 truncate font-medium text-sm">
+                            {r.request_type === "exchange" ? "Exchange" : "Return"} {r.return_number}
+                          </span>
+                          <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wider rounded-full px-3 py-1 bg-amber-500/15 text-amber-700">
+                            {returnStatusLabel(r)}
+                          </span>
                         </span>
-                        <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wider rounded-full px-3 py-1 bg-amber-500/15 text-amber-700">
-                          {returnStatusLabel(r)}
-                        </span>
+                        {isRejectedReturn(r) ? (
+                          <span className="text-xs font-normal normal-case tracking-normal text-amber-800">
+                            {closedReturnMessage(r)}
+                          </span>
+                        ) : null}
                       </span>
                     </AccordionTrigger>
                     <AccordionContent className="pb-3">
-                      <ReturnTrackingCard item={r} showHeader={false} />
+                      <ReturnTrackingCard item={r} showHeader={false} omitClosedMessage={isRejectedReturn(r)} />
                     </AccordionContent>
                   </AccordionItem>
                 ))}
@@ -689,23 +752,21 @@ function OrderDetail() {
             {order.order_items?.map((it: any) => {
               const openExchange = it.id != null ? openExchangeByItemId.get(it.id) : undefined;
               const canAct =
-                RETURNS_UI_ENABLED &&
+                SHOW_M2_POST_ORDER_UI &&
                 order.payment_status === "paid" &&
                 eligibility?.eligible &&
+                !eligibilityLoadError &&
                 !openWholeOrderReturn &&
                 !openExchange &&
                 it.id != null;
               return (
                 <div key={it.id} className="glass rounded-2xl p-3 flex flex-col gap-2 min-w-0">
                   <div className="flex gap-3 items-start sm:items-center min-w-0">
-                    {it.product_image && (
-                      <LazyImage
-                        src={it.product_image}
-                        className="h-14 w-14 sm:h-16 sm:w-16 rounded-xl object-cover shrink-0"
-                        alt=""
-                        priority="auto"
-                      />
-                    )}
+                    <OrderProductThumb
+                      src={it.product_image}
+                      alt={it.product_name ?? ""}
+                      className="h-14 w-14 sm:h-16 sm:w-16"
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium break-words">{it.product_name}</div>
                       <div className="text-xs text-muted-foreground">
@@ -742,6 +803,7 @@ function OrderDetail() {
                             size: it.size,
                             color: it.color,
                             qty: Number(it.qty ?? 1),
+                            price: Number(it.price ?? 0),
                           })
                         }
                         className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border px-3 py-1.5 hover:bg-white/60 transition"
@@ -777,12 +839,17 @@ function OrderDetail() {
               <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground mb-2">
                 <CreditCard className="h-4 w-4 text-primary" /> Payment
               </div>
-              <div className="text-sm font-medium">
-                {order.status === "cancelled" && order.payment_status !== "refunded"
-                  ? "No payment due"
-                  : formatPaymentStatusLabel(order.payment_status, order.payment_method)}
-              </div>
-              {order.status !== "cancelled" &&
+              {!isCodCancelledUncollected(order) && (
+                <>
+                  <div className="text-sm font-medium">{formatAccountOrderPaymentLabel(paymentOrder)}</div>
+                  {isOnlineRefundProcessedAwaitingBank(paymentOrder) && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {refundProcessedMessage(refundTimeline.min, refundTimeline.max)}
+                    </div>
+                  )}
+                </>
+              )}
+              {!isCancelledOrder(order) &&
                 order.payment_method === "cod" &&
                 order.payment_status === "pending" && (
                   <div className="text-xs text-muted-foreground mt-1">Cash or UPI at doorstep</div>
@@ -792,7 +859,7 @@ function OrderDetail() {
                   ID: {order.razorpay_payment_id}
                 </div>
               )}
-              {order.status !== "cancelled" &&
+              {!isCancelledOrder(order) &&
                 order.payment_status === "pending" &&
                 order.payment_method !== "cod" && (
                   <div className="mt-3 flex flex-col sm:flex-row flex-wrap gap-2">
@@ -880,6 +947,7 @@ function OrderDetail() {
         <p className="text-[11px] text-muted-foreground text-center">Refreshing order details…</p>
       )}
 
+      {SHOW_M2_POST_ORDER_UI && (
       <AlertDialog
         open={cancelDialogOpen}
         onOpenChange={(open) => {
@@ -895,6 +963,20 @@ function OrderDetail() {
               {order.payment_status === "paid" ? " and any refund is processed" : ""}.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-2">
+            {(order.order_items ?? []).map((item) => (
+              <div key={item.id ?? item.product_name} className="flex gap-3 rounded-xl border border-border p-3">
+                <OrderProductThumb src={item.product_image} alt={item.product_name ?? ""} />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm break-words">{item.product_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {[item.size, item.color].filter(Boolean).join(" · ")}
+                    {item.qty != null ? ` · Qty ${item.qty}` : ""}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
           <div className="space-y-1.5">
             <label htmlFor="cancel-reason" className="text-sm font-medium">
               Why are you cancelling?
@@ -924,8 +1006,9 @@ function OrderDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      )}
 
-      {RETURNS_UI_ENABLED && (
+      {SHOW_M2_POST_ORDER_UI && (
       <Dialog
         open={returnDialogOpen}
         onOpenChange={(open) => {
@@ -940,7 +1023,8 @@ function OrderDetail() {
           <DialogHeader>
             <DialogTitle>Return items</DialogTitle>
             <DialogDescription>
-              Choose how many pieces to send back, tell us why, and attach photos if you can.
+              Choose how many pieces to send back, tell us why, and attach photos if you can. Refunds cover item
+              price after discounts — delivery and COD fees are not refunded.
             </DialogDescription>
           </DialogHeader>
           <ReturnConditionNotice />
@@ -953,12 +1037,15 @@ function OrderDetail() {
                   key={item.id}
                   className="flex items-center justify-between gap-3 rounded-xl border border-border p-3 text-sm"
                 >
-                  <span className="min-w-0">
+                  <span className="flex min-w-0 items-start gap-3">
+                    <OrderProductThumb src={item.product_image} alt={item.product_name ?? ""} />
+                    <span className="min-w-0">
                     <span className="block font-medium break-words">{item.product_name}</span>
                     <span className="block text-xs text-muted-foreground">
                       {[item.size, item.color].filter(Boolean).join(" · ")}
                       {item.size || item.color ? " · " : ""}
                       Ordered qty {max}
+                    </span>
                     </span>
                   </span>
                   <select
@@ -1026,7 +1113,7 @@ function OrderDetail() {
       </Dialog>
       )}
 
-      {RETURNS_UI_ENABLED && (
+      {SHOW_M2_POST_ORDER_UI && (
       <Dialog
         open={!!exchangeItem}
         onOpenChange={(open) => {
@@ -1040,20 +1127,14 @@ function OrderDetail() {
           <DialogHeader>
             <DialogTitle>Exchange item</DialogTitle>
             <DialogDescription>
-              Choose a replacement size or colour. Photos help us review your request faster.
+              Choose a replacement size or colour. Photos help us review your request faster. Any refund or
+              collect is on item price after discounts — delivery and COD fees are not refunded.
             </DialogDescription>
           </DialogHeader>
           <ReturnConditionNotice />
           {exchangeItem ? (
             <div className="flex gap-3 rounded-xl border border-border p-3">
-              {exchangeItem.product_image ? (
-                <LazyImage
-                  src={exchangeItem.product_image}
-                  className="h-14 w-14 rounded-xl object-cover shrink-0"
-                  alt=""
-                  priority="auto"
-                />
-              ) : null}
+              <OrderProductThumb src={exchangeItem.product_image} alt={exchangeItem.product_name ?? ""} />
               <div className="min-w-0">
                 <p className="font-medium text-sm break-words">{exchangeItem.product_name}</p>
                 <p className="text-xs text-muted-foreground">
@@ -1074,6 +1155,8 @@ function OrderDetail() {
             product={exchangeProduct}
             originalSize={exchangeItem?.size}
             originalColor={exchangeItem?.color}
+            originalUnitPrice={exchangeItem?.price}
+            qty={exchangeItem?.qty}
             size={exchangeSize}
             color={exchangeColor}
             onSizeChange={setExchangeSize}

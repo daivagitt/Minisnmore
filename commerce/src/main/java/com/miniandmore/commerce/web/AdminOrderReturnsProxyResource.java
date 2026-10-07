@@ -183,4 +183,20 @@ public class AdminOrderReturnsProxyResource {
             body
         );
     }
+
+    @PostMapping("/{returnNumber}/package-rates")
+    public ResponseEntity<String> packageRates(@PathVariable String returnNumber, @RequestBody Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/admin/order-returns/{returnNumber}/package-rates", returnNumber),
+            body
+        );
+    }
+
+    @PostMapping("/{returnNumber}/complete-package")
+    public ResponseEntity<String> completePackage(@PathVariable String returnNumber, @RequestBody Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/admin/order-returns/{returnNumber}/complete-package", returnNumber),
+            body
+        );
+    }
 }

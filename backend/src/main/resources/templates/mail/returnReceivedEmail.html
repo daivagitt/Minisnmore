@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="en">
 <head>
 <meta charset="UTF-8">
-<title th:text="#{email.order.return.received.title(${orderNumber})}">Item Received at Warehouse</title>
+<title th:text="${requestType == 'EXCHANGE'} ? #{email.order.exchange.received.title(${orderNumber})} : #{email.order.return.received.title(${orderNumber})}">Item Received at Warehouse</title>
 </head>
 <body style="margin:0; padding:0; background-color:#fdf1ec; font-family: Arial, Helvetica, sans-serif;">
   <span style="display:none !important; visibility:hidden; opacity:0; color:transparent; height:0; width:0; overflow:hidden;" th:text="'Item received for order ' + ${orderNumber}">Item received at warehouse.</span>

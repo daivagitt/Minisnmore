@@ -96,8 +96,8 @@ public interface UserRepository extends R2dbcRepository<User, Long> {
     @Query("SELECT password_hash FROM jhi_user WHERE id = :userId")
     Mono<String> findPasswordHashByUserId(Long userId);
 
-    @Query("SELECT authority_name FROM jhi_user_authority WHERE user_id = :userId")
-    reactor.core.publisher.Flux<String> findAuthorityNamesByUserId(Long userId);
+    @Query("SELECT user_id, authority_name FROM jhi_user_authority WHERE user_id = ANY(:userIds)")
+    Flux<UserAuthorityAssignment> findAuthorityNamesByUserIds(Long[] userIds);
 
     @Query("SELECT COALESCE(MAX(id), 0) FROM jhi_user")
     Mono<Long> findMaxId();

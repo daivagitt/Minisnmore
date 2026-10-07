@@ -16,12 +16,15 @@ import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.OrderReturn;
 import com.miniandmore.app.domain.enumeration.OrderRequestType;
 import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
+import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.SiteSetting;
 import com.miniandmore.app.repository.OrderItemRepository;
 import com.miniandmore.app.repository.SiteSettingRepository;
+import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Properties;
 import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -259,7 +262,8 @@ class OrderMailServiceTest {
         @SuppressWarnings("unchecked")
         List<String> lines = (List<String>) contextCaptor.getValue().getVariable("addressLines");
         assertThat(lines).contains("Near Park");
-        assertThat(contextCaptor.getValue().getVariable("orderDate")).isNotEqualTo("");
+        assertThat(contextCaptor.getValue().getVariable("orderDate")).isEqualTo("Fri, 14 Aug 2026, 3:30 PM IST");
+        assertThat(contextCaptor.getValue().getVariable("placedOnFormatted")).isEqualTo("Fri, 14 Aug 2026, 3:30 PM IST");
     }
 
     @Test
@@ -355,9 +359,13 @@ class OrderMailServiceTest {
         exchange.setReturnNumber("EXG-123");
         exchange.setRequestType(OrderRequestType.EXCHANGE);
         exchange.setStatus(OrderRequestType.EXCHANGE != null ? OrderReturnStatus.APPROVED : null);
+        exchange.setReason("Need a larger size for my baby");
 
         service.sendExchangeRequested(order, exchange);
-        verify(templateEngine).process(eq("mail/exchangeRequestedEmail"), any(Context.class));
+        ArgumentCaptor<Context> requestedContext = ArgumentCaptor.forClass(Context.class);
+        verify(templateEngine).process(eq("mail/exchangeRequestedEmail"), requestedContext.capture());
+        assertThat(requestedContext.getValue().getVariable("returnReason")).isEqualTo("Need a larger size for my baby");
+        assertThat(requestedContext.getValue().getVariable("exchangeReason")).isEqualTo("Need a larger size for my baby");
 
         service.sendExchangeAccepted(order, exchange);
         verify(templateEngine).process(eq("mail/exchangeApprovedEmail"), any(Context.class));
@@ -403,6 +411,134 @@ class OrderMailServiceTest {
         exchange.setStatus(OrderReturnStatus.CANCELLED);
         service.sendReturnUpdate(order, exchange);
         verify(templateEngine).process(eq("mail/exchangeCancelledEmail"), any(Context.class));
+
+        exchange.setStatus(OrderReturnStatus.PICKUP_REQUESTED);
+        service.sendReturnUpdate(order, exchange);
+        verify(templateEngine).process(eq("mail/pickupScheduledEmail"), any(Context.class));
+
+        exchange.setStatus(OrderReturnStatus.RECEIVED);
+        service.sendReturnUpdate(order, exchange);
+        verify(templateEngine).process(eq("mail/returnReceivedEmail"), any(Context.class));
+
+        org.mockito.Mockito.clearInvocations(templateEngine);
+        for (OrderReturnStatus silent : List.of(
+            OrderReturnStatus.PICKUP_FAILED,
+            OrderReturnStatus.INSPECTED,
+            OrderReturnStatus.ACCEPTED,
+            OrderReturnStatus.ITEM_ALLOCATED,
+            OrderReturnStatus.REPACKING,
+            OrderReturnStatus.READY_TO_SHIP,
+            OrderReturnStatus.FAILED
+        )) {
+            exchange.setStatus(silent);
+            service.sendReturnUpdate(order, exchange);
+        }
+        verify(templateEngine, org.mockito.Mockito.never()).process(anyString(), any(Context.class));
+    }
+
+    @Test
+    void sendReturnUpdate_razorpayRefund_sendsInitiatedEmail() {
+        CustomerOrder order = orderWithAddress().paymentMethod("online");
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(anyString(), any(Context.class))).thenReturn("content");
+        when(messageSource.getMessage(anyString(), any(), any())).thenReturn("title");
+        when(orderItemRepository.findAllByOrderId(9L)).thenReturn(List.of());
+
+        OrderReturn orderReturn = new OrderReturn();
+        orderReturn.setReturnNumber("RET-9");
+        orderReturn.setStatus(OrderReturnStatus.REFUNDED);
+        orderReturn.setRazorpayRefundId("rfnd_live_1");
+        orderReturn.setRefundAmount(BigDecimal.valueOf(499));
+
+        service.sendReturnUpdate(order, orderReturn);
+
+        verify(templateEngine).process(eq("mail/refundInitiatedEmail"), any(Context.class));
+    }
+
+    @Test
+    void sendOrderConfirmation_stampsIstDateHeaderOnSentMessage() throws Exception {
+        CustomerOrder order = orderWithAddress();
+        MimeMessage realMessage = new MimeMessage(Session.getInstance(new Properties()));
+        when(javaMailSender.createMimeMessage()).thenReturn(realMessage);
+        when(templateEngine.process(eq("mail/orderConfirmationEmail"), any(Context.class))).thenReturn("<html>ok</html>");
+        when(messageSource.getMessage(eq("email.order.confirm.title"), any(), eq(Locale.ENGLISH))).thenReturn("Confirmed");
+        when(orderItemRepository.findAllByOrderId(9L)).thenReturn(List.of());
+
+        service.sendOrderConfirmation(order);
+
+        assertThat(realMessage.getHeader("Date", null)).endsWith("+0530");
+    }
+
+    @Test
+    void sendReturnUpdate_exchangeRefunded_usesRefundLifecycleTemplates() {
+        CustomerOrder order = orderWithAddress().paymentMethod("online");
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(anyString(), any(Context.class))).thenReturn("content");
+        when(messageSource.getMessage(anyString(), any(), any())).thenReturn("title");
+        when(orderItemRepository.findAllByOrderId(9L)).thenReturn(List.of());
+
+        OrderReturn exchange = new OrderReturn();
+        exchange.setReturnNumber("EXG-1");
+        exchange.setRequestType(OrderRequestType.EXCHANGE);
+        exchange.setStatus(OrderReturnStatus.REFUNDED);
+        exchange.setRazorpayRefundId("rfnd_exg_1");
+        exchange.setRefundAmount(BigDecimal.valueOf(499));
+
+        service.sendReturnUpdate(order, exchange);
+
+        verify(templateEngine).process(eq("mail/refundInitiatedEmail"), any(Context.class));
+    }
+
+    @Test
+    void sendReturnUpdate_exchangeZeroRefund_sendsNoRefundMail() {
+        CustomerOrder order = orderWithAddress().paymentMethod("online");
+
+        OrderReturn exchange = new OrderReturn();
+        exchange.setReturnNumber("EXG-0");
+        exchange.setRequestType(OrderRequestType.EXCHANGE);
+        exchange.setStatus(OrderReturnStatus.REFUNDED);
+        exchange.setRefundAmount(BigDecimal.ZERO);
+
+        service.sendReturnUpdate(order, exchange);
+
+        verify(templateEngine, org.mockito.Mockito.never()).process(anyString(), any(Context.class));
+    }
+
+    @Test
+    void sendReturnUpdate_exchangeReceived_usesExchangeSubject() {
+        CustomerOrder order = orderWithAddress();
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(anyString(), any(Context.class))).thenReturn("content");
+        when(messageSource.getMessage(anyString(), any(), any())).thenReturn("title");
+        when(orderItemRepository.findAllByOrderId(9L)).thenReturn(List.of());
+
+        OrderReturn exchange = new OrderReturn();
+        exchange.setReturnNumber("EXG-R");
+        exchange.setRequestType(OrderRequestType.EXCHANGE);
+        exchange.setStatus(OrderReturnStatus.RECEIVED);
+
+        service.sendReturnUpdate(order, exchange);
+
+        verify(messageSource).getMessage(eq("email.order.exchange.received.title"), any(), eq(Locale.ENGLISH));
+    }
+
+    @Test
+    void sendReturnUpdate_razorpayRefund_sendsCompletedWhenPaymentRefunded() {
+        CustomerOrder order = orderWithAddress().paymentMethod("online").paymentStatus(PaymentStatus.REFUNDED);
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(anyString(), any(Context.class))).thenReturn("content");
+        when(messageSource.getMessage(anyString(), any(), any())).thenReturn("title");
+        when(orderItemRepository.findAllByOrderId(9L)).thenReturn(List.of());
+
+        OrderReturn orderReturn = new OrderReturn();
+        orderReturn.setReturnNumber("RET-10");
+        orderReturn.setStatus(OrderReturnStatus.REFUNDED);
+        orderReturn.setRazorpayRefundId("rfnd_live_2");
+        orderReturn.setRefundAmount(BigDecimal.valueOf(499));
+
+        service.sendReturnUpdate(order, orderReturn);
+
+        verify(templateEngine).process(eq("mail/refundCompletedEmail"), any(Context.class));
     }
 
     private CustomerOrder orderWithAddress() {

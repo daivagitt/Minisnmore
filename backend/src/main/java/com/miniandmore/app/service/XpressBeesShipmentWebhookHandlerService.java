@@ -88,7 +88,7 @@ public class XpressBeesShipmentWebhookHandlerService {
             return ZohoWebhookSupport.duplicateEventResult(eventId);
         }
 
-        CustomerOrder saved = orderShipmentService.applyProviderStatus(order, providerStatus);
+        CustomerOrder saved = orderShipmentService.applyProviderStatus(order, providerStatus, OrderDeliverySupport.deliveredAt(data));
         String localStatus = eventStatus(XpressBeesShipmentStatus.normalize(providerStatus));
         event.setLocalStatus(localStatus);
         eventRepository.save(event);

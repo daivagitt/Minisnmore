@@ -115,20 +115,33 @@ class OrderMailTemplateRenderingTest {
         )) {
             service.sendReturnUpdate(cod, orderReturn(OrderRequestType.EXCHANGE, status, null));
         }
+        // 23 sends total: exchange SHIPPED is intentionally silent in sendReturnUpdate (OFD mail via notifyExchangeOutForDelivery).
 
         ArgumentCaptor<MimeMessage> sent = ArgumentCaptor.forClass(MimeMessage.class);
         verify(javaMailSender, atLeastOnce()).send(sent.capture());
-        assertThat(sent.getAllValues()).hasSize(24);
+        assertThat(sent.getAllValues()).hasSize(23);
         for (MimeMessage message : sent.getAllValues()) {
             assertThat((String) message.getContent()).contains("MNM-TEST-1");
         }
 
+        String confirmation = (String) sent.getAllValues().get(0).getContent();
+        assertThat(confirmation).contains("Fri, 2 Oct 2026, 11:30 AM IST");
         String codAccepted = (String) sent.getAllValues().get(5).getContent();
-        assertThat(codAccepted).contains("Cancelled").doesNotContain("Refund Initiated");
+        assertThat(codAccepted).contains("Cancelled").doesNotContain("Refund Initiated").contains(" IST");
         String onlineAccepted = (String) sent.getAllValues().get(6).getContent();
         assertThat(onlineAccepted).contains("Cancelled &amp; Refund Initiated").contains("₹263");
         String refundCompleted = (String) sent.getAllValues().get(9).getContent();
         assertThat(refundCompleted).contains("₹263");
+        List<String> bodies = sent.getAllValues().stream().map(message -> {
+            try {
+                return (String) message.getContent();
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
+            }
+        }).toList();
+        assertThat(bodies.stream().anyMatch(html -> html.contains("Cancellation Requested") && html.contains("https://cdn.example/products/shorts.jpg"))).isTrue();
+        assertThat(bodies.stream().anyMatch(html -> html.contains("Return Requested") && html.contains("https://cdn.example/products/shorts.jpg"))).isTrue();
+        assertThat(bodies.stream().anyMatch(html -> html.contains("Exchange Requested") && html.contains("https://cdn.example/products/shorts.jpg"))).isTrue();
     }
 
     private static CustomerOrder order(String paymentMethod) {
@@ -137,6 +150,7 @@ class OrderMailTemplateRenderingTest {
             .orderNumber("MNM-TEST-1")
             .userLogin("buyer@example.com")
             .paymentMethod(paymentMethod)
+            .placedAt(Instant.parse("2026-10-02T06:00:00Z"))
             .total(BigDecimal.valueOf(263))
             .subtotal(BigDecimal.valueOf(263))
             .trackingNumber("AWB1")
@@ -147,7 +161,14 @@ class OrderMailTemplateRenderingTest {
     }
 
     private static OrderItem item() {
-        return new OrderItem().id(11L).productName("Basic Shorts Set").itemSize("12-18 M").color("Baby Blue").qty(1).price(BigDecimal.valueOf(263));
+        return new OrderItem()
+            .id(11L)
+            .productName("Basic Shorts Set")
+            .productImage("https://cdn.example/products/shorts.jpg")
+            .itemSize("12-18 M")
+            .color("Baby Blue")
+            .qty(1)
+            .price(BigDecimal.valueOf(263));
     }
 
     private static OrderCancellationRequest cancellation(BigDecimal refund) {

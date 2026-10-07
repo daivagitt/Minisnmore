@@ -2,6 +2,7 @@ package com.miniandmore.app.config;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -655,7 +656,7 @@ public class ApplicationProperties {
         private String businessAccountName;
 
         /** Relative path or absolute URL for reverse pickup booking. */
-        private String reverseManifestPath = "/api/courier/reverse/order";
+        private String reverseManifestPath = "/api/shipments2";
 
         /** Relative path or absolute URL for forward outbound shipment booking. */
         private String forwardManifestPath = "/api/shipments2";
@@ -751,6 +752,21 @@ public class ApplicationProperties {
 
         public void setReverseManifestPath(String reverseManifestPath) {
             this.reverseManifestPath = reverseManifestPath;
+        }
+
+        /**
+         * Token authentication creates reverse shipments through {@code /api/shipments2} with
+         * {@code payment_type=reverse}. Keep accepting the old default in deployed environment
+         * files, but route it only to the legacy XBkey API where it belongs.
+         */
+        public String resolvedReverseManifestPath() {
+            if (
+                !usesLegacyAuth() &&
+                (StringUtils.isBlank(reverseManifestPath) || "/api/courier/reverse/order".equalsIgnoreCase(reverseManifestPath.trim()))
+            ) {
+                return resolvedForwardManifestPath();
+            }
+            return reverseManifestPath;
         }
 
         public String getForwardManifestPath() {

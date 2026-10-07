@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20261002120000-1" author="codex">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="razorpay_webhook_event"/>
+            </not>
+        </preConditions>
+        <createTable tableName="razorpay_webhook_event">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="event_id" type="varchar(160)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="event_type" type="varchar(80)"/>
+            <column name="order_number" type="varchar(40)"/>
+            <column name="refund_id" type="varchar(120)"/>
+            <column name="local_status" type="varchar(80)"/>
+            <column name="received_at" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+</databaseChangeLog>

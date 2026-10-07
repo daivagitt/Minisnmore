@@ -1,0 +1,13 @@
+# One Liquibase changelog path per line (relative to catalog JAR classpath).
+# Used by uat-restart-isolated-catalog.sh and prod-restart-isolated-catalog.sh.
+#
+# Intentionally omitted vs master.xml: 20260929180000_backfill_shipment_delivered_at,
+# 20260930180000_seed_shop_merchandising_sections (data seed; run via monolith/full Liquibase or ad-hoc).
+config/liquibase/changelog/20260930160000_add_customer_order_package_type.xml
+config/liquibase/changelog/20261001120000_add_customer_order_zoho_credit_note_id.xml
+config/liquibase/changelog/20261001180000_add_order_return_replacement_invoice.xml
+config/liquibase/changelog/20261002120000_add_razorpay_webhook_event.xml
+config/liquibase/changelog/20261002160000_add_return_and_refund_policy_days.xml
+config/liquibase/changelog/20261002180000_add_order_return_original_restocked_at.xml
+config/liquibase/changelog/20261002190000_add_order_return_outbound_package_fields.xml
+config/liquibase/changelog/20261002210000_add_order_return_carrier_status.xml

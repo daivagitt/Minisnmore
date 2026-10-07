@@ -33,6 +33,7 @@ import reactor.core.scheduler.Schedulers;
 public class UserService {
 
     private static final Logger LOG = LoggerFactory.getLogger(UserService.class);
+    private static final String LOG_DELETED_USER = "Deleted User: {}";
 
     private final UserRepository userRepository;
     private final AuthorityRepository authorityRepository;
@@ -111,8 +112,7 @@ public class UserService {
     public Mono<User> requestPasswordReset(String mail) {
         return userRepository
             .findOneByEmailIgnoreCase(mail)
-            // OAuth-linked accounts are matched by login-derived-from-email during sign-in;
-            // fall back the same way here so a stale/mismatched email column doesn't hide them.
+            // Handle OAuth linked accounts which fallback to login when email does not match directly
             .switchIfEmpty(Mono.defer(() -> userRepository.findOneByLogin(mail.toLowerCase().trim())))
             .filter(User::isActivated)
             .publishOn(Schedulers.boundedElastic())
@@ -317,7 +317,7 @@ public class UserService {
         return userRepository
             .findOneByLogin(login)
             .flatMap(userRepository::delete)
-            .doOnNext(u -> LOG.debug("Deleted User: {}", login));
+            .doOnNext(u -> LOG.debug(LOG_DELETED_USER, login));
     }
 
     public Mono<Void> deleteStaffUser(String login, Set<String> actorAuthorities) {
@@ -331,7 +331,7 @@ public class UserService {
                 next.setAuthorities(Set.of());
                 return protectLastSuperAdmin(existing, next).then(userRepository.delete(existing));
             })
-            .doOnNext(u -> LOG.debug("Deleted User: {}", login));
+            .doOnNext(u -> LOG.debug(LOG_DELETED_USER, login));
     }
 
     public Mono<Void> changePassword(String currentClearTextPassword, String newPassword) {
@@ -355,7 +355,8 @@ public class UserService {
         long offset = pageable.getOffset();
         return userRepository
             .findAllUsersForAdmin(limit, offset)
-            .flatMap(userAuthoritiesLoader::withAuthorities)
+            .collectList()
+            .flatMapMany(userAuthoritiesLoader::attachAuthorities)
             .map(AdminUserDTO::new);
     }
 
@@ -413,7 +414,7 @@ public class UserService {
 
         return Flux.merge(staleShoppers, staleStaffInvites)
             .flatMap(user -> userRepository.delete(user).thenReturn(user))
-            .doOnNext(user -> LOG.debug("Deleted User: {}", user));
+            .doOnNext(user -> LOG.debug(LOG_DELETED_USER, user));
     }
 
     public static String generatePassword() {

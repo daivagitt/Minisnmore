@@ -314,7 +314,9 @@ application:
     payment-type: ${XPRESSBEES_PAYMENT_TYPE:prepaid}
     xb-key: ${XPRESSBEES_XB_KEY:}
     business-account-name: ${XPRESSBEES_BUSINESS_ACCOUNT_NAME:}
-    reverse-manifest-path: ${XPRESSBEES_REVERSE_MANIFEST_PATH:/api/courier/reverse/order}
+    # Token-auth reverse shipments use the normal shipments2 endpoint with payment_type=reverse.
+    # The older /api/courier/reverse/order route belongs to the legacy XBkey API.
+    reverse-manifest-path: ${XPRESSBEES_REVERSE_MANIFEST_PATH:/api/shipments2}
     forward-manifest-path: ${XPRESSBEES_FORWARD_MANIFEST_PATH:/api/shipments2}
     cancel-shipment-path: ${XPRESSBEES_CANCEL_SHIPMENT_PATH:/api/shipments2/cancel}
     webhook-secret: ${XPRESSBEES_WEBHOOK_SECRET:}
@@ -363,3 +365,5 @@ razorpay:
   key-id: ${RAZORPAY_KEY_ID:}
   key-secret: ${RAZORPAY_KEY_SECRET:}
   payment-demo: ${RAZORPAY_PAYMENT_DEMO:false}
+  refund-demo: ${RAZORPAY_REFUND_DEMO:false}
+  webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}

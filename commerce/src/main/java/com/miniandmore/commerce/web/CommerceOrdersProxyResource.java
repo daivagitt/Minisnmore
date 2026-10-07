@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1")
 public class CommerceOrdersProxyResource {
 
+    private static final String ACCOUNT_ADDRESSES_PATH = "/internal/v1/account/addresses/";
+
     private final CatalogInternalClient catalog;
 
     public CommerceOrdersProxyResource(CatalogInternalClient catalog) {
@@ -52,17 +54,17 @@ public class CommerceOrdersProxyResource {
 
     @PutMapping("/account/addresses/{id}")
     public ResponseEntity<String> updateAddress(@PathVariable Long id, @RequestBody Object body) {
-        return catalog.put("/internal/v1/account/addresses/" + id, body);
+        return catalog.put(ACCOUNT_ADDRESSES_PATH + id, body);
     }
 
     @DeleteMapping("/account/addresses/{id}")
     public ResponseEntity<String> deleteAddress(@PathVariable Long id) {
-        return catalog.delete("/internal/v1/account/addresses/" + id);
+        return catalog.delete(ACCOUNT_ADDRESSES_PATH + id);
     }
 
     @PutMapping("/account/addresses/{id}/default")
     public ResponseEntity<String> setDefaultAddress(@PathVariable Long id) {
-        return catalog.put("/internal/v1/account/addresses/" + id + "/default", Map.of());
+        return catalog.put(ACCOUNT_ADDRESSES_PATH + id + "/default", Map.of());
     }
 
     @PostMapping("/account/addresses/sync")

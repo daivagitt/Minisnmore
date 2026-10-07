@@ -29,6 +29,7 @@ vi.mock("@/lib/orders.functions", () => ({
     closed: 0,
     overdue: 0,
     stages: { request: 0, pickup: 0, inspection: 0, exchange: 0, closed: 0 },
+    xpressbeesReverseReady: 0,
   },
 }));
 
@@ -64,6 +65,7 @@ describe("admin dashboard", () => {
       open: 7,
       closed: 5,
       overdue: 2,
+      xpressbeesReverseReady: 4,
       stages: { request: 3, pickup: 2, inspection: 1, exchange: 1, closed: 5 },
     });
   });
@@ -73,7 +75,7 @@ describe("admin dashboard", () => {
 
     await waitFor(() => expect(screen.getByText("Returns")).toBeInTheDocument());
     expect(screen.getByText("Exchanges")).toBeInTheDocument();
-    expect(screen.getByText("7 open · 2 overdue")).toBeInTheDocument();
+    expect(screen.getByText("7 open · 2 overdue · 4 book pickup")).toBeInTheDocument();
     expect(screen.getByText("12 total cases")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Returns & exchanges/i })).toHaveAttribute("href", "/admin/returns");
   });

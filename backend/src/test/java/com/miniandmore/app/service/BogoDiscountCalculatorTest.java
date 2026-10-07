@@ -347,5 +347,116 @@ class BogoDiscountCalculatorTest {
         assertThat(result.allocationForLine(1)).isEqualByComparingTo("0.00");
         assertThat(result.allocationForLine(2)).isEqualByComparingTo("500.00");
     }
+
+    @Test
+    void utilityAndEdgeCases_coverage() {
+        // clampQty
+        assertThat(BogoDiscountCalculator.clampQty(null)).isEqualTo(1);
+        assertThat(BogoDiscountCalculator.clampQty(0)).isEqualTo(1);
+        assertThat(BogoDiscountCalculator.clampQty(-5)).isEqualTo(1);
+        assertThat(BogoDiscountCalculator.clampQty(5)).isEqualTo(5);
+        assertThat(BogoDiscountCalculator.clampQty(100)).isEqualTo(10);
+
+        // resolveScope
+        assertThat(BogoDiscountCalculator.resolveScope(null))
+            .isEqualTo(com.miniandmore.app.domain.enumeration.CouponEligibilityScope.ALL);
+
+        // Constructors and methods on records
+        BogoDiscountCalculator.Line line = new BogoDiscountCalculator.Line(2, BigDecimal.valueOf(100));
+        assertThat(line.qty()).isEqualTo(2);
+        assertThat(line.unitPrice()).isEqualByComparingTo("100");
+        BogoDiscountCalculator.Line indexedLine = line.withIndex(5);
+        assertThat(indexedLine.lineIndex()).isEqualTo(5);
+
+        BogoDiscountCalculator.Result res2 = new BogoDiscountCalculator.Result(BigDecimal.TEN, 2);
+        assertThat(res2.discount()).isEqualByComparingTo("10");
+        assertThat(res2.missingItems()).isEqualTo(2);
+        assertThat(res2.eligible()).isFalse();
+        assertThat(res2.allocationForLine(999)).isEqualByComparingTo("0.00");
+
+        BogoDiscountCalculator.Result res4 = new BogoDiscountCalculator.Result(BigDecimal.TEN, 0, 1, 2);
+        assertThat(res4.appliedGroups()).isEqualTo(1);
+        assertThat(res4.nextTierMissing()).isEqualTo(2);
+        assertThat(res4.eligible()).isTrue();
+
+        // qualifyingSubtotal and allocateProportionally
+        List<BogoDiscountCalculator.Line> lines = List.of(
+            new BogoDiscountCalculator.Line(2, BigDecimal.valueOf(50), 0, "p1", "SKU1", 10L),
+            new BogoDiscountCalculator.Line(1, BigDecimal.valueOf(100), 1, "p2", "SKU2", 20L)
+        );
+        BigDecimal subtotal = BogoDiscountCalculator.qualifyingSubtotal(
+            lines,
+            com.miniandmore.app.domain.enumeration.CouponEligibilityScope.CATEGORY,
+            10L
+        );
+        assertThat(subtotal).isEqualByComparingTo("100.00");
+
+        var allocated = BogoDiscountCalculator.allocateProportionally(
+            BigDecimal.valueOf(20),
+            lines,
+            com.miniandmore.app.domain.enumeration.CouponEligibilityScope.ALL,
+            null
+        );
+        assertThat(allocated).isNotEmpty();
+
+        // category filter with null categoryId
+        var catLines = BogoDiscountCalculator.qualifyingLines(
+            lines,
+            com.miniandmore.app.domain.enumeration.CouponEligibilityScope.CATEGORY,
+            null
+        );
+        assertThat(catLines).isEmpty();
+    }
+
+    @Test
+    void calculate_percentOffClamping_andSubtotalCap() {
+        // Percent off < 0 clamped to 0
+        BogoDiscountCalculator.Result resNeg = BogoDiscountCalculator.calculate(
+            1, 1, BigDecimal.valueOf(-10), null, BigDecimal.valueOf(1000),
+            List.of(new BogoDiscountCalculator.Line(2, BigDecimal.valueOf(500)))
+        );
+        assertThat(resNeg.discount()).isEqualByComparingTo("0.00");
+
+        // Percent off > 100 clamped to 100
+        BogoDiscountCalculator.Result resLarge = BogoDiscountCalculator.calculate(
+            1, 1, BigDecimal.valueOf(150), null, BigDecimal.valueOf(1000),
+            List.of(new BogoDiscountCalculator.Line(2, BigDecimal.valueOf(500)))
+        );
+        assertThat(resLarge.discount()).isEqualByComparingTo("500.00");
+
+        // Discount capped by subtotal
+        BogoDiscountCalculator.Result resSubCap = BogoDiscountCalculator.calculate(
+            1, 1, BigDecimal.valueOf(100), null, BigDecimal.valueOf(200),
+            List.of(new BogoDiscountCalculator.Line(2, BigDecimal.valueOf(500)))
+        );
+        assertThat(resSubCap.discount()).isEqualByComparingTo("200.00");
+    }
+
+    @Test
+    void sameSku_keyVariations_andIneligible() {
+        // Ineligible same-sku
+        BogoDiscountCalculator.Result notEligible = BogoDiscountCalculator.calculate(
+            1, 1, BigDecimal.valueOf(100), null, BigDecimal.valueOf(1000),
+            List.of(
+                new BogoDiscountCalculator.Line(1, BigDecimal.valueOf(500), 0, "prod-1", null, null),
+                new BogoDiscountCalculator.Line(1, BigDecimal.valueOf(500), 1, "prod-2", null, null)
+            ),
+            com.miniandmore.app.domain.enumeration.CouponEligibilityScope.SAME_SKU,
+            null
+        );
+        assertThat(notEligible.eligible()).isFalse();
+
+        // Line without variantSku or productId uses idx
+        BogoDiscountCalculator.Result idxLine = BogoDiscountCalculator.calculate(
+            1, 1, BigDecimal.valueOf(100), null, BigDecimal.valueOf(1000),
+            List.of(
+                new BogoDiscountCalculator.Line(2, BigDecimal.valueOf(500), 0, null, null, null)
+            ),
+            com.miniandmore.app.domain.enumeration.CouponEligibilityScope.SAME_SKU,
+            null
+        );
+        assertThat(idxLine.eligible()).isTrue();
+        assertThat(idxLine.discount()).isEqualByComparingTo("500.00");
+    }
 }
 

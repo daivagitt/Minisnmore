@@ -222,6 +222,26 @@ class ZohoBooksClientTest {
     }
 
     @Test
+    void findCreditNoteByReferenceNumber_prefersOpenOverDraft() {
+        server
+            .expect(requestTo("https://www.zohoapis.in/books/v3/creditnotes?organization_id=org-1&reference_number=CNCL-MNM-1"))
+            .andRespond(
+                withSuccess(
+                    "{\"creditnotes\":[" +
+                    "{\"creditnote_id\":\"cn-draft\",\"reference_number\":\"CNCL-MNM-1\",\"status\":\"draft\"}," +
+                    "{\"creditnote_id\":\"cn-open\",\"reference_number\":\"CNCL-MNM-1\",\"status\":\"open\"}" +
+                    "]}",
+                    MediaType.APPLICATION_JSON
+                )
+            );
+
+        assertThat(client.findCreditNoteByReferenceNumber("CNCL-MNM-1"))
+            .containsEntry("creditnote_id", "cn-open")
+            .containsEntry("status", "open");
+        server.verify();
+    }
+
+    @Test
     void listPackagesForSalesOrder_acceptsZohoPublishedPackageaKeyWithoutAnOrderNumber() {
         server
             .expect(requestTo("https://www.zohoapis.in/inventory/v1/packages?organization_id=org-1&per_page=200"))

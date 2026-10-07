@@ -181,4 +181,21 @@ class AdminOrdersProxyResourceTest {
 
         verify(catalog).post(eq("/internal/v1/admin/orders/MNM-42/complete-package"), any());
     }
+
+    @Test
+    void cancelOrder_delegatesToCatalog() throws Exception {
+        when(catalog.post(eq("/internal/v1/admin/orders/MNM-42/cancel"), any()))
+            .thenReturn(ResponseEntity.ok("{\"order\":{}}"));
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/orders/MNM-42/cancel")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"Out of stock item\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(content().string("{\"order\":{}}"));
+
+        verify(catalog).post(eq("/internal/v1/admin/orders/MNM-42/cancel"), any());
+    }
 }

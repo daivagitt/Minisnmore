@@ -21,6 +21,7 @@ import { ColorImagesEditor } from "@/components/admin/ColorImagesEditor";
 import { AdminProductImage } from "@/components/admin/AdminProductImage";
 import { DisplayImageField } from "@/components/admin/DisplayImageField";
 import { AdminSizeAvailabilityPreview } from "@/components/admin/AdminSizeAvailabilityPreview";
+import { CopyButton } from "@/components/CopyButton";
 import { SizeChartEditor } from "@/components/admin/SizeChartEditor";
 import { SizeNotesEditor } from "@/components/admin/SizeNotesEditor";
 import { DETAILS_KICKER_MAX_LEN } from "@/lib/product-details-kicker";
@@ -686,11 +687,14 @@ function ProductsPage() {
             const previewImage = resolveStorefrontProductImages(p.images, p.colors).image;
             return (
               <div key={p.id ?? `new-${i}`} className="glass-strong rounded-3xl overflow-hidden">
-                <button
-                  onClick={() => setEditing(isOpen ? null : i)}
-                  className="w-full p-4 flex items-center gap-4 text-left hover:bg-white/30"
-                >
-                  <div className="h-14 w-14 rounded-xl bg-muted overflow-hidden grid place-items-center text-xs text-muted-foreground">
+                <div className="w-full p-4 flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setEditing(isOpen ? null : i)}
+                    aria-expanded={isOpen}
+                    aria-label={isOpen ? "Collapse product" : "Edit product"}
+                    className="h-14 w-14 shrink-0 rounded-xl bg-muted overflow-hidden grid place-items-center text-xs text-muted-foreground hover:bg-white/40"
+                  >
                     {previewImage ? (
                       <AdminProductImage
                         src={normalizeImageUrl(String(previewImage)) ?? ""}
@@ -701,18 +705,33 @@ function ProductsPage() {
                     ) : (
                       "—"
                     )}
-                  </div>
+                  </button>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">
-                      {p.name || <span className="italic text-muted-foreground">Untitled</span>}
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="font-medium truncate select-text cursor-text" title={p.name || undefined}>
+                        {p.name || <span className="italic text-muted-foreground">Untitled</span>}
+                      </div>
+                      {p.name ? (
+                        <CopyButton
+                          value={p.name}
+                          label="Copy product name"
+                          title="Copy product name"
+                          successMessage="Product name copied"
+                          className="h-7 w-7"
+                        />
+                      ) : null}
                     </div>
-                    <div className="text-xs text-muted-foreground truncate">
+                    <button
+                      type="button"
+                      onClick={() => setEditing(isOpen ? null : i)}
+                      className="block w-full text-left text-xs text-muted-foreground truncate hover:text-foreground"
+                    >
                       /{p.slug || "(no slug)"}
                       {p.category_name ? ` · ${p.category_name}` : ""}
                       {p.price != null ? ` · ₹${Number(p.price).toLocaleString("en-IN")}` : ""}
-                    </div>
+                    </button>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 shrink-0">
                     {p.featured && <Award className="h-4 w-4 text-primary" aria-label="Featured" />}
                     {p.best_seller && (
                       <Star className="h-4 w-4 text-amber-500" aria-label="Best seller" />
@@ -727,7 +746,7 @@ function ProductsPage() {
                       </span>
                     )}
                   </div>
-                </button>
+                </div>
                 {isOpen && (
                   <div className="p-5 border-t border-white/40 space-y-4">
                     <AdminSectionToggles sections={editorSections}>
@@ -735,13 +754,23 @@ function ProductsPage() {
                     </AdminSectionToggles>
                     <div className="grid sm:grid-cols-3 gap-3">
                       <Field label="Name" required>
-                        <input
-                          className={inputCls()}
-                          maxLength={ADMIN_NAME_MAX_LEN}
-                          value={p.name}
-                          onChange={(e) => update(i, { name: e.target.value })}
-                          required
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            className={inputCls()}
+                            maxLength={ADMIN_NAME_MAX_LEN}
+                            value={p.name}
+                            onChange={(e) => update(i, { name: e.target.value })}
+                            required
+                          />
+                          {p.name ? (
+                            <CopyButton
+                              value={p.name}
+                              label="Copy product name"
+                              title="Copy product name"
+                              successMessage="Product name copied"
+                            />
+                          ) : null}
+                        </div>
                       </Field>
                       <Field label="Slug">
                         <input

@@ -17,6 +17,7 @@ const tracking = vi.hoisted(() => ({
         id: 11,
         product_slug: "floral-dress",
         product_name: "Floral Cotton Dress",
+        product_image: "https://cdn.example/dress.jpg",
         size: "2-3 yrs",
         color: "Pink",
         qty: 1,
@@ -68,7 +69,9 @@ vi.mock("@/lib/orders.functions", () => ({
 
 vi.mock("@/lib/razorpay", () => ({ openRazorpayCheckout: vi.fn() }));
 vi.mock("@/lib/invoice-availability", () => ({ isInvoiceAvailable: () => false }));
-vi.mock("@/components/LazyImage", () => ({ LazyImage: () => null }));
+vi.mock("@/components/LazyImage", () => ({
+  LazyImage: ({ src, alt }: { src: string; alt?: string }) => <img src={src} alt={alt ?? ""} />,
+}));
 vi.mock("@/components/CopyButton", () => ({ CopyButton: () => null }));
 vi.mock("@/components/OrderTrackingCard", () => ({ OrderTrackingCard: () => null }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
@@ -82,6 +85,7 @@ describe("order return tracking", () => {
     tracking.order.can_cancel = false;
     tracking.order.pending_cancellation = false;
     tracking.order.packed_at = undefined;
+    tracking.order.cancellation_request = undefined;
   });
 
   it("shows the return state machine with AWB and tracking link", async () => {
@@ -97,6 +101,7 @@ describe("order return tracking", () => {
           reverse_awb: "REV-123",
           tracking_url: "https://track.example/REV-123",
           product_name: "Floral Cotton Dress",
+          product_image: "https://cdn.example/dress.jpg",
         },
       ],
     });
@@ -136,5 +141,63 @@ describe("order return tracking", () => {
     expect(await screen.findByText("Please contact Customer Care")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Request cancellation/i })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Contact Customer Care" })).toHaveAttribute("href", "/contact-us");
+  });
+
+  it("shows the admin return decline reason", async () => {
+    listMyOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "RET-9",
+          order_number: "MNM-1",
+          request_type: "return",
+          status: "rejected",
+          rejection_reason: "Return window of 7 days has expired",
+          requested_at: "2026-09-20T00:00:00Z",
+        },
+      ],
+    });
+
+    render(<OrderDetail />);
+
+    expect(
+      await screen.findByText("This return request was declined. Reason: Return window of 7 days has expired"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the admin exchange reject reason", async () => {
+    listMyOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "EXG-9",
+          order_number: "MNM-1",
+          request_type: "exchange",
+          status: "rejected",
+          rejection_reason: "Requested size is currently out of stock",
+          requested_at: "2026-09-20T00:00:00Z",
+        },
+      ],
+    });
+
+    render(<OrderDetail />);
+
+    expect(
+      await screen.findByText("This exchange request was declined. Reason: Requested size is currently out of stock"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the admin cancellation decline reason", async () => {
+    tracking.order.pending_cancellation = false;
+    tracking.order.cancellation_request = {
+      status: "rejected",
+      rejection_reason: "Order is already packed and cannot be cancelled",
+    };
+    listMyOrderReturns.mockResolvedValue({ returns: [] });
+
+    render(<OrderDetail />);
+
+    expect(await screen.findByText("Cancellation request declined")).toBeInTheDocument();
+    expect(
+      screen.getByText("Reason: Order is already packed and cannot be cancelled"),
+    ).toBeInTheDocument();
   });
 });

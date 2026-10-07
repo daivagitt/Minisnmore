@@ -18,8 +18,19 @@ import { ListPagination } from "@/components/ListPagination";
 import { ReturnConditionNotice } from "@/components/ReturnConditionNotice";
 import { ReturnImageGallery } from "@/components/ReturnImageGallery";
 import { ReturnImageUpload } from "@/components/ReturnImageUpload";
+import { OrderProductThumb } from "@/components/OrderProductThumb";
+import { SHOW_M2_POST_ORDER_UI } from "@/lib/feature-flags";
 import { useListPagination } from "@/hooks/useListPagination";
 import { LIST_PAGE_SIZE } from "@/lib/pagination";
+import {
+  DEFAULT_REFUND_MAX_BUSINESS_DAYS,
+  DEFAULT_REFUND_MIN_BUSINESS_DAYS,
+  DEFAULT_RETURN_WINDOW_DAYS,
+  formatRefundBusinessDayRange,
+  refundListLineMessage,
+} from "@/lib/refund-policy";
+import { resolveReturnProductLines } from "@/lib/return-product-lines";
+import { closedReturnMessage, returnStatusLabel } from "@/lib/return-tracking";
 
 export const Route = createFileRoute("/account/returns")({
   head: () => ({ meta: [{ title: "Returns & exchanges · Mini's n More" }] }),
@@ -27,13 +38,17 @@ export const Route = createFileRoute("/account/returns")({
 });
 
 const TERMINAL_STATUSES = ["rejected", "cancelled", "refunded", "completed"];
-const RETURNS_UI_ENABLED = true;
 
 function ReturnsPage() {
-  if (!RETURNS_UI_ENABLED) return null;
+  if (!SHOW_M2_POST_ORDER_UI) return null;
 
   const { orders: allOrders, loadingOrders } = useAccountData();
-  const [config, setConfig] = useState<{ enabled: boolean; window_days: number } | null>(null);
+  const [config, setConfig] = useState<{
+    enabled: boolean;
+    window_days: number;
+    refund_min_business_days?: number;
+    refund_max_business_days?: number;
+  } | null>(null);
   const [returns, setReturns] = useState<OrderReturnRow[]>([]);
   const [loadingReturns, setLoadingReturns] = useState(true);
   const [eligibility, setEligibility] = useState<Record<string, ReturnEligibility>>({});
@@ -45,7 +60,14 @@ function ReturnsPage() {
   useEffect(() => {
     void getReturnsConfig()
       .then(setConfig)
-      .catch(() => setConfig({ enabled: true, window_days: 3 }));
+      .catch(() =>
+        setConfig({
+          enabled: true,
+          window_days: DEFAULT_RETURN_WINDOW_DAYS,
+          refund_min_business_days: DEFAULT_REFUND_MIN_BUSINESS_DAYS,
+          refund_max_business_days: DEFAULT_REFUND_MAX_BUSINESS_DAYS,
+        }),
+      );
   }, []);
 
   const paidOrders = useMemo(
@@ -160,7 +182,11 @@ function ReturnsPage() {
     );
   }
 
-  const windowDays = config?.window_days ?? 3;
+  const windowDays = config?.window_days ?? DEFAULT_RETURN_WINDOW_DAYS;
+  const refundRange = formatRefundBusinessDayRange(
+    config?.refund_min_business_days ?? DEFAULT_REFUND_MIN_BUSINESS_DAYS,
+    config?.refund_max_business_days ?? DEFAULT_REFUND_MAX_BUSINESS_DAYS,
+  );
 
   return (
     <div className="space-y-4">
@@ -170,8 +196,9 @@ function ReturnsPage() {
         </h1>
         <p className="text-sm text-muted-foreground">
           Eligible within {windowDays} day{windowDays === 1 ? "" : "s"} of delivery. Exchanges depend on stock
-          availability — if the size you want isn't available, you can convert to a refund instead. Refunds reach
-          you in 5–7 business days after we receive the items.
+          availability — if the size you want isn't available, you can convert to a refund instead. Refunds cover
+          item price after discounts; delivery and COD fees are not refunded. Refunds reach you in {refundRange}{" "}
+          after we receive the items.
         </p>
         <ReturnConditionNotice className="mt-4" />
         <div className="mt-4 glass rounded-2xl p-3 inline-flex items-center gap-2 text-xs text-muted-foreground">
@@ -186,15 +213,31 @@ function ReturnsPage() {
           <div className="text-sm text-muted-foreground">No return or exchange requests yet.</div>
         )}
         <div id="account-returns-list" className="space-y-3">
-          {returnsPaging.pageItems.map((r) => (
+          {returnsPaging.pageItems.map((r) => {
+            const productLines = resolveReturnProductLines(r);
+            return (
             <div key={r.return_number} className="glass rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="min-w-0">
+                <div className="flex gap-3 items-start">
+                  {productLines.length > 0 ? (
+                    <div className="flex -space-x-2 shrink-0">
+                      {productLines.slice(0, 3).map((line, index) => (
+                        <OrderProductThumb
+                          key={`${line.product_name ?? "item"}-${index}`}
+                          src={line.product_image}
+                          alt={line.product_name ?? ""}
+                          className="h-12 w-12 ring-2 ring-background"
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="min-w-0">
                 <div className="font-medium">
                   {r.request_type === "exchange" ? "Exchange" : "Return"} · {r.return_number}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {r.order_number} · {new Date(r.requested_at).toLocaleDateString("en-IN")} ·{" "}
-                  <span className="uppercase tracking-wide">{r.status.replace(/_/g, " ")}</span>
+                  <span className="uppercase tracking-wide">{returnStatusLabel(r)}</span>
                 </div>
                 {r.product_name ? (
                   <div className="text-xs text-muted-foreground mt-0.5">
@@ -210,10 +253,21 @@ function ReturnsPage() {
                       : ""}
                   </div>
                 ) : null}
-                {r.rejection_reason ? (
-                  <p className="text-xs text-amber-700 mt-1">{r.rejection_reason}</p>
+                {r.status === "refunded" ? (
+                  <p className="text-xs text-amber-800 mt-2">
+                    {refundListLineMessage(
+                      config?.refund_min_business_days ?? DEFAULT_REFUND_MIN_BUSINESS_DAYS,
+                      config?.refund_max_business_days ?? DEFAULT_REFUND_MAX_BUSINESS_DAYS,
+                      r.order_payment_status,
+                    )}
+                  </p>
+                ) : null}
+                {String(r.status ?? "").toLowerCase() === "rejected" ? (
+                  <p className="text-xs text-amber-800 mt-1">{closedReturnMessage(r)}</p>
                 ) : null}
                 <ReturnImageGallery urls={r.image_urls} className="mt-2 flex flex-wrap gap-2" />
+                  </div>
+                </div>
                 {r.reverse_awb || r.tracking_url ? (
                   r.tracking_url ? (
                     <a
@@ -250,7 +304,8 @@ function ReturnsPage() {
                 </button>
               ) : null}
             </div>
-          ))}
+            );
+          })}
         </div>
         <ListPagination
           page={returnsPaging.page}
@@ -269,13 +324,32 @@ function ReturnsPage() {
           <div className="text-sm text-muted-foreground">No paid orders yet.</div>
         )}
         <div id="account-eligible-orders-list" className="space-y-4">
-          {paidPaging.pageItems.map((o: { id: string; order_number: string; created_at: string; total: number }) => {
+          {paidPaging.pageItems.map((o: {
+            id: string;
+            order_number: string;
+            created_at: string;
+            total: number;
+            order_items?: Array<{ product_name?: string; product_image?: string }>;
+          }) => {
             const open = openReturnByOrder.get(o.order_number);
             const elig = eligibility[o.order_number];
             return (
               <div key={o.id} className="glass rounded-2xl p-4 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 min-w-0">
-                  <div className="min-w-0">
+                  <div className="flex items-start gap-3 min-w-0">
+                    {(o.order_items ?? []).length > 0 ? (
+                      <div className="flex -space-x-2 shrink-0">
+                        {(o.order_items ?? []).slice(0, 3).map((it, i) => (
+                          <OrderProductThumb
+                            key={`${it.product_name ?? "item"}-${i}`}
+                            src={it.product_image}
+                            alt={it.product_name ?? ""}
+                            className="h-12 w-12 ring-2 ring-background"
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                    <div className="min-w-0">
                     <Link
                       to="/account/orders/$orderNumber"
                       params={{ orderNumber: o.order_number }}
@@ -286,6 +360,7 @@ function ReturnsPage() {
                     <div className="text-xs text-muted-foreground">
                       {formatOrderDate(o.created_at)}{" "}
                       · ₹{Number(o.total).toLocaleString("en-IN")}
+                    </div>
                     </div>
                   </div>
                   {open ? (

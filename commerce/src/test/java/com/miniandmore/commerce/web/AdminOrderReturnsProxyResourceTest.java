@@ -104,6 +104,8 @@ class AdminOrderReturnsProxyResourceTest {
             "close-pickup-failed",
             "settle-price-difference",
             "book-outbound",
+            "package-rates",
+            "complete-package",
         };
         for (String path : paths) {
             when(catalog.post(eq("/internal/v1/admin/order-returns/R3/" + path), any())).thenReturn(ResponseEntity.ok("{}"));

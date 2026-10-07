@@ -376,6 +376,79 @@ class XpressBeesClientTest {
     }
 
     @Test
+    void buildTokenReverseManifestBody_usesShipments2Contract() throws Exception {
+        var node = new ObjectMapper().readTree(client.buildTokenReverseManifestBody(sampleReverseRequest(), "8"));
+
+        assertThat(node.path("order_number").asText()).isEqualTo("312CCA7BFFAF-662135");
+        assertThat(node.path("order_number").asText()).hasSizeLessThanOrEqualTo(20);
+        assertThat(node.path("payment_type").asText()).isEqualTo("reverse");
+        assertThat(node.path("courier_id").asText()).isEqualTo("8");
+        assertThat(node.path("collectable_amount").decimalValue()).isEqualByComparingTo("0");
+        assertThat(node.path("pickup").path("name").asText()).isEqualTo("WH");
+        assertThat(node.path("pickup").path("pincode").asText()).isEqualTo("560074");
+        assertThat(node.path("consignee").path("name").asText()).isEqualTo("Jane");
+        assertThat(node.path("consignee").path("pincode").asText()).isEqualTo("560001");
+        assertThat(node.path("order_items").get(0).path("qty").asText()).isEqualTo("1");
+        assertThat(node.path("package_weight").asInt()).isEqualTo(500);
+        assertThat(node.has("delivery")).isFalse();
+        assertThat(node.has("products")).isFalse();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void createReversePickup_tokenAuth_replacesLegacyRouteWithShipments2() throws Exception {
+        ApplicationProperties properties = new ApplicationProperties();
+        ApplicationProperties.XpressBees config = properties.getXpressbees();
+        config.setEmail("info@example.com");
+        config.setPassword("secret");
+        config.setOriginPincode("560074");
+        config.setBaseUrl("https://xpressbees.test");
+        config.setBusinessAccountName("MiniSnMore");
+        config.setWarehouseLine1("Warehouse 1");
+        // This is still present in UAT's environment. Token auth must not call this legacy API.
+        config.setReverseManifestPath("/api/courier/reverse/order");
+        XpressBeesClient shippingClient = new XpressBeesClient(properties, new ObjectMapper());
+        HttpClient shippingHttp = mock(HttpClient.class);
+        ReflectionTestUtils.setField(shippingClient, "httpClient", shippingHttp);
+
+        HttpResponse<String> loginResponse = mock(HttpResponse.class);
+        when(loginResponse.statusCode()).thenReturn(200);
+        when(loginResponse.body()).thenReturn("{\"status\":true,\"data\":\"plain-login-token\"}");
+
+        HttpResponse<String> createResponse = mock(HttpResponse.class);
+        when(createResponse.statusCode()).thenReturn(200);
+        when(createResponse.body()).thenReturn("{\"status\":true,\"data\":{\"awb_number\":\"XB-REV-1\",\"shipment_id\":99}}");
+
+        HttpResponse<String> serviceabilityResponse = mock(HttpResponse.class);
+        when(serviceabilityResponse.statusCode()).thenReturn(200);
+        when(serviceabilityResponse.body())
+            .thenReturn("{\"status\":true,\"data\":[{\"id\":\"1\",\"name\":\"Surface Xpressbees 0.5 K.G\"},{\"id\":\"8\",\"name\":\"Express Reverse\"}]}");
+
+        when(shippingHttp.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenAnswer(invocation -> {
+                HttpRequest request = invocation.getArgument(0);
+                String uri = request.uri().toString();
+                if (uri.endsWith("/api/users/login")) {
+                    return loginResponse;
+                }
+                if (uri.endsWith("/api/courier/serviceability/pincode/560001")) {
+                    assertThat(request.method()).isEqualTo("GET");
+                    return serviceabilityResponse;
+                }
+                if (uri.equals("https://xpressbees.test/api/shipments2")) {
+                    assertThat(request.method()).isEqualTo("POST");
+                    return createResponse;
+                }
+                throw new AssertionError("Unexpected HTTP request: " + uri);
+            });
+
+        XpressBeesClient.ReversePickupResult result = shippingClient.createReversePickup(sampleReverseRequest());
+
+        assertThat(result.awb()).isEqualTo("XB-REV-1");
+        verify(shippingHttp, times(3)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
     void parseForwardShipmentResponse_tokenSuccess_returnsAwbAndLabel() throws Exception {
         String body =
             """
@@ -578,6 +651,153 @@ class XpressBeesClientTest {
     }
 
     @Test
+    void parseForwardCourierOptions_prefersNestedFreightOverZeroRate() {
+        String body =
+            """
+            {
+              "status": true,
+              "data": [
+                {"id":"1","name":"Surface Xpressbees 0.5 K.G","eddDays":3,"rate":0,"freight_charges":48.5},
+                {"id":"2","name":"Xpressbees 1 K.G","eddDays":2,"pricing":{"total_charges":"72"}}
+              ]
+            }
+            """;
+
+        List<XpressBeesClient.CourierOption> options = client.parseForwardCourierOptions(body, 500);
+
+        assertThat(options).hasSize(2);
+        assertThat(options.get(0).rate()).isEqualByComparingTo("48.5");
+        assertThat(options.get(1).rate()).isEqualByComparingTo("72");
+    }
+
+    @Test
+    void parseForwardCourierOptions_prefersTotalChargesOverFreightForCod() {
+        String body =
+            """
+            {
+              "status": true,
+              "data": [
+                {"id":"1","name":"Surface Xpressbees 0.5 K.G","freight_charges":50,"cod_charges":34,"total_charges":84,"eddDays":7}
+              ]
+            }
+            """;
+
+        List<XpressBeesClient.CourierOption> options = client.parseForwardCourierOptions(body, 500);
+
+        assertThat(options).hasSize(1);
+        assertThat(options.get(0).rate()).isEqualByComparingTo("84");
+    }
+
+    @Test
+    void parseForwardCourierOptions_readsLiveFreightChargesWithoutRateField() {
+        String body =
+            """
+            {
+              "status": true,
+              "data": [
+                {
+                  "id":"1",
+                  "name":"Surface Xpressbees 0.5 K.G",
+                  "freight_charges":50,
+                  "cod_charges":0,
+                  "total_charges":50,
+                  "eddDays":7
+                }
+              ]
+            }
+            """;
+
+        List<XpressBeesClient.CourierOption> options = client.parseForwardCourierOptions(body, 500);
+
+        assertThat(options).hasSize(1);
+        assertThat(options.get(0).rate()).isEqualByComparingTo("50");
+        assertThat(options.get(0).eta()).isEqualTo("7 days");
+    }
+
+    @Test
+    void buildCourierRatePayload_postsIntegerGramsDimensionsAndCodAmount() {
+        java.util.Map<String, Object> prepaid = client.buildCourierRatePayload("400067", 500, 20, 15, 10, "prepaid", null);
+        assertThat(prepaid.get("origin")).isEqualTo("560074");
+        assertThat(prepaid.get("destination")).isEqualTo("400067");
+        assertThat(prepaid.get("payment_type")).isEqualTo("prepaid");
+        assertThat(prepaid.get("weight")).isEqualTo(500);
+        assertThat(prepaid.get("length")).isEqualTo(20);
+        assertThat(prepaid.get("breadth")).isEqualTo(15);
+        assertThat(prepaid.get("height")).isEqualTo(10);
+        assertThat(prepaid).doesNotContainKey("order_amount");
+
+        java.util.Map<String, Object> cod = client.buildCourierRatePayload(
+            "400067",
+            500,
+            0,
+            0,
+            0,
+            "cod",
+            new java.math.BigDecimal("1499")
+        );
+        assertThat(cod.get("payment_type")).isEqualTo("cod");
+        assertThat((java.math.BigDecimal) cod.get("order_amount")).isEqualByComparingTo("1499");
+        assertThat(cod).doesNotContainKey("length");
+
+        java.util.Map<String, Object> missingCodAmount = client.buildCourierRatePayload("400067", 0, 10, 8, 4, "cod", null);
+        assertThat(missingCodAmount.get("payment_type")).isEqualTo("cod");
+        assertThat(missingCodAmount.get("weight")).isEqualTo(1);
+        assertThat(missingCodAmount).doesNotContainKey("order_amount");
+    }
+
+    @Test
+    void courierSelectionWeightGrams_usesChargeableWeightForVolumetricBox() {
+        int weight = ReflectionTestUtils.invokeMethod(client, "courierSelectionWeightGrams", 400, 40, 30, 25);
+
+        assertThat(weight).isEqualTo(6000);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void listForwardCourierOptions_postsServiceabilityBodyInsteadOfGet() throws Exception {
+        HttpResponse<String> loginResponse = mock(HttpResponse.class);
+        when(loginResponse.statusCode()).thenReturn(200);
+        when(loginResponse.body()).thenReturn("{\"status\":true,\"data\":\"plain-login-token\"}");
+
+        HttpResponse<String> ratesResponse = mock(HttpResponse.class);
+        when(ratesResponse.statusCode()).thenReturn(200);
+        when(ratesResponse.body())
+            .thenReturn(
+                """
+                {"status":true,"data":[{"id":"1","name":"Surface Xpressbees 0.5 K.G","freight_charges":50,"eddDays":7}]}
+                """
+            );
+
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenAnswer(invocation -> {
+                HttpRequest request = invocation.getArgument(0);
+                String uri = request.uri().toString();
+                if (uri.endsWith("/api/users/login")) {
+                    return loginResponse;
+                }
+                if (uri.equals("https://xpressbees.test/api/courier/serviceability/pincode/400067")) {
+                    assertThat(request.method()).isEqualTo("POST");
+                    return ratesResponse;
+                }
+                throw new AssertionError("Unexpected HTTP request: " + request.method() + " " + uri);
+            });
+
+        List<XpressBeesClient.CourierOption> options = client.listForwardCourierOptions(
+            "400067",
+            500,
+            20,
+            15,
+            10,
+            "prepaid",
+            null
+        );
+
+        assertThat(options).hasSize(1);
+        assertThat(options.get(0).rate()).isEqualByComparingTo("50");
+        verify(httpClient, times(2)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
     void courierSelectionWeightGrams_usesChargeableWeightFromDimensions() {
         ApplicationProperties properties = new ApplicationProperties();
         properties.getXpressbees().setVolumetricDivisor(5000);
@@ -632,6 +852,53 @@ class XpressBeesClientTest {
         assertThat(node.path("courier_id").asText()).isEqualTo("2");
     }
 
+    @Test
+    void buildTokenForwardManifestBody_leavesShortOrderNumberUnchanged() throws Exception {
+        var node = new ObjectMapper().readTree(client.buildTokenForwardManifestBody(sampleForwardRequest("prepaid", new java.math.BigDecimal("100")), "1"));
+
+        assertThat(node.path("order_number").asText()).isEqualTo("MNM-COD-1");
+        assertThat(node.path("order_id").asText()).isEqualTo("MNM-COD-1");
+    }
+
+    @Test
+    void buildTokenForwardManifestBody_truncatesExchangeOutboundOrderNumberTo30() throws Exception {
+        // Store order numbers are well under 30. Exchange outbound appends "-OUT" to the
+        // return number, which is what ExpressBees rejected for RET-MNM-F1942C01991F-2BFB42.
+        String storeOrderNumber = "MNM-F1942C01991F";
+        String caseReference = "RET-MNM-F1942C01991F-2BFB42-OUT";
+        assertThat(storeOrderNumber.length()).isLessThan(30);
+        assertThat(caseReference.length()).isGreaterThan(30);
+
+        XpressBeesClient.ForwardShipmentRequest request = new XpressBeesClient.ForwardShipmentRequest(
+            caseReference,
+            storeOrderNumber,
+            new XpressBeesClient.ReversePickupAddress("WH", "9876500000", null, "WH Line", null, "City", "State", "560074"),
+            new XpressBeesClient.ReversePickupAddress("Jane", "9876543210", null, "Line 1", null, "City", "State", "560001"),
+            List.of(new XpressBeesClient.ReversePickupLine("Tee", "SKU", 1, new java.math.BigDecimal("100"), 500)),
+            null
+        );
+
+        var node = new ObjectMapper().readTree(client.buildTokenForwardManifestBody(request, "1"));
+        String providerOrderNumber = node.path("order_number").asText();
+
+        assertThat(providerOrderNumber).isEqualTo("ET-MNM-F1942C01991F-2BFB42-OUT");
+        assertThat(providerOrderNumber.length()).isLessThanOrEqualTo(XpressBeesClient.FORWARD_PROVIDER_ORDER_NUMBER_MAX_LEN);
+        assertThat(node.path("order_id").asText()).isEqualTo(providerOrderNumber);
+        assertThat(providerOrderNumber).contains("2BFB42");
+        assertThat(providerOrderNumber).endsWith("-OUT");
+    }
+
+    @Test
+    void truncateProviderOrderNumber_keepsUniqueTail() {
+        assertThat(XpressBeesClient.truncateProviderOrderNumber("MNM-F1942C01991F", 30)).isEqualTo("MNM-F1942C01991F");
+        assertThat(XpressBeesClient.truncateProviderOrderNumber("RET-MNM-F1942C01991F-2BFB42-OUT", 30))
+            .isEqualTo("ET-MNM-F1942C01991F-2BFB42-OUT")
+            .hasSize(30);
+        assertThat(XpressBeesClient.truncateProviderOrderNumber("-ABCDEFGHIJKLMNOPQRSTUVWXYZ", 20))
+            .doesNotStartWith("-")
+            .hasSizeLessThanOrEqualTo(20);
+    }
+
     private static XpressBeesClient.ForwardShipmentRequest sampleForwardRequest(String paymentType, java.math.BigDecimal amount) {
         return new XpressBeesClient.ForwardShipmentRequest(
             "MNM-COD-1",
@@ -643,6 +910,35 @@ class XpressBeesClientTest {
             paymentType,
             amount,
             "cod".equals(paymentType) ? amount : java.math.BigDecimal.ZERO
+        );
+    }
+
+    private static XpressBeesClient.ReversePickupRequest sampleReverseRequest() {
+        return new XpressBeesClient.ReversePickupRequest(
+            "RET-MNM-312CCA7BFFAF-662135",
+            "MNM-312CCA7BFFAF",
+            new XpressBeesClient.ReversePickupAddress(
+                "Jane",
+                "9876543210",
+                "jane@example.com",
+                "Line 1",
+                null,
+                "City",
+                "State",
+                "560001"
+            ),
+            new XpressBeesClient.ReversePickupAddress(
+                "WH",
+                "9876500000",
+                null,
+                "WH Line",
+                null,
+                "City",
+                "State",
+                "560074"
+            ),
+            List.of(new XpressBeesClient.ReversePickupLine("Tee", "SKU", 1, new java.math.BigDecimal("100"), 500)),
+            null
         );
     }
 

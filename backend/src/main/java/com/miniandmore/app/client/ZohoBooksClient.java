@@ -468,6 +468,14 @@ public class ZohoBooksClient {
         return get("/invoices/" + invoiceId + "?" + orgIdParam());
     }
 
+    public Map<String, Object> listInvoicePayments(String invoiceId) {
+        return get("/invoices/" + invoiceId + "/payments?" + orgIdParam());
+    }
+
+    public void deleteInvoicePayment(String invoiceId, String invoicePaymentId) {
+        delete("/invoices/" + invoiceId + "/payments/" + invoicePaymentId + "?" + orgIdParam());
+    }
+
     /**
      * Downloads one invoice as a PDF via the bulk-export endpoint reused with a single id
      * ({@code invoice_ids}) — Zoho Books has no dedicated single-invoice PDF path.
@@ -585,8 +593,74 @@ public class ZohoBooksClient {
             .toList();
     }
 
+    public Map<String, Object> createInvoice(Map<String, Object> payload) {
+        return post("/invoices?" + orgIdParam(), payload);
+    }
+
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> findInvoiceByReferenceNumber(String referenceNumber) {
+        String trimmed = StringUtils.trimToNull(referenceNumber);
+        if (trimmed == null) {
+            return null;
+        }
+        Map<String, Object> response = get("/invoices?" + orgIdParam() + "&reference_number=" + encode(trimmed));
+        List<Map<String, Object>> invoices = (List<Map<String, Object>>) response.getOrDefault("invoices", List.of());
+        for (Map<String, Object> invoice : invoices) {
+            String reference = stringValue(invoice.get("reference_number"));
+            if (trimmed.equalsIgnoreCase(StringUtils.trimToEmpty(reference))) {
+                return invoice;
+            }
+        }
+        return null;
+    }
+
+    public Map<String, Object> getCreditNote(String creditNoteId) {
+        return get("/creditnotes/" + creditNoteId + "?" + orgIdParam());
+    }
+
+    public Map<String, Object> applyCreditNoteToInvoices(String creditNoteId, Map<String, Object> payload) {
+        return post("/creditnotes/" + creditNoteId + "/invoices?" + orgIdParam(), payload);
+    }
+
     public Map<String, Object> createCreditNote(Map<String, Object> payload) {
         return post("/creditnotes?" + orgIdParam(), payload);
+    }
+
+    /**
+     * Reuse an existing cancellation/return credit note when a retry lost the persisted id locally.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> findCreditNoteByReferenceNumber(String referenceNumber) {
+        String trimmed = StringUtils.trimToNull(referenceNumber);
+        if (trimmed == null) {
+            return null;
+        }
+        Map<String, Object> response = get("/creditnotes?" + orgIdParam() + "&reference_number=" + encode(trimmed));
+        List<Map<String, Object>> creditNotes = (List<Map<String, Object>>) response.getOrDefault("creditnotes", List.of());
+        Map<String, Object> best = null;
+        int bestRank = -1;
+        for (Map<String, Object> creditNote : creditNotes) {
+            String reference = stringValue(creditNote.get("reference_number"));
+            if (!trimmed.equalsIgnoreCase(StringUtils.trimToEmpty(reference))) {
+                continue;
+            }
+            int rank = creditNoteReuseRank(stringValue(creditNote.get("status")));
+            if (rank > bestRank) {
+                best = creditNote;
+                bestRank = rank;
+            }
+        }
+        return best;
+    }
+
+    private static int creditNoteReuseRank(String status) {
+        String normalized = StringUtils.lowerCase(StringUtils.trimToEmpty(status));
+        return switch (normalized) {
+            case "void", "voided" -> -1;
+            case "draft" -> 1;
+            case "open", "pending" -> 2;
+            default -> 0;
+        };
     }
 
     public Map<String, Object> createCustomerPayment(Map<String, Object> payload) {
@@ -614,6 +688,10 @@ public class ZohoBooksClient {
     private Map<String, Object> put(String path, Object body) {
         RestClient.RequestBodySpec spec = client().put().uri(path).contentType(MediaType.APPLICATION_JSON);
         return (Map<String, Object>) authorize(spec.body(body)).retrieve().body(Map.class);
+    }
+
+    private void delete(String path) {
+        authorize(client().delete().uri(path)).retrieve().toBodilessEntity();
     }
 
     private String encode(String value) {

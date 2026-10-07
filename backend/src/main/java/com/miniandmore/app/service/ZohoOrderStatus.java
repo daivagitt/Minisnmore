@@ -89,6 +89,7 @@ public final class ZohoOrderStatus {
         }
         if (delivered && order.getStatus() != OrderStatus.CANCELLED) {
             order.setStatus(OrderStatus.FULFILLED);
+            challans.stream().filter(ZohoOrderStatus::indicatesDelivery).findFirst().ifPresent(challan -> OrderDeliverySupport.markDelivered(order, challan));
         }
     }
 
@@ -129,8 +130,10 @@ public final class ZohoOrderStatus {
                 order.setShipmentDate(LocalDate.now().toString());
             }
         }
-        if (packages.stream().anyMatch(ZohoOrderStatus::isFulfilledShipment)) {
+        java.util.Optional<Map<String, Object>> deliveredPackage = packages.stream().filter(ZohoOrderStatus::isFulfilledShipment).findFirst();
+        if (deliveredPackage.isPresent()) {
             order.setStatus(OrderStatus.FULFILLED);
+            OrderDeliverySupport.markDelivered(order, deliveredPackage.orElseThrow());
             return;
         }
         if (order.getStatus() != OrderStatus.CONFIRMED) {
@@ -307,6 +310,7 @@ public final class ZohoOrderStatus {
         // explicit "delivered" signal here for Zoho organizations that expose one directly.
         if ("delivered".equals(status) || "delivered".equals(shippedStatus) || "delivered".equals(shippedStatusCamel) || indicatesDelivery(salesOrder)) {
             order.setStatus(OrderStatus.FULFILLED);
+            OrderDeliverySupport.markDelivered(order, salesOrder);
             return;
         }
         // Sales-order "fulfilled"/invoiced is not physical delivery. Never demote a store

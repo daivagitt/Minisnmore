@@ -64,8 +64,15 @@ public class ZohoStockReconcileService {
     }
 
     public void reconcileOrderProducts(CustomerOrder order) {
+        reconcileOrderProducts(order, false);
+    }
+
+    /**
+     * @return true when every product on the order reconciled successfully (or nothing to reconcile)
+     */
+    public boolean reconcileOrderProducts(CustomerOrder order, boolean failOnError) {
         if (!accountResolver.isStockAdjustmentEnabled() || order == null) {
-            return;
+            return true;
         }
         Set<Long> productIds = new LinkedHashSet<>();
         for (OrderItem item : orderItemRepository.findAllByOrderId(order.getId())) {
@@ -78,18 +85,33 @@ public class ZohoStockReconcileService {
                 // skip malformed product id
             }
         }
+        boolean allOk = true;
         for (Long productId : productIds) {
             try {
-                syncProductStockOnly(productId);
+                Map<String, Object> result = syncProductStockOnly(productId);
+                Object ok = result.get("ok");
+                if (Boolean.FALSE.equals(ok)) {
+                    allOk = false;
+                    if (failOnError) {
+                        throw new IllegalStateException(
+                            "Zoho stock reconcile failed for product " + productId + " on order " + order.getOrderNumber()
+                        );
+                    }
+                }
             } catch (RuntimeException e) {
+                allOk = false;
                 LOG.warn(
                     "Post-document stock reconcile failed for product {} on order {}: {}",
                     productId,
                     order.getOrderNumber(),
                     e.getMessage()
                 );
+                if (failOnError) {
+                    throw e;
+                }
             }
         }
+        return allOk;
     }
 
     private Map<String, Object> reconcileProductStock(Product product, String variantSkuHint, Integer stockOverride) {

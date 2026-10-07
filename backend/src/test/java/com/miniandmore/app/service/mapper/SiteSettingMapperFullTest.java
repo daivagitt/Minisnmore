@@ -47,7 +47,10 @@ class SiteSettingMapperFullTest {
             .shippingExpressInr(150)
             .freeShippingMinInr(2500)
             .codFeeInr(149)
-            .deliveryEtaBufferDays(3);
+            .deliveryEtaBufferDays(3)
+            .returnWindowDays(3)
+            .refundMinBusinessDays(2)
+            .refundMaxBusinessDays(5);
         entity.setSubscribeHeroTitle("Subscribe");
         entity.setSubscribeHeroSubtitle("Get updates");
         entity.setSubscribeTestimonial("Love it!");
@@ -79,6 +82,9 @@ class SiteSettingMapperFullTest {
         assertThat(dto.getFreeShippingMinInr()).isEqualTo(2500);
         assertThat(roundTrip.getCodFeeInr()).isEqualTo(149);
         assertThat(roundTrip.getDeliveryEtaBufferDays()).isEqualTo(3);
+        assertThat(roundTrip.getReturnWindowDays()).isEqualTo(3);
+        assertThat(roundTrip.getRefundMinBusinessDays()).isEqualTo(2);
+        assertThat(roundTrip.getRefundMaxBusinessDays()).isEqualTo(5);
         assertThat(roundTrip.getContactEmail()).isEqualTo("hello@example.com");
         assertThat(copy.getBrandName()).isEqualTo("Updated Brand");
         assertThat(mapper.toDto(List.of(entity))).hasSize(1);

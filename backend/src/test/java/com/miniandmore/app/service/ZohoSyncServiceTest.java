@@ -20,6 +20,8 @@ import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.Product;
 import com.miniandmore.app.domain.ZohoSetting;
+import com.miniandmore.app.domain.enumeration.OrderStatus;
+import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.CustomerProfileRepository;
@@ -41,7 +43,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientResponseException;
 
@@ -898,7 +902,6 @@ class ZohoSyncServiceTest {
 
     @Test
     void syncOrder_reusesExistingSalesOrderByReferenceInsteadOfCreatingASecond() {
-        Product product = new Product().id(10L).sku("SKU-10").zohoItemId("zoho-item-10");
         OrderItem line = new OrderItem()
             .productId("10")
             .productName("Dress")
@@ -1450,17 +1453,68 @@ class ZohoSyncServiceTest {
         when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-online-paid")));
         when(booksClient.createInvoiceFromSalesOrder("so-online-paid"))
             .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-online-paid")));
+        when(booksClient.getInvoice("inv-online-paid"))
+            .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-online-paid", "status", "sent", "balance", 1000)));
+        when(booksClient.createCustomerPayment(any())).thenReturn(Map.of("payment", Map.of("payment_id", "pay-online")));
         when(productRepository.findById(10L)).thenReturn(Optional.of(product));
 
         service.syncOrder(117L);
 
         assertThat(order.getZohoInvoiceId()).isEqualTo("inv-online-paid");
         verify(booksClient).markInvoiceAsSent("inv-online-paid");
+        ArgumentCaptor<Map<String, Object>> paymentCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(booksClient).createCustomerPayment(paymentCaptor.capture());
+        Map<String, Object> payment = paymentCaptor.getValue();
+        assertThat(payment.get("payment_mode")).isEqualTo("others");
+        assertThat(payment.get("customer_id")).isEqualTo("cust-1");
+        assertThat(payment.get("description")).isEqualTo("Razorpay prepaid payment");
+        assertThat(new BigDecimal(String.valueOf(payment.get("amount")))).isEqualByComparingTo("1000");
+    }
+
+    @Test
+    void syncOrder_paidOnline_usesRazorpayPaymentIdAndSkipsWhenInvoiceAlreadyPaid() {
+        CustomerOrder alreadyPaid = new CustomerOrder()
+            .id(118L)
+            .orderNumber("MNM-ONLINE-SETTLED")
+            .userLogin("buyer@example.com")
+            .paymentMethod("online")
+            .paymentStatus(com.miniandmore.app.domain.enumeration.PaymentStatus.PAID)
+            .razorpayPaymentId("pay_RzpAlreadyPaid")
+            .zohoSalesOrderId("so-online-settled")
+            .zohoInvoiceId("inv-online-settled");
+        when(customerOrderRepository.findById(118L)).thenReturn(Optional.of(alreadyPaid));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(booksClient.getInvoice("inv-online-settled"))
+            .thenReturn(Map.of("invoice", Map.of("status", "paid", "balance", 0)));
+
+        service.syncOrder(118L);
+
+        verify(booksClient, never()).createCustomerPayment(any());
+
+        CustomerOrder unpaid = new CustomerOrder()
+            .id(119L)
+            .orderNumber("MNM-ONLINE-RAZORPAY")
+            .userLogin("buyer@example.com")
+            .paymentMethod("online")
+            .paymentStatus(com.miniandmore.app.domain.enumeration.PaymentStatus.PAID)
+            .razorpayPaymentId("pay_RzpRef123")
+            .zohoSalesOrderId("so-online-rzp")
+            .zohoInvoiceId("inv-online-rzp");
+        when(customerOrderRepository.findById(119L)).thenReturn(Optional.of(unpaid));
+        when(booksClient.getInvoice("inv-online-rzp"))
+            .thenReturn(Map.of("invoice", Map.of("status", "sent", "balance", 2500)));
+        when(booksClient.createCustomerPayment(any())).thenReturn(Map.of("payment", Map.of("payment_id", "pay-rzp")));
+
+        service.syncOrder(119L);
+
+        ArgumentCaptor<Map<String, Object>> paymentCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(booksClient).createCustomerPayment(paymentCaptor.capture());
+        assertThat(paymentCaptor.getValue().get("reference_number")).isEqualTo("pay_RzpRef123");
+        assertThat(paymentCaptor.getValue().get("payment_mode")).isEqualTo("others");
     }
 
     @Test
     void syncOrder_codCollected_recordsCashPaymentAgainstInvoice() {
-        Product product = new Product().id(10L).sku("SKU-10").zohoItemId("zoho-item-10");
         OrderItem line = new OrderItem()
             .productId("10")
             .productName("Dress")
@@ -1725,6 +1779,241 @@ class ZohoSyncServiceTest {
         Map<String, Object> result = service.syncProductStockOnly(14L);
 
         assertThat(result).containsEntry("ok", true);
+        verify(booksClient, never()).createInventoryAdjustment(any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void createCreditNote_usesReturnedQuantitiesNotFullOrder() {
+        Product product = new Product().id(10L).sku("SKU-10").zohoItemId("zoho-item-10");
+        OrderItem kept = new OrderItem()
+            .id(1L)
+            .productId("10")
+            .productName("Dress")
+            .itemSize("S")
+            .color("Red")
+            .variantSku("DRESS-S-RED")
+            .qty(2)
+            .price(BigDecimal.valueOf(499));
+        OrderItem returned = new OrderItem()
+            .id(2L)
+            .productId("10")
+            .productName("Dress")
+            .itemSize("M")
+            .color("Blue")
+            .variantSku("DRESS-M-BLUE")
+            .qty(1)
+            .price(BigDecimal.valueOf(499));
+        CustomerOrder order = new CustomerOrder()
+            .id(200L)
+            .orderNumber("MNM-RET-1")
+            .userLogin("buyer@example.com")
+            .shipping(BigDecimal.valueOf(80))
+            .zohoInvoiceId("inv-ret");
+        when(customerOrderRepository.findById(200L)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(200L)).thenReturn(List.of(kept, returned));
+        when(productRepository.findById(10L)).thenReturn(Optional.of(product));
+        when(booksClient.getInvoice("inv-ret")).thenReturn(
+            Map.of(
+                "invoice",
+                Map.of(
+                    "customer_id",
+                    "cust-invoice",
+                    "date",
+                    "2026-10-01",
+                    "is_inclusive_tax",
+                    true,
+                    "shipping_charge",
+                    80,
+                    "line_items",
+                    List.of(
+                        Map.of("item_id", "zoho-item-10", "line_item_id", "inv-line-1", "rate", 499, "tax_id", "tax-5"),
+                        Map.of("item_id", "zoho-item-10", "line_item_id", "inv-line-2", "rate", 499, "tax_id", "tax-5")
+                    )
+                )
+            )
+        );
+        when(booksClient.createCreditNote(any())).thenReturn(Map.of("creditnote", Map.of("creditnote_id", "cn-1")));
+
+        Optional<String> creditNoteId = service.createCreditNote(200L, "RET-1", Map.of(2L, 1));
+
+        assertThat(creditNoteId).contains("cn-1");
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(booksClient).createCreditNote(payloadCaptor.capture());
+        Map<String, Object> payload = payloadCaptor.getValue();
+        assertThat(payload)
+            .containsEntry("customer_id", "cust-invoice")
+            .containsEntry("invoice_id", "inv-ret")
+            .containsEntry("is_inclusive_tax", true)
+            .containsEntry("date", "2026-10-01");
+        assertThat(new BigDecimal(String.valueOf(payload.get("shipping_charge")))).isEqualByComparingTo(BigDecimal.ZERO);
+        List<Map<String, Object>> lines = (List<Map<String, Object>>) payload.get("line_items");
+        assertThat(lines).hasSize(1);
+        assertThat(lines.get(0))
+            .containsEntry("quantity", 1)
+            .containsEntry("item_id", "zoho-item-10")
+            .containsEntry("invoice_item_id", "inv-line-2")
+            .containsEntry("rate", 499)
+            .containsEntry("tax_id", "tax-5")
+            .doesNotContainKey("name")
+            .doesNotContainKey("description");
+        verify(booksClient, never()).findContactByEmail(any());
+    }
+
+    @Test
+    void createCreditNote_reusesExistingByReturnNumber_doesNotCreateAgain() {
+        CustomerOrder order = new CustomerOrder().id(204L).orderNumber("MNM-RET-EXISTING").zohoInvoiceId("inv-existing");
+        when(customerOrderRepository.findById(204L)).thenReturn(Optional.of(order));
+        when(booksClient.findCreditNoteByReferenceNumber("RET-EXISTING")).thenReturn(
+            Map.of("creditnote_id", "cn-existing", "reference_number", "RET-EXISTING", "status", "open")
+        );
+
+        Optional<String> creditNoteId = service.createCreditNote(204L, "RET-EXISTING", Map.of(1L, 1));
+
+        assertThat(creditNoteId).contains("cn-existing");
+        verify(booksClient, never()).createCreditNote(any());
+        verify(booksClient, never()).getInvoice(any());
+    }
+
+    @Test
+    void createCreditNote_timeoutAfterCreate_reusesCreditNoteByReference() {
+        Product product = new Product().id(10L).sku("SKU-10").zohoItemId("zoho-item-10");
+        OrderItem item = new OrderItem().id(1L).productId("10").productName("Tee").qty(1).price(BigDecimal.valueOf(499));
+        CustomerOrder order = new CustomerOrder().id(205L).orderNumber("MNM-RET-TIMEOUT").zohoInvoiceId("inv-timeout");
+        when(customerOrderRepository.findById(205L)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(205L)).thenReturn(List.of(item));
+        when(productRepository.findById(10L)).thenReturn(Optional.of(product));
+        when(booksClient.getInvoice("inv-timeout")).thenReturn(
+            Map.of("invoice", Map.of("customer_id", "cust-invoice", "line_items", List.of()))
+        );
+        when(booksClient.findCreditNoteByReferenceNumber("RET-TIMEOUT"))
+            .thenReturn(null)
+            .thenReturn(Map.of("creditnote_id", "cn-after-timeout", "reference_number", "RET-TIMEOUT", "status", "open"));
+        when(booksClient.createCreditNote(any())).thenThrow(new ResourceAccessException("connection timed out"));
+
+        Optional<String> creditNoteId = service.createCreditNote(205L, "RET-TIMEOUT", Map.of(1L, 1));
+
+        assertThat(creditNoteId).contains("cn-after-timeout");
+        verify(booksClient).createCreditNote(any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void createCreditNote_duplicateInvoiceItemId_mapsDistinctInvoiceLines() {
+        Product product = new Product().id(10L).sku("SKU-10").zohoItemId("zoho-item-10");
+        OrderItem first = new OrderItem().id(1L).productId("10").productName("Tee").qty(1).price(BigDecimal.valueOf(499));
+        OrderItem second = new OrderItem().id(2L).productId("10").productName("Tee").qty(1).price(BigDecimal.valueOf(499));
+        CustomerOrder order = new CustomerOrder()
+            .id(201L)
+            .orderNumber("MNM-RET-2")
+            .userLogin("buyer@example.com")
+            .zohoInvoiceId("inv-dup");
+        when(customerOrderRepository.findById(201L)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(201L)).thenReturn(List.of(first, second));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(productRepository.findById(10L)).thenReturn(Optional.of(product));
+        when(booksClient.getInvoice("inv-dup")).thenReturn(
+            Map.of(
+                "invoice",
+                Map.of(
+                    "line_items",
+                    List.of(
+                        Map.of("item_id", "zoho-item-10", "line_item_id", "inv-line-1"),
+                        Map.of("item_id", "zoho-item-10", "line_item_id", "inv-line-2")
+                    )
+                )
+            )
+        );
+        when(booksClient.createCreditNote(any())).thenReturn(Map.of("creditnote", Map.of("creditnote_id", "cn-dup")));
+
+        service.createCreditNote(201L, "RET-2", Map.of(1L, 1, 2L, 1));
+
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(booksClient).createCreditNote(payloadCaptor.capture());
+        List<Map<String, Object>> lines = (List<Map<String, Object>>) payloadCaptor.getValue().get("line_items");
+        assertThat(lines).hasSize(2);
+        assertThat(lines.get(0)).containsEntry("invoice_item_id", "inv-line-1");
+        assertThat(lines.get(1)).containsEntry("invoice_item_id", "inv-line-2");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void createCreditNote_code6_retriesWithoutInvoiceLinkage() {
+        Product product = new Product().id(10L).sku("SKU-10").zohoItemId("zoho-item-10");
+        OrderItem item = new OrderItem().id(1L).productId("10").productName("Tee").qty(1).price(BigDecimal.valueOf(1.60));
+        CustomerOrder order = new CustomerOrder()
+            .id(202L)
+            .orderNumber("MNM-RET-3")
+            .userLogin("buyer@example.com")
+            .zohoInvoiceId("inv-bad");
+        when(customerOrderRepository.findById(202L)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(202L)).thenReturn(List.of(item));
+        when(productRepository.findById(10L)).thenReturn(Optional.of(product));
+        when(booksClient.getInvoice("inv-bad")).thenReturn(
+            Map.of(
+                "invoice",
+                Map.of(
+                    "customer_id",
+                    "cust-invoice",
+                    "line_items",
+                    List.of(Map.of("item_id", "zoho-item-10", "line_item_id", "inv-line-1", "rate", 1.60))
+                )
+            )
+        );
+        when(booksClient.createCreditNote(any()))
+            .thenThrow(
+                new RestClientResponseException(
+                    "Invalid values are given for creation",
+                    400,
+                    "Bad Request",
+                    null,
+                    "{\"code\":6,\"message\":\"Invalid values are given for creation\"}".getBytes(),
+                    null
+                )
+            )
+            .thenReturn(Map.of("creditnote", Map.of("creditnote_id", "cn-retry")));
+
+        Optional<String> creditNoteId = service.createCreditNote(202L, "RET-3", Map.of(1L, 1));
+
+        assertThat(creditNoteId).contains("cn-retry");
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(booksClient, times(2)).createCreditNote(payloadCaptor.capture());
+        Map<String, Object> first = payloadCaptor.getAllValues().get(0);
+        Map<String, Object> retry = payloadCaptor.getAllValues().get(1);
+        assertThat(first).containsEntry("invoice_id", "inv-bad");
+        assertThat(((List<Map<String, Object>>) first.get("line_items")).get(0)).containsEntry("invoice_item_id", "inv-line-1");
+        assertThat(retry).doesNotContainKey("invoice_id");
+        assertThat(((List<Map<String, Object>>) retry.get("line_items")).get(0)).doesNotContainKey("invoice_item_id");
+    }
+
+    @Test
+    void createCreditNote_keepsIdWhenOpenFails_andDoesNotPushStoreStock() {
+        ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
+        zoho.setSyncProductStock(true);
+        zoho.setInventoryAccountId("inv-acct-1");
+        when(applicationProperties.getZoho()).thenReturn(zoho);
+        when(booksClient.listAssetAccounts()).thenReturn(List.of(Map.of("account_id", "inv-acct-1")));
+
+        Product product = new Product().id(10L).sku("SKU-10").zohoItemId("zoho-item-10").stock(5);
+        OrderItem item = new OrderItem().id(1L).productId("10").productName("Tee").qty(1).price(BigDecimal.valueOf(1.60));
+        CustomerOrder order = new CustomerOrder()
+            .id(203L)
+            .orderNumber("MNM-RET-4")
+            .userLogin("buyer@example.com")
+            .zohoInvoiceId("inv-open");
+        when(customerOrderRepository.findById(203L)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(203L)).thenReturn(List.of(item));
+        when(productRepository.findById(10L)).thenReturn(Optional.of(product));
+        when(booksClient.getInvoice("inv-open")).thenReturn(
+            Map.of("invoice", Map.of("customer_id", "cust-invoice", "line_items", List.of()))
+        );
+        when(booksClient.createCreditNote(any())).thenReturn(Map.of("creditnote", Map.of("creditnote_id", "cn-keep")));
+        when(booksClient.markCreditNoteAsOpen("cn-keep")).thenThrow(new RuntimeException("open failed"));
+
+        Optional<String> creditNoteId = service.createCreditNote(203L, "RET-4", Map.of(1L, 1));
+
+        assertThat(creditNoteId).contains("cn-keep");
+        verify(booksClient).markCreditNoteAsOpen("cn-keep");
         verify(booksClient, never()).createInventoryAdjustment(any());
     }
 
@@ -5517,6 +5806,7 @@ class ZohoSyncServiceTest {
         CustomerOrder order = new CustomerOrder()
             .id(203L)
             .orderNumber("MNM-CANCEL-ZOHO")
+            .paymentMethod("cod")
             .zohoInvoiceId("inv-cancel")
             .zohoSalesOrderId("so-cancel");
         when(customerOrderRepository.findById(203L)).thenReturn(Optional.of(order));
@@ -5525,6 +5815,333 @@ class ZohoSyncServiceTest {
 
         verify(booksClient).voidInvoice("inv-cancel");
         verify(booksClient).voidSalesOrder("so-cancel", "Customer cancelled before dispatch");
+        assertThat(order.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.SYNCED);
+        assertThat(order.getZohoSyncError()).isNull();
+        verify(customerOrderRepository).save(order);
+    }
+
+    @Test
+    void cancelOrder_paidInvoice_removesPaymentThenVoidsInvoiceAndSalesOrder() {
+        CustomerOrder order = new CustomerOrder()
+            .id(204L)
+            .orderNumber("MNM-CANCEL-PAID")
+            .paymentMethod("cod")
+            .zohoInvoiceId("inv-paid")
+            .zohoSalesOrderId("so-paid");
+        RestClientResponseException paidInvoice = new RestClientResponseException(
+            "Bad Request",
+            400,
+            "Bad Request",
+            null,
+            "{\"code\":4001,\"message\":\"You cannot void a paid invoice. Delete the recorded payment and try again.\"}".getBytes(),
+            null
+        );
+        when(customerOrderRepository.findById(204L)).thenReturn(Optional.of(order));
+        when(booksClient.voidInvoice("inv-paid")).thenThrow(paidInvoice).thenReturn(Map.of());
+        when(booksClient.listInvoicePayments("inv-paid"))
+            .thenReturn(Map.of("payments", List.of(Map.of("payment_id", "pay-1", "invoice_payment_id", "inv-pay-1"))));
+
+        service.cancelOrder(204L);
+
+        verify(booksClient, times(2)).voidInvoice("inv-paid");
+        verify(booksClient).deleteInvoicePayment("inv-paid", "inv-pay-1");
+        verify(booksClient).voidSalesOrder("so-paid", "Customer cancelled before dispatch");
+        assertThat(order.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.SYNCED);
+        assertThat(order.getZohoSyncError()).isNull();
+    }
+
+    @Test
+    void cancelOrder_paidInvoiceWithoutPaymentId_recordsFailureAndDoesNotVoidSalesOrder() {
+        CustomerOrder order = new CustomerOrder()
+            .id(205L)
+            .orderNumber("MNM-CANCEL-NO-PAYMENT")
+            .paymentMethod("cod")
+            .zohoInvoiceId("inv-paid-missing")
+            .zohoSalesOrderId("so-paid-missing");
+        RestClientResponseException paidInvoice = new RestClientResponseException(
+            "Bad Request",
+            400,
+            "Bad Request",
+            null,
+            "{\"code\":4001,\"message\":\"You cannot void a paid invoice.\"}".getBytes(),
+            null
+        );
+        when(customerOrderRepository.findById(205L)).thenReturn(Optional.of(order));
+        doThrow(paidInvoice).when(booksClient).voidInvoice("inv-paid-missing");
+        when(booksClient.listInvoicePayments("inv-paid-missing"))
+            .thenReturn(Map.of("payments", List.of(Map.of("payment_id", "pay-without-invoice-link"))));
+
+        service.cancelOrder(205L);
+
+        verify(booksClient, never()).voidSalesOrder(eq("so-paid-missing"), any());
+        assertThat(order.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.FAILED);
+        assertThat(order.getZohoSyncError()).contains("invoice payment id is missing");
+        verify(customerOrderRepository).save(order);
+    }
+
+    @Test
+    void syncOrder_cancelledOrder_retriesCancellationInsteadOfRecreatingInvoice() {
+        CustomerOrder order = new CustomerOrder()
+            .id(206L)
+            .orderNumber("MNM-CANCEL-RETRY")
+            .paymentMethod("cod")
+            .status(com.miniandmore.app.domain.enumeration.OrderStatus.CANCELLED)
+            .zohoInvoiceId("inv-retry")
+            .zohoSalesOrderId("so-retry");
+        when(customerOrderRepository.findById(206L)).thenReturn(Optional.of(order));
+
+        service.syncOrder(206L);
+
+        verify(booksClient).voidInvoice("inv-retry");
+        verify(booksClient).voidSalesOrder("so-retry", "Customer cancelled before dispatch");
+        verify(booksClient, never()).createInvoiceFromSalesOrder(any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void cancelOrder_prepaid_createsCreditNoteInsteadOfVoiding() {
+        CustomerOrder order = prepaidCancelOrder(208L, "MNM-CANCEL-PREPAID", "inv-prepaid", "so-prepaid");
+        stubPrepaidCancellationCreditNote(order, "inv-prepaid", "cn-prepaid");
+        when(booksClient.getInvoice("inv-prepaid")).thenReturn(
+            Map.of(
+                "invoice",
+                Map.of(
+                    "customer_id",
+                    "cust-prepaid",
+                    "date",
+                    "2026-10-01",
+                    "shipping_charge",
+                    80,
+                    "discount",
+                    50,
+                    "discount_type",
+                    "entity_level",
+                    "line_items",
+                    List.of(Map.of("item_id", "zoho-item-10", "line_item_id", "inv-line-1", "rate", 499))
+                )
+            )
+        );
+
+        service.cancelOrder(208L);
+
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(booksClient).createCreditNote(payloadCaptor.capture());
+        Map<String, Object> payload = payloadCaptor.getValue();
+        assertThat(payload)
+            .containsEntry("customer_id", "cust-prepaid")
+            .containsEntry("invoice_id", "inv-prepaid")
+            .containsEntry("reference_number", "CNCL-MNM-CANCEL-PREPAID")
+            .containsEntry("shipping_charge", 80)
+            .containsEntry("discount", 50)
+            .containsEntry("discount_type", "entity_level")
+            .containsEntry("notes", "Prepaid order cancelled before dispatch");
+        List<Map<String, Object>> lines = (List<Map<String, Object>>) payload.get("line_items");
+        assertThat(lines).hasSize(1);
+        assertThat(lines.get(0)).containsEntry("quantity", 1).containsEntry("invoice_item_id", "inv-line-1");
+        verify(booksClient, never()).voidInvoice(any());
+        verify(booksClient, never()).voidSalesOrder(any(), any());
+        verify(booksClient, never()).deleteInvoicePayment(any(), any());
+        assertThat(order.getZohoCreditNoteId()).isEqualTo("cn-prepaid");
+        assertThat(order.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.SYNCED);
+        assertThat(order.getZohoSyncError()).isNull();
+    }
+
+    @Test
+    void cancelOrder_prepaid_existingCreditNote_skipsCreate() {
+        CustomerOrder order = prepaidCancelOrder(209L, "MNM-CANCEL-EXISTING-CN", "inv-existing", "so-existing")
+            .zohoCreditNoteId("cn-already");
+        when(customerOrderRepository.findById(209L)).thenReturn(Optional.of(order));
+
+        service.cancelOrder(209L);
+
+        verify(booksClient, never()).createCreditNote(any());
+        verify(booksClient, never()).voidInvoice(any());
+        verify(booksClient, never()).voidSalesOrder(any(), any());
+        assertThat(order.getZohoCreditNoteId()).isEqualTo("cn-already");
+        assertThat(order.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.SYNCED);
+    }
+
+    @Test
+    void cancelOrder_prepaid_reusesCreditNoteFoundInZohoByReference() {
+        CustomerOrder order = prepaidCancelOrder(214L, "MNM-CANCEL-ZOHO-CN", "inv-zoho-cn", "so-zoho-cn");
+        when(customerOrderRepository.findById(214L)).thenReturn(Optional.of(order));
+        when(booksClient.findCreditNoteByReferenceNumber("CNCL-MNM-CANCEL-ZOHO-CN"))
+            .thenReturn(Map.of("creditnote_id", "cn-from-zoho", "reference_number", "CNCL-MNM-CANCEL-ZOHO-CN", "status", "open"));
+
+        service.cancelOrder(214L);
+
+        verify(booksClient, never()).createCreditNote(any());
+        assertThat(order.getZohoCreditNoteId()).isEqualTo("cn-from-zoho");
+        assertThat(order.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.SYNCED);
+    }
+
+    @Test
+    void cancelOrder_prepaidWithoutInvoice_voidsSalesOrder() {
+        CustomerOrder order = new CustomerOrder()
+            .id(210L)
+            .orderNumber("MNM-CANCEL-SO-ONLY")
+            .paymentMethod("online")
+            .zohoSalesOrderId("so-only");
+        when(customerOrderRepository.findById(210L)).thenReturn(Optional.of(order));
+
+        service.cancelOrder(210L);
+
+        verify(booksClient, never()).createCreditNote(any());
+        verify(booksClient).voidSalesOrder("so-only", "Customer cancelled before dispatch");
+        assertThat(order.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.SYNCED);
+    }
+
+    @Test
+    void cancelOrder_prepaidCreditNoteFailure_marksFailedAndDoesNotVoid() {
+        CustomerOrder order = prepaidCancelOrder(211L, "MNM-CANCEL-CN-FAIL", "inv-cn-fail", "so-cn-fail");
+        stubPrepaidCancellationCreditNote(order, "inv-cn-fail", null);
+        when(booksClient.createCreditNote(any())).thenThrow(new RuntimeException("Zoho credit note rejected"));
+
+        service.cancelOrder(211L);
+
+        verify(booksClient, never()).voidInvoice(any());
+        verify(booksClient, never()).voidSalesOrder(any(), any());
+        assertThat(order.getZohoCreditNoteId()).isNull();
+        assertThat(order.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.FAILED);
+        assertThat(order.getZohoSyncError()).contains("Zoho credit note rejected");
+    }
+
+    @Test
+    void syncOrder_cancelledPrepaid_retriesCreditNoteInsteadOfVoiding() {
+        CustomerOrder order = prepaidCancelOrder(212L, "MNM-CANCEL-PREPAID-RETRY", "inv-prepaid-retry", "so-prepaid-retry")
+            .status(OrderStatus.CANCELLED);
+        stubPrepaidCancellationCreditNote(order, "inv-prepaid-retry", "cn-retry");
+
+        service.syncOrder(212L);
+
+        verify(booksClient).createCreditNote(any());
+        verify(booksClient, never()).voidInvoice(any());
+        verify(booksClient, never()).createInvoiceFromSalesOrder(any());
+        assertThat(order.getZohoCreditNoteId()).isEqualTo("cn-retry");
+        assertThat(order.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.SYNCED);
+    }
+
+    @Test
+    void retryFailedOrders_cancelledCreditNoteFailure_countsAsBatchFailure() {
+        CustomerOrder order = prepaidCancelOrder(213L, "MNM-CANCEL-CN-RETRY-FAIL", "inv-cn-retry-fail", "so-cn-retry-fail")
+            .status(OrderStatus.CANCELLED)
+            .paymentStatus(PaymentStatus.REFUNDED)
+            .zohoSyncStatus(ZohoSyncStatus.FAILED)
+            .zohoSyncError("previous credit note error");
+        when(
+            customerOrderRepository.findPaidOrdersForZohoRetry(
+                PaymentStatus.PAID,
+                List.of(ZohoSyncStatus.FAILED, ZohoSyncStatus.PENDING),
+                PageRequest.of(0, 200)
+            )
+        ).thenReturn(new PageImpl<>(List.of(order)));
+        when(customerOrderRepository.findConfirmedCodOrdersForZohoRetry(any(), any())).thenReturn(Page.empty());
+        stubPrepaidCancellationCreditNote(order, "inv-cn-retry-fail", null);
+        when(booksClient.createCreditNote(any())).thenThrow(new RuntimeException("credit note still failing"));
+
+        Map<String, Object> result = service.retryFailedOrders();
+
+        assertThat(result.get("success")).isEqualTo(0);
+        assertThat(result.get("failed")).isEqualTo(1);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> failures = (List<Map<String, Object>>) result.get("failures");
+        assertThat(failures).hasSize(1);
+        assertThat(failures.get(0).get("orderNumber")).isEqualTo("MNM-CANCEL-CN-RETRY-FAIL");
+        verify(booksClient, never()).voidInvoice(any());
+    }
+
+    @Test
+    void syncOrder_paidOnline_invoiceBalanceReadFails_marksFailedAndSkipsPayment() {
+        CustomerOrder order = new CustomerOrder()
+            .id(120L)
+            .orderNumber("MNM-ONLINE-INV-READ-FAIL")
+            .userLogin("buyer@example.com")
+            .paymentMethod("online")
+            .paymentStatus(PaymentStatus.PAID)
+            .status(OrderStatus.CONFIRMED)
+            .zohoSalesOrderId("so-read-fail")
+            .zohoInvoiceId("inv-read-fail");
+        when(customerOrderRepository.findById(120L)).thenReturn(Optional.of(order));
+        when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
+        when(booksClient.getInvoice("inv-read-fail")).thenThrow(new RuntimeException("Zoho unavailable"));
+
+        service.syncOrder(120L);
+
+        assertThat(order.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.FAILED);
+        assertThat(order.getZohoSyncError()).contains("Zoho unavailable");
+        verify(booksClient, never()).createCustomerPayment(any());
+    }
+
+    @Test
+    void retryFailedOrders_cancelledVoidFailure_countsAsBatchFailure() {
+        CustomerOrder order = new CustomerOrder()
+            .id(207L)
+            .orderNumber("MNM-CANCEL-RETRY-FAIL")
+            .paymentMethod("cod")
+            .status(OrderStatus.CANCELLED)
+            .paymentStatus(PaymentStatus.REFUNDED)
+            .zohoInvoiceId("inv-retry-fail")
+            .zohoSalesOrderId("so-retry-fail")
+            .zohoSyncStatus(ZohoSyncStatus.FAILED)
+            .zohoSyncError("previous void error");
+        when(
+            customerOrderRepository.findPaidOrdersForZohoRetry(
+                PaymentStatus.PAID,
+                List.of(ZohoSyncStatus.FAILED, ZohoSyncStatus.PENDING),
+                PageRequest.of(0, 200)
+            )
+        ).thenReturn(new PageImpl<>(List.of(order)));
+        when(customerOrderRepository.findConfirmedCodOrdersForZohoRetry(any(), any())).thenReturn(Page.empty());
+        when(customerOrderRepository.findById(207L)).thenReturn(Optional.of(order));
+        doThrow(new RuntimeException("void still failing")).when(booksClient).voidInvoice("inv-retry-fail");
+
+        Map<String, Object> result = service.retryFailedOrders();
+
+        assertThat(result.get("success")).isEqualTo(0);
+        assertThat(result.get("failed")).isEqualTo(1);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> failures = (List<Map<String, Object>>) result.get("failures");
+        assertThat(failures).hasSize(1);
+        assertThat(failures.get(0).get("orderNumber")).isEqualTo("MNM-CANCEL-RETRY-FAIL");
+    }
+
+    private CustomerOrder prepaidCancelOrder(Long id, String orderNumber, String invoiceId, String salesOrderId) {
+        return new CustomerOrder()
+            .id(id)
+            .orderNumber(orderNumber)
+            .paymentMethod("online")
+            .paymentStatus(PaymentStatus.REFUNDED)
+            .shipping(BigDecimal.valueOf(80))
+            .discount(BigDecimal.valueOf(50))
+            .zohoInvoiceId(invoiceId)
+            .zohoSalesOrderId(salesOrderId);
+    }
+
+    private void stubPrepaidCancellationCreditNote(CustomerOrder order, String invoiceId, String creditNoteId) {
+        Product product = new Product().id(10L).sku("SKU-10").zohoItemId("zoho-item-10");
+        OrderItem item = new OrderItem().id(1L).productId("10").productName("Dress").qty(1).price(BigDecimal.valueOf(499));
+        when(customerOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(order.getId())).thenReturn(List.of(item));
+        when(productRepository.findById(10L)).thenReturn(Optional.of(product));
+        lenient().when(booksClient.findCreditNoteByReferenceNumber(any())).thenReturn(null);
+        lenient()
+            .when(booksClient.getInvoice(invoiceId))
+            .thenReturn(
+                Map.of(
+                    "invoice",
+                    Map.of(
+                        "customer_id",
+                        "cust-prepaid",
+                        "date",
+                        "2026-10-01",
+                        "line_items",
+                        List.of(Map.of("item_id", "zoho-item-10", "line_item_id", "inv-line-1", "rate", 499))
+                    )
+                )
+            );
+        if (creditNoteId != null) {
+            when(booksClient.createCreditNote(any())).thenReturn(Map.of("creditnote", Map.of("creditnote_id", creditNoteId)));
+        }
     }
 
     private static Map<String, Object> groupedZohoItem(

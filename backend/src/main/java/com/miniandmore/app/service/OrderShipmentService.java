@@ -7,6 +7,7 @@ import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
+import com.miniandmore.app.domain.enumeration.PackageType;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.repository.CustomerOrderRepository;
@@ -19,6 +20,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -94,21 +96,22 @@ public class OrderShipmentService {
     }
 
     public boolean canBook(CustomerOrder order) {
-        return isShipmentEligible(order) && !orderCancellationService.hasPendingRequest(order.getId());
+        return isShipmentEligible(order) && isPackageCompleted(order) && !orderCancellationService.hasPendingRequest(order.getId());
     }
 
     public boolean canBookWithOverride(CustomerOrder order) {
-        return isShipmentEligible(order) && orderCancellationService.hasPendingRequest(order.getId());
+        return isShipmentEligible(order) && isPackageCompleted(order) && orderCancellationService.hasPendingRequest(order.getId());
     }
 
     public boolean canBookExpressBees(CustomerOrder order) {
-        return canBook(order) && isPackageCompleted(order);
+        return canBook(order);
     }
 
     public boolean canBookExpressBeesWithOverride(CustomerOrder order) {
-        return canBookWithOverride(order) && isPackageCompleted(order);
+        return canBookWithOverride(order);
     }
 
+    @SuppressWarnings("java:S107")
     public CustomerOrder bookShipment(
         String orderNumber,
         ReturnLogisticsMode mode,
@@ -119,18 +122,75 @@ public class OrderShipmentService {
         boolean overrideFulfillmentHold,
         String overrideReason
     ) {
+        return bookShipment(
+            orderNumber,
+            mode,
+            carrierName,
+            awb,
+            trackingUrl,
+            labelUrl,
+            overrideFulfillmentHold,
+            overrideReason,
+            null,
+            null,
+            null
+        );
+    }
+
+    public CustomerOrder bookShipment(
+        String orderNumber,
+        ReturnLogisticsMode mode,
+        String carrierName,
+        String awb,
+        String trackingUrl,
+        String labelUrl,
+        boolean overrideFulfillmentHold,
+        String overrideReason,
+        String courierId,
+        String courierName
+    ) {
+        return bookShipment(
+            orderNumber,
+            mode,
+            carrierName,
+            awb,
+            trackingUrl,
+            labelUrl,
+            overrideFulfillmentHold,
+            overrideReason,
+            courierId,
+            courierName,
+            null
+        );
+    }
+
+    public CustomerOrder bookShipment(
+        String orderNumber,
+        ReturnLogisticsMode mode,
+        String carrierName,
+        String awb,
+        String trackingUrl,
+        String labelUrl,
+        boolean overrideFulfillmentHold,
+        String overrideReason,
+        String courierId,
+        String courierName,
+        String packageType
+    ) {
         CustomerOrder order = customerOrderRepository
             .findOneByOrderNumber(orderNumber)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
         assertCanBook(order, overrideFulfillmentHold, overrideReason);
+        PackageType.parse(packageType).ifPresent(order::setPackageType);
         if (mode == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Logistics mode is required");
         }
-        if (mode == ReturnLogisticsMode.XPRESSBEES) {
-            return bookExpressBees(order, awb);
-        }
         if (mode == ReturnLogisticsMode.SELF_SHIP) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Use manual mode for non-ExpressBees carriers");
+        }
+        if (mode == ReturnLogisticsMode.XPRESSBEES) {
+            applyCourierSelection(order, courierId, courierName);
+            return bookExpressBees(order, awb);
         }
         if (StringUtils.isBlank(awb)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "AWB or tracking reference is required");
@@ -154,7 +214,6 @@ public class OrderShipmentService {
                 "ExpressBees forward shipment is not configured. Set XPRESSBEES credentials, business account, warehouse address and forward manifest path, or book using manual mode."
             );
         }
-        assertPackageCompleted(order);
         try {
             XpressBeesClient.ForwardShipmentResult result = xpressBeesClient.createForwardShipment(
                 buildForwardShipmentRequest(order, preAssignedAwb)
@@ -262,6 +321,7 @@ public class OrderShipmentService {
                 StringUtils.left(reason, 500)
             );
         }
+        assertPackageCompleted(order);
     }
 
     private void applyShipment(
@@ -289,13 +349,18 @@ public class OrderShipmentService {
     }
 
     public CustomerOrder applyProviderStatus(CustomerOrder order, String providerStatus) {
+        return applyProviderStatus(order, providerStatus, null);
+    }
+
+    CustomerOrder applyProviderStatus(CustomerOrder order, String providerStatus, Instant providerDeliveredAt) {
         if (order.getStatus() == OrderStatus.CANCELLED || order.getShipmentCancelledAt() != null) {
             return order;
         }
         String incoming = XpressBeesShipmentStatus.normalize(providerStatus);
         String current = XpressBeesShipmentStatus.normalize(order.getShipmentCarrierStatus());
-        // Keep OFD sticky against weaker hub/in-transit scans so tracking does not regress to "On the way".
-        String normalized = preferCarrierStatus(current, incoming);
+        String incomingMilestone = Optional.ofNullable(XpressBeesShipmentStatus.milestone(incoming)).orElse(incoming);
+        String currentMilestone = Optional.ofNullable(XpressBeesShipmentStatus.milestone(current)).orElse(current);
+        String normalized = XpressBeesShipmentStatus.preferForwardMilestone(currentMilestone, incomingMilestone);
         order.setShipmentCarrierStatus(normalized);
         boolean leftWarehouse =
             XpressBeesShipmentStatus.isPickedUpOrInTransit(normalized) ||
@@ -305,7 +370,7 @@ public class OrderShipmentService {
             order.setShipmentDate(LocalDate.now(INDIA).toString());
         }
         if (XpressBeesShipmentStatus.isDelivered(normalized) && canMarkDelivered(order)) {
-            order.setShipmentDeliveredAt(Instant.now());
+            OrderDeliverySupport.markDelivered(order, providerDeliveredAt);
             if (order.getStatus() != OrderStatus.CANCELLED) {
                 order.setStatus(OrderStatus.FULFILLED);
             }
@@ -314,27 +379,12 @@ public class OrderShipmentService {
     }
 
     /**
-     * Carrier scans are not always monotonic. Once the parcel is out for delivery, ignore weaker
-     * in-transit/hub updates so the customer tracker does not fall back to "On the way".
-     * Undelivered and delivered always win; undelivered may later advance to OFD on reattempt.
+     * Carrier scans are not always monotonic. Delegates to {@link XpressBeesShipmentStatus#preferForwardMilestone}.
      */
     static String preferCarrierStatus(String current, String incoming) {
-        if (StringUtils.isBlank(incoming)) {
-            return current;
-        }
-        if (XpressBeesShipmentStatus.isDelivered(incoming) || XpressBeesShipmentStatus.isDelivered(current)) {
-            return XpressBeesShipmentStatus.isDelivered(incoming) ? incoming : current;
-        }
-        if (XpressBeesShipmentStatus.isOutForDelivery(current)) {
-            if (
-                XpressBeesShipmentStatus.isOutForDelivery(incoming) ||
-                XpressBeesShipmentStatus.isUndelivered(incoming)
-            ) {
-                return incoming;
-            }
-            return current;
-        }
-        return incoming;
+        String incomingMilestone = Optional.ofNullable(XpressBeesShipmentStatus.milestone(incoming)).orElse(XpressBeesShipmentStatus.normalize(incoming));
+        String currentMilestone = Optional.ofNullable(XpressBeesShipmentStatus.milestone(current)).orElse(XpressBeesShipmentStatus.normalize(current));
+        return XpressBeesShipmentStatus.preferForwardMilestone(currentMilestone, incomingMilestone);
     }
 
     public boolean isExpressBeesTrackingFresh(CustomerOrder order) {
@@ -362,9 +412,7 @@ public class OrderShipmentService {
             return xpressBeesClient
                 .fetchForwardTracking(order.getTrackingNumber())
                 .map(result -> {
-                    String incoming = XpressBeesShipmentStatus.normalize(result.status());
-                    String current = XpressBeesShipmentStatus.normalize(order.getShipmentCarrierStatus());
-                    if (incoming.equals(current)) {
+                    if (XpressBeesShipmentStatus.sameForwardMilestone(result.status(), order.getShipmentCarrierStatus())) {
                         return order;
                     }
                     return applyProviderStatus(order, result.status());
@@ -393,11 +441,23 @@ public class OrderShipmentService {
         );
     }
 
+    private static void applyCourierSelection(CustomerOrder order, String courierId, String courierName) {
+        String selectedId = StringUtils.trimToNull(courierId);
+        if (selectedId == null) {
+            return;
+        }
+        order.setPackageCourierId(StringUtils.left(selectedId, 40));
+        String selectedName = StringUtils.trimToNull(courierName);
+        if (selectedName != null) {
+            order.setPackageCourierName(StringUtils.left(selectedName, 120));
+        }
+    }
+
     private static void assertPackageCompleted(CustomerOrder order) {
         if (!isPackageCompleted(order)) {
             throw new ResponseStatusException(
                 HttpStatus.CONFLICT,
-                "Complete package dimensions before booking an ExpressBees shipment"
+                "Create a package before booking a shipment"
             );
         }
     }

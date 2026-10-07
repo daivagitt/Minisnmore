@@ -10,7 +10,9 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @Component
@@ -75,6 +77,29 @@ public class CatalogInternalClient {
 
     public ResponseEntity<String> postEmpty(String internalPath) {
         return post(internalPath, Map.of());
+    }
+
+    public ResponseEntity<String> postMultipart(String internalPath, MultipartFile file) {
+        LinkedMultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
+        parts.add("file", file.getResource());
+        RestClient.RequestBodySpec spec = restClient
+            .method(HttpMethod.POST)
+            .uri(toUri(internalPath))
+            .contentType(MediaType.MULTIPART_FORM_DATA);
+        String authorization = SecurityUtils.currentBearerToken();
+        if (authorization != null) {
+            spec = spec.header(HttpHeaders.AUTHORIZATION, authorization);
+        }
+        return spec.body(parts).exchange((request, response) -> {
+            byte[] bytes = response.getBody().readAllBytes();
+            String text = bytes.length == 0 ? null : new String(bytes, StandardCharsets.UTF_8);
+            HttpHeaders headers = new HttpHeaders();
+            response.getHeaders().forEach(headers::addAll);
+            headers.remove(HttpHeaders.TRANSFER_ENCODING);
+            headers.remove(HttpHeaders.CONTENT_LENGTH);
+            headers.remove(HttpHeaders.CONNECTION);
+            return ResponseEntity.status(response.getStatusCode()).headers(headers).body(text);
+        });
     }
 
     private static URI toUri(String internalPath) {

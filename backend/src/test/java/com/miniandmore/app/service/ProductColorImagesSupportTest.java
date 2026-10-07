@@ -499,4 +499,75 @@ class ProductColorImagesSupportTest {
             "https://cdn.example.com/extra.jpg"
         );
     }
+
+    @Test
+    void realignColorNamesToGalleryKeys_emptyGalleryOrEmptyEntries() {
+        assertThat(support.realignColorNamesToGalleryKeys("[\"Navy\"]", null)).contains("Navy");
+        assertThat(support.realignColorNamesToGalleryKeys("[\"Navy\"]", Map.of())).contains("Navy");
+
+        Map<String, List<String>> gallery = Map.of("Blue", List.of("https://cdn.example.com/b.jpg"));
+        String result = support.realignColorNamesToGalleryKeys("[]", gallery);
+        assertThat(result).contains("Blue").contains("b.jpg");
+    }
+
+    @Test
+    void realignColorNamesToGalleryKeys_mismatchedSizeOrOverlap() {
+        Map<String, List<String>> gallery = Map.of(
+            "Blue", List.of("https://cdn.example.com/b.jpg"),
+            "Red", List.of("https://cdn.example.com/r.jpg")
+        );
+        // Size mismatch (1 entry vs 2 gallery keys)
+        String res1 = support.realignColorNamesToGalleryKeys("[\"Print 1\"]", gallery);
+        assertThat(res1).isNotNull();
+
+        // Key overlap
+        String res2 = support.realignColorNamesToGalleryKeys("[\"Blue\",\"Print 2\"]", gallery);
+        assertThat(res2).isNotNull();
+
+        // Exact match realignment
+        String res3 = support.realignColorNamesToGalleryKeys("[\"Print 1\",\"Print 2\"]", gallery);
+        assertThat(res3).isNotNull();
+    }
+
+    @Test
+    void buildPositionalColorRename_sizeMismatch_returnsEmpty() {
+        Map<String, String> rename = support.buildPositionalColorRename("[\"A\"]", "[\"B\",\"C\"]");
+        assertThat(rename).isEmpty();
+    }
+
+    @Test
+    void stripUrlsFromImagesJson_nullAndEmptyCases() {
+        support.stripUrlsFromImagesJson(null, List.of("url"));
+        Product product = new Product();
+        support.stripUrlsFromImagesJson(product, null);
+        support.stripUrlsFromImagesJson(product, List.of());
+        support.stripUrlsFromImagesJson(product, List.of("url"));
+
+        product.setImagesJson("[\"url1\",\"url2\"]");
+        support.stripUrlsFromImagesJson(product, List.of("url1"));
+        assertThat(product.getImagesJson()).contains("url2").doesNotContain("url1");
+    }
+
+    @Test
+    void coerceAndParseMethods_reflectionEdgeCases() {
+        // invalid JSON string
+        Map<String, List<String>> map1 = support.galleryMapFromColorsJson("invalid json");
+        assertThat(map1).isEmpty();
+
+        // array with numbers or empty name
+        Map<String, List<String>> map2 = support.galleryMapFromColorsJson("[123, {\"name\":\"\"}]");
+        assertThat(map2).isEmpty();
+
+        // coerceUrlList via reflection
+        Object res1 = org.springframework.test.util.ReflectionTestUtils.invokeMethod(support, "coerceUrlList", (Object) null);
+        assertThat((List<?>) res1).isEmpty();
+
+        Object res2 = org.springframework.test.util.ReflectionTestUtils.invokeMethod(support, "coerceUrlList", "   ");
+        assertThat((List<?>) res2).isEmpty();
+
+        Object res3 = org.springframework.test.util.ReflectionTestUtils.invokeMethod(support, "coerceUrlList", "https://single.jpg");
+        @SuppressWarnings("unchecked")
+        java.util.List<String> list3 = (java.util.List<String>) res3;
+        assertThat(list3).containsExactly("https://single.jpg");
+    }
 }

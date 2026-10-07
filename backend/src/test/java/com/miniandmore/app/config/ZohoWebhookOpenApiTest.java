@@ -19,6 +19,7 @@ class ZohoWebhookOpenApiTest {
         openAPI.path("/internal/v1/zoho/order-status-webhook", webhookPath("receiveOrderStatusWebhook"));
         openAPI.path("/internal/v1/zoho/shipment-webhook", webhookPath("receiveShipmentWebhook"));
         openAPI.path("/internal/v1/zoho/stock-webhook", webhookPath("receiveStockWebhook"));
+        openAPI.path("/internal/v1/webhooks/razorpay", webhookPath("receive"));
 
         publicApiPathCustomizer.customise(openAPI);
 
@@ -26,7 +27,8 @@ class ZohoWebhookOpenApiTest {
             "/api/v1/zoho/invoice-webhook",
             "/api/v1/zoho/order-status-webhook",
             "/api/v1/zoho/shipment-webhook",
-            "/api/v1/zoho/stock-webhook"
+            "/api/v1/zoho/stock-webhook",
+            "/api/v1/webhooks/razorpay"
         );
     }
 

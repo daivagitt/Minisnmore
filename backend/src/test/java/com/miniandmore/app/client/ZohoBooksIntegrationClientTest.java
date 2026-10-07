@@ -52,4 +52,10 @@ class ZohoBooksIntegrationClientTest {
         assertThat(client.createCreditNote(1L, "RET-1", BigDecimal.TEN)).isEmpty();
         verify(syncService).createCreditNote(1L, "RET-1");
     }
+
+    @Test
+    void createCreditNote_withReturnedQuantities_delegates() {
+        when(syncService.createCreditNote(1L, "RET-1", java.util.Map.of(11L, 1))).thenReturn(Optional.of("cn_qty"));
+        assertThat(client.createCreditNote(1L, "RET-1", java.util.Map.of(11L, 1))).contains("cn_qty");
+    }
 }

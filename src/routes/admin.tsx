@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { ADMIN_NAV_ITEMS, filterAdminNavItems } from "@/lib/admin-nav";
+import { filterAdminNavItems, visibleAdminNavItems } from "@/lib/admin-nav";
 import {
   LayoutDashboard, Image as ImgIcon, Tag, BookOpen, FileText, Package, Plug, LogOut, Loader2,
   Folder, Home, EyeOff, Settings as SettingsIcon, ExternalLink, ShoppingCart, ReceiptText, Percent, RotateCcw, XCircle,
@@ -35,7 +35,6 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/admin/returns": RotateCcw,
   "/admin/zoho": Plug,
   "/admin/customers": Users,
-  "/admin/users": Users,
   "/admin/rbac": ShieldCheck,
 };
 
@@ -44,7 +43,7 @@ function AdminLayout() {
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const [navQuery, setNavQuery] = useState("");
-  const nav = useMemo(() => filterAdminNavItems(ADMIN_NAV_ITEMS, navQuery), [navQuery]);
+  const nav = useMemo(() => filterAdminNavItems(visibleAdminNavItems(), navQuery), [navQuery]);
 
   useEffect(() => {
     if (loading) return;

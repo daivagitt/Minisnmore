@@ -90,6 +90,12 @@ public class InternalAdminCancellationRequestResource {
         return ApiResponse.ok(enrichDto(orderCancellationService.toDto(recorded)));
     }
 
+    @PostMapping("/{requestNumber}/retry-refund")
+    public ApiResponse<Map<String, Object>> retryRefund(@PathVariable String requestNumber) {
+        OrderCancellationRequest retried = orderCancellationService.retryOnlineRefund(requestNumber);
+        return ApiResponse.ok(enrichDto(orderCancellationService.toDto(retried)));
+    }
+
     private Map<String, Object> enrichDto(Map<String, Object> data) {
         caseSlaSupport.enrichCancellationCase(data);
         return data;

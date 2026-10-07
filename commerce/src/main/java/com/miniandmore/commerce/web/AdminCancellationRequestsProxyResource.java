@@ -50,4 +50,12 @@ public class AdminCancellationRequestsProxyResource {
             body
         );
     }
+
+    @PostMapping("/{requestNumber}/retry-refund")
+    public ResponseEntity<String> retryRefund(@PathVariable String requestNumber) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/admin/cancellation-requests/{requestNumber}/retry-refund", requestNumber),
+            null
+        );
+    }
 }

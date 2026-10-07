@@ -66,6 +66,7 @@ class InternalAdminOrderReturnResourceTest {
                 "open", 7L,
                 "closed", 5L,
                 "overdue", 2L,
+                "xpressbeesReverseReady", 4L,
                 "stages", Map.of("request", 3L, "pickup", 2L, "inspection", 1L, "exchange", 1L, "closed", 5L)
             )
         );
@@ -77,7 +78,8 @@ class InternalAdminOrderReturnResourceTest {
             .andExpect(jsonPath("$.data.returns").value(8))
             .andExpect(jsonPath("$.data.exchanges").value(4))
             .andExpect(jsonPath("$.data.open").value(7))
-            .andExpect(jsonPath("$.data.overdue").value(2));
+            .andExpect(jsonPath("$.data.overdue").value(2))
+            .andExpect(jsonPath("$.data.xpressbeesReverseReady").value(4));
     }
 
     @Test
@@ -226,6 +228,34 @@ class InternalAdminOrderReturnResourceTest {
     }
 
     @Test
+    void settlePriceDifference_forceManual_isPassedThrough() throws Exception {
+        OrderReturn updated = sampleReturn();
+        when(
+            orderReturnService.settlePriceDifference(
+                eq("RET-1"),
+                eq(com.miniandmore.app.domain.enumeration.ExchangeSettlementStatus.REFUNDED),
+                any(),
+                eq("UPI"),
+                eq("UTR-1"),
+                any(),
+                eq("gateway down"),
+                eq(true)
+            )
+        ).thenReturn(updated);
+
+        mockMvc
+            .perform(
+                post("/internal/v1/admin/order-returns/RET-1/settle-price-difference")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"status\":\"refunded\",\"amount\":300,\"method\":\"UPI\",\"reference\":\"UTR-1\",\"admin_notes\":\"gateway down\",\"force_manual\":true}"
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.return_number").value("RET-1"));
+    }
+
+    @Test
     void convertToRefund_returns200() throws Exception {
         OrderReturn updated = sampleReturn();
         updated.setStatus(OrderReturnStatus.REFUNDED);
@@ -267,7 +297,7 @@ class InternalAdminOrderReturnResourceTest {
         updated.setStatus(OrderReturnStatus.SHIPPED);
         updated.setOutboundAwb("OUT123");
         when(
-            orderReturnService.bookOutbound("RET-1", ReturnLogisticsMode.XPRESSBEES, null, null, null, null, null)
+            orderReturnService.bookOutbound("RET-1", ReturnLogisticsMode.XPRESSBEES, null, null, null, null, null, null, null, null)
         ).thenReturn(updated);
 
         mockMvc
@@ -279,6 +309,45 @@ class InternalAdminOrderReturnResourceTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("shipped"))
             .andExpect(jsonPath("$.data.outbound_awb").value("OUT123"));
+    }
+
+    @Test
+    void completePackage_returnsPackedExchange() throws Exception {
+        OrderReturn updated = sampleReturn();
+        updated.setStatus(OrderReturnStatus.READY_TO_SHIP);
+        updated.setPackedAt(Instant.now());
+        updated.setPackageWeightGrams(500);
+        when(
+            orderReturnService.completeOutboundPackage("RET-1", 500, 12, 10, 8, "1", "Surface", "box")
+        ).thenReturn(updated);
+
+        mockMvc
+            .perform(
+                post("/internal/v1/admin/order-returns/RET-1/complete-package")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"weight_grams\":500,\"length_cm\":12,\"breadth_cm\":10,\"height_cm\":8,\"courier_id\":\"1\",\"courier_name\":\"Surface\",\"package_type\":\"box\"}"
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("ready_to_ship"))
+            .andExpect(jsonPath("$.data.package_weight_grams").value(500));
+    }
+
+    @Test
+    void packageRates_returnsQuotedCouriers() throws Exception {
+        when(orderReturnService.previewOutboundPackageRates("RET-1", 500, 12, 10, 8)).thenReturn(
+            Map.of("chargeable_weight_grams", 500, "preferred_courier_id", "1")
+        );
+
+        mockMvc
+            .perform(
+                post("/internal/v1/admin/order-returns/RET-1/package-rates")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"weight_grams\":500,\"length_cm\":12,\"breadth_cm\":10,\"height_cm\":8}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.chargeable_weight_grams").value(500));
     }
 
     @Test

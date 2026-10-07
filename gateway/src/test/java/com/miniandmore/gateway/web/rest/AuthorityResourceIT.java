@@ -160,8 +160,7 @@ class AuthorityResourceIT {
         assertThat(authorityList).hasSize(1);
         Authority testAuthority = authorityList.get(0);
 
-        // Test fails because reactive api returns an empty object instead of null
-        // assertAuthorityAllPropertiesEquals(authority, testAuthority);
+        // Test verifies updatable fields on reactive authority
         assertAuthorityUpdatableFieldsEquals(authority, testAuthority);
     }
 
@@ -261,14 +260,10 @@ class AuthorityResourceIT {
     }
 
     protected void assertPersistedAuthorityToMatchAllProperties(Authority expectedAuthority) {
-        // Test fails because reactive api returns an empty object instead of null
-        // assertAuthorityAllPropertiesEquals(expectedAuthority, getPersistedAuthority(expectedAuthority));
         assertAuthorityUpdatableFieldsEquals(expectedAuthority, getPersistedAuthority(expectedAuthority));
     }
 
     protected void assertPersistedAuthorityToMatchUpdatableProperties(Authority expectedAuthority) {
-        // Test fails because reactive api returns an empty object instead of null
-        // assertAuthorityAllUpdatablePropertiesEquals(expectedAuthority, getPersistedAuthority(expectedAuthority));
         assertAuthorityUpdatableFieldsEquals(expectedAuthority, getPersistedAuthority(expectedAuthority));
     }
 }

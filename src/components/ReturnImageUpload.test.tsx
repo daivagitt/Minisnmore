@@ -18,19 +18,42 @@ vi.mock("@/lib/ui-errors", () => ({
   showApiError: vi.fn(),
 }));
 
+function attachLiveFileList(input: HTMLInputElement, file: File) {
+  let length = 1;
+  const liveList = {
+    0: file,
+    get length() {
+      return length;
+    },
+    item: (index: number) => (index === 0 && length > 0 ? file : null),
+    *[Symbol.iterator]() {
+      if (length > 0) yield file;
+    },
+  };
+  Object.defineProperty(input, "files", { configurable: true, get: () => liveList });
+  Object.defineProperty(input, "value", {
+    configurable: true,
+    get: () => "",
+    set: (next: string) => {
+      if (next === "") length = 0;
+    },
+  });
+}
+
 describe("ReturnImageUpload", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("uploads a selected photo and shows a preview", async () => {
+  it("uploads selected photos after the input is reset", async () => {
     uploadReturnImage.mockResolvedValue("https://cdn.example/returns/damage.jpg");
     const onChange = vi.fn();
     render(<ReturnImageUpload urls={[]} onChange={onChange} />);
 
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const input = screen.getByLabelText("Add photos");
     const file = new File(["photo"], "damage.jpg", { type: "image/jpeg" });
-    fireEvent.change(input, { target: { files: [file] } });
+    attachLiveFileList(input, file);
+    fireEvent.change(input);
 
     await waitFor(() =>
       expect(onChange).toHaveBeenCalledWith(["https://cdn.example/returns/damage.jpg"]),

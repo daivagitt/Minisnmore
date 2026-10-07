@@ -137,6 +137,12 @@ public class InternalOrderReturnResource {
             var order = orderReturn.getOrder();
             data.put("order_number", order.getOrderNumber());
             data.put("order_total", order.getTotal());
+            data.put("order_shipping", order.getShipping());
+            data.put("order_cod_fee", order.getCodFee());
+            data.put(
+                "order_payment_status",
+                order.getPaymentStatus() != null ? order.getPaymentStatus().name().toLowerCase() : null
+            );
             data.put("tracking_status", OrderTrackingStatusResolver.resolve(order));
             data.put("shipment_delivered_at", order.getShipmentDeliveredAt());
         }
@@ -145,6 +151,7 @@ public class InternalOrderReturnResource {
         data.put("tracking_url", orderReturn.getTrackingUrl());
         data.put("pickup_window", orderReturn.getPickupWindow());
         data.put("pickup_failure_reason", orderReturn.getPickupFailureReason());
+        data.put("reverse_carrier_status", orderReturn.getReverseCarrierStatus());
         List<Map<String, Object>> lines = orderReturnService.returnLineBreakdown(orderReturn).stream().map(OrderReturnDtoSupport::toLineDto).toList();
         OrderReturnDtoSupport.putOriginalItemFields(data, orderReturn, lines);
         data.put("replacement_size", orderReturn.getReplacementSize());
@@ -152,6 +159,7 @@ public class InternalOrderReturnResource {
         data.put("outbound_awb", orderReturn.getOutboundAwb());
         data.put("outbound_tracking_url", orderReturn.getOutboundTrackingUrl());
         data.put("outbound_carrier_name", orderReturn.getOutboundCarrierName());
+        data.put("outbound_carrier_status", orderReturn.getOutboundCarrierStatus());
         data.put("original_item_amount", orderReturn.getOriginalItemAmount());
         data.put("replacement_item_amount", orderReturn.getReplacementItemAmount());
         data.put("price_difference", orderReturn.getPriceDifference());

@@ -150,8 +150,8 @@ function AdminRbacPage() {
     >
       <p className="text-sm text-muted-foreground -mt-2">
         Customer join stats live on{" "}
-        <Link to="/admin/users" className="text-primary underline-offset-2 hover:underline">
-          Users
+        <Link to="/admin/customers" className="text-primary underline-offset-2 hover:underline">
+          Customers
         </Link>
         .
       </p>

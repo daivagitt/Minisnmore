@@ -10,32 +10,42 @@ type Props = {
   products: { slug: string; name: string }[];
   slugs: string[];
   onChange: (slugs: string[]) => void;
+  limit?: number;
+  hint?: string;
 };
 
-export function HomeSectionProductsPicker({ products, slugs, onChange }: Props) {
+export function HomeSectionProductsPicker({
+  products,
+  slugs,
+  onChange,
+  limit = HOME_SECTION_PRODUCT_LIMIT,
+  hint,
+}: Props) {
   const knownSlugs = new Set(products.map((p) => p.slug));
-  const selected = pruneHomeSectionProductSlugs(slugs, knownSlugs);
-  const removed = normalizeHomeSectionProductSlugs(slugs).filter((slug) => !knownSlugs.has(slug));
-  const atLimit = selected.length >= HOME_SECTION_PRODUCT_LIMIT;
+  const selected = pruneHomeSectionProductSlugs(slugs, knownSlugs, limit);
+  const removed = normalizeHomeSectionProductSlugs(slugs, Number.MAX_SAFE_INTEGER).filter(
+    (slug) => !knownSlugs.has(slug),
+  );
+  const atLimit = selected.length >= limit;
+  const hintText =
+    hint ??
+    `Choose up to ${limit} products for the homepage grid. Leave empty to auto-pick by product flags — customers use Explore to see all.`;
 
   const toggle = (slug: string, checked: boolean) => {
     if (checked) {
       if (selected.includes(slug)) return;
       if (atLimit) {
-        toast.error(`You can pick at most ${HOME_SECTION_PRODUCT_LIMIT} products for this section.`);
+        toast.error(`You can pick at most ${limit} products for this section.`);
         return;
       }
-      onChange(normalizeHomeSectionProductSlugs([...selected, slug]));
+      onChange(normalizeHomeSectionProductSlugs([...selected, slug], limit));
       return;
     }
     onChange(selected.filter((s) => s !== slug));
   };
 
   return (
-    <Field
-      label={`Products to show (${selected.length}/${HOME_SECTION_PRODUCT_LIMIT})`}
-      hint={`Choose up to ${HOME_SECTION_PRODUCT_LIMIT} products for the homepage grid. Leave empty to auto-pick by product flags — customers use Explore to see all.`}
-    >
+    <Field label={`Products to show (${selected.length}/${limit})`} hint={hintText}>
       {removed.length > 0 && (
         <p className="text-xs text-amber-700 mb-2">
           Removed from catalog (not counted toward the limit): {removed.join(", ")}. Save to clear

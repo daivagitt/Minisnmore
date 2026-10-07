@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.miniandmore.app.domain.enumeration.ExchangeSettlementStatus;
 import com.miniandmore.app.domain.enumeration.OrderRequestType;
 import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
+import com.miniandmore.app.domain.enumeration.PackageType;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -64,6 +65,10 @@ public class OrderReturn implements Serializable {
     @Size(max = 120)
     @Column(name = "zoho_credit_note_id", length = 120)
     private String zohoCreditNoteId;
+
+    @Size(max = 120)
+    @Column(name = "zoho_replacement_invoice_id", length = 120)
+    private String zohoReplacementInvoiceId;
 
     @NotNull
     @Column(name = "requested_at", nullable = false)
@@ -137,6 +142,11 @@ public class OrderReturn implements Serializable {
     @Column(name = "pickup_failure_reason", length = 500)
     private String pickupFailureReason;
 
+    /** Latest ExpressBees reverse-pickup milestone. See {@code XpressBeesReturnCarrierStatus}. */
+    @Size(max = 40)
+    @Column(name = "reverse_carrier_status", length = 40)
+    private String reverseCarrierStatus;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "outbound_logistics_mode", length = 16)
     private com.miniandmore.app.domain.enumeration.ReturnLogisticsMode outboundLogisticsMode;
@@ -160,6 +170,41 @@ public class OrderReturn implements Serializable {
     @Size(max = 120)
     @Column(name = "outbound_provider_request_id", length = 120)
     private String outboundProviderRequestId;
+
+    /** Latest ExpressBees replacement-shipment milestone. See {@code XpressBeesReturnCarrierStatus}. */
+    @Size(max = 40)
+    @Column(name = "outbound_carrier_status", length = 40)
+    private String outboundCarrierStatus;
+
+    @Column(name = "package_weight_grams")
+    private Integer packageWeightGrams;
+
+    @Column(name = "package_length_cm")
+    private Integer packageLengthCm;
+
+    @Column(name = "package_breadth_cm")
+    private Integer packageBreadthCm;
+
+    @Column(name = "package_height_cm")
+    private Integer packageHeightCm;
+
+    @Column(name = "package_chargeable_weight_grams")
+    private Integer packageChargeableWeightGrams;
+
+    @Size(max = 40)
+    @Column(name = "package_courier_id", length = 40)
+    private String packageCourierId;
+
+    @Size(max = 120)
+    @Column(name = "package_courier_name", length = 120)
+    private String packageCourierName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "package_type", length = 20)
+    private PackageType packageType;
+
+    @Column(name = "packed_at")
+    private Instant packedAt;
 
     @Column(name = "original_item_amount", precision = 21, scale = 2)
     private BigDecimal originalItemAmount;
@@ -197,6 +242,10 @@ public class OrderReturn implements Serializable {
 
     @Column(name = "replacement_reservation_released_at")
     private Instant replacementReservationReleasedAt;
+
+    /** Set when the exchanged original item is restocked locally (allocate or convert-to-refund). */
+    @Column(name = "original_restocked_at")
+    private Instant originalRestockedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "manual_refund_method", length = 32)
@@ -299,6 +348,14 @@ public class OrderReturn implements Serializable {
 
     public void setZohoCreditNoteId(String zohoCreditNoteId) {
         this.zohoCreditNoteId = zohoCreditNoteId;
+    }
+
+    public String getZohoReplacementInvoiceId() {
+        return zohoReplacementInvoiceId;
+    }
+
+    public void setZohoReplacementInvoiceId(String zohoReplacementInvoiceId) {
+        this.zohoReplacementInvoiceId = zohoReplacementInvoiceId;
     }
 
     public Instant getRequestedAt() {
@@ -437,6 +494,14 @@ public class OrderReturn implements Serializable {
         this.pickupFailureReason = pickupFailureReason;
     }
 
+    public String getReverseCarrierStatus() {
+        return reverseCarrierStatus;
+    }
+
+    public void setReverseCarrierStatus(String reverseCarrierStatus) {
+        this.reverseCarrierStatus = reverseCarrierStatus;
+    }
+
     public com.miniandmore.app.domain.enumeration.ReturnLogisticsMode getOutboundLogisticsMode() {
         return outboundLogisticsMode;
     }
@@ -483,6 +548,86 @@ public class OrderReturn implements Serializable {
 
     public void setOutboundProviderRequestId(String outboundProviderRequestId) {
         this.outboundProviderRequestId = outboundProviderRequestId;
+    }
+
+    public String getOutboundCarrierStatus() {
+        return outboundCarrierStatus;
+    }
+
+    public void setOutboundCarrierStatus(String outboundCarrierStatus) {
+        this.outboundCarrierStatus = outboundCarrierStatus;
+    }
+
+    public Integer getPackageWeightGrams() {
+        return packageWeightGrams;
+    }
+
+    public void setPackageWeightGrams(Integer packageWeightGrams) {
+        this.packageWeightGrams = packageWeightGrams;
+    }
+
+    public Integer getPackageLengthCm() {
+        return packageLengthCm;
+    }
+
+    public void setPackageLengthCm(Integer packageLengthCm) {
+        this.packageLengthCm = packageLengthCm;
+    }
+
+    public Integer getPackageBreadthCm() {
+        return packageBreadthCm;
+    }
+
+    public void setPackageBreadthCm(Integer packageBreadthCm) {
+        this.packageBreadthCm = packageBreadthCm;
+    }
+
+    public Integer getPackageHeightCm() {
+        return packageHeightCm;
+    }
+
+    public void setPackageHeightCm(Integer packageHeightCm) {
+        this.packageHeightCm = packageHeightCm;
+    }
+
+    public Integer getPackageChargeableWeightGrams() {
+        return packageChargeableWeightGrams;
+    }
+
+    public void setPackageChargeableWeightGrams(Integer packageChargeableWeightGrams) {
+        this.packageChargeableWeightGrams = packageChargeableWeightGrams;
+    }
+
+    public String getPackageCourierId() {
+        return packageCourierId;
+    }
+
+    public void setPackageCourierId(String packageCourierId) {
+        this.packageCourierId = packageCourierId;
+    }
+
+    public String getPackageCourierName() {
+        return packageCourierName;
+    }
+
+    public void setPackageCourierName(String packageCourierName) {
+        this.packageCourierName = packageCourierName;
+    }
+
+    public PackageType getPackageType() {
+        return packageType;
+    }
+
+    public void setPackageType(PackageType packageType) {
+        this.packageType = packageType;
+    }
+
+    public Instant getPackedAt() {
+        return packedAt;
+    }
+
+    public void setPackedAt(Instant packedAt) {
+        this.packedAt = packedAt;
     }
 
     public BigDecimal getOriginalItemAmount() {
@@ -571,6 +716,14 @@ public class OrderReturn implements Serializable {
 
     public void setReplacementReservationReleasedAt(Instant replacementReservationReleasedAt) {
         this.replacementReservationReleasedAt = replacementReservationReleasedAt;
+    }
+
+    public Instant getOriginalRestockedAt() {
+        return originalRestockedAt;
+    }
+
+    public void setOriginalRestockedAt(Instant originalRestockedAt) {
+        this.originalRestockedAt = originalRestockedAt;
     }
 
     public com.miniandmore.app.domain.enumeration.ManualRefundMethod getManualRefundMethod() {

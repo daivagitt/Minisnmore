@@ -5,6 +5,7 @@ import {
   IMAGE_ACCEPT,
   validateAdminImageFile,
 } from "@/lib/admin-image";
+import { snapshotInputFiles } from "@/lib/file-input";
 import { MAX_RETURN_IMAGES, uploadReturnImage } from "@/lib/orders.functions";
 import { showApiError } from "@/lib/ui-errors";
 
@@ -26,8 +27,8 @@ export function ReturnImageUpload({
   };
   const remaining = Math.max(0, MAX_RETURN_IMAGES - urls.length);
 
-  const upload = async (files: FileList | File[]) => {
-    const selected = Array.from(files).slice(0, remaining);
+  const upload = async (files: File[]) => {
+    const selected = files.slice(0, remaining);
     if (selected.length === 0) {
       toast.error(`You can attach up to ${MAX_RETURN_IMAGES} images`);
       return;
@@ -42,8 +43,8 @@ export function ReturnImageUpload({
           continue;
         }
         next.push(await uploadReturnImage(file));
+        onChange([...next]);
       }
-      onChange(next);
     } catch (error) {
       showApiError(error, "Could not upload image");
     } finally {
@@ -77,7 +78,7 @@ export function ReturnImageUpload({
       ) : null}
       {remaining > 0 ? (
         <label
-          className={`inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs ${
+          className={`relative inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs ${
             disabled || uploading ? "opacity-50 pointer-events-none" : "cursor-pointer hover:bg-muted/60"
           }`}
         >
@@ -87,12 +88,12 @@ export function ReturnImageUpload({
             type="file"
             accept={IMAGE_ACCEPT}
             multiple
-            className="hidden"
+            aria-label="Add photos"
             disabled={disabled || uploading}
+            className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
             onChange={(event) => {
-              const files = event.target.files;
-              event.target.value = "";
-              if (files?.length) void upload(files);
+              const files = snapshotInputFiles(event.currentTarget);
+              if (files.length) void upload(files);
             }}
           />
         </label>

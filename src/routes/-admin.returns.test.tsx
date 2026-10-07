@@ -1,11 +1,14 @@
 /** @vitest-environment jsdom */
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route } from "./admin.returns";
 
 const listAdminOrderReturns = vi.hoisted(() => vi.fn());
 
 const getAdminOrderReturnsSummary = vi.hoisted(() => vi.fn());
+
+const settleOrderReturnPriceDifference = vi.hoisted(() => vi.fn());
 
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (config: unknown) => config,
@@ -22,12 +25,15 @@ vi.mock("@/lib/orders.functions", () => ({
     closed: 0,
     overdue: 0,
     stages: { request: 0, pickup: 0, inspection: 0, exchange: 0, closed: 0 },
+    xpressbeesReverseReady: 0,
   },
   acceptOrderReturnAfterInspection: vi.fn(),
   allocateReplacementForOrderReturn: vi.fn(),
   approveOrderReturn: vi.fn(),
   bookOrderReturnPickup: vi.fn(),
   bookOrderReturnOutbound: vi.fn(),
+  completeOrderReturnPackage: vi.fn(),
+  previewOrderReturnPackageRates: vi.fn(),
   completeOrderReturnExchange: vi.fn(),
   closeFailedOrderReturnPickup: vi.fn(),
   convertOrderReturnToRefund: vi.fn(),
@@ -44,7 +50,7 @@ vi.mock("@/lib/orders.functions", () => ({
   refundOrderReturn: vi.fn(),
   rejectOrderReturn: vi.fn(),
   rescheduleOrderReturnPickup: vi.fn(),
-  settleOrderReturnPriceDifference: vi.fn(),
+  settleOrderReturnPriceDifference: (...args: unknown[]) => settleOrderReturnPriceDifference(...args),
 }));
 
 vi.mock("sonner", () => ({
@@ -70,6 +76,7 @@ describe("admin returns", () => {
       open: 1,
       closed: 0,
       overdue: 0,
+      xpressbeesReverseReady: 0,
       stages: { request: 1, pickup: 0, inspection: 0, exchange: 0, closed: 0 },
     });
   });
@@ -128,6 +135,30 @@ describe("admin returns", () => {
       "href",
       "https://cdn.example/returns/damage.jpg",
     );
+  });
+
+  it("tells staff that delivery and COD fees are not refunded", async () => {
+    listAdminOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "RET-1",
+          order_number: "MNM-1",
+          request_type: "return",
+          status: "accepted",
+          reason: "Product arrived damaged in transit",
+          requested_at: "2026-09-20T00:00:00Z",
+          customer_login: "asha",
+          order_total: 1149,
+          order_shipping: 99,
+          order_cod_fee: 40,
+        },
+      ],
+    });
+
+    renderAdminReturns();
+
+    await waitFor(() => expect(screen.getByText(/delivery ₹99 is not refunded/i)).toBeInTheDocument());
+    expect(screen.getByText(/cod fee ₹40 is not refunded/i)).toBeInTheDocument();
   });
 
   it("shows customer-uploaded exchange photos", async () => {
@@ -211,6 +242,13 @@ describe("admin returns", () => {
     expect(screen.getByText("pickup scheduled")).toBeInTheDocument();
   });
 
+  it("loads requested cases by default", async () => {
+    listAdminOrderReturns.mockResolvedValue({ returns: [] });
+    renderAdminReturns();
+    await waitFor(() => expect(listAdminOrderReturns).toHaveBeenCalledWith("requested"));
+    expect(screen.getByRole("button", { name: "Requested" })).toBeInTheDocument();
+  });
+
   it("shows a returns and exchanges summary", async () => {
     getAdminOrderReturnsSummary.mockResolvedValue({
       total: 12,
@@ -219,6 +257,7 @@ describe("admin returns", () => {
       open: 7,
       closed: 5,
       overdue: 2,
+      xpressbeesReverseReady: 4,
       stages: { request: 3, pickup: 2, inspection: 1, exchange: 1, closed: 5 },
     });
     listAdminOrderReturns.mockResolvedValue({ returns: [] });
@@ -231,6 +270,382 @@ describe("admin returns", () => {
     expect(screen.getByRole("button", { name: "8 returns" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "4 exchanges" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "7 open" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Request/ })).toHaveTextContent("3");
+    expect(screen.getByRole("button", { name: "4 book reverse pickup" })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("group", { name: "Filter by stage" })).getByRole("button", {
+        name: /Request/,
+      }),
+    ).toHaveTextContent("3");
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Filter by return status")).not.toBeInTheDocument();
+  });
+
+  it("shows stage statuses as pills after a parent stage is clicked", async () => {
+    getAdminOrderReturnsSummary.mockResolvedValue({
+      total: 12,
+      returns: 8,
+      exchanges: 4,
+      open: 7,
+      closed: 5,
+      overdue: 2,
+      xpressbeesReverseReady: 4,
+      stages: { request: 3, pickup: 2, inspection: 1, exchange: 1, closed: 5 },
+    });
+    listAdminOrderReturns.mockResolvedValue({ returns: [] });
+    const user = userEvent.setup();
+
+    renderAdminReturns();
+
+    const stageGroup = screen.getByRole("group", { name: "Filter by stage" });
+    await waitFor(() => expect(within(stageGroup).getByRole("button", { name: /Request/ })).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Requested" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Shipped" })).not.toBeInTheDocument();
+
+    await user.click(within(stageGroup).getByRole("button", { name: /^All/ }));
+    expect(screen.queryByRole("button", { name: "Requested" })).not.toBeInTheDocument();
+
+    await user.click(within(stageGroup).getByRole("button", { name: /Request/ }));
+    expect(screen.getByRole("button", { name: "Requested" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approved" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Shipped" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+
+    await user.click(within(stageGroup).getByRole("button", { name: /Exchange/ }));
+    expect(screen.getByRole("button", { name: "Item allocated" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Shipped" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Requested" })).not.toBeInTheDocument();
+  });
+
+  it("does not offer mark received on an approved return until pickup is booked", async () => {
+    listAdminOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "RET-1",
+          order_number: "MNM-1",
+          request_type: "return",
+          status: "approved",
+          reason: "Product arrived damaged in transit",
+          requested_at: "2026-09-20T00:00:00Z",
+          customer_login: "asha",
+          order_total: 999,
+        },
+      ],
+    });
+
+    renderAdminReturns();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /book pickup/i })).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /mark received/i })).not.toBeInTheDocument();
+  });
+
+  it("offers mark received after reverse pickup shipment exists", async () => {
+    listAdminOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "RET-1",
+          order_number: "MNM-1",
+          request_type: "return",
+          status: "picked_up",
+          reason: "Product arrived damaged in transit",
+          requested_at: "2026-09-20T00:00:00Z",
+          customer_login: "asha",
+          order_total: 999,
+          reverse_awb: "AWB-REV-1",
+          logistics_mode: "manual",
+        },
+      ],
+    });
+
+    renderAdminReturns();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /mark received/i })).toBeInTheDocument());
+  });
+
+  it("hides mark received on picked up returns with no shipment", async () => {
+    listAdminOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "RET-1",
+          order_number: "MNM-1",
+          request_type: "return",
+          status: "picked_up",
+          reason: "Product arrived damaged in transit",
+          requested_at: "2026-09-20T00:00:00Z",
+          customer_login: "asha",
+          order_total: 999,
+        },
+      ],
+    });
+
+    renderAdminReturns();
+
+    await waitFor(() => expect(screen.getByText(/picked up/i)).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /mark received/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /book pickup/i })).toBeInTheDocument();
+  });
+
+  it("does not offer mark received on a scheduled exchange until the item is picked up", async () => {
+    listAdminOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "EXC-1",
+          order_number: "MNM-1",
+          request_type: "exchange",
+          status: "pickup_scheduled",
+          reason: "Wrong size, exchanging for Medium",
+          requested_at: "2026-09-20T00:00:00Z",
+          customer_login: "asha",
+          order_total: 999,
+          reverse_awb: "AWB-REV-1",
+          logistics_mode: "manual",
+        },
+      ],
+    });
+
+    renderAdminReturns();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /mark picked up/i })).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /mark received/i })).not.toBeInTheDocument();
+  });
+
+  it("offers mark received on a picked up exchange after reverse pickup shipment exists", async () => {
+    listAdminOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "EXC-1",
+          order_number: "MNM-1",
+          request_type: "exchange",
+          status: "picked_up",
+          reason: "Wrong size, exchanging for Medium",
+          requested_at: "2026-09-20T00:00:00Z",
+          customer_login: "asha",
+          order_total: 999,
+          reverse_awb: "AWB-REV-1",
+          logistics_mode: "manual",
+        },
+      ],
+    });
+
+    renderAdminReturns();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /mark received/i })).toBeInTheDocument());
+  });
+
+  it("offers create package for an exchange that is ready to ship", async () => {
+    listAdminOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "EXC-1",
+          order_number: "MNM-1",
+          request_type: "exchange",
+          status: "ready_to_ship",
+          reason: "Wrong size ordered by mistake",
+          requested_at: "2026-10-02T00:00:00Z",
+          customer_login: "asha",
+          order_total: 999,
+          product_name: "Body Suit",
+        },
+      ],
+    });
+
+    renderAdminReturns();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /create package/i })).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /book shipment/i })).not.toBeInTheDocument();
+  });
+
+  it("offers book shipment after the exchange package exists", async () => {
+    const user = userEvent.setup();
+    listAdminOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "EXC-1",
+          order_number: "MNM-1",
+          request_type: "exchange",
+          status: "ready_to_ship",
+          reason: "Wrong size ordered by mistake",
+          requested_at: "2026-10-02T00:00:00Z",
+          customer_login: "asha",
+          order_total: 999,
+          product_name: "Body Suit",
+          packed_at: "2026-10-02T01:00:00Z",
+          package_weight_grams: 500,
+          package_length_cm: 12,
+          package_breadth_cm: 10,
+          package_height_cm: 8,
+          can_book_outbound: true,
+        },
+      ],
+    });
+
+    renderAdminReturns();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /book shipment/i })).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /update package/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /book shipment/i }));
+    expect(screen.getByText("New replacement shipment")).toBeInTheDocument();
+    expect(screen.getByText("Validate Address")).toBeInTheDocument();
+  });
+
+  it("refunds a cheaper prepaid replacement through Razorpay without a manual reference", async () => {
+    settleOrderReturnPriceDifference.mockResolvedValue({
+      return_number: "EXC-CHEAP-1",
+      settlement_status: "refunded",
+    });
+    listAdminOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "EXC-CHEAP-1",
+          order_number: "MNM-1",
+          request_type: "exchange",
+          status: "accepted",
+          reason: "Wrong size, exchanging for a cheaper colour",
+          requested_at: "2026-09-20T00:00:00Z",
+          customer_login: "asha",
+          order_total: 1299,
+          payment_method: "online",
+          price_difference: -300,
+          settlement_status: "pending",
+          can_razorpay_refund_price_difference: true,
+        },
+      ],
+    });
+    const user = userEvent.setup();
+
+    renderAdminReturns();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /refund via razorpay/i })).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /refund via razorpay/i }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/original prepaid payment via Razorpay/i)).toBeInTheDocument();
+    expect(within(dialog).queryByText("Transaction reference")).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: /refund via razorpay/i }));
+    await waitFor(() =>
+      expect(settleOrderReturnPriceDifference).toHaveBeenCalledWith("EXC-CHEAP-1", {
+        status: "refunded",
+        amount: 300,
+        method: undefined,
+        reference: undefined,
+      }),
+    );
+  });
+
+  it("shows manual settlement fields when Razorpay auto-refund is not available", async () => {
+    listAdminOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "EXC-MAN-1",
+          order_number: "MNM-2",
+          request_type: "exchange",
+          status: "accepted",
+          reason: "Cheaper replacement",
+          requested_at: "2026-09-20T00:00:00Z",
+          customer_login: "asha",
+          order_total: 999,
+          payment_method: "online",
+          price_difference: -200,
+          settlement_status: "pending",
+          can_razorpay_refund_price_difference: false,
+        },
+      ],
+    });
+    const user = userEvent.setup();
+
+    renderAdminReturns();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /settle price difference/i })).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /settle price difference/i }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Transaction reference")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/original prepaid payment via Razorpay/i)).not.toBeInTheDocument();
+  });
+
+  it("records a prepaid cheaper replacement manually when Razorpay is overridden", async () => {
+    settleOrderReturnPriceDifference.mockResolvedValue({
+      return_number: "EXC-CHEAP-1",
+      settlement_status: "refunded",
+    });
+    listAdminOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "EXC-CHEAP-1",
+          order_number: "MNM-1",
+          request_type: "exchange",
+          status: "accepted",
+          reason: "Wrong size, exchanging for a cheaper colour",
+          requested_at: "2026-09-20T00:00:00Z",
+          customer_login: "asha",
+          order_total: 1299,
+          payment_method: "online",
+          price_difference: -300,
+          settlement_status: "pending",
+          can_razorpay_refund_price_difference: true,
+        },
+      ],
+    });
+    const user = userEvent.setup();
+
+    renderAdminReturns();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /refund via razorpay/i })).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /refund via razorpay/i }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByLabelText(/record manually instead/i));
+    await user.type(within(dialog).getByLabelText(/^method$/i), "UPI");
+    await user.type(within(dialog).getByLabelText(/transaction reference/i), "UTR-OUTAGE-1");
+    await user.click(within(dialog).getByRole("button", { name: /record settlement/i }));
+    await waitFor(() =>
+      expect(settleOrderReturnPriceDifference).toHaveBeenCalledWith("EXC-CHEAP-1", {
+        status: "refunded",
+        amount: 300,
+        method: "UPI",
+        reference: "UTR-OUTAGE-1",
+        force_manual: true,
+      }),
+    );
+  });
+
+  it("sends method and reference when collecting a higher-price exchange difference", async () => {
+    settleOrderReturnPriceDifference.mockResolvedValue({
+      return_number: "EXC-COLLECT-1",
+      settlement_status: "collected",
+    });
+    listAdminOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "EXC-COLLECT-1",
+          order_number: "MNM-7C691DO23016",
+          request_type: "exchange",
+          status: "accepted",
+          reason: "Size exchange, customer pays the difference",
+          requested_at: "2026-09-20T00:00:00Z",
+          customer_login: "asha",
+          order_total: 999,
+          payment_method: "online",
+          price_difference: 299.2,
+          settlement_status: "pending",
+        },
+      ],
+    });
+    const user = userEvent.setup();
+
+    renderAdminReturns();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /settle price difference/i })).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /settle price difference/i }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText(/^method$/i), "UPI");
+    await user.type(within(dialog).getByLabelText(/transaction reference/i), "UTR-COLLECT-1");
+    await user.click(within(dialog).getByRole("button", { name: /record settlement/i }));
+    await waitFor(() =>
+      expect(settleOrderReturnPriceDifference).toHaveBeenCalledWith("EXC-COLLECT-1", {
+        status: "collected",
+        amount: 299.2,
+        method: "UPI",
+        reference: "UTR-COLLECT-1",
+      }),
+    );
   });
 });

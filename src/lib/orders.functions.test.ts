@@ -67,6 +67,8 @@ import {
   bookAdminOrderShipment,
   previewAdminOrderPackageRates,
   completeAdminOrderPackage,
+  previewOrderReturnPackageRates,
+  completeOrderReturnPackage,
   markOrderReturnDelivered,
   markOrderReturnInspected,
   markOrderReturnPickedUp,
@@ -376,6 +378,7 @@ describe("orders functions", () => {
       open: 7,
       closed: 5,
       overdue: 2,
+      xpressbeesReverseReady: 4,
       stages: { request: 3, pickup: 2, inspection: 1, exchange: 1, closed: 5 },
     });
     await expect(getAdminOrderReturnsSummary()).resolves.toEqual({
@@ -385,6 +388,7 @@ describe("orders functions", () => {
       open: 7,
       closed: 5,
       overdue: 2,
+      xpressbeesReverseReady: 4,
       stages: { request: 3, pickup: 2, inspection: 1, exchange: 1, closed: 5 },
     });
     expect(getMock).toHaveBeenCalledWith("/api/v1/admin/order-returns/summary", { auth: true });
@@ -397,15 +401,21 @@ describe("orders functions", () => {
       open: 0,
       closed: 0,
       overdue: 0,
+      xpressbeesReverseReady: 0,
       stages: { request: 0, pickup: 0, inspection: 0, exchange: 0, closed: 0 },
     });
-    expect(normalizeAdminOrderReturnsSummary({ total: "3" as never, stages: { request: 2 } as never })).toEqual({
+    expect(normalizeAdminOrderReturnsSummary({
+      total: "3" as never,
+      stages: { request: 2 } as never,
+      xpressbees_reverse_ready: "5",
+    } as never)).toEqual({
       total: 3,
       returns: 0,
       exchanges: 0,
       open: 0,
       closed: 0,
       overdue: 0,
+      xpressbeesReverseReady: 5,
       stages: { request: 2, pickup: 0, inspection: 0, exchange: 0, closed: 0 },
     });
 
@@ -938,6 +948,7 @@ describe("orders functions", () => {
       height_cm: 8,
       courier_id: "1",
       courier_name: "Surface Xpressbees 0.5 K.G",
+      package_type: "box",
     });
     expect(postMock).toHaveBeenCalledWith(
       "/api/v1/admin/orders/MNM-1/complete-package",
@@ -948,6 +959,44 @@ describe("orders functions", () => {
         height_cm: 8,
         courier_id: "1",
         courier_name: "Surface Xpressbees 0.5 K.G",
+        package_type: "box",
+      },
+      { auth: true },
+    );
+  });
+
+  it("previews package rates for an exchange outbound", async () => {
+    postMock.mockResolvedValueOnce({ chargeable_weight_grams: 500, couriers: [] });
+    await previewOrderReturnPackageRates("RET-1", {
+      weight_grams: 500,
+      length_cm: 12,
+      breadth_cm: 10,
+      height_cm: 8,
+    });
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/admin/order-returns/RET-1/package-rates",
+      { weight_grams: 500, length_cm: 12, breadth_cm: 10, height_cm: 8 },
+      { auth: true },
+    );
+  });
+
+  it("completes an exchange outbound package wrap", async () => {
+    postMock.mockResolvedValueOnce({ return_number: "RET-1", packed_at: "2026-10-02T01:00:00Z" });
+    await completeOrderReturnPackage("RET-1", {
+      weight_grams: 500,
+      length_cm: 12,
+      breadth_cm: 10,
+      height_cm: 8,
+      package_type: "box",
+    });
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/admin/order-returns/RET-1/complete-package",
+      {
+        weight_grams: 500,
+        length_cm: 12,
+        breadth_cm: 10,
+        height_cm: 8,
+        package_type: "box",
       },
       { auth: true },
     );

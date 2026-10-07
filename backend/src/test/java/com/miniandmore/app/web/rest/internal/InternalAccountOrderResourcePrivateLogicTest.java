@@ -392,7 +392,11 @@ class InternalAccountOrderResourcePrivateLogicTest {
         Map<String, Object> summary = (Map<String, Object>) ReflectionTestUtils.invokeMethod(resource, "publicTrackingSummary", order);
         @SuppressWarnings("unchecked")
         Map<String, Object> orderMap = (Map<String, Object>) summary.get("order");
-        assertThat(orderMap).containsKey("tracking_number").doesNotContainKey("total");
+        assertThat(orderMap)
+            .containsEntry("tracking_number", "AWB-1")
+            .containsEntry("shipment_date", "2026-08-01")
+            .containsEntry("shipment_delivered_at", "")
+            .doesNotContainKey("total");
     }
 
     @Test
@@ -760,5 +764,29 @@ class InternalAccountOrderResourcePrivateLogicTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> payment = (Map<String, Object>) ReflectionTestUtils.invokeMethod(resource, "paymentSummary", order);
         assertThat(payment.get("payment_status")).isEqualTo("paid");
+    }
+
+    @Test
+    void orderSummary_packedOrder_hidesCustomerCancelAndAsksForCare() {
+        CustomerOrder order = new CustomerOrder()
+            .id(12L)
+            .orderNumber("MNM-12")
+            .status(OrderStatus.HAND_WRAPPED)
+            .paymentStatus(PaymentStatus.PAID)
+            .paymentMethod("online")
+            .total(BigDecimal.valueOf(100))
+            .packedAt(Instant.parse("2026-09-30T00:00:00Z"))
+            .placedAt(Instant.parse("2026-08-10T10:00:00Z"));
+        OrderItem item = new OrderItem().id(1L).productId("1").productName("Dress").qty(1).price(BigDecimal.TEN);
+        when(orderItemRepository.findAllByOrderId(12L)).thenReturn(List.of(item));
+        when(orderCancellationService.canCustomerShowCancelAction(order)).thenReturn(false);
+        when(orderCancellationService.shouldContactCareToCancel(order)).thenReturn(true);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> summary = (Map<String, Object>) ReflectionTestUtils.invokeMethod(resource, "orderSummary", order);
+
+        assertThat(summary.get("can_cancel")).isEqualTo(false);
+        assertThat(summary.get("contact_care_to_cancel")).isEqualTo(true);
+        assertThat(summary.get("packed_at")).isEqualTo("2026-09-30T00:00:00Z");
     }
 }

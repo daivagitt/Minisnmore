@@ -146,13 +146,25 @@ class OrderEventServiceTest {
     }
 
     @Test
-    void syncLifecycleEvents_cancelled_sendsCancelEmail() {
+    void syncLifecycleEvents_cancelled_sendsDirectCancelEmail() {
         CustomerOrder order = baseOrder().status(OrderStatus.CANCELLED).paymentStatus(PaymentStatus.PAID);
         stubInsertSucceeds();
 
         service.syncLifecycleEvents(order);
 
         verify(orderMailService).sendOrderCancelled(order);
+        verify(orderSmsService).sendOrderCancelled(order);
+    }
+
+    @Test
+    void syncLifecycleEvents_cancelled_skipsNotificationWhenOwnedByCancellationService() {
+        CustomerOrder order = baseOrder().status(OrderStatus.CANCELLED).paymentStatus(PaymentStatus.PAID);
+        stubInsertSucceeds();
+
+        service.syncLifecycleEvents(order, false);
+
+        verify(orderMailService, never()).sendOrderCancelled(order);
+        verify(orderSmsService, never()).sendOrderCancelled(order);
     }
 
     @Test
@@ -178,14 +190,13 @@ class OrderEventServiceTest {
     }
 
     @Test
-    void syncLifecycleEvents_cancelled_smsStillRunsWhenEmailFails() {
+    void syncLifecycleEvents_cancelled_doesNotSendLifecycleSmsWhenOwnedByCancellationService() {
         CustomerOrder order = baseOrder().status(OrderStatus.CANCELLED).paymentStatus(PaymentStatus.PAID);
         stubInsertSucceeds();
-        org.mockito.Mockito.doThrow(new RuntimeException("smtp down")).when(orderMailService).sendOrderCancelled(order);
 
-        service.syncLifecycleEvents(order);
+        service.syncLifecycleEvents(order, false);
 
-        verify(orderSmsService).sendOrderCancelled(order);
+        verify(orderSmsService, never()).sendOrderCancelled(order);
     }
 
     @Test
@@ -252,6 +263,38 @@ class OrderEventServiceTest {
         service.syncLifecycleEvents(order);
 
         assertThat(capturedEventTypes()).contains(OrderEventService.TYPE_REFUNDED);
+        verify(orderMailService).sendRefundCompleted(order, order.getTotal(), null, order.getPaymentMethod());
+    }
+
+    @Test
+    void syncLifecycleEvents_cancelledRefunded_sendsRefundCompleted() {
+        CustomerOrder order = baseOrder().status(OrderStatus.CANCELLED).paymentStatus(PaymentStatus.REFUNDED);
+        stubInsertSucceeds();
+
+        service.syncLifecycleEvents(order);
+
+        verify(orderMailService).sendRefundCompleted(order, order.getTotal(), null, order.getPaymentMethod());
+    }
+
+    @Test
+    void syncLifecycleEvents_refundFailed_recordsRefundFailedEvent() {
+        CustomerOrder order = baseOrder().paymentStatus(PaymentStatus.REFUND_FAILED);
+        stubInsertSucceeds();
+
+        service.syncLifecycleEvents(order);
+
+        assertThat(capturedEventTypes()).contains(OrderEventService.TYPE_REFUND_FAILED);
+        verify(orderMailService).sendRefundFailed(order, order.getTotal(), null, order.getPaymentMethod());
+    }
+
+    @Test
+    void syncLifecycleEvents_refundInitiated_recordsRefundInitiatedEvent() {
+        CustomerOrder order = baseOrder().paymentStatus(PaymentStatus.REFUND_INITIATED);
+        stubInsertSucceeds();
+
+        service.syncLifecycleEvents(order);
+
+        assertThat(capturedEventTypes()).contains(OrderEventService.TYPE_REFUND_INITIATED);
     }
 
     @Test

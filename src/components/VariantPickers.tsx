@@ -29,6 +29,7 @@ export function VariantSizeButtons({
   onSizeChange,
   gapClass = "gap-1.5",
   readOnly = false,
+  sizeAnnotation,
 }: {
   product: VariantProductLike;
   size?: string | null;
@@ -36,6 +37,8 @@ export function VariantSizeButtons({
   gapClass?: string;
   /** Admin preview — show all sizes with sold-out strikethrough, no selection. */
   readOnly?: boolean;
+  /** Optional second-line label, e.g. exchange price difference. */
+  sizeAnnotation?: (size: string) => string | null;
 }) {
   const sizes = sizesForDisplay(product);
   const isVariants = isVariantsProduct(product);
@@ -45,16 +48,20 @@ export function VariantSizeButtons({
       {sizes.map((s) => {
         const unavailable = isVariants && !sizeHasSellableVariants(product, s);
         const selected = !readOnly && size === s;
+        const annotation = sizeAnnotation?.(s) ?? null;
         const className = cn(
           SIZE_PILL_CLASS,
+          annotation && "inline-flex flex-col items-center leading-tight",
           selected ? "bg-primary text-primary-foreground" : "glass",
           !readOnly && !selected && "hover:bg-white/60",
           unavailable && UNAVAILABLE_SIZE_CLASS,
         );
+        const title = unavailable ? `${s} — sold out` : annotation ? `${s} · ${annotation}` : s;
         if (readOnly) {
           return (
-            <span key={s} className={className} title={unavailable ? `${s} — sold out` : s}>
+            <span key={s} className={className} title={title}>
               {s}
+              {annotation ? <span className="text-[10px] font-medium tabular-nums opacity-80">{annotation}</span> : null}
             </span>
           );
         }
@@ -65,9 +72,10 @@ export function VariantSizeButtons({
             disabled={unavailable}
             onClick={() => onSizeChange?.(s)}
             className={className}
-            title={unavailable ? `${s} — sold out` : s}
+            title={title}
           >
             {s}
+            {annotation ? <span className="text-[10px] font-medium tabular-nums opacity-80">{annotation}</span> : null}
           </button>
         );
       })}
@@ -84,6 +92,7 @@ export function VariantColorButtons({
   colors,
   gapClass = "gap-2.5",
   swatchClass = "h-12 w-12 sm:h-14 sm:w-14",
+  colorAnnotation,
 }: {
   product: VariantProductLike;
   size: string | null;
@@ -94,6 +103,8 @@ export function VariantColorButtons({
   colors: VariantProductLike["colors"];
   gapClass?: string;
   swatchClass?: string;
+  /** Optional caption under a swatch, e.g. exchange price difference. */
+  colorAnnotation?: (color: string) => string | null;
 }) {
   const isVariants = isVariantsProduct(product);
 
@@ -104,10 +115,15 @@ export function VariantColorButtons({
         const unavailable = isVariants && !isVariantSellable(row);
         const selected = !unavailable && color?.trim().toLowerCase() === c.name.trim().toLowerCase();
         const swatchImage = swatchImageForColor(c);
+        const annotation = colorAnnotation?.(c.name) ?? null;
         const intent = () => onColorIntent?.(c.name);
-        return (
+        const title = unavailable
+          ? `${c.name} — out of stock in this size`
+          : annotation
+            ? `${c.name} · ${annotation}`
+            : c.name;
+        const swatch = (
           <button
-            key={c.name}
             type="button"
             disabled={unavailable}
             onClick={() => onColorChange(c.name)}
@@ -120,9 +136,9 @@ export function VariantColorButtons({
               unavailable && UNAVAILABLE_COLOR_CLASS,
             )}
             style={swatchImage ? undefined : { background: c.hex }}
-            aria-label={c.name}
+            aria-label={annotation ? `${c.name}, ${annotation}` : c.name}
             aria-pressed={selected}
-            title={unavailable ? `${c.name} — out of stock in this size` : c.name}
+            title={title}
           >
             {swatchImage ? (
               <LazyImage
@@ -137,6 +153,19 @@ export function VariantColorButtons({
               />
             ) : null}
           </button>
+        );
+        if (!annotation) {
+          return (
+            <span key={c.name} className="contents">
+              {swatch}
+            </span>
+          );
+        }
+        return (
+          <div key={c.name} className="flex flex-col items-center gap-0.5">
+            {swatch}
+            <span className="text-[10px] font-medium tabular-nums text-muted-foreground">{annotation}</span>
+          </div>
         );
       })}
     </div>

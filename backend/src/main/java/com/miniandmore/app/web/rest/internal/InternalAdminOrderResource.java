@@ -103,7 +103,8 @@ public class InternalAdminOrderResource {
         @RequestParam(required = false) String paymentStatus,
         @RequestParam(required = false) String paymentMethod,
         @RequestParam(required = false) String zohoSyncStatus,
-        @RequestParam(required = false) String ledgerlySyncStatus
+        @RequestParam(required = false) String ledgerlySyncStatus,
+        @RequestParam(required = false) String trackingStatus
     ) {
         boolean hasRange = from != null || to != null;
         if (hasRange) {
@@ -127,7 +128,17 @@ public class InternalAdminOrderResource {
         Page<CustomerOrder> result = dataAccess
             .customerOrderRepository()
             .findAll(
-                AdminOrderListSpec.create(from, to, q, status, paymentStatus, paymentMethod, zohoSyncStatus, ledgerlySyncStatus),
+                AdminOrderListSpec.create(
+                    from,
+                    to,
+                    q,
+                    status,
+                    paymentStatus,
+                    paymentMethod,
+                    zohoSyncStatus,
+                    ledgerlySyncStatus,
+                    trackingStatus
+                ),
                 pageable
             );
         if (result.getTotalPages() > 0 && pageNumber > result.getTotalPages()) {
@@ -140,7 +151,17 @@ public class InternalAdminOrderResource {
             result = dataAccess
                 .customerOrderRepository()
                 .findAll(
-                    AdminOrderListSpec.create(from, to, q, status, paymentStatus, paymentMethod, zohoSyncStatus, ledgerlySyncStatus),
+                    AdminOrderListSpec.create(
+                        from,
+                        to,
+                        q,
+                        status,
+                        paymentStatus,
+                        paymentMethod,
+                        zohoSyncStatus,
+                        ledgerlySyncStatus,
+                        trackingStatus
+                    ),
                     pageable
                 );
         }
@@ -249,7 +270,10 @@ public class InternalAdminOrderResource {
             body.tracking_url(),
             body.label_url(),
             Boolean.TRUE.equals(body.override_fulfillment_hold()),
-            body.override_reason()
+            body.override_reason(),
+            body.courier_id(),
+            body.courier_name(),
+            body.package_type()
         );
         return ApiResponse.ok(Map.of("order", summary(saved)));
     }
@@ -284,7 +308,8 @@ public class InternalAdminOrderResource {
             body.breadth_cm(),
             body.height_cm(),
             body.courier_id(),
-            body.courier_name()
+            body.courier_name(),
+            body.package_type()
         );
         return ApiResponse.ok(Map.of("order", summary(saved)));
     }
@@ -300,6 +325,21 @@ public class InternalAdminOrderResource {
             parseLogisticsMode(body.mode()),
             body.reason(),
             SecurityUtils.getCurrentUserLogin().orElse("system")
+        );
+        return ApiResponse.ok(Map.of("order", summary(saved)));
+    }
+
+    @PostMapping("/{orderNumber}/cancel")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
+    public ApiResponse<Map<String, Object>> cancelOrder(
+        @PathVariable String orderNumber,
+        @Valid @RequestBody CancelOrderRequest body
+    ) {
+        CustomerOrder saved = orderCancellationService.cancelOrderFromAdmin(
+            orderNumber,
+            body.reason(),
+            SecurityUtils.getCurrentUserLogin().orElse("system"),
+            body.shipment_mode()
         );
         return ApiResponse.ok(Map.of("order", summary(saved)));
     }
@@ -321,6 +361,7 @@ public class InternalAdminOrderResource {
         data.put("zoho_last_synced_at", instant(order.getZohoLastSyncedAt()));
         data.put("zoho_sales_order_id", StringUtils.defaultString(order.getZohoSalesOrderId()));
         data.put("zoho_invoice_id", StringUtils.defaultString(order.getZohoInvoiceId()));
+        data.put("zoho_credit_note_id", StringUtils.defaultString(order.getZohoCreditNoteId()));
         data.put("zoho_sync_eligible", isZohoSyncEligible(order));
         data.put("ledgerly_sync_status", lower(order.getLedgerlySyncStatus()));
         data.put("ledgerly_sync_error", StringUtils.defaultString(order.getLedgerlySyncError()));
@@ -332,6 +373,10 @@ public class InternalAdminOrderResource {
         data.put("full_name", address.path("full_name").asText(""));
         data.put("phone", address.path("phone").asText(""));
         data.put("city", address.path("city").asText(""));
+        data.put("shipping_address", shippingAddressMap(address));
+        data.put("dispatch_address", dispatchAddressMap());
+        data.put("package_slip_number", documentNumber("PKG-", order));
+        data.put("shipment_order_number", documentNumber("SHP-", order));
         data.put("tracking_number", StringUtils.defaultString(order.getTrackingNumber()));
         data.put("tracking_carrier", StringUtils.defaultString(order.getTrackingCarrier()));
         data.put("tracking_url", StringUtils.defaultString(order.getTrackingUrl()));
@@ -348,6 +393,8 @@ public class InternalAdminOrderResource {
         );
         boolean pendingCancellation = order.getId() != null && orderCancellationService.hasPendingRequest(order.getId());
         data.put("pending_cancellation", pendingCancellation);
+        data.put("can_admin_cancel", orderCancellationService.canCancel(order));
+        data.put("can_cancel", orderCancellationService.canCancel(order));
         data.put("can_book_shipment", orderShipmentService.canBook(order));
         data.put("can_book_shipment_with_override", orderShipmentService.canBookWithOverride(order));
         data.put("can_book_expressbees_shipment", orderShipmentService.canBookExpressBees(order));
@@ -361,6 +408,10 @@ public class InternalAdminOrderResource {
         data.put("package_chargeable_weight_grams", order.getPackageChargeableWeightGrams());
         data.put("package_courier_id", StringUtils.defaultString(order.getPackageCourierId()));
         data.put("package_courier_name", StringUtils.defaultString(order.getPackageCourierName()));
+        data.put(
+            "package_type",
+            order.getPackageType() == null ? "custom" : order.getPackageType().toApi()
+        );
         data.put("packed_at", instant(order.getPackedAt()));
         if (order.getId() != null) {
             data.put(
@@ -374,6 +425,9 @@ public class InternalAdminOrderResource {
     }
 
     private static boolean isZohoSyncEligible(CustomerOrder order) {
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            return StringUtils.isNotBlank(order.getZohoSalesOrderId()) || StringUtils.isNotBlank(order.getZohoInvoiceId());
+        }
         return order.getPaymentStatus() == PaymentStatus.PAID ||
         (ZohoSyncService.isCodOrder(order) &&
             (order.getStatus() == OrderStatus.CONFIRMED || order.getStatus() == OrderStatus.HAND_WRAPPED));
@@ -398,6 +452,54 @@ public class InternalAdminOrderResource {
         }
     }
 
+    private Map<String, Object> shippingAddressMap(JsonNode address) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("name", firstText(address, "full_name", "name"));
+        data.put("full_name", firstText(address, "full_name", "name"));
+        data.put("line1", firstText(address, "line1", "address_line1", "address"));
+        data.put("line2", firstText(address, "line2", "address_line2"));
+        data.put("city", firstText(address, "city"));
+        data.put("state", firstText(address, "state"));
+        data.put("pincode", firstText(address, "pincode", "postal_code", "zip"));
+        data.put("phone", firstText(address, "phone", "mobile"));
+        data.put("email", firstText(address, "email"));
+        data.put("country", StringUtils.defaultIfBlank(firstText(address, "country"), "India"));
+        return data;
+    }
+
+    private Map<String, Object> dispatchAddressMap() {
+        ApplicationProperties.XpressBees warehouse = applicationProperties.getXpressbees();
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("name", StringUtils.defaultString(warehouse.getWarehouseName()));
+        data.put("full_name", StringUtils.defaultString(warehouse.getWarehouseName()));
+        data.put("line1", StringUtils.defaultString(warehouse.getWarehouseLine1()));
+        data.put("line2", StringUtils.defaultString(warehouse.getWarehouseLine2()));
+        data.put("city", StringUtils.defaultString(warehouse.getWarehouseCity()));
+        data.put("state", StringUtils.defaultString(warehouse.getWarehouseState()));
+        data.put("pincode", StringUtils.defaultString(warehouse.getOriginPincode()));
+        data.put("phone", StringUtils.defaultString(warehouse.getWarehousePhone()));
+        data.put("country", "India");
+        return data;
+    }
+
+    private static String documentNumber(String prefix, CustomerOrder order) {
+        long id = order.getId() == null ? 0L : order.getId();
+        return prefix + String.format("%05d", id);
+    }
+
+    private static String firstText(JsonNode address, String... fields) {
+        if (address == null || address.isMissingNode()) {
+            return "";
+        }
+        for (String field : fields) {
+            String value = address.path(field).asText("").trim();
+            if (StringUtils.isNotBlank(value)) {
+                return value;
+            }
+        }
+        return "";
+    }
+
     private static ReturnLogisticsMode parseLogisticsMode(String mode) {
         if (StringUtils.isBlank(mode)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Logistics mode is required");
@@ -416,12 +518,20 @@ public class InternalAdminOrderResource {
         @Size(max = 500) String tracking_url,
         @Size(max = 500) String label_url,
         Boolean override_fulfillment_hold,
-        @Size(max = 500) String override_reason
+        @Size(max = 500) String override_reason,
+        @Size(max = 40) String courier_id,
+        @Size(max = 120) String courier_name,
+        @Size(max = 20) String package_type
     ) {}
 
     public record CancelShipmentRequest(
         @NotBlank String mode,
         @NotBlank @Size(min = 5, max = 500) String reason
+    ) {}
+
+    public record CancelOrderRequest(
+        @NotBlank @Size(min = 5, max = 2000) String reason,
+        @Size(max = 20) String shipment_mode
     ) {}
 
     public record PackageRatesRequest(
@@ -437,6 +547,7 @@ public class InternalAdminOrderResource {
         @NotNull @Min(1) Integer breadth_cm,
         @NotNull @Min(1) Integer height_cm,
         @Size(max = 40) String courier_id,
-        @Size(max = 120) String courier_name
+        @Size(max = 120) String courier_name,
+        @Size(max = 20) String package_type
     ) {}
 }

@@ -40,6 +40,14 @@ import { commerceFromSiteSettings } from "@/lib/commerce";
 import { sizeNoteForSelection } from "@/lib/product-size-notes";
 import { SizeFeatureNote } from "@/components/SizeFeatureNote";
 import { productDetailsKicker } from "@/lib/product-details-kicker";
+import { SHOW_M2_POST_ORDER_UI } from "@/lib/feature-flags";
+import { useHomeSections } from "@/hooks/useHomeSections";
+import {
+  YOU_MAY_ALSO_LOVE_KEY,
+  YOU_MAY_ALSO_LOVE_LIMIT,
+  resolveYouMayAlsoLove,
+  sectionProductSlugs,
+} from "@/lib/home-products";
 
 export const Route = createFileRoute("/product/$slug")({
   head: ({ params }) => ({
@@ -63,6 +71,7 @@ function ProductPage() {
   const product = useProduct(slug) as Product | undefined;
   const { addToCart, toggleWish, wishlist } = useShop();
   const settings = useSiteSettings();
+  const { byKey, isEnabled, titleFor, subtitleFor } = useHomeSections();
   const commerce = commerceFromSiteSettings(settings);
   const freeShippingMinLabel = commerce.freeShippingMinInr.toLocaleString("en-IN");
   const defaults = product ? defaultSellableSelection(product) : { size: null as string | null, color: null as string | null };
@@ -251,11 +260,17 @@ function ProductPage() {
       </div>
     );
   }
-  const recommendedProducts = products
-    .filter((p) => p.id !== product.id && (p.category === product.category || p.fabric === product.fabric))
-    .concat(products.filter((p) => p.id !== product.id))
-    .filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i)
-    .slice(0, 4);
+  const showPairings = isEnabled(YOU_MAY_ALSO_LOVE_KEY);
+  const recommendedProducts = showPairings
+    ? resolveYouMayAlsoLove(
+        products,
+        product,
+        sectionProductSlugs(
+          byKey.get(YOU_MAY_ALSO_LOVE_KEY)?.payload as Record<string, unknown> | undefined,
+          YOU_MAY_ALSO_LOVE_LIMIT,
+        ),
+      )
+    : [];
 
   const trustBadges: { i: typeof Leaf; t: string; title?: string }[] = [
     { i: Leaf, t: "Organic" },
@@ -265,7 +280,15 @@ function ProductPage() {
       t: `Free ₹${freeShippingMinLabel}+`,
       title: `Free shipping order above ${freeShippingMinLabel}`,
     },
-    { i: RotateCcw, t: "3 days", title: "3 days return" },
+    ...(SHOW_M2_POST_ORDER_UI
+      ? [
+          {
+            i: RotateCcw,
+            t: `${settings.return_window_days} day${settings.return_window_days === 1 ? "" : "s"}`,
+            title: `${settings.return_window_days} day${settings.return_window_days === 1 ? "" : "s"} return`,
+          },
+        ]
+      : []),
   ];
 
   const checkPin = async () => {
@@ -456,7 +479,7 @@ function ProductPage() {
         </div>
 
         <div className="glass rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 w-full min-w-0 shrink-0">
-          <div className="grid grid-cols-4 gap-2 sm:gap-3 md:gap-4 w-full">
+          <div className={`grid ${trustBadges.length === 4 ? "grid-cols-4" : "grid-cols-3"} gap-2 sm:gap-3 md:gap-4 w-full`}>
             {trustBadges.map((b) => (
               <button
                 type="button"
@@ -480,11 +503,16 @@ function ProductPage() {
         <ProductInfoSections product={product} />
       </div>
 
+      {recommendedProducts.length > 0 && (
       <section className="space-y-6 mt-6 sm:mt-8 md:mt-10">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4 sm:mb-6">
           <div className="min-w-0">
-            <div className="text-xs uppercase tracking-[0.28em] text-muted-foreground">You may also love</div>
-            <h2 className="font-display text-2xl sm:text-3xl md:text-4xl mt-1.5 sm:mt-2">Pieces that pair beautifully</h2>
+            <div className="text-xs uppercase tracking-[0.28em] text-muted-foreground">
+              {subtitleFor(YOU_MAY_ALSO_LOVE_KEY, "You may also love")}
+            </div>
+            <h2 className="font-display text-2xl sm:text-3xl md:text-4xl mt-1.5 sm:mt-2">
+              {titleFor(YOU_MAY_ALSO_LOVE_KEY, "Pieces that pair beautifully")}
+            </h2>
           </div>
           <Link to="/shop" className="story-link text-sm shrink-0">Browse all</Link>
         </div>
@@ -494,6 +522,7 @@ function ProductPage() {
           ))}
         </div>
       </section>
+      )}
 
       <div className="lg:hidden fixed inset-x-0 bottom-0 z-30 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="glass-strong rounded-full p-2 flex items-center gap-1.5 sm:gap-2 max-w-7xl mx-auto">

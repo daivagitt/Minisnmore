@@ -52,4 +52,20 @@ class XpressBeesShipmentStatusTest {
         assertThat(XpressBeesShipmentStatus.isPickedUpOrInTransit("undelivered")).isFalse();
         assertThat(XpressBeesShipmentStatus.isPickedUpOrInTransit("delivery_failed")).isFalse();
     }
+
+    @Test
+    void preferForwardMilestone_keepsOutForDeliveryAheadOfHubScans() {
+        assertThat(XpressBeesShipmentStatus.preferForwardMilestone("out_for_delivery", "in_transit")).isEqualTo(
+            "out_for_delivery"
+        );
+        assertThat(XpressBeesShipmentStatus.preferForwardMilestone("out_for_delivery", "delivery_failed")).isEqualTo(
+            "delivery_failed"
+        );
+        assertThat(XpressBeesShipmentStatus.preferForwardMilestone("delivery_failed", "out_for_delivery")).isEqualTo(
+            "out_for_delivery"
+        );
+        assertThat(XpressBeesShipmentStatus.preferForwardMilestone("delivered", "out_for_delivery")).isEqualTo("delivered");
+        assertThat(XpressBeesShipmentStatus.milestone("Picked Up")).isEqualTo("in_transit");
+        assertThat(XpressBeesShipmentStatus.milestone("booked")).isEqualTo("awaiting_pickup");
+    }
 }

@@ -73,7 +73,7 @@ describe("admin rbac route", () => {
     expect(screen.getByRole("heading", { name: "RBAC" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Staff" })).toBeInTheDocument();
     expect(screen.queryByText("today@example.com")).toBeNull();
-    expect(screen.getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/users");
+    expect(screen.getByRole("link", { name: "Customers" })).toHaveAttribute("href", "/admin/customers");
   });
 
   it("sends a staff invitation for an assignable role", async () => {

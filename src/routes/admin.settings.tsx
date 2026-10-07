@@ -17,6 +17,16 @@ import {
   MAX_DELIVERY_ETA_BUFFER_DAYS,
   parseDeliveryEtaBufferDays,
 } from "@/lib/commerce";
+import {
+  DEFAULT_REFUND_MAX_BUSINESS_DAYS,
+  DEFAULT_REFUND_MIN_BUSINESS_DAYS,
+  DEFAULT_RETURN_WINDOW_DAYS,
+  MAX_REFUND_BUSINESS_DAYS,
+  MAX_RETURN_WINDOW_DAYS,
+  parseRefundMaxBusinessDays,
+  parseRefundMinBusinessDays,
+  parseReturnWindowDays,
+} from "@/lib/refund-policy";
 import { invalidateSiteSettings, type SiteSettings } from "@/hooks/useSiteSettings";
 import { ImageUploadField } from "@/components/admin/ImageUploadField";
 import { PdfUploadField } from "@/components/admin/PdfUploadField";
@@ -42,6 +52,9 @@ type SettingsForm = Omit<
   | "free_shipping_min_inr"
   | "cod_fee_inr"
   | "delivery_eta_buffer_days"
+  | "return_window_days"
+  | "refund_min_business_days"
+  | "refund_max_business_days"
 > & {
   gst_rate: number | null;
   shipping_standard_inr: number | null;
@@ -49,6 +62,9 @@ type SettingsForm = Omit<
   free_shipping_min_inr: number | null;
   cod_fee_inr: number | null;
   delivery_eta_buffer_days: number | null;
+  return_window_days: number | null;
+  refund_min_business_days: number | null;
+  refund_max_business_days: number | null;
 };
 
 const empty: SettingsForm = {
@@ -76,6 +92,9 @@ const empty: SettingsForm = {
   free_shipping_min_inr: 2500,
   cod_fee_inr: 99,
   delivery_eta_buffer_days: DEFAULT_DELIVERY_ETA_BUFFER_DAYS,
+  return_window_days: DEFAULT_RETURN_WINDOW_DAYS,
+  refund_min_business_days: DEFAULT_REFUND_MIN_BUSINESS_DAYS,
+  refund_max_business_days: DEFAULT_REFUND_MAX_BUSINESS_DAYS,
   store_discount_percent: 20,
 };
 
@@ -83,7 +102,7 @@ function SettingsPage() {
   const [s, setS] = useState<SettingsForm>(empty);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const sections = useAdminSections<"brand" | "contact" | "footer" | "pricing" | "ecatalogue">();
+  const sections = useAdminSections<"brand" | "contact" | "footer" | "pricing" | "returns" | "ecatalogue">();
 
   useEffect(() => {
     (async () => {
@@ -103,6 +122,19 @@ function SettingsPage() {
             delivery_eta_buffer_days: parseDeliveryEtaBufferDays(
               data.delivery_eta_buffer_days,
               empty.delivery_eta_buffer_days
+            ),
+            return_window_days: parseReturnWindowDays(
+              data.return_window_days,
+              empty.return_window_days
+            ),
+            refund_min_business_days: parseRefundMinBusinessDays(
+              data.refund_min_business_days,
+              empty.refund_min_business_days
+            ),
+            refund_max_business_days: parseRefundMaxBusinessDays(
+              data.refund_max_business_days,
+              parseRefundMinBusinessDays(data.refund_min_business_days, empty.refund_min_business_days),
+              empty.refund_max_business_days
             ),
           } as SettingsForm);
         }
@@ -373,6 +405,39 @@ function SettingsPage() {
             <p className="text-xs text-muted-foreground">
               Pincode lookup ETAs (e.g. 2–3 days) get this many extra days before showing on product and checkout.
               Set 0 for no buffer.
+            </p>
+          </AdminPanelSection>
+
+          <AdminPanelSection title="Returns & refunds" {...sections.panel("returns")}>
+            <div className="grid sm:grid-cols-3 gap-3">
+              <NumberField
+                label="Return window (days after delivery)"
+                value={s.return_window_days}
+                onChange={(return_window_days) => up("return_window_days", return_window_days)}
+                min={1}
+                max={MAX_RETURN_WINDOW_DAYS}
+                required
+              />
+              <NumberField
+                label="Refund min business days"
+                value={s.refund_min_business_days}
+                onChange={(refund_min_business_days) => up("refund_min_business_days", refund_min_business_days)}
+                min={1}
+                max={MAX_REFUND_BUSINESS_DAYS}
+                required
+              />
+              <NumberField
+                label="Refund max business days"
+                value={s.refund_max_business_days}
+                onChange={(refund_max_business_days) => up("refund_max_business_days", refund_max_business_days)}
+                min={1}
+                max={MAX_REFUND_BUSINESS_DAYS}
+                required
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Return window is counted from delivery. Refund min–max is shown to customers when a refund is
+              initiated (original payment source).
             </p>
           </AdminPanelSection>
 

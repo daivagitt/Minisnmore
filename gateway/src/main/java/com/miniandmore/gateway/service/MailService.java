@@ -5,6 +5,9 @@ import com.miniandmore.gateway.domain.User;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.nio.charset.StandardCharsets;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -30,6 +33,9 @@ public class MailService {
     private static final String USER = "user";
 
     private static final String BASE_URL = "baseUrl";
+    // Keep in sync with catalog MailTimestamps (same pattern + Asia/Kolkata); gateway cannot depend on backend module.
+    private static final DateTimeFormatter IST_RFC_2822 = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss Z", Locale.ENGLISH);
+    private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
 
     private final JHipsterProperties jHipsterProperties;
 
@@ -76,6 +82,7 @@ public class MailService {
             message.setFrom(jHipsterProperties.getMail().getFrom());
             message.setSubject(subject);
             message.setText(content, isHtml);
+            stampIstSentDate(mimeMessage);
             javaMailSender.send(mimeMessage);
             LOG.info("Sent email to '{}'", to);
         } catch (MailException | MessagingException e) {
@@ -128,5 +135,13 @@ public class MailService {
     public void sendPasswordResetMail(User user) {
         LOG.debug("Sending password reset email to '{}'", user.getEmail());
         sendEmailFromTemplate(user, "mail/passwordResetEmail", "email.reset.title");
+    }
+
+    private static void stampIstSentDate(MimeMessage mimeMessage) {
+        try {
+            mimeMessage.setHeader("Date", IST_RFC_2822.format(ZonedDateTime.now(IST)));
+        } catch (MessagingException e) {
+            LOG.debug("Could not stamp IST Date header", e);
+        }
     }
 }

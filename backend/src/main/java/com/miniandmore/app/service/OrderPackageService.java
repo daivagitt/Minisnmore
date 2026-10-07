@@ -7,6 +7,7 @@ import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
+import com.miniandmore.app.domain.enumeration.PackageType;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.OrderItemRepository;
@@ -76,7 +77,58 @@ public class OrderPackageService {
         requirePackageEligible(order);
         requireDimensions(lengthCm, breadthCm, heightCm);
         requireDestinationPincode(order);
-        return buildRates(order, resolveActualWeight(order, weightGrams), lengthCm, breadthCm, heightCm);
+        return previewRatesForDestination(
+            destinationPincode(order),
+            resolveActualWeight(order, weightGrams),
+            lengthCm,
+            breadthCm,
+            heightCm,
+            isCod(order),
+            order.getTotal()
+        );
+    }
+
+    public Map<String, Object> previewRatesForDestination(
+        String destinationPincode,
+        int actualWeightGrams,
+        int lengthCm,
+        int breadthCm,
+        int heightCm,
+        boolean cod,
+        BigDecimal orderAmount
+    ) {
+        requireDimensions(lengthCm, breadthCm, heightCm);
+        if (destinationPincode == null || !destinationPincode.matches("^[1-9]\\d{5}$")) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Order shipping address must include a valid 6-digit pincode before packing"
+            );
+        }
+        return buildRates(destinationPincode, actualWeightGrams, lengthCm, breadthCm, heightCm, cod, orderAmount);
+    }
+
+    public record CourierSelection(String id, String name, Integer chargeableWeightGrams) {}
+
+    public CourierSelection selectCourier(Map<String, Object> rates, String courierId, String courierName) {
+        String selectedId = StringUtils.trimToNull(courierId);
+        String selectedName = StringUtils.trimToNull(courierName);
+        if (selectedId == null || selectedName == null) {
+            selectedId = stringValue(rates.get("preferred_courier_id"), selectedId);
+            selectedName = stringValue(rates.get("preferred_courier_name"), selectedName);
+        }
+        selectedName = resolveCourierName(rates, selectedId, selectedName);
+        List<Map<String, Object>> couriers = courierRows(rates);
+        if (!couriers.isEmpty()) {
+            requireResolvableCourier(rates, selectedId, courierId);
+            selectedName = resolveCourierName(rates, selectedId, selectedName);
+        } else if (StringUtils.isNotBlank(courierId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selected courier is not serviceable for this shipment");
+        } else {
+            selectedId = null;
+            selectedName = null;
+        }
+        Integer chargeable = rates.get("chargeable_weight_grams") instanceof Integer value ? value : null;
+        return new CourierSelection(selectedId, selectedName, chargeable);
     }
 
     public CustomerOrder completePackage(
@@ -88,27 +140,43 @@ public class OrderPackageService {
         String courierId,
         String courierName
     ) {
+        return completePackage(orderNumber, weightGrams, lengthCm, breadthCm, heightCm, courierId, courierName, null);
+    }
+
+    public CustomerOrder completePackage(
+        String orderNumber,
+        Integer weightGrams,
+        int lengthCm,
+        int breadthCm,
+        int heightCm,
+        String courierId,
+        String courierName,
+        String packageType
+    ) {
         CustomerOrder order = requireOrder(orderNumber);
         requirePackageEligible(order);
         requireDimensions(lengthCm, breadthCm, heightCm);
         requireDestinationPincode(order);
+        PackageType resolvedType = resolvePackageType(packageType);
         int actualWeight = resolveActualWeight(order, weightGrams);
-        Map<String, Object> rates = buildRates(order, actualWeight, lengthCm, breadthCm, heightCm);
-        String selectedId = StringUtils.trimToNull(courierId);
-        String selectedName = StringUtils.trimToNull(courierName);
-        if (selectedId == null || selectedName == null) {
-            selectedId = stringValue(rates.get("preferred_courier_id"), selectedId);
-            selectedName = stringValue(rates.get("preferred_courier_name"), selectedName);
-        }
-        selectedName = resolveCourierName(rates, selectedId, selectedName);
-        requireResolvableCourier(rates, selectedId, courierId);
+        Map<String, Object> rates = previewRatesForDestination(
+            destinationPincode(order),
+            actualWeight,
+            lengthCm,
+            breadthCm,
+            heightCm,
+            isCod(order),
+            order.getTotal()
+        );
+        CourierSelection selected = selectCourier(rates, courierId, courierName);
         order.setPackageWeightGrams(actualWeight);
         order.setPackageLengthCm(lengthCm);
         order.setPackageBreadthCm(breadthCm);
         order.setPackageHeightCm(heightCm);
-        order.setPackageChargeableWeightGrams((Integer) rates.get("chargeable_weight_grams"));
-        order.setPackageCourierId(selectedId);
-        order.setPackageCourierName(selectedName);
+        order.setPackageChargeableWeightGrams(selected.chargeableWeightGrams());
+        order.setPackageCourierId(selected.id());
+        order.setPackageCourierName(selected.name());
+        order.setPackageType(resolvedType);
         order.setPackedAt(Instant.now());
         if (order.getStatus() == OrderStatus.CONFIRMED) {
             order.setStatus(OrderStatus.HAND_WRAPPED);
@@ -118,14 +186,30 @@ public class OrderPackageService {
         return saved;
     }
 
-    private Map<String, Object> buildRates(CustomerOrder order, int actualWeightGrams, int lengthCm, int breadthCm, int heightCm) {
+    private Map<String, Object> buildRates(
+        String destinationPincode,
+        int actualWeightGrams,
+        int lengthCm,
+        int breadthCm,
+        int heightCm,
+        boolean cod,
+        BigDecimal orderAmount
+    ) {
         int divisor = Math.max(1, applicationProperties.getXpressbees().getVolumetricDivisor());
         int volumetric = volumetricWeightGrams(lengthCm, breadthCm, heightCm, divisor);
         int chargeable = chargeableWeightGrams(actualWeightGrams, volumetric);
         String preferredName = XpressBeesClient.preferredForwardCourierName(chargeable);
+        if (cod && (orderAmount == null || orderAmount.compareTo(BigDecimal.ZERO) <= 0)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order total is required to quote COD shipping rates");
+        }
         List<XpressBeesClient.CourierOption> options = xpressBeesClient.listForwardCourierOptions(
-            destinationPincode(order),
-            chargeable
+            destinationPincode,
+            actualWeightGrams,
+            lengthCm,
+            breadthCm,
+            heightCm,
+            cod ? "cod" : "prepaid",
+            orderAmount
         );
         String preferredId = null;
         List<Map<String, Object>> couriers = new ArrayList<>();
@@ -155,6 +239,12 @@ public class OrderPackageService {
         payload.put("preferred_courier_id", preferredId);
         payload.put("preferred_courier_name", preferredName);
         payload.put("couriers", couriers);
+        if (couriers.isEmpty() && xpressBeesClient.isConfigured()) {
+            payload.put(
+                "rates_warning",
+                "ExpressBees did not return shipping options. Check carrier configuration or try again."
+            );
+        }
         return payload;
     }
 
@@ -256,6 +346,16 @@ public class OrderPackageService {
         if (lengthCm < 1 || breadthCm < 1 || heightCm < 1) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Package length, breadth and height must be at least 1 cm");
         }
+    }
+
+    private static PackageType resolvePackageType(String packageType) {
+        return PackageType.parse(packageType).orElseThrow(
+            () ->
+                new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Package type must be custom, box or envelope"
+                )
+        );
     }
 
     private void requireDestinationPincode(CustomerOrder order) {

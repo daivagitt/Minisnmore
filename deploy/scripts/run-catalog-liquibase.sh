@@ -3,7 +3,8 @@
 set -euo pipefail
 
 CATALOG_JAR_PATH="${1:?Usage: run-catalog-liquibase.sh /path/to/catalog.jar}"
-export CATALOG_LIQUIBASE_CHANGELOG="${CATALOG_LIQUIBASE_CHANGELOG:-config/liquibase/changelog/20260828120000_add_invoice_legal_fields.xml}"
+# Default single changelog (master.xml validate fails from PropertiesLauncher classpath). Override per migration.
+export CATALOG_LIQUIBASE_CHANGELOG="${CATALOG_LIQUIBASE_CHANGELOG:-config/liquibase/changelog/20260930160000_add_customer_order_package_type.xml}"
 
 if [ ! -f "$CATALOG_JAR_PATH" ]; then
   echo "ERROR: catalog JAR not found: ${CATALOG_JAR_PATH}" >&2

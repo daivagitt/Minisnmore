@@ -12,11 +12,13 @@ import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.OrderReturn;
 import com.miniandmore.app.domain.OrderReturnItem;
 import com.miniandmore.app.domain.Product;
+import com.miniandmore.app.domain.SiteSetting;
 import com.miniandmore.app.domain.enumeration.ExchangeSettlementStatus;
 import com.miniandmore.app.domain.enumeration.ManualRefundMethod;
 import com.miniandmore.app.domain.enumeration.OrderRequestType;
 import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
+import com.miniandmore.app.domain.enumeration.PackageType;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.ReturnDisposition;
 import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
@@ -25,6 +27,7 @@ import com.miniandmore.app.repository.OrderItemRepository;
 import com.miniandmore.app.repository.OrderReturnItemRepository;
 import com.miniandmore.app.repository.OrderReturnRepository;
 import com.miniandmore.app.repository.ProductRepository;
+import com.miniandmore.app.repository.SiteSettingRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -51,7 +54,6 @@ import org.springframework.web.server.ResponseStatusException;
 public class OrderReturnService {
 
     private static final Logger LOG = LoggerFactory.getLogger(OrderReturnService.class);
-    private static final int RETURN_WINDOW_DAYS = 3;
 
     /** Feature switch: returns & exchanges. Flip to false to disable; no other code needs to change. */
     private static final boolean RETURNS_REFUNDS_ENABLED = true;
@@ -70,6 +72,17 @@ public class OrderReturnService {
     /** Anything not terminal is "open" — computed so new intermediate statuses default to open, not the reverse. */
     private static final Set<OrderReturnStatus> OPEN_RETURN_STATUSES = EnumSet.complementOf(TERMINAL_RETURN_STATUSES);
 
+    private static final EnumSet<OrderReturnStatus> RECEIVED_FROM_STATUSES = EnumSet.of(
+        OrderReturnStatus.PICKUP_REQUESTED,
+        OrderReturnStatus.PICKUP_SCHEDULED,
+        OrderReturnStatus.PICKED_UP
+    );
+
+    private static final EnumSet<OrderReturnStatus> PICKED_UP_FROM_STATUSES = EnumSet.of(
+        OrderReturnStatus.PICKUP_REQUESTED,
+        OrderReturnStatus.PICKUP_SCHEDULED
+    );
+
     private final OrderReturnRepository orderReturnRepository;
     private final OrderReturnItemRepository orderReturnItemRepository;
     private final CustomerOrderRepository customerOrderRepository;
@@ -85,6 +98,10 @@ public class OrderReturnService {
     private final XpressBeesClient xpressBeesClient;
     private final ObjectMapper objectMapper;
     private final CaseSlaSupport caseSlaSupport;
+    private final SiteSettingRepository siteSettingRepository;
+    private final OrderPackageService orderPackageService;
+    private final ExchangeRazorpaySettlementService exchangeRazorpaySettlementService;
+    private final ReturnXpressBeesShipmentFactory shipmentFactory;
 
     private static final EnumSet<OrderReturnStatus> SUMMARY_CLOSED_STATUSES = EnumSet.of(
         OrderReturnStatus.REJECTED,
@@ -109,7 +126,10 @@ public class OrderReturnService {
         ApplicationProperties applicationProperties,
         XpressBeesClient xpressBeesClient,
         ObjectMapper objectMapper,
-        CaseSlaSupport caseSlaSupport
+        CaseSlaSupport caseSlaSupport,
+        SiteSettingRepository siteSettingRepository,
+        OrderPackageService orderPackageService,
+        ExchangeRazorpaySettlementService exchangeRazorpaySettlementService
     ) {
         this.orderReturnRepository = orderReturnRepository;
         this.orderReturnItemRepository = orderReturnItemRepository;
@@ -126,6 +146,14 @@ public class OrderReturnService {
         this.xpressBeesClient = xpressBeesClient;
         this.objectMapper = objectMapper;
         this.caseSlaSupport = caseSlaSupport;
+        this.siteSettingRepository = siteSettingRepository;
+        this.orderPackageService = orderPackageService;
+        this.exchangeRazorpaySettlementService = exchangeRazorpaySettlementService;
+        this.shipmentFactory = new ReturnXpressBeesShipmentFactory(
+            applicationProperties,
+            objectMapper,
+            orderReturnItemRepository
+        );
     }
 
     public List<OrderReturn> listForUser(String login) {
@@ -174,6 +202,8 @@ public class OrderReturnService {
 
         long closed = stages.getOrDefault("closed", 0L);
         long open = Math.max(0, total - closed);
+        // Approved cases awaiting reverse pickup booking (matches bookPickup preconditions).
+        long xpressbeesReverseReady = orderReturnRepository.countByStatus(OrderReturnStatus.APPROVED);
         long overdue = 0;
         for (Object[] row : orderReturnRepository.findStatusAndRequestedAtByStatusNotIn(SUMMARY_CLOSED_STATUSES)) {
             if (row == null || row.length < 2 || !(row[0] instanceof OrderReturnStatus status) || !(row[1] instanceof Instant requestedAt)) {
@@ -191,6 +221,7 @@ public class OrderReturnService {
         summary.put("open", open);
         summary.put("closed", closed);
         summary.put("overdue", overdue);
+        summary.put("xpressbeesReverseReady", xpressbeesReverseReady);
         summary.put("stages", stages);
         return summary;
     }
@@ -258,7 +289,7 @@ public class OrderReturnService {
     private void createReturnLineSnapshots(OrderReturn orderReturn, CustomerOrder order, List<ReturnLineSelection> requestedLines) {
         List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
         if (orderItems.isEmpty()) {
-            orderReturn.setRefundAmount(money(order.getTotal()));
+            orderReturn.setRefundAmount(merchandiseRefund(order));
             return;
         }
         Map<Long, Integer> requestedByItem = new LinkedHashMap<>();
@@ -420,7 +451,7 @@ public class OrderReturnService {
             reserveExchangeReplacement(orderReturn);
         }
         orderReturn.setStatus(OrderReturnStatus.APPROVED);
-        orderReturn.setAdminNotes(trimNotes(adminNotes));
+        orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
         OrderReturn saved = orderReturnRepository.save(orderReturn);
         queueReturnEmail(saved.getOrder(), saved);
         return saved;
@@ -438,7 +469,7 @@ public class OrderReturnService {
         if (!variantSupport.decrementVariantStock(product, replacement.sku(), replacement.size(), replacement.color(), qty)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Replacement is no longer in stock");
         }
-        productRepository.save(product);
+        saveExchangeProductAndSyncZoho(orderReturn, product);
         BigDecimal originalGross = money(item.getPrice()).multiply(BigDecimal.valueOf(qty)).setScale(2, RoundingMode.HALF_UP);
         int orderedQty = Math.max(1, Optional.ofNullable(item.getQty()).orElse(1));
         CustomerOrder order = orderReturn.getOrder();
@@ -544,6 +575,7 @@ public class OrderReturnService {
         orderReturn.setTrackingUrl(StringUtils.left(StringUtils.trimToNull(trackingUrl), 500));
         orderReturn.setPickupWindow(StringUtils.left(StringUtils.trimToNull(pickupWindow), 200));
         orderReturn.setPickupFailureReason(null);
+        orderReturn.setReverseCarrierStatus(XpressBeesReturnCarrierStatus.DATA_RECEIVED);
         orderReturn.setStatus(OrderReturnStatus.PICKUP_SCHEDULED);
         orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
         OrderReturn saved = orderReturnRepository.save(orderReturn);
@@ -575,7 +607,9 @@ public class OrderReturnService {
             );
         }
         try {
-            XpressBeesClient.ReversePickupResult result = xpressBeesClient.createReversePickup(buildReversePickupRequest(orderReturn, preAssignedAwb));
+            XpressBeesClient.ReversePickupResult result = xpressBeesClient.createReversePickup(
+                shipmentFactory.buildReversePickupRequest(orderReturn, preAssignedAwb)
+            );
             orderReturn.setLogisticsMode(ReturnLogisticsMode.XPRESSBEES);
             orderReturn.setCarrierName("XpressBees");
             orderReturn.setReverseAwb(StringUtils.left(result.awb(), 80));
@@ -584,6 +618,7 @@ public class OrderReturnService {
             orderReturn.setPickupWindow(StringUtils.left(StringUtils.trimToNull(result.pickupWindow()), 200));
             orderReturn.setProviderRequestId(StringUtils.left(StringUtils.trimToNull(result.providerRequestId()), 120));
             orderReturn.setPickupFailureReason(null);
+            orderReturn.setReverseCarrierStatus(XpressBeesReturnCarrierStatus.DATA_RECEIVED);
             orderReturn.setStatus(OrderReturnStatus.PICKUP_SCHEDULED);
             orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
             OrderReturn saved = orderReturnRepository.save(orderReturn);
@@ -593,126 +628,6 @@ public class OrderReturnService {
             LOG.warn("ExpressBees reverse pickup failed for {}: {}", orderReturn.getReturnNumber(), ex.getMessage());
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, ex.getMessage());
         }
-    }
-
-    private XpressBeesClient.ReversePickupRequest buildReversePickupRequest(OrderReturn orderReturn, String preAssignedAwb) {
-        CustomerOrder order = orderReturn.getOrder();
-        JsonNode shipping = parseShippingAddress(order.getShippingAddressJson());
-        ApplicationProperties.XpressBees xpressBees = applicationProperties.getXpressbees();
-        XpressBeesClient.ReversePickupAddress pickupFrom = new XpressBeesClient.ReversePickupAddress(
-            firstAddressField(shipping, "full_name", "name"),
-            firstAddressField(shipping, "phone", "mobile"),
-            firstAddressField(shipping, "email"),
-            firstAddressField(shipping, "line1", "address_line1", "address"),
-            firstAddressField(shipping, "line2", "address_line2"),
-            firstAddressField(shipping, "city"),
-            firstAddressField(shipping, "state"),
-            firstAddressField(shipping, "pincode", "postal_code", "zip")
-        );
-        XpressBeesClient.ReversePickupAddress deliverTo = new XpressBeesClient.ReversePickupAddress(
-            StringUtils.defaultIfBlank(xpressBees.getWarehouseName(), "Mini's n More"),
-            StringUtils.defaultIfBlank(xpressBees.getWarehousePhone(), pickupFrom.phone()),
-            null,
-            xpressBees.getWarehouseLine1(),
-            xpressBees.getWarehouseLine2(),
-            xpressBees.getWarehouseCity(),
-            xpressBees.getWarehouseState(),
-            xpressBees.getOriginPincode()
-        );
-        List<XpressBeesClient.ReversePickupLine> lines = buildReversePickupLines(orderReturn, order);
-        return new XpressBeesClient.ReversePickupRequest(
-            orderReturn.getReturnNumber(),
-            order.getOrderNumber(),
-            pickupFrom,
-            deliverTo,
-            lines,
-            StringUtils.trimToNull(preAssignedAwb)
-        );
-    }
-
-    private List<XpressBeesClient.ReversePickupLine> buildReversePickupLines(OrderReturn orderReturn, CustomerOrder order) {
-        List<XpressBeesClient.ReversePickupLine> lines = new ArrayList<>();
-        if (orderReturn.getRequestType() == OrderRequestType.RETURN && orderReturn.getId() != null) {
-            for (OrderReturnItem returnItem : orderReturnItemRepository.findAllByOrderReturnIdOrderById(orderReturn.getId())) {
-                OrderItem selected = returnItem.getOrderItem();
-                lines.add(
-                    new XpressBeesClient.ReversePickupLine(
-                        StringUtils.defaultIfBlank(selected.getProductName(), "Return item"),
-                        StringUtils.defaultIfBlank(selected.getVariantSku(), selected.getProductSlug()),
-                        returnItem.getRequestedQty(),
-                        returnItem.getUnitAmount(),
-                        Math.max(1, applicationProperties.getXpressbees().getDefaultWeightGrams())
-                    )
-                );
-            }
-            if (!lines.isEmpty()) {
-                return lines;
-            }
-        }
-        OrderItem item = orderReturn.getOrderItem();
-        if (item != null) {
-            lines.add(
-                new XpressBeesClient.ReversePickupLine(
-                    StringUtils.defaultIfBlank(item.getProductName(), "Return item"),
-                    StringUtils.defaultIfBlank(item.getVariantSku(), item.getProductSlug()),
-                    Math.max(1, item.getQty() == null ? 1 : item.getQty()),
-                    item.getPrice(),
-                    Math.max(1, applicationProperties.getXpressbees().getDefaultWeightGrams())
-                )
-            );
-            return lines;
-        }
-        for (OrderItem orderItem : order.getItemses()) {
-            lines.add(
-                new XpressBeesClient.ReversePickupLine(
-                    StringUtils.defaultIfBlank(orderItem.getProductName(), "Return item"),
-                    StringUtils.defaultIfBlank(orderItem.getVariantSku(), orderItem.getProductSlug()),
-                    Math.max(1, orderItem.getQty() == null ? 1 : orderItem.getQty()),
-                    orderItem.getPrice(),
-                    Math.max(1, applicationProperties.getXpressbees().getDefaultWeightGrams())
-                )
-            );
-        }
-        if (lines.isEmpty()) {
-            lines.add(
-                new XpressBeesClient.ReversePickupLine(
-                    "Return item",
-                    orderReturn.getReturnNumber(),
-                    1,
-                    order.getTotal(),
-                    Math.max(1, applicationProperties.getXpressbees().getDefaultWeightGrams())
-                )
-            );
-        }
-        return lines;
-    }
-
-    private JsonNode parseShippingAddress(String shippingAddressJson) {
-        if (StringUtils.isBlank(shippingAddressJson)) {
-            return objectMapper.createObjectNode();
-        }
-        try {
-            return objectMapper.readTree(shippingAddressJson);
-        } catch (Exception ex) {
-            LOG.debug("Could not parse shipping address JSON for reverse pickup: {}", ex.getMessage());
-            return objectMapper.createObjectNode();
-        }
-    }
-
-    private static String firstAddressField(JsonNode address, String... fields) {
-        if (address == null || address.isMissingNode()) {
-            return null;
-        }
-        for (String field : fields) {
-            JsonNode value = address.path(field);
-            if (!value.isMissingNode() && !value.isNull()) {
-                String text = value.asText("").trim();
-                if (StringUtils.isNotBlank(text)) {
-                    return text;
-                }
-            }
-        }
-        return null;
     }
 
     public OrderReturn markPickupFailed(String returnNumber, String failureReason, String adminNotes) {
@@ -777,30 +692,52 @@ public class OrderReturnService {
     }
 
     public OrderReturn markPickedUp(String returnNumber, String adminNotes) {
-        OrderReturn saved = transition(
-            returnNumber,
-            EnumSet.of(OrderReturnStatus.APPROVED, OrderReturnStatus.PICKUP_REQUESTED, OrderReturnStatus.PICKUP_SCHEDULED),
-            OrderReturnStatus.PICKED_UP,
-            adminNotes,
-            "Pickup must be scheduled before marking picked up"
-        );
+        assertFeatureEnabled();
+        OrderReturn orderReturn = loadReturn(returnNumber);
+        if (!hasReverseShipment(orderReturn)) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Book a reverse pickup shipment before marking picked up"
+            );
+        }
+        if (!PICKED_UP_FROM_STATUSES.contains(orderReturn.getStatus())) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Return must be scheduled for pickup before marking picked up"
+            );
+        }
+        orderReturn.setStatus(OrderReturnStatus.PICKED_UP);
+        orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
+        OrderReturn saved = orderReturnRepository.save(orderReturn);
         queueReturnEmail(saved.getOrder(), saved);
         return saved;
     }
 
     public OrderReturn markReceived(String returnNumber, String adminNotes) {
-        OrderReturn saved = transition(
-            returnNumber,
-            EnumSet.of(
-                OrderReturnStatus.APPROVED,
-                OrderReturnStatus.PICKUP_REQUESTED,
-                OrderReturnStatus.PICKUP_SCHEDULED,
-                OrderReturnStatus.PICKED_UP
-            ),
-            OrderReturnStatus.RECEIVED,
-            adminNotes,
-            "Return must be approved (or already picked up) before marking received"
-        );
+        assertFeatureEnabled();
+        OrderReturn orderReturn = loadReturn(returnNumber);
+        if (!hasReverseShipment(orderReturn)) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Book a reverse pickup shipment before marking received"
+            );
+        }
+        if (orderReturn.getRequestType() == OrderRequestType.EXCHANGE) {
+            if (orderReturn.getStatus() != OrderReturnStatus.PICKED_UP) {
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Exchange item must be picked up before marking received"
+                );
+            }
+        } else if (!RECEIVED_FROM_STATUSES.contains(orderReturn.getStatus())) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Return must be picked up or scheduled for pickup before marking received"
+            );
+        }
+        orderReturn.setStatus(OrderReturnStatus.RECEIVED);
+        orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
+        OrderReturn saved = orderReturnRepository.save(orderReturn);
         queueReturnEmail(saved.getOrder(), saved);
         return saved;
     }
@@ -833,12 +770,11 @@ public class OrderReturnService {
         if (disposition == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Disposition is required when accepting a return");
         }
+        // Exchange accept only records disposition. Requested-item restock happens once later
+        // (allocation or convert-to-refund). Credit notes wait for Razorpay refund, allocation,
+        // or convert-to-refund — not QC accept.
         orderReturn.setDisposition(disposition);
-        if (orderReturn.getRequestType() == OrderRequestType.EXCHANGE) {
-            if (disposition == ReturnDisposition.RESTOCKABLE) {
-                restoreItemStock(orderReturn.getOrderItem());
-            }
-        } else {
+        if (orderReturn.getRequestType() != OrderRequestType.EXCHANGE) {
             applyReturnLineInspection(orderReturn, disposition, lineDecisions);
         }
         orderReturn.setStatus(OrderReturnStatus.ACCEPTED);
@@ -853,9 +789,6 @@ public class OrderReturnService {
     ) {
         List<OrderReturnItem> lines = orderReturnItemRepository.findAllByOrderReturnIdOrderById(orderReturn.getId());
         if (lines.isEmpty()) {
-            if (defaultDisposition == ReturnDisposition.RESTOCKABLE) {
-                restoreInventoryForOrder(orderReturn.getOrder());
-            }
             return;
         }
         Map<Long, InspectionLineDecision> decisionsById = new LinkedHashMap<>();
@@ -888,9 +821,6 @@ public class OrderReturnService {
                 .multiply(BigDecimal.valueOf(acceptedQty))
                 .divide(BigDecimal.valueOf(line.getRequestedQty()), 2, RoundingMode.HALF_UP);
             line.setRefundAmount(lineRefund);
-            if (acceptedQty > 0 && lineDisposition == ReturnDisposition.RESTOCKABLE) {
-                restoreItemStock(line.getOrderItem(), acceptedQty);
-            }
             acceptedRefund = acceptedRefund.add(lineRefund);
         }
         if (acceptedRefund.signum() <= 0) {
@@ -913,11 +843,28 @@ public class OrderReturnService {
         String settledBy,
         String adminNotes
     ) {
+        return settlePriceDifference(returnNumber, settlementStatus, amount, method, reference, settledBy, adminNotes, false);
+    }
+
+    public OrderReturn settlePriceDifference(
+        String returnNumber,
+        ExchangeSettlementStatus settlementStatus,
+        BigDecimal amount,
+        String method,
+        String reference,
+        String settledBy,
+        String adminNotes,
+        boolean forceManual
+    ) {
         assertFeatureEnabled();
         OrderReturn orderReturn = loadReturn(returnNumber);
         assertIsExchange(orderReturn);
         if (orderReturn.getStatus() != OrderReturnStatus.APPROVED && orderReturn.getStatus() != OrderReturnStatus.ACCEPTED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Price difference can only be settled for an approved exchange");
+        }
+        ExchangeSettlementStatus currentSettlement = orderReturn.getSettlementStatus();
+        if (ExchangeSettlementAmounts.alreadySettled(currentSettlement)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Price difference already settled");
         }
         BigDecimal difference = money(orderReturn.getPriceDifference());
         ExchangeSettlementStatus expected;
@@ -932,21 +879,56 @@ public class OrderReturnService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Settlement action does not match the exchange price difference");
         }
         BigDecimal expectedAmount = difference.abs().setScale(2, RoundingMode.HALF_UP);
+        boolean razorpayRefund =
+            !forceManual &&
+            settlementStatus == ExchangeSettlementStatus.REFUNDED &&
+            canRefundExchangeDifferenceViaRazorpay(orderReturn);
         BigDecimal recordedAmount = settlementStatus == ExchangeSettlementStatus.WAIVED ? BigDecimal.ZERO : money(amount);
+        if (razorpayRefund && recordedAmount.signum() <= 0) {
+            recordedAmount = expectedAmount;
+        }
         if (settlementStatus != ExchangeSettlementStatus.WAIVED && recordedAmount.compareTo(expectedAmount) != 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Settlement amount must equal the price difference");
         }
-        if (settlementStatus != ExchangeSettlementStatus.WAIVED && StringUtils.isAnyBlank(method, reference)) {
+        if (settlementStatus != ExchangeSettlementStatus.WAIVED && !razorpayRefund && StringUtils.isAnyBlank(method, reference)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Settlement method and transaction reference are required");
         }
+        if (razorpayRefund) {
+            OrderReturn refunded = exchangeRazorpaySettlementService.recordRazorpayRefund(
+                returnNumber,
+                recordedAmount,
+                settledBy,
+                adminNotes
+            );
+            issueExchangeCreditNote(refunded, false);
+            return orderReturnRepository.save(refunded);
+        }
+        orderReturn = orderReturnRepository
+            .findOneByReturnNumberForUpdate(returnNumber)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Return not found"));
+        if (orderReturn.getRequestType() != OrderRequestType.EXCHANGE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Price difference settlement applies only to exchanges");
+        }
+        if (orderReturn.getStatus() != OrderReturnStatus.APPROVED && orderReturn.getStatus() != OrderReturnStatus.ACCEPTED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Price difference can only be settled for an approved exchange");
+        }
+        if (ExchangeSettlementAmounts.alreadySettled(orderReturn.getSettlementStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Price difference already settled");
+        }
+        String recordedMethod = StringUtils.left(StringUtils.trimToNull(method), 40);
+        String recordedReference = StringUtils.left(StringUtils.trimToNull(reference), 160);
         orderReturn.setSettlementStatus(settlementStatus);
         orderReturn.setSettlementAmount(recordedAmount);
-        orderReturn.setSettlementMethod(StringUtils.left(StringUtils.trimToNull(method), 40));
-        orderReturn.setSettlementReference(StringUtils.left(StringUtils.trimToNull(reference), 160));
+        orderReturn.setSettlementMethod(recordedMethod);
+        orderReturn.setSettlementReference(recordedReference);
         orderReturn.setSettledAt(Instant.now());
         orderReturn.setSettledBy(StringUtils.left(StringUtils.defaultIfBlank(settledBy, "system"), 50));
         orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
         return orderReturnRepository.save(orderReturn);
+    }
+
+    public boolean canRefundExchangeDifferenceViaRazorpay(OrderReturn orderReturn) {
+        return ExchangeSettlementAmounts.canRefundViaRazorpay(orderReturn);
     }
 
     public OrderReturn allocateReplacementItem(String returnNumber, String adminNotes) {
@@ -985,12 +967,135 @@ public class OrderReturnService {
         if (orderReturn.getSettlementStatus() == ExchangeSettlementStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Settle the exchange price difference before allocation");
         }
-        orderReturn.setStatus(OrderReturnStatus.ITEM_ALLOCATED);
         orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
+        restoreExchangeOriginalIfRestockable(orderReturn);
+        issueExchangeCreditNote(orderReturn, false);
+        issueReplacementInvoice(orderReturn);
+        syncExchangeProductStockToZoho(orderReturn);
+        orderReturn.setStatus(OrderReturnStatus.ITEM_ALLOCATED);
         return orderReturnRepository.save(orderReturn);
     }
 
+    /**
+     * Credit note for the item coming back. Cheaper replacement: after the Razorpay
+     * refund. Same price or more expensive replacement: at allocation (no Razorpay
+     * step). Convert-to-refund: after that refund is initiated. Unlinked when the
+     * exchange continues so the replacement invoice can apply it.
+     */
+    private void issueExchangeCreditNote(OrderReturn orderReturn, boolean linkToSourceInvoice) {
+        CustomerOrder order = orderReturn.getOrder();
+        if (order == null || order.getId() == null) {
+            return;
+        }
+        if (applicationProperties.getLedgerly().isSyncReturns() && StringUtils.isBlank(orderReturn.getLedgerlyCreditNoteId())) {
+            try {
+                Optional<String> creditNoteId = ledgerlyIntegrationClient.createCreditNote(
+                    order.getOrderNumber(),
+                    orderReturn.getReturnNumber(),
+                    money(orderReturn.getOriginalItemAmount())
+                );
+                if (creditNoteId.isPresent()) {
+                    orderReturn.setLedgerlyCreditNoteId(creditNoteId.orElseThrow());
+                } else if (shouldStubDemoCreditNote(order, null)) {
+                    orderReturn.setLedgerlyCreditNoteId("cn_demo_" + order.getOrderNumber());
+                }
+            } catch (RuntimeException e) {
+                if (shouldStubDemoCreditNote(order, e)) {
+                    orderReturn.setLedgerlyCreditNoteId("cn_demo_" + order.getOrderNumber());
+                } else {
+                    LOG.warn("Ledgerly exchange credit note failed for {}: {}", orderReturn.getReturnNumber(), e.getMessage());
+                    orderReturn.setAdminNotes(
+                        mergeNotes(orderReturn.getAdminNotes(), "Ledgerly credit note failed: " + StringUtils.left(e.getMessage(), 200))
+                    );
+                }
+            }
+        }
+        if (applicationProperties.getZoho().isSyncReturns() && StringUtils.isBlank(orderReturn.getZohoCreditNoteId())) {
+            try {
+                Optional<String> zohoCreditNoteId = zohoBooksIntegrationClient.createCreditNote(
+                    order.getId(),
+                    orderReturn.getReturnNumber(),
+                    returnedQuantitiesForZoho(orderReturn),
+                    linkToSourceInvoice
+                );
+                if (zohoCreditNoteId.isPresent()) {
+                    orderReturn.setZohoCreditNoteId(zohoCreditNoteId.orElseThrow());
+                } else if (shouldStubDemoCreditNote(order, null)) {
+                    orderReturn.setZohoCreditNoteId("cn_zoho_demo_" + order.getOrderNumber());
+                }
+            } catch (RuntimeException e) {
+                if (shouldStubDemoCreditNote(order, e)) {
+                    orderReturn.setZohoCreditNoteId("cn_zoho_demo_" + order.getOrderNumber());
+                } else {
+                    LOG.warn("Zoho exchange credit note failed for {}: {}", orderReturn.getReturnNumber(), e.getMessage());
+                    orderReturn.setAdminNotes(
+                        mergeNotes(orderReturn.getAdminNotes(), "Zoho credit note failed: " + StringUtils.left(e.getMessage(), 200))
+                    );
+                }
+            }
+        }
+    }
+
+    private void issueReplacementInvoice(OrderReturn orderReturn) {
+        CustomerOrder order = orderReturn.getOrder();
+        if (order == null || order.getId() == null || !applicationProperties.getZoho().isSyncReturns()) {
+            return;
+        }
+        if (StringUtils.isNotBlank(orderReturn.getZohoReplacementInvoiceId())) {
+            return;
+        }
+        OrderItem item = orderReturn.getOrderItem();
+        if (item == null || item.getId() == null) {
+            return;
+        }
+        try {
+            Optional<String> invoiceId = zohoBooksIntegrationClient.createExchangeReplacementInvoice(
+                order.getId(),
+                orderReturn.getReturnNumber(),
+                item.getId(),
+                orderReturn.getReplacementVariantSku(),
+                orderReturn.getReplacementSize(),
+                orderReturn.getReplacementColor(),
+                orderReturn.getReplacementItemAmount(),
+                Math.max(1, Optional.ofNullable(item.getQty()).orElse(1)),
+                priorCreditNoteIds(order, orderReturn)
+            );
+            if (invoiceId != null && invoiceId.isPresent()) {
+                orderReturn.setZohoReplacementInvoiceId(invoiceId.orElseThrow());
+            }
+        } catch (RuntimeException e) {
+            LOG.warn("Zoho replacement invoice failed for {}: {}", orderReturn.getReturnNumber(), e.getMessage());
+            orderReturn.setAdminNotes(
+                mergeNotes(orderReturn.getAdminNotes(), "Zoho replacement invoice failed: " + StringUtils.left(e.getMessage(), 200))
+            );
+        }
+    }
+
+    private List<String> priorCreditNoteIds(CustomerOrder order, OrderReturn current) {
+        List<String> ids = new ArrayList<>();
+        String orderCreditNote = StringUtils.trimToNull(order.getZohoCreditNoteId());
+        if (orderCreditNote != null) {
+            ids.add(orderCreditNote);
+        }
+        if (order.getId() != null) {
+            for (OrderReturn earlier : orderReturnRepository.findAllByOrder_IdOrderByRequestedAtAsc(order.getId())) {
+                if (earlier.getRequestType() != OrderRequestType.EXCHANGE) {
+                    continue;
+                }
+                String creditNoteId = StringUtils.trimToNull(earlier.getZohoCreditNoteId());
+                if (creditNoteId != null && !ids.contains(creditNoteId)) {
+                    ids.add(creditNoteId);
+                }
+            }
+        }
+        return ids;
+    }
+
     private void releaseExchangeReservation(OrderReturn orderReturn) {
+        releaseExchangeReservation(orderReturn, true);
+    }
+
+    private void releaseExchangeReservation(OrderReturn orderReturn, boolean syncZohoImmediately) {
         if (
             orderReturn.getRequestType() != OrderRequestType.EXCHANGE ||
             orderReturn.getReplacementReservedAt() == null ||
@@ -1012,7 +1117,13 @@ public class OrderReturnService {
             if (!restored) {
                 product.setStock(Optional.ofNullable(product.getStock()).orElse(0) + qty);
             }
-            productRepository.save(product);
+            if (syncZohoImmediately) {
+                saveExchangeProductAndSyncZoho(orderReturn, product);
+            } else {
+                productRepository.save(product);
+            }
+            orderReturn.setReplacementReservationReleasedAt(Instant.now());
+            return;
         }
         orderReturn.setReplacementReservationReleasedAt(Instant.now());
     }
@@ -1027,15 +1138,23 @@ public class OrderReturnService {
                 "Exchange must be accepted (or retried after a failed refund) before converting to a refund"
             );
         }
-        releaseExchangeReservation(orderReturn);
+        releaseExchangeReservation(orderReturn, false);
         OrderItem item = orderReturn.getOrderItem();
-        BigDecimal itemAmount = orderReturn.getOriginalItemAmount() == null
+        BigDecimal originalItemAmount = orderReturn.getOriginalItemAmount() == null
             ? item.getPrice().multiply(BigDecimal.valueOf(Optional.ofNullable(item.getQty()).orElse(1)))
             : orderReturn.getOriginalItemAmount();
-        if (orderReturn.getSettlementStatus() == ExchangeSettlementStatus.COLLECTED) {
-            itemAmount = itemAmount.add(money(orderReturn.getSettlementAmount()));
+        BigDecimal itemAmount = ExchangeSettlementAmounts.remainingItemRefund(orderReturn, originalItemAmount);
+        if (itemAmount.signum() <= 0) {
+            // Cash already went out as the price-difference refund. Do not record it again as
+            // refundAmount or Razorpay/webhooks will double-count settlement + refund.
+            issueExchangeCreditNote(orderReturn, true);
+            OrderReturn saved = finalizeRefund(orderReturn, BigDecimal.ZERO, adminNotes, true);
+            syncExchangeProductStockToZoho(saved);
+            return saved;
         }
-        return executeRefund(orderReturn, itemAmount, adminNotes);
+        OrderReturn saved = executeRefund(orderReturn, itemAmount, adminNotes);
+        syncExchangeProductStockToZoho(saved);
+        return saved;
     }
 
     public OrderReturn markRepacking(String returnNumber, String adminNotes) {
@@ -1049,6 +1168,11 @@ public class OrderReturnService {
     }
 
     public OrderReturn markReadyToShip(String returnNumber, String adminNotes) {
+        assertFeatureEnabled();
+        OrderReturn orderReturn = loadReturn(returnNumber);
+        if (orderReturn.getRequestType() == OrderRequestType.EXCHANGE && !isPackageCompleted(orderReturn)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Create a package before marking ready to ship");
+        }
         return transition(
             returnNumber,
             OrderReturnStatus.REPACKING,
@@ -1056,6 +1180,116 @@ public class OrderReturnService {
             adminNotes,
             "Item must be repacked before it is ready to ship"
         );
+    }
+
+    public boolean canCompletePackage(OrderReturn orderReturn) {
+        return isOutboundPackageEligible(orderReturn) && StringUtils.isBlank(orderReturn.getOutboundAwb());
+    }
+
+    public boolean canBookOutbound(OrderReturn orderReturn) {
+        return (
+            isOutboundPackageEligible(orderReturn) &&
+            orderReturn.getStatus() == OrderReturnStatus.READY_TO_SHIP &&
+            isPackageCompleted(orderReturn) &&
+            orderReturn.getSettlementStatus() != ExchangeSettlementStatus.PENDING &&
+            StringUtils.isBlank(orderReturn.getOutboundAwb())
+        );
+    }
+
+    public int defaultPackageWeightGrams(OrderReturn orderReturn) {
+        int perLine = Math.max(1, applicationProperties.getXpressbees().getDefaultWeightGrams());
+        OrderItem item = orderReturn == null ? null : orderReturn.getOrderItem();
+        int qty = 1;
+        if (item != null && item.getQty() != null) {
+            qty = Math.max(1, item.getQty());
+        }
+        return perLine * qty;
+    }
+
+    public Map<String, Object> previewOutboundPackageRates(
+        String returnNumber,
+        Integer weightGrams,
+        int lengthCm,
+        int breadthCm,
+        int heightCm
+    ) {
+        assertFeatureEnabled();
+        OrderReturn orderReturn = loadReturn(returnNumber);
+        assertOutboundPackageEligible(orderReturn);
+        return orderPackageService.previewRatesForDestination(
+            requireDestinationPincode(orderReturn),
+            resolveOutboundWeight(orderReturn, weightGrams),
+            lengthCm,
+            breadthCm,
+            heightCm,
+            false,
+            outboundOrderAmount(orderReturn)
+        );
+    }
+
+    public OrderReturn completeOutboundPackage(
+        String returnNumber,
+        Integer weightGrams,
+        int lengthCm,
+        int breadthCm,
+        int heightCm,
+        String courierId,
+        String courierName,
+        String packageType
+    ) {
+        assertFeatureEnabled();
+        OrderReturn orderReturn = loadReturn(returnNumber);
+        assertOutboundPackageEligible(orderReturn);
+        if (StringUtils.isNotBlank(orderReturn.getOutboundAwb())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Outbound shipment already booked");
+        }
+        PackageType resolvedType = PackageType.parse(packageType).orElseThrow(
+            () ->
+                new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Package type must be custom, box or envelope"
+                )
+        );
+        int actualWeight = resolveOutboundWeight(orderReturn, weightGrams);
+        Map<String, Object> rates = orderPackageService.previewRatesForDestination(
+            requireDestinationPincode(orderReturn),
+            actualWeight,
+            lengthCm,
+            breadthCm,
+            heightCm,
+            false,
+            outboundOrderAmount(orderReturn)
+        );
+        OrderPackageService.CourierSelection selected = orderPackageService.selectCourier(rates, courierId, courierName);
+        if (xpressBeesClient.isForwardShipmentConfigured() && StringUtils.isBlank(selected.id())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No serviceable couriers for this package");
+        }
+        orderReturn.setPackageWeightGrams(actualWeight);
+        orderReturn.setPackageLengthCm(lengthCm);
+        orderReturn.setPackageBreadthCm(breadthCm);
+        orderReturn.setPackageHeightCm(heightCm);
+        orderReturn.setPackageChargeableWeightGrams(selected.chargeableWeightGrams());
+        orderReturn.setPackageCourierId(StringUtils.left(selected.id(), 40));
+        orderReturn.setPackageCourierName(StringUtils.left(selected.name(), 120));
+        orderReturn.setPackageType(resolvedType);
+        orderReturn.setPackedAt(Instant.now());
+        if (orderReturn.getStatus() == OrderReturnStatus.REPACKING) {
+            orderReturn.setStatus(OrderReturnStatus.READY_TO_SHIP);
+        }
+        return orderReturnRepository.save(orderReturn);
+    }
+
+    public Map<String, Object> shippingAddressPayload(OrderReturn orderReturn) {
+        return shipmentFactory.shippingAddressPayload(orderReturn);
+    }
+
+    public Map<String, Object> dispatchAddressPayload() {
+        return shipmentFactory.dispatchAddressPayload();
+    }
+
+    public String documentNumber(String prefix, OrderReturn orderReturn) {
+        long id = orderReturn == null || orderReturn.getId() == null ? 0L : orderReturn.getId();
+        return prefix + String.format("%05d", id);
     }
 
     public OrderReturn bookOutbound(
@@ -1067,6 +1301,21 @@ public class OrderReturnService {
         String labelUrl,
         String adminNotes
     ) {
+        return bookOutbound(returnNumber, mode, carrierName, outboundAwb, trackingUrl, labelUrl, adminNotes, null, null, null);
+    }
+
+    public OrderReturn bookOutbound(
+        String returnNumber,
+        ReturnLogisticsMode mode,
+        String carrierName,
+        String outboundAwb,
+        String trackingUrl,
+        String labelUrl,
+        String adminNotes,
+        String courierId,
+        String courierName,
+        String packageType
+    ) {
         assertFeatureEnabled();
         OrderReturn orderReturn = loadReturn(returnNumber);
         assertIsExchange(orderReturn);
@@ -1076,9 +1325,23 @@ public class OrderReturnService {
         if (orderReturn.getSettlementStatus() == ExchangeSettlementStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Settle the exchange price difference before booking outbound");
         }
+        if (!isPackageCompleted(orderReturn)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Create a package before booking a shipment");
+        }
         if (mode == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Logistics mode is required");
         }
+        if (StringUtils.isNotBlank(packageType)) {
+            PackageType resolvedType = PackageType.parse(packageType).orElseThrow(
+                () ->
+                    new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Package type must be custom, box or envelope"
+                    )
+            );
+            orderReturn.setPackageType(resolvedType);
+        }
+        applyOutboundCourierSelection(orderReturn, courierId, courierName);
         if (mode == ReturnLogisticsMode.XPRESSBEES) {
             return bookExpressBeesOutbound(orderReturn, outboundAwb, adminNotes);
         }
@@ -1090,6 +1353,7 @@ public class OrderReturnService {
         orderReturn.setOutboundAwb(StringUtils.left(StringUtils.trimToNull(outboundAwb), 80));
         orderReturn.setOutboundTrackingUrl(StringUtils.left(StringUtils.trimToNull(trackingUrl), 500));
         orderReturn.setOutboundLabelUrl(StringUtils.left(StringUtils.trimToNull(labelUrl), 500));
+        orderReturn.setOutboundCarrierStatus(XpressBeesReturnCarrierStatus.IN_TRANSIT);
         orderReturn.setStatus(OrderReturnStatus.SHIPPED);
         orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
         OrderReturn saved = orderReturnRepository.save(orderReturn);
@@ -1106,7 +1370,7 @@ public class OrderReturnService {
         }
         try {
             XpressBeesClient.ForwardShipmentResult result = xpressBeesClient.createForwardShipment(
-                buildForwardShipmentRequest(orderReturn, preAssignedAwb)
+                shipmentFactory.buildForwardShipmentRequest(orderReturn, preAssignedAwb, outboundOrderAmount(orderReturn))
             );
             orderReturn.setOutboundLogisticsMode(ReturnLogisticsMode.XPRESSBEES);
             orderReturn.setOutboundCarrierName("XpressBees");
@@ -1115,7 +1379,8 @@ public class OrderReturnService {
             orderReturn.setOutboundTrackingUrl(StringUtils.left(StringUtils.trimToNull(tracking), 500));
             orderReturn.setOutboundLabelUrl(StringUtils.left(StringUtils.trimToNull(result.labelUrl()), 500));
             orderReturn.setOutboundProviderRequestId(StringUtils.left(StringUtils.trimToNull(result.providerRequestId()), 120));
-            orderReturn.setStatus(OrderReturnStatus.SHIPPED);
+            // ExpressBees AWB generation is a booking. "Shipped" waits for the first physical scan.
+            orderReturn.setOutboundCarrierStatus(XpressBeesReturnCarrierStatus.AWAITING_PICKUP);
             orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
             OrderReturn saved = orderReturnRepository.save(orderReturn);
             queueReturnEmail(saved.getOrder(), saved);
@@ -1126,65 +1391,98 @@ public class OrderReturnService {
         }
     }
 
-    private XpressBeesClient.ForwardShipmentRequest buildForwardShipmentRequest(OrderReturn orderReturn, String preAssignedAwb) {
-        CustomerOrder order = orderReturn.getOrder();
-        JsonNode shipping = parseShippingAddress(order.getShippingAddressJson());
-        ApplicationProperties.XpressBees xpressBees = applicationProperties.getXpressbees();
-        XpressBeesClient.ReversePickupAddress shipFrom = new XpressBeesClient.ReversePickupAddress(
-            StringUtils.defaultIfBlank(xpressBees.getWarehouseName(), "Mini's n More"),
-            StringUtils.defaultIfBlank(xpressBees.getWarehousePhone(), firstAddressField(shipping, "phone", "mobile")),
-            null,
-            xpressBees.getWarehouseLine1(),
-            xpressBees.getWarehouseLine2(),
-            xpressBees.getWarehouseCity(),
-            xpressBees.getWarehouseState(),
-            xpressBees.getOriginPincode()
-        );
-        XpressBeesClient.ReversePickupAddress deliverTo = new XpressBeesClient.ReversePickupAddress(
-            firstAddressField(shipping, "full_name", "name"),
-            firstAddressField(shipping, "phone", "mobile"),
-            firstAddressField(shipping, "email"),
-            firstAddressField(shipping, "line1", "address_line1", "address"),
-            firstAddressField(shipping, "line2", "address_line2"),
-            firstAddressField(shipping, "city"),
-            firstAddressField(shipping, "state"),
-            firstAddressField(shipping, "pincode", "postal_code", "zip")
-        );
-        List<XpressBeesClient.ReversePickupLine> lines = buildReplacementShipmentLines(orderReturn);
-        return new XpressBeesClient.ForwardShipmentRequest(
-            orderReturn.getReturnNumber() + "-OUT",
-            order.getOrderNumber(),
-            shipFrom,
-            deliverTo,
-            lines,
-            StringUtils.trimToNull(preAssignedAwb)
+    private static boolean isOutboundPackageEligible(OrderReturn orderReturn) {
+        return (
+            orderReturn != null &&
+            orderReturn.getRequestType() == OrderRequestType.EXCHANGE &&
+            (orderReturn.getStatus() == OrderReturnStatus.REPACKING || orderReturn.getStatus() == OrderReturnStatus.READY_TO_SHIP)
         );
     }
 
-    private List<XpressBeesClient.ReversePickupLine> buildReplacementShipmentLines(OrderReturn orderReturn) {
-        OrderItem item = orderReturn.getOrderItem();
-        String productName = item != null ? StringUtils.defaultIfBlank(item.getProductName(), "Replacement item") : "Replacement item";
-        String sku = StringUtils.defaultIfBlank(
-            orderReturn.getReplacementVariantSku(),
-            item != null ? StringUtils.defaultIfBlank(item.getVariantSku(), item.getProductSlug()) : orderReturn.getReturnNumber()
-        );
-        int qty = 1;
-        if (item != null && item.getQty() != null) {
-            qty = Math.max(1, item.getQty());
+    private void assertOutboundPackageEligible(OrderReturn orderReturn) {
+        assertIsExchange(orderReturn);
+        if (!isOutboundPackageEligible(orderReturn)) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Exchange replacement must be in packing or ready to ship before creating a package"
+            );
         }
-        BigDecimal price = item != null ? item.getPrice() : orderReturn.getOrder().getTotal();
-        return List.of(
-            new XpressBeesClient.ReversePickupLine(
-                productName,
-                sku,
-                qty,
-                price,
-                Math.max(1, applicationProperties.getXpressbees().getDefaultWeightGrams())
-            )
+    }
+
+    static boolean isPackageCompleted(OrderReturn orderReturn) {
+        return (
+            orderReturn != null &&
+            orderReturn.getPackedAt() != null &&
+            orderReturn.getPackageLengthCm() != null &&
+            orderReturn.getPackageBreadthCm() != null &&
+            orderReturn.getPackageHeightCm() != null &&
+            orderReturn.getPackageLengthCm() >= 1 &&
+            orderReturn.getPackageBreadthCm() >= 1 &&
+            orderReturn.getPackageHeightCm() >= 1
         );
+    }
+
+    private int resolveOutboundWeight(OrderReturn orderReturn, Integer weightGrams) {
+        if (weightGrams != null && weightGrams > 0) {
+            return weightGrams;
+        }
+        if (orderReturn.getPackageWeightGrams() != null && orderReturn.getPackageWeightGrams() > 0) {
+            return orderReturn.getPackageWeightGrams();
+        }
+        return defaultPackageWeightGrams(orderReturn);
+    }
+
+    private BigDecimal outboundOrderAmount(OrderReturn orderReturn) {
+        if (orderReturn.getReplacementItemAmount() != null && orderReturn.getReplacementItemAmount().compareTo(BigDecimal.ZERO) > 0) {
+            return orderReturn.getReplacementItemAmount();
+        }
+        OrderItem item = orderReturn.getOrderItem();
+        if (item != null && item.getPrice() != null) {
+            int qty = item.getQty() == null ? 1 : Math.max(1, item.getQty());
+            return item.getPrice().multiply(BigDecimal.valueOf(qty));
+        }
+        return orderReturn.getOrder() == null || orderReturn.getOrder().getTotal() == null
+            ? BigDecimal.ZERO
+            : orderReturn.getOrder().getTotal();
+    }
+
+    private String requireDestinationPincode(OrderReturn orderReturn) {
+        String pincode = shipmentFactory.destinationPincode(orderReturn);
+        if (pincode == null || !pincode.matches("^[1-9]\\d{5}$")) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Order shipping address must include a valid 6-digit pincode before packing"
+            );
+        }
+        return pincode;
+    }
+
+    private static void applyOutboundCourierSelection(OrderReturn orderReturn, String courierId, String courierName) {
+        String selectedId = StringUtils.trimToNull(courierId);
+        if (selectedId == null) {
+            return;
+        }
+        orderReturn.setPackageCourierId(StringUtils.left(selectedId, 40));
+        String selectedName = StringUtils.trimToNull(courierName);
+        if (selectedName != null) {
+            orderReturn.setPackageCourierName(StringUtils.left(selectedName, 120));
+        }
     }
 
     public OrderReturn markShipped(String returnNumber, String adminNotes) {
+        assertFeatureEnabled();
+        OrderReturn orderReturn = loadReturn(returnNumber);
+        if (orderReturn.getRequestType() == OrderRequestType.EXCHANGE) {
+            if (!isPackageCompleted(orderReturn)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Create a package before marking shipped");
+            }
+            if (StringUtils.isBlank(orderReturn.getOutboundAwb())) {
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Book outbound shipment before marking shipped"
+                );
+            }
+        }
         OrderReturn saved = transition(
             returnNumber,
             OrderReturnStatus.READY_TO_SHIP,
@@ -1271,7 +1569,7 @@ public class OrderReturnService {
             refundAmount = money(orderReturn.getRefundAmount());
         }
         if (refundAmount.signum() <= 0 && orderReturnItemRepository.findAllByOrderReturnIdOrderById(orderReturn.getId()).isEmpty()) {
-            refundAmount = money(orderReturn.getOrder().getTotal());
+            refundAmount = merchandiseRefund(orderReturn.getOrder());
         }
         if (refundAmount.signum() <= 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return has no refundable accepted lines");
@@ -1309,13 +1607,19 @@ public class OrderReturnService {
         orderReturn.setManualRefundReference(validateManualRefundReference(reference));
         orderReturn.setManualRefundRecordedAt(Instant.now());
         orderReturn.setManualRefundRecordedBy(StringUtils.left(StringUtils.trimToEmpty(recordedBy), 50));
-        return finalizeRefund(orderReturn, refundAmount, adminNotes);
+        if (orderReturn.getRequestType() == OrderRequestType.EXCHANGE) {
+            issueExchangeCreditNote(orderReturn, true);
+        }
+        return finalizeRefund(orderReturn, refundAmount, adminNotes, true);
     }
 
     private OrderReturn executeRefund(OrderReturn orderReturn, BigDecimal refundAmount, String adminNotes) {
         CustomerOrder order = orderReturn.getOrder();
         if (isUncollectedCod(order)) {
-            return finalizeRefund(orderReturn, refundAmount, adminNotes);
+            if (orderReturn.getRequestType() == OrderRequestType.EXCHANGE) {
+                issueExchangeCreditNote(orderReturn, true);
+            }
+            return finalizeRefund(orderReturn, refundAmount, adminNotes, true);
         }
         if (isCollectedCod(order)) {
             throw new ResponseStatusException(
@@ -1324,12 +1628,28 @@ public class OrderReturnService {
             );
         }
         String existingRefundId = StringUtils.trimToNull(orderReturn.getRazorpayRefundId());
+        String settlementRefundId = StringUtils.trimToNull(orderReturn.getSettlementReference());
+        if (existingRefundId != null && existingRefundId.equals(settlementRefundId)) {
+            existingRefundId = null;
+        }
+        String storedRefundId = existingRefundId;
+        if (orderReturn.getStatus() == OrderReturnStatus.FAILED) {
+            existingRefundId = null;
+        }
         try {
             if (existingRefundId == null) {
-                String refundId = razorpayRefundService.refundPayment(order, refundAmount);
+                String refundId = razorpayRefundService
+                    .findExistingRefundForOrder(order, refundAmount, RazorpayRefundService.PURPOSE_RETURN_REFUND)
+                    .filter(id -> !id.equals(settlementRefundId))
+                    .orElseGet(() ->
+                        razorpayRefundService.refundPayment(order, refundAmount, RazorpayRefundService.PURPOSE_RETURN_REFUND)
+                    );
                 orderReturn.setRazorpayRefundId(refundId);
             }
-            return finalizeRefund(orderReturn, refundAmount, adminNotes);
+            if (orderReturn.getRequestType() == OrderRequestType.EXCHANGE) {
+                issueExchangeCreditNote(orderReturn, true);
+            }
+            return finalizeRefund(orderReturn, refundAmount, adminNotes, existingRefundId == null && storedRefundId == null);
         } catch (RuntimeException e) {
             if (existingRefundId == null) {
                 orderReturn.setStatus(OrderReturnStatus.FAILED);
@@ -1341,14 +1661,38 @@ public class OrderReturnService {
         }
     }
 
-    private OrderReturn finalizeRefund(OrderReturn orderReturn, BigDecimal refundAmount, String adminNotes) {
+    private OrderReturn finalizeRefund(
+        OrderReturn orderReturn,
+        BigDecimal refundAmount,
+        String adminNotes,
+        boolean restockOnThisRefund
+    ) {
         CustomerOrder order = orderReturn.getOrder();
+        if (restockOnThisRefund) {
+            restoreRestockableStockOnRefund(orderReturn);
+        }
         orderReturn.setRefundAmount(refundAmount);
-        if (orderReturn.getRequestType() == OrderRequestType.RETURN && order.getPaymentStatus() != PaymentStatus.REFUNDED) {
+        if (
+            (orderReturn.getRequestType() == OrderRequestType.RETURN ||
+                orderReturn.getRequestType() == OrderRequestType.EXCHANGE) &&
+            order.getPaymentStatus() != PaymentStatus.REFUNDED
+        ) {
             PaymentStatus nextPaymentStatus;
+            boolean razorpayRefundInitiated =
+                StringUtils.isNotBlank(orderReturn.getRazorpayRefundId()) &&
+                orderReturn.getManualRefundRecordedAt() == null &&
+                !StringUtils.equals(orderReturn.getRazorpayRefundId(), orderReturn.getSettlementReference());
             if (isUncollectedCod(order)) {
                 nextPaymentStatus = order.getPaymentStatus();
-            } else if (refundAmount.compareTo(money(order.getTotal())) >= 0) {
+            } else if (razorpayRefundInitiated) {
+                nextPaymentStatus = PaymentStatus.REFUND_INITIATED;
+            } else if (
+                StringUtils.startsWith(orderReturn.getSettlementReference(), "rfnd_") &&
+                orderReturn.getRequestType() == OrderRequestType.EXCHANGE &&
+                StringUtils.isBlank(orderReturn.getRazorpayRefundId())
+            ) {
+                nextPaymentStatus = PaymentStatus.REFUND_INITIATED;
+            } else if (cashMovedOnRefund(orderReturn, refundAmount).compareTo(money(order.getTotal())) >= 0) {
                 nextPaymentStatus = PaymentStatus.REFUNDED;
             } else {
                 nextPaymentStatus = PaymentStatus.PARTIALLY_REFUNDED;
@@ -1358,7 +1702,11 @@ public class OrderReturnService {
                 customerOrderRepository.save(order);
             }
         }
-        if (applicationProperties.getLedgerly().isSyncReturns() && StringUtils.isBlank(orderReturn.getLedgerlyCreditNoteId())) {
+        if (
+            orderReturn.getRequestType() != OrderRequestType.EXCHANGE &&
+            applicationProperties.getLedgerly().isSyncReturns() &&
+            StringUtils.isBlank(orderReturn.getLedgerlyCreditNoteId())
+        ) {
                 try {
                     Optional<String> creditNoteId = ledgerlyIntegrationClient.cancelOrder(
                         order.getOrderNumber(),
@@ -1391,7 +1739,11 @@ public class OrderReturnService {
                     }
                 }
             }
-            if (applicationProperties.getZoho().isSyncReturns() && StringUtils.isBlank(orderReturn.getZohoCreditNoteId())) {
+            if (
+                orderReturn.getRequestType() != OrderRequestType.EXCHANGE &&
+                applicationProperties.getZoho().isSyncReturns() &&
+                StringUtils.isBlank(orderReturn.getZohoCreditNoteId())
+            ) {
                 try {
                     Optional<String> zohoCreditNoteId = zohoBooksIntegrationClient.createCreditNote(
                         order.getId(),
@@ -1432,6 +1784,14 @@ public class OrderReturnService {
         return saved;
     }
 
+    private static BigDecimal cashMovedOnRefund(OrderReturn orderReturn, BigDecimal refundAmount) {
+        BigDecimal cash = money(refundAmount);
+        if (orderReturn.getSettlementStatus() == ExchangeSettlementStatus.REFUNDED) {
+            cash = cash.add(money(orderReturn.getSettlementAmount()));
+        }
+        return cash;
+    }
+
     private BigDecimal resolveRefundAmount(OrderReturn orderReturn) {
         BigDecimal refundAmount = orderReturnItemRepository
             .findAllByOrderReturnIdOrderById(orderReturn.getId())
@@ -1443,7 +1803,7 @@ public class OrderReturnService {
             refundAmount = money(orderReturn.getRefundAmount());
         }
         if (refundAmount.signum() <= 0 && orderReturnItemRepository.findAllByOrderReturnIdOrderById(orderReturn.getId()).isEmpty()) {
-            refundAmount = money(orderReturn.getOrder().getTotal());
+            refundAmount = merchandiseRefund(orderReturn.getOrder());
         }
         if (refundAmount.signum() <= 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return has no refundable accepted lines");
@@ -1478,7 +1838,7 @@ public class OrderReturnService {
             disabled.put("eligible", false);
             disabled.put("message", RETURNS_DISABLED_MESSAGE);
             disabled.put("enabled", false);
-            disabled.put("window_days", RETURN_WINDOW_DAYS);
+            putReturnPolicy(disabled);
             return disabled;
         }
         return customerOrderRepository
@@ -1487,11 +1847,14 @@ public class OrderReturnService {
                 var result = new LinkedHashMap<String, Object>();
                 result.put("order_number", orderNumber);
                 result.put("enabled", true);
-                result.put("window_days", RETURN_WINDOW_DAYS);
+                SiteSetting settings = currentSiteSettings().orElse(null);
+                int windowDays = returnWindowDays(settings);
+                result.put("window_days", windowDays);
+                putRefundTimeline(result, settings);
                 result.put("tracking_status", OrderTrackingStatusResolver.resolve(order));
                 Instant deliveryAnchor = resolveDeliveryAnchor(order);
                 result.put("delivered_at", deliveryAnchor);
-                result.put("return_deadline", deliveryAnchor != null ? deliveryAnchor.plus(RETURN_WINDOW_DAYS, ChronoUnit.DAYS) : null);
+                result.put("return_deadline", deliveryAnchor != null ? deliveryAnchor.plus(windowDays, ChronoUnit.DAYS) : null);
                 try {
                     assertReturnEligible(order);
                     result.put("eligible", true);
@@ -1507,7 +1870,7 @@ public class OrderReturnService {
                 result.put("eligible", false);
                 result.put("message", "Order not found");
                 result.put("enabled", true);
-                result.put("window_days", RETURN_WINDOW_DAYS);
+                putReturnPolicy(result);
                 return result;
             });
     }
@@ -1515,7 +1878,7 @@ public class OrderReturnService {
     public Map<String, Object> publicConfig() {
         var result = new LinkedHashMap<String, Object>();
         result.put("enabled", RETURNS_REFUNDS_ENABLED);
-        result.put("window_days", RETURN_WINDOW_DAYS);
+        putReturnPolicy(result);
         return result;
     }
 
@@ -1545,13 +1908,46 @@ public class OrderReturnService {
                 "This order is not marked as delivered yet. You can request a return after delivery."
             );
         }
-        Instant windowEnd = deliveryAnchor.plus(RETURN_WINDOW_DAYS, ChronoUnit.DAYS);
+        int windowDays = returnWindowDays();
+        Instant windowEnd = deliveryAnchor.plus(windowDays, ChronoUnit.DAYS);
         if (Instant.now().isAfter(windowEnd)) {
             throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
-                "Return window has expired (" + RETURN_WINDOW_DAYS + " days from delivery)"
+                "Return window has expired (" + windowDays + " days from delivery)"
             );
         }
+    }
+
+    private int returnWindowDays() {
+        return returnWindowDays(currentSiteSettings().orElse(null));
+    }
+
+    private static int returnWindowDays(SiteSetting settings) {
+        return SiteSetting.resolveReturnWindowDays(settings != null ? settings.getReturnWindowDays() : null);
+    }
+
+    private Optional<SiteSetting> currentSiteSettings() {
+        return siteSettingRepository.findFirstByOrderByIdAsc();
+    }
+
+    private void putRefundTimeline(Map<String, Object> result) {
+        putRefundTimeline(result, currentSiteSettings().orElse(null));
+    }
+
+    private static void putRefundTimeline(Map<String, Object> result, SiteSetting settings) {
+        int min = SiteSetting.resolveRefundMinBusinessDays(settings != null ? settings.getRefundMinBusinessDays() : null);
+        int max = SiteSetting.resolveRefundMaxBusinessDays(
+            min,
+            settings != null ? settings.getRefundMaxBusinessDays() : null
+        );
+        result.put("refund_min_business_days", min);
+        result.put("refund_max_business_days", max);
+    }
+
+    private void putReturnPolicy(Map<String, Object> result) {
+        SiteSetting settings = currentSiteSettings().orElse(null);
+        result.put("window_days", returnWindowDays(settings));
+        putRefundTimeline(result, settings);
     }
 
     Instant resolveDeliveryAnchor(CustomerOrder order) {
@@ -1609,41 +2005,149 @@ public class OrderReturnService {
     // Inventory helpers
     // ---------------------------------------------------------------------
 
-    private void restoreItemStock(OrderItem item) {
-        restoreItemStock(item, item == null ? 0 : Optional.ofNullable(item.getQty()).orElse(0));
+    /**
+     * Pushes current store stock for the exchanged product to Zoho after this transaction
+     * commits, so a later rollback cannot leave Zoho ahead of local inventory.
+     * Best-effort: does not create credit notes; failures are logged and noted.
+     */
+    private void saveExchangeProductAndSyncZoho(OrderReturn orderReturn, Product product) {
+        productRepository.save(product);
+        syncZohoInventoryAfterExchangeStockChange(orderReturn, product.getId());
     }
 
-    private void restoreItemStock(OrderItem item, int quantity) {
+    private void syncZohoInventoryAfterExchangeStockChange(OrderReturn orderReturn, Long productId) {
+        if (productId == null || orderReturn == null || !applicationProperties.getZoho().isSyncProductStock()) {
+            return;
+        }
+        String returnNumber = orderReturn.getReturnNumber();
+        AfterCommit.run(() -> {
+            String error = null;
+            try {
+                Map<String, Object> result = zohoBooksIntegrationClient.syncProductStockOnly(productId);
+                if (result != null && Boolean.FALSE.equals(result.get("ok"))) {
+                    error = String.valueOf(result.getOrDefault("error", "Zoho stock reconcile returned ok=false"));
+                }
+            } catch (RuntimeException e) {
+                error = e.getMessage();
+            }
+            if (error == null) {
+                return;
+            }
+            LOG.warn("Zoho stock sync failed after exchange inventory change for {}: {}", returnNumber, error);
+            String note = "Zoho stock sync failed: " + StringUtils.left(error, 200);
+            orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), note));
+            if (StringUtils.isBlank(returnNumber)) {
+                return;
+            }
+            orderReturnRepository.findOneByReturnNumber(returnNumber).ifPresent(persisted -> {
+                persisted.setAdminNotes(mergeNotes(persisted.getAdminNotes(), note));
+                orderReturnRepository.save(persisted);
+            });
+        });
+    }
+
+    private Long restoreItemStock(OrderItem item) {
+        return restoreItemStock(item, item == null ? 0 : Optional.ofNullable(item.getQty()).orElse(0));
+    }
+
+    private Long restoreItemStock(OrderItem item, int quantity) {
+        if (item == null || StringUtils.isBlank(item.getProductId()) || quantity <= 0) {
+            return null;
+        }
+        try {
+            long productId = Long.parseLong(item.getProductId());
+            Optional<Product> productOpt = productRepository.findOneForInventoryUpdate(productId);
+            if (productOpt.isEmpty()) {
+                return null;
+            }
+            Product product = productOpt.orElseThrow();
+            if (variantSupport.isVariants(product)) {
+                if (!variantSupport.incrementVariantStock(
+                    product,
+                    item.getVariantSku(),
+                    item.getItemSize(),
+                    item.getColor(),
+                    quantity
+                )) {
+                    product.setStock(Optional.ofNullable(product.getStock()).orElse(0) + quantity);
+                }
+            } else {
+                product.setStock(Optional.ofNullable(product.getStock()).orElse(0) + quantity);
+            }
+            productRepository.save(product);
+            return product.getId();
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    /**
+     * Restocks the exchanged original once, when the replacement is allocated (or the exchange is
+     * converted to a refund). Accepting an exchange only records disposition — it must not change stock.
+     */
+    private void restoreExchangeOriginalIfRestockable(OrderReturn orderReturn) {
+        if (orderReturn.getRequestType() != OrderRequestType.EXCHANGE) {
+            return;
+        }
+        if (orderReturn.getDisposition() != ReturnDisposition.RESTOCKABLE) {
+            return;
+        }
+        if (orderReturn.getOriginalRestockedAt() != null) {
+            return;
+        }
+        Long productId = restoreItemStock(orderReturn.getOrderItem());
+        if (productId != null) {
+            orderReturn.setOriginalRestockedAt(Instant.now());
+        }
+    }
+
+    private void syncExchangeProductStockToZoho(OrderReturn orderReturn) {
+        OrderItem item = orderReturn == null ? null : orderReturn.getOrderItem();
         if (item == null || StringUtils.isBlank(item.getProductId())) {
             return;
         }
         try {
-            long productId = Long.parseLong(item.getProductId());
-            productRepository
-                .findOneForInventoryUpdate(productId)
-                .ifPresent(product -> {
-                    int qty = quantity;
-                    if (qty <= 0) {
-                        return;
-                    }
-                    if (variantSupport.isVariants(product)) {
-                        if (!variantSupport.incrementVariantStock(
-                            product,
-                            item.getVariantSku(),
-                            item.getItemSize(),
-                            item.getColor(),
-                            qty
-                        )) {
-                            product.setStock(Optional.ofNullable(product.getStock()).orElse(0) + qty);
-                        }
-                    } else {
-                        product.setStock(Optional.ofNullable(product.getStock()).orElse(0) + qty);
-                    }
-                    productRepository.save(product);
-                });
+            syncZohoInventoryAfterExchangeStockChange(orderReturn, Long.parseLong(item.getProductId()));
         } catch (NumberFormatException ignored) {
-            // skip invalid product id
+            // Catalog ids that are not numeric cannot be reconciled.
         }
+    }
+
+    /**
+     * Local restock happens on the first successful refund money movement, matching the Zoho
+     * credit note. Retries that already have a Razorpay refund id skip this so stock is not added twice.
+     */
+    private void restoreRestockableStockOnRefund(OrderReturn orderReturn) {
+        if (orderReturn.getRequestType() == OrderRequestType.EXCHANGE) {
+            restoreExchangeOriginalIfRestockable(orderReturn);
+            return;
+        }
+        if (orderReturn.getRequestType() != OrderRequestType.RETURN) {
+            return;
+        }
+        List<OrderReturnItem> lines = orderReturn.getId() == null
+            ? List.of()
+            : orderReturnItemRepository.findAllByOrderReturnIdOrderById(orderReturn.getId());
+        if (!lines.isEmpty()) {
+            for (OrderReturnItem line : lines) {
+                int acceptedQty = Optional.ofNullable(line.getAcceptedQty()).orElse(0);
+                ReturnDisposition disposition = line.getDisposition() != null
+                    ? line.getDisposition()
+                    : orderReturn.getDisposition();
+                if (acceptedQty > 0 && disposition == ReturnDisposition.RESTOCKABLE) {
+                    restoreItemStock(line.getOrderItem(), acceptedQty);
+                }
+            }
+            return;
+        }
+        if (orderReturn.getDisposition() != ReturnDisposition.RESTOCKABLE) {
+            return;
+        }
+        if (orderReturn.getOrderItem() != null) {
+            restoreItemStock(orderReturn.getOrderItem());
+            return;
+        }
+        restoreInventoryForOrder(orderReturn.getOrder());
     }
 
     private void restoreInventoryForOrder(CustomerOrder order) {
@@ -1675,9 +2179,8 @@ public class OrderReturnService {
     }
 
     /**
-     * Reverses a previously-restored item's stock (used when a return/exchange is rejected after
-     * inspection, undoing the credit given at approval). Best-effort: if the stock has already been
-     * resold in the meantime, clamps at zero and returns false so the caller can note the discrepancy.
+     * Best-effort decrement when an item must be removed from sellable stock after it was credited
+     * (e.g. operational correction). Not used in the standard exchange accept/allocate flow.
      */
     private boolean reverseItemStock(OrderItem item) {
         if (item == null || StringUtils.isBlank(item.getProductId())) {
@@ -1729,6 +2232,10 @@ public class OrderReturnService {
         } catch (NumberFormatException e) {
             return Optional.empty();
         }
+    }
+
+    private static boolean hasReverseShipment(OrderReturn orderReturn) {
+        return orderReturn.getLogisticsMode() != null || StringUtils.isNotBlank(orderReturn.getReverseAwb());
     }
 
     // ---------------------------------------------------------------------
@@ -1827,6 +2334,16 @@ public class OrderReturnService {
 
     private static BigDecimal money(BigDecimal value) {
         return value == null ? BigDecimal.ZERO.setScale(2) : value.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Product net only. Delivery, COD fee, and donation stay with the shop on returns and exchanges.
+     */
+    static BigDecimal merchandiseRefund(CustomerOrder order) {
+        if (order == null) {
+            return BigDecimal.ZERO.setScale(2);
+        }
+        return money(order.getSubtotal()).subtract(money(order.getDiscount())).max(BigDecimal.ZERO);
     }
 
     /**

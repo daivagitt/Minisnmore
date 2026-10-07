@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+    <changeSet id="20260930180000-1" author="miniandmore">
+        <sql dbms="postgresql">
+            INSERT INTO home_section (id, section_key, title, subtitle, enabled, sort_order, payload_json)
+            VALUES
+                (nextval('sequence_generator'), 'loved_right_now', 'Loved right now', 'Shop mega-menu picks.', true, 200, '{"product_slugs":[]}'),
+                (nextval('sequence_generator'), 'you_may_also_love', 'Pieces that pair beautifully', 'Product-page pairing picks.', true, 210, '{"product_slugs":[]}')
+            ON CONFLICT (section_key) DO NOTHING;
+        </sql>
+    </changeSet>
+</databaseChangeLog>

@@ -2,6 +2,7 @@ package com.miniandmore.gateway.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
@@ -64,6 +65,7 @@ class UserServiceTest {
         userService = new UserService(userRepository, authorityRepository, userAuthoritiesLoader, passwordEncoder);
         user = sampleUser();
         lenient().when(userAuthoritiesLoader.withAuthorities(any(User.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        lenient().when(userAuthoritiesLoader.attachAuthorities(anyList())).thenAnswer(inv -> Flux.fromIterable(inv.getArgument(0)));
         lenient().when(passwordEncoder.encode(anyString())).thenReturn("encoded");
         lenient()
             .when(userRepository.save(any(User.class)))
@@ -351,6 +353,8 @@ class UserServiceTest {
         StepVerifier.create(userService.getAllManagedUsers(PageRequest.of(0, 20)))
             .assertNext(dto -> assertThat(dto.getLogin()).isEqualTo("user"))
             .verifyComplete();
+        verify(userAuthoritiesLoader).attachAuthorities(anyList());
+        verify(userAuthoritiesLoader, never()).withAuthorities(any(User.class));
     }
 
     @Test

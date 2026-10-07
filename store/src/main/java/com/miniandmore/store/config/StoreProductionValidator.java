@@ -8,6 +8,7 @@ import org.springframework.core.env.Profiles;
 import org.springframework.beans.factory.annotation.Value;
 
 @Configuration
+@SuppressWarnings("java:S1118")
 public class StoreProductionValidator {
 
     private static final String SAMPLE_JWT_SECRET =

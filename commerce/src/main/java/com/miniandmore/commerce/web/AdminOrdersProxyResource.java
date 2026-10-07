@@ -81,4 +81,12 @@ public class AdminOrdersProxyResource {
             body
         );
     }
+
+    @PostMapping("/{orderNumber}/cancel")
+    public ResponseEntity<String> cancelOrder(@PathVariable String orderNumber, @RequestBody Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/admin/orders/{orderNumber}/cancel", orderNumber),
+            body
+        );
+    }
 }

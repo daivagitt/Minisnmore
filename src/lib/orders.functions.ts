@@ -236,6 +236,9 @@ export type OrderReturnRow = {
   resolved_at?: string | null;
   order_number?: string;
   order_total?: number;
+  order_shipping?: number | null;
+  order_cod_fee?: number | null;
+  order_payment_status?: string | null;
   order_item_id?: number;
   product_name?: string;
   product_slug?: string;
@@ -258,6 +261,8 @@ export type OrderReturnRow = {
   carrier_name?: string | null;
   pickup_window?: string | null;
   pickup_failure_reason?: string | null;
+  reverse_carrier_status?: string | null;
+  outbound_carrier_status?: string | null;
   tracking_status?: string;
   shipment_delivered_at?: string | null;
   items?: OrderReturnLine[];
@@ -296,6 +301,8 @@ export type ReturnEligibility = {
   delivered_at?: string | null;
   return_deadline?: string | null;
   window_days?: number;
+  refund_min_business_days?: number;
+  refund_max_business_days?: number;
   enabled?: boolean;
 };
 
@@ -305,7 +312,12 @@ export async function checkReturnEligibility(orderNumber: string): Promise<Retur
   });
 }
 
-export async function getReturnsConfig(): Promise<{ enabled: boolean; window_days: number }> {
+export async function getReturnsConfig(): Promise<{
+  enabled: boolean;
+  window_days: number;
+  refund_min_business_days?: number;
+  refund_max_business_days?: number;
+}> {
   return api.get("/api/v1/order-returns/config", { auth: true });
 }
 
@@ -414,6 +426,7 @@ export type AdminOrderReturnRow = OrderReturnRow & {
   settlement_amount?: number | null;
   settled_at?: string | null;
   settled_by?: string | null;
+  can_razorpay_refund_price_difference?: boolean;
   replacement_reserved_at?: string | null;
   payment_method?: string | null;
   payment_status?: string | null;
@@ -427,6 +440,22 @@ export type AdminOrderReturnRow = OrderReturnRow & {
   sla_due_at?: string | null;
   sla_overdue?: boolean;
   sla_limit_hours?: number;
+  packed_at?: string | null;
+  package_slip_number?: string | null;
+  shipment_order_number?: string | null;
+  shipping_address?: FulfillmentAddress;
+  dispatch_address?: FulfillmentAddress;
+  can_complete_package?: boolean;
+  can_book_outbound?: boolean;
+  default_package_weight_grams?: number | null;
+  package_weight_grams?: number | null;
+  package_length_cm?: number | null;
+  package_breadth_cm?: number | null;
+  package_height_cm?: number | null;
+  package_chargeable_weight_grams?: number | null;
+  package_courier_id?: string | null;
+  package_courier_name?: string | null;
+  package_type?: "custom" | "box" | "envelope" | string | null;
 };
 
 export type AdminOrderReturnsStageCounts = {
@@ -444,6 +473,7 @@ export type AdminOrderReturnsSummary = {
   open: number;
   closed: number;
   overdue: number;
+  xpressbeesReverseReady: number;
   stages: AdminOrderReturnsStageCounts;
 };
 
@@ -454,6 +484,7 @@ export const EMPTY_ADMIN_RETURNS_SUMMARY: AdminOrderReturnsSummary = {
   open: 0,
   closed: 0,
   overdue: 0,
+  xpressbeesReverseReady: 0,
   stages: { request: 0, pickup: 0, inspection: 0, exchange: 0, closed: 0 },
 };
 
@@ -466,6 +497,9 @@ export function normalizeAdminOrderReturnsSummary(
   raw?: Partial<AdminOrderReturnsSummary> | null,
 ): AdminOrderReturnsSummary {
   const stages = raw?.stages ?? EMPTY_ADMIN_RETURNS_SUMMARY.stages;
+  const reverseReadyRaw = raw as (Partial<AdminOrderReturnsSummary> & {
+    xpressbees_reverse_ready?: unknown;
+  }) | null | undefined;
   return {
     total: numberOrZero(raw?.total),
     returns: numberOrZero(raw?.returns),
@@ -473,6 +507,9 @@ export function normalizeAdminOrderReturnsSummary(
     open: numberOrZero(raw?.open),
     closed: numberOrZero(raw?.closed),
     overdue: numberOrZero(raw?.overdue),
+    xpressbeesReverseReady: numberOrZero(
+      reverseReadyRaw?.xpressbeesReverseReady ?? reverseReadyRaw?.xpressbees_reverse_ready,
+    ),
     stages: {
       request: numberOrZero(stages.request),
       pickup: numberOrZero(stages.pickup),
@@ -614,11 +651,49 @@ export async function bookOrderReturnOutbound(
     outbound_awb?: string;
     tracking_url?: string;
     label_url?: string;
+    courier_id?: string;
+    courier_name?: string;
+    package_type?: "custom" | "box" | "envelope";
     admin_notes?: string;
   },
 ) {
   return api.post(
     `/api/v1/admin/order-returns/${encodeURIComponent(returnNumber)}/book-outbound`,
+    payload,
+    { auth: true },
+  );
+}
+
+export async function previewOrderReturnPackageRates(
+  returnNumber: string,
+  payload: {
+    weight_grams?: number;
+    length_cm: number;
+    breadth_cm: number;
+    height_cm: number;
+  },
+) {
+  return api.post<PackageRatesResult>(
+    `/api/v1/admin/order-returns/${encodeURIComponent(returnNumber)}/package-rates`,
+    payload,
+    { auth: true },
+  );
+}
+
+export async function completeOrderReturnPackage(
+  returnNumber: string,
+  payload: {
+    weight_grams?: number;
+    length_cm: number;
+    breadth_cm: number;
+    height_cm: number;
+    courier_id?: string;
+    courier_name?: string;
+    package_type?: "custom" | "box" | "envelope";
+  },
+) {
+  return api.post(
+    `/api/v1/admin/order-returns/${encodeURIComponent(returnNumber)}/complete-package`,
     payload,
     { auth: true },
   );
@@ -669,6 +744,7 @@ export async function settleOrderReturnPriceDifference(
     method?: string;
     reference?: string;
     admin_notes?: string;
+    force_manual?: boolean;
   },
 ) {
   return api.post(
@@ -731,6 +807,14 @@ export async function rejectCancellationRequest(
   return api.post(
     `/api/v1/admin/cancellation-requests/${encodeURIComponent(requestNumber)}/reject`,
     { rejection_reason: rejectionReason, admin_notes: adminNotes ?? "" },
+    { auth: true },
+  );
+}
+
+export async function retryCancellationRefund(requestNumber: string) {
+  return api.post(
+    `/api/v1/admin/cancellation-requests/${encodeURIComponent(requestNumber)}/retry-refund`,
+    {},
     { auth: true },
   );
 }
@@ -803,6 +887,7 @@ export type AdminOrderRow = AdminCodOrderRow & {
   package_chargeable_weight_grams?: number | null;
   package_courier_id?: string;
   package_courier_name?: string;
+  package_type?: "custom" | "box" | "envelope" | string;
   packed_at?: string;
   package_slip_number?: string;
   shipment_order_number?: string;
@@ -815,6 +900,7 @@ export type AdminOrderRow = AdminCodOrderRow & {
   zoho_last_synced_at: string;
   zoho_sales_order_id: string;
   zoho_invoice_id: string;
+  zoho_credit_note_id?: string;
   zoho_sync_eligible: boolean;
   ledgerly_sync_status: string;
   ledgerly_sync_error: string;
@@ -921,6 +1007,7 @@ export async function bookAdminOrderShipment(
     override_reason?: string;
     courier_id?: string;
     courier_name?: string;
+    package_type?: "custom" | "box" | "envelope";
   },
 ) {
   return api.post(
@@ -975,6 +1062,7 @@ export async function completeAdminOrderPackage(
     height_cm: number;
     courier_id?: string;
     courier_name?: string;
+    package_type?: "custom" | "box" | "envelope";
   },
 ) {
   return api.post(

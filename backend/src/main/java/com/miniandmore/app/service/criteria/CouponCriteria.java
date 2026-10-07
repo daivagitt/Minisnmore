@@ -25,7 +25,10 @@ public class CouponCriteria implements Serializable, Criteria {
     /**
      * Class for filtering DiscountType
      */
-    public static class DiscountTypeFilter extends Filter<DiscountType> {
+    public static class DiscountTypeFilter extends Filter<DiscountType> implements Serializable {
+
+        @Serial
+        private static final long serialVersionUID = 1L;
 
         public DiscountTypeFilter() {}
 

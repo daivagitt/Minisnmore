@@ -97,11 +97,11 @@ public class LedgerlyWebhookHandlerService {
             default -> LOG.debug("Ignoring unhandled Ledgerly webhook event {}", event);
         }
 
-        LedgerlyWebhookEvent record = new LedgerlyWebhookEvent();
-        record.setEventId(eventId);
-        record.setEventType(event);
-        record.setReceivedAt(Instant.now());
-        webhookEventRepository.save(record);
+        LedgerlyWebhookEvent eventRecord = new LedgerlyWebhookEvent();
+        eventRecord.setEventId(eventId);
+        eventRecord.setEventType(event);
+        eventRecord.setReceivedAt(Instant.now());
+        webhookEventRepository.save(eventRecord);
         return Map.of("ok", true, "event", event);
     }
 
@@ -184,10 +184,6 @@ public class LedgerlyWebhookHandlerService {
         if (!WebhookHmacSupport.signaturesMatch(secret, rawBody, signature)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid webhook signature");
         }
-    }
-
-    private String sign(String payload, String secret) {
-        return WebhookHmacSupport.hmacSha256Hex(secret, payload);
     }
 
     private Map<String, Object> parsePayload(String rawBody) {

@@ -302,7 +302,7 @@ Approving an exchange reserves replacement stock immediately. The system calcula
 .IP "Replacement costs more" 24
 The exact difference must be COLLECTED.
 .IP "Replacement costs less" 24
-The exact difference must be REFUNDED.
+The exact difference must be REFUNDED. For prepaid Razorpay orders this is issued through Razorpay. If the gateway is unavailable or the refund was already issued outside the app, an administrator may record a manual method and transaction reference instead.
 .IP "Same price" 24
 Settlement is NOT_REQUIRED.
 .IP "Operational exception" 24

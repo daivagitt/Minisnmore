@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { formatOrderDate } from "@/lib/dates";
 import { formatInr } from "@/lib/money";
-import { formatOrderStatusLabel, formatPaymentStatusLabel, isCodOrder } from "@/lib/order-status";
+import { formatAdminPaymentStatusLabel, formatOrderStatusLabel, isCodOrder } from "@/lib/order-status";
 import {
   listAdminOrders,
   listCodPendingOrders,
@@ -115,6 +115,9 @@ const PAYMENT_STATUS_FILTERS = [
   { id: "paid", label: "Paid" },
   { id: "pending", label: "Pending" },
   { id: "failed", label: "Failed" },
+  { id: "refund_initiated", label: "Refund initiated" },
+  { id: "refund_failed", label: "Refund failed" },
+  { id: "refunded", label: "Refunded" },
 ];
 
 export function OperationsDashboard() {
@@ -734,7 +737,7 @@ export function OperationsDashboard() {
                             {isCod ? "COD" : "Prepaid"}
                           </span>
                           <span className="text-[10px] text-muted-foreground">
-                            {formatPaymentStatusLabel(o.payment_status, o.payment_method)}
+                            {formatAdminPaymentStatusLabel(o.payment_status)}
                           </span>
                         </div>
                       </td>

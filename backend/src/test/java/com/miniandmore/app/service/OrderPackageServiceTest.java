@@ -14,6 +14,7 @@ import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
+import com.miniandmore.app.domain.enumeration.PackageType;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.OrderItemRepository;
@@ -89,7 +90,18 @@ class OrderPackageServiceTest {
         when(orderItemRepository.findAllByOrderId(10L)).thenReturn(
             List.of(new OrderItem().qty(2).productName("Tee").productId("p1").price(BigDecimal.TEN))
         );
-        when(xpressBeesClient.listForwardCourierOptions("560001", 1000)).thenReturn(
+        when(
+            xpressBeesClient.listForwardCourierOptions(
+                eq("560001"),
+                eq(1000),
+                eq(10),
+                eq(10),
+                eq(10),
+                eq("prepaid"),
+                eq(BigDecimal.TEN)
+            )
+        )
+            .thenReturn(
             List.of(
                 new XpressBeesClient.CourierOption("8", "Express Reverse", 3, "3 days", null, false),
                 new XpressBeesClient.CourierOption(
@@ -120,7 +132,10 @@ class OrderPackageServiceTest {
     void completePackage_setsHandWrappedAndPersistsDimensions() {
         CustomerOrder order = confirmedPaid();
         when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
-        when(xpressBeesClient.listForwardCourierOptions(eq("560001"), anyInt())).thenReturn(
+        when(
+            xpressBeesClient.listForwardCourierOptions(eq("560001"), anyInt(), anyInt(), anyInt(), anyInt(), any(), any())
+        )
+            .thenReturn(
             List.of(new XpressBeesClient.CourierOption("1", "Surface Xpressbees 0.5 K.G", 3, "3 days", null, true))
         );
 
@@ -133,6 +148,7 @@ class OrderPackageServiceTest {
         assertThat(saved.getPackageHeightCm()).isEqualTo(8);
         assertThat(saved.getPackageChargeableWeightGrams()).isEqualTo(500);
         assertThat(saved.getPackageCourierId()).isEqualTo("1");
+        assertThat(saved.getPackageType()).isEqualTo(PackageType.CUSTOM);
         assertThat(saved.getPackedAt()).isNotNull();
         verify(orderEventService).syncLifecycleEvents(saved);
     }
@@ -145,6 +161,17 @@ class OrderPackageServiceTest {
         assertThatThrownBy(() -> orderPackageService.completePackage("MNM-1", 500, 10, 10, 10, null, null))
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+    }
+
+    @Test
+    void previewRates_rejectsCodOrderWithoutTotal() {
+        CustomerOrder order = confirmedPaid().paymentMethod("cod").total(null);
+        when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderPackageService.previewRates("MNM-1", 500, 10, 10, 10))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST))
+            .hasMessageContaining("COD");
     }
 
     @Test
@@ -162,7 +189,10 @@ class OrderPackageServiceTest {
     void completePackage_allowsCodWithoutPayment() {
         CustomerOrder order = confirmedPaid().paymentMethod("cod").paymentStatus(PaymentStatus.PENDING);
         when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
-        when(xpressBeesClient.listForwardCourierOptions(eq("560001"), anyInt())).thenReturn(
+        when(
+            xpressBeesClient.listForwardCourierOptions(eq("560001"), anyInt(), anyInt(), anyInt(), anyInt(), any(), any())
+        )
+            .thenReturn(
             List.of(new XpressBeesClient.CourierOption("1", "Surface Xpressbees 0.5 K.G", 3, "3 days", null, true))
         );
 
@@ -174,27 +204,76 @@ class OrderPackageServiceTest {
     }
 
     @Test
-    void completePackage_rejectsEmptyCourierList() {
+    void completePackage_savesWithoutCourierWhenRatesUnavailable() {
         CustomerOrder order = confirmedPaid();
         when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
-        when(xpressBeesClient.listForwardCourierOptions(eq("560001"), anyInt())).thenReturn(List.of());
+        when(
+            xpressBeesClient.listForwardCourierOptions(eq("560001"), anyInt(), anyInt(), anyInt(), anyInt(), any(), any())
+        )
+            .thenReturn(List.of());
 
-        assertThatThrownBy(() -> orderPackageService.completePackage("MNM-1", 500, 10, 10, 10, null, null))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY));
+        CustomerOrder saved = orderPackageService.completePackage("MNM-1", 500, 10, 10, 10, null, null);
+
+        assertThat(saved.getStatus()).isEqualTo(OrderStatus.HAND_WRAPPED);
+        assertThat(saved.getPackedAt()).isNotNull();
+        assertThat(saved.getPackageCourierId()).isNull();
+        assertThat(saved.getPackageCourierName()).isNull();
     }
 
     @Test
     void completePackage_rejectsUnknownCourierId() {
         CustomerOrder order = confirmedPaid();
         when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
-        when(xpressBeesClient.listForwardCourierOptions(eq("560001"), anyInt())).thenReturn(
+        when(
+            xpressBeesClient.listForwardCourierOptions(eq("560001"), anyInt(), anyInt(), anyInt(), anyInt(), any(), any())
+        )
+            .thenReturn(
             List.of(new XpressBeesClient.CourierOption("1", "Surface Xpressbees 0.5 K.G", 3, "3 days", null, true))
         );
 
         assertThatThrownBy(() -> orderPackageService.completePackage("MNM-1", 500, 10, 10, 10, "99", "Unknown"))
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void completePackage_persistsZohoEnvelopeType() {
+        CustomerOrder order = confirmedPaid();
+        when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
+        when(
+            xpressBeesClient.listForwardCourierOptions(eq("560001"), anyInt(), anyInt(), anyInt(), anyInt(), any(), any())
+        )
+            .thenReturn(
+            List.of(new XpressBeesClient.CourierOption("1", "Surface Xpressbees 0.5 K.G", 3, "3 days", null, true))
+        );
+
+        CustomerOrder saved = orderPackageService.completePackage(
+            "MNM-1",
+            250,
+            32,
+            24,
+            2,
+            "1",
+            "Surface Xpressbees 0.5 K.G",
+            "envelope"
+        );
+
+        assertThat(saved.getPackageType()).isEqualTo(PackageType.ENVELOPE);
+        assertThat(saved.getPackageLengthCm()).isEqualTo(32);
+        assertThat(saved.getPackageHeightCm()).isEqualTo(2);
+    }
+
+    @Test
+    void completePackage_rejectsUnknownPackageType() {
+        CustomerOrder order = confirmedPaid();
+        when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(
+            () -> orderPackageService.completePackage("MNM-1", 500, 10, 10, 10, null, null, "pallet")
+        )
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST))
+            .hasMessageContaining("Package type");
     }
 
     @Test

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20261002190000-1" author="miniandmore">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="order_return" columnName="package_weight_grams"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="order_return">
+            <column name="package_weight_grams" type="integer"/>
+            <column name="package_length_cm" type="integer"/>
+            <column name="package_breadth_cm" type="integer"/>
+            <column name="package_height_cm" type="integer"/>
+            <column name="package_chargeable_weight_grams" type="integer"/>
+            <column name="package_courier_id" type="varchar(40)"/>
+            <column name="package_courier_name" type="varchar(120)"/>
+            <column name="package_type" type="varchar(20)"/>
+            <column name="packed_at" type="timestamp"/>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>

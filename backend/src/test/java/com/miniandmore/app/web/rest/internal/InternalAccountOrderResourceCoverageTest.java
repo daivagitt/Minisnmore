@@ -126,7 +126,6 @@ class InternalAccountOrderResourceCoverageTest {
             .inventoryReserved(true)
             .total(BigDecimal.TEN);
         OrderItem item = new OrderItem().productId("1").qty(1).order(order);
-        Product product = new Product().id(1L).stock(4);
         when(customerOrderRepository.findById(50L)).thenReturn(Optional.of(order));
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderItemRepository.findAllByOrderId(50L)).thenReturn(List.of(item));
@@ -148,7 +147,7 @@ class InternalAccountOrderResourceCoverageTest {
 
     @Test
     void getCancelRequest_withoutOpenRequest_returnsNull() throws Exception {
-        when(orderCancellationService.getOpenForUser("customer1", "MNM-NO-CANCEL")).thenReturn(null);
+        when(orderCancellationService.getVisibleForUser("customer1", "MNM-NO-CANCEL")).thenReturn(null);
 
         mockMvc
             .perform(get("/internal/v1/orders/MNM-NO-CANCEL/cancel-request").with(user("customer1")))
@@ -284,13 +283,18 @@ class InternalAccountOrderResourceCoverageTest {
             .orderNumber("MNM-DONE")
             .status(OrderStatus.FULFILLED)
             .ledgerlySalesOrderId("SO-2")
-            .trackingNumber("TRK");
+            .trackingNumber("TRK")
+            .shipmentDate("2026-09-29")
+            .shipmentDeliveredAt(Instant.parse("2026-09-29T09:57:19Z"));
         when(customerOrderRepository.findOneByOrderNumber("MNM-DONE")).thenReturn(Optional.of(order));
 
         mockMvc
             .perform(get("/internal/v1/orders/track/MNM-DONE"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.order.tracking_number").value("TRK"));
+            .andExpect(jsonPath("$.data.order.tracking_number").value("TRK"))
+            .andExpect(jsonPath("$.data.order.tracking_status").value("delivered"))
+            .andExpect(jsonPath("$.data.order.shipment_date").value("2026-09-29"))
+            .andExpect(jsonPath("$.data.order.shipment_delivered_at").value("2026-09-29T09:57:19Z"));
     }
 
     @Test
@@ -703,7 +707,6 @@ class InternalAccountOrderResourceCoverageTest {
             .freeShippingMinInr(2500)
             .codFeeInr(149);
         when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.of(settings));
-        CustomerOrder saved = new CustomerOrder().id(403L).orderNumber("MNM-COD").total(BigDecimal.valueOf(1148));
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> {
             CustomerOrder order = inv.getArgument(0);
             order.setId(403L);
@@ -1136,6 +1139,41 @@ class InternalAccountOrderResourceCoverageTest {
     }
 
     @Test
+    void orderDetail_includesRejectedCancellationReason() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(56L)
+            .userLogin("customer1")
+            .orderNumber("MNM-56")
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .paymentMethod("online")
+            .subtotal(BigDecimal.valueOf(400))
+            .discount(BigDecimal.ZERO)
+            .shipping(BigDecimal.ZERO)
+            .codFee(BigDecimal.ZERO)
+            .tax(BigDecimal.ZERO)
+            .donation(BigDecimal.ZERO)
+            .total(BigDecimal.valueOf(400))
+            .placedAt(Instant.now());
+        OrderCancellationRequest rejected = new OrderCancellationRequest();
+        rejected.setRequestNumber("CAN-56");
+        rejected.setStatus(CancellationRequestStatus.REJECTED);
+        rejected.setRejectionReason("Order is already packed");
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-56", "customer1")).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(56L)).thenReturn(List.of());
+        when(orderCancellationService.getVisibleForUser("customer1", "MNM-56")).thenReturn(rejected);
+        when(orderCancellationService.toCustomerDto(rejected)).thenReturn(
+            Map.of("status", "rejected", "rejection_reason", "Order is already packed")
+        );
+
+        mockMvc
+            .perform(get("/internal/v1/orders/MNM-56").with(user("customer1")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.cancellation_request.status").value("rejected"))
+            .andExpect(jsonPath("$.data.order.cancellation_request.rejection_reason").value("Order is already packed"));
+    }
+
+    @Test
     void retryPayment_reopensPendingSession() throws Exception {
         CustomerOrder order = new CustomerOrder()
             .id(77L)
@@ -1499,7 +1537,7 @@ class InternalAccountOrderResourceCoverageTest {
         request.setUserLogin("customer1");
         when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-COD-CANCEL", "customer1")).thenReturn(Optional.of(order));
         when(orderCancellationService.submitRequest("customer1", "MNM-COD-CANCEL", "Ordered by mistake")).thenReturn(request);
-        when(orderCancellationService.getOpenForUser("customer1", "MNM-COD-CANCEL")).thenReturn(request);
+        when(orderCancellationService.getVisibleForUser("customer1", "MNM-COD-CANCEL")).thenReturn(request);
         when(orderCancellationService.hasPendingRequest(80L)).thenReturn(true);
         when(orderCancellationService.toDto(request)).thenReturn(
             Map.of("request_number", "CAN-COD-001", "status", "requested", "reason", "Ordered by mistake")
@@ -1539,7 +1577,7 @@ class InternalAccountOrderResourceCoverageTest {
         request.setUserLogin("customer1");
         when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-PAID-CANCEL", "customer1")).thenReturn(Optional.of(order));
         when(orderCancellationService.submitRequest("customer1", "MNM-PAID-CANCEL", "Found a better price elsewhere")).thenReturn(request);
-        when(orderCancellationService.getOpenForUser("customer1", "MNM-PAID-CANCEL")).thenReturn(request);
+        when(orderCancellationService.getVisibleForUser("customer1", "MNM-PAID-CANCEL")).thenReturn(request);
         when(orderCancellationService.hasPendingRequest(81L)).thenReturn(true);
         when(orderCancellationService.toDto(request)).thenReturn(
             Map.of("request_number", "CAN-PAID-001", "status", "requested", "reason", "Found a better price elsewhere")
@@ -1626,7 +1664,6 @@ class InternalAccountOrderResourceCoverageTest {
 
     @Test
     void orderDetail_wrongOwner_returns404() throws Exception {
-        CustomerOrder order = new CustomerOrder().id(99L).userLogin("other").orderNumber("MNM-OTHER");
         when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-OTHER", "customer1")).thenReturn(Optional.empty());
 
         mockMvc

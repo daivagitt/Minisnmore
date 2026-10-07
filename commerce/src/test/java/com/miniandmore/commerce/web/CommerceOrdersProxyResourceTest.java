@@ -185,4 +185,29 @@ class CommerceOrdersProxyResourceTest {
             .perform(post("/api/v1/account/wishlist/sync").contentType(MediaType.APPLICATION_JSON).content("{\"product_ids\":[9]}"))
             .andExpect(status().isOk());
     }
+
+    @Test
+    void cancelRequestEndpoints_delegateToCatalog() throws Exception {
+        when(catalog.post(eq("/internal/v1/orders/ORD-1/cancel-request"), any())).thenReturn(ResponseEntity.ok("{\"id\":1}"));
+        when(catalog.get("/internal/v1/orders/ORD-1/cancel-request")).thenReturn(ResponseEntity.ok("{\"id\":1}"));
+        when(catalog.post(eq("/internal/v1/orders/ORD-1/cancel-request/withdraw"), any())).thenReturn(ResponseEntity.ok("{}"));
+
+        mockMvc
+            .perform(
+                post("/api/v1/orders/ORD-1/cancel-request")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"Duplicate\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(content().string("{\"id\":1}"));
+
+        mockMvc
+            .perform(get("/api/v1/orders/ORD-1/cancel-request"))
+            .andExpect(status().isOk())
+            .andExpect(content().string("{\"id\":1}"));
+
+        mockMvc
+            .perform(post("/api/v1/orders/ORD-1/cancel-request/withdraw"))
+            .andExpect(status().isOk());
+    }
 }

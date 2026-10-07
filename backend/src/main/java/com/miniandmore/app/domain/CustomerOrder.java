@@ -2,6 +2,7 @@ package com.miniandmore.app.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
+import com.miniandmore.app.domain.enumeration.PackageType;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
@@ -139,6 +140,10 @@ public class CustomerOrder implements Serializable {
     @Column(name = "zoho_invoice_id", length = 120)
     private String zohoInvoiceId;
 
+    @Size(max = 120)
+    @Column(name = "zoho_credit_note_id", length = 120)
+    private String zohoCreditNoteId;
+
     @Size(max = 600)
     @Column(name = "zoho_invoice_pdf_url", length = 600)
     private String zohoInvoicePdfUrl;
@@ -252,6 +257,10 @@ public class CustomerOrder implements Serializable {
     @Size(max = 120)
     @Column(name = "package_courier_name", length = 120)
     private String packageCourierName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "package_type", length = 20)
+    private PackageType packageType;
 
     @Column(name = "packed_at")
     private Instant packedAt;
@@ -590,6 +599,19 @@ public class CustomerOrder implements Serializable {
         this.zohoInvoiceId = zohoInvoiceId;
     }
 
+    public String getZohoCreditNoteId() {
+        return this.zohoCreditNoteId;
+    }
+
+    public CustomerOrder zohoCreditNoteId(String zohoCreditNoteId) {
+        this.setZohoCreditNoteId(zohoCreditNoteId);
+        return this;
+    }
+
+    public void setZohoCreditNoteId(String zohoCreditNoteId) {
+        this.zohoCreditNoteId = zohoCreditNoteId;
+    }
+
     public String getZohoInvoicePdfUrl() {
         return this.zohoInvoicePdfUrl;
     }
@@ -854,6 +876,11 @@ public class CustomerOrder implements Serializable {
         return shipmentDeliveredAt;
     }
 
+    public CustomerOrder shipmentDeliveredAt(Instant shipmentDeliveredAt) {
+        this.setShipmentDeliveredAt(shipmentDeliveredAt);
+        return this;
+    }
+
     public void setShipmentDeliveredAt(Instant shipmentDeliveredAt) {
         this.shipmentDeliveredAt = shipmentDeliveredAt;
     }
@@ -971,6 +998,19 @@ public class CustomerOrder implements Serializable {
 
     public void setPackageCourierName(String packageCourierName) {
         this.packageCourierName = packageCourierName;
+    }
+
+    public PackageType getPackageType() {
+        return packageType;
+    }
+
+    public CustomerOrder packageType(PackageType packageType) {
+        this.setPackageType(packageType);
+        return this;
+    }
+
+    public void setPackageType(PackageType packageType) {
+        this.packageType = packageType;
     }
 
     public Instant getPackedAt() {

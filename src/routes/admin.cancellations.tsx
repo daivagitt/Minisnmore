@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { AdminPage } from "@/components/admin/AdminPage";
+import { SHOW_M2_POST_ORDER_UI } from "@/lib/feature-flags";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -8,6 +9,7 @@ import {
   listAdminCancellationRequests,
   recordCancellationCodRefund,
   rejectCancellationRequest,
+  retryCancellationRefund,
   type AdminCancellationRequestRow,
 } from "@/lib/orders.functions";
 import { showApiError } from "@/lib/ui-errors";
@@ -37,6 +39,8 @@ function formatCaseAge(row: AdminCancellationRequestRow) {
 }
 
 function AdminCancellationsPage() {
+  if (!SHOW_M2_POST_ORDER_UI) return null;
+
   const [status, setStatus] = useState<string>("requested");
   const [rows, setRows] = useState<AdminCancellationRequestRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,6 +155,9 @@ function AdminCancellationsPage() {
                     {r.cod_refund_pending ? (
                       <span className="ml-2 text-amber-700">· COD refund pending</span>
                     ) : null}
+                    {r.payment_status === "refund_failed" ? (
+                      <span className="ml-2 text-destructive">· Refund failed</span>
+                    ) : null}
                   </p>
                 </div>
                 <div className="text-xs text-right">
@@ -171,6 +178,24 @@ function AdminCancellationsPage() {
               ) : null}
               {r.rejection_reason ? (
                 <p className="text-xs text-amber-700">{r.rejection_reason}</p>
+              ) : null}
+              {r.status === "approved" && r.payment_status === "refund_failed" ? (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={busy === r.request_number}
+                    className="text-xs rounded-full bg-primary text-primary-foreground px-3 py-1.5"
+                    onClick={() =>
+                      void run(
+                        r.request_number,
+                        () => retryCancellationRefund(r.request_number),
+                        "Refund retry initiated",
+                      )
+                    }
+                  >
+                    Retry refund
+                  </button>
+                </div>
               ) : null}
               {r.cod_refund_pending ? (
                 <div className="flex flex-wrap gap-2">

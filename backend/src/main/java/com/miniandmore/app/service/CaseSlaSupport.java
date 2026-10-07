@@ -39,6 +39,14 @@ public class CaseSlaSupport {
         enrich(data, "return", status, requestedAt, TERMINAL_RETURN_STATUSES);
     }
 
+    public boolean isReturnOverdue(String status, Instant requestedAt) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("status", status);
+        data.put("requested_at", requestedAt);
+        enrichReturnCase(data);
+        return Boolean.TRUE.equals(data.get("sla_overdue"));
+    }
+
     public void enrichCancellationCase(Map<String, Object> data) {
         if (data == null) {
             return;

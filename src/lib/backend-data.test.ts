@@ -602,6 +602,9 @@ describe("backend data API calls", () => {
       codFeeInr: 149,
       pricesIncludeGst: false,
       deliveryEtaBufferDays: 2,
+      returnWindowDays: 7,
+      refundMinBusinessDays: 2,
+      refundMaxBusinessDays: 5,
     });
     await expect(getAdminSiteSettings()).resolves.toMatchObject({
       brand_name: "Admin",
@@ -611,6 +614,9 @@ describe("backend data API calls", () => {
       free_shipping_min_inr: 3000,
       cod_fee_inr: 149,
       delivery_eta_buffer_days: 2,
+      return_window_days: 7,
+      refund_min_business_days: 2,
+      refund_max_business_days: 5,
       prices_include_gst: false,
     });
     expect(mockedApi.get).toHaveBeenLastCalledWith("/api/v1/admin/site-settings", { auth: true });
@@ -634,6 +640,9 @@ describe("backend data API calls", () => {
       free_shipping_min_inr: 2500,
       cod_fee_inr: 149,
       delivery_eta_buffer_days: 2,
+      return_window_days: 7,
+      refund_min_business_days: 2,
+      refund_max_business_days: 5,
       store_discount_percent: 20,
     });
     expect(mockedApi.put).toHaveBeenCalledWith(
@@ -648,6 +657,9 @@ describe("backend data API calls", () => {
         freeShippingMinInr: 2500,
         codFeeInr: 149,
         deliveryEtaBufferDays: 2,
+        returnWindowDays: 7,
+        refundMinBusinessDays: 2,
+        refundMaxBusinessDays: 5,
       }),
       { auth: true },
     );

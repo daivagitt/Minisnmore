@@ -11,9 +11,6 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,12 +43,9 @@ public class AdminConfigChangeMailService {
     static final String AREA_ZOHO_SETTINGS = "Zoho settings";
 
     private static final Logger LOG = LoggerFactory.getLogger(AdminConfigChangeMailService.class);
+    private static final String VALUE_EMPTY = "(empty)";
+    private static final String VALUE_SET = "(set)";
     private static final Locale DEFAULT_LOCALE = Locale.ENGLISH;
-    private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
-    private static final DateTimeFormatter CHANGED_AT_FORMAT = DateTimeFormatter.ofPattern(
-        "EEE, d MMM yyyy, h:mm a z",
-        Locale.ENGLISH
-    );
     private static final int MAX_VALUE_LENGTH = 280;
     private static final TypeReference<LinkedHashMap<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
@@ -128,7 +122,7 @@ public class AdminConfigChangeMailService {
             context.setVariable("area", section);
             context.setVariable("subject", subject);
             context.setVariable("changedBy", changedBy);
-            context.setVariable("changedAt", ZonedDateTime.now(IST).format(CHANGED_AT_FORMAT));
+            context.setVariable("changedAt", MailTimestamps.now());
             context.setVariable("changes", changes);
             context.setVariable("hasChanges", !changes.isEmpty());
             context.setVariable(
@@ -214,6 +208,7 @@ public class AdminConfigChangeMailService {
             message.setFrom(jHipsterProperties.getMail().getFrom());
             message.setSubject(subject);
             message.setText(content, true);
+            MailTimestamps.stampSentDate(mimeMessage, LOG);
             javaMailSender.send(mimeMessage);
             LOG.info("Sent admin configuration change email to {}", String.join(", ", to));
         } catch (MailException | MessagingException e) {
@@ -223,10 +218,13 @@ public class AdminConfigChangeMailService {
 
     static String display(Object value) {
         if (value == null) {
-            return "(empty)";
+            return VALUE_EMPTY;
         }
+        String formattedInstant = MailTimestamps.formatIfInstant(value);
         String text;
-        if (value instanceof BigDecimal decimal) {
+        if (formattedInstant != null) {
+            text = formattedInstant;
+        } else if (value instanceof BigDecimal decimal) {
             text = decimal.stripTrailingZeros().toPlainString();
         } else if (value instanceof Number number) {
             text = new BigDecimal(number.toString()).stripTrailingZeros().toPlainString();
@@ -236,7 +234,7 @@ public class AdminConfigChangeMailService {
             text = String.valueOf(value).trim();
         }
         if (text.isEmpty()) {
-            return "(empty)";
+            return VALUE_EMPTY;
         }
         if (text.length() > MAX_VALUE_LENGTH) {
             return text.substring(0, MAX_VALUE_LENGTH - 3) + "...";
@@ -301,26 +299,26 @@ public class AdminConfigChangeMailService {
         boolean wasSet = StringUtils.isNotBlank(previousSecret);
         boolean isSet = StringUtils.isNotBlank(currentSecret);
         if (!wasSet && !isSet) {
-            before.put(key, "(empty)");
-            after.put(key, "(empty)");
+            before.put(key, VALUE_EMPTY);
+            after.put(key, VALUE_EMPTY);
             return;
         }
         if (!wasSet) {
-            before.put(key, "(empty)");
-            after.put(key, "(set)");
+            before.put(key, VALUE_EMPTY);
+            after.put(key, VALUE_SET);
             return;
         }
         if (!isSet) {
-            before.put(key, "(set)");
-            after.put(key, "(empty)");
+            before.put(key, VALUE_SET);
+            after.put(key, VALUE_EMPTY);
             return;
         }
         if (Objects.equals(previousSecret, currentSecret)) {
-            before.put(key, "(set)");
-            after.put(key, "(set)");
+            before.put(key, VALUE_SET);
+            after.put(key, VALUE_SET);
             return;
         }
-        before.put(key, "(set)");
+        before.put(key, VALUE_SET);
         after.put(key, "(updated)");
     }
 }

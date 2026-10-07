@@ -7,6 +7,7 @@ import com.miniandmore.app.domain.OrderReturn;
 import com.miniandmore.app.domain.XpressBeesReturnWebhookEvent;
 import com.miniandmore.app.domain.enumeration.OrderRequestType;
 import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
+import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.repository.OrderReturnRepository;
 import com.miniandmore.app.repository.XpressBeesReturnWebhookEventRepository;
 import java.time.Instant;
@@ -15,11 +16,15 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -27,14 +32,34 @@ import org.springframework.web.server.ResponseStatusException;
 public class XpressBeesReturnWebhookHandlerService {
 
     private static final Logger LOG = LoggerFactory.getLogger(XpressBeesReturnWebhookHandlerService.class);
+    private static final String EXPRESS_BEES_PREFIX = "ExpressBees: ";
 
     private final ApplicationProperties applicationProperties;
     private final XpressBeesReturnWebhookEventRepository webhookEventRepository;
     private final OrderReturnRepository orderReturnRepository;
     private final OrderReturnService orderReturnService;
     private final ObjectMapper objectMapper;
+    private final TransactionTemplate eventInsertTransaction;
 
+    @Autowired
     public XpressBeesReturnWebhookHandlerService(
+        ApplicationProperties applicationProperties,
+        XpressBeesReturnWebhookEventRepository webhookEventRepository,
+        OrderReturnRepository orderReturnRepository,
+        OrderReturnService orderReturnService,
+        ObjectMapper objectMapper,
+        PlatformTransactionManager transactionManager
+    ) {
+        this.applicationProperties = applicationProperties;
+        this.webhookEventRepository = webhookEventRepository;
+        this.orderReturnRepository = orderReturnRepository;
+        this.orderReturnService = orderReturnService;
+        this.objectMapper = objectMapper;
+        this.eventInsertTransaction = new TransactionTemplate(transactionManager);
+        this.eventInsertTransaction.setPropagationBehaviorName("PROPAGATION_REQUIRES_NEW");
+    }
+
+    XpressBeesReturnWebhookHandlerService(
         ApplicationProperties applicationProperties,
         XpressBeesReturnWebhookEventRepository webhookEventRepository,
         OrderReturnRepository orderReturnRepository,
@@ -46,6 +71,7 @@ public class XpressBeesReturnWebhookHandlerService {
         this.orderReturnRepository = orderReturnRepository;
         this.orderReturnService = orderReturnService;
         this.objectMapper = objectMapper;
+        this.eventInsertTransaction = null;
     }
 
     public Map<String, Object> handle(String rawBody, String signature, String sharedSecret) {
@@ -81,20 +107,25 @@ public class XpressBeesReturnWebhookHandlerService {
 
         OrderReturn orderReturn = findReturn(returnNumber, reverseAwb);
         String eventId = resolveEventId(payload, data, orderReturn, providerStatus, reverseAwb);
-        if (webhookEventRepository.existsByEventId(eventId)) {
+        if (isCompletedWebhookEvent(eventId)) {
             return ZohoWebhookSupport.duplicateEventResult(eventId);
         }
+        clearPendingWebhookEvent(eventId);
 
-        XpressBeesReturnWebhookEvent record = new XpressBeesReturnWebhookEvent();
-        record.setEventId(eventId);
-        record.setReturnNumber(orderReturn.getReturnNumber());
-        record.setReverseAwb(reverseAwb);
-        record.setProviderStatus(providerStatus);
-        record.setReceivedAt(Instant.now());
-        try {
-            webhookEventRepository.saveAndFlush(record);
-        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
-            return ZohoWebhookSupport.duplicateEventResult(eventId);
+        XpressBeesReturnWebhookEvent webhookRecord = new XpressBeesReturnWebhookEvent();
+        webhookRecord.setEventId(eventId);
+        webhookRecord.setReturnNumber(orderReturn.getReturnNumber());
+        webhookRecord.setReverseAwb(reverseAwb);
+        webhookRecord.setProviderStatus(providerStatus);
+        webhookRecord.setReceivedAt(Instant.now());
+        if (!insertEvent(webhookRecord)) {
+            if (isCompletedWebhookEvent(eventId)) {
+                return ZohoWebhookSupport.duplicateEventResult(eventId);
+            }
+            clearPendingWebhookEvent(eventId);
+            if (!insertEvent(webhookRecord)) {
+                return ZohoWebhookSupport.duplicateEventResult(eventId);
+            }
         }
 
         String failureReason = ZohoWebhookSupport.firstNonBlank(
@@ -102,9 +133,15 @@ public class XpressBeesReturnWebhookHandlerService {
             ZohoWebhookSupport.stringValue(data.get("reason")),
             ZohoWebhookSupport.stringValue(data.get("remarks"))
         );
-        String localStatus = applyCarrierStatus(orderReturn, providerStatus, failureReason, reverseAwb);
-        record.setLocalStatus(localStatus);
-        webhookEventRepository.save(record);
+        String localStatus;
+        try {
+            localStatus = applyCarrierStatus(orderReturn, providerStatus, failureReason, reverseAwb);
+        } catch (RuntimeException ex) {
+            clearPendingWebhookEvent(eventId);
+            throw ex;
+        }
+        webhookRecord.setLocalStatus(localStatus);
+        webhookEventRepository.save(webhookRecord);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("ok", true);
@@ -113,6 +150,39 @@ public class XpressBeesReturnWebhookHandlerService {
         result.put("provider_status", providerStatus);
         result.put("local_status", localStatus);
         return result;
+    }
+
+    /**
+     * The unique-key insert runs in its own transaction. If two carrier callbacks race, only the
+     * inner transaction rolls back; the successful pickup-booking request remains committable.
+     */
+    private boolean insertEvent(XpressBeesReturnWebhookEvent event) {
+        try {
+            if (eventInsertTransaction == null) {
+                webhookEventRepository.saveAndFlush(event);
+            } else {
+                eventInsertTransaction.executeWithoutResult(status -> webhookEventRepository.saveAndFlush(event));
+            }
+            return true;
+        } catch (DataIntegrityViolationException ex) {
+            return false;
+        }
+    }
+
+    /** Completed events are deduped; pending rows (failed apply) are cleared so the carrier can retry. */
+    private boolean isCompletedWebhookEvent(String eventId) {
+        return webhookEventRepository
+            .findOneByEventId(eventId)
+            .map(row -> StringUtils.isNotBlank(row.getLocalStatus()))
+            .orElse(false);
+    }
+
+    private void clearPendingWebhookEvent(String eventId) {
+        if (eventInsertTransaction == null) {
+            webhookEventRepository.deletePendingByEventId(eventId);
+        } else {
+            eventInsertTransaction.executeWithoutResult(status -> webhookEventRepository.deletePendingByEventId(eventId));
+        }
     }
 
     private void verifyAuth(String rawBody, String signature, String sharedSecret) {
@@ -161,14 +231,14 @@ public class XpressBeesReturnWebhookHandlerService {
         if (explicit != null) {
             return explicit;
         }
-        return "xb-return-" + orderReturn.getReturnNumber() + "-" + normalizeStatus(providerStatus) + "-" + StringUtils.defaultString(reverseAwb);
+        return "xb-return-" + orderReturn.getReturnNumber() + "-" + XpressBeesShipmentStatus.normalize(providerStatus) + "-" + StringUtils.defaultString(reverseAwb);
     }
 
     private String applyCarrierStatus(OrderReturn orderReturn, String providerStatus, String failureReason, String awb) {
         if (isOutboundEvent(orderReturn, awb)) {
             return applyOutboundCarrierStatus(orderReturn, providerStatus);
         }
-        return applyReverseCarrierStatus(orderReturn, providerStatus, failureReason);
+        return applyReverseCarrierStatus(orderReturn, providerStatus, failureReason, awb);
     }
 
     private boolean isOutboundEvent(OrderReturn orderReturn, String awb) {
@@ -176,85 +246,118 @@ public class XpressBeesReturnWebhookHandlerService {
             return false;
         }
         if (StringUtils.isBlank(awb)) {
-            return orderReturn.getStatus() == OrderReturnStatus.READY_TO_SHIP || orderReturn.getStatus() == OrderReturnStatus.SHIPPED;
+            return false;
         }
         return StringUtils.equalsIgnoreCase(orderReturn.getOutboundAwb(), awb.trim());
     }
 
     private String applyOutboundCarrierStatus(OrderReturn orderReturn, String providerStatus) {
-        String normalized = normalizeStatus(providerStatus);
+        String incoming = XpressBeesReturnCarrierStatus.outboundMilestone(providerStatus);
+        String preferred = XpressBeesReturnCarrierStatus.preferOutbound(orderReturn.getOutboundCarrierStatus(), incoming);
+        if (StringUtils.isNotBlank(preferred)) {
+            orderReturn.setOutboundCarrierStatus(preferred);
+            orderReturnRepository.save(orderReturn);
+        }
         OrderReturnStatus current = orderReturn.getStatus();
-        return switch (normalized) {
-            case "shipped", "in_transit", "dispatched", "picked", "manifested" -> {
+        if (incoming == null) {
+            LOG.debug("Ignoring unmapped ExpressBees outbound status {} for {}", providerStatus, orderReturn.getReturnNumber());
+            return current.name().toLowerCase(Locale.ROOT);
+        }
+        return switch (incoming) {
+            case XpressBeesReturnCarrierStatus.IN_TRANSIT -> {
                 if (current == OrderReturnStatus.READY_TO_SHIP) {
-                    orderReturnService.markShipped(orderReturn.getReturnNumber(), "ExpressBees: " + providerStatus);
+                    orderReturnService.markShipped(orderReturn.getReturnNumber(), EXPRESS_BEES_PREFIX + providerStatus);
                 }
                 yield OrderReturnStatus.SHIPPED.name().toLowerCase(Locale.ROOT);
             }
-            case "out_for_delivery", "ofd" -> {
+            case XpressBeesReturnCarrierStatus.OUT_FOR_DELIVERY, XpressBeesReturnCarrierStatus.DELIVERY_FAILED -> {
                 if (current == OrderReturnStatus.READY_TO_SHIP) {
-                    orderReturnService.markShipped(orderReturn.getReturnNumber(), "ExpressBees: " + providerStatus);
+                    orderReturnService.markShipped(orderReturn.getReturnNumber(), EXPRESS_BEES_PREFIX + providerStatus);
                 }
                 // Once-only: prior completed OFD webhooks already notified (mirrors order_event insertIfAbsent).
-                if (!webhookEventRepository.existsCompletedOutForDeliveryEvent(orderReturn.getReturnNumber())) {
+                if (
+                    XpressBeesReturnCarrierStatus.OUT_FOR_DELIVERY.equals(incoming) &&
+                    !webhookEventRepository.existsCompletedOutForDeliveryEvent(orderReturn.getReturnNumber())
+                ) {
                     orderReturnService.notifyExchangeOutForDelivery(orderReturn.getReturnNumber());
                 }
                 yield OrderReturnStatus.SHIPPED.name().toLowerCase(Locale.ROOT);
             }
-            case "delivered", "delivery_done", "delivered_to_customer" -> {
+            case XpressBeesReturnCarrierStatus.DELIVERED -> {
                 if (current == OrderReturnStatus.READY_TO_SHIP) {
-                    orderReturnService.markShipped(orderReturn.getReturnNumber(), "ExpressBees: " + providerStatus);
+                    orderReturnService.markShipped(orderReturn.getReturnNumber(), EXPRESS_BEES_PREFIX + providerStatus);
                     current = OrderReturnStatus.SHIPPED;
                 }
                 if (current == OrderReturnStatus.SHIPPED) {
-                    orderReturnService.markDelivered(orderReturn.getReturnNumber(), "ExpressBees: " + providerStatus);
+                    orderReturnService.markDelivered(orderReturn.getReturnNumber(), EXPRESS_BEES_PREFIX + providerStatus);
                     current = OrderReturnStatus.DELIVERED;
                 }
                 if (current == OrderReturnStatus.DELIVERED && orderReturn.getRequestType() == OrderRequestType.EXCHANGE) {
-                    orderReturnService.completeExchange(orderReturn.getReturnNumber(), "ExpressBees: " + providerStatus);
+                    orderReturnService.completeExchange(orderReturn.getReturnNumber(), EXPRESS_BEES_PREFIX + providerStatus);
                     yield OrderReturnStatus.COMPLETED.name().toLowerCase(Locale.ROOT);
                 }
                 yield OrderReturnStatus.DELIVERED.name().toLowerCase(Locale.ROOT);
             }
-            default -> {
-                LOG.debug("Ignoring unmapped ExpressBees outbound status {} for {}", providerStatus, orderReturn.getReturnNumber());
-                yield current.name().toLowerCase(Locale.ROOT);
-            }
+            default -> current.name().toLowerCase(Locale.ROOT);
         };
     }
 
-    private String applyReverseCarrierStatus(OrderReturn orderReturn, String providerStatus, String failureReason) {
-        String normalized = normalizeStatus(providerStatus);
+    private String applyReverseCarrierStatus(OrderReturn orderReturn, String providerStatus, String failureReason, String awb) {
+        ensureReverseShipmentFromWebhook(orderReturn, awb);
+        String incoming = XpressBeesReturnCarrierStatus.reverseMilestone(providerStatus);
+        String preferred = XpressBeesReturnCarrierStatus.preferReverse(orderReturn.getReverseCarrierStatus(), incoming);
+        if (StringUtils.isNotBlank(preferred)) {
+            orderReturn.setReverseCarrierStatus(preferred);
+            orderReturnRepository.save(orderReturn);
+        }
         OrderReturnStatus current = orderReturn.getStatus();
-        return switch (normalized) {
-            case "pickup_scheduled", "out_for_pickup", "scheduled" -> {
+        if (incoming == null) {
+            LOG.debug("Ignoring unmapped ExpressBees return status {} for {}", providerStatus, orderReturn.getReturnNumber());
+            return current.name().toLowerCase(Locale.ROOT);
+        }
+        return switch (incoming) {
+            case XpressBeesReturnCarrierStatus.DATA_RECEIVED, XpressBeesReturnCarrierStatus.OUT_FOR_PICKUP -> {
                 if (current == OrderReturnStatus.APPROVED || current == OrderReturnStatus.PICKUP_FAILED) {
-                    orderReturnService.ensurePickupScheduled(orderReturn.getReturnNumber(), "ExpressBees: " + providerStatus);
+                    orderReturnService.ensurePickupScheduled(orderReturn.getReturnNumber(), EXPRESS_BEES_PREFIX + providerStatus);
                 }
                 yield OrderReturnStatus.PICKUP_SCHEDULED.name().toLowerCase(Locale.ROOT);
             }
-            case "picked_up", "pickdone", "pick_done" -> {
+            case XpressBeesReturnCarrierStatus.PICKED_UP, XpressBeesReturnCarrierStatus.IN_TRANSIT -> {
+                current = orderReturn.getStatus();
+                if (current == OrderReturnStatus.APPROVED || current == OrderReturnStatus.PICKUP_FAILED) {
+                    orderReturnService.ensurePickupScheduled(orderReturn.getReturnNumber(), EXPRESS_BEES_PREFIX + providerStatus);
+                    current = reloadReturn(orderReturn.getReturnNumber()).getStatus();
+                }
+                if (current == OrderReturnStatus.PICKUP_REQUESTED || current == OrderReturnStatus.PICKUP_SCHEDULED) {
+                    orderReturnService.markPickedUp(orderReturn.getReturnNumber(), EXPRESS_BEES_PREFIX + providerStatus);
+                    current = OrderReturnStatus.PICKED_UP;
+                }
+                yield current.name().toLowerCase(Locale.ROOT);
+            }
+            case XpressBeesReturnCarrierStatus.DELIVERED_TO_WAREHOUSE -> {
+                current = orderReturn.getStatus();
+                if (current == OrderReturnStatus.APPROVED || current == OrderReturnStatus.PICKUP_FAILED) {
+                    orderReturnService.ensurePickupScheduled(orderReturn.getReturnNumber(), EXPRESS_BEES_PREFIX + providerStatus);
+                    current = reloadReturn(orderReturn.getReturnNumber()).getStatus();
+                }
                 if (
-                    current == OrderReturnStatus.APPROVED ||
+                    orderReturn.getRequestType() == OrderRequestType.EXCHANGE &&
+                    (current == OrderReturnStatus.PICKUP_REQUESTED || current == OrderReturnStatus.PICKUP_SCHEDULED)
+                ) {
+                    orderReturnService.markPickedUp(orderReturn.getReturnNumber(), EXPRESS_BEES_PREFIX + providerStatus);
+                    current = OrderReturnStatus.PICKED_UP;
+                }
+                if (
                     current == OrderReturnStatus.PICKUP_REQUESTED ||
-                    current == OrderReturnStatus.PICKUP_SCHEDULED
-                ) {
-                    orderReturnService.markPickedUp(orderReturn.getReturnNumber(), "ExpressBees: " + providerStatus);
-                }
-                yield OrderReturnStatus.PICKED_UP.name().toLowerCase(Locale.ROOT);
-            }
-            case "received", "rto_delivered", "warehouse_received" -> {
-                if (
-                    current == OrderReturnStatus.APPROVED ||
-                    current == OrderReturnStatus.PICKED_UP ||
                     current == OrderReturnStatus.PICKUP_SCHEDULED ||
-                    current == OrderReturnStatus.PICKUP_REQUESTED
+                    current == OrderReturnStatus.PICKED_UP
                 ) {
-                    orderReturnService.markReceived(orderReturn.getReturnNumber(), "ExpressBees: " + providerStatus);
+                    orderReturnService.markReceived(orderReturn.getReturnNumber(), EXPRESS_BEES_PREFIX + providerStatus);
+                    current = OrderReturnStatus.RECEIVED;
                 }
-                yield OrderReturnStatus.RECEIVED.name().toLowerCase(Locale.ROOT);
+                yield current.name().toLowerCase(Locale.ROOT);
             }
-            case "pickup_failed", "failed", "cancelled", "rpcancel", "customer_cancelled", "customer_na", "no_product" -> {
+            case XpressBeesReturnCarrierStatus.PICKUP_FAILED -> {
                 if (
                     current == OrderReturnStatus.PICKUP_SCHEDULED ||
                     current == OrderReturnStatus.PICKUP_REQUESTED ||
@@ -268,18 +371,29 @@ public class XpressBeesReturnWebhookHandlerService {
                 }
                 yield OrderReturnStatus.PICKUP_FAILED.name().toLowerCase(Locale.ROOT);
             }
-            default -> {
-                LOG.debug("Ignoring unmapped ExpressBees return status {} for {}", providerStatus, orderReturn.getReturnNumber());
-                yield current.name().toLowerCase(Locale.ROOT);
-            }
+            default -> current.name().toLowerCase(Locale.ROOT);
         };
     }
 
-    private static String normalizeStatus(String status) {
-        return StringUtils.defaultString(status)
-            .trim()
-            .toLowerCase(Locale.ROOT)
-            .replace('-', '_')
-            .replace(' ', '_');
+    private void ensureReverseShipmentFromWebhook(OrderReturn orderReturn, String awb) {
+        if (orderReturn.getLogisticsMode() == null) {
+            orderReturn.setLogisticsMode(ReturnLogisticsMode.XPRESSBEES);
+        }
+        if (StringUtils.isBlank(orderReturn.getCarrierName())) {
+            orderReturn.setCarrierName("XpressBees");
+        }
+        if (StringUtils.isNotBlank(awb)) {
+            String normalizedAwb = awb.trim();
+            if (StringUtils.isBlank(orderReturn.getReverseAwb())) {
+                orderReturn.setReverseAwb(StringUtils.left(normalizedAwb, 80));
+            }
+        }
+        orderReturnRepository.save(orderReturn);
+    }
+
+    private OrderReturn reloadReturn(String returnNumber) {
+        return orderReturnRepository
+            .findOneByReturnNumber(returnNumber)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Return request not found"));
     }
 }

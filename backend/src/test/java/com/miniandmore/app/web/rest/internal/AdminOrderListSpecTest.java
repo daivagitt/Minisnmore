@@ -44,6 +44,24 @@ class AdminOrderListSpecTest {
         assertThat(AdminOrderListSpec.create(null, null, null, null, null, null, "attention", null)).isNotNull();
         assertThat(AdminOrderListSpec.create(null, null, "Jane", "confirmed", "paid", "cod", "not_synced", "pending"))
             .isNotNull();
+        assertThat(AdminOrderListSpec.create(null, null, null, null, null, null, null, null, "shipped")).isNotNull();
+        assertThat(AdminOrderListSpec.create(null, null, null, "hand_wrapped", null, null, null, null, "awaiting_pickup"))
+            .isNotNull();
+    }
+
+    @Test
+    void parseTrackingStatus_acceptsKnownFulfillmentStates() {
+        assertThat(AdminOrderListSpec.parseTrackingStatus("  Shipped  ")).isEqualTo("shipped");
+        assertThat(AdminOrderListSpec.parseTrackingStatus("out_for_delivery")).isEqualTo("out_for_delivery");
+        assertThat(AdminOrderListSpec.parseTrackingStatus(null)).isNull();
+    }
+
+    @Test
+    void parseTrackingStatus_rejectsUnknownValues() {
+        assertThatThrownBy(() -> AdminOrderListSpec.parseTrackingStatus("packed"))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test

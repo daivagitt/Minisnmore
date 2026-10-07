@@ -3,10 +3,20 @@ import type { Product } from "@/data/products";
 import {
   HOME_SECTION_PRODUCT_KEYS,
   HOME_SECTION_PRODUCT_LIMIT,
+  LOVED_RIGHT_NOW_KEY,
+  LOVED_RIGHT_NOW_LIMIT,
+  MERCHANDISE_PRODUCT_KEYS,
+  YOU_MAY_ALSO_LOVE_KEY,
+  YOU_MAY_ALSO_LOVE_LIMIT,
   getHomeSectionProductSlugErrors,
+  isMerchandiseProductKey,
   normalizeHomeSectionProductSlugs,
+  productLimitForSection,
   pruneHomeSectionProductSlugs,
   resolveHomeSectionProducts,
+  merchandisingProductLabel,
+  resolveLovedRightNow,
+  resolveYouMayAlsoLove,
   sectionProductSlugs,
 } from "./home-products";
 
@@ -35,6 +45,16 @@ describe("home-products", () => {
     expect(HOME_SECTION_PRODUCT_KEYS).toContain("gifts");
   });
 
+  it("treats shop menu and PDP pairing slots as merchandising pickers", () => {
+    expect(MERCHANDISE_PRODUCT_KEYS).toEqual(
+      expect.arrayContaining([LOVED_RIGHT_NOW_KEY, YOU_MAY_ALSO_LOVE_KEY, "gifts"]),
+    );
+    expect(isMerchandiseProductKey(LOVED_RIGHT_NOW_KEY)).toBe(true);
+    expect(productLimitForSection(LOVED_RIGHT_NOW_KEY)).toBe(LOVED_RIGHT_NOW_LIMIT);
+    expect(productLimitForSection(YOU_MAY_ALSO_LOVE_KEY)).toBe(YOU_MAY_ALSO_LOVE_LIMIT);
+    expect(productLimitForSection("best_sellers")).toBe(HOME_SECTION_PRODUCT_LIMIT);
+  });
+
   it("reads product slugs from section payload", () => {
     expect(sectionProductSlugs({ product_slugs: ["a", "", 1, "b"] })).toEqual(["a", "b"]);
     expect(sectionProductSlugs({})).toEqual([]);
@@ -51,7 +71,7 @@ describe("home-products", () => {
     const capped = slugs.slice(0, HOME_SECTION_PRODUCT_LIMIT);
     expect(normalizeHomeSectionProductSlugs(slugs)).toEqual(capped);
     expect(getHomeSectionProductSlugErrors(slugs)).toEqual([
-      `Pick at most ${HOME_SECTION_PRODUCT_LIMIT} products — the homepage shows five per section.`,
+      `Pick at most ${HOME_SECTION_PRODUCT_LIMIT} products for this section.`,
     ]);
     expect(sectionProductSlugs({ product_slugs: slugs })).toEqual(capped);
   });
@@ -84,5 +104,54 @@ describe("home-products", () => {
     ];
     const auto = resolveHomeSectionProducts(all, [], (ps) => ps.filter((p) => p.isBestseller));
     expect(auto.map((p) => p.slug)).toEqual(["c", "a"]);
+  });
+
+  it("resolves Loved Right Now from admin picks with a 3-item cap", () => {
+    const all = ["a", "b", "c", "d"].map((slug) => sample(slug, { isBestseller: true }));
+    expect(resolveLovedRightNow(all, ["d", "a", "c", "b"]).map((p) => p.slug)).toEqual([
+      "d",
+      "a",
+      "c",
+    ]);
+  });
+
+  it("auto-picks flagged products for Loved Right Now when no slugs are set", () => {
+    const all = [
+      sample("plain"),
+      sample("new", { isNew: true }),
+      sample("best", { isBestseller: true }),
+      sample("trend", { isTrending: true }),
+    ];
+    expect(resolveLovedRightNow(all, []).map((p) => p.slug)).toEqual(["best", "new", "trend"]);
+  });
+
+  it("resolves PDP pairings from admin picks and skips the current product", () => {
+    const all = ["a", "b", "c", "d", "e"].map((slug) => sample(slug, { category: "Infant" }));
+    const current = all[0];
+    expect(resolveYouMayAlsoLove(all, current, ["a", "e", "c"]).map((p) => p.slug)).toEqual([
+      "e",
+      "c",
+      "b",
+      "d",
+    ]);
+  });
+
+  it("uses admin product_label over the catalog category for Loved Right Now", () => {
+    const product = sample("shorts", { category: "Newborn", categoryName: "Jabla" });
+    expect(merchandisingProductLabel({}, product)).toBe("Newborn");
+    expect(merchandisingProductLabel({ product_label: "  kedar  " }, product)).toBe("kedar");
+    expect(merchandisingProductLabel({ product_label: "   " }, product)).toBe("Newborn");
+    expect(merchandisingProductLabel({}, sample("plain", { category: "Toddler" }))).toBe("Toddler");
+  });
+
+  it("falls back to same-category pieces when no PDP pairing slugs are set", () => {
+    const current = sample("a", { category: "Infant", fabric: "Knit" });
+    const all = [
+      current,
+      sample("b", { category: "Toddler", fabric: "Linen" }),
+      sample("c", { category: "Infant", fabric: "Muslin" }),
+      sample("d", { category: "Newborn", fabric: "Knit" }),
+    ];
+    expect(resolveYouMayAlsoLove(all, current, []).map((p) => p.slug)).toEqual(["c", "d", "b"]);
   });
 });

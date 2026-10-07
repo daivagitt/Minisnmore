@@ -2,6 +2,10 @@ import { api, ApiError } from "@/lib/api";
 import { numberFieldOr, requireNumberField } from "@/lib/admin-number-field";
 import { validateVariantRows } from "@/lib/admin-variants";
 import { MAX_DELIVERY_ETA_BUFFER_DAYS } from "@/lib/commerce";
+import {
+  MAX_REFUND_BUSINESS_DAYS,
+  MAX_RETURN_WINDOW_DAYS,
+} from "@/lib/refund-policy";
 import { internalSitePathError } from "@/lib/internal-links";
 import {
   isExampleOrPlaceholderUrl,
@@ -439,6 +443,34 @@ export function getSiteSettingsValidationErrors(row: SiteSettingsRow): string[] 
     max: MAX_DELIVERY_ETA_BUFFER_DAYS,
   });
   if (etaBufferError) errors.push(etaBufferError);
+  if (row.return_window_days != null) {
+    const returnWindowError = requireNumberField(row.return_window_days, "Return window days", {
+      min: 1,
+      max: MAX_RETURN_WINDOW_DAYS,
+    });
+    if (returnWindowError) errors.push(returnWindowError);
+  }
+  if (row.refund_min_business_days != null) {
+    const refundMinError = requireNumberField(row.refund_min_business_days, "Refund min business days", {
+      min: 1,
+      max: MAX_REFUND_BUSINESS_DAYS,
+    });
+    if (refundMinError) errors.push(refundMinError);
+  }
+  if (row.refund_max_business_days != null) {
+    const refundMaxError = requireNumberField(row.refund_max_business_days, "Refund max business days", {
+      min: 1,
+      max: MAX_REFUND_BUSINESS_DAYS,
+    });
+    if (refundMaxError) errors.push(refundMaxError);
+  }
+  if (
+    row.refund_min_business_days != null &&
+    row.refund_max_business_days != null &&
+    row.refund_max_business_days < row.refund_min_business_days
+  ) {
+    errors.push("Refund max business days must be at least the min.");
+  }
   const discountError = requireNumberField(row.store_discount_percent, "Store discount", {
     allowZero: true,
     max: GST_RATE_MAX,
@@ -1138,6 +1170,9 @@ export type SiteSettingsRow = Record<string, string | number | boolean | null | 
   free_shipping_min_inr?: number | null;
   cod_fee_inr?: number | null;
   delivery_eta_buffer_days?: number | null;
+  return_window_days?: number | null;
+  refund_min_business_days?: number | null;
+  refund_max_business_days?: number | null;
   store_discount_percent?: number | null;
   about_page_json?: string | null;
   gift_page_json?: string | null;
@@ -1191,6 +1226,9 @@ function fromSiteSettingDto(dto: Record<string, unknown> | null): SiteSettingsRo
   row.free_shipping_min_inr = dto.freeShippingMinInr as number | undefined;
   row.cod_fee_inr = dto.codFeeInr as number | undefined;
   row.delivery_eta_buffer_days = dto.deliveryEtaBufferDays as number | undefined;
+  row.return_window_days = dto.returnWindowDays as number | undefined;
+  row.refund_min_business_days = dto.refundMinBusinessDays as number | undefined;
+  row.refund_max_business_days = dto.refundMaxBusinessDays as number | undefined;
   row.store_discount_percent = dto.storeDiscountPercent as number | undefined;
   return row;
 }
@@ -1206,6 +1244,9 @@ function toSiteSettingDto(row: SiteSettingsRow) {
   payload.freeShippingMinInr = row.free_shipping_min_inr ?? null;
   payload.codFeeInr = row.cod_fee_inr ?? null;
   payload.deliveryEtaBufferDays = row.delivery_eta_buffer_days ?? null;
+  payload.returnWindowDays = row.return_window_days ?? null;
+  payload.refundMinBusinessDays = row.refund_min_business_days ?? null;
+  payload.refundMaxBusinessDays = row.refund_max_business_days ?? null;
   payload.storeDiscountPercent = row.store_discount_percent ?? null;
   return payload;
 }

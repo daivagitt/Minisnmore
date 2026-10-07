@@ -56,6 +56,13 @@ class S3StorageServiceTest {
     }
 
     @Test
+    void presignUpload_returnsFolder_isAllowed() {
+        var result = s3StorageService.presignUpload("returns", "damage.jpg", "image/jpeg");
+
+        assertThat(result.publicUrl()).contains("/returns/");
+    }
+
+    @Test
     void presignUpload_blankFilename_throwsBadRequest() {
         assertThatThrownBy(() -> s3StorageService.presignUpload("products", " "))
             .isInstanceOf(ResponseStatusException.class)
@@ -529,5 +536,125 @@ class S3StorageServiceTest {
 
         assertThat(s3StorageService.deleteObjects(List.of("   ", ""))).isZero();
         org.mockito.Mockito.verifyNoInteractions(mockClient);
+    }
+
+    @Test
+    void getObjectBytes_blankKey_returnsEmpty() {
+        assertThat(s3StorageService.getObjectBytes(null)).isEmpty();
+        assertThat(s3StorageService.getObjectBytes("  ")).isEmpty();
+    }
+
+    @Test
+    void getObjectBytes_success_returnsBytes() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+        byte[] expected = "test-bytes".getBytes();
+        software.amazon.awssdk.core.ResponseBytes<software.amazon.awssdk.services.s3.model.GetObjectResponse> respBytes =
+            software.amazon.awssdk.core.ResponseBytes.fromByteArray(
+                software.amazon.awssdk.services.s3.model.GetObjectResponse.builder().build(),
+                expected
+            );
+        when(mockClient.getObjectAsBytes(any(software.amazon.awssdk.services.s3.model.GetObjectRequest.class)))
+            .thenReturn(respBytes);
+
+        var result = s3StorageService.getObjectBytes("products/test.jpg");
+        assertThat(result).contains(expected);
+    }
+
+    @Test
+    void getObjectBytes_notFound_returnsEmpty() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+        when(mockClient.getObjectAsBytes(any(software.amazon.awssdk.services.s3.model.GetObjectRequest.class)))
+            .thenThrow(software.amazon.awssdk.services.s3.model.NoSuchKeyException.builder().message("not found").build());
+
+        assertThat(s3StorageService.getObjectBytes("products/missing.jpg")).isEmpty();
+    }
+
+    @Test
+    void getObjectBytes_s3Exception404_returnsEmpty() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+        software.amazon.awssdk.services.s3.model.S3Exception ex = (software.amazon.awssdk.services.s3.model.S3Exception)
+            software.amazon.awssdk.services.s3.model.S3Exception.builder().statusCode(404).message("not found").build();
+        when(mockClient.getObjectAsBytes(any(software.amazon.awssdk.services.s3.model.GetObjectRequest.class)))
+            .thenThrow(ex);
+
+        assertThat(s3StorageService.getObjectBytes("products/missing404.jpg")).isEmpty();
+    }
+
+    @Test
+    void getObjectBytes_s3Exception500_throwsBadGateway() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+        software.amazon.awssdk.services.s3.model.S3Exception ex = (software.amazon.awssdk.services.s3.model.S3Exception)
+            software.amazon.awssdk.services.s3.model.S3Exception.builder().statusCode(500).message("server error").build();
+        when(mockClient.getObjectAsBytes(any(software.amazon.awssdk.services.s3.model.GetObjectRequest.class)))
+            .thenThrow(ex);
+
+        assertThatThrownBy(() -> s3StorageService.getObjectBytes("products/error.jpg"))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Could not read stored image");
+    }
+
+    @Test
+    void putPublicImage_blankOrEmpty_isNoOp() {
+        s3StorageService.putPublicImage(" ", new byte[] { 1 });
+        s3StorageService.putPublicImage("products/test.jpg", null);
+        s3StorageService.putPublicImage("products/test.jpg", new byte[0]);
+    }
+
+    @Test
+    void putPublicImage_valid_callsS3Client() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+
+        s3StorageService.putPublicImage("products/test.jpg", "image-bytes".getBytes());
+        verify(mockClient).putObject(any(PutObjectRequest.class), any(RequestBody.class));
+    }
+
+    @Test
+    void uploadInvoicePdf_valid_uploadsSuccessfully() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+        byte[] pdfBytes = "%PDF-1.4 sample content".getBytes();
+
+        String url = s3StorageService.uploadInvoicePdf("invoice-101.pdf", pdfBytes);
+        assertThat(url).contains("invoice-101.pdf");
+        verify(mockClient).putObject(any(PutObjectRequest.class), any(RequestBody.class));
+    }
+
+    @Test
+    void uploadCataloguePdf_valid_uploadsSuccessfully() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+        byte[] pdfBytes = "%PDF-1.4 sample catalogue".getBytes();
+
+        String url = s3StorageService.uploadCataloguePdf("catalogue.pdf", new java.io.ByteArrayInputStream(pdfBytes), pdfBytes.length);
+        assertThat(url).contains("catalogue.pdf");
+        verify(mockClient).putObject(any(PutObjectRequest.class), any(RequestBody.class));
+    }
+
+    @Test
+    void uploadInvoicePdf_empty_throwsBadRequest() {
+        assertThatThrownBy(() -> s3StorageService.uploadInvoicePdf("invoice.pdf", null))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Invoice PDF is empty");
+
+        assertThatThrownBy(() -> s3StorageService.uploadInvoicePdf("invoice.pdf", new byte[0]))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Invoice PDF is empty");
+    }
+
+    @Test
+    void uploadCataloguePdf_emptyOrTooLarge_throwsBadRequest() {
+        assertThatThrownBy(() -> s3StorageService.uploadCataloguePdf("catalogue.pdf", null, 0))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Catalogue PDF is empty");
+
+        byte[] big = new byte[10];
+        assertThatThrownBy(() -> s3StorageService.uploadCataloguePdf("catalogue.pdf", new java.io.ByteArrayInputStream(big), 10_000_000L))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("too large");
     }
 }

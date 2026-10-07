@@ -43,7 +43,7 @@
               <div style="font-size:14px; color:#5a4a4a; font-weight:bold; margin-bottom:6px;">Refund Details</div>
               <div style="font-size:14px; color:#5a4a4a;">Amount: <b th:text="${refundAmountFormatted}">₹206</b></div>
               <div style="font-size:14px; color:#5a4a4a; margin-top:4px;">Method: <span th:text="${paymentMethodDisplay != null ? paymentMethodDisplay : 'Original payment method'}">Original payment method</span></div>
-              <div style="font-size:14px; color:#5a4a4a; margin-top:4px;">Expected credit: within 5-7 business days</div>
+              <div style="font-size:14px; color:#5a4a4a; margin-top:4px;">Expected credit: within <span th:text="${refundBusinessDays}">2–5 business days</span></div>
             </td>
           </tr></table>
           <p style="font-size:12px; color:#b79aa0; margin:0 0 28px 0;">&nbsp;</p>

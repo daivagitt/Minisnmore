@@ -1,6 +1,8 @@
 package com.miniandmore.app.repository;
 
 import com.miniandmore.app.domain.XpressBeesReturnWebhookEvent;
+import java.util.Optional;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -9,6 +11,12 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface XpressBeesReturnWebhookEventRepository extends JpaRepository<XpressBeesReturnWebhookEvent, Long> {
     boolean existsByEventId(String eventId);
+
+    Optional<XpressBeesReturnWebhookEvent> findOneByEventId(String eventId);
+
+    @Modifying
+    @Query("delete from XpressBeesReturnWebhookEvent e where e.eventId = :eventId and e.localStatus is null")
+    int deletePendingByEventId(@Param("eventId") String eventId);
 
     /**
      * True when a prior OFD webhook for this return already finished applying (local_status set).

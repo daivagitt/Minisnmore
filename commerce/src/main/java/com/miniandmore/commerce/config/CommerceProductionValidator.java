@@ -8,6 +8,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 
 @Configuration
+@SuppressWarnings("java:S1118")
 public class CommerceProductionValidator {
 
     private static final String SAMPLE_JWT_SECRET =

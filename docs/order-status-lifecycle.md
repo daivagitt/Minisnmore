@@ -109,8 +109,8 @@ Separate entity: one or more return requests per order (`order_return` table). L
 
 - Order must be **`payment_status = PAID`**
 - Order must **not** be `CANCELLED`
-- Order must be **delivered** (delivery anchor resolved from shipment date, fulfilled status, or tracking)
-- Within **7 days** of delivery (`RETURN_WINDOW_DAYS`)
+- Order must be **delivered** (`shipment_delivered_at` is set; dispatch `shipment_date` does not count)
+- Within **3 days** of that physical delivery timestamp (`RETURN_WINDOW_DAYS`)
 
 Check: `GET /api/v1/order-returns/eligibility/{orderNumber}`
 

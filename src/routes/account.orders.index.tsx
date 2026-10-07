@@ -11,8 +11,8 @@ import { formatOrderDate } from "@/lib/dates";
 import {
   formatOrderStatusSummary,
   needsOnlinePayment,
+  orderStatusSummaryTone,
   PAYMENT_STATUS_TONE_CLASS,
-  paymentStatusTone,
 } from "@/lib/order-status";
 import { shouldShowOrderTrackingLink } from "@/lib/order-tracking";
 import { isInvoiceAvailable } from "@/lib/invoice-availability";
@@ -196,9 +196,9 @@ function OrdersPage() {
 function StatusPill({
   order,
 }: {
-  order: { payment_status?: string; payment_method?: string; status?: string };
+  order: { payment_status?: string; payment_method?: string; status?: string; tracking_status?: string };
 }) {
-  const tone = paymentStatusTone(order.payment_status);
+  const tone = orderStatusSummaryTone(order);
   return (
     <span
       className={`inline-flex text-[10px] tracking-wide rounded-full px-2 py-0.5 ${PAYMENT_STATUS_TONE_CLASS[tone]}`}

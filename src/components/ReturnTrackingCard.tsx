@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { RefundInitiatedNotice } from "@/components/RefundInitiatedNotice";
 import { CopyButton } from "@/components/CopyButton";
+import { OrderProductThumb } from "@/components/OrderProductThumb";
 import { ReturnImageGallery } from "@/components/ReturnImageGallery";
 import {
   closedReturnMessage,
@@ -13,6 +16,7 @@ import {
   returnTrackingStages,
   type ReturnTrackingFields,
 } from "@/lib/return-tracking";
+import { resolveReturnProductLines } from "@/lib/return-product-lines";
 import { formatReturnProductSubtitle } from "@/lib/return-variant";
 import { formatOrderDate } from "@/lib/dates";
 
@@ -21,6 +25,7 @@ type Props = {
     return_number?: string;
     order_number?: string;
     product_name?: string;
+    product_image?: string | null;
     original_size?: string | null;
     original_color?: string | null;
     sku?: string | null;
@@ -29,24 +34,53 @@ type Props = {
     variant_sku?: string | null;
     requested_at?: string;
     image_urls?: string[] | null;
+    items?: Array<{ product_name?: string; product_image?: string | null }>;
+    order_payment_status?: string | null;
   };
   actions?: ReactNode;
   showHeader?: boolean;
+  /** When the parent already shows {@link closedReturnMessage}, skip the duplicate block. */
+  omitClosedMessage?: boolean;
 };
 
-export function ReturnTrackingCard({ item, actions, showHeader = true }: Props) {
+export function ReturnTrackingCard({ item, actions, showHeader = true, omitClosedMessage = false }: Props) {
+  const settings = useSiteSettings();
+  const refundTimeline = {
+    min: settings.refund_min_business_days,
+    max: settings.refund_max_business_days,
+  };
   const exchange = isExchangeRequest(item);
   const closed = isClosedReturn(item);
   const stages = returnTrackingStages(item);
   const idx = resolveReturnStage(item);
   const currentStage = idx >= 0 ? stages[idx] : undefined;
   const subtitle = formatReturnProductSubtitle(item);
+  const productThumbs = resolveReturnProductLines(item);
+  const refunded = (item.status ?? "").toLowerCase() === "refunded";
 
   return (
     <div className="space-y-4">
+      {refunded ? (
+        <RefundInitiatedNotice
+          orderPaymentStatus={item.order_payment_status}
+          timeline={refundTimeline}
+        />
+      ) : null}
       {showHeader && (
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-          <div className="min-w-0">
+          {productThumbs.length > 0 ? (
+            <div className="flex flex-wrap gap-2 shrink-0">
+              {productThumbs.slice(0, 3).map((line, index) => (
+                <OrderProductThumb
+                  key={`${line.product_name ?? "item"}-${index}`}
+                  src={line.product_image}
+                  alt={line.product_name ?? ""}
+                  className="h-12 w-12"
+                />
+              ))}
+            </div>
+          ) : null}
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground flex-wrap">
               <span>
                 {exchange ? "Exchange" : "Return"} {item.return_number}
@@ -70,16 +104,38 @@ export function ReturnTrackingCard({ item, actions, showHeader = true }: Props) 
               </p>
             ) : null}
             {subtitle ? <p className="text-sm text-muted-foreground mt-1">{subtitle}</p> : null}
-            {closed ? <p className="text-sm mt-2">{closedReturnMessage(item)}</p> : null}
+            {closed ? <p className="text-sm mt-2 text-amber-800">{closedReturnMessage(item, refundTimeline)}</p> : null}
             {!closed && currentStage ? (
               <p className="text-sm text-muted-foreground mt-1 max-w-xl">
-                {returnStageDetail(item, currentStage.key, "current")}
+                {returnStageDetail(item, currentStage.key, "current", refundTimeline)}
+              </p>
+            ) : null}
+            {!closed && currentStage ? (
+              <p className="text-xs text-muted-foreground mt-2">
+                Step {idx + 1} of {stages.length}
               </p>
             ) : null}
           </div>
           {actions}
         </div>
       )}
+
+      {!showHeader && closed && !omitClosedMessage ? (
+        <p className="text-sm text-amber-800">{closedReturnMessage(item, refundTimeline)}</p>
+      ) : null}
+
+      {!showHeader && productThumbs.length > 0 ? (
+        <div className="flex flex-wrap gap-3">
+          {productThumbs.map((line, index) => (
+            <div key={`${line.product_name ?? "item"}-${index}`} className="flex items-center gap-2 min-w-0">
+              <OrderProductThumb src={line.product_image} alt={line.product_name ?? ""} />
+              {line.product_name ? (
+                <span className="text-sm font-medium break-words">{line.product_name}</span>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {item.image_urls && item.image_urls.length > 0 ? (
         <div className="space-y-1.5">
@@ -189,7 +245,7 @@ export function ReturnTrackingCard({ item, actions, showHeader = true }: Props) 
               const current = i === idx;
               const state = current ? "current" : done ? "done" : "upcoming";
               const label = returnStageLabel(item, stage.key);
-              const detail = returnStageDetail(item, stage.key, state);
+              const detail = current ? returnStageDetail(item, stage.key, state, refundTimeline) : "";
               const ariaState = current ? "Current" : done ? "Completed" : "Upcoming";
               return (
                 <div

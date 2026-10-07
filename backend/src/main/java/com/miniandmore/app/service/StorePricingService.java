@@ -23,11 +23,8 @@ public class StorePricingService {
     }
 
     public BigDecimal resolveDiscountPercent() {
-        Optional<SiteSetting> setting = siteSettingRepository.findFirstByOrderByIdAsc();
-        if (setting == null) {
-            return DEFAULT_DISCOUNT_PERCENT;
-        }
-        return setting
+        return siteSettingRepository
+            .findFirstByOrderByIdAsc()
             .map(SiteSetting::getStoreDiscountPercent)
             .filter(p -> p != null)
             .orElse(DEFAULT_DISCOUNT_PERCENT);

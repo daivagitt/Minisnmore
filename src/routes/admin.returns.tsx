@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AdminPage } from "@/components/admin/AdminPage";
+import { BookShipmentDialog } from "@/components/admin/BookShipmentDialog";
+import { CreatePackageDialog } from "@/components/admin/CreatePackageDialog";
 import { ReturnsSummaryCards } from "@/components/admin/ReturnsSummaryCards";
 import { ReturnImageGallery } from "@/components/ReturnImageGallery";
 import { ArrowRight, Loader2, Printer } from "lucide-react";
@@ -11,8 +13,8 @@ import {
   allocateReplacementForOrderReturn,
   approveOrderReturn,
   bookOrderReturnPickup,
-  bookOrderReturnOutbound,
   completeOrderReturnExchange,
+  completeOrderReturnPackage,
   closeFailedOrderReturnPickup,
   convertOrderReturnToRefund,
   getAdminOrderReturnsSummary,
@@ -22,6 +24,7 @@ import {
   markOrderReturnPickupFailed,
   markOrderReturnPickedUp,
   markOrderReturnPickupRequested,
+  previewOrderReturnPackageRates,
   markOrderReturnReadyToShip,
   markOrderReturnReceived,
   markOrderReturnRepacking,
@@ -46,9 +49,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatReturnVariant } from "@/lib/return-variant";
+import { SHOW_M2_POST_ORDER_UI } from "@/lib/feature-flags";
+import { isPackageReady } from "@/lib/fulfillment-docs";
+import { bookExchangeFulfillmentShipment, exchangeToFulfillmentOrder } from "@/lib/exchange-fulfillment";
 
 export const Route = createFileRoute("/admin/returns")({ component: AdminReturnsPage });
-const RETURNS_UI_ENABLED = true;
 
 function formatCaseAge(row: { case_age_hours?: number; sla_due_at?: string | null; sla_overdue?: boolean }) {
   const age = row.case_age_hours ?? 0;
@@ -61,6 +66,19 @@ function formatCaseAge(row: { case_age_hours?: number; sla_due_at?: string | nul
 }
 
 type StageId = "all" | "request" | "pickup" | "inspection" | "exchange" | "closed";
+type RequestTypeFilter = "" | "return" | "exchange";
+
+const TYPE_FILTERS: { id: RequestTypeFilter; label: string }[] = [
+  { id: "", label: "All cases" },
+  { id: "return", label: "Returns" },
+  { id: "exchange", label: "Exchanges" },
+];
+
+const DEFAULT_RETURNS_LIST_FILTER = {
+  stage: "request" as StageId,
+  status: "requested",
+  requestType: "" as RequestTypeFilter,
+};
 
 const STAGE_FILTERS: { id: StageId; label: string }[] = [
   { id: "all", label: "All" },
@@ -108,7 +126,7 @@ const STATUS_FILTER_GROUPS: {
     label: "Exchange",
     options: [
       { value: "item_allocated", label: "Item allocated" },
-      { value: "repacking", label: "Repacking" },
+      { value: "repacking", label: "Exchange pack" },
       { value: "ready_to_ship", label: "Ready to ship" },
       { value: "shipped", label: "Shipped" },
       { value: "delivered", label: "Delivered" },
@@ -176,6 +194,27 @@ function priceDifferenceClass(diff: number): string {
   if (diff > 0) return "border-amber-200/80 bg-amber-50/90 text-amber-950";
   if (diff < 0) return "border-emerald-200/80 bg-emerald-50/90 text-emerald-950";
   return "border-border/70 bg-muted/50 text-foreground";
+}
+
+function usesRazorpayPriceDifferenceRefund(r: AdminOrderReturnRow | null | undefined): boolean {
+  return r?.can_razorpay_refund_price_difference === true;
+}
+
+function hasPendingFailedSettlement(r: AdminOrderReturnRow): boolean {
+  return r.settlement_status === "pending" && Boolean(r.settlement_reference?.startsWith("rfnd_"));
+}
+
+type SettlementMode = "razorpay" | "manual" | "waive" | "collect";
+
+function settlementMode(
+  target: AdminOrderReturnRow | null | undefined,
+  waived: boolean,
+  manualOverride: boolean,
+): SettlementMode {
+  if (waived) return "waive";
+  if (Number(target?.price_difference ?? 0) > 0) return "collect";
+  if (usesRazorpayPriceDifferenceRefund(target) && !manualOverride) return "razorpay";
+  return "manual";
 }
 
 function HighlightBlock({
@@ -255,6 +294,24 @@ function ProductHighlight({
   );
 }
 
+function returnCasePaymentPill(r: AdminOrderReturnRow): string {
+  if (r.status === "repacking") {
+    return "exchange pack";
+  }
+  if (r.status !== "refunded" || !r.razorpay_refund_id) {
+    return r.status.replace(/_/g, " ");
+  }
+  const payment = r.payment_status?.trim().toLowerCase();
+  if (payment === "refunded") return "refunded";
+  if (payment === "partially_refunded") return "partially refunded";
+  if (payment === "refund_failed") return "refund failed";
+  return "refund initiated";
+}
+
+function hasReverseShipment(r: AdminOrderReturnRow): boolean {
+  return Boolean(r.reverse_awb?.trim() || r.logistics_mode?.trim());
+}
+
 /** One primary next-step action (plus an optional secondary one) per current status. */
 function nextActions(
   r: AdminOrderReturnRow,
@@ -262,11 +319,16 @@ function nextActions(
   openReject: () => void,
   openBookPickup: () => void,
   openBookOutbound: () => void,
+  openCreatePackage: () => void,
   openAccept: () => void,
   openPickupFailed: () => void,
   openSettlement: () => void,
   openCodRefund: () => void,
-): { primary?: { label: string; onClick: () => void }; secondary?: { label: string; onClick: () => void } } {
+): {
+  primary?: { label: string; onClick: () => void };
+  secondary?: { label: string; onClick: () => void };
+  tertiary?: { label: string; onClick: () => void };
+} {
   const isExchange = r.request_type === "exchange";
   switch (r.status) {
     case "requested":
@@ -277,19 +339,26 @@ function nextActions(
     case "approved":
       return {
         primary: { label: "Book pickup", onClick: openBookPickup },
-        secondary: {
-          label: "Mark received",
-          onClick: () => run("Marked received", () => markOrderReturnReceived(r.return_number)),
-        },
       };
     case "pickup_scheduled":
-      return {
-        primary: {
-          label: "Mark picked up",
-          onClick: () => run("Marked picked up", () => markOrderReturnPickedUp(r.return_number)),
-        },
-        secondary: { label: "Pickup failed", onClick: openPickupFailed },
-      };
+      return hasReverseShipment(r)
+        ? {
+            primary: {
+              label: "Mark picked up",
+              onClick: () => run("Marked picked up", () => markOrderReturnPickedUp(r.return_number)),
+            },
+            secondary: isExchange
+              ? { label: "Pickup failed", onClick: openPickupFailed }
+              : {
+                  label: "Mark received",
+                  onClick: () => run("Marked received", () => markOrderReturnReceived(r.return_number)),
+                },
+            tertiary: isExchange ? undefined : { label: "Pickup failed", onClick: openPickupFailed },
+          }
+        : {
+            primary: { label: "Book pickup", onClick: openBookPickup },
+            secondary: { label: "Pickup failed", onClick: openPickupFailed },
+          };
     case "pickup_failed":
       return {
         primary: {
@@ -302,23 +371,33 @@ function nextActions(
         },
       };
     case "pickup_requested":
-      return {
-        primary: {
-          label: "Mark picked up",
-          onClick: () => run("Marked picked up", () => markOrderReturnPickedUp(r.return_number)),
-        },
-        secondary: {
-          label: "Mark received",
-          onClick: () => run("Marked received", () => markOrderReturnReceived(r.return_number)),
-        },
-      };
+      return hasReverseShipment(r)
+        ? {
+            primary: {
+              label: "Mark picked up",
+              onClick: () => run("Marked picked up", () => markOrderReturnPickedUp(r.return_number)),
+            },
+            secondary: isExchange
+              ? undefined
+              : {
+                  label: "Mark received",
+                  onClick: () => run("Marked received", () => markOrderReturnReceived(r.return_number)),
+                },
+          }
+        : {
+            primary: { label: "Book pickup", onClick: openBookPickup },
+          };
     case "picked_up":
-      return {
-        primary: {
-          label: "Mark received",
-          onClick: () => run("Marked received", () => markOrderReturnReceived(r.return_number)),
-        },
-      };
+      return hasReverseShipment(r)
+        ? {
+            primary: {
+              label: "Mark received",
+              onClick: () => run("Marked received", () => markOrderReturnReceived(r.return_number)),
+            },
+          }
+        : {
+            primary: { label: "Book pickup", onClick: openBookPickup },
+          };
     case "received":
       return {
         primary: {
@@ -335,11 +414,18 @@ function nextActions(
       return isExchange
         ? r.settlement_status === "pending"
           ? {
-              primary: { label: "Settle price difference", onClick: openSettlement },
-              secondary: {
-                label: "Convert to refund",
-                onClick: () => run("Converted to refund", () => convertOrderReturnToRefund(r.return_number)),
+              primary: {
+                label: usesRazorpayPriceDifferenceRefund(r) ? "Refund via Razorpay" : "Settle price difference",
+                onClick: openSettlement,
               },
+              ...(hasPendingFailedSettlement(r)
+                ? {}
+                : {
+                    secondary: {
+                      label: "Convert to refund",
+                      onClick: () => run("Converted to refund", () => convertOrderReturnToRefund(r.return_number)),
+                    },
+                  }),
             }
           : {
             primary: {
@@ -358,32 +444,57 @@ function nextActions(
           : {
               primary: {
                 label: "Issue refund",
-                onClick: () => run("Refund processed", () => refundOrderReturn(r.return_number)),
+                onClick: () => run("Refund initiated", () => refundOrderReturn(r.return_number)),
               },
             };
     case "item_allocated":
       return {
         primary: {
-          label: "Mark repacking",
-          onClick: () => run("Marked repacking", () => markOrderReturnRepacking(r.return_number)),
+          label: "Mark exchange pack",
+          onClick: () => run("Marked exchange pack", () => markOrderReturnRepacking(r.return_number)),
         },
       };
     case "repacking":
       return {
         primary: {
-          label: "Mark ready to ship",
-          onClick: () => run("Marked ready to ship", () => markOrderReturnReadyToShip(r.return_number)),
+          label: "Create package",
+          onClick: openCreatePackage,
         },
+        secondary: isExchange
+          ? undefined
+          : {
+              label: "Mark ready to ship",
+              onClick: () => run("Marked ready to ship", () => markOrderReturnReadyToShip(r.return_number)),
+            },
       };
     case "ready_to_ship":
       return isExchange
-        ? {
-            primary: { label: "Book outbound", onClick: openBookOutbound },
-            secondary: {
-              label: "Mark shipped (manual)",
-              onClick: () => run("Marked shipped", () => markOrderReturnShipped(r.return_number)),
-            },
-          }
+        ? isPackageReady(r)
+          ? r.can_book_outbound
+            ? {
+                primary: { label: "Book shipment", onClick: openBookOutbound },
+                secondary: { label: "Update package", onClick: openCreatePackage },
+                tertiary: r.outbound_awb
+                  ? {
+                      label: "Mark shipped (manual)",
+                      onClick: () => run("Marked shipped", () => markOrderReturnShipped(r.return_number)),
+                    }
+                  : undefined,
+              }
+            : r.outbound_awb
+              ? {
+                  primary: {
+                    label: "Mark shipped (manual)",
+                    onClick: () => run("Marked shipped", () => markOrderReturnShipped(r.return_number)),
+                  },
+                  secondary: { label: "Update package", onClick: openCreatePackage },
+                }
+              : {
+                  primary: { label: "Update package", onClick: openCreatePackage },
+                }
+          : {
+              primary: { label: "Create package", onClick: openCreatePackage },
+            }
         : {
             primary: {
               label: "Mark shipped",
@@ -419,7 +530,7 @@ function nextActions(
           : {
               primary: {
                 label: "Retry refund",
-                onClick: () => run("Refund processed", () => refundOrderReturn(r.return_number)),
+                onClick: () => run("Refund initiated", () => refundOrderReturn(r.return_number)),
               },
             };
     default:
@@ -428,10 +539,11 @@ function nextActions(
 }
 
 function AdminReturnsPage() {
-  if (!RETURNS_UI_ENABLED) return null;
+  if (!SHOW_M2_POST_ORDER_UI) return null;
 
-  const [stage, setStage] = useState<StageId>("request");
-  const [status, setStatus] = useState<string>("requested");
+  const [stage, setStage] = useState<StageId>(DEFAULT_RETURNS_LIST_FILTER.stage);
+  const [status, setStatus] = useState<string>(DEFAULT_RETURNS_LIST_FILTER.status);
+  const [requestType, setRequestType] = useState<RequestTypeFilter>(DEFAULT_RETURNS_LIST_FILTER.requestType);
   const [rows, setRows] = useState<AdminOrderReturnRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -449,16 +561,13 @@ function AdminReturnsPage() {
   const [acceptDispositions, setAcceptDispositions] = useState<Record<number, string>>({});
   const [pickupFailedTarget, setPickupFailedTarget] = useState<string | null>(null);
   const [pickupFailedReason, setPickupFailedReason] = useState("");
-  const [bookOutboundTarget, setBookOutboundTarget] = useState<string | null>(null);
-  const [outboundMode, setOutboundMode] = useState<"manual" | "xpressbees">("xpressbees");
-  const [outboundCarrier, setOutboundCarrier] = useState("");
-  const [outboundAwb, setOutboundAwb] = useState("");
-  const [outboundTrackingUrl, setOutboundTrackingUrl] = useState("");
-  const [outboundLabelUrl, setOutboundLabelUrl] = useState("");
+  const [bookOutboundTarget, setBookOutboundTarget] = useState<AdminOrderReturnRow | null>(null);
+  const [packageTarget, setPackageTarget] = useState<AdminOrderReturnRow | null>(null);
   const [settlementTarget, setSettlementTarget] = useState<AdminOrderReturnRow | null>(null);
   const [settlementMethod, setSettlementMethod] = useState("");
   const [settlementReference, setSettlementReference] = useState("");
   const [settlementWaived, setSettlementWaived] = useState(false);
+  const [settlementManualOverride, setSettlementManualOverride] = useState(false);
   const [codRefundTarget, setCodRefundTarget] = useState<string | null>(null);
   const [codRefundMethod, setCodRefundMethod] = useState<"upi" | "bank_transfer" | "cash" | "other">("upi");
   const [codRefundReference, setCodRefundReference] = useState("");
@@ -500,21 +609,33 @@ function AdminReturnsPage() {
   }, [loadSummary]);
 
   const filteredRows = useMemo(() => {
-    if (status) return rows;
-    if (stage === "all") return rows;
+    let next = rows;
+    if (requestType) {
+      next = next.filter((row) => row.request_type === requestType);
+    }
+    if (status) return next;
+    if (stage === "all") return next;
     const allowed = STAGE_STATUS_SET[stage];
-    return rows.filter((row) => allowed.has(row.status));
-  }, [rows, stage, status]);
+    return next.filter((row) => allowed.has(row.status));
+  }, [rows, requestType, stage, status]);
 
   const paging = useListPagination(filteredRows, {
     pageSize: LIST_PAGE_SIZE,
-    resetKey: `${stage}|${status}`,
+    resetKey: `${requestType}|${stage}|${status}`,
   });
 
-  const selectStage = (next: StageId) => {
+  const selectStage = (next: StageId, nextStatus?: string, nextType?: RequestTypeFilter) => {
     setStage(next);
-    setStatus("");
+    setStatus(nextStatus ?? "");
+    if (nextType !== undefined) {
+      setRequestType(nextType);
+    }
   };
+
+  const filtersActive =
+    stage !== DEFAULT_RETURNS_LIST_FILTER.stage ||
+    status !== DEFAULT_RETURNS_LIST_FILTER.status ||
+    requestType !== DEFAULT_RETURNS_LIST_FILTER.requestType;
 
   const run = async (returnNumber: string, action: () => Promise<unknown>, label: string) => {
     setBusy(returnNumber);
@@ -584,8 +705,10 @@ function AdminReturnsPage() {
   const submitSettlement = async () => {
     if (!settlementTarget) return;
     const difference = Number(settlementTarget.price_difference ?? 0);
-    const status = settlementWaived ? "waived" : difference > 0 ? "collected" : "refunded";
-    if (!settlementWaived && (!settlementMethod.trim() || !settlementReference.trim())) {
+    const mode = settlementMode(settlementTarget, settlementWaived, settlementManualOverride);
+    const status = mode === "waive" ? "waived" : mode === "collect" ? "collected" : "refunded";
+    const needsManualProof = mode === "manual" || mode === "collect";
+    if (needsManualProof && (!settlementMethod.trim() || !settlementReference.trim())) {
       toast.error("Settlement method and transaction reference are required");
       return;
     }
@@ -594,11 +717,14 @@ function AdminReturnsPage() {
       () =>
         settleOrderReturnPriceDifference(settlementTarget.return_number, {
           status,
-          amount: settlementWaived ? 0 : Math.abs(difference),
-          method: settlementMethod.trim() || undefined,
-          reference: settlementReference.trim() || undefined,
+          amount: mode === "waive" ? 0 : Math.abs(difference),
+          method: needsManualProof ? settlementMethod.trim() : undefined,
+          reference: needsManualProof ? settlementReference.trim() : undefined,
+          ...(mode === "manual" && usesRazorpayPriceDifferenceRefund(settlementTarget)
+            ? { force_manual: true }
+            : {}),
         }),
-      "Price difference settled",
+      mode === "razorpay" ? "Razorpay refund initiated" : "Price difference settled",
     );
     setSettlementTarget(null);
   };
@@ -615,31 +741,6 @@ function AdminReturnsPage() {
     );
     setPickupFailedTarget(null);
     setPickupFailedReason("");
-  };
-
-  const submitBookOutbound = async () => {
-    if (!bookOutboundTarget) return;
-    if (outboundMode !== "xpressbees" && outboundAwb.trim().length < 3) {
-      toast.error("Outbound AWB or tracking reference is required");
-      return;
-    }
-    await run(
-      bookOutboundTarget,
-      () =>
-        bookOrderReturnOutbound(bookOutboundTarget, {
-          mode: outboundMode,
-          carrier_name: outboundCarrier.trim() || undefined,
-          outbound_awb: outboundAwb.trim() || undefined,
-          tracking_url: outboundTrackingUrl.trim() || undefined,
-          label_url: outboundLabelUrl.trim() || undefined,
-        }),
-      outboundMode === "xpressbees" ? "ExpressBees outbound booked" : "Outbound shipment booked",
-    );
-    setBookOutboundTarget(null);
-    setOutboundCarrier("");
-    setOutboundAwb("");
-    setOutboundTrackingUrl("");
-    setOutboundLabelUrl("");
   };
 
   const acceptingRow = rows.find((row) => row.return_number === acceptTarget);
@@ -676,6 +777,34 @@ function AdminReturnsPage() {
       >
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            Case type
+          </p>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by case type">
+            {TYPE_FILTERS.map((option) => (
+              <button
+                key={option.id || "all-cases"}
+                type="button"
+                aria-pressed={requestType === option.id}
+                onClick={() => setRequestType(option.id)}
+                className={stageFilterPillClass(requestType === option.id)}
+              >
+                {option.label}
+                {summary ? (
+                  <span className="ml-1 tabular-nums opacity-80">
+                    {option.id === ""
+                      ? summary.total
+                      : option.id === "return"
+                        ? summary.returns
+                        : summary.exchanges}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
             Stage
           </p>
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by stage">
@@ -701,43 +830,51 @@ function AdminReturnsPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="block min-w-[14rem] flex-1 sm:max-w-xs">
-            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-              Status
-            </span>
-            <select
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-              aria-label="Filter by return status"
-              className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:ring-2 focus:ring-primary/30"
+        {stage === "all" ? (
+          <p className="text-xs text-muted-foreground">
+            Choose a stage to see its statuses. Return cases close after inspection; exchange cases continue through replacement shipping.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+              {STAGE_FILTERS.find((option) => option.id === stage)?.label} status
+            </p>
+            <div
+              className="flex flex-wrap gap-1.5"
+              role="group"
+              aria-label={`Filter by ${STAGE_FILTERS.find((option) => option.id === stage)?.label.toLowerCase()} status`}
             >
-              <option value="">
-                {stage === "all" ? "All statuses" : `All ${STAGE_FILTERS.find((s) => s.id === stage)?.label.toLowerCase()} statuses`}
-              </option>
-              {stage === "all"
-                ? STATUS_FILTER_GROUPS.map((group) => (
-                    <optgroup key={group.id} label={group.label}>
-                      {group.options.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))
-                : stageStatusOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-            </select>
-          </label>
-          {(stage !== "all" || status !== "") && (
+              <button
+                type="button"
+                aria-pressed={status === ""}
+                onClick={() => setStatus("")}
+                className={stageFilterPillClass(status === "")}
+              >
+                All
+              </button>
+              {stageStatusOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={status === option.value}
+                  onClick={() => setStatus(option.value)}
+                  className={stageFilterPillClass(status === option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-end gap-3">
+          {filtersActive && (
             <button
               type="button"
               onClick={() => {
-                setStage("all");
-                setStatus("");
+                setStage(DEFAULT_RETURNS_LIST_FILTER.stage);
+                setStatus(DEFAULT_RETURNS_LIST_FILTER.status);
+                setRequestType(DEFAULT_RETURNS_LIST_FILTER.requestType);
               }}
               className="inline-flex h-10 items-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
@@ -747,10 +884,10 @@ function AdminReturnsPage() {
           {!loading && (
             <p className="ml-auto text-xs text-muted-foreground" aria-live="polite">
               {paging.totalItems === 0
-                ? "0 returns"
+                ? "0 cases"
                 : paging.totalPages > 1
                   ? `Showing ${paging.rangeStart}–${paging.rangeEnd} of ${paging.totalItems}`
-                  : `${paging.totalItems} return${paging.totalItems === 1 ? "" : "s"}`}
+                  : `${paging.totalItems} case${paging.totalItems === 1 ? "" : "s"}`}
             </p>
           )}
         </div>
@@ -764,7 +901,7 @@ function AdminReturnsPage() {
         <>
         <ul id="admin-returns-list" className="space-y-4">
           {paging.pageItems.map((r) => {
-            const { primary, secondary } = nextActions(
+            const { primary, secondary, tertiary } = nextActions(
               r,
               (label, action) => void run(r.return_number, action, label),
               () => {
@@ -780,12 +917,10 @@ function AdminReturnsPage() {
                 setPickupWindow("");
               },
               () => {
-                setBookOutboundTarget(r.return_number);
-                setOutboundMode("xpressbees");
-                setOutboundCarrier("");
-                setOutboundAwb("");
-                setOutboundTrackingUrl("");
-                setOutboundLabelUrl("");
+                setBookOutboundTarget(r);
+              },
+              () => {
+                setPackageTarget(r);
               },
               () => {
                 setAcceptTarget(r.return_number);
@@ -806,6 +941,7 @@ function AdminReturnsPage() {
                 setSettlementMethod("");
                 setSettlementReference("");
                 setSettlementWaived(false);
+                setSettlementManualOverride(false);
               },
               () => {
                 setCodRefundTarget(r.return_number);
@@ -832,7 +968,7 @@ function AdminReturnsPage() {
                           returnStatusPillClass(r.status, r.sla_overdue),
                         )}
                       >
-                        {r.status.replace(/_/g, " ")}
+                        {returnCasePaymentPill(r)}
                       </span>
                       {r.cod_refund_pending ? (
                         <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-500/25">
@@ -844,6 +980,14 @@ function AdminReturnsPage() {
                       Order {r.order_number} · {r.customer_login} ·{" "}
                       <span className="font-medium text-foreground">{formatInr(r.order_total)}</span>
                     </p>
+                    {Number(r.order_shipping) > 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        Delivery {formatInr(r.order_shipping)} is not refunded
+                        {Number(r.order_cod_fee) > 0 ? ` · COD fee ${formatInr(r.order_cod_fee)} is not refunded` : ""}
+                      </p>
+                    ) : Number(r.order_cod_fee) > 0 ? (
+                      <p className="text-xs text-muted-foreground">COD fee {formatInr(r.order_cod_fee)} is not refunded</p>
+                    ) : null}
                   </div>
                   <div className="text-xs text-right">
                     <p className={r.sla_overdue ? "text-amber-700 font-medium" : "text-muted-foreground"}>
@@ -978,9 +1122,24 @@ function AdminReturnsPage() {
                       </>
                     ) : null}
                   </p>
+                ) : r.request_type === "exchange" && (r.status === "repacking" || r.status === "ready_to_ship") ? (
+                  <p className="text-xs text-muted-foreground">
+                    {isPackageReady(r)
+                      ? `Packed ${r.package_weight_grams || r.default_package_weight_grams || "—"} g${
+                          r.package_length_cm && r.package_breadth_cm && r.package_height_cm
+                            ? ` · ${r.package_length_cm}×${r.package_breadth_cm}×${r.package_height_cm} cm`
+                            : ""
+                        }${r.package_courier_name ? ` · ${r.package_courier_name}` : ""}. Book a shipment to generate the AWB and label.`
+                      : "Create a package first. Booking a shipment is blocked until the package exists."}
+                  </p>
                 ) : null}
                 {r.razorpay_refund_id ? (
                   <p className="text-xs text-muted-foreground">Razorpay refund: {r.razorpay_refund_id}</p>
+                ) : null}
+                {r.settlement_reference && r.settlement_status === "refunded" ? (
+                  <p className="text-xs text-muted-foreground">
+                    Exchange settlement refund{r.settlement_method ? ` (${r.settlement_method})` : ""}: {r.settlement_reference}
+                  </p>
                 ) : null}
                 {r.manual_refund_reference ? (
                   <p className="text-xs text-muted-foreground">
@@ -1007,6 +1166,16 @@ function AdminReturnsPage() {
                       onClick={secondary.onClick}
                     >
                       {secondary.label}
+                    </button>
+                  ) : null}
+                  {tertiary ? (
+                    <button
+                      type="button"
+                      disabled={busy === r.return_number}
+                      className="text-xs rounded-full border border-border px-3 py-1.5"
+                      onClick={tertiary.onClick}
+                    >
+                      {tertiary.label}
                     </button>
                   ) : null}
                   {r.outbound_label_url ? (
@@ -1148,87 +1317,31 @@ function AdminReturnsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!bookOutboundTarget} onOpenChange={(open) => !open && setBookOutboundTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Book replacement outbound</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Book the replacement shipment through ExpressBees when configured, or enter manual carrier AWB and tracking. The exchange moves to shipped once booked.
-          </p>
-          <div className="space-y-3">
-            <label className="text-sm font-medium block">
-              Mode
-              <select
-                className="mt-1 w-full rounded-xl border border-border bg-background/60 px-3 py-2 text-sm"
-                value={outboundMode}
-                onChange={(e) => setOutboundMode(e.target.value as "manual" | "xpressbees")}
-              >
-                <option value="xpressbees">ExpressBees (admin API)</option>
-                <option value="manual">Manual carrier</option>
-              </select>
-            </label>
-            {outboundMode !== "xpressbees" ? (
-              <>
-                <label className="text-sm font-medium block">
-                  Carrier name
-                  <input
-                    className="mt-1 w-full rounded-xl border border-border bg-background/60 px-3 py-2 text-sm"
-                    value={outboundCarrier}
-                    onChange={(e) => setOutboundCarrier(e.target.value)}
-                    placeholder="e.g. Delhivery"
-                  />
-                </label>
-                <label className="text-sm font-medium block">
-                  Outbound AWB / reference *
-                  <input
-                    className="mt-1 w-full rounded-xl border border-border bg-background/60 px-3 py-2 text-sm"
-                    value={outboundAwb}
-                    onChange={(e) => setOutboundAwb(e.target.value)}
-                  />
-                </label>
-                <label className="text-sm font-medium block">
-                  Tracking URL
-                  <input
-                    className="mt-1 w-full rounded-xl border border-border bg-background/60 px-3 py-2 text-sm"
-                    value={outboundTrackingUrl}
-                    onChange={(e) => setOutboundTrackingUrl(e.target.value)}
-                  />
-                </label>
-                <label className="text-sm font-medium block">
-                  Label URL
-                  <input
-                    className="mt-1 w-full rounded-xl border border-border bg-background/60 px-3 py-2 text-sm"
-                    value={outboundLabelUrl}
-                    onChange={(e) => setOutboundLabelUrl(e.target.value)}
-                    placeholder="Optional printable label link"
-                  />
-                </label>
-              </>
-            ) : (
-              <label className="text-sm font-medium block">
-                Pre-assigned AWB (optional)
-                <input
-                  className="mt-1 w-full rounded-xl border border-border bg-background/60 px-3 py-2 text-sm"
-                  value={outboundAwb}
-                  onChange={(e) => setOutboundAwb(e.target.value)}
-                  placeholder="Leave blank if ExpressBees generates the AWB"
-                />
-              </label>
-            )}
-          </div>
-          <DialogFooter>
-            <button
-              type="button"
-              onClick={submitBookOutbound}
-              disabled={busy === bookOutboundTarget || (outboundMode !== "xpressbees" && outboundAwb.trim().length < 3)}
-              className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm disabled:opacity-50"
-            >
-              Book outbound
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CreatePackageDialog
+        order={packageTarget ? exchangeToFulfillmentOrder(packageTarget) : null}
+        open={!!packageTarget}
+        onOpenChange={(open) => !open && setPackageTarget(null)}
+        onSaved={async () => {
+          await load();
+          await loadSummary();
+        }}
+        completePackage={completeOrderReturnPackage}
+        description="The replacement item is included in this package. Choose a Zoho parcel type, then save weight and dimensions. Package date is display only."
+      />
+
+      <BookShipmentDialog
+        order={bookOutboundTarget ? exchangeToFulfillmentOrder(bookOutboundTarget) : null}
+        open={!!bookOutboundTarget}
+        requiresOverride={false}
+        onOpenChange={(open) => !open && setBookOutboundTarget(null)}
+        onSaved={async () => {
+          await load();
+          await loadSummary();
+        }}
+        title="New replacement shipment"
+        previewRates={previewOrderReturnPackageRates}
+        bookShipment={bookExchangeFulfillmentShipment}
+      />
 
       <Dialog open={!!acceptTarget} onOpenChange={(open) => !open && setAcceptTarget(null)}>
         <DialogContent>
@@ -1309,28 +1422,48 @@ function AdminReturnsPage() {
       <Dialog open={!!settlementTarget} onOpenChange={(open) => !open && setSettlementTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Settle exchange price difference</DialogTitle>
+            <DialogTitle>
+              {usesRazorpayPriceDifferenceRefund(settlementTarget)
+                ? "Refund exchange price difference"
+                : "Settle exchange price difference"}
+            </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            {Number(settlementTarget?.price_difference ?? 0) > 0 ? "Collect" : "Refund"} ₹
-            {Math.abs(Number(settlementTarget?.price_difference ?? 0)).toLocaleString("en-IN")} before allocating the replacement.
+            {settlementMode(settlementTarget, settlementWaived, settlementManualOverride) === "razorpay"
+              ? `Refund ₹${Math.abs(Number(settlementTarget?.price_difference ?? 0)).toLocaleString("en-IN")} to the original prepaid payment via Razorpay before allocating the replacement.`
+              : `${Number(settlementTarget?.price_difference ?? 0) > 0 ? "Collect" : "Refund"} ₹${Math.abs(Number(settlementTarget?.price_difference ?? 0)).toLocaleString("en-IN")} before allocating the replacement.`}
           </p>
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
               checked={settlementWaived}
-              onChange={(event) => setSettlementWaived(event.target.checked)}
+              onChange={(event) => {
+                setSettlementWaived(event.target.checked);
+                if (event.target.checked) setSettlementManualOverride(false);
+              }}
             />
             Waive this difference with an audit record
           </label>
-          {!settlementWaived ? (
+          {usesRazorpayPriceDifferenceRefund(settlementTarget) &&
+          settlementMode(settlementTarget, settlementWaived, settlementManualOverride) !== "waive" ? (
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={settlementManualOverride}
+                onChange={(event) => setSettlementManualOverride(event.target.checked)}
+              />
+              Record manually instead (Razorpay unavailable or already refunded)
+            </label>
+          ) : null}
+          {settlementMode(settlementTarget, settlementWaived, settlementManualOverride) === "manual" ||
+          settlementMode(settlementTarget, settlementWaived, settlementManualOverride) === "collect" ? (
             <div className="grid gap-3">
               <label className="text-sm font-medium">
                 Method
                 <input
                   value={settlementMethod}
                   onChange={(event) => setSettlementMethod(event.target.value)}
-                  placeholder="UPI, bank transfer, Razorpay"
+                  placeholder="UPI, bank transfer, Razorpay dashboard"
                   className="mt-1 w-full rounded-xl border border-border bg-background/60 px-3 py-2"
                 />
               </label>
@@ -1351,7 +1484,9 @@ function AdminReturnsPage() {
               disabled={busy === settlementTarget?.return_number}
               className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm disabled:opacity-50"
             >
-              Record settlement
+              {settlementMode(settlementTarget, settlementWaived, settlementManualOverride) === "razorpay"
+                ? "Refund via Razorpay"
+                : "Record settlement"}
             </button>
           </DialogFooter>
         </DialogContent>

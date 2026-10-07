@@ -112,6 +112,15 @@ describe("order-tracking helpers", () => {
 
     expect(
       trackingActivityDate({
+        tracking_status: "delivered",
+        shipment_date: "2026-08-10",
+        shipment_delivered_at: "2026-08-12T09:57:19Z",
+        created_at: "2026-08-01T10:00:00Z",
+      }),
+    ).toEqual({ prefix: "Shipped", value: "2026-08-10" });
+
+    expect(
+      trackingActivityDate({
         tracking_status: "hand_wrapped",
         created_at: "2026-08-01T10:00:00Z",
       }),

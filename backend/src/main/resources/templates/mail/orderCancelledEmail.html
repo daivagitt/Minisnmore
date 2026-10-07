@@ -59,13 +59,15 @@
                 </tr>
               </table>
 
+              <th:block th:replace="~{mail/fragments/orderItemRows :: card('ITEMS IN THIS ORDER')}"></th:block>
+
               <!-- Refund card -->
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fdf1ec; border-radius:14px; margin:0 0 8px 0;" th:if="${hasRefund}">
                 <tr>
                   <td style="padding:20px 24px;">
                     <div style="font-size:14px; color:#5a4a4a; font-weight:bold; margin-bottom:6px;">Refund Status</div>
                     <div style="font-size:14px; color:#5a4a4a;">Amount Refunded: <b th:text="${refundAmountFormatted}">₹206</b></div>
-                    <div style="font-size:14px; color:#5a4a4a; margin-top:4px;">Refunded to original payment method within 5-7 business days.</div>
+                    <div style="font-size:14px; color:#5a4a4a; margin-top:4px;">Refunded to original payment method within <span th:text="${refundBusinessDays}">2–5 business days</span>.</div>
                   </td>
                 </tr>
               </table>

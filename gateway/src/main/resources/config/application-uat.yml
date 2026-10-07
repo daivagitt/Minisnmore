@@ -37,6 +37,10 @@ spring:
               uri: http://127.0.0.1:8084
               predicates:
                 - Path=/internal/v1/webhooks/xpressbees/shipments,/api/v1/webhooks/xpressbees/shipments
+            - id: miniandmore-razorpay-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/webhooks/razorpay,/api/v1/webhooks/razorpay
             - id: miniandmore-ledgerly-api
               uri: http://127.0.0.1:8081
               predicates:

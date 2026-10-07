@@ -14,7 +14,7 @@ import {
   trackingActivityTitle,
   type OrderTrackingFields,
 } from "@/lib/order-tracking";
-import { formatPaymentStatusLabel, needsOnlinePayment } from "@/lib/order-status";
+import { formatPaymentStatusLabel, isCodCancelledUncollected, isPrepaidCancelledPaymentOnlySummary, needsOnlinePayment } from "@/lib/order-status";
 
 export const Route = createFileRoute("/account/notifications")({
   head: () => ({ meta: [{ title: "Notifications · Mini's n More" }] }),
@@ -36,6 +36,7 @@ function iconForEventType(eventType: string): LucideIcon {
   switch (eventType) {
     case "payment_received":
     case "refunded":
+    case "refund_initiated":
       return CreditCard;
     case "shipped":
     case "out_for_delivery":
@@ -66,8 +67,12 @@ function datePrefixForEventType(eventType: string): string {
       return "Delivery attempt unsuccessful";
     case "delivered":
       return "Delivered";
+    case "refund_initiated":
+      return "Refund initiated";
     case "refunded":
-      return "Settled";
+      return "Refund processed";
+    case "refund_failed":
+      return "Refund failed";
     case "cancelled":
       return "Cancelled";
     default:
@@ -100,16 +105,25 @@ function eventToActivity(
 
 function buildOrderActivityFallback(orders: OrderTrackingFields[]): ActivityItem[] {
   return orders.map((order) => {
-    const paymentLabel = formatPaymentStatusLabel(
-      (order as { payment_status?: string }).payment_status,
-      (order as { payment_method?: string }).payment_method,
-    );
+    const hidePaymentStatus = isCodCancelledUncollected(order);
+    const paymentLabel = hidePaymentStatus
+      ? ""
+      : formatPaymentStatusLabel(
+          (order as { payment_status?: string }).payment_status,
+          (order as { payment_method?: string }).payment_method,
+          order,
+        );
     const total = Number((order as { total?: number }).total ?? 0);
     const orderNumber = (order as { order_number?: string }).order_number ?? "";
     const parts = [orderNumber];
     if (total > 0) parts.push(`₹${total.toLocaleString("en-IN")}`);
     if (paymentLabel) parts.push(paymentLabel);
-    if (order.tracking_number) parts.push(`Tracking ${order.tracking_number}`);
+    if (
+      order.tracking_number &&
+      !isPrepaidCancelledPaymentOnlySummary(order as { payment_status?: string; payment_method?: string; status?: string })
+    ) {
+      parts.push(`Tracking ${order.tracking_number}`);
+    }
 
     const { prefix, value } = trackingActivityDate(
       order as OrderTrackingFields & { created_at?: string },

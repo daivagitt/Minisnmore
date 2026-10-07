@@ -32,6 +32,24 @@ public class XpressBeesClient {
     private static final Logger LOG = LoggerFactory.getLogger(XpressBeesClient.class);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(20);
     private static final String USER_AGENT = "MiniSnMore/1.0 (+https://minisnmore.com)";
+    // shipments2 rejects order_number longer than 30 characters on forward manifests.
+    // Reverse pickup is kept at 20 to stay unique versus the original forward order number.
+    static final int FORWARD_PROVIDER_ORDER_NUMBER_MAX_LEN = 30;
+    static final int REVERSE_PROVIDER_ORDER_NUMBER_MAX_LEN = 20;
+    private static final String[] COURIER_RATE_FIELDS = {
+        "rate",
+        "total_charges",
+        "total_charge",
+        "freight",
+        "freight_charge",
+        "freight_charges",
+        "charge",
+        "charges",
+        "price",
+        "shipping_charge",
+        "shipping_charges",
+        "amount",
+    };
 
     private final ApplicationProperties.XpressBees config;
     private final ObjectMapper objectMapper;
@@ -90,11 +108,7 @@ public class XpressBeesClient {
                     StringUtils.defaultIfBlank(config.getPaymentType(), "prepaid")
                 )
             );
-            String url =
-                config.getBaseUrl().replaceAll("/$", "") +
-                "/api/courier/serviceability/pincode/" +
-                destinationPincode;
-            HttpResponse<String> response = postJson(url, body, token);
+            HttpResponse<String> response = postJson(serviceabilityPincodeUrl(destinationPincode), body, token);
             if (response.statusCode() != 200) {
                 LOG.debug("XpressBees serviceability HTTP {} for pincode {}", response.statusCode(), destinationPincode);
                 return Optional.empty();
@@ -163,7 +177,9 @@ public class XpressBeesClient {
         }
         validateReversePickupRequest(request);
         try {
-            String body = config.usesLegacyAuth() ? buildLegacyReverseManifestBody(request) : buildTokenReverseManifestBody(request);
+            String body = config.usesLegacyAuth()
+                ? buildLegacyReverseManifestBody(request)
+                : buildTokenReverseManifestBody(request, resolveReverseCourierId(request.pickupFrom().pincode()));
             String token = config.usesLegacyAuth() ? null : accessToken();
             if (!config.usesLegacyAuth() && token == null) {
                 throw new XpressBeesApiException("ExpressBees login failed");
@@ -478,8 +494,15 @@ public class XpressBeesClient {
         int weightGrams = packageWeightGrams(request);
 
         ObjectNode root = objectMapper.createObjectNode();
-        root.put("order_id", request.caseReference());
-        root.put("order_number", request.caseReference());
+        // Exchange outbound uses returnNumber + "-OUT", which exceeds the 30-char XB limit
+        // even when the store order number (e.g. MNM-F1942C01991F) is well under 30.
+        // Keep the unique tail so it does not collide with the original forward shipment.
+        String providerOrderNumber = truncateProviderOrderNumber(
+            request.caseReference(),
+            FORWARD_PROVIDER_ORDER_NUMBER_MAX_LEN
+        );
+        root.put("order_id", providerOrderNumber);
+        root.put("order_number", providerOrderNumber);
         root.put("payment_type", paymentType);
         root.put("order_amount", orderAmount);
         root.put("collectable_amount", collectable);
@@ -550,8 +573,12 @@ public class XpressBeesClient {
         if (StringUtils.isNotBlank(request.preAssignedAwb())) {
             body.put("AirWayBillNO", request.preAssignedAwb());
         }
-        body.put("OrderNo", request.caseReference());
-        body.put("SubOrderNo", request.caseReference());
+        String providerOrderNumber = truncateProviderOrderNumber(
+            request.caseReference(),
+            FORWARD_PROVIDER_ORDER_NUMBER_MAX_LEN
+        );
+        body.put("OrderNo", providerOrderNumber);
+        body.put("SubOrderNo", providerOrderNumber);
         body.put("CustomerName", customer.name());
         body.put("CustomerAddress", joinAddress(customer.line1(), customer.line2()));
         body.put("CustomerCity", customer.city());
@@ -578,12 +605,31 @@ public class XpressBeesClient {
         return objectMapper.writeValueAsString(body);
     }
 
-    private String buildTokenReverseManifestBody(ReversePickupRequest request) throws Exception {
+    String buildTokenReverseManifestBody(ReversePickupRequest request, String courierId) throws Exception {
+        BigDecimal orderAmount = firstPositiveAmount(sumLineValue(request.lines()), BigDecimal.ZERO);
+        int weightGrams = totalWeightGrams(request.lines());
+
         ObjectNode root = objectMapper.createObjectNode();
-        root.put("order_id", request.caseReference());
-        root.put("order_number", request.caseReference());
-        root.put("business_account_name", config.getBusinessAccountName());
-        root.put("payment_type", StringUtils.defaultIfBlank(config.getPaymentType(), "prepaid"));
+        // Reverse pickup keeps a shorter unique tail so it does not collide with the original
+        // forward order number, which Zoho/XB may reject as a duplicate.
+        String providerOrderNumber = truncateProviderOrderNumber(
+            request.caseReference(),
+            REVERSE_PROVIDER_ORDER_NUMBER_MAX_LEN
+        );
+        root.put("order_id", providerOrderNumber);
+        root.put("order_number", providerOrderNumber);
+        root.put("payment_type", "reverse");
+        root.put("order_amount", orderAmount);
+        root.put("collectable_amount", 0);
+        root.put("cod_charges", 0);
+        root.put("shipping_charges", 0);
+        root.put("discount", 0);
+        root.put("package_weight", weightGrams);
+        root.put("package_length", 10);
+        root.put("package_breadth", 10);
+        root.put("package_height", 10);
+        root.put("request_auto_pickup", "yes");
+        root.put("courier_id", courierId);
         if (StringUtils.isNotBlank(request.preAssignedAwb())) {
             root.put("awb", request.preAssignedAwb());
         }
@@ -591,24 +637,42 @@ public class XpressBeesClient {
             root.put("pickup_vendor_code", config.getPickupVendorCode());
         }
 
+        // shipments2 always models the merchant warehouse as pickup and the customer as
+        // consignee. payment_type=reverse tells XpressBees to reverse the physical movement.
+        ReversePickupAddress warehouse = request.deliverTo();
         ObjectNode pickup = root.putObject("pickup");
-        writeAddress(pickup, request.pickupFrom());
+        pickup.put("warehouse_name", StringUtils.defaultIfBlank(config.getWarehouseName(), warehouse.name()));
+        pickup.put("name", warehouse.name());
+        pickup.put("address", joinAddress(warehouse.line1(), warehouse.line2()));
+        pickup.put("address_2", StringUtils.defaultString(warehouse.line2()));
+        pickup.put("city", warehouse.city());
+        pickup.put("state", warehouse.state());
+        pickup.put("pincode", warehouse.pincode());
+        pickup.put("phone", indianMobile10(warehouse.phone()));
 
-        ObjectNode delivery = root.putObject("delivery");
-        writeAddress(delivery, request.deliverTo());
+        ReversePickupAddress customer = request.pickupFrom();
+        ObjectNode consignee = root.putObject("consignee");
+        consignee.put("name", customer.name());
+        consignee.put("address", joinAddress(customer.line1(), customer.line2()));
+        consignee.put("address_2", StringUtils.defaultString(customer.line2()));
+        consignee.put("city", customer.city());
+        consignee.put("state", customer.state());
+        consignee.put("pincode", customer.pincode());
+        consignee.put("phone", indianMobile10(customer.phone()));
+        if (StringUtils.isNotBlank(customer.email())) {
+            consignee.put("email", customer.email());
+        }
 
-        ArrayNode products = root.putArray("products");
+        ArrayNode products = root.putArray("order_items");
         for (ReversePickupLine line : request.lines()) {
             ObjectNode product = products.addObject();
             product.put("name", line.productName());
             product.put("sku", line.sku());
-            product.put("quantity", line.quantity());
+            product.put("qty", String.valueOf(Math.max(1, line.quantity())));
             if (line.price() != null) {
-                product.put("price", line.price());
+                product.put("price", line.price().toPlainString());
             }
-            product.put("weight_grams", line.weightGrams());
         }
-        root.put("weight_grams", totalWeightGrams(request.lines()));
         return objectMapper.writeValueAsString(root);
     }
 
@@ -622,8 +686,12 @@ public class XpressBeesClient {
         if (StringUtils.isNotBlank(request.preAssignedAwb())) {
             body.put("AirWayBillNO", request.preAssignedAwb());
         }
-        body.put("OrderNo", request.caseReference());
-        body.put("SubOrderNo", request.caseReference());
+        String providerOrderNumber = truncateProviderOrderNumber(
+            request.caseReference(),
+            REVERSE_PROVIDER_ORDER_NUMBER_MAX_LEN
+        );
+        body.put("OrderNo", providerOrderNumber);
+        body.put("SubOrderNo", providerOrderNumber);
         body.put("CustomerName", pickup.name());
         body.put("CustomerAddress", joinAddress(pickup.line1(), pickup.line2()));
         body.put("CustomerCity", pickup.city());
@@ -734,29 +802,59 @@ public class XpressBeesClient {
     }
 
     public List<CourierOption> listForwardCourierOptions(String destinationPincode, int weightGrams) {
+        return listForwardCourierOptions(destinationPincode, weightGrams, 0, 0, 0, null, null);
+    }
+
+    /**
+     * GET /api/courier/serviceability/pincode/{pin} only lists courier names. Rates (the same
+     * freight_charges Zoho shows) come from POST with origin, destination, integer grams, and box size.
+     */
+    public List<CourierOption> listForwardCourierOptions(
+        String destinationPincode,
+        int weightGrams,
+        int lengthCm,
+        int breadthCm,
+        int heightCm,
+        String paymentType,
+        BigDecimal orderAmount
+    ) {
         if (!isConfigured() || destinationPincode == null || !destinationPincode.matches("^[1-9]\\d{5}$")) {
             return List.of();
         }
         try {
             String token = accessToken();
             if (token == null) {
+                LOG.warn("XpressBees courier rates skipped for pincode {}: login failed", destinationPincode);
                 return List.of();
             }
-            String url =
-                config.getBaseUrl().replaceAll("/$", "") +
-                "/api/courier/serviceability/pincode/" +
-                destinationPincode;
-            HttpResponse<String> response = getJson(url, token);
+            int chargeableWeightGrams = courierSelectionWeightGrams(weightGrams, lengthCm, breadthCm, heightCm);
+            String body = objectMapper.writeValueAsString(
+                buildCourierRatePayload(
+                    destinationPincode,
+                    chargeableWeightGrams,
+                    lengthCm,
+                    breadthCm,
+                    heightCm,
+                    paymentType,
+                    orderAmount
+                )
+            );
+            HttpResponse<String> response = postJson(serviceabilityPincodeUrl(destinationPincode), body, token);
             if (response.statusCode() != 200) {
-                LOG.debug("XpressBees courier options HTTP {} for pincode {}", response.statusCode(), destinationPincode);
+                LOG.warn(
+                    "XpressBees courier rates HTTP {} for pincode {}: {}",
+                    response.statusCode(),
+                    destinationPincode,
+                    abbreviate(response.body(), 200)
+                );
                 return List.of();
             }
-            return parseForwardCourierOptions(response.body(), weightGrams);
+            return parseForwardCourierOptions(response.body(), chargeableWeightGrams);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             return List.of();
         } catch (Exception ex) {
-            LOG.debug("XpressBees courier options failed for pincode {}: {}", destinationPincode, ex.getMessage());
+            LOG.warn("XpressBees courier rates failed for pincode {}: {}", destinationPincode, ex.getMessage());
             return List.of();
         }
     }
@@ -783,7 +881,7 @@ public class XpressBeesClient {
                         name,
                         eddDays,
                         eddDays < 0 ? "" : formatEta(eddDays),
-                        firstDecimal(option, "rate", "freight", "charge", "price", "shipping_charge"),
+                        courierRate(option),
                         name.equalsIgnoreCase(preferred)
                     )
                 );
@@ -849,6 +947,44 @@ public class XpressBeesClient {
         }
     }
 
+    private String resolveReverseCourierId(String customerPincode) throws XpressBeesApiException {
+        if (customerPincode == null || !customerPincode.matches("^[1-9]\\d{5}$")) {
+            throw courierResolutionFailure(customerPincode, "invalid reverse-pickup pincode");
+        }
+        try {
+            String token = accessToken();
+            if (token == null) {
+                throw courierResolutionFailure(customerPincode, "login failed");
+            }
+            String url =
+                config.getBaseUrl().replaceAll("/$", "") +
+                "/api/courier/serviceability/pincode/" +
+                customerPincode;
+            HttpResponse<String> response = getJson(url, token);
+            if (response.statusCode() != 200) {
+                throw courierResolutionFailure(customerPincode, "reverse serviceability HTTP " + response.statusCode());
+            }
+            JsonNode data = objectMapper.readTree(response.body()).path("data");
+            if (data.isArray()) {
+                for (JsonNode option : data) {
+                    String id = text(option, "id");
+                    String name = firstText(option, "name", "courier_name", "service_name");
+                    if (StringUtils.isNotBlank(id) && name.toLowerCase(Locale.ROOT).contains("reverse")) {
+                        return id;
+                    }
+                }
+            }
+            throw courierResolutionFailure(customerPincode, "no reverse courier match");
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw courierResolutionFailure(customerPincode, "interrupted");
+        } catch (XpressBeesApiException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw courierResolutionFailure(customerPincode, ex.getMessage());
+        }
+    }
+
     private static XpressBeesApiException courierResolutionFailure(String destinationPincode, String reason) {
         return new XpressBeesApiException(
             "ExpressBees courier serviceability failed for pincode " + destinationPincode + ": " + reason
@@ -907,6 +1043,53 @@ public class XpressBeesClient {
         return value != null && value > 0 ? value : fallback;
     }
 
+    private int courierSelectionWeightGrams(int weightGrams, int lengthCm, int breadthCm, int heightCm) {
+        int actual = Math.max(1, weightGrams);
+        if (lengthCm >= 1 && breadthCm >= 1 && heightCm >= 1) {
+            int volumetric = OrderPackageService.volumetricWeightGrams(
+                lengthCm,
+                breadthCm,
+                heightCm,
+                Math.max(1, config.getVolumetricDivisor())
+            );
+            return OrderPackageService.chargeableWeightGrams(actual, volumetric);
+        }
+        return actual;
+    }
+
+    private String serviceabilityPincodeUrl(String destinationPincode) {
+        return config.getBaseUrl().replaceAll("/$", "") + "/api/courier/serviceability/pincode/" + destinationPincode;
+    }
+
+    Map<String, Object> buildCourierRatePayload(
+        String destinationPincode,
+        int weightGrams,
+        int lengthCm,
+        int breadthCm,
+        int heightCm,
+        String paymentType,
+        BigDecimal orderAmount
+    ) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("origin", config.getOriginPincode());
+        payload.put("destination", destinationPincode);
+        String pay = StringUtils.defaultIfBlank(paymentType, StringUtils.defaultIfBlank(config.getPaymentType(), "prepaid"))
+            .trim()
+            .toLowerCase(Locale.ROOT);
+        boolean cod = "cod".equals(pay);
+        payload.put("payment_type", cod ? "cod" : "prepaid");
+        payload.put("weight", Math.max(1, weightGrams));
+        if (lengthCm >= 1 && breadthCm >= 1 && heightCm >= 1) {
+            payload.put("length", lengthCm);
+            payload.put("breadth", breadthCm);
+            payload.put("height", heightCm);
+        }
+        if (cod && orderAmount != null && orderAmount.compareTo(BigDecimal.ZERO) > 0) {
+            payload.put("order_amount", orderAmount);
+        }
+        return payload;
+    }
+
     private String resolveForwardManifestUrl() {
         String path = StringUtils.trimToEmpty(config.resolvedForwardManifestPath());
         if (path.startsWith("http://") || path.startsWith("https://")) {
@@ -919,7 +1102,7 @@ public class XpressBeesClient {
     }
 
     private String resolveReverseManifestUrl() {
-        String path = StringUtils.trimToEmpty(config.getReverseManifestPath());
+        String path = StringUtils.trimToEmpty(config.resolvedReverseManifestPath());
         if (path.startsWith("http://") || path.startsWith("https://")) {
             return path;
         }
@@ -1050,25 +1233,74 @@ public class XpressBeesClient {
         return null;
     }
 
-    private static BigDecimal firstDecimal(JsonNode node, String... fields) {
-        for (String field : fields) {
-            JsonNode value = node.path(field);
-            if (value.isMissingNode() || value.isNull() || value.isObject() || value.isArray()) {
-                continue;
-            }
-            if (value.isNumber()) {
-                return value.decimalValue();
-            }
-            String text = value.asText("").trim().replaceAll("[^0-9.\\-]", "");
-            if (StringUtils.isNotBlank(text)) {
-                try {
-                    return new BigDecimal(text);
-                } catch (NumberFormatException ignored) {
-                    // try the next field
+    static BigDecimal courierRate(JsonNode option) {
+        BigDecimal rate = firstPositiveDecimal(option, COURIER_RATE_FIELDS);
+        if (rate != null) {
+            return rate;
+        }
+        var fields = option.fields();
+        while (fields.hasNext()) {
+            JsonNode nested = fields.next().getValue();
+            if (nested != null && nested.isObject()) {
+                rate = firstPositiveDecimal(nested, COURIER_RATE_FIELDS);
+                if (rate != null) {
+                    return rate;
                 }
             }
         }
+        return firstDecimal(option, COURIER_RATE_FIELDS);
+    }
+
+    private static BigDecimal firstPositiveDecimal(JsonNode node, String... fields) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        for (String field : fields) {
+            JsonNode value = node.path(field);
+            BigDecimal parsed = decimalValue(value, fields);
+            if (parsed != null && parsed.compareTo(BigDecimal.ZERO) > 0) {
+                return parsed;
+            }
+        }
         return null;
+    }
+
+    private static BigDecimal firstDecimal(JsonNode node, String... fields) {
+        BigDecimal positive = firstPositiveDecimal(node, fields);
+        if (positive != null) {
+            return positive;
+        }
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        for (String field : fields) {
+            BigDecimal parsed = decimalValue(node.path(field), fields);
+            if (parsed != null) {
+                return parsed;
+            }
+        }
+        return null;
+    }
+
+    private static BigDecimal decimalValue(JsonNode value, String... fields) {
+        if (value == null || value.isMissingNode() || value.isNull() || value.isArray()) {
+            return null;
+        }
+        if (value.isObject()) {
+            return firstPositiveDecimal(value, fields);
+        }
+        if (value.isNumber()) {
+            return value.decimalValue();
+        }
+        String text = value.asText("").trim().replaceAll("[^0-9.\\-]", "");
+        if (StringUtils.isBlank(text)) {
+            return null;
+        }
+        try {
+            return new BigDecimal(text);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     static String indianMobile10(String raw) {
@@ -1093,6 +1325,14 @@ public class XpressBeesClient {
             return StringUtils.defaultString(line1).trim();
         }
         return (StringUtils.defaultString(line1) + " " + line2).trim();
+    }
+
+    static String truncateProviderOrderNumber(String reference, int maxLen) {
+        String value = StringUtils.trimToEmpty(reference);
+        if (maxLen <= 0 || value.length() <= maxLen) {
+            return value;
+        }
+        return StringUtils.right(value, maxLen).replaceFirst("^[^A-Za-z0-9]+", "");
     }
 
     private static String abbreviate(String value, int maxLen) {

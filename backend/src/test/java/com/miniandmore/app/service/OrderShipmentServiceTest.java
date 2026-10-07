@@ -12,6 +12,7 @@ import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
+import com.miniandmore.app.domain.enumeration.PackageType;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.repository.CustomerOrderRepository;
@@ -115,7 +116,7 @@ class OrderShipmentServiceTest {
 
     @Test
     void canBook_blocksWhenCancellationPending() {
-        CustomerOrder order = confirmedPaid();
+        CustomerOrder order = packedConfirmedPaid();
         when(orderCancellationService.hasPendingRequest(10L)).thenReturn(true);
         assertThat(orderShipmentService.canBook(order)).isFalse();
         assertThat(orderShipmentService.canBookWithOverride(order)).isTrue();
@@ -149,7 +150,7 @@ class OrderShipmentServiceTest {
 
     @Test
     void bookShipment_allowsOverrideWhenCancellationPending() {
-        CustomerOrder order = confirmedPaid();
+        CustomerOrder order = packedConfirmedPaid();
         when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
         when(orderCancellationService.hasPendingRequest(10L)).thenReturn(true);
 
@@ -168,13 +169,14 @@ class OrderShipmentServiceTest {
     }
 
     @Test
-    void canBook_confirmedPaidOnline_isTrue() {
-        assertThat(orderShipmentService.canBook(confirmedPaid())).isTrue();
+    void canBook_requiresCompletedPackage() {
+        assertThat(orderShipmentService.canBook(confirmedPaid())).isFalse();
+        assertThat(orderShipmentService.canBook(packedConfirmedPaid())).isTrue();
     }
 
     @Test
-    void canBook_confirmedCodUnpaid_isTrue() {
-        CustomerOrder order = confirmedPaid().paymentMethod("cod").paymentStatus(PaymentStatus.PENDING);
+    void canBook_confirmedCodUnpaid_isTrueWhenPacked() {
+        CustomerOrder order = packedConfirmedPaid().paymentMethod("cod").paymentStatus(PaymentStatus.PENDING);
         assertThat(orderShipmentService.canBook(order)).isTrue();
     }
 
@@ -192,7 +194,7 @@ class OrderShipmentServiceTest {
 
     @Test
     void bookShipment_manual_persistsAwbAndTracking() {
-        CustomerOrder order = confirmedPaid();
+        CustomerOrder order = packedConfirmedPaid();
         when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
 
         CustomerOrder result = orderShipmentService.bookShipment(
@@ -218,14 +220,25 @@ class OrderShipmentServiceTest {
     @Test
     void bookShipment_xpressBees_rejectsWhenPackageIncomplete() {
         when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(confirmedPaid()));
-        when(xpressBeesClient.isForwardShipmentConfigured()).thenReturn(true);
 
         assertThatThrownBy(() ->
             orderShipmentService.bookShipment("MNM-1", ReturnLogisticsMode.XPRESSBEES, null, null, null, null, false, null)
         )
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.CONFLICT))
-            .hasMessageContaining("Complete package dimensions");
+            .hasMessageContaining("Create a package");
+    }
+
+    @Test
+    void bookShipment_manual_rejectsWhenPackageIncomplete() {
+        when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(confirmedPaid()));
+
+        assertThatThrownBy(() ->
+            orderShipmentService.bookShipment("MNM-1", ReturnLogisticsMode.MANUAL, "Delhivery", "AWB-99", null, null, false, null)
+        )
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.CONFLICT))
+            .hasMessageContaining("Create a package");
     }
 
     @Test
@@ -271,6 +284,64 @@ class OrderShipmentServiceTest {
     }
 
     @Test
+    void bookShipment_manual_persistsPackageTypeFromShipmentStep() {
+        CustomerOrder order = packedConfirmedPaid();
+        when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
+
+        CustomerOrder result = orderShipmentService.bookShipment(
+            "MNM-1",
+            ReturnLogisticsMode.MANUAL,
+            "Delhivery",
+            "AWB-99",
+            null,
+            null,
+            false,
+            null,
+            null,
+            null,
+            "envelope"
+        );
+
+        assertThat(result.getPackageType()).isEqualTo(PackageType.ENVELOPE);
+    }
+
+    @Test
+    void bookShipment_xpressBees_appliesSelectedCourierWithoutRepacking() throws Exception {
+        CustomerOrder order = packedConfirmedPaid();
+        order.setPackageCourierId("old-courier");
+        when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
+        when(xpressBeesClient.isForwardShipmentConfigured()).thenReturn(true);
+        when(xpressBeesClient.createForwardShipment(any())).thenReturn(
+            new XpressBeesClient.ForwardShipmentResult("XB-1", "https://track/XB-1", "https://label/XB-1", "REQ-1", "ok")
+        );
+        when(xpressBeesClient.buildTrackingUrl("XB-1")).thenReturn("https://track/XB-1");
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(
+            List.of(new OrderItem().productName("Tee").variantSku("TEE-1").qty(1).price(BigDecimal.TEN))
+        );
+
+        orderShipmentService.bookShipment(
+            "MNM-1",
+            ReturnLogisticsMode.XPRESSBEES,
+            null,
+            null,
+            null,
+            null,
+            false,
+            null,
+            "xb-2",
+            "Xpressbees 2 K.G"
+        );
+
+        ArgumentCaptor<XpressBeesClient.ForwardShipmentRequest> captor = ArgumentCaptor.forClass(
+            XpressBeesClient.ForwardShipmentRequest.class
+        );
+        verify(xpressBeesClient).createForwardShipment(captor.capture());
+        assertThat(captor.getValue().courierId()).isEqualTo("xb-2");
+        assertThat(order.getPackageCourierId()).isEqualTo("xb-2");
+        assertThat(order.getPackageCourierName()).isEqualTo("Xpressbees 2 K.G");
+    }
+
+    @Test
     void bookShipment_xpressBees_usesSavedPackageDimensions() throws Exception {
         CustomerOrder order = packedConfirmedPaid()
             .packageWeightGrams(750)
@@ -311,7 +382,7 @@ class OrderShipmentServiceTest {
         assertThat(afterHub.getShipmentCarrierStatus()).isEqualTo("out_for_delivery");
 
         CustomerOrder afterFail = orderShipmentService.applyProviderStatus(order, "undelivered");
-        assertThat(afterFail.getShipmentCarrierStatus()).isEqualTo("undelivered");
+        assertThat(afterFail.getShipmentCarrierStatus()).isEqualTo("delivery_failed");
 
         CustomerOrder afterReattempt = orderShipmentService.applyProviderStatus(order, "OUT FOR DELIVERY");
         assertThat(afterReattempt.getShipmentCarrierStatus()).isEqualTo("out_for_delivery");
@@ -327,7 +398,7 @@ class OrderShipmentServiceTest {
 
         CustomerOrder result = orderShipmentService.applyProviderStatus(order, "Picked Up");
 
-        assertThat(result.getShipmentCarrierStatus()).isEqualTo("picked_up");
+        assertThat(result.getShipmentCarrierStatus()).isEqualTo("in_transit");
         assertThat(result.getShipmentDate()).isNotBlank();
         assertThat(result.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
         verify(orderEventService).syncLifecycleEvents(order);
@@ -345,6 +416,22 @@ class OrderShipmentServiceTest {
 
         assertThat(result.getStatus()).isEqualTo(OrderStatus.FULFILLED);
         assertThat(result.getShipmentDeliveredAt()).isNotNull();
+    }
+
+    @Test
+    void applyProviderStatus_duplicateDeliveryDoesNotExtendReturnWindow() {
+        Instant firstDelivery = Instant.parse("2026-09-27T14:10:00Z");
+        CustomerOrder order = confirmedPaid()
+            .status(OrderStatus.FULFILLED)
+            .trackingNumber("XB-1")
+            .shipmentLogisticsMode(ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("delivered")
+            .shipmentDeliveredAt(firstDelivery);
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        CustomerOrder result = orderShipmentService.applyProviderStatus(order, "delivered");
+
+        assertThat(result.getShipmentDeliveredAt()).isEqualTo(firstDelivery);
     }
 
     @Test
@@ -375,7 +462,7 @@ class OrderShipmentServiceTest {
 
         CustomerOrder result = orderShipmentService.refreshExpressBeesTracking(order);
 
-        assertThat(result.getShipmentCarrierStatus()).isEqualTo("picked_up");
+        assertThat(result.getShipmentCarrierStatus()).isEqualTo("in_transit");
         assertThat(result.getShipmentDate()).isNotBlank();
         verify(orderEventService).syncLifecycleEvents(order);
     }
@@ -419,7 +506,7 @@ class OrderShipmentServiceTest {
 
     @Test
     void bookShipment_xpressBeesNotConfigured_throwsServiceUnavailable() {
-        when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(confirmedPaid()));
+        when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(packedConfirmedPaid()));
         when(xpressBeesClient.isForwardShipmentConfigured()).thenReturn(false);
 
         assertThatThrownBy(() ->
@@ -431,7 +518,7 @@ class OrderShipmentServiceTest {
 
     @Test
     void bookShipment_manualWithoutAwb_throwsBadRequest() {
-        when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(confirmedPaid()));
+        when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(packedConfirmedPaid()));
 
         assertThatThrownBy(() ->
             orderShipmentService.bookShipment("MNM-1", ReturnLogisticsMode.MANUAL, "Delhivery", "", null, null, false, null)
@@ -505,6 +592,114 @@ class OrderShipmentServiceTest {
 
         verify(xpressBeesClient).cancelForwardShipment("XB-1", "MNM-1");
         assertThat(result.getTrackingNumber()).isNull();
+    }
+
+    @Test
+    void canBookWithOverride_andCanBookExpressBeesWithOverride() {
+        CustomerOrder order = packedConfirmedPaid();
+        when(orderCancellationService.hasPendingRequest(order.getId())).thenReturn(true);
+
+        assertThat(orderShipmentService.canBookWithOverride(order)).isTrue();
+        assertThat(orderShipmentService.canBookExpressBeesWithOverride(order)).isTrue();
+    }
+
+    @Test
+    void cancelShipment_validations() throws Exception {
+        CustomerOrder order = confirmedPaid();
+        when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
+
+        // Short reason (< 5 chars)
+        assertThatThrownBy(() -> orderShipmentService.cancelShipment("MNM-1", ReturnLogisticsMode.MANUAL, "bad", "admin"))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(400));
+
+        // No tracking number
+        assertThatThrownBy(() -> orderShipmentService.cancelShipment("MNM-1", ReturnLogisticsMode.MANUAL, "Valid reason", "admin"))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(409));
+
+        // Already delivered
+        order.setTrackingNumber("TRK-1");
+        order.setStatus(OrderStatus.FULFILLED);
+        assertThatThrownBy(() -> orderShipmentService.cancelShipment("MNM-1", ReturnLogisticsMode.MANUAL, "Valid reason", "admin"))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(409));
+
+        // Invalid mode (SELF_SHIP)
+        order.setStatus(OrderStatus.CONFIRMED);
+        assertThatThrownBy(() -> orderShipmentService.cancelShipment("MNM-1", ReturnLogisticsMode.SELF_SHIP, "Valid reason", "admin"))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(400));
+
+        // ExpressBees mode but order was booked manual
+        order.setShipmentLogisticsMode(ReturnLogisticsMode.MANUAL);
+        assertThatThrownBy(() -> orderShipmentService.cancelShipment("MNM-1", ReturnLogisticsMode.XPRESSBEES, "Valid reason", "admin"))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(400));
+
+        // ExpressBees API exception on cancel
+        order.setShipmentLogisticsMode(ReturnLogisticsMode.XPRESSBEES);
+        org.mockito.Mockito.doThrow(new XpressBeesClient.XpressBeesApiException("carrier down"))
+            .when(xpressBeesClient).cancelForwardShipment("TRK-1", "MNM-1");
+        assertThatThrownBy(() -> orderShipmentService.cancelShipment("MNM-1", ReturnLogisticsMode.XPRESSBEES, "Valid reason", "admin"))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(502));
+    }
+
+    @Test
+    void bookShipment_validations() {
+        CustomerOrder order = packedConfirmedPaid();
+        when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
+
+        // Mode is null
+        assertThatThrownBy(() -> orderShipmentService.bookShipment("MNM-1", null, null, null, null, null, false, null))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(400));
+
+        // Mode is SELF_SHIP
+        assertThatThrownBy(() -> orderShipmentService.bookShipment("MNM-1", ReturnLogisticsMode.SELF_SHIP, null, null, null, null, false, null))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(400));
+
+        // Cancelled order cannot be booked
+        order.setStatus(OrderStatus.CANCELLED);
+        assertThatThrownBy(() -> orderShipmentService.bookShipment("MNM-1", ReturnLogisticsMode.MANUAL, "Carrier", "AWB-1", null, null, false, null))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(400));
+
+        // Fulfilled order cannot be booked
+        order.setStatus(OrderStatus.FULFILLED);
+        assertThatThrownBy(() -> orderShipmentService.bookShipment("MNM-1", ReturnLogisticsMode.MANUAL, "Carrier", "AWB-1", null, null, false, null))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(400));
+
+        // Already has tracking number
+        order.setStatus(OrderStatus.CONFIRMED);
+        order.setTrackingNumber("EXISTING-AWB");
+        assertThatThrownBy(() -> orderShipmentService.bookShipment("MNM-1", ReturnLogisticsMode.MANUAL, "Carrier", "AWB-1", null, null, false, null))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(409));
+    }
+
+    @Test
+    void isShipmentEligible_edgeCases() {
+        assertThat(OrderShipmentService.isShipmentEligible(null)).isFalse();
+
+        CustomerOrder order = confirmedPaid();
+        assertThat(OrderShipmentService.isShipmentEligible(order)).isTrue();
+
+        order.setStatus(OrderStatus.CANCELLED);
+        assertThat(OrderShipmentService.isShipmentEligible(order)).isFalse();
+
+        order.setStatus(OrderStatus.HAND_WRAPPED);
+        assertThat(OrderShipmentService.isShipmentEligible(order)).isTrue();
+
+        order.setPaymentStatus(PaymentStatus.PENDING);
+        assertThat(OrderShipmentService.isShipmentEligible(order)).isFalse();
+
+        // COD is eligible even when pending
+        order.setPaymentMethod("cod");
+        assertThat(OrderShipmentService.isShipmentEligible(order)).isTrue();
     }
 
     private CustomerOrder confirmedPaid() {

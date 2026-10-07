@@ -1,6 +1,7 @@
 package com.miniandmore.app.web.rest.internal;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,6 +16,7 @@ import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
+import com.miniandmore.app.domain.enumeration.PackageType;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import com.miniandmore.app.repository.*;
@@ -183,6 +185,28 @@ class InternalAdminOrderResourceTest {
 
     @Test
     @WithMockUser(authorities = "ROLE_ADMIN")
+    void listOrders_cancelledRefundedOrderWithZohoDocs_staysSyncEligible() throws Exception {
+        CustomerOrder order = codOrder()
+            .paymentMethod("online")
+            .status(OrderStatus.CANCELLED)
+            .paymentStatus(PaymentStatus.REFUNDED)
+            .zohoSalesOrderId("so-cancel")
+            .zohoInvoiceId("inv-cancel")
+            .zohoSyncStatus(ZohoSyncStatus.FAILED)
+            .zohoSyncError("Could not void paid invoice");
+        when(customerOrderRepository.findAll(any(Specification.class), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(order), PageRequest.of(0, 10), 1));
+
+        mockMvc
+            .perform(get("/internal/v1/admin/orders"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.orders[0].status").value("cancelled"))
+            .andExpect(jsonPath("$.data.orders[0].payment_status").value("refunded"))
+            .andExpect(jsonPath("$.data.orders[0].zoho_sync_eligible").value(true));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
     void listOrders_paginatesAllOrdersWhenNoDateRange() throws Exception {
         CustomerOrder order = codOrder().status(OrderStatus.CONFIRMED).paymentStatus(PaymentStatus.PAID);
         when(customerOrderRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(
@@ -340,6 +364,9 @@ class InternalAdminOrderResourceTest {
                 null,
                 null,
                 false,
+                null,
+                null,
+                null,
                 null
             )
         ).thenReturn(booked);
@@ -398,7 +425,7 @@ class InternalAdminOrderResourceTest {
             .packageHeightCm(8)
             .packageChargeableWeightGrams(500);
         when(
-            orderPackageService.completePackage("MNM-COD1", 500, 12, 10, 8, "1", "Surface Xpressbees 0.5 K.G")
+            orderPackageService.completePackage("MNM-COD1", 500, 12, 10, 8, "1", "Surface Xpressbees 0.5 K.G", null)
         ).thenReturn(wrapped);
 
         mockMvc
@@ -413,7 +440,37 @@ class InternalAdminOrderResourceTest {
             .andExpect(jsonPath("$.data.order.order_number").value("MNM-COD1"))
             .andExpect(jsonPath("$.data.order.status").value("hand_wrapped"))
             .andExpect(jsonPath("$.data.order.package_weight_grams").value(500))
-            .andExpect(jsonPath("$.data.order.package_length_cm").value(12));
+            .andExpect(jsonPath("$.data.order.package_length_cm").value(12))
+            .andExpect(jsonPath("$.data.order.package_slip_number").value("PKG-00900"))
+            .andExpect(jsonPath("$.data.order.package_type").value("custom"))
+            .andExpect(jsonPath("$.data.order.shipment_order_number").value("SHP-00900"))
+            .andExpect(jsonPath("$.data.order.shipping_address.full_name").value("Jane Doe"));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
+    void completePackage_acceptsZohoEnvelopeType() throws Exception {
+        CustomerOrder wrapped = codOrder()
+            .status(OrderStatus.HAND_WRAPPED)
+            .paymentStatus(PaymentStatus.PAID)
+            .packageWeightGrams(250)
+            .packageLengthCm(32)
+            .packageBreadthCm(24)
+            .packageHeightCm(2)
+            .packageType(PackageType.ENVELOPE);
+        when(
+            orderPackageService.completePackage("MNM-COD1", 250, 32, 24, 2, null, null, "envelope")
+        ).thenReturn(wrapped);
+
+        mockMvc
+            .perform(
+                post("/internal/v1/admin/orders/MNM-COD1/complete-package")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content("{\"weight_grams\":250,\"length_cm\":32,\"breadth_cm\":24,\"height_cm\":2,\"package_type\":\"envelope\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.package_type").value("envelope"))
+            .andExpect(jsonPath("$.data.order.package_height_cm").value(2));
     }
 
     @Test
@@ -444,6 +501,56 @@ class InternalAdminOrderResourceTest {
         } finally {
             applicationProperties.getZoho().getOrderTracking().setEnabled(true);
         }
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
+    void cancelOrder_beforeShipment_cancelsWithoutTouchingCarrier() throws Exception {
+        CustomerOrder cancelled = codOrder().status(OrderStatus.CANCELLED).paymentStatus(PaymentStatus.REFUNDED);
+        when(orderCancellationService.cancelOrderFromAdmin(eq("MNM-COD1"), eq("Item is out of stock"), any(), eq(null)))
+            .thenReturn(cancelled);
+
+        mockMvc
+            .perform(
+                post("/internal/v1/admin/orders/MNM-COD1/cancel")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"Item is out of stock\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.order_number").value("MNM-COD1"))
+            .andExpect(jsonPath("$.data.order.status").value("cancelled"));
+
+        verify(orderShipmentService, never()).cancelShipment(any(), any(), any(), any());
+        verify(orderCancellationService).cancelOrderFromAdmin(eq("MNM-COD1"), eq("Item is out of stock"), any(), eq(null));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
+    void cancelOrder_withBookedLabel_delegatesToCancellationService() throws Exception {
+        CustomerOrder cancelled = codOrder().status(OrderStatus.CANCELLED);
+        when(orderCancellationService.cancelOrderFromAdmin(
+            eq("MNM-COD1"),
+            eq("Unable to fulfil this order"),
+            any(),
+            eq(null)
+        )).thenReturn(cancelled);
+
+        mockMvc
+            .perform(
+                post("/internal/v1/admin/orders/MNM-COD1/cancel")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"Unable to fulfil this order\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.status").value("cancelled"));
+
+        verify(orderCancellationService).cancelOrderFromAdmin(
+            eq("MNM-COD1"),
+            eq("Unable to fulfil this order"),
+            any(),
+            eq(null)
+        );
+        verify(orderShipmentService, never()).cancelShipment(any(), any(), any(), any());
     }
 
     @TestConfiguration

@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.*;
@@ -42,9 +43,13 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     Optional<CustomerOrder> findOneByOrderNumberAndUserLogin(@Param("orderNumber") String orderNumber, @Param("login") String login);
 
     @Query(
-        value = "select customerOrder from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
+        value = "select customerOrder from CustomerOrder customerOrder where " +
+        "(customerOrder.paymentStatus = :paymentStatus or (customerOrder.status = com.miniandmore.app.domain.enumeration.OrderStatus.CANCELLED and " +
+        "(customerOrder.zohoSalesOrderId is not null or customerOrder.zohoInvoiceId is not null))) and " +
         "(customerOrder.zohoSyncStatus in :statuses or customerOrder.zohoSyncStatus is null) order by customerOrder.id asc",
-        countQuery = "select count(customerOrder) from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
+        countQuery = "select count(customerOrder) from CustomerOrder customerOrder where " +
+        "(customerOrder.paymentStatus = :paymentStatus or (customerOrder.status = com.miniandmore.app.domain.enumeration.OrderStatus.CANCELLED and " +
+        "(customerOrder.zohoSalesOrderId is not null or customerOrder.zohoInvoiceId is not null))) and " +
         "(customerOrder.zohoSyncStatus in :statuses or customerOrder.zohoSyncStatus is null)"
     )
     Page<CustomerOrder> findPaidOrdersForZohoRetry(
@@ -82,6 +87,14 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     Page<CustomerOrder> findPaidOrdersMissingLedgerlySalesOrder(@Param("paymentStatus") PaymentStatus paymentStatus, Pageable pageable);
 
     Optional<CustomerOrder> findOneByOrderNumber(String orderNumber);
+
+    Optional<CustomerOrder> findFirstByRazorpayPaymentId(String razorpayPaymentId);
+
+    Optional<CustomerOrder> findFirstByRazorpayOrderId(String razorpayOrderId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select customerOrder from CustomerOrder customerOrder where customerOrder.orderNumber = :orderNumber")
+    Optional<CustomerOrder> findOneByOrderNumberForUpdate(@Param("orderNumber") String orderNumber);
 
     Optional<CustomerOrder> findFirstByTrackingNumber(String trackingNumber);
 

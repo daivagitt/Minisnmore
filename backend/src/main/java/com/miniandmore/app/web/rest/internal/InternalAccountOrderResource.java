@@ -554,20 +554,20 @@ public class InternalAccountOrderResource {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("order", orderDetail(order));
-        data.put("cancellation_request", orderCancellationService.toDto(cancellationRequest));
+        data.put("cancellation_request", orderCancellationService.toCustomerDto(cancellationRequest));
         return ApiResponse.ok(data);
     }
 
     @GetMapping("/orders/{orderNumber}/cancel-request")
     public ApiResponse<Map<String, Object>> getCancelRequest(@PathVariable String orderNumber) {
         String login = requireLogin();
-        var cancellationRequest = orderCancellationService.getOpenForUser(login, orderNumber);
+        var cancellationRequest = orderCancellationService.getVisibleForUser(login, orderNumber);
         if (cancellationRequest == null) {
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("cancellation_request", null);
             return ApiResponse.ok(data);
         }
-        return ApiResponse.ok(Map.of("cancellation_request", orderCancellationService.toDto(cancellationRequest)));
+        return ApiResponse.ok(Map.of("cancellation_request", orderCancellationService.toCustomerDto(cancellationRequest)));
     }
 
     @PostMapping("/orders/{orderNumber}/cancel-request/withdraw")
@@ -580,7 +580,7 @@ public class InternalAccountOrderResource {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("order", orderDetail(order));
-        data.put("cancellation_request", orderCancellationService.toDto(cancellationRequest));
+        data.put("cancellation_request", orderCancellationService.toCustomerDto(cancellationRequest));
         return ApiResponse.ok(data);
     }
 
@@ -1209,7 +1209,12 @@ public class InternalAccountOrderResource {
         }
         // Paid orders no longer carry the temporary reservation flag, but their stock was still
         // deducted at checkout and must be restored when they are cancelled before dispatch.
-        if (!Boolean.TRUE.equals(order.getInventoryReserved()) && order.getPaymentStatus() != PaymentStatus.REFUNDED) {
+        if (
+            !Boolean.TRUE.equals(order.getInventoryReserved()) &&
+            order.getPaymentStatus() != PaymentStatus.REFUNDED &&
+            order.getPaymentStatus() != PaymentStatus.REFUND_INITIATED &&
+            order.getPaymentStatus() != PaymentStatus.REFUND_FAILED
+        ) {
             return;
         }
         order.setInventoryReserved(true);
@@ -1409,20 +1414,12 @@ public class InternalAccountOrderResource {
         data.put("payment_method", order.getPaymentMethod());
         data.put(FIELD_TOTAL, order.getTotal());
         data.put("created_at", orderCreatedAtIso(order));
-        data.put("can_cancel", canCancel(order));
+        data.put("can_cancel", orderCancellationService.canCustomerShowCancelAction(order));
+        data.put("contact_care_to_cancel", orderCancellationService.shouldContactCareToCancel(order));
+        data.put("packed_at", order.getPackedAt() == null ? "" : order.getPackedAt().toString());
         data.put("order_items", dataAccess.orderItemRepository().findAllByOrderId(order.getId()).stream().map(this::orderItem).toList());
         trackingFields(order).forEach(data::putIfAbsent);
         return data;
-    }
-
-    private boolean canCancel(CustomerOrder order) {
-        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FULFILLED) {
-            return false;
-        }
-        if (orderCancellationService.hasPendingRequest(order.getId())) {
-            return false;
-        }
-        return !OrderTrackingStatusResolver.isDispatched(OrderTrackingStatusResolver.resolve(order));
     }
 
     Map<String, Object> orderDetail(CustomerOrder order) {
@@ -1437,10 +1434,10 @@ public class InternalAccountOrderResource {
         data.put("shipping_address", readJson(order.getShippingAddressJson()));
         data.put("notes", order.getNotes());
         data.put("cancellation_reason", order.getCancellationReason());
-        var openCancellationRequest = orderCancellationService.getOpenForUser(order.getUserLogin(), order.getOrderNumber());
+        var cancellationRequest = orderCancellationService.getVisibleForUser(order.getUserLogin(), order.getOrderNumber());
         data.put(
             "cancellation_request",
-            openCancellationRequest != null ? orderCancellationService.toDto(openCancellationRequest) : null
+            cancellationRequest != null ? orderCancellationService.toCustomerDto(cancellationRequest) : null
         );
         data.put("pending_cancellation", orderCancellationService.hasPendingRequest(order.getId()));
         data.put("razorpay_order_id", order.getRazorpayOrderId());
@@ -1487,6 +1484,7 @@ public class InternalAccountOrderResource {
         limited.put("tracking_carrier", fields.get("tracking_carrier"));
         limited.put("tracking_url", fields.get("tracking_url"));
         limited.put("shipment_date", fields.get("shipment_date"));
+        limited.put("shipment_delivered_at", fields.get("shipment_delivered_at"));
         return limited;
     }
 
@@ -1499,6 +1497,7 @@ public class InternalAccountOrderResource {
         fields.put("tracking_carrier", StringUtils.defaultString(order.getTrackingCarrier()));
         fields.put("tracking_url", StringUtils.defaultString(order.getTrackingUrl()));
         fields.put("shipment_date", StringUtils.defaultString(order.getShipmentDate()));
+        fields.put("shipment_delivered_at", instant(order.getShipmentDeliveredAt()));
         return fields;
     }
 
@@ -1690,7 +1689,11 @@ public class InternalAccountOrderResource {
 
     private String orderCreatedAtIso(CustomerOrder order) {
         Instant placed = resolveOrderPlacedAt(order);
-        return placed == null ? "" : placed.toString();
+        return instant(placed);
+    }
+
+    private static String instant(Instant value) {
+        return value == null ? "" : value.toString();
     }
 
     private static long toPaise(BigDecimal total) {

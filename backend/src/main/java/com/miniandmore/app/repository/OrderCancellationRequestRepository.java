@@ -12,6 +12,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface OrderCancellationRequestRepository extends JpaRepository<OrderCancellationRequest, Long> {
     @EntityGraph(attributePaths = { "order" })
+    Optional<OrderCancellationRequest> findFirstByRazorpayRefundIdOrderByIdDesc(String razorpayRefundId);
+
+    @EntityGraph(attributePaths = { "order" })
     Optional<OrderCancellationRequest> findOneByRequestNumber(String requestNumber);
 
     @EntityGraph(attributePaths = { "order" })

@@ -95,7 +95,9 @@ class UserResourceIT {
     /**
      * Delete all the users from the database.
      */
-    public static void deleteEntities(EntityManager em) {}
+    public static void deleteEntities(EntityManager em) {
+        // Test suite relies on transactional rollback; explicit deletion is intentionally skipped.
+    }
 
     /**
      * Setups the database with one user.
@@ -267,6 +269,7 @@ class UserResourceIT {
         assertThat(foundUser.getEmail()).isEqualTo(DEFAULT_EMAIL);
         assertThat(foundUser.getImageUrl()).isEqualTo(DEFAULT_IMAGEURL);
         assertThat(foundUser.getLangKey()).isEqualTo(DEFAULT_LANGKEY);
+        assertThat(foundUser.getAuthorities()).contains(AuthoritiesConstants.SALES);
     }
 
     @Test

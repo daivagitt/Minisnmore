@@ -25,6 +25,7 @@ import {
   getAdminOrderReturnsSummary,
   type AdminOrderReturnsSummary,
 } from "@/lib/orders.functions";
+import { SHOW_M2_POST_ORDER_UI } from "@/lib/feature-flags";
 import { showApiError } from "@/lib/ui-errors";
 
 export const Route = createFileRoute("/admin/")({
@@ -67,7 +68,7 @@ function AdminDashboard() {
       try {
         const [dashboard, summary] = await Promise.all([
           getAdminDashboard(),
-          getAdminOrderReturnsSummary().catch(() => null),
+          SHOW_M2_POST_ORDER_UI ? getAdminOrderReturnsSummary().catch(() => null) : Promise.resolve(null),
         ]);
         const total = Number(dashboard.pageVisibility ?? 0);
         const v = Number(dashboard.visiblePages ?? 0);
@@ -113,20 +114,24 @@ function AdminDashboard() {
       tint: "from-emerald-400/20 to-emerald-200/10",
     },
     { label: "Total coupons", n: s.coupons, icon: Tag, tint: "from-sky-400/20 to-sky-200/10" },
-    {
-      label: "Returns",
-      n: returnsSummary.returns,
-      sub: `${returnsSummary.open} open · ${returnsSummary.overdue} overdue`,
-      icon: RotateCcw,
-      tint: "from-cyan-400/20 to-cyan-200/10",
-    },
-    {
-      label: "Exchanges",
-      n: returnsSummary.exchanges,
-      sub: `${returnsSummary.total} total cases`,
-      icon: ArrowLeftRight,
-      tint: "from-indigo-400/20 to-indigo-200/10",
-    },
+    ...(SHOW_M2_POST_ORDER_UI
+      ? [
+          {
+            label: "Returns",
+            n: returnsSummary.returns,
+            sub: `${returnsSummary.open} open · ${returnsSummary.overdue} overdue · ${returnsSummary.xpressbeesReverseReady} book pickup`,
+            icon: RotateCcw,
+            tint: "from-cyan-400/20 to-cyan-200/10",
+          },
+          {
+            label: "Exchanges",
+            n: returnsSummary.exchanges,
+            sub: `${returnsSummary.total} total cases`,
+            icon: ArrowLeftRight,
+            tint: "from-indigo-400/20 to-indigo-200/10",
+          },
+        ]
+      : []),
     {
       label: "Total blogs",
       n: s.blogs,
@@ -160,7 +165,9 @@ function AdminDashboard() {
     { to: "/admin/home", label: "Home sections", icon: Home, n: "Configure" },
     { to: "/admin/about", label: "About page", icon: Users, n: "Configure" },
     { to: "/admin/coupons", label: "Coupons", icon: Tag, n: s.coupons },
-    { to: "/admin/returns", label: "Returns & exchanges", icon: RotateCcw, n: returnsSummary.total },
+    ...(SHOW_M2_POST_ORDER_UI
+      ? [{ to: "/admin/returns", label: "Returns & exchanges", icon: RotateCcw, n: returnsSummary.total }]
+      : []),
     { to: "/admin/blog", label: "Blogs", icon: BookOpen, n: s.blogs },
     { to: "/admin/policies", label: "Policies", icon: FileText, n: s.policies },
     { to: "/admin/pages", label: "Page visibility", icon: EyeOff, n: `${s.visiblePages}/${s.pages}` },

@@ -51,7 +51,10 @@ export SPRING_LIQUIBASE_URL="${SPRING_LIQUIBASE_URL:-$SPRING_DATASOURCE_URL}"
 export SPRING_LIQUIBASE_USERNAME="${SPRING_LIQUIBASE_USERNAME:-$SPRING_DATASOURCE_USERNAME}"
 
 # Migrate first. On failure, the currently running catalog is left untouched.
-bash "${REPO_ROOT}/deploy/scripts/run-catalog-liquibase.sh" "$CATALOG_JAR"
+while IFS= read -r changelog || [ -n "${changelog:-}" ]; do
+  case "$changelog" in ''|'#'*) continue ;; esac
+  CATALOG_LIQUIBASE_CHANGELOG="$changelog" bash "${REPO_ROOT}/deploy/scripts/run-catalog-liquibase.sh" "$CATALOG_JAR"
+done < "${REPO_ROOT}/deploy/scripts/catalog-isolated-migrations.list"
 
 echo "=== Restart catalog core on :${CATALOG_PORT} ==="
 pm2 delete mini-prod-ms-catalog-core >/dev/null 2>&1 || true

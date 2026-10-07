@@ -60,7 +60,7 @@ public class OrderCancellationExecutor {
         String refundId = null;
         if (order.getPaymentStatus() == PaymentStatus.PAID && onlinePayment) {
             refundId = razorpayRefundService.refundPayment(order, order.getTotal());
-            order.setPaymentStatus(PaymentStatus.REFUNDED);
+            order.setPaymentStatus(PaymentStatus.REFUND_INITIATED);
             order = dataAccess.customerOrderRepository().save(order);
         }
         CustomerOrder orderForInventoryRestore = order;
@@ -74,8 +74,15 @@ public class OrderCancellationExecutor {
         CustomerOrder cancelled = dataAccess.customerOrderRepository().save(order);
         syncCancellationToLedgerly(cancelled, refundId);
         syncCancellationToZoho(cancelled);
-        orderEventService.syncLifecycleEvents(cancelled);
+        orderEventService.syncLifecycleEvents(cancelled, false);
         return refundId;
+    }
+
+    public boolean isCancelEligible(CustomerOrder order) {
+        if (order == null || order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FULFILLED) {
+            return false;
+        }
+        return !OrderTrackingStatusResolver.isDispatched(OrderTrackingStatusResolver.resolve(order));
     }
 
     public void assertCancelEligible(CustomerOrder order) {
@@ -90,11 +97,33 @@ public class OrderCancellationExecutor {
         }
     }
 
+    public String retryFailedOnlineRefund(CustomerOrder order) {
+        if (order.getPaymentStatus() != PaymentStatus.REFUND_FAILED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only a failed online refund can be retried");
+        }
+        boolean onlinePayment =
+            "online".equalsIgnoreCase(order.getPaymentMethod()) && StringUtils.isNotBlank(order.getRazorpayPaymentId());
+        if (!onlinePayment) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order has no Razorpay payment to refund");
+        }
+        String refundId = razorpayRefundService
+            .findExistingRefundForOrder(order, order.getTotal())
+            .orElseGet(() -> razorpayRefundService.refundPayment(order, order.getTotal()));
+        order.setPaymentStatus(PaymentStatus.REFUND_INITIATED);
+        dataAccess.customerOrderRepository().save(order);
+        return refundId;
+    }
+
     private void restoreInventoryForCancellation(CustomerOrder order) {
         if (order.getInventoryReleasedAt() != null) {
             return;
         }
-        if (!Boolean.TRUE.equals(order.getInventoryReserved()) && order.getPaymentStatus() != PaymentStatus.REFUNDED) {
+        if (
+            !Boolean.TRUE.equals(order.getInventoryReserved()) &&
+            order.getPaymentStatus() != PaymentStatus.REFUNDED &&
+            order.getPaymentStatus() != PaymentStatus.REFUND_INITIATED &&
+            order.getPaymentStatus() != PaymentStatus.REFUND_FAILED
+        ) {
             return;
         }
         order.setInventoryReserved(true);

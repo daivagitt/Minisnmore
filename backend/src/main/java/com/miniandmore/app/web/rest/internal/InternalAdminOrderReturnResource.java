@@ -196,7 +196,8 @@ public class InternalAdminOrderReturnResource {
                     body.method(),
                     body.reference(),
                     SecurityUtils.getCurrentUserLogin().orElse("system"),
-                    body.admin_notes()
+                    body.admin_notes(),
+                    Boolean.TRUE.equals(body.force_manual())
                 )
             )
         );
@@ -234,6 +235,43 @@ public class InternalAdminOrderReturnResource {
         return ApiResponse.ok(toDto(orderReturnService.markReadyToShip(returnNumber, notes(body))));
     }
 
+    @PostMapping("/{returnNumber}/package-rates")
+    public ApiResponse<Map<String, Object>> packageRates(
+        @PathVariable String returnNumber,
+        @Valid @RequestBody PackageRatesRequest body
+    ) {
+        return ApiResponse.ok(
+            orderReturnService.previewOutboundPackageRates(
+                returnNumber,
+                body.weight_grams(),
+                body.length_cm(),
+                body.breadth_cm(),
+                body.height_cm()
+            )
+        );
+    }
+
+    @PostMapping("/{returnNumber}/complete-package")
+    public ApiResponse<Map<String, Object>> completePackage(
+        @PathVariable String returnNumber,
+        @Valid @RequestBody CompletePackageRequest body
+    ) {
+        return ApiResponse.ok(
+            toDto(
+                orderReturnService.completeOutboundPackage(
+                    returnNumber,
+                    body.weight_grams(),
+                    body.length_cm(),
+                    body.breadth_cm(),
+                    body.height_cm(),
+                    body.courier_id(),
+                    body.courier_name(),
+                    body.package_type()
+                )
+            )
+        );
+    }
+
     @PostMapping("/{returnNumber}/book-outbound")
     public ApiResponse<Map<String, Object>> bookOutbound(
         @PathVariable String returnNumber,
@@ -249,7 +287,10 @@ public class InternalAdminOrderReturnResource {
                     body.outbound_awb(),
                     body.tracking_url(),
                     body.label_url(),
-                    body.admin_notes()
+                    body.admin_notes(),
+                    body.courier_id(),
+                    body.courier_name(),
+                    body.package_type()
                 )
             )
         );
@@ -322,6 +363,8 @@ public class InternalAdminOrderReturnResource {
         data.put("refund_amount", orderReturn.getRefundAmount());
         data.put("razorpay_refund_id", orderReturn.getRazorpayRefundId());
         data.put("ledgerly_credit_note_id", orderReturn.getLedgerlyCreditNoteId());
+        data.put("zoho_credit_note_id", orderReturn.getZohoCreditNoteId());
+        data.put("zoho_replacement_invoice_id", orderReturn.getZohoReplacementInvoiceId());
         data.put("requested_at", orderReturn.getRequestedAt());
         data.put("resolved_at", orderReturn.getResolvedAt());
         if (orderReturn.getOrder() != null) {
@@ -329,6 +372,8 @@ public class InternalAdminOrderReturnResource {
             data.put("order_id", order.getId());
             data.put("order_number", order.getOrderNumber());
             data.put("order_total", order.getTotal());
+            data.put("order_shipping", order.getShipping());
+            data.put("order_cod_fee", order.getCodFee());
             data.put("customer_login", orderReturn.getUserLogin());
             data.put("payment_method", order.getPaymentMethod());
             data.put("payment_status", order.getPaymentStatus() != null ? order.getPaymentStatus().name().toLowerCase() : null);
@@ -361,15 +406,36 @@ public class InternalAdminOrderReturnResource {
         data.put("pickup_window", orderReturn.getPickupWindow());
         data.put("provider_request_id", orderReturn.getProviderRequestId());
         data.put("pickup_failure_reason", orderReturn.getPickupFailureReason());
+        data.put("reverse_carrier_status", orderReturn.getReverseCarrierStatus());
         data.put(
             "outbound_logistics_mode",
             orderReturn.getOutboundLogisticsMode() != null ? orderReturn.getOutboundLogisticsMode().name().toLowerCase() : null
         );
         data.put("outbound_carrier_name", orderReturn.getOutboundCarrierName());
+        data.put("outbound_carrier_status", orderReturn.getOutboundCarrierStatus());
         data.put("outbound_awb", orderReturn.getOutboundAwb());
         data.put("outbound_tracking_url", orderReturn.getOutboundTrackingUrl());
         data.put("outbound_label_url", orderReturn.getOutboundLabelUrl());
         data.put("outbound_provider_request_id", orderReturn.getOutboundProviderRequestId());
+        data.put("can_complete_package", orderReturnService.canCompletePackage(orderReturn));
+        data.put("can_book_outbound", orderReturnService.canBookOutbound(orderReturn));
+        data.put("default_package_weight_grams", orderReturnService.defaultPackageWeightGrams(orderReturn));
+        data.put("package_weight_grams", orderReturn.getPackageWeightGrams());
+        data.put("package_length_cm", orderReturn.getPackageLengthCm());
+        data.put("package_breadth_cm", orderReturn.getPackageBreadthCm());
+        data.put("package_height_cm", orderReturn.getPackageHeightCm());
+        data.put("package_chargeable_weight_grams", orderReturn.getPackageChargeableWeightGrams());
+        data.put("package_courier_id", StringUtils.defaultString(orderReturn.getPackageCourierId()));
+        data.put("package_courier_name", StringUtils.defaultString(orderReturn.getPackageCourierName()));
+        data.put(
+            "package_type",
+            orderReturn.getPackageType() == null ? "custom" : orderReturn.getPackageType().toApi()
+        );
+        data.put("packed_at", orderReturn.getPackedAt() == null ? "" : orderReturn.getPackedAt().toString());
+        data.put("package_slip_number", orderReturnService.documentNumber("PKG-", orderReturn));
+        data.put("shipment_order_number", orderReturnService.documentNumber("SHP-", orderReturn));
+        data.put("shipping_address", orderReturnService.shippingAddressPayload(orderReturn));
+        data.put("dispatch_address", orderReturnService.dispatchAddressPayload());
         data.put("original_item_amount", orderReturn.getOriginalItemAmount());
         data.put("replacement_item_amount", orderReturn.getReplacementItemAmount());
         data.put("price_difference", orderReturn.getPriceDifference());
@@ -382,6 +448,7 @@ public class InternalAdminOrderReturnResource {
         data.put("settlement_amount", orderReturn.getSettlementAmount());
         data.put("settled_at", orderReturn.getSettledAt());
         data.put("settled_by", orderReturn.getSettledBy());
+        data.put("can_razorpay_refund_price_difference", orderReturnService.canRefundExchangeDifferenceViaRazorpay(orderReturn));
         data.put("replacement_reserved_at", orderReturn.getReplacementReservedAt());
         data.put("items", lines);
         caseSlaSupport.enrichReturnCase(data);
@@ -449,7 +516,27 @@ public class InternalAdminOrderReturnResource {
         @Size(max = 80) String outbound_awb,
         @Size(max = 500) String tracking_url,
         @Size(max = 500) String label_url,
+        @Size(max = 40) String courier_id,
+        @Size(max = 120) String courier_name,
+        @Size(max = 20) String package_type,
         @Size(max = 2000) String admin_notes
+    ) {}
+
+    public record PackageRatesRequest(
+        Integer weight_grams,
+        @NotNull @Min(1) Integer length_cm,
+        @NotNull @Min(1) Integer breadth_cm,
+        @NotNull @Min(1) Integer height_cm
+    ) {}
+
+    public record CompletePackageRequest(
+        Integer weight_grams,
+        @NotNull @Min(1) Integer length_cm,
+        @NotNull @Min(1) Integer breadth_cm,
+        @NotNull @Min(1) Integer height_cm,
+        @Size(max = 40) String courier_id,
+        @Size(max = 120) String courier_name,
+        @Size(max = 20) String package_type
     ) {}
 
     public record PickupFailedRequest(
@@ -478,6 +565,7 @@ public class InternalAdminOrderReturnResource {
         BigDecimal amount,
         @Size(max = 40) String method,
         @Size(max = 160) String reference,
-        @Size(max = 2000) String admin_notes
+        @Size(max = 2000) String admin_notes,
+        Boolean force_manual
     ) {}
 }

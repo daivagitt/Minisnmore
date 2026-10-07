@@ -1,5 +1,6 @@
 import { createFileRoute, Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { SHOW_M2_POST_ORDER_UI } from "@/lib/feature-flags";
 import { useAuth } from "@/hooks/useAuth";
 import { AccountDataProvider } from "@/lib/account";
 import newbornBaby from "@/assets/cat-newborn.webp";
@@ -46,7 +47,11 @@ const navGroups: { label: string; items: { to: string; label: string; icon: any;
   },
 ];
 
-const flatNavItems = navGroups.flatMap((g) => g.items);
+const visibleNavGroups = navGroups.map((g) => ({
+  ...g,
+  items: g.items.filter((it) => SHOW_M2_POST_ORDER_UI || it.to !== "/account/returns"),
+}));
+const flatNavItems = visibleNavGroups.flatMap((g) => g.items);
 
 function AccountLayout() {
   const { user, loading, signOut } = useAuth();
@@ -72,7 +77,7 @@ function AccountLayout() {
           <div className="font-medium text-sm mt-1 truncate text-foreground">{user?.email ?? "…"}</div>
         </div>
         <nav className="mt-4 flex flex-col gap-4 flex-1">
-          {navGroups.map((g) => (
+          {visibleNavGroups.map((g) => (
             <div key={g.label} className="flex flex-col gap-1.5">
               <div className="px-3 pt-1 pb-1 text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{g.label}</div>
               {g.items.map((it) => {
