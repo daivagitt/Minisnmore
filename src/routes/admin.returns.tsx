@@ -25,9 +25,7 @@ import {
   markOrderReturnPickedUp,
   markOrderReturnPickupRequested,
   previewOrderReturnPackageRates,
-  markOrderReturnReadyToShip,
   markOrderReturnReceived,
-  markOrderReturnRepacking,
   markOrderReturnShipped,
   recordOrderReturnCodRefund,
   refundOrderReturn,
@@ -312,6 +310,8 @@ function hasReverseShipment(r: AdminOrderReturnRow): boolean {
   return Boolean(r.reverse_awb?.trim() || r.logistics_mode?.trim());
 }
 
+const EXCHANGE_OUTBOUND_PACK_STATUSES = new Set(["item_allocated", "repacking", "ready_to_ship"]);
+
 /** One primary next-step action (plus an optional secondary one) per current status. */
 function nextActions(
   r: AdminOrderReturnRow,
@@ -448,24 +448,12 @@ function nextActions(
               },
             };
     case "item_allocated":
-      return {
-        primary: {
-          label: "Mark exchange pack",
-          onClick: () => run("Marked exchange pack", () => markOrderReturnRepacking(r.return_number)),
-        },
-      };
     case "repacking":
       return {
         primary: {
           label: "Create package",
           onClick: openCreatePackage,
         },
-        secondary: isExchange
-          ? undefined
-          : {
-              label: "Mark ready to ship",
-              onClick: () => run("Marked ready to ship", () => markOrderReturnReadyToShip(r.return_number)),
-            },
       };
     case "ready_to_ship":
       return isExchange
@@ -1122,7 +1110,7 @@ function AdminReturnsPage() {
                       </>
                     ) : null}
                   </p>
-                ) : r.request_type === "exchange" && (r.status === "repacking" || r.status === "ready_to_ship") ? (
+                ) : r.request_type === "exchange" && EXCHANGE_OUTBOUND_PACK_STATUSES.has(r.status) ? (
                   <p className="text-xs text-muted-foreground">
                     {isPackageReady(r)
                       ? `Packed ${r.package_weight_grams || r.default_package_weight_grams || "—"} g${

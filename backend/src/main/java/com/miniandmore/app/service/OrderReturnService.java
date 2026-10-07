@@ -83,6 +83,18 @@ public class OrderReturnService {
         OrderReturnStatus.PICKUP_SCHEDULED
     );
 
+    /** Legacy REPACKING stays eligible so in-flight rows can still complete a package. */
+    private static final EnumSet<OrderReturnStatus> OUTBOUND_PACKAGE_STATUSES = EnumSet.of(
+        OrderReturnStatus.ITEM_ALLOCATED,
+        OrderReturnStatus.REPACKING,
+        OrderReturnStatus.READY_TO_SHIP
+    );
+
+    private static final EnumSet<OrderReturnStatus> OUTBOUND_PACKAGE_ADVANCE_STATUSES = EnumSet.of(
+        OrderReturnStatus.ITEM_ALLOCATED,
+        OrderReturnStatus.REPACKING
+    );
+
     private final OrderReturnRepository orderReturnRepository;
     private final OrderReturnItemRepository orderReturnItemRepository;
     private final CustomerOrderRepository customerOrderRepository;
@@ -771,8 +783,8 @@ public class OrderReturnService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Disposition is required when accepting a return");
         }
         // Exchange accept only records disposition. Requested-item restock happens once later
-        // (allocation or convert-to-refund). Credit notes wait for Razorpay refund, allocation,
-        // or convert-to-refund — not QC accept.
+        // (allocation or convert-to-refund). Credit notes wait for allocation or convert-to-refund,
+        // not QC accept or price-difference settle.
         orderReturn.setDisposition(disposition);
         if (orderReturn.getRequestType() != OrderRequestType.EXCHANGE) {
             applyReturnLineInspection(orderReturn, disposition, lineDecisions);
@@ -894,14 +906,12 @@ public class OrderReturnService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Settlement method and transaction reference are required");
         }
         if (razorpayRefund) {
-            OrderReturn refunded = exchangeRazorpaySettlementService.recordRazorpayRefund(
+            return exchangeRazorpaySettlementService.recordRazorpayRefund(
                 returnNumber,
                 recordedAmount,
                 settledBy,
                 adminNotes
             );
-            issueExchangeCreditNote(refunded, false);
-            return orderReturnRepository.save(refunded);
         }
         orderReturn = orderReturnRepository
             .findOneByReturnNumberForUpdate(returnNumber)
@@ -977,10 +987,10 @@ public class OrderReturnService {
     }
 
     /**
-     * Credit note for the item coming back. Cheaper replacement: after the Razorpay
-     * refund. Same price or more expensive replacement: at allocation (no Razorpay
-     * step). Convert-to-refund: after that refund is initiated. Unlinked when the
-     * exchange continues so the replacement invoice can apply it.
+     * Credit note for the item coming back. Unlinked at allocation so a continuing
+     * exchange can apply it to the replacement invoice. Linked at convert-to-refund
+     * so the original invoice is credited. Not created at price-difference settle
+     * (Razorpay or collect) — convert-to-refund is still a first-class next step.
      */
     private void issueExchangeCreditNote(OrderReturn orderReturn, boolean linkToSourceInvoice) {
         CustomerOrder order = orderReturn.getOrder();
@@ -1273,7 +1283,7 @@ public class OrderReturnService {
         orderReturn.setPackageCourierName(StringUtils.left(selected.name(), 120));
         orderReturn.setPackageType(resolvedType);
         orderReturn.setPackedAt(Instant.now());
-        if (orderReturn.getStatus() == OrderReturnStatus.REPACKING) {
+        if (OUTBOUND_PACKAGE_ADVANCE_STATUSES.contains(orderReturn.getStatus())) {
             orderReturn.setStatus(OrderReturnStatus.READY_TO_SHIP);
         }
         return orderReturnRepository.save(orderReturn);
@@ -1395,7 +1405,7 @@ public class OrderReturnService {
         return (
             orderReturn != null &&
             orderReturn.getRequestType() == OrderRequestType.EXCHANGE &&
-            (orderReturn.getStatus() == OrderReturnStatus.REPACKING || orderReturn.getStatus() == OrderReturnStatus.READY_TO_SHIP)
+            OUTBOUND_PACKAGE_STATUSES.contains(orderReturn.getStatus())
         );
     }
 
@@ -1404,7 +1414,7 @@ public class OrderReturnService {
         if (!isOutboundPackageEligible(orderReturn)) {
             throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
-                "Exchange replacement must be in packing or ready to ship before creating a package"
+                "Exchange replacement must be allocated or ready to ship before creating a package"
             );
         }
     }

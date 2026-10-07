@@ -431,6 +431,60 @@ describe("admin returns", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /mark received/i })).toBeInTheDocument());
   });
 
+  it("offers create package for an allocated exchange without a separate mark-pack step", async () => {
+    const user = userEvent.setup();
+    listAdminOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "EXC-1",
+          order_number: "MNM-1",
+          request_type: "exchange",
+          status: "item_allocated",
+          reason: "Wrong size ordered by mistake",
+          requested_at: "2026-10-02T00:00:00Z",
+          customer_login: "asha",
+          order_total: 999,
+          product_name: "Body Suit",
+          can_complete_package: true,
+        },
+      ],
+    });
+
+    renderAdminReturns();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /create package/i })).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /mark exchange pack/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/create a package first/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /create package/i }));
+    expect(screen.getByText("New Package")).toBeInTheDocument();
+  });
+
+  it("offers create package for a leftover exchange-pack row", async () => {
+    listAdminOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "EXC-1",
+          order_number: "MNM-1",
+          request_type: "exchange",
+          status: "repacking",
+          reason: "Wrong size ordered by mistake",
+          requested_at: "2026-10-02T00:00:00Z",
+          customer_login: "asha",
+          order_total: 999,
+          product_name: "Body Suit",
+          can_complete_package: true,
+        },
+      ],
+    });
+
+    renderAdminReturns();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /create package/i })).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /mark exchange pack/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /mark ready to ship/i })).not.toBeInTheDocument();
+  });
+
   it("offers create package for an exchange that is ready to ship", async () => {
     listAdminOrderReturns.mockResolvedValue({
       returns: [

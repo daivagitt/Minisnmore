@@ -47,6 +47,8 @@ import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -1508,12 +1510,13 @@ class OrderReturnServiceTest {
     @Test
     void exchangeFulfilment_walksThroughRemainingStates() {
         OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ITEM_ALLOCATED, "TEE-M-BLUE", "M", "Blue");
-        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
-        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        stubOutboundPackageRates(orderReturn);
 
-        assertThat(orderReturnService.markRepacking("RET-1", null).getStatus()).isEqualTo(OrderReturnStatus.REPACKING);
-        stampExchangeOutboundPackage(orderReturn);
-        assertThat(orderReturnService.markReadyToShip("RET-1", null).getStatus()).isEqualTo(OrderReturnStatus.READY_TO_SHIP);
+        assertThat(
+            orderReturnService
+                .completeOutboundPackage("RET-1", 500, 12, 10, 8, "1", "Surface Xpressbees 0.5 K.G", "box")
+                .getStatus()
+        ).isEqualTo(OrderReturnStatus.READY_TO_SHIP);
         orderReturn.setOutboundAwb("OUT-AWB-1");
         assertThat(orderReturnService.markShipped("RET-1", null).getStatus()).isEqualTo(OrderReturnStatus.SHIPPED);
         assertThat(orderReturnService.markDelivered("RET-1", null).getStatus()).isEqualTo(OrderReturnStatus.DELIVERED);
@@ -2574,7 +2577,6 @@ class OrderReturnServiceTest {
                 null
             )
         ).thenReturn(orderReturn);
-        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
         OrderReturn result = orderReturnService.settlePriceDifference(
             "RET-1",
@@ -2594,14 +2596,14 @@ class OrderReturnServiceTest {
             null
         );
         verify(zohoBooksIntegrationClient, never()).createCreditNote(any(), any(), anyMap(), eq(false));
-        verify(orderReturnRepository).save(orderReturn);
+        verify(orderReturnRepository, never()).save(any());
     }
 
     @Test
-    void settlePriceDifference_razorpay_createsCreditNoteAfterRefund() {
+    void settlePriceDifference_razorpay_doesNotCreateCreditNote() {
         ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
         zoho.setSyncReturns(true);
-        when(applicationProperties.getZoho()).thenReturn(zoho);
+        lenient().when(applicationProperties.getZoho()).thenReturn(zoho);
         OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ACCEPTED, "TEE-M-BLUE", "M", "Blue");
         orderReturn.getOrder().paymentMethod("online").razorpayPaymentId("pay_live_1").total(new BigDecimal("1200.00"));
         orderReturn.setPriceDifference(new BigDecimal("-300.00"));
@@ -2616,8 +2618,6 @@ class OrderReturnServiceTest {
                 null
             )
         ).thenReturn(orderReturn);
-        when(zohoBooksIntegrationClient.createCreditNote(eq(10L), eq("RET-1"), anyMap(), eq(false))).thenReturn(Optional.of("cn-ex-rp"));
-        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
         OrderReturn result = orderReturnService.settlePriceDifference(
             "RET-1",
@@ -2629,9 +2629,9 @@ class OrderReturnServiceTest {
             null
         );
 
-        assertThat(result.getZohoCreditNoteId()).isEqualTo("cn-ex-rp");
-        verify(zohoBooksIntegrationClient).createCreditNote(eq(10L), eq("RET-1"), anyMap(), eq(false));
-        verify(orderReturnRepository).save(orderReturn);
+        assertThat(result.getZohoCreditNoteId()).isNull();
+        verify(zohoBooksIntegrationClient, never()).createCreditNote(any(), any(), anyMap(), eq(false));
+        verify(orderReturnRepository, never()).save(any());
     }
 
     @Test
@@ -2796,7 +2796,6 @@ class OrderReturnServiceTest {
                 null
             )
         ).thenReturn(orderReturn);
-        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
         orderReturnService.settlePriceDifference(
             "RET-1",
@@ -2814,7 +2813,7 @@ class OrderReturnServiceTest {
             "admin",
             null
         );
-        verify(orderReturnRepository).save(orderReturn);
+        verify(orderReturnRepository, never()).save(any());
     }
 
     @Test
@@ -2837,6 +2836,29 @@ class OrderReturnServiceTest {
             new BigDecimal("380.00"),
             RazorpayRefundService.PURPOSE_RETURN_REFUND
         );
+    }
+
+    @Test
+    void convertExchangeToRefund_afterPriceDifferenceRazorpay_createsLinkedCreditNote() {
+        ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
+        zoho.setSyncReturns(true);
+        when(applicationProperties.getZoho()).thenReturn(zoho);
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ACCEPTED, "TEE-M-BLUE", "M", "Blue");
+        orderReturn.setOriginalItemAmount(new BigDecimal("500.00"));
+        orderReturn.setSettlementStatus(ExchangeSettlementStatus.REFUNDED);
+        orderReturn.setSettlementAmount(new BigDecimal("120.00"));
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(razorpayRefundService.refundPayment(any(), eq(new BigDecimal("380.00")), eq(RazorpayRefundService.PURPOSE_RETURN_REFUND)))
+            .thenReturn("rfnd_rest");
+        when(zohoBooksIntegrationClient.createCreditNote(eq(10L), eq("RET-1"), anyMap(), eq(true))).thenReturn(Optional.of("cn-linked"));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderReturn result = orderReturnService.convertExchangeToRefund("RET-1", null);
+
+        assertThat(result.getZohoCreditNoteId()).isEqualTo("cn-linked");
+        verify(zohoBooksIntegrationClient).createCreditNote(eq(10L), eq("RET-1"), anyMap(), eq(true));
+        verify(zohoBooksIntegrationClient, never()).createCreditNote(any(), any(), anyMap(), eq(false));
     }
 
     @Test
@@ -3360,33 +3382,11 @@ class OrderReturnServiceTest {
             .hasMessageContaining("Create a package before booking a shipment");
     }
 
-    @Test
-    void completeOutboundPackage_fromRepacking_movesToReadyToShip() {
-        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.REPACKING, "TEE-M-BLUE", "M", "Blue");
-        orderReturn
-            .getOrder()
-            .setShippingAddressJson(
-                "{\"full_name\":\"Jane Doe\",\"phone\":\"9876543210\",\"line1\":\"12 MG Road\",\"city\":\"Bengaluru\",\"state\":\"Karnataka\",\"pincode\":\"560001\"}"
-            );
-        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
-        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
-        when(
-            orderPackageService.previewRatesForDestination(eq("560001"), eq(500), eq(12), eq(10), eq(8), eq(false), any())
-        ).thenReturn(
-            Map.of(
-                "chargeable_weight_grams",
-                500,
-                "preferred_courier_id",
-                "1",
-                "preferred_courier_name",
-                "Surface Xpressbees 0.5 K.G",
-                "couriers",
-                List.of(Map.of("id", "1", "name", "Surface Xpressbees 0.5 K.G"))
-            )
-        );
-        when(orderPackageService.selectCourier(any(), eq("1"), eq("Surface Xpressbees 0.5 K.G"))).thenReturn(
-            new OrderPackageService.CourierSelection("1", "Surface Xpressbees 0.5 K.G", 500)
-        );
+    @ParameterizedTest
+    @EnumSource(value = OrderReturnStatus.class, names = { "ITEM_ALLOCATED", "REPACKING" })
+    void completeOutboundPackage_fromPackingStatuses_movesToReadyToShip(OrderReturnStatus fromStatus) {
+        OrderReturn orderReturn = exchangeReturnWithStatus(fromStatus, "TEE-M-BLUE", "M", "Blue");
+        stubOutboundPackageRates(orderReturn);
 
         OrderReturn result = orderReturnService.completeOutboundPackage(
             "RET-1",
@@ -3604,6 +3604,33 @@ class OrderReturnServiceTest {
         assertThat(simpleOk).isTrue();
         assertThat(emptyOk).isTrue();
         assertThat(invalidOk).isTrue();
+    }
+
+    private void stubOutboundPackageRates(OrderReturn orderReturn) {
+        orderReturn
+            .getOrder()
+            .setShippingAddressJson(
+                "{\"full_name\":\"Jane Doe\",\"phone\":\"9876543210\",\"line1\":\"12 MG Road\",\"city\":\"Bengaluru\",\"state\":\"Karnataka\",\"pincode\":\"560001\"}"
+            );
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(
+            orderPackageService.previewRatesForDestination(eq("560001"), eq(500), eq(12), eq(10), eq(8), eq(false), any())
+        ).thenReturn(
+            Map.of(
+                "chargeable_weight_grams",
+                500,
+                "preferred_courier_id",
+                "1",
+                "preferred_courier_name",
+                "Surface Xpressbees 0.5 K.G",
+                "couriers",
+                List.of(Map.of("id", "1", "name", "Surface Xpressbees 0.5 K.G"))
+            )
+        );
+        when(orderPackageService.selectCourier(any(), eq("1"), eq("Surface Xpressbees 0.5 K.G"))).thenReturn(
+            new OrderPackageService.CourierSelection("1", "Surface Xpressbees 0.5 K.G", 500)
+        );
     }
 
     private void stampExchangeOutboundPackage(OrderReturn orderReturn) {
