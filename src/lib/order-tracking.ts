@@ -78,6 +78,7 @@ const STATUS_INDEX: Record<string, number> = {
   hand_wrapped: 1,
   wrapped: 1,
   awaiting_pickup: 2,
+  carrier_cancelled: 2,
   shipped: 3,
   out_for_delivery: 4,
   delivery_failed: 4,
@@ -123,6 +124,7 @@ export function trackingStatusLabel(order: OrderTrackingFields) {
   if (key === "cancelled" || key === "canceled") return "Cancelled";
   if (key === "confirmed") return "Order confirmed";
   if (key === "awaiting_pickup") return "Waiting for pickup";
+  if (key === "carrier_cancelled") return "ExpressBees cancelled";
   if (key === "delivery_failed") return "Delivery attempt unsuccessful";
   if (isHandWrapped(order)) return "Hand-wrapped";
   const stage = TRACKING_STAGES.find((s) => s.key === key);
@@ -133,7 +135,10 @@ export function trackingStatusLabel(order: OrderTrackingFields) {
 /** Label for a timeline row — stage 0 becomes "Order confirmed" after payment. */
 export function trackingStageLabel(order: OrderTrackingFields, stageKey: string): string {
   const key = normalizedTrackingKey(order);
-  if (stageKey === "pending" && (key === "confirmed" || isHandWrapped(order) || key === "awaiting_pickup")) {
+  if (
+    stageKey === "pending" &&
+    (key === "confirmed" || isHandWrapped(order) || key === "awaiting_pickup" || key === "carrier_cancelled")
+  ) {
     return "Order confirmed";
   }
   return TRACKING_STAGES.find((s) => s.key === stageKey)?.label ?? stageKey;
@@ -152,6 +157,9 @@ export function trackingStageDetail(
     if (state === "done") return "Order confirmed.";
   }
   const stage = TRACKING_STAGES.find((s) => s.key === stageKey);
+  if (stageKey === "awaiting_pickup" && key === "carrier_cancelled" && state === "current") {
+    return "The courier cancelled this shipment booking. We are arranging a new pickup.";
+  }
   if (stageKey === "out_for_delivery" && key === "delivery_failed" && state === "current") {
     return "Delivery attempt was unsuccessful. A reattempt is scheduled by the courier.";
   }
@@ -175,6 +183,7 @@ export function shouldShowOrderTrackingLink(
 ): boolean {
   if (!order) return false;
   if (order.payment_status && order.payment_status !== "paid") return false;
+  if (String(order.tracking_status ?? "").toLowerCase() === "carrier_cancelled") return false;
   return !isTerminalTrackingState(order);
 }
 
@@ -189,6 +198,7 @@ export function trackingActivityTitle(order: OrderTrackingFields): string {
   if (key === "cancelled" || key === "canceled") return "Order cancelled";
   if (key === "confirmed") return "Order confirmed";
   if (key === "awaiting_pickup") return "Waiting for pickup";
+  if (key === "carrier_cancelled") return "ExpressBees cancelled";
   if (key === "delivery_failed") return "Delivery attempt unsuccessful";
   if (isHandWrapped(order)) return "Hand-wrapped";
   const stage = TRACKING_STAGES.find((s) => s.key === key);
@@ -199,6 +209,7 @@ export function trackingActivityTitle(order: OrderTrackingFields): string {
 export function trackingActivityIcon(order: OrderTrackingFields): LucideIcon {
   const key = normalizedTrackingKey(order);
   if (key === "cancelled" || key === "canceled") return Package;
+  if (key === "carrier_cancelled") return trackingStageIcon("awaiting_pickup");
   if (isHandWrapped(order)) return Package;
   return trackingStageIcon(key);
 }

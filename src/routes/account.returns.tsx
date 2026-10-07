@@ -385,14 +385,23 @@ function ReturnsPage() {
                       </p>
                     ) : null}
                     <ReturnConditionNotice />
-                    <textarea
-                      className="w-full rounded-xl border border-border bg-background/60 px-3 py-2 text-sm min-h-[80px]"
-                      placeholder="Why are you returning this order?"
-                      value={reasonByOrder[o.order_number] ?? ""}
-                      onChange={(e) =>
-                        setReasonByOrder((prev) => ({ ...prev, [o.order_number]: e.target.value }))
-                      }
-                    />
+                    <div className="space-y-1.5">
+                      <label htmlFor={`return-reason-${o.order_number}`} className="text-sm font-medium">
+                        Why are you returning this order?
+                        <span className="text-destructive" aria-hidden="true"> *</span>
+                      </label>
+                      <textarea
+                        id={`return-reason-${o.order_number}`}
+                        className="w-full rounded-xl border border-border bg-background/60 px-3 py-2 text-sm min-h-[80px]"
+                        placeholder="Tell us what went wrong"
+                        value={reasonByOrder[o.order_number] ?? ""}
+                        onChange={(e) =>
+                          setReasonByOrder((prev) => ({ ...prev, [o.order_number]: e.target.value }))
+                        }
+                        required
+                        aria-required="true"
+                      />
+                    </div>
                     <ReturnImageUpload
                       urls={imagesByOrder[o.order_number] ?? []}
                       onChange={(urls) => setImagesByOrder((prev) => ({ ...prev, [o.order_number]: urls }))}

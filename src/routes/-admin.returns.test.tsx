@@ -61,6 +61,12 @@ vi.mock("@/lib/ui-errors", () => ({
   showApiError: vi.fn(),
 }));
 
+const openPrintableShippingLabel = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/print-shipping-label", () => ({
+  openPrintableShippingLabel: (...args: unknown[]) => openPrintableShippingLabel(...args),
+}));
+
 function renderAdminReturns() {
   const Component = (Route as { component: React.ComponentType }).component;
   return render(<Component />);
@@ -69,6 +75,7 @@ function renderAdminReturns() {
 describe("admin returns", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Element.prototype.scrollIntoView = vi.fn();
     getAdminOrderReturnsSummary.mockResolvedValue({
       total: 1,
       returns: 1,
@@ -102,11 +109,13 @@ describe("admin returns", () => {
 
     renderAdminReturns();
 
-    await waitFor(() => expect(screen.getByRole("link", { name: /print label/i })).toBeInTheDocument());
-    expect(screen.getByRole("link", { name: /print label/i })).toHaveAttribute(
+    expect(await screen.findByRole("link", { name: /open label/i })).toHaveAttribute(
       "href",
       "https://label.example/OUT-456",
     );
+    const printLabel = await screen.findByRole("button", { name: /print label/i });
+    await userEvent.click(printLabel);
+    expect(openPrintableShippingLabel).toHaveBeenCalledWith("https://label.example/OUT-456");
     expect(screen.getByRole("link", { name: "Track" })).toHaveAttribute("href", "https://track.example/OUT-456");
   });
 
@@ -159,6 +168,47 @@ describe("admin returns", () => {
 
     await waitFor(() => expect(screen.getByText(/delivery ₹99 is not refunded/i)).toBeInTheDocument());
     expect(screen.getByText(/cod fee ₹40 is not refunded/i)).toBeInTheDocument();
+  });
+
+  it("marks return and exchange rejection and pickup-failure reasons as required", async () => {
+    listAdminOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "RET-1",
+          order_number: "MNM-1",
+          request_type: "return",
+          status: "requested",
+          reason: "Product arrived damaged in transit",
+          requested_at: "2026-09-20T00:00:00Z",
+          customer_login: "asha",
+          order_total: 999,
+        },
+        {
+          return_number: "EXG-2",
+          order_number: "MNM-2",
+          request_type: "exchange",
+          status: "pickup_scheduled",
+          reason: "Need a larger size for my baby",
+          requested_at: "2026-09-20T00:00:00Z",
+          customer_login: "asha",
+          order_total: 999,
+          reverse_awb: "AWB-1",
+        },
+      ],
+    });
+
+    renderAdminReturns();
+
+    const rejectButtons = await screen.findAllByRole("button", { name: "Reject" });
+    await userEvent.click(rejectButtons[0]);
+    expect(await screen.findByLabelText(/Rejection reason/i)).toBeRequired();
+    expect(screen.getByText(/Rejection reason/i).querySelector(".text-destructive")).toHaveTextContent("*");
+
+    await userEvent.keyboard("{Escape}");
+    const pickupFailed = await screen.findByRole("button", { name: "Pickup failed" });
+    await userEvent.click(pickupFailed);
+    expect(await screen.findByLabelText(/Failure reason/i)).toBeRequired();
+    expect(screen.getByText(/Failure reason/i).querySelector(".text-destructive")).toHaveTextContent("*");
   });
 
   it("shows customer-uploaded exchange photos", async () => {
@@ -701,5 +751,131 @@ describe("admin returns", () => {
         reference: "UTR-COLLECT-1",
       }),
     );
+  });
+
+  it("finds a return by order id without paging through results", async () => {
+    const requestedAt = new Date(2026, 9, 7, 12, 0, 0).toISOString();
+    listAdminOrderReturns.mockResolvedValue({
+      returns: Array.from({ length: 12 }, (_, index) => ({
+        return_number: `RET-${index + 1}`,
+        order_number: `MNM-${100 + index}`,
+        order_id: 100 + index,
+        request_type: "return",
+        status: "requested",
+        reason: "Need a different size",
+        requested_at: requestedAt,
+        customer_login: "asha",
+        order_total: 999,
+      })),
+    });
+
+    renderAdminReturns();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Go to page 2" })).toBeInTheDocument());
+    expect(screen.getByText(/Order MNM-100/)).toBeInTheDocument();
+    expect(screen.queryByText(/Order MNM-111/)).toBeNull();
+
+    await userEvent.type(screen.getByRole("searchbox", { name: /search by order id/i }), "MNM-111");
+    await waitFor(() => expect(screen.getByText(/Order MNM-111/)).toBeInTheDocument());
+    expect(screen.queryByText(/Order MNM-100/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Go to page 2" })).toBeNull();
+  });
+
+  it("filters returns by requested date", async () => {
+    const inRange = new Date(2026, 9, 7, 12, 0, 0);
+    const outOfRange = new Date(2026, 8, 1, 12, 0, 0);
+    listAdminOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "RET-TODAY",
+          order_number: "MNM-TODAY",
+          request_type: "return",
+          status: "requested",
+          reason: "Need a different size",
+          requested_at: inRange.toISOString(),
+          customer_login: "asha",
+          order_total: 999,
+        },
+        {
+          return_number: "RET-OLD",
+          order_number: "MNM-OLD",
+          request_type: "return",
+          status: "requested",
+          reason: "Need a different size",
+          requested_at: outOfRange.toISOString(),
+          customer_login: "asha",
+          order_total: 999,
+        },
+      ],
+    });
+
+    renderAdminReturns();
+    await waitFor(() => expect(screen.getByText(/Order MNM-TODAY/)).toBeInTheDocument());
+    expect(screen.getByText(/Order MNM-OLD/)).toBeInTheDocument();
+
+    const from = screen.getByLabelText("From date");
+    await userEvent.type(from, "2026-10-07");
+    await waitFor(() => expect(screen.getByText(/Order MNM-TODAY/)).toBeInTheDocument());
+    expect(screen.queryByText(/Order MNM-OLD/)).toBeNull();
+  });
+
+  it("finds a return in another status without switching the Requested chip", async () => {
+    const requestedAt = new Date(2026, 9, 7, 12, 0, 0).toISOString();
+    const requested = {
+      return_number: "RET-REQ",
+      order_number: "MNM-REQ",
+      order_id: 10,
+      request_type: "return" as const,
+      status: "requested",
+      reason: "Need a different size",
+      requested_at: requestedAt,
+      customer_login: "asha",
+      order_total: 999,
+    };
+    const approved = {
+      ...requested,
+      return_number: "RET-OK",
+      order_number: "MNM-OK",
+      order_id: 88,
+      status: "approved",
+    };
+    listAdminOrderReturns.mockImplementation((status?: string) =>
+      Promise.resolve({ returns: status === "requested" ? [requested] : [requested, approved] }),
+    );
+
+    renderAdminReturns();
+    await waitFor(() => expect(screen.getByText(/Order MNM-REQ/)).toBeInTheDocument());
+    expect(screen.queryByText(/Order MNM-OK/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Requested" })).toHaveAttribute("aria-pressed", "true");
+
+    await userEvent.type(screen.getByRole("searchbox", { name: /search by order id/i }), "MNM-OK");
+    await waitFor(() => expect(screen.getByText(/Order MNM-OK/)).toBeInTheDocument());
+    expect(listAdminOrderReturns).toHaveBeenCalledWith(undefined);
+    expect(screen.getByRole("button", { name: "Requested" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("searches by date across statuses", async () => {
+    const today = new Date(2026, 9, 7, 12, 0, 0).toISOString();
+    const requested = {
+      return_number: "RET-REQ",
+      order_number: "MNM-REQ",
+      request_type: "return" as const,
+      status: "requested",
+      reason: "Need a different size",
+      requested_at: today,
+      customer_login: "asha",
+      order_total: 999,
+    };
+    const approved = { ...requested, return_number: "RET-OK", order_number: "MNM-OK", status: "approved" };
+    listAdminOrderReturns.mockImplementation((status?: string) =>
+      Promise.resolve({ returns: status === "requested" ? [requested] : [requested, approved] }),
+    );
+
+    renderAdminReturns();
+    await waitFor(() => expect(screen.getByText(/Order MNM-REQ/)).toBeInTheDocument());
+    expect(screen.queryByText(/Order MNM-OK/)).toBeNull();
+
+    await userEvent.type(screen.getByLabelText("From date"), "2026-10-07");
+    await waitFor(() => expect(screen.getByText(/Order MNM-OK/)).toBeInTheDocument());
+    expect(listAdminOrderReturns).toHaveBeenCalledWith(undefined);
   });
 });

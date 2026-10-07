@@ -1,34 +1,39 @@
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { ArrowLeft, LayoutDashboard, Loader2, LogOut, Package, ShoppingCart } from "lucide-react";
+import {
+  ArrowLeft,
+  LayoutDashboard,
+  Loader2,
+  LogOut,
+  Mail,
+  Package,
+  ReceiptText,
+  RotateCcw,
+  ShoppingCart,
+  Users,
+  XCircle,
+  type LucideIcon,
+} from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { STAFF_ROLE_NAV, type DeskStaffRole } from "@/lib/staff-nav";
 import { isCmsAdminRole, staffHomePath, type StaffRole } from "@/lib/staff-roles";
 
-type StaffNavItem = { to: string; label: string; exact?: boolean };
-
-const ROLE_NAV: Record<string, { title: string; items: StaffNavItem[] }> = {
-  ROLE_OPERATIONS: {
-    title: "Operations",
-    items: [
-      { to: "/operations/dashboard", label: "Dashboard", exact: true },
-      { to: "/operations/orders", label: "Orders" },
-    ],
-  },
-  ROLE_SALES: {
-    title: "Sales",
-    items: [{ to: "/sales/products", label: "Products", exact: true }],
-  },
-  ROLE_CUSTOMER_SUPPORT: {
-    title: "Customer Support",
-    items: [{ to: "/customersupport/orders", label: "Orders" }],
-  },
+const NAV_ICONS: Record<string, LucideIcon> = {
+  Dashboard: LayoutDashboard,
+  Orders: ShoppingCart,
+  Products: Package,
+  Customers: Users,
+  Returns: RotateCcw,
+  Cancellations: XCircle,
+  Invoices: ReceiptText,
+  "Contact messages": Mail,
 };
 
 export function StaffShell({ allowedRole }: { allowedRole: StaffRole }) {
   const { user, staffRole, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
-  const nav = ROLE_NAV[allowedRole];
+  const nav = allowedRole in STAFF_ROLE_NAV ? STAFF_ROLE_NAV[allowedRole as DeskStaffRole] : { title: "Staff", items: [] };
   const isCmsAdmin = isCmsAdminRole(staffRole);
   const canAccess = Boolean(staffRole === allowedRole || isCmsAdmin);
 
@@ -66,7 +71,7 @@ export function StaffShell({ allowedRole }: { allowedRole: StaffRole }) {
         </div>
         {nav.items.map((item) => {
           const active = item.exact ? path === item.to : path.startsWith(item.to);
-          const Icon = item.label === "Products" ? Package : item.label === "Dashboard" ? LayoutDashboard : ShoppingCart;
+          const Icon = NAV_ICONS[item.label] ?? ShoppingCart;
           return (
             <Link
               key={item.to}

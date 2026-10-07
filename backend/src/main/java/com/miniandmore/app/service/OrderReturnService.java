@@ -28,6 +28,7 @@ import com.miniandmore.app.repository.OrderReturnItemRepository;
 import com.miniandmore.app.repository.OrderReturnRepository;
 import com.miniandmore.app.repository.ProductRepository;
 import com.miniandmore.app.repository.SiteSettingRepository;
+import com.miniandmore.app.repository.StoreAddressRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -141,7 +142,8 @@ public class OrderReturnService {
         CaseSlaSupport caseSlaSupport,
         SiteSettingRepository siteSettingRepository,
         OrderPackageService orderPackageService,
-        ExchangeRazorpaySettlementService exchangeRazorpaySettlementService
+        ExchangeRazorpaySettlementService exchangeRazorpaySettlementService,
+        StoreAddressRepository storeAddressRepository
     ) {
         this.orderReturnRepository = orderReturnRepository;
         this.orderReturnItemRepository = orderReturnItemRepository;
@@ -164,7 +166,8 @@ public class OrderReturnService {
         this.shipmentFactory = new ReturnXpressBeesShipmentFactory(
             applicationProperties,
             objectMapper,
-            orderReturnItemRepository
+            orderReturnItemRepository,
+            storeAddressRepository
         );
     }
 
@@ -482,25 +485,8 @@ public class OrderReturnService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Replacement is no longer in stock");
         }
         saveExchangeProductAndSyncZoho(orderReturn, product);
-        BigDecimal originalGross = money(item.getPrice()).multiply(BigDecimal.valueOf(qty)).setScale(2, RoundingMode.HALF_UP);
-        int orderedQty = Math.max(1, Optional.ofNullable(item.getQty()).orElse(1));
         CustomerOrder order = orderReturn.getOrder();
-        BigDecimal orderSubtotal = positiveOrFallback(order.getSubtotal(), originalGross);
-        List<OrderItem> siblings = order.getId() == null
-            ? List.of(item)
-            : orderItemRepository.findAllByOrderId(order.getId());
-        if (siblings.isEmpty()) {
-            siblings = List.of(item);
-        }
-        BigDecimal allocatedDiscount = allocatedDiscountFor(
-            item,
-            qty,
-            orderedQty,
-            orderSubtotal,
-            money(order.getDiscount()),
-            orderHasPersistedLineAllocations(siblings)
-        ).min(originalGross);
-        BigDecimal originalAmount = originalGross.subtract(allocatedDiscount).max(BigDecimal.ZERO);
+        BigDecimal originalAmount = netMerchandiseAmount(item, order, qty);
         BigDecimal replacementAmount = money(variantSupport.variantSellingPrice(replacement))
             .multiply(BigDecimal.valueOf(qty))
             .setScale(2, RoundingMode.HALF_UP);
@@ -1002,7 +988,7 @@ public class OrderReturnService {
                 Optional<String> creditNoteId = ledgerlyIntegrationClient.createCreditNote(
                     order.getOrderNumber(),
                     orderReturn.getReturnNumber(),
-                    money(orderReturn.getOriginalItemAmount())
+                    exchangeOriginalAmount(orderReturn)
                 );
                 if (creditNoteId.isPresent()) {
                     orderReturn.setLedgerlyCreditNoteId(creditNoteId.orElseThrow());
@@ -1149,10 +1135,7 @@ public class OrderReturnService {
             );
         }
         releaseExchangeReservation(orderReturn, false);
-        OrderItem item = orderReturn.getOrderItem();
-        BigDecimal originalItemAmount = orderReturn.getOriginalItemAmount() == null
-            ? item.getPrice().multiply(BigDecimal.valueOf(Optional.ofNullable(item.getQty()).orElse(1)))
-            : orderReturn.getOriginalItemAmount();
+        BigDecimal originalItemAmount = exchangeOriginalAmount(orderReturn);
         BigDecimal itemAmount = ExchangeSettlementAmounts.remainingItemRefund(orderReturn, originalItemAmount);
         if (itemAmount.signum() <= 0) {
             // Cash already went out as the price-difference refund. Do not record it again as
@@ -2140,7 +2123,7 @@ public class OrderReturnService {
             : orderReturnItemRepository.findAllByOrderReturnIdOrderById(orderReturn.getId());
         if (!lines.isEmpty()) {
             for (OrderReturnItem line : lines) {
-                int acceptedQty = Optional.ofNullable(line.getAcceptedQty()).orElse(0);
+                int acceptedQty = creditedQuantity(line);
                 ReturnDisposition disposition = line.getDisposition() != null
                     ? line.getDisposition()
                     : orderReturn.getDisposition();
@@ -2171,7 +2154,7 @@ public class OrderReturnService {
                 if (line.getOrderItem() == null || line.getOrderItem().getId() == null) {
                     continue;
                 }
-                int qty = Optional.ofNullable(line.getAcceptedQty()).orElse(0);
+                int qty = creditedQuantity(line);
                 if (qty > 0) {
                     qtyByItemId.merge(line.getOrderItem().getId(), qty, Integer::sum);
                 }
@@ -2344,6 +2327,60 @@ public class OrderReturnService {
 
     private static BigDecimal money(BigDecimal value) {
         return value == null ? BigDecimal.ZERO.setScale(2) : value.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Warehouse inspection writes acceptedQty (including 0). Missing acceptedQty is not a full
+     * accept — do not restock or credit requested units without that decision.
+     */
+    private static int creditedQuantity(OrderReturnItem line) {
+        if (line == null || line.getAcceptedQty() == null) {
+            return 0;
+        }
+        return Math.max(0, line.getAcceptedQty());
+    }
+
+    /**
+     * Prefer the net amount snapshotted at reservation. If that is missing (legacy rows),
+     * recompute with the same discount allocation as approve — never live gross price × qty.
+     */
+    private BigDecimal exchangeOriginalAmount(OrderReturn orderReturn) {
+        if (orderReturn.getOriginalItemAmount() != null) {
+            return money(orderReturn.getOriginalItemAmount());
+        }
+        OrderItem item = orderReturn.getOrderItem();
+        if (item == null) {
+            return BigDecimal.ZERO.setScale(2);
+        }
+        int qty = Optional.ofNullable(item.getQty()).orElse(1);
+        return netMerchandiseAmount(item, orderReturn.getOrder(), qty);
+    }
+
+    private BigDecimal netMerchandiseAmount(OrderItem item, CustomerOrder order, int qty) {
+        if (item == null || qty <= 0) {
+            return BigDecimal.ZERO.setScale(2);
+        }
+        BigDecimal originalGross = money(item.getPrice()).multiply(BigDecimal.valueOf(qty)).setScale(2, RoundingMode.HALF_UP);
+        if (order == null) {
+            return originalGross;
+        }
+        int orderedQty = Math.max(1, Optional.ofNullable(item.getQty()).orElse(1));
+        BigDecimal orderSubtotal = positiveOrFallback(order.getSubtotal(), originalGross);
+        List<OrderItem> siblings = order.getId() == null
+            ? List.of(item)
+            : orderItemRepository.findAllByOrderId(order.getId());
+        if (siblings.isEmpty()) {
+            siblings = List.of(item);
+        }
+        BigDecimal allocatedDiscount = allocatedDiscountFor(
+            item,
+            qty,
+            orderedQty,
+            orderSubtotal,
+            money(order.getDiscount()),
+            orderHasPersistedLineAllocations(siblings)
+        ).min(originalGross);
+        return originalGross.subtract(allocatedDiscount).max(BigDecimal.ZERO);
     }
 
     /**

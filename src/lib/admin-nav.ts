@@ -10,7 +10,8 @@ export type AdminNavItem = {
 
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { to: "/admin", label: "Dashboard", exact: true, keywords: "overview stats studio home" },
-  { to: "/admin/settings", label: "Site settings", keywords: "contact whatsapp social footer company" },
+  { to: "/admin/settings", label: "Site settings", keywords: "contact office address whatsapp social footer company" },
+  { to: "/admin/addresses", label: "Addresses", keywords: "warehouse dispatch shipment invoice billing registered office company address" },
   { to: "/admin/contact-messages", label: "Contact messages", keywords: "write to us comments email phone address communication" },
   { to: "/admin/banners", label: "Banners", keywords: "hero carousel slides" },
   { to: "/admin/categories", label: "Categories", keywords: "catalog folders" },

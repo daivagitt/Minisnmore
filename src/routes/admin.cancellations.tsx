@@ -1,7 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminPage } from "@/components/admin/AdminPage";
+import { AdminCaseSearchFields } from "@/components/admin/AdminCaseSearchFields";
 import { SHOW_M2_POST_ORDER_UI } from "@/lib/feature-flags";
+import {
+  adminCaseListFetchStatus,
+  adminCaseSearchActive,
+  matchesLocalDateRange,
+  matchesOrderQuery,
+} from "@/lib/admin-case-search";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -38,8 +45,10 @@ function formatCaseAge(row: AdminCancellationRequestRow) {
   return row.sla_overdue ? `${ageLabel} · overdue (due ${due})` : `${ageLabel} · due ${due}`;
 }
 
-function AdminCancellationsPage() {
+export function AdminCancellationsPage({ mode = "admin" }: { mode?: "admin" | "operations" | "support" } = {}) {
   if (!SHOW_M2_POST_ORDER_UI) return null;
+  const canFulfill = mode !== "support";
+  const eyebrow = mode === "support" ? "Customer Support" : mode === "operations" ? "Operations" : "Fulfilment";
 
   const [status, setStatus] = useState<string>("requested");
   const [rows, setRows] = useState<AdminCancellationRequestRow[]>([]);
@@ -50,24 +59,47 @@ function AdminCancellationsPage() {
   const [codRefundTarget, setCodRefundTarget] = useState<string | null>(null);
   const [codRefundMethod, setCodRefundMethod] = useState<"upi" | "bank_transfer" | "cash" | "other">("upi");
   const [codRefundReference, setCodRefundReference] = useState("");
+  const [orderQueryInput, setOrderQueryInput] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const hasRowsRef = useRef(false);
+  const loadGenRef = useRef(0);
+  const searchActive = adminCaseSearchActive(orderQueryInput, dateFrom, dateTo);
+  hasRowsRef.current = rows.length > 0;
 
   const load = useCallback(async () => {
-    setLoading(true);
+    const gen = ++loadGenRef.current;
+    const keepList = hasRowsRef.current;
+    if (!keepList) setLoading(true);
     try {
-      const res = await listAdminCancellationRequests(status || undefined);
+      const res = await listAdminCancellationRequests(adminCaseListFetchStatus(searchActive, status));
+      if (gen !== loadGenRef.current) return;
       setRows(res.requests ?? []);
     } catch (error) {
+      if (gen !== loadGenRef.current) return;
       showApiError(error, "Could not load cancellation requests");
     } finally {
-      setLoading(false);
+      if (gen === loadGenRef.current) setLoading(false);
     }
-  }, [status]);
+  }, [searchActive, status]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const paging = useListPagination(rows, { pageSize: LIST_PAGE_SIZE, resetKey: status });
+  const filteredRows = useMemo(() => {
+    return rows.filter(
+      (row) =>
+        matchesOrderQuery(orderQueryInput, { orderNumber: row.order_number, orderId: row.order_id }) &&
+        matchesLocalDateRange(row.requested_at, dateFrom, dateTo),
+    );
+  }, [rows, orderQueryInput, dateFrom, dateTo]);
+
+  const paging = useListPagination(filteredRows, {
+    pageSize: LIST_PAGE_SIZE,
+    resetKey: `${status}|${orderQueryInput}|${dateFrom}|${dateTo}`,
+  });
+  const filtersActive = status !== "requested" || adminCaseSearchActive(orderQueryInput, dateFrom, dateTo);
 
   const run = async (requestNumber: string, action: () => Promise<unknown>, label: string) => {
     setBusy(requestNumber);
@@ -116,28 +148,63 @@ function AdminCancellationsPage() {
 
   return (
     <AdminPage
-      eyebrow="Fulfilment"
+      eyebrow={eyebrow}
       title="Cancellation requests"
       description="Review customer cancellation requests before refund and stock release. ExpressBees is not involved in pre-dispatch cancellations."
     >
-      <div className="flex flex-wrap gap-2 mb-4">
-        {STATUS_FILTERS.map((s) => (
-          <button
-            key={s || "all"}
-            type="button"
-            onClick={() => setStatus(s)}
-            className={`text-xs rounded-full px-3 py-1.5 border ${
-              status === s ? "bg-primary text-primary-foreground border-primary" : "border-border"
-            }`}
-          >
-            {s ? s.replace(/_/g, " ") : "All"}
-          </button>
-        ))}
-      </div>
+      <section className="glass-strong mb-5 space-y-4 rounded-3xl p-4 sm:p-5" aria-label="Filter cancellations">
+        <div className="flex flex-wrap gap-2">
+          {STATUS_FILTERS.map((s) => (
+            <button
+              key={s || "all"}
+              type="button"
+              onClick={() => setStatus(s)}
+              className={`text-xs rounded-full px-3 py-1.5 border ${
+                status === s ? "bg-primary text-primary-foreground border-primary" : "border-border"
+              }`}
+            >
+              {s ? s.replace(/_/g, " ") : "All"}
+            </button>
+          ))}
+        </div>
+        <AdminCaseSearchFields
+          orderQuery={orderQueryInput}
+          onOrderQueryChange={setOrderQueryInput}
+          from={dateFrom}
+          to={dateTo}
+          onFromChange={setDateFrom}
+          onToChange={setDateTo}
+        />
+        <div className="flex flex-wrap items-end gap-3">
+          {filtersActive ? (
+            <button
+              type="button"
+              onClick={() => {
+                setStatus("requested");
+                setOrderQueryInput("");
+                setDateFrom("");
+                setDateTo("");
+              }}
+              className="inline-flex h-10 items-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Clear
+            </button>
+          ) : null}
+          {!loading && (
+            <p className="ml-auto text-xs text-muted-foreground" aria-live="polite">
+              {paging.totalItems === 0
+                ? "0 requests"
+                : paging.totalPages > 1
+                  ? `Showing ${paging.rangeStart}–${paging.rangeEnd} of ${paging.totalItems}`
+                  : `${paging.totalItems} request${paging.totalItems === 1 ? "" : "s"}`}
+            </p>
+          )}
+        </div>
+      </section>
 
       {loading ? (
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      ) : rows.length === 0 ? (
+      ) : filteredRows.length === 0 ? (
         <p className="text-sm text-muted-foreground">No cancellation requests in this filter.</p>
       ) : (
         <ul id="admin-cancellations-list" className="space-y-4">
@@ -179,7 +246,7 @@ function AdminCancellationsPage() {
               {r.rejection_reason ? (
                 <p className="text-xs text-amber-700">{r.rejection_reason}</p>
               ) : null}
-              {r.status === "approved" && r.payment_status === "refund_failed" ? (
+              {canFulfill && r.status === "approved" && r.payment_status === "refund_failed" ? (
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -197,7 +264,7 @@ function AdminCancellationsPage() {
                   </button>
                 </div>
               ) : null}
-              {r.cod_refund_pending ? (
+              {canFulfill && r.cod_refund_pending ? (
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -246,7 +313,7 @@ function AdminCancellationsPage() {
           ))}
         </ul>
       )}
-      {!loading && rows.length > 0 && (
+      {!loading && filteredRows.length > 0 && (
         <ListPagination
           page={paging.page}
           totalPages={paging.totalPages}

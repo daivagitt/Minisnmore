@@ -66,6 +66,32 @@ public interface UserRepository extends R2dbcRepository<User, Long> {
     @Query("SELECT * FROM jhi_user ORDER BY created_date DESC NULLS LAST, id DESC LIMIT :limit OFFSET :offset")
     Flux<User> findAllUsersForAdmin(long limit, long offset);
 
+    @Query(
+        """
+        SELECT COUNT(DISTINCT u.id) FROM jhi_user u
+        WHERE NOT EXISTS (
+          SELECT 1 FROM jhi_user_authority ua
+          WHERE ua.user_id = u.id
+            AND ua.authority_name IN ('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_SALES','ROLE_OPERATIONS','ROLE_CUSTOMER_SUPPORT')
+        )
+        """
+    )
+    Mono<Long> countCustomerUsers();
+
+    @Query(
+        """
+        SELECT u.* FROM jhi_user u
+        WHERE NOT EXISTS (
+          SELECT 1 FROM jhi_user_authority ua
+          WHERE ua.user_id = u.id
+            AND ua.authority_name IN ('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_SALES','ROLE_OPERATIONS','ROLE_CUSTOMER_SUPPORT')
+        )
+        ORDER BY u.created_date DESC NULLS LAST, u.id DESC
+        LIMIT :limit OFFSET :offset
+        """
+    )
+    Flux<User> findAllCustomerUsers(long limit, long offset);
+
     @Query("SELECT * FROM jhi_user WHERE activated = true ORDER BY id LIMIT :limit OFFSET :offset")
     Flux<User> findAllActivatedUsers(long limit, long offset);
 

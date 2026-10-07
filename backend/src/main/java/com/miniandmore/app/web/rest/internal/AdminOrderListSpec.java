@@ -27,7 +27,8 @@ final class AdminOrderListSpec {
         "awaiting_pickup",
         "shipped",
         "out_for_delivery",
-        "delivery_failed"
+        "delivery_failed",
+        "carrier_cancelled"
     );
     private static final List<String> AWAITING_PICKUP_CARRIER = List.of(
         "booked",
@@ -189,6 +190,7 @@ final class AdminOrderListSpec {
             case "awaiting_pickup" -> awaitingPickup(root, cb);
             case "out_for_delivery" -> outForDelivery(root, cb);
             case "delivery_failed" -> deliveryFailed(root, cb);
+            case "carrier_cancelled" -> carrierCancelled(root, cb);
             default -> shipped(root, cb);
         };
     }
@@ -200,7 +202,8 @@ final class AdminOrderListSpec {
             cb.isNull(root.get("shipmentCancelledAt")),
             cb.not(awaitingPickup(root, cb)),
             cb.not(outForDelivery(root, cb)),
-            cb.not(deliveryFailed(root, cb))
+            cb.not(deliveryFailed(root, cb)),
+            cb.not(carrierCancelled(root, cb))
         );
     }
 
@@ -248,6 +251,20 @@ final class AdminOrderListSpec {
                 cb.like(carrier, "%delivery-failed%"),
                 cb.like(carrier, "%failed_delivery%"),
                 cb.like(carrier, "%failed-delivery%")
+            )
+        );
+    }
+
+    private static Predicate carrierCancelled(Root<CustomerOrder> root, CriteriaBuilder cb) {
+        return cb.and(
+            hasAwb(root, cb),
+            cb.equal(root.get("shipmentLogisticsMode"), ReturnLogisticsMode.XPRESSBEES),
+            cb.isNull(root.get("shipmentCancelledAt")),
+            cb.not(root.get("status").in(OrderStatus.FULFILLED, OrderStatus.CANCELLED)),
+            cb.or(
+                cb.equal(carrierStatus(root, cb), "carrier_cancelled"),
+                cb.equal(carrierStatus(root, cb), "cancelled"),
+                cb.equal(carrierStatus(root, cb), "canceled")
             )
         );
     }

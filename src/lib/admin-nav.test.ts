@@ -38,6 +38,9 @@ describe("admin-nav", () => {
 
     const rbac = filterAdminNavItems(ADMIN_NAV_ITEMS, "rbac");
     expect(rbac.map((item) => item.to)).toEqual(["/admin/rbac"]);
+
+    const addresses = filterAdminNavItems(ADMIN_NAV_ITEMS, "warehouse invoice");
+    expect(addresses.map((item) => item.to)).toEqual(["/admin/addresses"]);
   });
 
   it("requires every token to match", () => {

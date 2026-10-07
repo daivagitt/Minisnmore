@@ -358,6 +358,23 @@ class UserServiceTest {
     }
 
     @Test
+    void getAllCustomerUsers_mapsToDto() {
+        when(userRepository.findAllCustomerUsers(20, 0)).thenReturn(Flux.just(user));
+
+        StepVerifier.create(userService.getAllCustomerUsers(PageRequest.of(0, 20)))
+            .assertNext(dto -> assertThat(dto.getLogin()).isEqualTo("user"))
+            .verifyComplete();
+        verify(userAuthoritiesLoader).attachAuthorities(anyList());
+    }
+
+    @Test
+    void countCustomerUsers_delegatesToRepository() {
+        when(userRepository.countCustomerUsers()).thenReturn(Mono.just(4L));
+
+        StepVerifier.create(userService.countCustomerUsers()).expectNext(4L).verifyComplete();
+    }
+
+    @Test
     void getAllPublicUsers_mapsToDto() {
         when(userRepository.findAllActivatedUsers(20, 0)).thenReturn(Flux.just(user));
 

@@ -283,6 +283,20 @@ class OrderMailServiceTest {
     }
 
     @Test
+    void sendForwardCarrierCancelledAdminNotice_sendsToSiteContactEmail() {
+        CustomerOrder order = orderWithAddress();
+        order.setTrackingNumber("XB-9");
+        SiteSetting settings = new SiteSetting();
+        settings.setContactEmail("ops@minisnmore.com");
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(java.util.Optional.of(settings));
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+
+        service.sendForwardCarrierCancelledAdminNotice(order);
+
+        verify(javaMailSender).send(mimeMessage);
+    }
+
+    @Test
     void cancellationEmails_processTheirTemplates() {
         CustomerOrder order = orderWithAddress();
         when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);

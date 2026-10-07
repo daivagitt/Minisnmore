@@ -83,6 +83,7 @@ const empty: SettingsForm = {
   twitter_url: "",
   footer_tagline: "",
   footer_copyright: "",
+  invoice_registered_office_address: "",
   ecatalogue_url: "",
   ecatalogue_label: "New Catalogue – Soft Bloom",
   gst_rate: 5,
@@ -174,7 +175,7 @@ function SettingsPage() {
     <AdminPage
       eyebrow="Site"
       title="Site settings"
-      description="Logo, contact details, social links, footer text and e-catalogue. Changes apply to the storefront immediately."
+      description="Logo, contact details, office address, social links, footer text and e-catalogue. Changes apply to the storefront immediately."
       action={
         <button
           onClick={save}
@@ -273,6 +274,18 @@ function SettingsPage() {
                   value={s.care_label ?? ""}
                   onChange={(e) => up("care_label", e.target.value)}
                   placeholder="Care"
+                />
+              </Field>
+              <Field
+                label="Office address"
+                hint="Registered office on invoices, and Our office address on Contact Us."
+              >
+                <textarea
+                  className={`${inputCls()} min-h-[5.5rem]`}
+                  value={s.invoice_registered_office_address ?? ""}
+                  onChange={(e) => up("invoice_registered_office_address", e.target.value)}
+                  placeholder="Street, area, city, state, PIN"
+                  rows={3}
                 />
               </Field>
               <Field label="WhatsApp number (digits only, with country code)">

@@ -361,6 +361,17 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
+    public Flux<AdminUserDTO> getAllCustomerUsers(Pageable pageable) {
+        long limit = pageable.getPageSize();
+        long offset = pageable.getOffset();
+        return userRepository
+            .findAllCustomerUsers(limit, offset)
+            .collectList()
+            .flatMapMany(userAuthoritiesLoader::attachAuthorities)
+            .map(AdminUserDTO::new);
+    }
+
+    @Transactional(readOnly = true)
     public Flux<com.miniandmore.gateway.service.dto.UserDTO> getAllPublicUsers(Pageable pageable) {
         return userRepository
             .findAllActivatedUsers(pageable.getPageSize(), pageable.getOffset())
@@ -375,6 +386,11 @@ public class UserService {
     @Transactional(readOnly = true)
     public Mono<Long> countManagedUsers() {
         return userRepository.count();
+    }
+
+    @Transactional(readOnly = true)
+    public Mono<Long> countCustomerUsers() {
+        return userRepository.countCustomerUsers();
     }
 
     @Transactional(readOnly = true)

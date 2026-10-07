@@ -94,6 +94,17 @@ class OrderTrackingStatusResolverTest {
     }
 
     @Test
+    void resolve_expressBeesCarrierCancelledStaysOpenForAdmin() {
+        CustomerOrder order = paidOrder()
+            .trackingNumber("XB-1")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("carrier_cancelled");
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("carrier_cancelled");
+        assertThat(OrderTrackingStatusResolver.isDispatched("carrier_cancelled")).isFalse();
+    }
+
+    @Test
     void resolve_expressBeesBookedAwbIsAwaitingPickup() {
         CustomerOrder order = paidOrder()
             .trackingNumber("XB-1")

@@ -28,8 +28,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/internal/v1/admin/order-returns")
-@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
+@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_OPERATIONS','ROLE_CUSTOMER_SUPPORT')")
 public class InternalAdminOrderReturnResource {
+
+    private static final String FULFILLMENT = "hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_OPERATIONS')";
 
     private final OrderReturnService orderReturnService;
     private final CaseSlaSupport caseSlaSupport;
@@ -72,6 +74,7 @@ public class InternalAdminOrderReturnResource {
         );
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/book-pickup")
     public ApiResponse<Map<String, Object>> bookPickup(
         @PathVariable String returnNumber,
@@ -93,6 +96,7 @@ public class InternalAdminOrderReturnResource {
         );
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/pickup-failed")
     public ApiResponse<Map<String, Object>> pickupFailed(
         @PathVariable String returnNumber,
@@ -103,6 +107,7 @@ public class InternalAdminOrderReturnResource {
         );
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/reschedule-pickup")
     public ApiResponse<Map<String, Object>> reschedulePickup(
         @PathVariable String returnNumber,
@@ -111,6 +116,7 @@ public class InternalAdminOrderReturnResource {
         return ApiResponse.ok(toDto(orderReturnService.reschedulePickup(returnNumber, notes(body))));
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/close-pickup-failed")
     public ApiResponse<Map<String, Object>> closePickupFailed(
         @PathVariable String returnNumber,
@@ -119,6 +125,7 @@ public class InternalAdminOrderReturnResource {
         return ApiResponse.ok(toDto(orderReturnService.closePickupFailed(returnNumber, notes(body))));
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/pickup-requested")
     public ApiResponse<Map<String, Object>> pickupRequested(
         @PathVariable String returnNumber,
@@ -127,6 +134,7 @@ public class InternalAdminOrderReturnResource {
         return ApiResponse.ok(toDto(orderReturnService.markPickupRequested(returnNumber, notes(body))));
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/picked-up")
     public ApiResponse<Map<String, Object>> pickedUp(
         @PathVariable String returnNumber,
@@ -135,6 +143,7 @@ public class InternalAdminOrderReturnResource {
         return ApiResponse.ok(toDto(orderReturnService.markPickedUp(returnNumber, notes(body))));
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/mark-received")
     public ApiResponse<Map<String, Object>> markReceived(
         @PathVariable String returnNumber,
@@ -143,6 +152,7 @@ public class InternalAdminOrderReturnResource {
         return ApiResponse.ok(toDto(orderReturnService.markReceived(returnNumber, notes(body))));
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/inspect")
     public ApiResponse<Map<String, Object>> inspect(
         @PathVariable String returnNumber,
@@ -151,6 +161,7 @@ public class InternalAdminOrderReturnResource {
         return ApiResponse.ok(toDto(orderReturnService.markInspected(returnNumber, notes(body))));
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/accept")
     public ApiResponse<Map<String, Object>> accept(
         @PathVariable String returnNumber,
@@ -176,6 +187,7 @@ public class InternalAdminOrderReturnResource {
         return ApiResponse.ok(toDto(accepted));
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/settle-price-difference")
     public ApiResponse<Map<String, Object>> settlePriceDifference(
         @PathVariable String returnNumber,
@@ -203,6 +215,7 @@ public class InternalAdminOrderReturnResource {
         );
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/allocate-replacement")
     public ApiResponse<Map<String, Object>> allocateReplacement(
         @PathVariable String returnNumber,
@@ -211,6 +224,7 @@ public class InternalAdminOrderReturnResource {
         return ApiResponse.ok(toDto(orderReturnService.allocateReplacementItem(returnNumber, notes(body))));
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/convert-to-refund")
     public ApiResponse<Map<String, Object>> convertToRefund(
         @PathVariable String returnNumber,
@@ -219,6 +233,7 @@ public class InternalAdminOrderReturnResource {
         return ApiResponse.ok(toDto(orderReturnService.convertExchangeToRefund(returnNumber, notes(body))));
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/repacking")
     public ApiResponse<Map<String, Object>> repacking(
         @PathVariable String returnNumber,
@@ -227,6 +242,7 @@ public class InternalAdminOrderReturnResource {
         return ApiResponse.ok(toDto(orderReturnService.markRepacking(returnNumber, notes(body))));
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/ready-to-ship")
     public ApiResponse<Map<String, Object>> readyToShip(
         @PathVariable String returnNumber,
@@ -235,6 +251,7 @@ public class InternalAdminOrderReturnResource {
         return ApiResponse.ok(toDto(orderReturnService.markReadyToShip(returnNumber, notes(body))));
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/package-rates")
     public ApiResponse<Map<String, Object>> packageRates(
         @PathVariable String returnNumber,
@@ -251,6 +268,7 @@ public class InternalAdminOrderReturnResource {
         );
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/complete-package")
     public ApiResponse<Map<String, Object>> completePackage(
         @PathVariable String returnNumber,
@@ -272,6 +290,7 @@ public class InternalAdminOrderReturnResource {
         );
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/book-outbound")
     public ApiResponse<Map<String, Object>> bookOutbound(
         @PathVariable String returnNumber,
@@ -296,6 +315,7 @@ public class InternalAdminOrderReturnResource {
         );
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/shipped")
     public ApiResponse<Map<String, Object>> shipped(
         @PathVariable String returnNumber,
@@ -304,6 +324,7 @@ public class InternalAdminOrderReturnResource {
         return ApiResponse.ok(toDto(orderReturnService.markShipped(returnNumber, notes(body))));
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/delivered")
     public ApiResponse<Map<String, Object>> delivered(
         @PathVariable String returnNumber,
@@ -312,6 +333,7 @@ public class InternalAdminOrderReturnResource {
         return ApiResponse.ok(toDto(orderReturnService.markDelivered(returnNumber, notes(body))));
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/complete")
     public ApiResponse<Map<String, Object>> complete(
         @PathVariable String returnNumber,
@@ -320,6 +342,7 @@ public class InternalAdminOrderReturnResource {
         return ApiResponse.ok(toDto(orderReturnService.completeExchange(returnNumber, notes(body))));
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/refund")
     public ApiResponse<Map<String, Object>> refund(
         @PathVariable String returnNumber,
@@ -328,6 +351,7 @@ public class InternalAdminOrderReturnResource {
         return ApiResponse.ok(toDto(orderReturnService.processRefund(returnNumber, notes(body))));
     }
 
+    @PreAuthorize(FULFILLMENT)
     @PostMapping("/{returnNumber}/record-cod-refund")
     public ApiResponse<Map<String, Object>> recordCodRefund(
         @PathVariable String returnNumber,

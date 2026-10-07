@@ -104,6 +104,9 @@ class InternalAdminOrderResourceTest {
     @MockitoBean
     private OrderCancellationService orderCancellationService;
 
+    @MockitoBean
+    private StoreAddressRepository storeAddressRepository;
+
     private CustomerOrder codOrder() {
         return new CustomerOrder()
             .id(900L)
@@ -180,7 +183,21 @@ class InternalAdminOrderResourceTest {
             .andExpect(jsonPath("$.data.page").value(1))
             .andExpect(jsonPath("$.data.pageSize").value(10))
             .andExpect(jsonPath("$.data.totalItems").value(1))
-            .andExpect(jsonPath("$.data.totalPages").value(1));
+            .andExpect(jsonPath("$.data.totalPages").value(1))
+            .andExpect(jsonPath("$.data.express_cancellation_count").value(0));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
+    void listOrders_includesExpressCancellationCount() throws Exception {
+        when(customerOrderRepository.findAll(any(Specification.class), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+        when(orderShipmentService.countExpressCancellations()).thenReturn(4L);
+
+        mockMvc
+            .perform(get("/internal/v1/admin/orders"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.express_cancellation_count").value(4));
     }
 
     @Test

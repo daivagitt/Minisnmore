@@ -123,6 +123,22 @@ SECTIONS: list[tuple[str, str, list[tuple[str, str, str]]]] = [
         ],
     ),
     (
+        "Manual UI tests",
+        "Positive and negative screen-level cases (smoke, regression, responsive, security) evaluated against the frontend codebase on every reports run.",
+        [
+            (
+                "./manual-ui-tests/index.html",
+                "Manual UI test report",
+                "Per-screen accordion with Test Case ID, scenario, manual steps, expected result, priority, type, and pass/fail",
+            ),
+            (
+                "./manual-ui-tests/manual-ui-tests-report.json",
+                "Manual UI results (JSON)",
+                "Machine-readable results for dashboards",
+            ),
+        ],
+    ),
+    (
         "API testing",
         "Lifecycle and functional tests against live UAT.",
         [

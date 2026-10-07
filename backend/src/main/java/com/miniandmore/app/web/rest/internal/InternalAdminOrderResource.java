@@ -14,8 +14,11 @@ import com.miniandmore.app.service.LedgerlySyncService;
 import com.miniandmore.app.service.OrderCancellationService;
 import com.miniandmore.app.service.OrderEventService;
 import com.miniandmore.app.service.OrderPackageService;
+import com.miniandmore.app.domain.enumeration.StoreAddressUsage;
+import com.miniandmore.app.repository.StoreAddressRepository;
 import com.miniandmore.app.service.OrderShipmentService;
 import com.miniandmore.app.service.OrderTrackingStatusResolver;
+import com.miniandmore.app.service.StoreAddressService;
 import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import com.miniandmore.app.web.rest.v1.ApiResponse;
@@ -67,6 +70,7 @@ public class InternalAdminOrderResource {
     private final OrderShipmentService orderShipmentService;
     private final OrderPackageService orderPackageService;
     private final OrderCancellationService orderCancellationService;
+    private final StoreAddressRepository storeAddressRepository;
 
     public InternalAdminOrderResource(
         AccountOrderDataAccess dataAccess,
@@ -78,7 +82,8 @@ public class InternalAdminOrderResource {
         InternalAccountOrderResource accountOrders,
         OrderShipmentService orderShipmentService,
         OrderPackageService orderPackageService,
-        OrderCancellationService orderCancellationService
+        OrderCancellationService orderCancellationService,
+        StoreAddressRepository storeAddressRepository
     ) {
         this.dataAccess = dataAccess;
         this.applicationProperties = applicationProperties;
@@ -90,6 +95,7 @@ public class InternalAdminOrderResource {
         this.orderShipmentService = orderShipmentService;
         this.orderPackageService = orderPackageService;
         this.orderCancellationService = orderCancellationService;
+        this.storeAddressRepository = storeAddressRepository;
     }
 
     @GetMapping
@@ -171,6 +177,7 @@ public class InternalAdminOrderResource {
         payload.put("pageSize", pageSize);
         payload.put("totalItems", result.getTotalElements());
         payload.put("totalPages", Math.max(result.getTotalPages(), 1));
+        payload.put("express_cancellation_count", orderShipmentService.countExpressCancellations());
         return ApiResponse.ok(payload);
     }
 
@@ -399,6 +406,7 @@ public class InternalAdminOrderResource {
         data.put("can_book_shipment_with_override", orderShipmentService.canBookWithOverride(order));
         data.put("can_book_expressbees_shipment", orderShipmentService.canBookExpressBees(order));
         data.put("can_book_expressbees_shipment_with_override", orderShipmentService.canBookExpressBeesWithOverride(order));
+        data.put("can_rebook_carrier_cancelled_shipment", orderShipmentService.canRebookCarrierCancelled(order));
         data.put("can_complete_package", orderPackageService.canCompletePackage(order));
         data.put("default_package_weight_grams", orderPackageService.defaultPackageWeightGrams(order));
         data.put("package_weight_grams", order.getPackageWeightGrams());
@@ -468,18 +476,10 @@ public class InternalAdminOrderResource {
     }
 
     private Map<String, Object> dispatchAddressMap() {
-        ApplicationProperties.XpressBees warehouse = applicationProperties.getXpressbees();
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("name", StringUtils.defaultString(warehouse.getWarehouseName()));
-        data.put("full_name", StringUtils.defaultString(warehouse.getWarehouseName()));
-        data.put("line1", StringUtils.defaultString(warehouse.getWarehouseLine1()));
-        data.put("line2", StringUtils.defaultString(warehouse.getWarehouseLine2()));
-        data.put("city", StringUtils.defaultString(warehouse.getWarehouseCity()));
-        data.put("state", StringUtils.defaultString(warehouse.getWarehouseState()));
-        data.put("pincode", StringUtils.defaultString(warehouse.getOriginPincode()));
-        data.put("phone", StringUtils.defaultString(warehouse.getWarehousePhone()));
-        data.put("country", "India");
-        return data;
+        return StoreAddressService.dispatchAddressPayload(
+            storeAddressRepository.findFirstByUsageAndIsDefaultTrue(StoreAddressUsage.SHIPMENT),
+            applicationProperties.getXpressbees()
+        );
     }
 
     private static String documentNumber(String prefix, CustomerOrder order) {

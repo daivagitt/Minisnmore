@@ -68,4 +68,30 @@ class XpressBeesShipmentStatusTest {
         assertThat(XpressBeesShipmentStatus.milestone("Picked Up")).isEqualTo("in_transit");
         assertThat(XpressBeesShipmentStatus.milestone("booked")).isEqualTo("awaiting_pickup");
     }
+
+    @Test
+    void cancelledAwbIsDetectedBeforePickup() {
+        assertThat(XpressBeesShipmentStatus.isCancelled("Cancelled")).isTrue();
+        assertThat(XpressBeesShipmentStatus.isCancelled("shipment cancelled")).isTrue();
+        assertThat(XpressBeesShipmentStatus.isCancelled("AWB-Cancelled")).isTrue();
+        assertThat(XpressBeesShipmentStatus.milestone("cancelled")).isEqualTo("carrier_cancelled");
+        assertThat(XpressBeesShipmentStatus.isAwaitingPickup("cancelled")).isFalse();
+        assertThat(XpressBeesShipmentStatus.isPickedUpOrInTransit("cancelled")).isFalse();
+        assertThat(XpressBeesShipmentStatus.isCancelled("in transit")).isFalse();
+    }
+
+    @Test
+    void preferForwardMilestone_carrierCancelOnlyReplacesAwaitingPickup() {
+        assertThat(XpressBeesShipmentStatus.preferForwardMilestone("awaiting_pickup", "carrier_cancelled")).isEqualTo(
+            "carrier_cancelled"
+        );
+        assertThat(XpressBeesShipmentStatus.preferForwardMilestone("carrier_cancelled", "awaiting_pickup")).isEqualTo(
+            "carrier_cancelled"
+        );
+        assertThat(XpressBeesShipmentStatus.preferForwardMilestone("in_transit", "cancelled")).isEqualTo("in_transit");
+        assertThat(XpressBeesShipmentStatus.preferForwardMilestone("carrier_cancelled", "in_transit")).isEqualTo(
+            "in_transit"
+        );
+        assertThat(XpressBeesShipmentStatus.preferForwardMilestone("delivered", "cancelled")).isEqualTo("delivered");
+    }
 }

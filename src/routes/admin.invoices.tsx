@@ -8,7 +8,7 @@ import {
   PortraitInvoiceDocument,
   type InvoiceBrandSettings,
 } from "@/components/PortraitInvoiceDocument";
-import { getAdminSiteSettings, saveSiteSettings, type SiteSettingsRow } from "@/lib/backend-data";
+import { getAdminSiteSettings, getSiteSettings, saveSiteSettings, type SiteSettingsRow } from "@/lib/backend-data";
 import { invalidateSiteSettings } from "@/hooks/useSiteSettings";
 import { showApiError } from "@/lib/ui-errors";
 import type { InvoiceOrder } from "@/lib/invoice-breakdown";
@@ -97,7 +97,13 @@ const PREVIEW_ORDER: InvoiceOrder & { shipping_address: Record<string, unknown> 
   ],
 };
 
-function AdminInvoicesPage() {
+export function AdminInvoicesPage({
+  readOnly = false,
+  eyebrow = "Sales",
+}: {
+  readOnly?: boolean;
+  eyebrow?: string;
+} = {}) {
   const [row, setRow] = useState<SiteSettingsRow>(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -105,7 +111,7 @@ function AdminInvoicesPage() {
   useEffect(() => {
     void (async () => {
       try {
-        const saved = await getAdminSiteSettings();
+        const saved = readOnly ? await getSiteSettings() : await getAdminSiteSettings();
         if (saved) setRow({ ...DEFAULTS, ...saved });
       } catch (error) {
         showApiError(error, "Could not load invoice settings");
@@ -113,7 +119,7 @@ function AdminInvoicesPage() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [readOnly]);
 
   const settings = useMemo(() => row as InvoiceBrandSettings, [row]);
 
@@ -132,18 +138,24 @@ function AdminInvoicesPage() {
 
   return (
     <AdminPage
-      eyebrow="Sales"
+      eyebrow={eyebrow}
       title="Invoices"
-      description="Configure the identity and legal details printed on custom invoices. A unique QR code linking to the matching order is generated automatically."
+      description={
+        readOnly
+          ? "Legal details printed on custom invoices. Open an order to print the matching invoice."
+          : "Configure the identity and legal details printed on custom invoices. A unique QR code linking to the matching order is generated automatically."
+      }
       action={
-        <button
-          type="button"
-          onClick={() => void save()}
-          disabled={loading || saving}
-          className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm text-primary-foreground disabled:opacity-60"
-        >
-          <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save invoice settings"}
-        </button>
+        readOnly ? undefined : (
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={loading || saving}
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm text-primary-foreground disabled:opacity-60"
+          >
+            <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save invoice settings"}
+          </button>
+        )
       }
     >
       {loading ? (
@@ -152,23 +164,34 @@ function AdminInvoicesPage() {
         <div className="space-y-6">
           <section className="glass-strong rounded-3xl p-5">
             <div className="space-y-5">
-              <ImageUploadField
-                label="Invoice logo"
-                folder="branding"
-                spec="invoiceLogo"
-                value={String(row.invoice_logo_url ?? "")}
-                onChange={(invoice_logo_url) =>
-                  setRow((current) => ({ ...current, invoice_logo_url }))
-                }
-                previewClassName="h-20 w-56 rounded-xl bg-white object-contain p-2 shrink-0"
-                hint="If left blank, invoices use the horizontal brand logo and then the main logo."
-              />
+              {readOnly ? (
+                row.invoice_logo_url ? (
+                  <img
+                    src={String(row.invoice_logo_url)}
+                    alt="Invoice logo"
+                    className="h-20 w-56 rounded-xl bg-white object-contain p-2"
+                  />
+                ) : null
+              ) : (
+                <ImageUploadField
+                  label="Invoice logo"
+                  folder="branding"
+                  spec="invoiceLogo"
+                  value={String(row.invoice_logo_url ?? "")}
+                  onChange={(invoice_logo_url) =>
+                    setRow((current) => ({ ...current, invoice_logo_url }))
+                  }
+                  previewClassName="h-20 w-56 rounded-xl bg-white object-contain p-2 shrink-0"
+                  hint="If left blank, invoices use the horizontal brand logo and then the main logo."
+                />
+              )}
 
               <div className="grid gap-4 md:grid-cols-2">
                 <InvoiceInput
                   label="Invoice website"
                   placeholder="https://www.example.com"
                   value={row.invoice_website}
+                  readOnly={readOnly}
                   onChange={(invoice_website) =>
                     setRow((current) => ({ ...current, invoice_website }))
                   }
@@ -177,18 +200,21 @@ function AdminInvoicesPage() {
                   label="GSTIN"
                   placeholder="Enter company GSTIN"
                   value={row.invoice_gstin}
+                  readOnly={readOnly}
                   onChange={(invoice_gstin) => setRow((current) => ({ ...current, invoice_gstin }))}
                 />
                 <InvoiceInput
                   label="CIN"
                   placeholder="Enter company CIN"
                   value={row.invoice_cin}
+                  readOnly={readOnly}
                   onChange={(invoice_cin) => setRow((current) => ({ ...current, invoice_cin }))}
                 />
                 <InvoiceInput
                   label="Seller state"
                   placeholder="Karnataka"
                   value={row.invoice_seller_state}
+                  readOnly={readOnly}
                   onChange={(invoice_seller_state) =>
                     setRow((current) => ({ ...current, invoice_seller_state }))
                   }
@@ -200,6 +226,7 @@ function AdminInvoicesPage() {
                   label="Sold by address"
                   placeholder="Enter the legal seller name and full address"
                   value={row.invoice_sold_by_address}
+                  readOnly={readOnly}
                   onChange={(invoice_sold_by_address) =>
                     setRow((current) => ({ ...current, invoice_sold_by_address }))
                   }
@@ -208,6 +235,7 @@ function AdminInvoicesPage() {
                   label="Dispatch from address"
                   placeholder="Enter the warehouse or dispatch address"
                   value={row.invoice_dispatch_from_address}
+                  readOnly={readOnly}
                   onChange={(invoice_dispatch_from_address) =>
                     setRow((current) => ({ ...current, invoice_dispatch_from_address }))
                   }
@@ -216,6 +244,7 @@ function AdminInvoicesPage() {
                   label="Registered office address"
                   placeholder="Enter the registered-office address"
                   value={row.invoice_registered_office_address}
+                  readOnly={readOnly}
                   onChange={(invoice_registered_office_address) =>
                     setRow((current) => ({ ...current, invoice_registered_office_address }))
                   }
@@ -224,6 +253,7 @@ function AdminInvoicesPage() {
                   label="Invoice footer note"
                   placeholder="Optional tax, membership or customer note"
                   value={row.invoice_footer_note}
+                  readOnly={readOnly}
                   onChange={(invoice_footer_note) =>
                     setRow((current) => ({ ...current, invoice_footer_note }))
                   }
@@ -254,11 +284,13 @@ function InvoiceInput({
   placeholder,
   value,
   onChange,
+  readOnly = false,
 }: {
   label: string;
   placeholder: string;
   value: SiteSettingsRow[string];
   onChange: (value: string) => void;
+  readOnly?: boolean;
 }) {
   return (
     <Field label={label}>
@@ -266,6 +298,7 @@ function InvoiceInput({
         className={inputCls()}
         placeholder={placeholder}
         value={String(value ?? "")}
+        readOnly={readOnly}
         onChange={(event) => onChange(event.target.value)}
       />
     </Field>
@@ -277,11 +310,13 @@ function InvoiceTextarea({
   placeholder,
   value,
   onChange,
+  readOnly = false,
 }: {
   label: string;
   placeholder: string;
   value: SiteSettingsRow[string];
   onChange: (value: string) => void;
+  readOnly?: boolean;
 }) {
   return (
     <Field label={label}>
@@ -289,6 +324,7 @@ function InvoiceTextarea({
         className={`${inputCls()} min-h-24 resize-y`}
         placeholder={placeholder}
         value={String(value ?? "")}
+        readOnly={readOnly}
         onChange={(event) => onChange(event.target.value)}
       />
     </Field>

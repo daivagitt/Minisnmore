@@ -35,6 +35,13 @@ describe("order-tracking helpers", () => {
     expect(shouldShowOrderTrackingLink({ payment_status: "pending", status: "confirmed" })).toBe(false);
     expect(shouldShowOrderTrackingLink({ payment_status: "paid", status: "confirmed" })).toBe(true);
     expect(shouldShowOrderTrackingLink({ payment_status: "paid", status: "fulfilled" })).toBe(false);
+    expect(
+      shouldShowOrderTrackingLink({
+        payment_status: "paid",
+        status: "confirmed",
+        tracking_status: "carrier_cancelled",
+      }),
+    ).toBe(false);
   });
 
   it("keeps confirmed separate from the explicit Hand-wrapped state", () => {
@@ -45,6 +52,16 @@ describe("order-tracking helpers", () => {
     expect(trackingStatusLabel({ tracking_status: "hand_wrapped" })).toBe("Hand-wrapped");
     expect(trackingStageLabel({ tracking_status: "hand_wrapped" }, "pending")).toBe("Order confirmed");
     expect(trackingStageLabel({ tracking_status: "hand_wrapped" }, "processing")).toBe("Hand-wrapped");
+  });
+
+  it("maps ExpressBees carrier cancellation to awaiting pickup with a distinct label", () => {
+    expect(resolveTrackingStage({ tracking_status: "carrier_cancelled" })).toBe(2);
+    expect(trackingStatusLabel({ tracking_status: "carrier_cancelled" })).toBe("ExpressBees cancelled");
+    expect(trackingActivityTitle({ tracking_status: "carrier_cancelled" })).toBe("ExpressBees cancelled");
+    expect(
+      trackingStageDetail({ tracking_status: "carrier_cancelled" }, "awaiting_pickup", "current"),
+    ).toMatch(/cancelled this shipment booking/i);
+    expect(isTerminalTrackingState({ tracking_status: "carrier_cancelled" })).toBe(false);
   });
 
   it("shows Waiting for pickup as a distinct stage before shipping", () => {

@@ -85,7 +85,7 @@ export function OrderTrackingCard({ order, showHeader = true }: Props) {
               <span className="text-muted-foreground">Delivered on:</span> {formatOrderDate(order.shipment_delivered_at)}
             </div>
           )}
-          {order.tracking_url && (
+          {order.tracking_url && (order.tracking_status ?? "").toLowerCase() !== "carrier_cancelled" && (
             <div>
               <a href={order.tracking_url} target="_blank" rel="noreferrer" className="underline">
                 Track shipment

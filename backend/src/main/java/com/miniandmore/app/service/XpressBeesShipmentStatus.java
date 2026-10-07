@@ -13,6 +13,7 @@ import org.apache.commons.lang3.StringUtils;
 public final class XpressBeesShipmentStatus {
 
     public static final String AWAITING_PICKUP_MILESTONE = "awaiting_pickup";
+    public static final String CARRIER_CANCELLED = "carrier_cancelled";
     public static final String IN_TRANSIT = "in_transit";
     public static final String OUT_FOR_DELIVERY = "out_for_delivery";
     public static final String DELIVERY_FAILED = "delivery_failed";
@@ -39,6 +40,23 @@ public final class XpressBeesShipmentStatus {
         "delivered_to_customer"
     );
 
+    /** Pre-pickup AWB/booking cancellations. Post-pickup scans must not use this bucket. */
+    private static final Set<String> CARRIER_CANCELLED_STATUSES = Set.of(
+        CARRIER_CANCELLED,
+        "cancelled",
+        "canceled",
+        "cancel",
+        "shipment_cancelled",
+        "shipment_canceled",
+        "shipment_cancel",
+        "awb_cancelled",
+        "awb_canceled",
+        "booking_cancelled",
+        "booking_canceled",
+        "cancelled_by_carrier",
+        "canceled_by_carrier"
+    );
+
     private XpressBeesShipmentStatus() {}
 
     public static String normalize(String status) {
@@ -52,6 +70,10 @@ public final class XpressBeesShipmentStatus {
     public static boolean isAwaitingPickup(String status) {
         String normalized = normalize(status);
         return normalized.isBlank() || AWAITING_PICKUP.contains(normalized);
+    }
+
+    public static boolean isCancelled(String status) {
+        return CARRIER_CANCELLED_STATUSES.contains(normalize(status));
     }
 
     public static boolean isDelivered(String status) {
@@ -77,6 +99,7 @@ public final class XpressBeesShipmentStatus {
         if (
             normalized.isBlank() ||
             isAwaitingPickup(normalized) ||
+            isCancelled(normalized) ||
             isDelivered(normalized) ||
             isOutForDelivery(normalized) ||
             isUndelivered(normalized)
@@ -110,6 +133,9 @@ public final class XpressBeesShipmentStatus {
         }
         if (isPickedUpOrInTransit(raw)) {
             return IN_TRANSIT;
+        }
+        if (isCancelled(raw)) {
+            return CARRIER_CANCELLED;
         }
         if (isAwaitingPickup(raw)) {
             return AWAITING_PICKUP_MILESTONE;
@@ -168,9 +194,10 @@ public final class XpressBeesShipmentStatus {
     private static int forwardRank(String milestone) {
         return switch (StringUtils.defaultString(milestone)) {
             case AWAITING_PICKUP_MILESTONE -> 1;
-            case IN_TRANSIT -> 2;
-            case OUT_FOR_DELIVERY, DELIVERY_FAILED -> 3;
-            case DELIVERED_MILESTONE -> 4;
+            case CARRIER_CANCELLED -> 2;
+            case IN_TRANSIT -> 3;
+            case OUT_FOR_DELIVERY, DELIVERY_FAILED -> 4;
+            case DELIVERED_MILESTONE -> 5;
             default -> 0;
         };
     }

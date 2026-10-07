@@ -1,11 +1,13 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Route } from "./admin.customers";
+import { AdminCustomersPage, Route } from "./admin.customers";
 
 const apiMock = vi.hoisted(() => ({
   get: vi.fn(),
 }));
+
+const downloadTableAsXlsx = vi.hoisted(() => vi.fn());
 
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (config: unknown) => config,
@@ -21,6 +23,14 @@ vi.mock("@/lib/api", () => ({
 vi.mock("@/lib/ui-errors", () => ({
   showApiError: vi.fn(),
 }));
+
+vi.mock("@/lib/export-table", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/export-table")>();
+  return {
+    ...actual,
+    downloadTableAsXlsx: (...args: unknown[]) => downloadTableAsXlsx(...args),
+  };
+});
 
 function daysAgo(days: number): string {
   const date = new Date();
@@ -120,6 +130,12 @@ describe("admin customers route", () => {
     expect(screen.getByRole("heading", { name: "Join timeline" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Ordered" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "RBAC" })).toHaveAttribute("href", "/admin/rbac");
+  });
+
+  it("hides the RBAC invite hint on staff desks", async () => {
+    render(<AdminCustomersPage showRbacHint={false} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Customers: 3" })).toBeInTheDocument());
+    expect(screen.queryByRole("link", { name: "RBAC" })).toBeNull();
   });
 
   it("shows whether each customer has previously ordered", async () => {
@@ -264,6 +280,27 @@ describe("admin customers route", () => {
     expect(screen.queryByText("week@example.com")).toBeNull();
     expect(screen.queryByText("older@example.com")).toBeNull();
     expect(screen.getByText("No customers match these filters.")).toBeInTheDocument();
+  });
+
+  it("exports the filtered customer list", async () => {
+    downloadTableAsXlsx.mockResolvedValue(undefined);
+    renderCustomers();
+    await waitFor(() => expect(screen.getByText("today@example.com")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Pending" }));
+    await waitFor(() => expect(screen.getByText("older@example.com")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Export" }));
+    await waitFor(() => expect(downloadTableAsXlsx).toHaveBeenCalled());
+    const [rows, filename, sheet] = downloadTableAsXlsx.mock.calls[0];
+    expect(filename).toMatch(/^customers-\d{8}\.xlsx$/);
+    expect(sheet).toBe("Customers");
+    expect(rows).toEqual([
+      expect.objectContaining({
+        Name: "Older Customer",
+        Email: "older@example.com",
+        Status: "Pending",
+        Ordered: "No",
+      }),
+    ]);
   });
 
   it("paginates the customer list", async () => {

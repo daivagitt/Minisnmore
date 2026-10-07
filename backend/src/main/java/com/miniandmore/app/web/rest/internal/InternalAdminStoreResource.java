@@ -21,6 +21,9 @@ import org.springframework.web.server.ResponseStatusException;
 public class InternalAdminStoreResource {
 
     private static final String CMS_ADMIN = "hasAuthority('ROLE_ADMIN')";
+    private static final String CMS_STORE_ADDRESSES = "hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')";
+    private static final String CATALOG_READ = "hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_SALES','ROLE_OPERATIONS')";
+    private static final String STAFF_DESK = "hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_OPERATIONS','ROLE_CUSTOMER_SUPPORT')";
 
     private static final Logger LOG = LoggerFactory.getLogger(InternalAdminStoreResource.class);
 
@@ -52,6 +55,7 @@ public class InternalAdminStoreResource {
     private final PolicyMapper policyMapper;
     private final CouponMapper couponMapper;
     private final ContactMessageService contactMessageService;
+    private final StoreAddressService storeAddressService;
     private final LedgerlySyncService ledgerlySyncService;
     private final ZohoSyncService zohoSyncService;
 
@@ -84,6 +88,7 @@ public class InternalAdminStoreResource {
         PolicyMapper policyMapper,
         CouponMapper couponMapper,
         ContactMessageService contactMessageService,
+        StoreAddressService storeAddressService,
         LedgerlySyncService ledgerlySyncService,
         ZohoSyncService zohoSyncService
     ) {
@@ -115,6 +120,7 @@ public class InternalAdminStoreResource {
         this.policyMapper = policyMapper;
         this.couponMapper = couponMapper;
         this.contactMessageService = contactMessageService;
+        this.storeAddressService = storeAddressService;
         this.ledgerlySyncService = ledgerlySyncService;
         this.zohoSyncService = zohoSyncService;
     }
@@ -177,7 +183,7 @@ public class InternalAdminStoreResource {
     }
 
     @GetMapping("/products")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SALES')")
+    @PreAuthorize(CATALOG_READ)
     public ApiResponse<List<ProductDTO>> products() {
         return ApiResponse.ok(productRepository.findAllWithCategoryOrderBySortOrder().stream().map(productMapper::toDto).toList());
     }
@@ -377,7 +383,7 @@ public class InternalAdminStoreResource {
     }
 
     @GetMapping("/contact-messages")
-    @PreAuthorize(CMS_ADMIN)
+    @PreAuthorize(STAFF_DESK)
     public ApiResponse<List<ContactMessageDTO>> contactMessages() {
         return ApiResponse.ok(contactMessageService.findAllNewestFirst());
     }
@@ -386,6 +392,32 @@ public class InternalAdminStoreResource {
     @PreAuthorize(CMS_ADMIN)
     public ApiResponse<Map<String, Boolean>> deleteContactMessage(@PathVariable Long id) {
         contactMessageService.delete(id);
+        return ApiResponse.ok(Map.of("deleted", true));
+    }
+
+    @GetMapping("/store-addresses")
+    @PreAuthorize(CMS_STORE_ADDRESSES)
+    public ApiResponse<List<StoreAddressDTO>> storeAddresses() {
+        return ApiResponse.ok(storeAddressService.findAllNewestFirst());
+    }
+
+    @PostMapping("/store-addresses")
+    @PreAuthorize(CMS_STORE_ADDRESSES)
+    public ApiResponse<StoreAddressDTO> createStoreAddress(@Valid @RequestBody StoreAddressDTO dto) {
+        return ApiResponse.ok(storeAddressService.save(dto));
+    }
+
+    @PutMapping("/store-addresses/{id}")
+    @PreAuthorize(CMS_STORE_ADDRESSES)
+    public ApiResponse<StoreAddressDTO> updateStoreAddress(@PathVariable Long id, @Valid @RequestBody StoreAddressDTO dto) {
+        dto.setId(id);
+        return ApiResponse.ok(storeAddressService.update(dto));
+    }
+
+    @DeleteMapping("/store-addresses/{id}")
+    @PreAuthorize(CMS_STORE_ADDRESSES)
+    public ApiResponse<Map<String, Boolean>> deleteStoreAddress(@PathVariable Long id) {
+        storeAddressService.delete(id);
         return ApiResponse.ok(Map.of("deleted", true));
     }
 

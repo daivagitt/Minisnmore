@@ -122,6 +122,9 @@ class InternalAdminStoreResourceTest {
     private ContactMessageService contactMessageService;
 
     @MockitoBean
+    private StoreAddressService storeAddressService;
+
+    @MockitoBean
     private LedgerlySyncService ledgerlySyncService;
 
     @MockitoBean
@@ -198,6 +201,7 @@ class InternalAdminStoreResourceTest {
         mockMvc.perform(get("/internal/v1/admin/site-settings")).andExpect(status().isOk());
         mockMvc.perform(get("/internal/v1/admin/policies")).andExpect(status().isOk());
         mockMvc.perform(get("/internal/v1/admin/coupons")).andExpect(status().isOk());
+        mockMvc.perform(get("/internal/v1/admin/store-addresses")).andExpect(status().isOk());
     }
 
     @Test
@@ -647,6 +651,46 @@ class InternalAdminStoreResourceTest {
             .delete(404L);
 
         mockMvc.perform(delete("/internal/v1/admin/contact-messages/404")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void storeAddresses_returns200() throws Exception {
+        StoreAddressDTO dto = new StoreAddressDTO();
+        dto.setId(31L);
+        dto.setFullName("Warehouse");
+        dto.setUsage(com.miniandmore.app.domain.enumeration.StoreAddressUsage.SHIPMENT);
+        when(storeAddressService.findAllNewestFirst()).thenReturn(List.of(dto));
+
+        mockMvc
+            .perform(get("/internal/v1/admin/store-addresses"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].fullName").value("Warehouse"));
+    }
+
+    @Test
+    void createStoreAddress_returnsSavedDto() throws Exception {
+        StoreAddressDTO dto = new StoreAddressDTO();
+        dto.setId(32L);
+        dto.setFullName("Invoice office");
+        when(storeAddressService.save(any(StoreAddressDTO.class))).thenReturn(dto);
+
+        mockMvc
+            .perform(
+                post("/internal/v1/admin/store-addresses")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"fullName\":\"Invoice office\",\"phone\":\"9876543210\",\"line1\":\"12 Flower Lane\",\"city\":\"Bengaluru\",\"state\":\"Karnataka\",\"pincode\":\"560001\",\"usage\":\"INVOICE\"}"
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.fullName").value("Invoice office"));
+    }
+
+    @Test
+    void deleteStoreAddress_deletesWhenExists() throws Exception {
+        mockMvc.perform(delete("/internal/v1/admin/store-addresses/31")).andExpect(status().isOk());
+
+        verify(storeAddressService).delete(31L);
     }
 
     private static CategoryDTO categoryDto(Long id, String name) {

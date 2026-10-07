@@ -3,6 +3,7 @@ package com.miniandmore.app.repository;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
+import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import java.time.Instant;
@@ -193,5 +194,22 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
         @Param("paymentStatus") PaymentStatus paymentStatus,
         @Param("statuses") List<OrderStatus> statuses,
         Pageable pageable
+    );
+
+    @Query(
+        """
+        select count(customerOrder) from CustomerOrder customerOrder
+        where customerOrder.shipmentLogisticsMode = :mode
+          and lower(customerOrder.shipmentCarrierStatus) in :carrierStatuses
+          and customerOrder.shipmentCancelledAt is null
+          and customerOrder.status not in :excludedStatuses
+          and customerOrder.trackingNumber is not null
+          and trim(customerOrder.trackingNumber) <> ''
+        """
+    )
+    long countExpressBeesCarrierCancelled(
+        @Param("mode") ReturnLogisticsMode mode,
+        @Param("carrierStatuses") Collection<String> carrierStatuses,
+        @Param("excludedStatuses") Collection<OrderStatus> excludedStatuses
     );
 }

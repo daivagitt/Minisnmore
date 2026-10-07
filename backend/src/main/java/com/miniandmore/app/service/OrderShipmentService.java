@@ -10,8 +10,10 @@ import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PackageType;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
+import com.miniandmore.app.domain.enumeration.StoreAddressUsage;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.OrderItemRepository;
+import com.miniandmore.app.repository.StoreAddressRepository;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -45,7 +47,9 @@ public class OrderShipmentService {
     private final ApplicationProperties applicationProperties;
     private final OrderEventService orderEventService;
     private final OrderCancellationService orderCancellationService;
+    private final OrderMailService orderMailService;
     private final ObjectMapper objectMapper;
+    private final StoreAddressRepository storeAddressRepository;
 
     public OrderShipmentService(
         CustomerOrderRepository customerOrderRepository,
@@ -54,7 +58,9 @@ public class OrderShipmentService {
         ApplicationProperties applicationProperties,
         OrderEventService orderEventService,
         OrderCancellationService orderCancellationService,
-        ObjectMapper objectMapper
+        OrderMailService orderMailService,
+        ObjectMapper objectMapper,
+        StoreAddressRepository storeAddressRepository
     ) {
         this.customerOrderRepository = customerOrderRepository;
         this.orderItemRepository = orderItemRepository;
@@ -62,7 +68,9 @@ public class OrderShipmentService {
         this.applicationProperties = applicationProperties;
         this.orderEventService = orderEventService;
         this.orderCancellationService = orderCancellationService;
+        this.orderMailService = orderMailService;
         this.objectMapper = objectMapper;
+        this.storeAddressRepository = storeAddressRepository;
     }
 
     /**
@@ -86,7 +94,10 @@ public class OrderShipmentService {
         if (order.getStatus() != OrderStatus.CONFIRMED && order.getStatus() != OrderStatus.HAND_WRAPPED) {
             return false;
         }
-        if (StringUtils.isNotBlank(order.getTrackingNumber()) || StringUtils.isNotBlank(order.getShipmentDate())) {
+        if (
+            !isCarrierCancelledShipment(order) &&
+            (StringUtils.isNotBlank(order.getTrackingNumber()) || StringUtils.isNotBlank(order.getShipmentDate()))
+        ) {
             return false;
         }
         if (!isCod(order) && order.getPaymentStatus() != PaymentStatus.PAID) {
@@ -261,14 +272,16 @@ public class OrderShipmentService {
             if (order.getShipmentLogisticsMode() != ReturnLogisticsMode.XPRESSBEES) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This shipment was not booked through ExpressBees");
             }
-            try {
-                xpressBeesClient.cancelForwardShipment(order.getTrackingNumber(), order.getOrderNumber());
-            } catch (XpressBeesClient.XpressBeesApiException ex) {
-                LOG.warn("ExpressBees shipment cancellation failed for {}: {}", orderNumber, ex.getMessage());
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY,
-                    ex.getMessage() + ". Confirm cancellation with the carrier, then use manual cancellation mode."
-                );
+            if (!XpressBeesShipmentStatus.isCancelled(order.getShipmentCarrierStatus())) {
+                try {
+                    xpressBeesClient.cancelForwardShipment(order.getTrackingNumber(), order.getOrderNumber());
+                } catch (XpressBeesClient.XpressBeesApiException ex) {
+                    LOG.warn("ExpressBees shipment cancellation failed for {}: {}", orderNumber, ex.getMessage());
+                    throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        ex.getMessage() + ". Confirm cancellation with the carrier, then use manual cancellation mode."
+                    );
+                }
             }
         }
         order.setShipmentCancelledAt(Instant.now());
@@ -292,7 +305,9 @@ public class OrderShipmentService {
         if (order.getStatus() == OrderStatus.FULFILLED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Delivered orders cannot be booked for shipment");
         }
-        if (StringUtils.isNotBlank(order.getTrackingNumber())) {
+        if (isCarrierCancelledShipment(order)) {
+            LOG.info("Rebooking ExpressBees shipment for {} after carrier cancellation of AWB {}", order.getOrderNumber(), order.getTrackingNumber());
+        } else if (StringUtils.isNotBlank(order.getTrackingNumber())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "A shipment is already booked for this order");
         }
         if (!isShipmentEligible(order)) {
@@ -361,6 +376,9 @@ public class OrderShipmentService {
         String incomingMilestone = Optional.ofNullable(XpressBeesShipmentStatus.milestone(incoming)).orElse(incoming);
         String currentMilestone = Optional.ofNullable(XpressBeesShipmentStatus.milestone(current)).orElse(current);
         String normalized = XpressBeesShipmentStatus.preferForwardMilestone(currentMilestone, incomingMilestone);
+        boolean becameCarrierCancelled =
+            XpressBeesShipmentStatus.CARRIER_CANCELLED.equals(normalized) &&
+            !XpressBeesShipmentStatus.isCancelled(current);
         order.setShipmentCarrierStatus(normalized);
         boolean leftWarehouse =
             XpressBeesShipmentStatus.isPickedUpOrInTransit(normalized) ||
@@ -375,7 +393,27 @@ public class OrderShipmentService {
                 order.setStatus(OrderStatus.FULFILLED);
             }
         }
-        return persist(order);
+        CustomerOrder saved = persist(order);
+        if (becameCarrierCancelled) {
+            queueAdminCarrierCancelledEmail(saved);
+        }
+        return saved;
+    }
+
+    public long countExpressCancellations() {
+        return customerOrderRepository.countExpressBeesCarrierCancelled(
+            ReturnLogisticsMode.XPRESSBEES,
+            List.of(XpressBeesShipmentStatus.CARRIER_CANCELLED, "cancelled", "canceled"),
+            List.of(OrderStatus.CANCELLED, OrderStatus.FULFILLED)
+        );
+    }
+
+    public static boolean isCarrierCancelledShipment(CustomerOrder order) {
+        return OrderTrackingStatusResolver.isExpressBeesCarrierCancelled(order);
+    }
+
+    public boolean canRebookCarrierCancelled(CustomerOrder order) {
+        return isCarrierCancelledShipment(order) && canBook(order);
     }
 
     /**
@@ -468,18 +506,23 @@ public class OrderShipmentService {
         return saved;
     }
 
+    private void queueAdminCarrierCancelledEmail(CustomerOrder order) {
+        AfterCommit.run(() -> {
+            try {
+                orderMailService.sendForwardCarrierCancelledAdminNotice(order);
+            } catch (RuntimeException ex) {
+                LOG.warn("Admin ExpressBees cancellation email failed for {}", order.getOrderNumber(), ex);
+            }
+        });
+    }
+
     private XpressBeesClient.ForwardShipmentRequest buildForwardShipmentRequest(CustomerOrder order, String preAssignedAwb) {
         JsonNode shipping = parseShippingAddress(order.getShippingAddressJson());
         ApplicationProperties.XpressBees xpressBees = applicationProperties.getXpressbees();
-        XpressBeesClient.ReversePickupAddress shipFrom = new XpressBeesClient.ReversePickupAddress(
-            StringUtils.defaultIfBlank(xpressBees.getWarehouseName(), "Mini's n More"),
-            StringUtils.defaultIfBlank(xpressBees.getWarehousePhone(), firstAddressField(shipping, "phone", "mobile")),
-            null,
-            xpressBees.getWarehouseLine1(),
-            xpressBees.getWarehouseLine2(),
-            xpressBees.getWarehouseCity(),
-            xpressBees.getWarehouseState(),
-            xpressBees.getOriginPincode()
+        XpressBeesClient.ReversePickupAddress shipFrom = StoreAddressService.warehousePickup(
+            storeAddressRepository.findFirstByUsageAndIsDefaultTrue(StoreAddressUsage.SHIPMENT),
+            xpressBees,
+            firstAddressField(shipping, "phone", "mobile")
         );
         XpressBeesClient.ReversePickupAddress deliverTo = new XpressBeesClient.ReversePickupAddress(
             firstAddressField(shipping, "full_name", "name"),

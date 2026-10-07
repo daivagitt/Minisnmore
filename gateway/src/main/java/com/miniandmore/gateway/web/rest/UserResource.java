@@ -199,33 +199,51 @@ public class UserResource {
     }
 
     /**
-     * {@code GET /admin/users} : get all users with all the details - calling this are only allowed for the administrators.
+     * {@code GET /admin/users} : list users. CMS admins receive every account; Operations and
+     * Customer Support receive shopper accounts only.
      *
      * @param request a {@link ServerHttpRequest} request.
      * @param pageable the pagination information.
-     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body all users.
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body matching users.
      */
     @GetMapping("/users")
-    @PreAuthorize("hasAnyAuthority(\"" + AuthoritiesConstants.ADMIN + "\", \"" + AuthoritiesConstants.SUPER_ADMIN + "\")")
+    @PreAuthorize(
+        "hasAnyAuthority(\"" +
+        AuthoritiesConstants.ADMIN +
+        "\", \"" +
+        AuthoritiesConstants.SUPER_ADMIN +
+        "\", \"" +
+        AuthoritiesConstants.OPERATIONS +
+        "\", \"" +
+        AuthoritiesConstants.CUSTOMER_SUPPORT +
+        "\")"
+    )
     public Mono<ResponseEntity<Flux<AdminUserDTO>>> getAllUsers(
         @org.springdoc.core.annotations.ParameterObject ServerHttpRequest request,
         @org.springdoc.core.annotations.ParameterObject Pageable pageable
     ) {
-        LOG.debug("REST request to get all User for an admin");
+        LOG.debug("REST request to get users");
         if (!onlyContainsAllowedProperties(pageable)) {
             return Mono.just(ResponseEntity.badRequest().build());
         }
 
-        return userService
-            .countManagedUsers()
-            .map(total -> new PageImpl<>(new ArrayList<>(), pageable, total))
-            .map(page ->
-                PaginationUtil.generatePaginationHttpHeaders(
-                    ForwardedHeaderUtils.adaptFromForwardedHeaders(request.getURI(), request.getHeaders()),
-                    page
-                )
-            )
-            .map(headers -> ResponseEntity.ok().headers(headers).body(userService.getAllManagedUsers(pageable)));
+        return currentActorAuthorities()
+            .flatMap(actor -> {
+                boolean cmsAdmin = StaffRoles.isCmsAdmin(actor);
+                Mono<Long> total = cmsAdmin ? userService.countManagedUsers() : userService.countCustomerUsers();
+                Flux<AdminUserDTO> users = cmsAdmin
+                    ? userService.getAllManagedUsers(pageable)
+                    : userService.getAllCustomerUsers(pageable);
+                return total
+                    .map(count -> new PageImpl<>(new ArrayList<>(), pageable, count))
+                    .map(page ->
+                        PaginationUtil.generatePaginationHttpHeaders(
+                            ForwardedHeaderUtils.adaptFromForwardedHeaders(request.getURI(), request.getHeaders()),
+                            page
+                        )
+                    )
+                    .map(headers -> ResponseEntity.ok().headers(headers).body(users));
+            });
     }
 
     private boolean onlyContainsAllowedProperties(Pageable pageable) {

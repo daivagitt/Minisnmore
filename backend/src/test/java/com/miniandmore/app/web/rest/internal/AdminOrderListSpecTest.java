@@ -47,12 +47,15 @@ class AdminOrderListSpecTest {
         assertThat(AdminOrderListSpec.create(null, null, null, null, null, null, null, null, "shipped")).isNotNull();
         assertThat(AdminOrderListSpec.create(null, null, null, "hand_wrapped", null, null, null, null, "awaiting_pickup"))
             .isNotNull();
+        assertThat(AdminOrderListSpec.create(null, null, null, null, null, null, null, null, "carrier_cancelled"))
+            .isNotNull();
     }
 
     @Test
     void parseTrackingStatus_acceptsKnownFulfillmentStates() {
         assertThat(AdminOrderListSpec.parseTrackingStatus("  Shipped  ")).isEqualTo("shipped");
         assertThat(AdminOrderListSpec.parseTrackingStatus("out_for_delivery")).isEqualTo("out_for_delivery");
+        assertThat(AdminOrderListSpec.parseTrackingStatus("carrier_cancelled")).isEqualTo("carrier_cancelled");
         assertThat(AdminOrderListSpec.parseTrackingStatus(null)).isNull();
     }
 

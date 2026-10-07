@@ -56,6 +56,11 @@ python3 jenkins/scripts/generate-javadocs-index.py \
   --javadocs-dir "$PKG/backend/javadoc" \
   --output "$PKG/backend/javadoc/index.html"
 
+echo "=== 6b. Manual UI tests ==="
+bash jenkins/scripts/run-manual-ui-tests.sh || true
+mkdir -p "$PKG/manual-ui-tests"
+cp -a artifacts/manual-ui-tests/. "$PKG/manual-ui-tests/" 2>/dev/null || true
+
 echo "=== 7. Reports index ==="
 python3 jenkins/scripts/generate-reports-site.py --output-dir "$PKG"
 

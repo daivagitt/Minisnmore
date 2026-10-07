@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, CalendarRange, Users } from "lucide-react";
+import { CalendarDays, CalendarRange, FileDown, Users } from "lucide-react";
 import { AdminPage, inputCls } from "@/components/admin/AdminPage";
+import { downloadTableAsXlsx, exportFilename, rowsForExport } from "@/lib/export-table";
 import { ListPagination } from "@/components/ListPagination";
 import { useListPagination } from "@/hooks/useListPagination";
 import { api } from "@/lib/api";
@@ -115,13 +116,20 @@ async function fetchAllCustomers(): Promise<AdminCustomer[]> {
   return all;
 }
 
-function AdminCustomersPage() {
+export function AdminCustomersPage({
+  showRbacHint = true,
+  eyebrow = "Admin",
+}: {
+  showRbacHint?: boolean;
+  eyebrow?: string;
+} = {}) {
   const [users, setUsers] = useState<AdminCustomer[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [timeline, setTimeline] = useState<"days" | "weeks">("weeks");
   const [joinFilter, setJoinFilter] = useState<JoinFilter>({ kind: "all" });
   const [listFilters, setListFilters] = useState<AdminUserListFilters>(DEFAULT_USER_LIST_FILTERS);
+  const [exporting, setExporting] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -181,6 +189,30 @@ function AdminCustomersPage() {
 
   const applyJoinFilter = (next: JoinFilter) => {
     setJoinFilter((current) => toggleJoinFilter(current, next));
+  };
+
+  const exportCustomers = async () => {
+    if (!customers.length) return;
+    setExporting(true);
+    try {
+      await downloadTableAsXlsx(
+        rowsForExport(customers, [
+          { header: "Name", value: displayName },
+          { header: "Email", value: (user) => user.email ?? "" },
+          { header: "Login", value: (user) => user.login },
+          { header: "Joined", value: (user) => formatOrderDate(user.createdDate) },
+          { header: "Status", value: (user) => (user.activated ? "Active" : "Pending") },
+          { header: "Ordered", value: (user) => Boolean(user.hasOrdered) },
+          { header: "Newsletter", value: (user) => user.subscribed === true },
+        ]),
+        exportFilename("customers"),
+        "Customers",
+      );
+    } catch (error) {
+      showApiError(error, "Could not export customers");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const setJoinedDate = (field: "from" | "to", value: string) => {
@@ -255,9 +287,24 @@ function AdminCustomersPage() {
 
   return (
     <AdminPage
-      eyebrow="Admin"
+      eyebrow={eyebrow}
       title="Customers"
-      description="See how many customers joined recently, then browse the customer list. Staff invites and role changes live on RBAC."
+      description={
+        showRbacHint
+          ? "See how many customers joined recently, then browse the customer list. Staff invites and role changes live on RBAC."
+          : "See how many customers joined recently, then browse the customer list."
+      }
+      action={
+        <button
+          type="button"
+          onClick={() => void exportCustomers()}
+          disabled={loading || exporting || customers.length === 0}
+          className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm text-primary-foreground disabled:opacity-60"
+        >
+          <FileDown className="h-4 w-4" />
+          {exporting ? "Exporting…" : "Export"}
+        </button>
+      }
     >
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {statCards.map((card) => {
@@ -472,13 +519,15 @@ function AdminCustomersPage() {
         )}
       </section>
 
-      <p className="text-sm text-muted-foreground">
-        Invite staff and manage roles on{" "}
-        <Link to="/admin/rbac" className="text-primary underline-offset-2 hover:underline">
-          RBAC
-        </Link>
-        .
-      </p>
+      {showRbacHint ? (
+        <p className="text-sm text-muted-foreground">
+          Invite staff and manage roles on{" "}
+          <Link to="/admin/rbac" className="text-primary underline-offset-2 hover:underline">
+            RBAC
+          </Link>
+          .
+        </p>
+      ) : null}
     </AdminPage>
   );
 }

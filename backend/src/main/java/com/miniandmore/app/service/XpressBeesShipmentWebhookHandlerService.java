@@ -67,6 +67,15 @@ public class XpressBeesShipmentWebhookHandlerService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing carrier status");
         }
         CustomerOrder order = findOrder(orderNumber, awb);
+        if (isStaleAwb(order, awb)) {
+            Map<String, Object> skipped = new LinkedHashMap<>();
+            skipped.put("ok", true);
+            skipped.put("skipped", true);
+            skipped.put("reason", "stale_awb");
+            skipped.put("order_number", order.getOrderNumber());
+            skipped.put("awb", awb);
+            return skipped;
+        }
         String normalized = normalize(providerStatus);
         String eventId = ZohoWebhookSupport.explicitEventIdIncludingLegacyId(payload, data);
         if (eventId == null) {
@@ -126,6 +135,14 @@ public class XpressBeesShipmentWebhookHandlerService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found for AWB"));
         }
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Provide order_number or AWB");
+    }
+
+    /** After a rebook, delayed scans for the previous AWB must not update the new shipment. */
+    static boolean isStaleAwb(CustomerOrder order, String awb) {
+        if (order == null || StringUtils.isBlank(awb) || StringUtils.isBlank(order.getTrackingNumber())) {
+            return false;
+        }
+        return !StringUtils.equalsIgnoreCase(awb.trim(), order.getTrackingNumber().trim());
     }
 
     private static String value(Map<String, Object> data, String key) {

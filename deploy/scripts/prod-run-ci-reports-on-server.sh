@@ -170,6 +170,11 @@ if [ "$RUN_API_TESTS" = "true" ]; then
   cp -a artifacts/e2e-scenarios/. "$PKG/backend/e2e-scenarios/" 2>/dev/null || true
 fi
 
+echo "=== 11c. Manual UI tests (positive / negative, codebase) ==="
+run_step bash jenkins/scripts/run-manual-ui-tests.sh
+mkdir -p "$PKG/manual-ui-tests"
+cp -a artifacts/manual-ui-tests/. "$PKG/manual-ui-tests/" 2>/dev/null || true
+
 if [ "$RUN_SONAR" = "true" ]; then
   echo "=== 12. SonarQube analysis + summary ==="
   chmod +x jenkins/scripts/run-sonar-ci.sh

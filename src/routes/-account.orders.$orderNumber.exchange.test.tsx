@@ -124,6 +124,8 @@ describe("order exchange dialog", () => {
     expect(screen.getByText(/Quantity:/i).closest("p")).toHaveTextContent("Quantity: 2");
     expect(screen.getAllByText(/unused/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/delivery and COD fees are not refunded/i)).toBeTruthy();
+    expect(screen.getByLabelText(/Why are you exchanging this item/i)).toBeRequired();
+    expect(screen.getByText(/Why are you exchanging this item/i).querySelector(".text-destructive")).toHaveTextContent("*");
     expect(screen.getByRole("button", { name: "Submit exchange" })).toBeTruthy();
     expect(screen.getAllByRole("img", { name: "Floral Cotton Dress" }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Submit exchange request" })).toBeNull();
@@ -162,6 +164,8 @@ describe("order exchange dialog", () => {
     expect(await screen.findByRole("heading", { name: "Return items" })).toBeInTheDocument();
     expect(screen.getByText(/delivery and COD fees are not refunded/i)).toBeInTheDocument();
     expect(screen.getByText(/Ordered qty 2/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Why are you returning this order/i)).toBeRequired();
+    expect(screen.getByText(/Why are you returning this order/i).querySelector(".text-destructive")).toHaveTextContent("*");
     expect(screen.getByRole("button", { name: "Submit return" })).toBeInTheDocument();
     expect(screen.getAllByRole("img", { name: "Floral Cotton Dress" }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Submit return request" })).toBeNull();

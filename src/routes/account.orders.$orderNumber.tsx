@@ -1073,6 +1073,7 @@ function OrderDetail() {
           <div className="space-y-1.5">
             <label htmlFor="return-reason" className="text-sm font-medium">
               Why are you returning this order?
+              <span className="text-destructive" aria-hidden="true"> *</span>
             </label>
             <textarea
               id="return-reason"
@@ -1081,6 +1082,8 @@ function OrderDetail() {
               value={returnReason}
               onChange={(e) => setReturnReason(e.target.value)}
               disabled={submittingReturn}
+              required
+              aria-required="true"
             />
           </div>
           <ReturnImageUpload
@@ -1165,6 +1168,7 @@ function OrderDetail() {
           <div className="space-y-1.5">
             <label htmlFor="exchange-reason" className="text-sm font-medium">
               Why are you exchanging this item?
+              <span className="text-destructive" aria-hidden="true"> *</span>
             </label>
             <textarea
               id="exchange-reason"
@@ -1173,6 +1177,8 @@ function OrderDetail() {
               value={exchangeReason}
               onChange={(e) => setExchangeReason(e.target.value)}
               disabled={submittingExchange}
+              required
+              aria-required="true"
             />
           </div>
           <ReturnImageUpload

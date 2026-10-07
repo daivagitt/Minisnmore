@@ -18,7 +18,7 @@ function formatCount(value: number): string {
   return value.toLocaleString("en-IN");
 }
 
-export function SalesProductsPage() {
+export function SalesProductsPage({ eyebrow = "Sales" }: { eyebrow?: string } = {}) {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -40,7 +40,7 @@ export function SalesProductsPage() {
 
   return (
     <AdminPage
-      eyebrow="Sales"
+      eyebrow={eyebrow}
       title="Products & quantity"
       description="View-only catalog with each size and colour, plus stock on every variant."
     >

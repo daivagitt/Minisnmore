@@ -37,6 +37,7 @@ import {
   ZOHO_PACKAGE_TYPES,
   type ZohoPackageType,
 } from "@/lib/package-types";
+import { openPrintableShippingLabel } from "@/lib/print-shipping-label";
 import { showApiError } from "@/lib/ui-errors";
 
 type WizardStep = "address" | "shipment" | "label";
@@ -207,7 +208,13 @@ export function BookShipmentDialog({
   useEffect(() => {
     if (!open || !order) return;
     setStep("address");
-    setCarrier(order.can_book_expressbees_shipment || order.can_book_expressbees_shipment_with_override ? "xpressbees" : "manual");
+    setCarrier(
+      order.can_book_expressbees_shipment ||
+        order.can_book_expressbees_shipment_with_override ||
+        order.can_rebook_carrier_cancelled_shipment
+        ? "xpressbees"
+        : "manual",
+    );
     setShipDate(todayInputValue());
     setParcelType(selectZohoPackageType(order.package_type || "custom", "cm").type);
     setDeliveryStatus("");
@@ -344,9 +351,9 @@ export function BookShipmentDialog({
       const bookedOrder = (result as { order?: AdminOrderRow }).order ?? {
         ...order,
         tracking_number:
-          (result as { outbound_awb?: string }).outbound_awb || bookAwb,
+          (result as { outbound_awb?: string }).outbound_awb || bookAwb || "",
         shipment_label_url:
-          (result as { outbound_label_url?: string }).outbound_label_url || bookLabelUrl,
+          (result as { outbound_label_url?: string }).outbound_label_url || bookLabelUrl || "",
       };
       setBooked(bookedOrder);
       setStep("label");
@@ -364,8 +371,8 @@ export function BookShipmentDialog({
   const selectedCourier: PackageCourierOption | undefined = rates?.couriers?.find(
     (option) => option.id === selectedCourierId,
   );
-  const labelUrl = booked?.shipment_label_url || order?.shipment_label_url || "";
-  const trackingNumber = booked?.tracking_number || order?.tracking_number || "";
+  const labelUrl = booked?.shipment_label_url || "";
+  const trackingNumber = booked?.tracking_number || "";
 
   const destination = (order?.shipping_address || {
     full_name: order?.full_name,
@@ -769,14 +776,13 @@ export function BookShipmentDialog({
                 >
                   <Printer className="h-4 w-4" /> Download Label
                 </a>
-                <a
-                  href={labelUrl}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  onClick={() => void openPrintableShippingLabel(labelUrl)}
                   className={`inline-flex items-center gap-2 ${SECONDARY_BTN}`}
                 >
-                  Print Label
-                </a>
+                  <Printer className="h-4 w-4" /> Print Label
+                </button>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">No printable label was returned by the carrier.</p>

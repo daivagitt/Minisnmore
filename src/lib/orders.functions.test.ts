@@ -207,6 +207,7 @@ describe("orders functions", () => {
       pageSize: 10,
       totalItems: 1,
       totalPages: 1,
+      express_cancellation_count: 0,
     });
     expect(getMock).toHaveBeenCalledWith(
       "/api/v1/admin/orders?from=2026-08-01T00%3A00%3A00.000Z&to=2026-08-08T00%3A00%3A00.000Z&page=1&size=10",
@@ -237,6 +238,7 @@ describe("orders functions", () => {
       pageSize: 10,
       totalItems: 0,
       totalPages: 1,
+      express_cancellation_count: 0,
     });
   });
 
@@ -268,6 +270,27 @@ describe("orders functions", () => {
     await listAdminOrders(undefined, undefined, { trackingStatus: "shipped", page: 1 });
     expect(getMock).toHaveBeenCalledWith(
       "/api/v1/admin/orders?trackingStatus=shipped&page=1&size=10",
+      { auth: true },
+    );
+  });
+
+  it("forwards ExpressBees cancellation filter and count", async () => {
+    getMock.mockResolvedValueOnce({
+      orders: [{ order_number: "MNM-XB" }],
+      page: 1,
+      pageSize: 10,
+      totalItems: 1,
+      totalPages: 1,
+      express_cancellation_count: 3,
+    });
+    await expect(
+      listAdminOrders(undefined, undefined, { trackingStatus: "carrier_cancelled", page: 1 }),
+    ).resolves.toMatchObject({
+      express_cancellation_count: 3,
+      orders: [{ order_number: "MNM-XB" }],
+    });
+    expect(getMock).toHaveBeenCalledWith(
+      "/api/v1/admin/orders?trackingStatus=carrier_cancelled&page=1&size=10",
       { auth: true },
     );
   });

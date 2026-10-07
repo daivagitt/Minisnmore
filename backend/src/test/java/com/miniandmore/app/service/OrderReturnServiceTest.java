@@ -37,6 +37,7 @@ import com.miniandmore.app.repository.OrderReturnItemRepository;
 import com.miniandmore.app.repository.OrderReturnRepository;
 import com.miniandmore.app.repository.ProductRepository;
 import com.miniandmore.app.repository.SiteSettingRepository;
+import com.miniandmore.app.repository.StoreAddressRepository;
 import com.miniandmore.app.domain.SiteSetting;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -115,6 +116,9 @@ class OrderReturnServiceTest {
 
     @Mock
     private ExchangeRazorpaySettlementService exchangeRazorpaySettlementService;
+
+    @Mock
+    private StoreAddressRepository storeAddressRepository;
 
     @InjectMocks
     private OrderReturnService orderReturnService;
@@ -1498,6 +1502,23 @@ class OrderReturnServiceTest {
     }
 
     @Test
+    void convertExchangeToRefund_discountedMissingSnapshot_refundsNetAmount() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ACCEPTED, "TEE-M-BLUE", "M", "Blue");
+        orderReturn.setOriginalItemAmount(null);
+        orderReturn.getOrderItem().price(new BigDecimal("250.00")).qty(2);
+        orderReturn.getOrder().subtotal(new BigDecimal("500.00")).discount(new BigDecimal("100.00"));
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(orderReturn.getOrderItem()));
+        when(razorpayRefundService.refundPayment(any(), eq(new BigDecimal("400.00")), any())).thenReturn("rfnd_net");
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.convertExchangeToRefund("RET-1", null);
+
+        assertThat(result.getRefundAmount()).isEqualByComparingTo("400.00");
+        verify(razorpayRefundService).refundPayment(orderReturn.getOrder(), new BigDecimal("400.00"), RazorpayRefundService.PURPOSE_RETURN_REFUND);
+    }
+
+    @Test
     void processRefund_exchangeType_throwsBadRequest() {
         OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ACCEPTED, "TEE-M-BLUE", "M", "Blue");
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
@@ -1684,6 +1705,62 @@ class OrderReturnServiceTest {
         orderReturnService.processRefund("RET-1", null);
 
         verify(zohoBooksIntegrationClient).createCreditNote(10L, "RET-1", Map.of(200L, 1));
+    }
+
+    @Test
+    void processRefund_zeroAcceptedQty_doesNotRestockOrCreditLine() {
+        ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
+        zoho.setSyncReturns(true);
+        when(applicationProperties.getZoho()).thenReturn(zoho);
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.ACCEPTED);
+        orderReturn.setId(50L);
+        orderReturn.setDisposition(ReturnDisposition.RESTOCKABLE);
+        OrderItem orderItem = new OrderItem().id(200L).productId("2").qty(2);
+        OrderReturnItem line = new OrderReturnItem();
+        line.setOrderItem(orderItem);
+        line.setRequestedQty(2);
+        line.setAcceptedQty(0);
+        line.setDisposition(ReturnDisposition.RESTOCKABLE);
+        line.setRefundAmount(new BigDecimal("200.00"));
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnItemRepository.findAllByOrderReturnIdOrderById(50L)).thenReturn(List.of(line));
+        when(razorpayRefundService.refundPayment(any(), any(), any())).thenReturn("rfnd_demo_ORD-9001");
+        when(zohoBooksIntegrationClient.createCreditNote(eq(10L), eq("RET-1"), eq(Map.of()))).thenReturn(Optional.of("cn-empty"));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        orderReturnService.processRefund("RET-1", null);
+
+        verify(productRepository, never()).findOneForInventoryUpdate(any());
+        verify(zohoBooksIntegrationClient).createCreditNote(10L, "RET-1", Map.of());
+    }
+
+    @Test
+    void processRefund_nullAcceptedQty_doesNotTreatRequestedAsAccepted() {
+        ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
+        zoho.setSyncReturns(true);
+        when(applicationProperties.getZoho()).thenReturn(zoho);
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.ACCEPTED);
+        orderReturn.setId(50L);
+        orderReturn.setDisposition(ReturnDisposition.RESTOCKABLE);
+        OrderItem orderItem = new OrderItem().id(200L).productId("2").qty(2);
+        OrderReturnItem line = new OrderReturnItem();
+        line.setOrderItem(orderItem);
+        line.setRequestedQty(2);
+        line.setAcceptedQty(null);
+        line.setDisposition(ReturnDisposition.RESTOCKABLE);
+        line.setRefundAmount(new BigDecimal("200.00"));
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnItemRepository.findAllByOrderReturnIdOrderById(50L)).thenReturn(List.of(line));
+        when(razorpayRefundService.refundPayment(any(), any(), any())).thenReturn("rfnd_demo_ORD-9001");
+        when(zohoBooksIntegrationClient.createCreditNote(eq(10L), eq("RET-1"), eq(Map.of()))).thenReturn(Optional.of("cn-empty"));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        orderReturnService.processRefund("RET-1", null);
+
+        verify(productRepository, never()).findOneForInventoryUpdate(any());
+        verify(zohoBooksIntegrationClient).createCreditNote(10L, "RET-1", Map.of());
     }
 
     @Test
@@ -2540,7 +2617,7 @@ class OrderReturnServiceTest {
         orderReturn.setSettlementAmount(new BigDecimal("100.00"));
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
         when(orderReturnRepository.findAllByOrder_IdOrderByRequestedAtAsc(10L)).thenReturn(List.of(orderReturn));
-        when(zohoBooksIntegrationClient.createCreditNote(eq(10L), eq("RET-1"), anyMap(), eq(false))).thenReturn(Optional.of("cn-higher"));
+        when(zohoBooksIntegrationClient.createCreditNote(eq(10L), eq("RET-1"), eq(Map.of(5L, 1)), eq(false))).thenReturn(Optional.of("cn-higher"));
         when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
         when(
             zohoBooksIntegrationClient.createExchangeReplacementInvoice(
@@ -2559,7 +2636,47 @@ class OrderReturnServiceTest {
         OrderReturn result = orderReturnService.allocateReplacementItem("RET-1", null);
 
         assertThat(result.getZohoCreditNoteId()).isEqualTo("cn-higher");
-        verify(zohoBooksIntegrationClient).createCreditNote(eq(10L), eq("RET-1"), anyMap(), eq(false));
+        verify(zohoBooksIntegrationClient).createCreditNote(eq(10L), eq("RET-1"), eq(Map.of(5L, 1)), eq(false));
+    }
+
+    @Test
+    void allocateReplacementItem_ledgerlyCreditNoteUsesNetAmountWhenOriginalMissing() {
+        enableLedgerlyReturnsSync();
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ACCEPTED, "TEE-M-BLUE", "M", "Blue");
+        orderReturn.setOriginalItemAmount(null);
+        orderReturn.getOrderItem().price(new BigDecimal("250.00")).qty(2);
+        orderReturn.getOrder().subtotal(new BigDecimal("500.00")).discount(new BigDecimal("100.00"));
+        orderReturn.setReplacementReservedAt(Instant.now());
+        orderReturn.setSettlementStatus(ExchangeSettlementStatus.NOT_REQUIRED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(orderReturn.getOrderItem()));
+        when(ledgerlyIntegrationClient.createCreditNote(eq(ORDER_NUMBER), eq("RET-1"), eq(new BigDecimal("400.00"))))
+            .thenReturn(Optional.of("cn-ledgerly"));
+
+        OrderReturn result = orderReturnService.allocateReplacementItem("RET-1", null);
+
+        assertThat(result.getLedgerlyCreditNoteId()).isEqualTo("cn-ledgerly");
+        verify(ledgerlyIntegrationClient).createCreditNote(ORDER_NUMBER, "RET-1", new BigDecimal("400.00"));
+    }
+
+    @Test
+    void allocateReplacementItem_ledgerlyCreditNoteDoesNotInventQtyWhenZero() {
+        enableLedgerlyReturnsSync();
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ACCEPTED, "TEE-M-BLUE", "M", "Blue");
+        orderReturn.setOriginalItemAmount(null);
+        orderReturn.getOrderItem().price(new BigDecimal("250.00")).qty(0);
+        orderReturn.setReplacementReservedAt(Instant.now());
+        orderReturn.setSettlementStatus(ExchangeSettlementStatus.NOT_REQUIRED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(ledgerlyIntegrationClient.createCreditNote(eq(ORDER_NUMBER), eq("RET-1"), eq(new BigDecimal("0.00"))))
+            .thenReturn(Optional.of("cn-zero"));
+
+        OrderReturn result = orderReturnService.allocateReplacementItem("RET-1", null);
+
+        assertThat(result.getLedgerlyCreditNoteId()).isEqualTo("cn-zero");
+        verify(ledgerlyIntegrationClient).createCreditNote(ORDER_NUMBER, "RET-1", new BigDecimal("0.00"));
     }
 
     @Test

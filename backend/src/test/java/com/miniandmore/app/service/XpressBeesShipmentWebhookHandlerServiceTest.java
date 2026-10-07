@@ -2,6 +2,8 @@ package com.miniandmore.app.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -59,7 +61,7 @@ class XpressBeesShipmentWebhookHandlerServiceTest {
             .paymentStatus(PaymentStatus.PAID)
             .trackingNumber("XB-1");
         when(orderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
-        when(orderShipmentService.applyProviderStatus(order, "delivered")).thenAnswer(invocation -> {
+        when(orderShipmentService.applyProviderStatus(eq(order), eq("delivered"), any())).thenAnswer(invocation -> {
             order.setStatus(OrderStatus.FULFILLED);
             order.setShipmentDeliveredAt(java.time.Instant.now());
             order.setShipmentCarrierStatus("delivered");
@@ -77,7 +79,7 @@ class XpressBeesShipmentWebhookHandlerServiceTest {
         assertThat(result.get("local_status")).isEqualTo("delivered");
         assertThat(order.getStatus()).isEqualTo(OrderStatus.FULFILLED);
         assertThat(order.getShipmentDeliveredAt()).isNotNull();
-        verify(orderShipmentService).applyProviderStatus(order, "delivered");
+        verify(orderShipmentService).applyProviderStatus(eq(order), eq("delivered"), any());
     }
 
     @Test
@@ -89,7 +91,7 @@ class XpressBeesShipmentWebhookHandlerServiceTest {
             .paymentStatus(PaymentStatus.REFUNDED)
             .trackingNumber("XB-2");
         when(orderRepository.findOneByOrderNumber("MNM-2")).thenReturn(Optional.of(order));
-        when(orderShipmentService.applyProviderStatus(order, "delivered")).thenReturn(order);
+        when(orderShipmentService.applyProviderStatus(eq(order), eq("delivered"), any())).thenReturn(order);
         when(eventRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(eventRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -101,7 +103,7 @@ class XpressBeesShipmentWebhookHandlerServiceTest {
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
         assertThat(order.getShipmentDeliveredAt()).isNull();
-        verify(orderShipmentService).applyProviderStatus(order, "delivered");
+        verify(orderShipmentService).applyProviderStatus(eq(order), eq("delivered"), any());
     }
 
     @Test
@@ -113,7 +115,7 @@ class XpressBeesShipmentWebhookHandlerServiceTest {
             .paymentStatus(PaymentStatus.PAID)
             .trackingNumber("4152912381315");
         when(orderRepository.findFirstByTrackingNumber("4152912381315")).thenReturn(Optional.of(order));
-        when(orderShipmentService.applyProviderStatus(order, "in transit")).thenAnswer(invocation -> {
+        when(orderShipmentService.applyProviderStatus(eq(order), eq("in transit"), any())).thenAnswer(invocation -> {
             order.setShipmentCarrierStatus("in_transit");
             return order;
         });
@@ -130,5 +132,58 @@ class XpressBeesShipmentWebhookHandlerServiceTest {
         assertThat(result.get("order_number")).isEqualTo("MNM-3");
         assertThat(order.getShipmentCarrierStatus()).isEqualTo("in_transit");
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+    }
+
+    @Test
+    void cancelledEventIsAppliedToForwardOrderWithoutFulfilling() {
+        CustomerOrder order = new CustomerOrder()
+            .id(13L)
+            .orderNumber("MNM-4")
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .trackingNumber("XB-4");
+        when(orderRepository.findOneByOrderNumber("MNM-4")).thenReturn(Optional.of(order));
+        when(orderShipmentService.applyProviderStatus(eq(order), eq("Cancelled"), any())).thenAnswer(invocation -> {
+            order.setShipmentCarrierStatus("carrier_cancelled");
+            return order;
+        });
+        when(eventRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(eventRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = service.handle(
+            "{\"event_id\":\"evt-cancel\",\"order_number\":\"MNM-4\",\"awb\":\"XB-4\",\"status\":\"Cancelled\"}",
+            null,
+            "secret"
+        );
+
+        assertThat(result.get("ok")).isEqualTo(true);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(order.getShipmentCarrierStatus()).isEqualTo("carrier_cancelled");
+        verify(orderShipmentService).applyProviderStatus(eq(order), eq("Cancelled"), any());
+    }
+
+    @Test
+    void staleAwbAfterRebookDoesNotUpdateTheNewShipment() {
+        CustomerOrder order = new CustomerOrder()
+            .id(14L)
+            .orderNumber("MNM-5")
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .trackingNumber("XB-NEW");
+        when(orderRepository.findOneByOrderNumber("MNM-5")).thenReturn(Optional.of(order));
+
+        Map<String, Object> result = service.handle(
+            "{\"event_id\":\"evt-old-cancel\",\"order_number\":\"MNM-5\",\"awb\":\"XB-OLD\",\"status\":\"Cancelled\"}",
+            null,
+            "secret"
+        );
+
+        assertThat(result.get("ok")).isEqualTo(true);
+        assertThat(result.get("skipped")).isEqualTo(true);
+        assertThat(result.get("reason")).isEqualTo("stale_awb");
+        assertThat(order.getTrackingNumber()).isEqualTo("XB-NEW");
+        assertThat(order.getShipmentCarrierStatus()).isNull();
+        verify(orderShipmentService, never()).applyProviderStatus(any(), any(), any());
+        verify(eventRepository, never()).saveAndFlush(any());
     }
 }

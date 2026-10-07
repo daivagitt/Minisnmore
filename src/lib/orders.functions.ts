@@ -763,6 +763,7 @@ export type AdminCancellationRequestRow = {
   admin_notes?: string | null;
   requested_at: string;
   resolved_at?: string | null;
+  order_id?: number;
   order_number?: string;
   order_total?: number;
   customer_login?: string | null;
@@ -878,6 +879,7 @@ export type AdminOrderRow = AdminCodOrderRow & {
   can_book_shipment_with_override?: boolean;
   can_book_expressbees_shipment?: boolean;
   can_book_expressbees_shipment_with_override?: boolean;
+  can_rebook_carrier_cancelled_shipment?: boolean;
   can_complete_package?: boolean;
   default_package_weight_grams?: number | null;
   package_weight_grams?: number | null;
@@ -917,6 +919,7 @@ export type AdminOrderList = {
   pageSize: number;
   totalItems: number;
   totalPages: number;
+  express_cancellation_count: number;
 };
 
 export type AdminOrderListFilters = {
@@ -967,6 +970,7 @@ export async function listAdminOrders(
       1,
       res.totalPages ?? Math.ceil(totalItems / Math.max(1, pageSize)),
     ),
+    express_cancellation_count: Number(res.express_cancellation_count ?? 0),
   };
 }
 

@@ -19,6 +19,9 @@ public final class OrderTrackingStatusResolver {
         if (order.getPaymentStatus() != PaymentStatus.PAID && order.getStatus() == OrderStatus.PENDING) {
             return "pending";
         }
+        if (isExpressBeesCarrierCancelled(order)) {
+            return XpressBeesShipmentStatus.CARRIER_CANCELLED;
+        }
         if (isExpressBeesAwaitingPickup(order)) {
             return "awaiting_pickup";
         }
@@ -72,9 +75,27 @@ public final class OrderTrackingStatusResolver {
             return false;
         }
         String carrierStatus = order.getShipmentCarrierStatus();
-        return !XpressBeesShipmentStatus.isPickedUpOrInTransit(carrierStatus) &&
+        return !XpressBeesShipmentStatus.isCancelled(carrierStatus) &&
+            !XpressBeesShipmentStatus.isPickedUpOrInTransit(carrierStatus) &&
             !XpressBeesShipmentStatus.isOutForDelivery(carrierStatus) &&
             !XpressBeesShipmentStatus.isUndelivered(carrierStatus) &&
             !XpressBeesShipmentStatus.isDelivered(carrierStatus);
+    }
+
+    /**
+     * ExpressBees voided the AWB before pickup. The customer order stays open so Admin
+     * can rebook a shipment or cancel the order — same fork as exchange pickup-failed.
+     */
+    static boolean isExpressBeesCarrierCancelled(CustomerOrder order) {
+        if (order == null || order.getShipmentLogisticsMode() != ReturnLogisticsMode.XPRESSBEES) {
+            return false;
+        }
+        if (StringUtils.isBlank(order.getTrackingNumber()) || order.getShipmentCancelledAt() != null) {
+            return false;
+        }
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FULFILLED) {
+            return false;
+        }
+        return XpressBeesShipmentStatus.isCancelled(order.getShipmentCarrierStatus());
     }
 }

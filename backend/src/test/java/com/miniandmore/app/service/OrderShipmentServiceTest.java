@@ -17,6 +17,7 @@ import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.OrderItemRepository;
+import com.miniandmore.app.repository.StoreAddressRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -52,6 +53,12 @@ class OrderShipmentServiceTest {
 
     @Mock
     private OrderCancellationService orderCancellationService;
+
+    @Mock
+    private OrderMailService orderMailService;
+
+    @Mock
+    private StoreAddressRepository storeAddressRepository;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -386,6 +393,103 @@ class OrderShipmentServiceTest {
 
         CustomerOrder afterReattempt = orderShipmentService.applyProviderStatus(order, "OUT FOR DELIVERY");
         assertThat(afterReattempt.getShipmentCarrierStatus()).isEqualTo("out_for_delivery");
+    }
+
+    @Test
+    void applyProviderStatus_carrierCancelBeforePickupNotifiesAdminAndKeepsOrderOpen() {
+        CustomerOrder order = confirmedPaid()
+            .trackingNumber("XB-1")
+            .shipmentLogisticsMode(ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("booked");
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        CustomerOrder result = orderShipmentService.applyProviderStatus(order, "Cancelled");
+
+        assertThat(result.getShipmentCarrierStatus()).isEqualTo("carrier_cancelled");
+        assertThat(result.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(result.getTrackingNumber()).isEqualTo("XB-1");
+        assertThat(result.getShipmentCancelledAt()).isNull();
+        verify(orderMailService).sendForwardCarrierCancelledAdminNotice(order);
+    }
+
+    @Test
+    void applyProviderStatus_carrierCancelDoesNotRollBackInTransit() {
+        CustomerOrder order = confirmedPaid()
+            .trackingNumber("XB-1")
+            .shipmentLogisticsMode(ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("in_transit")
+            .shipmentDate("2026-09-20");
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        CustomerOrder result = orderShipmentService.applyProviderStatus(order, "cancelled");
+
+        assertThat(result.getShipmentCarrierStatus()).isEqualTo("in_transit");
+        org.mockito.Mockito.verify(orderMailService, org.mockito.Mockito.never()).sendForwardCarrierCancelledAdminNotice(any());
+    }
+
+    @Test
+    void isShipmentEligible_carrierCancelledCanBeRebooked() {
+        CustomerOrder order = packedConfirmedPaid()
+            .trackingNumber("XB-1")
+            .shipmentLogisticsMode(ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("carrier_cancelled");
+
+        assertThat(OrderShipmentService.isCarrierCancelledShipment(order)).isTrue();
+        assertThat(OrderShipmentService.isShipmentEligible(order)).isTrue();
+        assertThat(orderShipmentService.canBook(order)).isTrue();
+        assertThat(orderShipmentService.canRebookCarrierCancelled(order)).isTrue();
+    }
+
+    @Test
+    void bookShipment_rebookAfterCarrierCancelSkipsAlreadyBookedConflict() throws Exception {
+        CustomerOrder order = packedConfirmedPaid()
+            .trackingNumber("XB-OLD")
+            .trackingCarrier("XpressBees")
+            .shipmentLogisticsMode(ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("carrier_cancelled");
+        when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
+        when(xpressBeesClient.isForwardShipmentConfigured()).thenReturn(true);
+        when(xpressBeesClient.createForwardShipment(any())).thenReturn(
+            new XpressBeesClient.ForwardShipmentResult("XB-NEW", null, null, "REQ-2", "ok")
+        );
+        when(xpressBeesClient.buildTrackingUrl("XB-NEW")).thenReturn("https://track/XB-NEW");
+
+        CustomerOrder result = orderShipmentService.bookShipment(
+            "MNM-1",
+            ReturnLogisticsMode.XPRESSBEES,
+            null,
+            null,
+            null,
+            null,
+            false,
+            null
+        );
+
+        org.mockito.Mockito.verify(xpressBeesClient, org.mockito.Mockito.never()).cancelForwardShipment(any(), any());
+        assertThat(result.getTrackingNumber()).isEqualTo("XB-NEW");
+        assertThat(result.getShipmentCarrierStatus()).isEqualTo("booked");
+        assertThat(result.getShipmentCancelledAt()).isNull();
+    }
+
+    @Test
+    void cancelShipment_skipsCarrierApiWhenAlreadyCarrierCancelled() {
+        CustomerOrder order = confirmedPaid()
+            .trackingNumber("XB-1")
+            .trackingCarrier("XpressBees")
+            .shipmentLogisticsMode(ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("carrier_cancelled");
+        when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
+
+        CustomerOrder result = orderShipmentService.cancelShipment(
+            "MNM-1",
+            ReturnLogisticsMode.XPRESSBEES,
+            "Rebooking after courier void",
+            "admin"
+        );
+
+        org.mockito.Mockito.verifyNoInteractions(xpressBeesClient);
+        assertThat(result.getTrackingNumber()).isNull();
+        assertThat(result.getShipmentCancelledAt()).isNotNull();
     }
 
     @Test

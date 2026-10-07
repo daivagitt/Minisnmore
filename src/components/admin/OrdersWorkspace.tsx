@@ -27,13 +27,20 @@ import { isInvoiceAvailable } from "@/lib/invoice-availability";
 import { isPackageReady } from "@/lib/fulfillment-docs";
 import { trackingStatusLabel } from "@/lib/order-tracking";
 import { formatAdminPaymentStatusLabel } from "@/lib/order-status";
+import { openPrintableShippingLabel } from "@/lib/print-shipping-label";
 
 export type OrdersWorkspaceMode = "admin" | "operations" | "support";
 
 type Period = "all" | "day" | "week";
 
 const ORDER_STATUS_VALUES = new Set(["pending", "confirmed", "hand_wrapped", "fulfilled", "cancelled"]);
-const TRACKING_STATUS_VALUES = new Set(["awaiting_pickup", "shipped", "out_for_delivery", "delivery_failed"]);
+const TRACKING_STATUS_VALUES = new Set([
+  "awaiting_pickup",
+  "shipped",
+  "out_for_delivery",
+  "delivery_failed",
+  "carrier_cancelled",
+]);
 
 const ORDER_STATUS_FILTERS = [
   { value: "", label: "All" },
@@ -41,6 +48,7 @@ const ORDER_STATUS_FILTERS = [
   { value: "confirmed", label: "Confirmed" },
   { value: "hand_wrapped", label: "Hand-wrapped" },
   { value: "awaiting_pickup", label: "Waiting for pickup" },
+  { value: "carrier_cancelled", label: "ExpressBees cancelled" },
   { value: "shipped", label: "Shipped" },
   { value: "out_for_delivery", label: "Out for delivery" },
   { value: "delivery_failed", label: "Delivery failed" },
@@ -77,6 +85,10 @@ function selectedRange(value: string, period: Period) {
       ? dateFormat.format(start)
       : `${dateFormat.format(start)} – ${dateFormat.format(new Date(end.getTime() - 1))}`;
   return { from: start.toISOString(), to: end.toISOString(), label };
+}
+
+function isExpressCarrierCancelled(order: AdminOrderRow) {
+  return order.tracking_status === "carrier_cancelled";
 }
 
 function normalizedStatus(value: string | null | undefined) {
@@ -161,6 +173,7 @@ export function OrdersWorkspace({
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [expressCancellationCount, setExpressCancellationCount] = useState(0);
   const [selectedDate, setSelectedDate] = useState(() => localDateValue(new Date()));
   const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
@@ -202,6 +215,7 @@ export function OrdersWorkspace({
       setRows(res.orders ?? []);
       setTotalItems(res.totalItems);
       setTotalPages(Math.max(1, res.totalPages));
+      setExpressCancellationCount(res.express_cancellation_count ?? 0);
       const nextPage = Math.min(Math.max(1, res.page), Math.max(1, res.totalPages));
       if (nextPage !== page) setPage(nextPage);
     } catch (error) {
@@ -424,6 +438,11 @@ export function OrdersWorkspace({
               }`}
             >
               {option.label}
+              {option.value === "carrier_cancelled" && expressCancellationCount > 0 ? (
+                <span className="ml-1.5 rounded-full bg-destructive/15 px-1.5 py-0.5 text-[10px] font-semibold text-destructive">
+                  {expressCancellationCount}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
@@ -485,6 +504,28 @@ export function OrdersWorkspace({
         )}
         </div>
       </div>
+
+      {expressCancellationCount > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            setPeriod("all");
+            setStatus("carrier_cancelled");
+          }}
+          className="mb-5 flex w-full flex-wrap items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-left"
+        >
+          <AlertCircle className="h-5 w-5 text-destructive" />
+          <div>
+            <p className="font-semibold">
+              {expressCancellationCount} ExpressBees{" "}
+              {expressCancellationCount === 1 ? "cancellation" : "cancellations"}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Courier voided the AWB before pickup. Rebook a shipment or cancel the order.
+            </p>
+          </div>
+        </button>
+      )}
 
       {canSyncZoho && !loading && rows.length > 0 && (
         <div
@@ -624,16 +665,24 @@ export function OrdersWorkspace({
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-semibold">Shipment</p>
                     {order.tracking_number ? (
-                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
-                        {order.tracking_status === "delivered"
-                          ? "Delivered"
-                          : order.tracking_status === "out_for_delivery"
-                            ? "Out for delivery"
-                            : order.tracking_status === "delivery_failed"
-                              ? "Delivery attempt unsuccessful"
-                              : order.tracking_status === "shipped"
-                                ? "In transit"
-                                : "Pickup pending"}
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          isExpressCarrierCancelled(order)
+                            ? "bg-destructive/15 text-destructive"
+                            : "bg-emerald-100 text-emerald-800"
+                        }`}
+                      >
+                        {isExpressCarrierCancelled(order)
+                          ? "ExpressBees cancelled"
+                          : order.tracking_status === "delivered"
+                            ? "Delivered"
+                            : order.tracking_status === "out_for_delivery"
+                              ? "Out for delivery"
+                              : order.tracking_status === "delivery_failed"
+                                ? "Delivery attempt unsuccessful"
+                                : order.tracking_status === "shipped"
+                                  ? "In transit"
+                                  : "Pickup pending"}
                       </span>
                     ) : (
                       <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
@@ -675,6 +724,14 @@ export function OrdersWorkspace({
                       {order.package_courier_name ? ` · ${order.package_courier_name}` : ""}
                     </p>
                   ) : null}
+                  {isExpressCarrierCancelled(order) && (
+                    <div className="mt-2 rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-xs">
+                      <p className="font-semibold text-destructive">ExpressBees cancelled this shipment</p>
+                      <p className="mt-1 text-muted-foreground">
+                        The AWB is void. Rebook a new shipment or cancel the customer order. The order stays open until you act.
+                      </p>
+                    </div>
+                  )}
                   {SHOW_M2_POST_ORDER_UI && order.pending_cancellation && !order.tracking_number && mode === "admin" && (
                     <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900">
                       <p className="font-semibold">Cancellation requested — shipment on hold</p>
@@ -713,14 +770,18 @@ export function OrdersWorkspace({
                         <Truck className="h-3.5 w-3.5" /> Book shipment
                       </button>
                     ) : null}
-                    {(order.can_book_expressbees_shipment || order.can_book_shipment) && isPackageReady(order) && (
+                    {(order.can_book_expressbees_shipment ||
+                      order.can_book_shipment ||
+                      order.can_rebook_carrier_cancelled_shipment) &&
+                    isPackageReady(order) && (
                       <button
                         type="button"
                         disabled={busy !== null}
                         onClick={() => openBookShipment(order, false)}
                         className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium disabled:opacity-60"
                       >
-                        <Truck className="h-3.5 w-3.5" /> Book shipment
+                        <Truck className="h-3.5 w-3.5" />{" "}
+                        {isExpressCarrierCancelled(order) ? "Rebook shipment" : "Book shipment"}
                       </button>
                     )}
                     {SHOW_M2_POST_ORDER_UI &&
@@ -736,16 +797,30 @@ export function OrdersWorkspace({
                       </button>
                     )}
                     {order.shipment_label_url ? (
-                      <a
-                        href={order.shipment_label_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium"
-                      >
-                        <Printer className="h-3.5 w-3.5" /> Download label
-                      </a>
+                      <>
+                        <a
+                          href={order.shipment_label_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium"
+                        >
+                          <Printer className="h-3.5 w-3.5" /> Download label
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const labelUrl = order.shipment_label_url;
+                            if (labelUrl) void openPrintableShippingLabel(labelUrl);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium"
+                        >
+                          <Printer className="h-3.5 w-3.5" /> Print label
+                        </button>
+                      </>
                     ) : null}
-                    {order.tracking_number && order.status !== "fulfilled" ? (
+                    {order.tracking_number &&
+                    order.status !== "fulfilled" &&
+                    !isExpressCarrierCancelled(order) ? (
                       <button
                         type="button"
                         disabled={busy !== null}

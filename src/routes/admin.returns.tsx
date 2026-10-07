@@ -1,13 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { BookShipmentDialog } from "@/components/admin/BookShipmentDialog";
 import { CreatePackageDialog } from "@/components/admin/CreatePackageDialog";
 import { ReturnsSummaryCards } from "@/components/admin/ReturnsSummaryCards";
 import { ReturnImageGallery } from "@/components/ReturnImageGallery";
+import { AdminCaseSearchFields } from "@/components/admin/AdminCaseSearchFields";
 import { ArrowRight, Loader2, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import {
+  adminCaseListFetchStatus,
+  adminCaseSearchActive,
+  matchesLocalDateRange,
+  matchesOrderQuery,
+} from "@/lib/admin-case-search";
 import {
   acceptOrderReturnAfterInspection,
   allocateReplacementForOrderReturn,
@@ -35,6 +42,7 @@ import {
   type AdminOrderReturnRow,
   type AdminOrderReturnsSummary,
 } from "@/lib/orders.functions";
+import { openPrintableShippingLabel } from "@/lib/print-shipping-label";
 import { showApiError } from "@/lib/ui-errors";
 import { ListPagination } from "@/components/ListPagination";
 import { useListPagination } from "@/hooks/useListPagination";
@@ -324,18 +332,21 @@ function nextActions(
   openPickupFailed: () => void,
   openSettlement: () => void,
   openCodRefund: () => void,
+  canFulfill: boolean,
 ): {
   primary?: { label: string; onClick: () => void };
   secondary?: { label: string; onClick: () => void };
   tertiary?: { label: string; onClick: () => void };
 } {
   const isExchange = r.request_type === "exchange";
+  if (r.status === "requested") {
+    return {
+      primary: { label: "Approve", onClick: () => run("Approved", () => approveOrderReturn(r.return_number)) },
+      secondary: { label: "Reject", onClick: openReject },
+    };
+  }
+  if (!canFulfill) return {};
   switch (r.status) {
-    case "requested":
-      return {
-        primary: { label: "Approve", onClick: () => run("Approved", () => approveOrderReturn(r.return_number)) },
-        secondary: { label: "Reject", onClick: openReject },
-      };
     case "approved":
       return {
         primary: { label: "Book pickup", onClick: openBookPickup },
@@ -526,8 +537,10 @@ function nextActions(
   }
 }
 
-function AdminReturnsPage() {
+export function AdminReturnsPage({ mode = "admin" }: { mode?: "admin" | "operations" | "support" } = {}) {
   if (!SHOW_M2_POST_ORDER_UI) return null;
+  const canFulfill = mode !== "support";
+  const eyebrow = mode === "support" ? "Customer Support" : mode === "operations" ? "Operations" : "Fulfilment";
 
   const [stage, setStage] = useState<StageId>(DEFAULT_RETURNS_LIST_FILTER.stage);
   const [status, setStatus] = useState<string>(DEFAULT_RETURNS_LIST_FILTER.status);
@@ -561,6 +574,13 @@ function AdminReturnsPage() {
   const [codRefundReference, setCodRefundReference] = useState("");
   const [summary, setSummary] = useState<AdminOrderReturnsSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
+  const [orderQueryInput, setOrderQueryInput] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const hasRowsRef = useRef(false);
+  const loadGenRef = useRef(0);
+  const searchActive = adminCaseSearchActive(orderQueryInput, dateFrom, dateTo);
+  hasRowsRef.current = rows.length > 0;
 
   const stageStatusOptions = useMemo(() => statusesForStage(stage), [stage]);
 
@@ -576,17 +596,21 @@ function AdminReturnsPage() {
   }, []);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    const gen = ++loadGenRef.current;
+    const keepList = hasRowsRef.current;
+    if (!keepList) setLoading(true);
     try {
-      // Exact status → API filter. Stage-only / All → fetch all, filter client-side.
-      const res = await listAdminOrderReturns(status || undefined);
+      // Exact status → API filter. Search / stage-only / All → fetch all, filter client-side.
+      const res = await listAdminOrderReturns(adminCaseListFetchStatus(searchActive, status));
+      if (gen !== loadGenRef.current) return;
       setRows(res.returns ?? []);
     } catch (error) {
+      if (gen !== loadGenRef.current) return;
       showApiError(error, "Could not load returns");
     } finally {
-      setLoading(false);
+      if (gen === loadGenRef.current) setLoading(false);
     }
-  }, [status]);
+  }, [searchActive, status]);
 
   useEffect(() => {
     void load();
@@ -598,18 +622,25 @@ function AdminReturnsPage() {
 
   const filteredRows = useMemo(() => {
     let next = rows;
-    if (requestType) {
-      next = next.filter((row) => row.request_type === requestType);
+    if (!searchActive) {
+      if (requestType) {
+        next = next.filter((row) => row.request_type === requestType);
+      }
+      if (!status && stage !== "all") {
+        const allowed = STAGE_STATUS_SET[stage];
+        next = next.filter((row) => allowed.has(row.status));
+      }
     }
-    if (status) return next;
-    if (stage === "all") return next;
-    const allowed = STAGE_STATUS_SET[stage];
-    return next.filter((row) => allowed.has(row.status));
-  }, [rows, requestType, stage, status]);
+    return next.filter(
+      (row) =>
+        matchesOrderQuery(orderQueryInput, { orderNumber: row.order_number, orderId: row.order_id }) &&
+        matchesLocalDateRange(row.requested_at, dateFrom, dateTo),
+    );
+  }, [rows, requestType, stage, status, searchActive, orderQueryInput, dateFrom, dateTo]);
 
   const paging = useListPagination(filteredRows, {
     pageSize: LIST_PAGE_SIZE,
-    resetKey: `${requestType}|${stage}|${status}`,
+    resetKey: `${requestType}|${stage}|${status}|${orderQueryInput}|${dateFrom}|${dateTo}`,
   });
 
   const selectStage = (next: StageId, nextStatus?: string, nextType?: RequestTypeFilter) => {
@@ -623,7 +654,8 @@ function AdminReturnsPage() {
   const filtersActive =
     stage !== DEFAULT_RETURNS_LIST_FILTER.stage ||
     status !== DEFAULT_RETURNS_LIST_FILTER.status ||
-    requestType !== DEFAULT_RETURNS_LIST_FILTER.requestType;
+    requestType !== DEFAULT_RETURNS_LIST_FILTER.requestType ||
+    adminCaseSearchActive(orderQueryInput, dateFrom, dateTo);
 
   const run = async (returnNumber: string, action: () => Promise<unknown>, label: string) => {
     setBusy(returnNumber);
@@ -753,7 +785,7 @@ function AdminReturnsPage() {
 
   return (
     <AdminPage
-      eyebrow="Fulfilment"
+      eyebrow={eyebrow}
       title="Returns & exchanges"
       description="Review customer photos, then walk each case through pickup, inspection, and refund or replacement."
     >
@@ -855,6 +887,15 @@ function AdminReturnsPage() {
           </div>
         )}
 
+        <AdminCaseSearchFields
+          orderQuery={orderQueryInput}
+          onOrderQueryChange={setOrderQueryInput}
+          from={dateFrom}
+          to={dateTo}
+          onFromChange={setDateFrom}
+          onToChange={setDateTo}
+        />
+
         <div className="flex flex-wrap items-end gap-3">
           {filtersActive && (
             <button
@@ -863,6 +904,9 @@ function AdminReturnsPage() {
                 setStage(DEFAULT_RETURNS_LIST_FILTER.stage);
                 setStatus(DEFAULT_RETURNS_LIST_FILTER.status);
                 setRequestType(DEFAULT_RETURNS_LIST_FILTER.requestType);
+                setOrderQueryInput("");
+                setDateFrom("");
+                setDateTo("");
               }}
               className="inline-flex h-10 items-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
@@ -936,6 +980,7 @@ function AdminReturnsPage() {
                 setCodRefundMethod("upi");
                 setCodRefundReference("");
               },
+              canFulfill,
             );
             const items = r.items ?? [];
             const headerVariant =
@@ -1167,14 +1212,26 @@ function AdminReturnsPage() {
                     </button>
                   ) : null}
                   {r.outbound_label_url ? (
-                    <a
-                      href={r.outbound_label_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border px-3 py-1.5"
-                    >
-                      <Printer className="h-3.5 w-3.5" /> Print label
-                    </a>
+                    <>
+                      <a
+                        href={r.outbound_label_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border px-3 py-1.5"
+                      >
+                        Open label
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const labelUrl = r.outbound_label_url;
+                          if (labelUrl) void openPrintableShippingLabel(labelUrl);
+                        }}
+                        className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border px-3 py-1.5"
+                      >
+                        <Printer className="h-3.5 w-3.5" /> Print label
+                      </button>
+                    </>
                   ) : null}
                 </div>
               </li>
@@ -1200,6 +1257,7 @@ function AdminReturnsPage() {
           <div className="space-y-1.5">
             <label htmlFor="admin-reject-reason" className="text-sm font-medium">
               Rejection reason (shown to the customer)
+              <span className="text-destructive" aria-hidden="true"> *</span>
             </label>
             <textarea
               id="admin-reject-reason"
@@ -1207,6 +1265,8 @@ function AdminReturnsPage() {
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               disabled={busy === rejectTarget}
+              required
+              aria-required="true"
             />
           </div>
           <DialogFooter>
@@ -1530,12 +1590,21 @@ function AdminReturnsPage() {
           <DialogHeader>
             <DialogTitle>Pickup failed</DialogTitle>
           </DialogHeader>
-          <textarea
-            className="w-full rounded-xl border border-border bg-background/60 px-3 py-2 text-sm min-h-[80px]"
-            value={pickupFailedReason}
-            onChange={(e) => setPickupFailedReason(e.target.value)}
-            placeholder="Customer unavailable, no product, etc."
-          />
+          <div className="space-y-1.5">
+            <label htmlFor="admin-pickup-failed-reason" className="text-sm font-medium">
+              Failure reason
+              <span className="text-destructive" aria-hidden="true"> *</span>
+            </label>
+            <textarea
+              id="admin-pickup-failed-reason"
+              className="w-full rounded-xl border border-border bg-background/60 px-3 py-2 text-sm min-h-[80px]"
+              value={pickupFailedReason}
+              onChange={(e) => setPickupFailedReason(e.target.value)}
+              placeholder="Customer unavailable, no product, etc."
+              required
+              aria-required="true"
+            />
+          </div>
           <DialogFooter>
             <button
               type="button"

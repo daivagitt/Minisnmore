@@ -77,7 +77,10 @@ describe("contact us page", () => {
     expect(screen.getByRole("link", { name: /care@minisnmore.com/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/^name$/i)).toBeInTheDocument();
     expect(screen.getByText(/hosakerehalli/i)).toBeInTheDocument();
-    expect(screen.getByTitle(/studio location on google maps/i)).toBeInTheDocument();
+    expect(screen.getByTitle(/office location on google maps/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /our office address/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /whatsapp/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/whatsapp/i)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /open in google maps/i })).toHaveAttribute(
       "href",
       expect.stringContaining("google.com/maps"),

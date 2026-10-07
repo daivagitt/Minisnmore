@@ -20,7 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/internal/v1/admin/cancellation-requests")
-@PreAuthorize("hasAuthority('ROLE_ADMIN')")
+@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_OPERATIONS','ROLE_CUSTOMER_SUPPORT')")
 public class InternalAdminCancellationRequestResource {
 
     private final OrderCancellationService orderCancellationService;
@@ -75,6 +75,7 @@ public class InternalAdminCancellationRequestResource {
         return ApiResponse.ok(enrichDto(orderCancellationService.toDto(rejected)));
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_OPERATIONS')")
     @PostMapping("/{requestNumber}/record-cod-refund")
     public ApiResponse<Map<String, Object>> recordCodRefund(
         @PathVariable String requestNumber,
@@ -90,6 +91,7 @@ public class InternalAdminCancellationRequestResource {
         return ApiResponse.ok(enrichDto(orderCancellationService.toDto(recorded)));
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_OPERATIONS')")
     @PostMapping("/{requestNumber}/retry-refund")
     public ApiResponse<Map<String, Object>> retryRefund(@PathVariable String requestNumber) {
         OrderCancellationRequest retried = orderCancellationService.retryOnlineRefund(requestNumber);

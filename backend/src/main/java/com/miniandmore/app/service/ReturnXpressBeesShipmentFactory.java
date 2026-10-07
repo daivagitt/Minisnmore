@@ -9,7 +9,9 @@ import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.OrderReturn;
 import com.miniandmore.app.domain.OrderReturnItem;
 import com.miniandmore.app.domain.enumeration.OrderRequestType;
+import com.miniandmore.app.domain.enumeration.StoreAddressUsage;
 import com.miniandmore.app.repository.OrderReturnItemRepository;
+import com.miniandmore.app.repository.StoreAddressRepository;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -30,15 +32,18 @@ final class ReturnXpressBeesShipmentFactory {
     private final ApplicationProperties applicationProperties;
     private final ObjectMapper objectMapper;
     private final OrderReturnItemRepository orderReturnItemRepository;
+    private final StoreAddressRepository storeAddressRepository;
 
     ReturnXpressBeesShipmentFactory(
         ApplicationProperties applicationProperties,
         ObjectMapper objectMapper,
-        OrderReturnItemRepository orderReturnItemRepository
+        OrderReturnItemRepository orderReturnItemRepository,
+        StoreAddressRepository storeAddressRepository
     ) {
         this.applicationProperties = applicationProperties;
         this.objectMapper = objectMapper;
         this.orderReturnItemRepository = orderReturnItemRepository;
+        this.storeAddressRepository = storeAddressRepository;
     }
 
     XpressBeesClient.ReversePickupRequest buildReversePickupRequest(OrderReturn orderReturn, String preAssignedAwb) {
@@ -46,15 +51,10 @@ final class ReturnXpressBeesShipmentFactory {
         JsonNode shipping = parseShippingAddress(order.getShippingAddressJson());
         ApplicationProperties.XpressBees xpressBees = applicationProperties.getXpressbees();
         XpressBeesClient.ReversePickupAddress pickupFrom = customerAddress(shipping);
-        XpressBeesClient.ReversePickupAddress deliverTo = new XpressBeesClient.ReversePickupAddress(
-            StringUtils.defaultIfBlank(xpressBees.getWarehouseName(), "Mini's n More"),
-            StringUtils.defaultIfBlank(xpressBees.getWarehousePhone(), pickupFrom.phone()),
-            null,
-            xpressBees.getWarehouseLine1(),
-            xpressBees.getWarehouseLine2(),
-            xpressBees.getWarehouseCity(),
-            xpressBees.getWarehouseState(),
-            xpressBees.getOriginPincode()
+        XpressBeesClient.ReversePickupAddress deliverTo = StoreAddressService.warehousePickup(
+            storeAddressRepository.findFirstByUsageAndIsDefaultTrue(StoreAddressUsage.SHIPMENT),
+            xpressBees,
+            pickupFrom.phone()
         );
         return new XpressBeesClient.ReversePickupRequest(
             orderReturn.getReturnNumber(),
@@ -74,15 +74,10 @@ final class ReturnXpressBeesShipmentFactory {
         CustomerOrder order = orderReturn.getOrder();
         JsonNode shipping = parseShippingAddress(order.getShippingAddressJson());
         ApplicationProperties.XpressBees xpressBees = applicationProperties.getXpressbees();
-        XpressBeesClient.ReversePickupAddress shipFrom = new XpressBeesClient.ReversePickupAddress(
-            StringUtils.defaultIfBlank(xpressBees.getWarehouseName(), "Mini's n More"),
-            StringUtils.defaultIfBlank(xpressBees.getWarehousePhone(), firstAddressField(shipping, "phone", "mobile")),
-            null,
-            xpressBees.getWarehouseLine1(),
-            xpressBees.getWarehouseLine2(),
-            xpressBees.getWarehouseCity(),
-            xpressBees.getWarehouseState(),
-            xpressBees.getOriginPincode()
+        XpressBeesClient.ReversePickupAddress shipFrom = StoreAddressService.warehousePickup(
+            storeAddressRepository.findFirstByUsageAndIsDefaultTrue(StoreAddressUsage.SHIPMENT),
+            xpressBees,
+            firstAddressField(shipping, "phone", "mobile")
         );
         Integer packageWeight = orderReturn.getPackageWeightGrams() != null && orderReturn.getPackageWeightGrams() > 0
             ? orderReturn.getPackageWeightGrams()
@@ -124,18 +119,10 @@ final class ReturnXpressBeesShipmentFactory {
     }
 
     Map<String, Object> dispatchAddressPayload() {
-        ApplicationProperties.XpressBees warehouse = applicationProperties.getXpressbees();
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("name", StringUtils.defaultString(warehouse.getWarehouseName()));
-        data.put("full_name", StringUtils.defaultString(warehouse.getWarehouseName()));
-        data.put("line1", StringUtils.defaultString(warehouse.getWarehouseLine1()));
-        data.put("line2", StringUtils.defaultString(warehouse.getWarehouseLine2()));
-        data.put("city", StringUtils.defaultString(warehouse.getWarehouseCity()));
-        data.put("state", StringUtils.defaultString(warehouse.getWarehouseState()));
-        data.put("pincode", StringUtils.defaultString(warehouse.getOriginPincode()));
-        data.put("phone", StringUtils.defaultString(warehouse.getWarehousePhone()));
-        data.put("country", "India");
-        return data;
+        return StoreAddressService.dispatchAddressPayload(
+            storeAddressRepository.findFirstByUsageAndIsDefaultTrue(StoreAddressUsage.SHIPMENT),
+            applicationProperties.getXpressbees()
+        );
     }
 
     String destinationPincode(OrderReturn orderReturn) {

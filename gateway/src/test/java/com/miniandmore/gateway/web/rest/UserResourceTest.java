@@ -106,6 +106,20 @@ class UserResourceTest {
     }
 
     @Test
+    void getAllUsers_forSupport_listsCustomersOnly() {
+        when(userService.countCustomerUsers()).thenReturn(Mono.just(1L));
+        when(userService.getAllCustomerUsers(any(Pageable.class))).thenReturn(Flux.just(new AdminUserDTO()));
+
+        webTestClient
+            .mutateWith(mockUser("care").authorities(AuthoritiesConstants.CUSTOMER_SUPPORT))
+            .get()
+            .uri("/api/admin/users?page=0&size=20")
+            .exchange()
+            .expectStatus()
+            .isOk();
+    }
+
+    @Test
     void getUser_returnsUser() {
         User user = new User();
         user.setLogin("user");

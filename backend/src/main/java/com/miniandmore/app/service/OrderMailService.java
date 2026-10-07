@@ -440,6 +440,33 @@ public class OrderMailService {
         return extra;
     }
 
+    public void sendForwardCarrierCancelledAdminNotice(CustomerOrder order) {
+        if (order == null) {
+            return;
+        }
+        String to = resolveAdminRecipient();
+        if (StringUtils.isBlank(to)) {
+            LOG.warn(
+                "ExpressBees cancelled shipment for order {} but no admin contact email is configured",
+                order.getOrderNumber()
+            );
+            return;
+        }
+        String orderNumber = StringUtils.defaultString(order.getOrderNumber());
+        String awb = StringUtils.defaultString(order.getTrackingNumber());
+        String baseUrl = StringUtils.defaultIfBlank(jHipsterProperties.getMail().getBaseUrl(), DEFAULT_BASE_URL);
+        String adminUrl = trimTrailingSlash(baseUrl) + "/admin/orders";
+        String content =
+            "<p>ExpressBees cancelled the forward shipment for order <strong>" +
+            escape(orderNumber) +
+            "</strong>" +
+            (StringUtils.isNotBlank(awb) ? " (AWB <strong>" + escape(awb) + "</strong>)" : "") +
+            ".</p><p>The customer order is still open. <a href=\"" +
+            escape(adminUrl) +
+            "\">Open orders</a> to rebook a shipment or cancel the order.</p>";
+        sendHtml(to, "ExpressBees cancelled shipment · order " + orderNumber, wrapAdminNotice(content));
+    }
+
     public void sendPickupFailedAdminNotice(CustomerOrder order, OrderReturn orderReturn) {
         if (order == null || orderReturn == null) {
             return;

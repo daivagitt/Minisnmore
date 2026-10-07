@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { ArrowUpRight, ExternalLink, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
+import { ArrowUpRight, ExternalLink, Mail, MapPin, Phone } from "lucide-react";
 import { ContactForm } from "@/components/ContactForm";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { canonicalUrl, SOCIAL_SHARE_IMAGE } from "@/lib/site-seo";
@@ -34,18 +34,6 @@ export const Route = createFileRoute("/contact-us")({
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
-function digitsOnly(value: string | null | undefined): string {
-  return (value ?? "").replace(/\D/g, "");
-}
-
-function whatsappHref(phone: string | null | undefined): string | null {
-  const digits = digitsOnly(phone);
-  if (!digits) return null;
-  const international = digits.length === 10 ? `91${digits}` : digits;
-  const text = encodeURIComponent("Hi Mini's n More, I have a question.");
-  return `https://wa.me/${international}?text=${text}`;
-}
-
 function mapsEmbedSrc(address: string): string {
   return `https://maps.google.com/maps?q=${encodeURIComponent(address)}&z=16&output=embed`;
 }
@@ -67,7 +55,6 @@ function ContactUsPage() {
   const settings = useSiteSettings();
   const contactEmail = resolveContactEmail(settings.contact_email);
   const contactPhone = settings.contact_phone?.trim() || null;
-  const whatsapp = whatsappHref(settings.whatsapp_number || contactPhone);
   const office = settings.invoice_registered_office_address?.trim() || null;
 
   const channels: Channel[] = [
@@ -86,18 +73,6 @@ function ContactUsPage() {
             label: "Call",
             value: contactPhone,
             href: `tel:${contactPhone.replace(/\s+/g, "")}`,
-          } satisfies Channel,
-        ]
-      : []),
-    ...(whatsapp
-      ? [
-          {
-            key: "whatsapp",
-            icon: MessageCircle,
-            label: "WhatsApp",
-            value: "Chat with care",
-            href: whatsapp,
-            external: true,
           } satisfies Channel,
         ]
       : []),
@@ -156,7 +131,7 @@ function ContactUsPage() {
                   Prefer a direct line?
                 </h2>
                 <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-                  Email, call, or message on WhatsApp — we respond personally, usually within one business day.
+                  Email or call — we respond personally, usually within one business day.
                 </p>
               </div>
 
@@ -232,7 +207,7 @@ function ContactUsPage() {
                 <div className="p-6 sm:p-8 md:p-10 flex flex-col justify-center">
                   <p className="text-[11px] uppercase tracking-[0.28em] text-primary">Visit us</p>
                   <h2 id="visit-us-heading" className="font-display text-2xl md:text-3xl mt-2 text-balance leading-tight">
-                    Our studio address
+                    Our office address
                   </h2>
                   <p className="mt-4 flex items-start gap-3 text-sm md:text-[15px] text-foreground/80 leading-relaxed">
                     <MapPin className="h-4 w-4 text-primary mt-0.5 shrink-0" aria-hidden />
@@ -250,7 +225,7 @@ function ContactUsPage() {
                 </div>
                 <div className="relative min-h-[220px] sm:min-h-[260px] lg:min-h-[300px] bg-muted/30">
                   <iframe
-                    title="Mini's n More studio location on Google Maps"
+                    title="Mini's n More office location on Google Maps"
                     src={mapsEmbedSrc(office)}
                     className="absolute inset-0 h-full w-full border-0"
                     loading="lazy"
