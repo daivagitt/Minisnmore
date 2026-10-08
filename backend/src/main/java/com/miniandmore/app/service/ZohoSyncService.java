@@ -2416,7 +2416,7 @@ public class ZohoSyncService {
     private Map<String, Object> resolveOrCreateInvoiceFromSalesOrder(String salesOrderId, String orderNumber) {
         markSalesOrderOpenBestEffort(salesOrderId, orderNumber);
         try {
-            return booksClient.createInvoiceFromSalesOrder(salesOrderId);
+            return booksClient.createInvoiceFromSalesOrder(salesOrderId, orderNumber);
         } catch (RestClientResponseException e) {
             if (!isSalesOrderAlreadyInvoiced(e)) {
                 throw e;

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -58,6 +59,9 @@ class ZohoInvoiceWebhookHandlerServiceTest {
             zohoSyncService,
             new ObjectMapper()
         );
+        lenient().when(customerOrderRepository.findOneByZohoInvoiceId(any())).thenReturn(Optional.empty());
+        lenient().when(customerOrderRepository.findOneByZohoSalesOrderId(any())).thenReturn(Optional.empty());
+        lenient().when(customerOrderRepository.findOneByOrderNumber(any())).thenReturn(Optional.empty());
     }
 
     @Test
@@ -92,15 +96,107 @@ class ZohoInvoiceWebhookHandlerServiceTest {
     }
 
     @Test
-    void handle_unknownSalesOrder_returnsNotFound() {
+    void handle_unknownSalesOrderWithStoreReference_matchesExistingOrder() {
         String body =
-            "{\"eventId\":\"evt-inv-missing\",\"invoice\":{\"invoice_id\":\"inv-missing\",\"salesorder_id\":\"so-missing\",\"status\":\"sent\"}}";
+            "{\"eventId\":\"evt-inv-race\",\"invoice\":{\"invoice_id\":\"inv-race\",\"salesorder_id\":\"so-not-stored\",\"reference_number\":\"MNM-INV-1\",\"status\":\"sent\"}}";
+        CustomerOrder order = order("MNM-INV-1", null, ZohoSyncStatus.PENDING, null);
+        when(webhookEventRepository.existsByEventId("evt-inv-race")).thenReturn(false);
+        when(customerOrderRepository.findOneByOrderNumber("MNM-INV-1")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(result).containsEntry("orderNumber", "MNM-INV-1").containsEntry("status", "sent");
+        assertThat(order.getZohoInvoiceId()).isEqualTo("inv-race");
+        verify(customerOrderRepository).save(order);
+    }
+
+    @Test
+    void handle_knownInvoiceId_updatesOrderWithoutSalesOrderId() {
+        String body = "{\"eventId\":\"evt-inv-id\",\"invoice\":{\"invoice_id\":\"inv-1\",\"status\":\"void\"}}";
+        CustomerOrder order = order("MNM-INV-1", "so-1", ZohoSyncStatus.SYNCED, null);
+        order.setZohoInvoiceId("inv-1");
+        when(webhookEventRepository.existsByEventId("evt-inv-id")).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoInvoiceId("inv-1")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(result).containsEntry("orderNumber", "MNM-INV-1").containsEntry("status", "void");
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        verify(customerOrderRepository, never()).findOneByZohoSalesOrderId(any());
+    }
+
+    @Test
+    void handle_unknownOfflineSalesOrder_skipsWithoutUpdating() {
+        String body =
+            "{\"eventId\":\"evt-inv-offline\",\"invoice\":{\"invoice_id\":\"inv-offline\",\"salesorder_id\":\"so-offline\",\"reference_number\":\"MnM/26-27/0044\",\"status\":\"void\"}}";
+        when(webhookEventRepository.existsByEventId("evt-inv-offline")).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-offline")).thenReturn(Optional.empty());
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(result)
+            .containsEntry("ok", true)
+            .containsEntry("skipped", true)
+            .containsEntry("reason", "no matching store order")
+            .containsEntry("eventId", "evt-inv-offline");
+        verify(customerOrderRepository, never()).save(any());
+        verify(webhookEventRepository, never()).saveAndFlush(any());
+        verify(zohoSyncService, never()).ensureInvoicePdfCached(any());
+    }
+
+    @Test
+    void handle_unknownSalesOrderWithoutStoreReference_skips() {
+        String body =
+            "{\"eventId\":\"evt-inv-so-only\",\"invoice\":{\"invoice_id\":\"inv-so-only\",\"salesorder_id\":\"so-offline\",\"status\":\"sent\"}}";
+        when(webhookEventRepository.existsByEventId("evt-inv-so-only")).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-offline")).thenReturn(Optional.empty());
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(result).containsEntry("skipped", true).containsEntry("eventId", "evt-inv-so-only");
+        verify(customerOrderRepository, never()).findOneByOrderNumber(any());
+        verify(webhookEventRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void handle_invoiceIdOnly_skips() {
+        String body = "{\"eventId\":\"evt-inv-only\",\"invoice\":{\"invoice_id\":\"inv-only\",\"status\":\"void\"}}";
+        when(webhookEventRepository.existsByEventId("evt-inv-only")).thenReturn(false);
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(result).containsEntry("skipped", true).containsEntry("eventId", "evt-inv-only");
+        verify(customerOrderRepository, never()).findOneByZohoSalesOrderId(any());
+        verify(customerOrderRepository, never()).save(any());
+    }
+
+    @Test
+    void handle_unknownStoreOrderNumber_returnsNotFound() {
+        String body =
+            "{\"eventId\":\"evt-inv-missing\",\"invoice\":{\"invoice_id\":\"inv-missing\",\"salesorder_id\":\"so-missing\",\"reference_number\":\"MNM-MISSING\",\"status\":\"sent\"}}";
         when(webhookEventRepository.existsByEventId("evt-inv-missing")).thenReturn(false);
         when(customerOrderRepository.findOneByZohoSalesOrderId("so-missing")).thenReturn(Optional.empty());
+        when(customerOrderRepository.findOneByOrderNumber("MNM-MISSING")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> handler.handle(body, null, SECRET))
             .isInstanceOf(ResponseStatusException.class)
-            .hasMessageContaining("No order for Zoho sales order so-missing");
+            .hasMessageContaining("No order for MNM-MISSING");
+        verify(webhookEventRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void handle_unknownStoreOrderNumberWithoutSalesOrderId_returnsNotFound() {
+        String body =
+            "{\"eventId\":\"evt-inv-ref-only\",\"invoice\":{\"invoice_id\":\"inv-ref\",\"reference_number\":\"MNM-REF-ONLY\",\"status\":\"paid\"}}";
+        when(webhookEventRepository.existsByEventId("evt-inv-ref-only")).thenReturn(false);
+        when(customerOrderRepository.findOneByOrderNumber("MNM-REF-ONLY")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> handler.handle(body, null, SECRET))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("No order for MNM-REF-ONLY");
+        verify(customerOrderRepository, never()).findOneByZohoSalesOrderId(any());
     }
 
     private static CustomerOrder order(String orderNumber, String zohoSalesOrderId, ZohoSyncStatus syncStatus, String syncError) {

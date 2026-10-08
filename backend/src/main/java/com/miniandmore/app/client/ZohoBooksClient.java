@@ -11,6 +11,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.AbstractList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -409,7 +410,15 @@ public class ZohoBooksClient {
     }
 
     public Map<String, Object> createInvoiceFromSalesOrder(String salesOrderId) {
-        return post("/invoices/fromsalesorder?" + orgIdParam() + "&salesorder_id=" + salesOrderId, Map.of());
+        return createInvoiceFromSalesOrder(salesOrderId, null);
+    }
+
+    public Map<String, Object> createInvoiceFromSalesOrder(String salesOrderId, String referenceNumber) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        if (StringUtils.isNotBlank(referenceNumber)) {
+            payload.put("reference_number", referenceNumber.trim());
+        }
+        return post("/invoices/fromsalesorder?" + orgIdParam() + "&salesorder_id=" + salesOrderId, payload);
     }
 
     public Map<String, Object> markInvoiceAsSent(String invoiceId) {

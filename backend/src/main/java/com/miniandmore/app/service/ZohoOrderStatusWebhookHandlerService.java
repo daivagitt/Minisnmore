@@ -132,11 +132,10 @@ public class ZohoOrderStatusWebhookHandlerService {
     }
 
     private Optional<CustomerOrder> findByStoreOrderNumber(String orderNumber) {
-        String trimmed = StringUtils.trimToNull(orderNumber);
-        if (trimmed == null || !trimmed.startsWith("MNM-")) {
+        if (!ZohoWebhookSupport.isStoreOrderNumber(orderNumber)) {
             return Optional.empty();
         }
-        return customerOrderRepository.findOneByOrderNumber(trimmed);
+        return customerOrderRepository.findOneByOrderNumber(orderNumber.trim());
     }
 
     private static boolean shouldReapplyDeliveryUpdate(CustomerOrder order, Map<String, Object> salesOrder) {

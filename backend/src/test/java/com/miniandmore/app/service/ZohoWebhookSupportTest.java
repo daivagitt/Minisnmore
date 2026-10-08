@@ -75,4 +75,22 @@ class ZohoWebhookSupportTest {
             .containsEntry("skipped", true)
             .containsEntry("reason", "inbound webhook disabled");
     }
+
+    @Test
+    void skippedResult_includesEventIdWhenPresent() {
+        assertThat(ZohoWebhookSupport.skippedResult("no matching store order", "evt-skip"))
+            .containsEntry("ok", true)
+            .containsEntry("skipped", true)
+            .containsEntry("reason", "no matching store order")
+            .containsEntry("eventId", "evt-skip");
+        assertThat(ZohoWebhookSupport.skippedResult("inbound webhook disabled")).doesNotContainKey("eventId");
+    }
+
+    @Test
+    void isStoreOrderNumber_requiresMnmPrefix() {
+        assertThat(ZohoWebhookSupport.isStoreOrderNumber("MNM-443B4DB2DCE3")).isTrue();
+        assertThat(ZohoWebhookSupport.isStoreOrderNumber("  MNM-443B4DB2DCE3  ")).isTrue();
+        assertThat(ZohoWebhookSupport.isStoreOrderNumber("MnM/26-27/0044")).isFalse();
+        assertThat(ZohoWebhookSupport.isStoreOrderNumber(null)).isFalse();
+    }
 }

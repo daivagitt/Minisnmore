@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,8 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 @Transactional
 public class ZohoInvoiceWebhookHandlerService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ZohoInvoiceWebhookHandlerService.class);
 
     private final ApplicationProperties applicationProperties;
     private final ZohoInvoiceWebhookEventRepository webhookEventRepository;
@@ -79,7 +83,17 @@ public class ZohoInvoiceWebhookHandlerService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Provide invoice_id and salesorder_id or reference_number");
         }
 
-        CustomerOrder order = findOrder(zohoSalesOrderId, referenceNumber);
+        Optional<CustomerOrder> matchedOrder = findOrder(zohoInvoiceId, zohoSalesOrderId, referenceNumber);
+        if (matchedOrder.isEmpty()) {
+            LOG.info(
+                "Skipping Zoho invoice webhook {} — no MiniMS order for salesorder_id={} reference_number={}",
+                eventId,
+                zohoSalesOrderId,
+                referenceNumber
+            );
+            return ZohoWebhookSupport.skippedResult("no matching store order", eventId);
+        }
+        CustomerOrder order = matchedOrder.get();
         OrderStatus statusBefore = order.getStatus();
 
         ZohoInvoiceWebhookEvent record = new ZohoInvoiceWebhookEvent();
@@ -124,23 +138,28 @@ public class ZohoInvoiceWebhookHandlerService {
         }
     }
 
-    private CustomerOrder findOrder(String zohoSalesOrderId, String referenceNumber) {
-        if (StringUtils.isNotBlank(zohoSalesOrderId)) {
-            return customerOrderRepository
-                .findOneByZohoSalesOrderId(zohoSalesOrderId.trim())
-                .or(() -> findByStoreOrderNumber(referenceNumber))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No order for Zoho sales order " + zohoSalesOrderId));
+    private Optional<CustomerOrder> findOrder(String zohoInvoiceId, String zohoSalesOrderId, String referenceNumber) {
+        Optional<CustomerOrder> matched = Optional.empty();
+        if (StringUtils.isNotBlank(zohoInvoiceId)) {
+            matched = customerOrderRepository.findOneByZohoInvoiceId(zohoInvoiceId.trim());
         }
-        return findByStoreOrderNumber(referenceNumber)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No order for " + referenceNumber));
+        if (matched.isEmpty() && StringUtils.isNotBlank(zohoSalesOrderId)) {
+            matched = customerOrderRepository.findOneByZohoSalesOrderId(zohoSalesOrderId.trim());
+        }
+        if (matched.isEmpty()) {
+            matched = findByStoreOrderNumber(referenceNumber);
+        }
+        if (matched.isEmpty() && ZohoWebhookSupport.isStoreOrderNumber(referenceNumber)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No order for " + referenceNumber);
+        }
+        return matched;
     }
 
     private Optional<CustomerOrder> findByStoreOrderNumber(String referenceNumber) {
-        String trimmed = StringUtils.trimToNull(referenceNumber);
-        if (trimmed == null || !trimmed.startsWith("MNM-")) {
+        if (!ZohoWebhookSupport.isStoreOrderNumber(referenceNumber)) {
             return Optional.empty();
         }
-        return customerOrderRepository.findOneByOrderNumber(trimmed);
+        return customerOrderRepository.findOneByOrderNumber(referenceNumber.trim());
     }
 
     @SuppressWarnings("unchecked")

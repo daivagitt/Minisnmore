@@ -71,12 +71,34 @@ public final class ZohoWebhookSupport {
         return null;
     }
 
+    public static final String STORE_ORDER_NUMBER_PREFIX = "MNM-";
+
+    public static boolean isStoreOrderNumber(String value) {
+        String trimmed = StringUtils.trimToNull(value);
+        return trimmed != null && trimmed.startsWith(STORE_ORDER_NUMBER_PREFIX);
+    }
+
     public static Map<String, Object> duplicateEventResult(String eventId) {
         return Map.of("ok", true, "duplicate", true, "eventId", eventId);
     }
 
+    public static Map<String, Object> skippedResult(String reason) {
+        return skippedResult(reason, null);
+    }
+
+    public static Map<String, Object> skippedResult(String reason, String eventId) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("ok", true);
+        result.put("skipped", true);
+        result.put("reason", reason);
+        if (StringUtils.isNotBlank(eventId)) {
+            result.put("eventId", eventId);
+        }
+        return Map.copyOf(result);
+    }
+
     public static Map<String, Object> disabledWebhookResult() {
-        return Map.of("ok", true, "skipped", true, "reason", "inbound webhook disabled");
+        return skippedResult("inbound webhook disabled");
     }
 
     public static void verifySecretOrSignature(

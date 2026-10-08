@@ -822,7 +822,7 @@ class ZohoSyncServiceTest {
         when(orderItemRepository.findAllByOrderId(120L)).thenReturn(List.of(line));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
         when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-addr")));
-        when(booksClient.createInvoiceFromSalesOrder("so-addr")).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-addr")));
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-addr"), any())).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-addr")));
         when(productRepository.findById(10L)).thenReturn(Optional.of(product));
 
         service.syncOrder(120L);
@@ -875,7 +875,7 @@ class ZohoSyncServiceTest {
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
         when(booksClient.findSalesOrderByReferenceNumber("MNM-DUP-SO"))
             .thenReturn(Map.of("salesorder_id", "so-closed", "reference_number", "MNM-DUP-SO", "status", "closed"));
-        when(booksClient.createInvoiceFromSalesOrder("so-closed"))
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-closed"), any()))
             .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-closed")));
 
         service.syncOrder(125L);
@@ -883,7 +883,7 @@ class ZohoSyncServiceTest {
         assertThat(order.getZohoSalesOrderId()).isEqualTo("so-closed");
         assertThat(order.getZohoInvoiceId()).isEqualTo("inv-closed");
         verify(booksClient, never()).createSalesOrder(any());
-        verify(booksClient).createInvoiceFromSalesOrder("so-closed");
+        verify(booksClient).createInvoiceFromSalesOrder(eq("so-closed"), any());
     }
 
     @Test
@@ -908,7 +908,7 @@ class ZohoSyncServiceTest {
         when(orderItemRepository.findAllByOrderId(100L)).thenReturn(List.of(line));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
         when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-1")));
-        when(booksClient.createInvoiceFromSalesOrder("so-1")).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-1")));
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-1"), any())).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-1")));
         when(productRepository.findById(10L)).thenReturn(Optional.of(product));
 
         service.syncOrder(100L);
@@ -931,6 +931,7 @@ class ZohoSyncServiceTest {
             })
         );
         verify(booksClient).markInvoiceAsSent("inv-1");
+        verify(booksClient).createInvoiceFromSalesOrder(eq("so-1"), eq("MNM-TEST-1"));
     }
 
     @Test
@@ -949,7 +950,7 @@ class ZohoSyncServiceTest {
         when(orderItemRepository.findAllByOrderId(126L)).thenReturn(List.of(line));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
         when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-cf")));
-        when(booksClient.createInvoiceFromSalesOrder("so-cf")).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-cf")));
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-cf"), any())).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-cf")));
         when(productRepository.findById(10L)).thenReturn(Optional.of(product));
 
         service.syncOrder(126L);
@@ -992,13 +993,13 @@ class ZohoSyncServiceTest {
         when(productRepository.findById(10L)).thenReturn(Optional.of(product));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
         when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-cod-stock")));
-        when(booksClient.createInvoiceFromSalesOrder("so-cod-stock"))
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-cod-stock"), any()))
             .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-cod-stock")));
 
         service.syncOrder(101L);
 
         verify(booksClient).createSalesOrder(any());
-        verify(booksClient).createInvoiceFromSalesOrder("so-cod-stock");
+        verify(booksClient).createInvoiceFromSalesOrder(eq("so-cod-stock"), any());
         verify(booksClient, never()).markInvoiceAsSent(any());
         verify(booksClient, never()).createInventoryAdjustment(any());
         verify(booksClient, never()).getItem("zoho-item-10");
@@ -1031,7 +1032,7 @@ class ZohoSyncServiceTest {
         when(booksClient.findItemBySku("BOOK-STYLE-TYING-JABLA-SHORT-SET")).thenReturn(null);
         when(booksClient.createItem(any())).thenReturn(Map.of("item", Map.of("item_id", "zoho-jabla")));
         when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-jabla")));
-        when(booksClient.createInvoiceFromSalesOrder("so-jabla"))
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-jabla"), any()))
             .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-jabla")));
 
         service.syncOrder(49251L);
@@ -1084,7 +1085,7 @@ class ZohoSyncServiceTest {
         when(booksClient.findItemBySku("BOOK-STYLE-TYING-JABLA-SHORT-SET")).thenReturn(null);
         when(booksClient.createItem(any())).thenReturn(Map.of("item", Map.of("item_id", "zoho-jabla")));
         when(booksClient.updateSalesOrder(eq("4066570000000341012"), any())).thenReturn(Map.of());
-        when(booksClient.createInvoiceFromSalesOrder("4066570000000341012"))
+        when(booksClient.createInvoiceFromSalesOrder(eq("4066570000000341012"), any()))
             .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-jabla-repair")));
 
         service.syncOrder(49251L);
@@ -1100,7 +1101,7 @@ class ZohoSyncServiceTest {
                 !payload.containsKey("custom_fields");
             })
         );
-        verify(booksClient).createInvoiceFromSalesOrder("4066570000000341012");
+        verify(booksClient).createInvoiceFromSalesOrder(eq("4066570000000341012"), any());
         verify(booksClient, never()).markInvoiceAsSent(any());
         verify(booksClient, never()).createCustomerPayment(any());
     }
@@ -1124,14 +1125,14 @@ class ZohoSyncServiceTest {
             .thenReturn(
                 Map.of("salesorder", Map.of("status", "closed", "line_items", List.of(Map.of("name", "Legacy item"))))
             );
-        when(booksClient.createInvoiceFromSalesOrder("so-closed"))
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-closed"), any()))
             .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-closed")));
 
         service.syncOrder(49252L);
 
         verify(booksClient, never()).updateSalesOrder(any(), any());
         verify(booksClient, never()).findItemBySku(any());
-        verify(booksClient).createInvoiceFromSalesOrder("so-closed");
+        verify(booksClient).createInvoiceFromSalesOrder(eq("so-closed"), any());
     }
 
     @Test
@@ -1150,7 +1151,7 @@ class ZohoSyncServiceTest {
         when(orderItemRepository.findAllByOrderId(101L)).thenReturn(List.of(line));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-2"));
         when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-2")));
-        when(booksClient.createInvoiceFromSalesOrder("so-2")).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-2")));
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-2"), any())).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-2")));
         when(productRepository.findById(11L)).thenReturn(Optional.of(product));
         when(booksClient.downloadInvoicePdf(eq("inv-2"), any(Long.class)))
             .thenReturn(Optional.of(new ZohoBooksClient.BinaryDownload("pdf-bytes".getBytes(), "application/pdf")));
@@ -1178,7 +1179,7 @@ class ZohoSyncServiceTest {
         when(orderItemRepository.findAllByOrderId(102L)).thenReturn(List.of(line));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-3"));
         when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-3")));
-        when(booksClient.createInvoiceFromSalesOrder("so-3")).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-3")));
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-3"), any())).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-3")));
         when(productRepository.findById(12L)).thenReturn(Optional.of(product));
         when(booksClient.downloadInvoicePdf(eq("inv-3"), any(Long.class))).thenThrow(new IllegalStateException("Zoho unreachable"));
 
@@ -1255,7 +1256,7 @@ class ZohoSyncServiceTest {
         when(orderItemRepository.findAllByOrderId(110L)).thenReturn(List.of(line));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
         when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-cod")));
-        when(booksClient.createInvoiceFromSalesOrder("so-cod"))
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-cod"), any()))
             .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-cod")));
         when(productRepository.findById(10L)).thenReturn(Optional.of(product));
 
@@ -1271,7 +1272,7 @@ class ZohoSyncServiceTest {
         List<Map<String, Object>> lines = (List<Map<String, Object>>) payload.get("line_items");
         assertThat(lines).anyMatch(salesLine -> "COD handling fee".equals(salesLine.get("name")));
         assertThat(order.getZohoInvoiceId()).isEqualTo("inv-cod");
-        verify(booksClient).createInvoiceFromSalesOrder("so-cod");
+        verify(booksClient).createInvoiceFromSalesOrder(eq("so-cod"), any());
         verify(booksClient, never()).markInvoiceAsSent(any());
         verify(booksClient, never()).createCustomerPayment(any());
     }
@@ -1290,7 +1291,7 @@ class ZohoSyncServiceTest {
 
         when(customerOrderRepository.findById(112L)).thenReturn(Optional.of(order));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
-        when(booksClient.createInvoiceFromSalesOrder("so-cod-collected"))
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-cod-collected"), any()))
             .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-cod-collected")));
         when(booksClient.getInvoice("inv-cod-collected"))
             .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-cod-collected", "status", "sent", "balance", 1148)));
@@ -1299,7 +1300,7 @@ class ZohoSyncServiceTest {
         service.syncOrder(112L);
 
         assertThat(order.getZohoInvoiceId()).isEqualTo("inv-cod-collected");
-        verify(booksClient).createInvoiceFromSalesOrder("so-cod-collected");
+        verify(booksClient).createInvoiceFromSalesOrder(eq("so-cod-collected"), any());
         verify(booksClient, never()).markInvoiceAsSent("inv-cod-collected");
         verify(booksClient).createCustomerPayment(
             argThat(payload -> {
@@ -1326,7 +1327,7 @@ class ZohoSyncServiceTest {
 
         when(customerOrderRepository.findById(113L)).thenReturn(Optional.of(order));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
-        when(booksClient.createInvoiceFromSalesOrder("so-cod-collected-early"))
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-cod-collected-early"), any()))
             .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-cod-collected-early")));
         when(booksClient.getInvoice("inv-cod-collected-early"))
             .thenReturn(Map.of("invoice", Map.of("status", "sent", "balance", 1148)));
@@ -1335,7 +1336,7 @@ class ZohoSyncServiceTest {
         service.syncOrder(113L);
 
         assertThat(order.getZohoInvoiceId()).isEqualTo("inv-cod-collected-early");
-        verify(booksClient).createInvoiceFromSalesOrder("so-cod-collected-early");
+        verify(booksClient).createInvoiceFromSalesOrder(eq("so-cod-collected-early"), any());
         verify(booksClient).createCustomerPayment(any());
     }
 
@@ -1362,7 +1363,7 @@ class ZohoSyncServiceTest {
         when(orderItemRepository.findAllByOrderId(117L)).thenReturn(List.of(line));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
         when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-online-paid")));
-        when(booksClient.createInvoiceFromSalesOrder("so-online-paid"))
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-online-paid"), any()))
             .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-online-paid")));
         when(productRepository.findById(10L)).thenReturn(Optional.of(product));
 
@@ -1466,7 +1467,7 @@ class ZohoSyncServiceTest {
         when(booksClient.findContactByName("Kedar")).thenReturn(null);
         when(booksClient.createContact(any())).thenReturn(Map.of("contact", Map.of("contact_id", "cust-admin")));
         when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-admin")));
-        when(booksClient.createInvoiceFromSalesOrder("so-admin")).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-admin")));
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-admin"), any())).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-admin")));
         when(productRepository.findById(10L)).thenReturn(Optional.of(product));
 
         service.syncOrder(101L);
@@ -1511,7 +1512,7 @@ class ZohoSyncServiceTest {
         when(booksClient.findContactByName("MNM-EMAIL-NAME")).thenReturn(null);
         when(booksClient.createContact(any())).thenReturn(Map.of("contact", Map.of("contact_id", "cust-email")));
         when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-email")));
-        when(booksClient.createInvoiceFromSalesOrder("so-email")).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-email")));
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-email"), any())).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-email")));
         when(productRepository.findById(10L)).thenReturn(Optional.of(product));
 
         service.syncOrder(121L);
@@ -1664,7 +1665,7 @@ class ZohoSyncServiceTest {
         when(orderItemRepository.findAllByOrderId(100L)).thenReturn(List.of(line));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
         when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-1")));
-        when(booksClient.createInvoiceFromSalesOrder("so-1")).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-1")));
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-1"), any())).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-1")));
         when(productRepository.findById(10L)).thenReturn(Optional.of(product));
         when(productRepository.findOneWithEagerRelationships(10L)).thenReturn(Optional.of(product));
         when(booksClient.getItem("zoho-item-10")).thenReturn(
@@ -1905,7 +1906,7 @@ class ZohoSyncServiceTest {
 
         assertThat(order.getStatus()).isEqualTo(com.miniandmore.app.domain.enumeration.OrderStatus.CONFIRMED);
         assertThat(order.getZohoInvoiceId()).isNull();
-        verify(booksClient, never()).createInvoiceFromSalesOrder(any());
+        verify(booksClient, never()).createInvoiceFromSalesOrder(any(), any());
         verify(booksClient, never()).createCustomerPayment(any());
     }
 
@@ -2465,7 +2466,7 @@ class ZohoSyncServiceTest {
         when(orderItemRepository.findAllByOrderId(200L)).thenReturn(List.of(line));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
         when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-var")));
-        when(booksClient.createInvoiceFromSalesOrder("so-var")).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-var")));
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-var"), any())).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-var")));
         when(productRepository.findById(40L)).thenReturn(Optional.of(product));
 
         service.syncOrder(200L);
@@ -2507,7 +2508,7 @@ class ZohoSyncServiceTest {
         when(orderItemRepository.findAllByOrderId(203L)).thenReturn(List.of(line));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
         when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-jabla-var")));
-        when(booksClient.createInvoiceFromSalesOrder("so-jabla-var"))
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-jabla-var"), any()))
             .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-jabla-var")));
         when(productRepository.findById(51L)).thenReturn(Optional.of(product));
 
@@ -5139,7 +5140,7 @@ class ZohoSyncServiceTest {
         when(orderItemRepository.findAllByOrderId(201L)).thenReturn(List.of(line));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
         when(booksClient.createSalesOrder(any())).thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-simple")));
-        when(booksClient.createInvoiceFromSalesOrder("so-simple")).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-simple")));
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-simple"), any())).thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-simple")));
         when(productRepository.findById(50L)).thenReturn(Optional.of(product));
 
         service.syncOrder(201L);
@@ -5226,7 +5227,7 @@ class ZohoSyncServiceTest {
             .thenReturn(Map.of("salesorder", Map.of("salesorder_id", "so-repaired")));
         when(booksClient.markItemActive("stale-item")).thenReturn(Map.of());
         when(booksClient.updateItem(eq("stale-item"), any())).thenReturn(Map.of("item", Map.of("item_id", "stale-item")));
-        when(booksClient.createInvoiceFromSalesOrder("so-repaired"))
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-repaired"), any()))
             .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-repaired")));
 
         service.syncOrder(202L);
@@ -5252,7 +5253,7 @@ class ZohoSyncServiceTest {
 
         when(customerOrderRepository.findById(114L)).thenReturn(Optional.of(order));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
-        when(booksClient.createInvoiceFromSalesOrder("so-mark-open"))
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-mark-open"), any()))
             .thenReturn(Map.of("invoice", Map.of("invoice_id", "inv-mark-open")));
         when(booksClient.getInvoice("inv-mark-open"))
             .thenReturn(Map.of("invoice", Map.of("status", "sent", "balance", 500)));
@@ -5262,7 +5263,7 @@ class ZohoSyncServiceTest {
 
         var inOrder = org.mockito.Mockito.inOrder(booksClient);
         inOrder.verify(booksClient).markSalesOrderAsOpen("so-mark-open");
-        inOrder.verify(booksClient).createInvoiceFromSalesOrder("so-mark-open");
+        inOrder.verify(booksClient).createInvoiceFromSalesOrder(eq("so-mark-open"), any());
         assertThat(order.getZohoInvoiceId()).isEqualTo("inv-mark-open");
         assertThat(order.getZohoSyncStatus()).isEqualTo(ZohoSyncStatus.SYNCED);
     }
@@ -5291,7 +5292,7 @@ class ZohoSyncServiceTest {
 
         when(customerOrderRepository.findById(115L)).thenReturn(Optional.of(order));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
-        when(booksClient.createInvoiceFromSalesOrder("so-already-inv")).thenThrow(alreadyInvoiced);
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-already-inv"), any())).thenThrow(alreadyInvoiced);
         when(booksClient.getSalesOrder("so-already-inv"))
             .thenReturn(
                 Map.of(
@@ -5330,7 +5331,7 @@ class ZohoSyncServiceTest {
 
         when(customerOrderRepository.findById(116L)).thenReturn(Optional.of(order));
         when(booksClient.findContactByEmail("buyer@example.com")).thenReturn(Map.of("contact_id", "cust-1"));
-        when(booksClient.createInvoiceFromSalesOrder("so-already-inv-cod")).thenThrow(alreadyInvoiced);
+        when(booksClient.createInvoiceFromSalesOrder(eq("so-already-inv-cod"), any())).thenThrow(alreadyInvoiced);
         when(booksClient.getSalesOrder("so-already-inv-cod"))
             .thenReturn(
                 Map.of(
