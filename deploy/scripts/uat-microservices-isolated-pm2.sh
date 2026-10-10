@@ -182,7 +182,10 @@ echo "  commerce:    ${COMMERCE_JAR_PATH}" >&2
 echo "  integration: ${INTEGRATION_JAR_PATH}" >&2
 
 # Fail before stopping the healthy stack if the release schema cannot be applied.
-bash "${SCRIPT_DIR}/run-catalog-liquibase.sh" "$CATALOG_JAR_PATH"
+while IFS= read -r changelog || [ -n "${changelog:-}" ]; do
+  case "$changelog" in ''|'#'*) continue ;; esac
+  CATALOG_LIQUIBASE_CHANGELOG="$changelog" bash "${SCRIPT_DIR}/run-catalog-liquibase.sh" "$CATALOG_JAR_PATH"
+done < "${SCRIPT_DIR}/catalog-isolated-migrations.list"
 
 # UAT VPS is often memory/CPU constrained — smaller heaps boot faster than 5 parallel 1GB JVMs.
 JAVA_OPTS_CATALOG="-Xms256m -Xmx512m -XX:+UseG1GC"
