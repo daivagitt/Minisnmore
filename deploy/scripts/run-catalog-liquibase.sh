@@ -3,8 +3,16 @@
 set -euo pipefail
 
 CATALOG_JAR_PATH="${1:?Usage: run-catalog-liquibase.sh /path/to/catalog.jar}"
-# Default single changelog (master.xml validate fails from PropertiesLauncher classpath). Override per migration.
-export CATALOG_LIQUIBASE_CHANGELOG="${CATALOG_LIQUIBASE_CHANGELOG:-config/liquibase/changelog/20260930160000_add_customer_order_package_type.xml}"
+# Prefer the ordered list in catalog-isolated-migrations.list (via prod/uat restart scripts).
+# Bare calls must set CATALOG_LIQUIBASE_CHANGELOG — do not default to a late single file
+# (that skips post-order / contact / BOGO foundation schema).
+if [ -z "${CATALOG_LIQUIBASE_CHANGELOG:-}" ]; then
+  echo "ERROR: CATALOG_LIQUIBASE_CHANGELOG is required." >&2
+  echo "       Use deploy/scripts/prod-restart-isolated-catalog.sh (or uat-*) so the full" >&2
+  echo "       catalog-isolated-migrations.list is applied in order, or export one changelog path." >&2
+  exit 1
+fi
+export CATALOG_LIQUIBASE_CHANGELOG
 
 if [ ! -f "$CATALOG_JAR_PATH" ]; then
   echo "ERROR: catalog JAR not found: ${CATALOG_JAR_PATH}" >&2

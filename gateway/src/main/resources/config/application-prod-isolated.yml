@@ -48,6 +48,14 @@ spring:
               uri: http://127.0.0.1:9184
               predicates:
                 - Path=/internal/v1/zoho/invoice-webhook,/api/v1/zoho/invoice-webhook
+            - id: miniandmore-xpressbees-return-webhooks
+              uri: http://127.0.0.1:9184
+              predicates:
+                - Path=/internal/v1/webhooks/xpressbees/returns,/api/v1/webhooks/xpressbees/returns
+            - id: miniandmore-xpressbees-shipment-webhooks
+              uri: http://127.0.0.1:9184
+              predicates:
+                - Path=/internal/v1/webhooks/xpressbees/shipments,/api/v1/webhooks/xpressbees/shipments
             - id: miniandmore-razorpay-webhooks
               uri: http://127.0.0.1:9184
               predicates:
