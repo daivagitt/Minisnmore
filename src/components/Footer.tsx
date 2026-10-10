@@ -302,6 +302,13 @@ export function Footer() {
                       About us
                     </Link>
                   </FooterNavItem>
+                  {isVisible("contact") ? (
+                    <FooterNavItem>
+                      <Link to="/contact-us" className="story-link text-muted-foreground hover:text-foreground">
+                        Contact Us
+                      </Link>
+                    </FooterNavItem>
+                  ) : null}
                   <FooterNavItem>
                     <a
                       href={toDirectDownloadUrl(settings.ecatalogue_url) || "/e-catalogue.pdf"}
@@ -351,7 +358,15 @@ export function Footer() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
-                <FooterSubheading>Contact us</FooterSubheading>
+                <FooterSubheading>
+                  {isVisible("contact") ? (
+                    <Link to="/contact-us" className="hover:text-foreground">
+                      Contact Us
+                    </Link>
+                  ) : (
+                    "Contact Us"
+                  )}
+                </FooterSubheading>
                 <div className="flex items-center gap-1.5">
                   {mailtoHref ? (
                     <a

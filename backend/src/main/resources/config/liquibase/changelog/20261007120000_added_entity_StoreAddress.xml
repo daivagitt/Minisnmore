@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20261007120000-1" author="miniandmore">
+        <createTable tableName="store_address">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="label" type="varchar(80)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="full_name" type="varchar(120)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="phone" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="line1" type="varchar(200)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="line2" type="varchar(200)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="city" type="varchar(80)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="state" type="varchar(80)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="pincode" type="varchar(6)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="country" type="varchar(80)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="usage" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_default" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex indexName="idx_store_address_usage" tableName="store_address">
+            <column name="usage"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="20261007120000-2" author="miniandmore" dbms="postgresql">
+        <sql>
+            CREATE UNIQUE INDEX idx_store_address_default_usage ON store_address (usage) WHERE is_default = true;
+        </sql>
+        <rollback>
+            DROP INDEX IF EXISTS idx_store_address_default_usage;
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

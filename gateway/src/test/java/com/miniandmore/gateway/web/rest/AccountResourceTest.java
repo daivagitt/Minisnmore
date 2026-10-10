@@ -1,6 +1,9 @@
 package com.miniandmore.gateway.web.rest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.mockUser;
@@ -17,6 +20,7 @@ import com.miniandmore.gateway.service.dto.PasswordChangeDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
@@ -204,6 +208,27 @@ class AccountResourceTest {
     }
 
     @Test
+    void registerAccount_capturesSubscribePreference() {
+        User user = new User();
+        user.setLogin("newuser");
+        user.setEmail("new@localhost");
+        when(userService.registerUser(any(), any())).thenReturn(Mono.just(user));
+
+        webTestClient
+            .post()
+            .uri("/api/register")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("{\"login\":\"newuser\",\"email\":\"new@localhost\",\"password\":\"password\",\"subscribed\":true}")
+            .exchange()
+            .expectStatus()
+            .isCreated();
+
+        ArgumentCaptor<AdminUserDTO> captor = ArgumentCaptor.forClass(AdminUserDTO.class);
+        verify(userService).registerUser(captor.capture(), eq("password"));
+        assertThat(captor.getValue().getSubscribed()).isTrue();
+    }
+
+    @Test
     void registerAccount_autoActivate_skipsEmail() {
         applicationProperties.setRegisterAutoActivate(true);
         User user = new User();
@@ -334,5 +359,35 @@ class AccountResourceTest {
             .exchange()
             .expectStatus()
             .isOk();
+    }
+
+    @Test
+    void finishInvite_validKey_activatesStaffUser() {
+        User user = new User();
+        user.setLogin("staff");
+        when(userService.completeInvite("newpass123", "invite-key")).thenReturn(Mono.just(user));
+
+        webTestClient
+            .post()
+            .uri("/api/account/invite/finish")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("{\"key\":\"invite-key\",\"newPassword\":\"newpass123\"}")
+            .exchange()
+            .expectStatus()
+            .isOk();
+    }
+
+    @Test
+    void finishInvite_invalidKey_returnsBadRequest() {
+        when(userService.completeInvite("newpass123", "bad-key")).thenReturn(Mono.empty());
+
+        webTestClient
+            .post()
+            .uri("/api/account/invite/finish")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("{\"key\":\"bad-key\",\"newPassword\":\"newpass123\"}")
+            .exchange()
+            .expectStatus()
+            .isBadRequest();
     }
 }

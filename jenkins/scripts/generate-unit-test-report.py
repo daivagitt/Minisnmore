@@ -39,6 +39,10 @@ def parse_backend_reports(reports_dir: Path, label: str = "") -> tuple[list[tupl
     rows: list[tuple] = []
     prefix = f"[{label}] " if label else ""
     for report in sorted(reports_dir.glob("TEST-*.xml")):
+        # Leftover *IT* / *IntTest* XMLs are failsafe suites, not unit tests.
+        simple = report.stem.removeprefix("TEST-").rsplit(".", 1)[-1]
+        if simple.endswith("IT") or "IntTest" in simple:
+            continue
         root = ET.parse(report).getroot()
         tests = int(root.attrib.get("tests", 0))
         file_failures = int(root.attrib.get("failures", 0))
@@ -137,6 +141,7 @@ def main() -> None:
       <section class="panel">
         <h2>Related reports</h2>
         <div class="links">
+          {link_card("./scenarios/index.html", "Unit test scenarios", "Every Vitest case grouped by route, component, and lib suite") if args.kind == "frontend" else ""}
           {link_card(coverage_href, "Code coverage summary", "Line, branch, and module coverage with drill-down browser")}
         </div>
       </section>

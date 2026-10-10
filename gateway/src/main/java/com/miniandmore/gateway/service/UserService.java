@@ -7,20 +7,23 @@ import com.miniandmore.gateway.repository.AuthorityRepository;
 import com.miniandmore.gateway.repository.UserAuthoritiesLoader;
 import com.miniandmore.gateway.repository.UserRepository;
 import com.miniandmore.gateway.security.AuthoritiesConstants;
+import com.miniandmore.gateway.security.StaffRoles;
 import com.miniandmore.gateway.service.dto.AdminUserDTO;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -30,6 +33,7 @@ import reactor.core.scheduler.Schedulers;
 public class UserService {
 
     private static final Logger LOG = LoggerFactory.getLogger(UserService.class);
+    private static final String LOG_DELETED_USER = "Deleted User: {}";
 
     private final UserRepository userRepository;
     private final AuthorityRepository authorityRepository;
@@ -108,8 +112,7 @@ public class UserService {
     public Mono<User> requestPasswordReset(String mail) {
         return userRepository
             .findOneByEmailIgnoreCase(mail)
-            // OAuth-linked accounts are matched by login-derived-from-email during sign-in;
-            // fall back the same way here so a stale/mismatched email column doesn't hide them.
+            // Handle OAuth linked accounts which fallback to login when email does not match directly
             .switchIfEmpty(Mono.defer(() -> userRepository.findOneByLogin(mail.toLowerCase().trim())))
             .filter(User::isActivated)
             .publishOn(Schedulers.boundedElastic())
@@ -165,6 +168,7 @@ public class UserService {
                     newUser.setImageUrl(userDTO.getImageUrl());
                     newUser.setLangKey(userDTO.getLangKey() != null ? userDTO.getLangKey() : Constants.DEFAULT_LANGUAGE);
                     newUser.setActivated(false);
+                    newUser.setSubscribed(Boolean.TRUE.equals(userDTO.getSubscribed()));
                     newUser.setActivationKey(generateActivationKey());
                     newUser.setCreatedBy(Constants.SYSTEM);
                     newUser.setLastModifiedBy(Constants.SYSTEM);
@@ -181,6 +185,8 @@ public class UserService {
     }
 
     public Mono<User> createUser(AdminUserDTO userDTO) {
+        String primaryRole = StaffRoles.primaryRole(userDTO.getAuthorities());
+        Set<String> canonical = StaffRoles.canonicalAuthorities(primaryRole);
         User user = new User();
         user.setLogin(userDTO.getLogin().toLowerCase());
         user.setFirstName(userDTO.getFirstName());
@@ -191,48 +197,104 @@ public class UserService {
         user.setImageUrl(userDTO.getImageUrl());
         user.setLangKey(userDTO.getLangKey() != null ? userDTO.getLangKey() : Constants.DEFAULT_LANGUAGE);
         user.setPassword(passwordEncoder.encode(generatePassword()));
-        user.setResetKey(generateResetKey());
-        user.setResetDate(Instant.now());
-        user.setActivated(true);
+        user.setActivationKey(generateActivationKey());
+        user.setActivated(false);
         user.setCreatedBy(Constants.SYSTEM);
         user.setLastModifiedBy(Constants.SYSTEM);
-        Set<Authority> authorities = new HashSet<>();
-        if (userDTO.getAuthorities() != null) {
-            userDTO.getAuthorities().forEach(a -> {
-                Authority auth = new Authority();
-                auth.setName(a);
-                authorities.add(auth);
+        user.setAuthorities(StaffRoles.toAuthorities(canonical));
+        return saveUser(user).doOnNext(u -> LOG.debug("Invited staff user: {}", u));
+    }
+
+    public Mono<User> createStaffUser(AdminUserDTO userDTO, Set<String> actorAuthorities) {
+        StaffRoles.requireAssignable(actorAuthorities, userDTO.getAuthorities());
+        return createUser(userDTO);
+    }
+
+    public Mono<User> completeInvite(String newPassword, String key) {
+        LOG.debug("Completing staff invite for activation key {}", key);
+        return userRepository
+            .findOneByActivationKey(key)
+            .flatMap(userAuthoritiesLoader::withAuthorities)
+            .filter(user -> !user.isActivated())
+            .filter(user -> StaffRoles.isStaff(StaffRoles.names(user)))
+            .publishOn(Schedulers.boundedElastic())
+            .flatMap(user -> {
+                user.setPassword(passwordEncoder.encode(newPassword));
+                user.setActivated(true);
+                user.setActivationKey(null);
+                return saveUser(user);
             });
-        }
-        user.setAuthorities(authorities);
-        return saveUser(user).doOnNext(u -> LOG.debug("Created Information for User: {}", u));
     }
 
     public Mono<AdminUserDTO> updateUser(AdminUserDTO userDTO) {
         return userRepository
             .findById(userDTO.getId())
-            .flatMap(user -> {
-                user.setLogin(userDTO.getLogin().toLowerCase());
-                user.setFirstName(userDTO.getFirstName());
-                user.setLastName(userDTO.getLastName());
-                if (userDTO.getEmail() != null) {
-                    user.setEmail(userDTO.getEmail().toLowerCase());
-                }
-                user.setImageUrl(userDTO.getImageUrl());
-                user.setActivated(userDTO.isActivated());
-                user.setLangKey(userDTO.getLangKey());
-                Set<Authority> managedAuthorities = new HashSet<>();
-                if (userDTO.getAuthorities() != null) {
-                    userDTO.getAuthorities().forEach(a -> {
-                        Authority auth = new Authority();
-                        auth.setName(a);
-                        managedAuthorities.add(auth);
-                    });
-                }
-                user.setAuthorities(managedAuthorities);
-                return saveUser(user);
-            })
+            .flatMap(user -> applyUserUpdate(user, userDTO))
             .map(AdminUserDTO::new);
+    }
+
+    public Mono<AdminUserDTO> updateStaffUser(AdminUserDTO userDTO, Set<String> actorAuthorities) {
+        return userRepository
+            .findById(userDTO.getId())
+            .flatMap(userAuthoritiesLoader::withAuthorities)
+            .flatMap(existing ->
+                protectLastSuperAdmin(existing, userDTO).then(
+                    Mono.defer(() -> {
+                        StaffRoles.requireCanManage(actorAuthorities, StaffRoles.names(existing));
+                        StaffRoles.requireAssignable(actorAuthorities, userDTO.getAuthorities());
+                        return applyUserUpdate(existing, userDTO);
+                    })
+                )
+            )
+            .map(AdminUserDTO::new);
+    }
+
+    private Mono<User> applyUserUpdate(User user, AdminUserDTO userDTO) {
+        boolean activatingPendingInvite =
+            userDTO.isActivated() && !user.isActivated() && StringUtils.isNotBlank(user.getActivationKey());
+        if (activatingPendingInvite) {
+            return Mono.error(
+                new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "This user must activate from the invitation email and set a password"
+                )
+            );
+        }
+        String primaryRole = StaffRoles.primaryRole(userDTO.getAuthorities());
+        Set<String> canonical = primaryRole == null ? Set.of() : StaffRoles.canonicalAuthorities(primaryRole);
+        user.setLogin(userDTO.getLogin().toLowerCase());
+        user.setFirstName(userDTO.getFirstName());
+        user.setLastName(userDTO.getLastName());
+        if (userDTO.getEmail() != null) {
+            user.setEmail(userDTO.getEmail().toLowerCase());
+        }
+        user.setImageUrl(userDTO.getImageUrl());
+        user.setActivated(userDTO.isActivated());
+        user.setLangKey(userDTO.getLangKey());
+        if (userDTO.getSubscribed() != null) {
+            user.setSubscribed(userDTO.getSubscribed());
+        }
+        user.setAuthorities(StaffRoles.toAuthorities(canonical));
+        return saveUser(user);
+    }
+
+    private Mono<Void> protectLastSuperAdmin(User existing, AdminUserDTO next) {
+        if (!StaffRoles.names(existing).contains(AuthoritiesConstants.SUPER_ADMIN)) {
+            return Mono.empty();
+        }
+        boolean removingSuperAdmin = !AuthoritiesConstants.SUPER_ADMIN.equals(StaffRoles.primaryRole(next.getAuthorities()));
+        boolean deactivating = !next.isActivated();
+        if (!removingSuperAdmin && !deactivating) {
+            return Mono.empty();
+        }
+        return userRepository
+            .countUsersWithAuthority(AuthoritiesConstants.SUPER_ADMIN)
+            .flatMap(count -> {
+                if (count != null && count <= 1) {
+                    return Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot remove the last Super Admin"));
+                }
+                return Mono.empty();
+            });
     }
 
     public Mono<Void> updateUser(String firstName, String lastName, String email, String langKey, String imageUrl) {
@@ -255,7 +317,21 @@ public class UserService {
         return userRepository
             .findOneByLogin(login)
             .flatMap(userRepository::delete)
-            .doOnNext(u -> LOG.debug("Deleted User: {}", login));
+            .doOnNext(u -> LOG.debug(LOG_DELETED_USER, login));
+    }
+
+    public Mono<Void> deleteStaffUser(String login, Set<String> actorAuthorities) {
+        return userRepository
+            .findOneByLogin(login)
+            .flatMap(userAuthoritiesLoader::withAuthorities)
+            .flatMap(existing -> {
+                StaffRoles.requireCanManage(actorAuthorities, StaffRoles.names(existing));
+                AdminUserDTO next = new AdminUserDTO(existing);
+                next.setActivated(false);
+                next.setAuthorities(Set.of());
+                return protectLastSuperAdmin(existing, next).then(userRepository.delete(existing));
+            })
+            .doOnNext(u -> LOG.debug(LOG_DELETED_USER, login));
     }
 
     public Mono<Void> changePassword(String currentClearTextPassword, String newPassword) {
@@ -275,17 +351,46 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public Flux<AdminUserDTO> getAllManagedUsers(Pageable pageable) {
-        return userRepository.findAllByIdNotNull(pageable).map(AdminUserDTO::new);
+        long limit = pageable.getPageSize();
+        long offset = pageable.getOffset();
+        return userRepository
+            .findAllUsersForAdmin(limit, offset)
+            .collectList()
+            .flatMapMany(userAuthoritiesLoader::attachAuthorities)
+            .map(AdminUserDTO::new);
+    }
+
+    @Transactional(readOnly = true)
+    public Flux<AdminUserDTO> getAllCustomerUsers(Pageable pageable) {
+        long limit = pageable.getPageSize();
+        long offset = pageable.getOffset();
+        return userRepository
+            .findAllCustomerUsers(limit, offset)
+            .collectList()
+            .flatMapMany(userAuthoritiesLoader::attachAuthorities)
+            .map(AdminUserDTO::new);
     }
 
     @Transactional(readOnly = true)
     public Flux<com.miniandmore.gateway.service.dto.UserDTO> getAllPublicUsers(Pageable pageable) {
-        return userRepository.findAllByActivatedIsTrue(pageable).map(com.miniandmore.gateway.service.dto.UserDTO::new);
+        return userRepository
+            .findAllActivatedUsers(pageable.getPageSize(), pageable.getOffset())
+            .map(com.miniandmore.gateway.service.dto.UserDTO::new);
+    }
+
+    @Transactional(readOnly = true)
+    public Mono<Long> countPublicUsers() {
+        return userRepository.countActivatedUsers();
     }
 
     @Transactional(readOnly = true)
     public Mono<Long> countManagedUsers() {
         return userRepository.count();
+    }
+
+    @Transactional(readOnly = true)
+    public Mono<Long> countCustomerUsers() {
+        return userRepository.countCustomerUsers();
     }
 
     @Transactional(readOnly = true)
@@ -305,11 +410,27 @@ public class UserService {
         removeNotActivatedUsersReactively().blockLast();
     }
 
+    private static final long SHOPPER_INVITE_TTL_DAYS = 3;
+    private static final long STAFF_INVITE_TTL_DAYS = 14;
+
     private Flux<User> removeNotActivatedUsersReactively() {
-        return userRepository
-            .findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(Instant.now().minus(3, ChronoUnit.DAYS))
+        Flux<User> staleShoppers = userRepository
+            .findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(
+                Instant.now().minus(SHOPPER_INVITE_TTL_DAYS, ChronoUnit.DAYS)
+            )
+            .flatMap(userAuthoritiesLoader::withAuthorities)
+            .filter(user -> !StaffRoles.isStaff(StaffRoles.names(user)));
+
+        Flux<User> staleStaffInvites = userRepository
+            .findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(
+                Instant.now().minus(STAFF_INVITE_TTL_DAYS, ChronoUnit.DAYS)
+            )
+            .flatMap(userAuthoritiesLoader::withAuthorities)
+            .filter(user -> StaffRoles.isStaff(StaffRoles.names(user)));
+
+        return Flux.merge(staleShoppers, staleStaffInvites)
             .flatMap(user -> userRepository.delete(user).thenReturn(user))
-            .doOnNext(user -> LOG.debug("Deleted User: {}", user));
+            .doOnNext(user -> LOG.debug(LOG_DELETED_USER, user));
     }
 
     public static String generatePassword() {

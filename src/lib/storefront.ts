@@ -142,6 +142,7 @@ function mapProduct(row: DbProductRow, discountPercent = DEFAULT_STORE_DISCOUNT_
     rating: 4.8,
     reviewCount: 0,
     category: categoryFromAge(row.age_min_months),
+    categoryId: row.category_id ? String(row.category_id) : undefined,
     categorySlug: row.category_slug?.trim().toLowerCase() || undefined,
     categoryName: row.category_name?.trim() || undefined,
     sku: row.sku?.trim() || undefined,

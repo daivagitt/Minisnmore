@@ -117,5 +117,7 @@ class AllMappersExtendedFieldsTest {
 
         var dto = mapper.toDto(entity);
         assertThat(mapper.toEntity(dto).getPhone()).isEqualTo("9999999999");
+        entity.setSubscribed(true);
+        assertThat(mapper.toDto(entity).getSubscribed()).isTrue();
     }
 }

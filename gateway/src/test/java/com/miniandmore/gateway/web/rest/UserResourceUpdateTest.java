@@ -2,6 +2,7 @@ package com.miniandmore.gateway.web.rest;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.mockUser;
 import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.springSecurity;
 
 import com.miniandmore.gateway.domain.User;
@@ -10,6 +11,7 @@ import com.miniandmore.gateway.security.AuthoritiesConstants;
 import com.miniandmore.gateway.service.MailService;
 import com.miniandmore.gateway.service.UserService;
 import com.miniandmore.gateway.service.dto.AdminUserDTO;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,7 +42,11 @@ class UserResourceUpdateTest {
     void setUp() {
         UserResource resource = new UserResource(userService, userRepository, mailService);
         ReflectionTestUtils.setField(resource, "applicationName", "gateway");
-        webTestClient = WebTestClientFactory.bindBuilder(resource).apply(springSecurity()).build();
+        webTestClient = WebTestClientFactory
+            .bindBuilder(resource)
+            .apply(springSecurity())
+            .build()
+            .mutateWith(mockUser("admin").authorities(AuthoritiesConstants.ADMIN));
     }
 
     @Test
@@ -51,11 +57,12 @@ class UserResourceUpdateTest {
         dto.setEmail("user@localhost");
         dto.setFirstName("A");
         dto.setLastName("B");
+        dto.setAuthorities(Set.of(AuthoritiesConstants.SALES));
         User existing = new User();
         existing.setId(1L);
         when(userRepository.findOneByEmailIgnoreCase("user@localhost")).thenReturn(Mono.just(existing));
         when(userRepository.findOneByLogin("user")).thenReturn(Mono.just(existing));
-        when(userService.updateUser(any())).thenReturn(Mono.just(dto));
+        when(userService.updateStaffUser(any(), any())).thenReturn(Mono.just(dto));
 
         webTestClient
             .put()
@@ -73,6 +80,7 @@ class UserResourceUpdateTest {
         dto.setId(1L);
         dto.setLogin("user");
         dto.setEmail("other@localhost");
+        dto.setAuthorities(Set.of(AuthoritiesConstants.SALES));
         User other = new User();
         other.setId(2L);
         when(userRepository.findOneByEmailIgnoreCase("other@localhost")).thenReturn(Mono.just(other));

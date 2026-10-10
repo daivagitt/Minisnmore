@@ -47,13 +47,33 @@ class SiteSettingMapperPartialTest {
         patch.setSubscribePlansJson("[]");
         patch.setSubscribeFeaturesJson("[]");
         patch.setAboutPageJson("{\"hero_title\":\"About\"}");
+        patch.setGiftPageJson("{\"hero_title\":\"Gift\"}");
+        patch.setInvoiceLogoUrl("https://cdn/inv-logo.png");
+        patch.setInvoiceWebsite("https://shop.example");
+        patch.setInvoiceGstin("29ABCDE1234F1Z5");
+        patch.setInvoiceSoldByAddress("Sold by");
+        patch.setInvoiceDispatchFromAddress("Dispatch");
+        patch.setInvoiceRegisteredOfficeAddress("Registered");
+        patch.setInvoiceCin("U12345KA2026PTC000001");
+        patch.setInvoiceQrUrl("https://cdn/qr.png");
+        patch.setInvoiceFooterNote("Thanks");
+        patch.setInvoiceSellerState("Karnataka");
+        patch.setCodFeeInr(99);
+        patch.setDeliveryEtaBufferDays(2);
+        patch.setReturnWindowDays(7);
+        patch.setRefundMinBusinessDays(3);
+        patch.setRefundMaxBusinessDays(10);
 
         mapper.partialUpdate(entity, patch);
 
         assertThat(entity.getContactEmail()).isEqualTo("a@b.com");
         assertThat(entity.getSubscribeHeroTitle()).isEqualTo("Hero");
         assertThat(entity.getAboutPageJson()).isEqualTo("{\"hero_title\":\"About\"}");
+        assertThat(entity.getGiftPageJson()).isEqualTo("{\"hero_title\":\"Gift\"}");
         assertThat(entity.getGstRate()).isEqualByComparingTo("18");
+        assertThat(entity.getInvoiceGstin()).isEqualTo("29ABCDE1234F1Z5");
+        assertThat(entity.getCodFeeInr()).isEqualTo(99);
+        assertThat(entity.getRefundMaxBusinessDays()).isEqualTo(10);
         mapper.partialUpdate(entity, null);
     }
 }

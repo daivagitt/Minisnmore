@@ -43,6 +43,26 @@ public class Banner implements Serializable {
     @Column(name = "cta_label", length = 80)
     private String ctaLabel;
 
+    /** Small overline above the title on the homepage hero (e.g. "Featured"). */
+    @Size(max = 80)
+    @Column(name = "eyebrow", length = 80)
+    private String eyebrow;
+
+    /** Optional trust chip under this slide; blank uses the storefront fabric default. */
+    @Size(max = 80)
+    @Column(name = "trust_fabric_label", length = 80)
+    private String trustFabricLabel;
+
+    /** Optional trust chip under this slide; blank uses the free-shipping default. */
+    @Size(max = 80)
+    @Column(name = "trust_shipping_label", length = 80)
+    private String trustShippingLabel;
+
+    /** Optional trust chip under this slide; blank uses "Azo-free dyes". */
+    @Size(max = 80)
+    @Column(name = "trust_dyes_label", length = 80)
+    private String trustDyesLabel;
+
     @NotNull
     @Min(value = 0)
     @Column(name = "sort_order", nullable = false)
@@ -132,6 +152,58 @@ public class Banner implements Serializable {
         this.ctaLabel = ctaLabel;
     }
 
+    public String getEyebrow() {
+        return this.eyebrow;
+    }
+
+    public Banner eyebrow(String eyebrow) {
+        this.setEyebrow(eyebrow);
+        return this;
+    }
+
+    public void setEyebrow(String eyebrow) {
+        this.eyebrow = eyebrow;
+    }
+
+    public String getTrustFabricLabel() {
+        return this.trustFabricLabel;
+    }
+
+    public Banner trustFabricLabel(String trustFabricLabel) {
+        this.setTrustFabricLabel(trustFabricLabel);
+        return this;
+    }
+
+    public void setTrustFabricLabel(String trustFabricLabel) {
+        this.trustFabricLabel = trustFabricLabel;
+    }
+
+    public String getTrustShippingLabel() {
+        return this.trustShippingLabel;
+    }
+
+    public Banner trustShippingLabel(String trustShippingLabel) {
+        this.setTrustShippingLabel(trustShippingLabel);
+        return this;
+    }
+
+    public void setTrustShippingLabel(String trustShippingLabel) {
+        this.trustShippingLabel = trustShippingLabel;
+    }
+
+    public String getTrustDyesLabel() {
+        return this.trustDyesLabel;
+    }
+
+    public Banner trustDyesLabel(String trustDyesLabel) {
+        this.setTrustDyesLabel(trustDyesLabel);
+        return this;
+    }
+
+    public void setTrustDyesLabel(String trustDyesLabel) {
+        this.trustDyesLabel = trustDyesLabel;
+    }
+
     public Integer getSortOrder() {
         return this.sortOrder;
     }
@@ -187,6 +259,10 @@ public class Banner implements Serializable {
             ", imageUrl='" + getImageUrl() + "'" +
             ", linkUrl='" + getLinkUrl() + "'" +
             ", ctaLabel='" + getCtaLabel() + "'" +
+            ", eyebrow='" + getEyebrow() + "'" +
+            ", trustFabricLabel='" + getTrustFabricLabel() + "'" +
+            ", trustShippingLabel='" + getTrustShippingLabel() + "'" +
+            ", trustDyesLabel='" + getTrustDyesLabel() + "'" +
             ", sortOrder=" + getSortOrder() +
             ", active='" + getActive() + "'" +
             "}";

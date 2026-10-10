@@ -67,6 +67,12 @@ public class CouponAsserts {
             )
             .satisfies(a -> assertThat(a.getBogoBuyQty()).as("check bogoBuyQty").isEqualTo(expected.getBogoBuyQty()))
             .satisfies(a -> assertThat(a.getBogoGetQty()).as("check bogoGetQty").isEqualTo(expected.getBogoGetQty()))
+            .satisfies(a -> assertThat(a.getEligibilityScope()).as("check eligibilityScope").isEqualTo(expected.getEligibilityScope()))
+            .satisfies(a ->
+                assertThat(a.getEligibilityCategoryId())
+                    .as("check eligibilityCategoryId")
+                    .isEqualTo(expected.getEligibilityCategoryId())
+            )
             .satisfies(a -> assertThat(a.getExpiresAt()).as("check expiresAt").isEqualTo(expected.getExpiresAt()))
             .satisfies(a -> assertThat(a.getActive()).as("check active").isEqualTo(expected.getActive()));
     }

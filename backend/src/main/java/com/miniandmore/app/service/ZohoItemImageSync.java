@@ -258,13 +258,19 @@ public class ZohoItemImageSync {
      */
     public void importZohoVariantColorImage(Product product, String color, String zohoItemId, Map<String, Object> item) {
         String sku = textOf(item, "sku");
-        List<String> importedUrls = StringUtils.isNotBlank(zohoItemId) ? storeImportedImages(product, zohoItemId, item) : List.of();
+        String colorName = StringUtils.trimToNull(color);
+        String passKey = colorName == null ? null : colorGalleryPassKey(product, colorName);
+        List<String> importedUrls = List.of();
+        // Same-print sibling sizes share one gallery; once this pass has photos for the colour,
+        // later sizes must not re-download their duplicate Zoho documents.
+        if (passKey == null || !replacedColorGalleries.contains(passKey)) {
+            importedUrls = StringUtils.isNotBlank(zohoItemId) ? storeImportedImages(product, zohoItemId, item) : List.of();
+        }
         if (StringUtils.isNotBlank(sku)) {
             // The variant matrix's per-SKU photo field is not the source of truth for prints —
             // clear it so stale/size-specific photos never linger after a pull.
             variantSupport.clearVariantImages(product, sku);
         }
-        String colorName = StringUtils.trimToNull(color);
         if (colorName != null && !importedUrls.isEmpty()) {
             applyImportedColorGallery(product, colorName, importedUrls);
         }
@@ -317,6 +323,7 @@ public class ZohoItemImageSync {
         }
         List<String> existing = colorImagesSupport.galleryUrlsForColor(product, colorName);
         if (!existing.isEmpty() && existing.containsAll(importedUrls)) {
+            replacedColorGalleries.add(passKey);
             return;
         }
         colorImagesSupport.replaceColorGallery(product, colorName, importedUrls);
@@ -336,10 +343,16 @@ public class ZohoItemImageSync {
             return List.of();
         }
         LinkedHashSet<String> urls = new LinkedHashSet<>();
+        Map<String, String> knownDocs = readImportedDocumentUrls(product);
         List<String> documentIds = ZohoItemDocuments.documentIdsForImport(item);
         long maxBytes = applicationProperties.getStorage().getS3().getMaxUploadBytes();
         int index = 0;
         for (String documentId : documentIds) {
+            String cached = knownDocs.get(documentKey(documentId));
+            if (StringUtils.isNotBlank(cached)) {
+                urls.add(cached.trim());
+                continue;
+            }
             Optional<BinaryDownload> downloaded = booksClient.downloadDocument(documentId, maxBytes);
             if (downloaded.isEmpty()) {
                 throw new IllegalStateException("Zoho returned no bytes for declared document " + documentId);
@@ -349,16 +362,28 @@ public class ZohoItemImageSync {
             }
             String stored = storeBinary(product, zohoItemId, item, downloaded.orElseThrow(), documentId + "-" + index);
             if (StringUtils.isNotBlank(stored)) {
-                urls.add(stored.trim());
+                String url = stored.trim();
+                urls.add(url);
+                knownDocs.put(documentKey(documentId), url);
             }
             index++;
         }
         if (urls.isEmpty() && itemDeclaresImage(item)) {
-            Optional<BinaryDownload> downloaded = booksClient.downloadItemImage(zohoItemId, maxBytes);
-            if (downloaded.isPresent() && isImageDownload(downloaded.orElseThrow())) {
-                String stored = storeBinary(product, zohoItemId, item, downloaded.orElseThrow(), "item");
-                if (StringUtils.isNotBlank(stored)) {
-                    urls.add(stored.trim());
+            String itemKey = itemImageDocumentKey(item);
+            String cached = itemKey == null ? null : knownDocs.get(itemKey);
+            if (StringUtils.isNotBlank(cached)) {
+                urls.add(cached.trim());
+            } else {
+                Optional<BinaryDownload> downloaded = booksClient.downloadItemImage(zohoItemId, maxBytes);
+                if (downloaded.isPresent() && isImageDownload(downloaded.orElseThrow())) {
+                    String stored = storeBinary(product, zohoItemId, item, downloaded.orElseThrow(), "item");
+                    if (StringUtils.isNotBlank(stored)) {
+                        String url = stored.trim();
+                        urls.add(url);
+                        if (itemKey != null) {
+                            knownDocs.put(itemKey, url);
+                        }
+                    }
                 }
             }
         }
@@ -377,7 +402,60 @@ public class ZohoItemImageSync {
         if (urls.isEmpty()) {
             LOG.debug("No Zoho image bytes for item {} (sku={})", zohoItemId, textOf(item, "sku"));
         }
+        writeImportedDocumentUrls(product, knownDocs);
         return new ArrayList<>(urls);
+    }
+
+    private Map<String, String> readImportedDocumentUrls(Product product) {
+        LinkedHashMap<String, String> out = new LinkedHashMap<>();
+        if (product == null || StringUtils.isBlank(product.getZohoImageDocsJson())) {
+            return out;
+        }
+        try {
+            Map<String, String> parsed = objectMapper.readValue(
+                product.getZohoImageDocsJson(),
+                new TypeReference<Map<String, String>>() {}
+            );
+            if (parsed == null) {
+                return out;
+            }
+            for (Map.Entry<String, String> entry : parsed.entrySet()) {
+                if (StringUtils.isBlank(entry.getKey()) || StringUtils.isBlank(entry.getValue())) {
+                    continue;
+                }
+                out.put(entry.getKey().trim(), entry.getValue().trim());
+            }
+        } catch (Exception e) {
+            LOG.debug("Could not parse zoho_image_docs_json for product {}: {}", product.getId(), e.getMessage());
+        }
+        return out;
+    }
+
+    private void writeImportedDocumentUrls(Product product, Map<String, String> docs) {
+        if (product == null || docs == null || docs.isEmpty()) {
+            return;
+        }
+        try {
+            product.setZohoImageDocsJson(objectMapper.writeValueAsString(docs));
+        } catch (Exception e) {
+            LOG.debug("Could not serialize zoho_image_docs_json for product {}: {}", product.getId(), e.getMessage());
+        }
+    }
+
+    private static String documentKey(String documentId) {
+        return "doc:" + documentId.trim();
+    }
+
+    /**
+     * Only {@code image_document_id} is a stable content identity. {@code image_name} values like
+     * {@code 1.png} are reused across uploads, so they must not be cached as skip keys.
+     */
+    private static String itemImageDocumentKey(Map<String, Object> item) {
+        String documentId = textOf(item, "image_document_id");
+        if (StringUtils.isBlank(documentId) || "0".equals(documentId) || "null".equalsIgnoreCase(documentId)) {
+            return null;
+        }
+        return documentKey(documentId);
     }
 
     private String storeBinary(

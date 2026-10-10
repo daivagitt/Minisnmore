@@ -9,11 +9,20 @@ import { usePageVisibility } from "@/hooks/usePageVisibility";
 import { useCategories, type Category } from "@/hooks/useCategories";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useAuth } from "@/hooks/useAuth";
+import { useHomeSections } from "@/hooks/useHomeSections";
+import { staffHomePath } from "@/lib/staff-roles";
 import { buildShopSearch } from "@/lib/shop-filters";
 import { filterProductsByQuery } from "@/lib/product-search";
 import { toDirectDownloadUrl, triggerPublicFileDownload } from "@/lib/utils";
 import { LazyImage } from "@/components/LazyImage";
 import { storefrontImageUrl } from "@/lib/storefront-image";
+import {
+  LOVED_RIGHT_NOW_KEY,
+  LOVED_RIGHT_NOW_LIMIT,
+  merchandisingProductLabel,
+  resolveLovedRightNow,
+  sectionProductSlugs,
+} from "@/lib/home-products";
 import defaultLogo from "@/assets/logo-horizontal-optimized.webp";
 import type { FileRoutesByTo } from '@/routeTree.gen';
 
@@ -29,6 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/best-sellers", label: "Collections", key: null as string | null },
   { to: "/gift", label: "Gift", key: "gift" },
   { to: "/about", label: "About", key: null as string | null },
+  { to: "/contact-us", label: "Contact Us", key: "contact" },
   { to: "/blog", label: "Blogs", key: "blog" },
   { to: "/track", label: "Track", key: "track" },
 ];
@@ -44,9 +54,9 @@ export function Navbar() {
     return wishlistCountForProducts(wishlist, products.map((p) => p.id));
   }, [wishlist, products, productsLoaded]);
   const settings = useSiteSettings();
-  const { user } = useAuth();
-  const profileTo = user ? "/account" : "/login";
-  const profileLabel = user ? "Profile" : "Sign in";
+  const { user, staffRole } = useAuth();
+  const profileTo = user ? (staffRole ? staffHomePath(staffRole) : "/account") : "/login";
+  const profileLabel = user ? (staffRole ? "Staff Portal" : "Profile") : "Sign in";
   const logo = settings.logo_horizontal_url || settings.logo_url || defaultLogo;
   const nav = NAV_ITEMS.filter((n) => !n.key || isVisible(n.key));
   const [open, setOpen] = useState(false);
@@ -394,25 +404,24 @@ export function Navbar() {
 }
 
 function MegaMenu({ categories, products, onClose }: { categories: Category[]; products: ReturnType<typeof useProducts>; onClose: () => void }) {
-  const lovedNow = (() => {
-    const flagged = products.filter((p) => p.isBestseller || p.isTrending || p.isNew);
-    return (flagged.length > 0 ? flagged : products).slice(0, 3);
-  })();
+  const { byKey, isEnabled, titleFor } = useHomeSections();
+  const lovedPayload = byKey.get(LOVED_RIGHT_NOW_KEY)?.payload as Record<string, unknown> | undefined;
+  const lovedNow = resolveLovedRightNow(
+    products,
+    sectionProductSlugs(lovedPayload, LOVED_RIGHT_NOW_LIMIT),
+  );
+  const showLovedNow = isEnabled(LOVED_RIGHT_NOW_KEY) && lovedNow.length > 0;
+  const lovedHeading = titleFor(LOVED_RIGHT_NOW_KEY, "Loved Right Now");
   const newArrivals = products.filter((p) => p.isNew);
   const bestsellers = products.filter((p) => p.isBestseller);
   const trending = products.filter((p) => p.isTrending);
-  const left = categories.slice(0, Math.ceil(categories.length / 2));
-  const right = categories.slice(Math.ceil(categories.length / 2));
   const hasCategories = categories.length > 0;
+  const categoriesScroll = categories.length > 8;
 
   return (
     <div className="rounded-[2rem] shadow-soft overflow-hidden border border-white/60 bg-background/98 backdrop-blur-2xl">
       <div className="grid grid-cols-12 gap-0">
-        {/* Left rail — quick edits (only what we actually have) */}
         <div className="col-span-12 md:col-span-3 p-6 bg-gradient-to-br from-primary/15 via-secondary/30 to-transparent border-r border-border/60">
-          <div className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.28em] text-primary mb-3 font-semibold">
-            <Sparkles className="h-3 w-3" /> Quick Edits
-          </div>
           <ul className="space-y-1">
             <li>
               <Link to="/shop" onClick={onClose} className="group block rounded-2xl px-3 py-2.5 hover:bg-primary/10 transition">
@@ -447,38 +456,40 @@ function MegaMenu({ categories, products, onClose }: { categories: Category[]; p
           </ul>
         </div>
 
-        {/* Middle — categories in two columns */}
-        <div className="col-span-12 md:col-span-5 p-6 bg-background/60">
-          <div className="text-[11px] uppercase tracking-[0.28em] text-foreground/70 mb-3 font-semibold">Shop by Category</div>
+        <div className="col-span-12 md:col-span-5 p-6 bg-background/60 min-w-0">
+          <div className="flex items-baseline justify-between gap-3 mb-3">
+            <div className="text-[11px] uppercase tracking-[0.28em] text-foreground/70 font-semibold">Shop by Category</div>
+            {categoriesScroll && (
+              <div className="text-[10px] text-muted-foreground shrink-0">Scroll for more</div>
+            )}
+          </div>
           {!hasCategories ? (
             <div className="text-sm text-muted-foreground">Loading categories…</div>
           ) : (
-            <div className="grid grid-cols-2 gap-1">
-              {[left, right].map((col, ci) => (
-                <ul key={ci} className="space-y-1">
-                  {col.map((c) => (
-                    <li key={c.id}>
-                      <Link
-                        to="/shop"
-                        search={{ category: c.slug }}
-                        onClick={onClose}
-                        className="group flex items-center gap-3 rounded-2xl p-2 hover:bg-primary/10 transition"
-                      >
-                        {c.image_url ? (
-                          <LazyImage src={storefrontImageUrl(c.image_url, "thumb")} fallbackSrc={c.image_url} alt="" className="h-11 w-11 rounded-xl object-cover shrink-0" priority="auto" />
-                        ) : (
-                          <div className="h-11 w-11 rounded-xl bg-primary/10 shrink-0" />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition">{c.name}</div>
-                          {c.description && <div className="text-[11px] text-muted-foreground truncate">{c.description}</div>}
-                        </div>
-                        <ArrowRight className="h-3.5 w-3.5 opacity-0 -translate-x-1 group-hover:opacity-60 group-hover:translate-x-0 transition" />
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ))}
+            <div className="max-h-[min(22rem,52vh)] overflow-y-auto overscroll-contain pr-1 -mr-1">
+              <ul className="grid grid-cols-2 gap-1">
+                {categories.map((c) => (
+                  <li key={c.id}>
+                    <Link
+                      to="/shop"
+                      search={{ category: c.slug }}
+                      onClick={onClose}
+                      className="group flex items-center gap-3 rounded-2xl p-2 hover:bg-primary/10 transition"
+                    >
+                      {c.image_url ? (
+                        <LazyImage src={storefrontImageUrl(c.image_url, "thumb")} fallbackSrc={c.image_url} alt="" className="h-11 w-11 rounded-xl object-cover shrink-0" priority="auto" />
+                      ) : (
+                        <div className="h-11 w-11 rounded-xl bg-primary/10 shrink-0" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition">{c.name}</div>
+                        {c.description && <div className="text-[11px] text-muted-foreground truncate">{c.description}</div>}
+                      </div>
+                      <ArrowRight className="h-3.5 w-3.5 opacity-0 -translate-x-1 group-hover:opacity-60 group-hover:translate-x-0 transition shrink-0" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
           <Link
@@ -490,12 +501,13 @@ function MegaMenu({ categories, products, onClose }: { categories: Category[]; p
           </Link>
         </div>
 
-        {/* Right — featured products showcase */}
-        {lovedNow.length > 0 && (
+        {showLovedNow && (
         <div className="hidden md:block col-span-4 p-6 bg-gradient-to-bl from-secondary/50 via-background/40 to-transparent border-l border-border/60">
-          <div className="text-[11px] uppercase tracking-[0.28em] text-foreground/70 mb-3 font-semibold">Loved Right Now</div>
+          <div className="text-[11px] uppercase tracking-[0.28em] text-foreground/70 mb-3 font-semibold">{lovedHeading}</div>
           <div className="space-y-2.5">
-            {lovedNow.map((p) => (
+            {lovedNow.map((p) => {
+              const productLabel = merchandisingProductLabel(lovedPayload, p);
+              return (
               <Link
                 key={p.id}
                 to="/product/$slug"
@@ -505,12 +517,15 @@ function MegaMenu({ categories, products, onClose }: { categories: Category[]; p
               >
                 <LazyImage src={storefrontImageUrl(p.image, "thumb")} fallbackSrc={p.image} alt={p.name} className="h-14 w-14 rounded-xl object-cover shrink-0" priority="auto" />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{p.category}</div>
+                  {productLabel ? (
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{productLabel}</div>
+                  ) : null}
                   <div className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition">{p.name}</div>
                   <div className="text-xs font-medium text-primary">₹{p.price.toLocaleString("en-IN")}</div>
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
         </div>
         )}

@@ -158,6 +158,19 @@ describe("admin validation helpers", () => {
     );
   });
 
+  it("rejects a refund max shorter than the min", () => {
+    const errors = getSiteSettingsValidationErrors({
+      brand_name: "Mini",
+      gst_rate: 5,
+      shipping_standard_inr: 99,
+      shipping_express_inr: 150,
+      free_shipping_min_inr: 2500,
+      refund_min_business_days: 5,
+      refund_max_business_days: 2,
+    });
+    expect(errors).toEqual(expect.arrayContaining(["Refund max business days must be at least the min."]));
+  });
+
   it("collects subscribe page plan errors but skips blank badge rows", () => {
     const errors = getSubscribePageValidationErrors({
       brand_name: "Mini",

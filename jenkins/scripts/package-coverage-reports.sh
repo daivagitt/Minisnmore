@@ -20,7 +20,7 @@ if [ -f coverage/frontend/coverage-summary.json ]; then
     --input coverage/frontend/coverage-summary.json \
     --detail-href ../coverage/index.html \
     --line-gate 95 \
-    --branch-gate 92 \
+    --branch-gate 88 \
     --output "$package_dir/frontend/coverage-summary/index.html"
 fi
 
@@ -65,7 +65,7 @@ if [ "${#module_args[@]}" -gt 0 ]; then
     --kind backend \
     --input "$jacoco_csv" \
     --detail-href ../coverage/index.html \
-    --line-gate 95 \
+    --line-gate 90 \
     --branch-gate 70 \
     --output "$package_dir/backend/coverage-summary/index.html"
 

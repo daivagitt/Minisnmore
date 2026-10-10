@@ -73,6 +73,11 @@ export const ADMIN_IMAGE_SPECS = {
     recommendedPx: "1200 × 1500 px",
     notes: "Right-hand photo on the About page hero.",
   },
+  giftHero: {
+    ratio: "16 : 10",
+    recommendedPx: "1600 × 1000 px",
+    notes: "Wide hero photo on the Gift page.",
+  },
   aboutFounder: {
     ratio: "16 : 10",
     recommendedPx: "1600 × 1000 px",

@@ -9,6 +9,6 @@ class UserSqlHelperTest {
 
     @Test
     void getColumns_returnsAllUserColumns() {
-        assertThat(UserSqlHelper.getColumns(Table.create("jhi_user"), "u")).hasSize(12);
+        assertThat(UserSqlHelper.getColumns(Table.create("jhi_user"), "u")).hasSize(13);
     }
 }

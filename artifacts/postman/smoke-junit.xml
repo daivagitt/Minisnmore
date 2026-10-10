@@ -1,27 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="Minis n More API — Smoke (public 2xx only)" tests="8" time="0.519">
-  <testsuite name="Storefront (public GET) / GET banners" id="9754bb4c-0653-442b-8c2d-28193caef925" timestamp="2026-06-05T08:23:47.512Z" tests="1" failures="0" errors="0" time="0.083">
-    <testcase name="Status is 2xx" time="0.083" classname="StorefrontPublicGetGetBanners"/>
+<testsuites name="Minis n More API — Smoke (public 2xx only)" tests="9" time="0.348">
+  <testsuite name="Storefront (public GET) / GET banners" id="3a7492ff-8330-4fcb-8d37-81b3873db3fa" timestamp="2026-10-09T13:10:41.221Z" tests="1" failures="0" errors="0" time="0.087">
+    <testcase name="Status is 2xx" time="0.087" classname="StorefrontPublicGetGetBanners"/>
   </testsuite>
-  <testsuite name="Storefront (public GET) / GET blog-posts" id="dfaf26b4-1a34-4154-8cc2-5c1aa5597d87" timestamp="2026-06-05T08:23:47.512Z" tests="1" failures="0" errors="0" time="0.023">
-    <testcase name="Status is 2xx" time="0.023" classname="StorefrontPublicGetGetBlogPosts"/>
+  <testsuite name="Storefront (public GET) / GET blog-posts" id="8414f46f-a89d-4fff-b70f-553524a9b92b" timestamp="2026-10-09T13:10:41.221Z" tests="1" failures="0" errors="0" time="0.035">
+    <testcase name="Status is 2xx" time="0.035" classname="StorefrontPublicGetGetBlogPosts"/>
   </testsuite>
-  <testsuite name="Storefront (public GET) / GET categories" id="64cf3346-2473-47e7-8acb-d7d8fa8af987" timestamp="2026-06-05T08:23:47.512Z" tests="1" failures="0" errors="0" time="0.053">
-    <testcase name="Status is 2xx" time="0.053" classname="StorefrontPublicGetGetCategories"/>
+  <testsuite name="Storefront (public GET) / GET blog-posts by slug" id="7c8dfad2-2b35-408b-855e-77a382fe4b45" timestamp="2026-10-09T13:10:41.221Z" tests="1" failures="0" errors="0" time="0.032">
+    <testcase name="Status is 2xx" time="0.032" classname="StorefrontPublicGetGetBlogPostsBySlug"/>
   </testsuite>
-  <testsuite name="Storefront (public GET) / GET home-sections" id="da3a054a-d013-4315-9a4a-b93303104b1f" timestamp="2026-06-05T08:23:47.512Z" tests="1" failures="0" errors="0" time="0.028">
-    <testcase name="Status is 2xx" time="0.028" classname="StorefrontPublicGetGetHomeSections"/>
+  <testsuite name="Storefront (public GET) / GET categories" id="152d8f88-a103-482e-b437-bf903b4f18a3" timestamp="2026-10-09T13:10:41.221Z" tests="1" failures="0" errors="0" time="0.025">
+    <testcase name="Status is 2xx" time="0.025" classname="StorefrontPublicGetGetCategories"/>
   </testsuite>
-  <testsuite name="Storefront (public GET) / GET page-visibility" id="93808b86-5b55-4216-b51e-b957bb36de60" timestamp="2026-06-05T08:23:47.512Z" tests="1" failures="0" errors="0" time="0.024">
-    <testcase name="Status is 2xx" time="0.024" classname="StorefrontPublicGetGetPageVisibility"/>
+  <testsuite name="Storefront (public GET) / GET home-sections" id="994ec650-97d0-4ea4-8c48-63a9e93f9eab" timestamp="2026-10-09T13:10:41.221Z" tests="1" failures="0" errors="0" time="0.026">
+    <testcase name="Status is 2xx" time="0.026" classname="StorefrontPublicGetGetHomeSections"/>
   </testsuite>
-  <testsuite name="Storefront (public GET) / GET products" id="b637cbf3-273e-4182-8c3b-0fa56d2b16a6" timestamp="2026-06-05T08:23:47.512Z" tests="1" failures="0" errors="0" time="0.238">
-    <testcase name="Status is 2xx" time="0.238" classname="StorefrontPublicGetGetProducts"/>
+  <testsuite name="Storefront (public GET) / GET page-visibility" id="1b69a9cf-1eda-44b8-957e-e3d909c6958d" timestamp="2026-10-09T13:10:41.221Z" tests="1" failures="0" errors="0" time="0.022">
+    <testcase name="Status is 2xx" time="0.022" classname="StorefrontPublicGetGetPageVisibility"/>
   </testsuite>
-  <testsuite name="Storefront (public GET) / GET products by slug" id="2e3cfe42-fd2a-4eaa-b32e-2b256d42ee4d" timestamp="2026-06-05T08:23:47.512Z" tests="1" failures="0" errors="0" time="0.043">
-    <testcase name="Status is 2xx" time="0.043" classname="StorefrontPublicGetGetProductsBySlug"/>
+  <testsuite name="Storefront (public GET) / GET products" id="8682246d-e272-46d8-878b-4857786d1d0e" timestamp="2026-10-09T13:10:41.221Z" tests="1" failures="0" errors="0" time="0.060">
+    <testcase name="Status is 2xx" time="0.060" classname="StorefrontPublicGetGetProducts"/>
   </testsuite>
-  <testsuite name="Storefront (public GET) / GET site-settings" id="3c730e20-f2bd-4bcc-8be8-f1da10d421e5" timestamp="2026-06-05T08:23:47.512Z" tests="1" failures="0" errors="0" time="0.027">
-    <testcase name="Status is 2xx" time="0.027" classname="StorefrontPublicGetGetSiteSettings"/>
+  <testsuite name="Storefront (public GET) / GET products by slug" id="066ca843-8ba8-4c90-a5af-12dad27d9345" timestamp="2026-10-09T13:10:41.221Z" tests="1" failures="0" errors="0" time="0.032">
+    <testcase name="Status is 2xx" time="0.032" classname="StorefrontPublicGetGetProductsBySlug"/>
+  </testsuite>
+  <testsuite name="Storefront (public GET) / GET site-settings" id="278dfb88-3b08-4d0f-97f6-8776e899f01c" timestamp="2026-10-09T13:10:41.221Z" tests="1" failures="0" errors="0" time="0.029">
+    <testcase name="Status is 2xx" time="0.029" classname="StorefrontPublicGetGetSiteSettings"/>
   </testsuite>
 </testsuites>

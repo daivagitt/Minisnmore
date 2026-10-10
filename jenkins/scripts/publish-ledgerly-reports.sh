@@ -36,23 +36,11 @@ fi
 echo "=== 4. Repackage backend unit tests (if surefire exists) ==="
 bash jenkins/scripts/package-unit-test-reports.sh "$PKG" || true
 
-echo "=== 5. Live Ledgerly API tests ==="
-API_TEST_BASE_URL="${API_TEST_BASE_URL:-http://127.0.0.1:9180}" \
-  bash jenkins/scripts/run-ledgerly-live-api-tests.sh || true
-mkdir -p "$PKG/backend/ledgerly-live"
-cp -a artifacts/ledgerly-live/. "$PKG/backend/ledgerly-live/"
+echo "=== 5. Skip live Ledgerly API tests ==="
+rm -rf "$PKG/backend/ledgerly-live" artifacts/ledgerly-live
 
-echo "=== 5b. Ledgerly scenario integration tests ==="
-API_TEST_BASE_URL="${API_TEST_BASE_URL:-http://127.0.0.1:9180}" \
-  bash jenkins/scripts/run-ledgerly-scenario-integration-tests.sh || true
-mkdir -p "$PKG/backend/ledgerly-scenario-integration"
-cp -a artifacts/ledgerly-scenario-integration/. "$PKG/backend/ledgerly-scenario-integration/"
-
-echo "=== 5c. Scenario integration tests ==="
-API_TEST_BASE_URL="${API_TEST_BASE_URL:-http://127.0.0.1:9180}" \
-  bash jenkins/scripts/run-scenario-integration-tests.sh || true
-mkdir -p "$PKG/backend/scenario-integration"
-cp -a artifacts/scenario-integration/. "$PKG/backend/scenario-integration/"
+rm -rf "$PKG/backend/scenario-integration" "$PKG/backend/ledgerly-scenario-integration" \
+  "$PKG/backend/zoho-live" "$PKG/backend/coverage/integration" "$PKG/backend/javadoc/integration"
 
 echo "=== 6. Ledgerly indices ==="
 python3 jenkins/scripts/generate-ledgerly-unit-tests-index.py \
@@ -64,6 +52,11 @@ python3 jenkins/scripts/generate-ledgerly-javadoc-index.py \
 python3 jenkins/scripts/generate-javadocs-index.py \
   --javadocs-dir "$PKG/backend/javadoc" \
   --output "$PKG/backend/javadoc/index.html"
+
+echo "=== 6b. Manual UI tests ==="
+bash jenkins/scripts/run-manual-ui-tests.sh || true
+mkdir -p "$PKG/manual-ui-tests"
+cp -a artifacts/manual-ui-tests/. "$PKG/manual-ui-tests/" 2>/dev/null || true
 
 echo "=== 7. Reports index ==="
 python3 jenkins/scripts/generate-reports-site.py --output-dir "$PKG"

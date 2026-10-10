@@ -1,20 +1,22 @@
 {
   "summary": {
     "strategy": "OpenAPI-driven: payloads from spec/schemas, skip user-interaction endpoints",
-    "openapiSource": "https://uat.minisnmore.com/v3/api-docs",
+    "openapiSource": "https://uat.minisnmore.com/v3/api-docs/catalog",
     "baseUrl": "https://uat.minisnmore.com",
-    "skippedUserInteraction": 2,
-    "totalOpenApiOps": 118,
-    "requestsRun": 121,
-    "openapiOpsMarked": 149,
+    "noMailMode": true,
+    "skippedNoMail": 74,
+    "skippedUserInteraction": 4,
+    "totalOpenApiOps": 166,
+    "requestsRun": 170,
+    "openapiOpsMarked": 196,
     "adminLogin": 200,
     "customerLogin": 200,
     "pass2xx": 77,
-    "fail": 40,
-    "skipped": 4,
-    "passRatePct": 65.8,
+    "fail": 12,
+    "skipped": 81,
+    "passRatePct": 86.5,
     "credentials": {
-      "admin": "admin@uat.minisnmore.com",
+      "admin": "admin",
       "customer": "irfanpatan9948@gmail.com"
     }
   },
@@ -45,9 +47,9 @@
       "skip": 0
     },
     "admin-coupons": {
-      "pass": 4,
+      "pass": 0,
       "fail": 0,
-      "skip": 0
+      "skip": 2
     },
     "admin-policies": {
       "pass": 4,
@@ -70,14 +72,19 @@
       "skip": 0
     },
     "admin": {
-      "pass": 7,
+      "pass": 6,
       "fail": 0,
-      "skip": 0
+      "skip": 1
     },
     "customer": {
       "pass": 5,
       "fail": 0,
       "skip": 2
+    },
+    "internal-storefront": {
+      "pass": 5,
+      "fail": 0,
+      "skip": 1
     },
     "internal-account": {
       "pass": 9,
@@ -91,48 +98,48 @@
     },
     "internal-account-order": {
       "pass": 2,
-      "fail": 3,
-      "skip": 0
+      "fail": 1,
+      "skip": 5
+    },
+    "internal-admin-cancellation-request": {
+      "pass": 1,
+      "fail": 0,
+      "skip": 4
+    },
+    "internal-admin-store": {
+      "pass": 4,
+      "fail": 0,
+      "skip": 6
     },
     "internal-admin-import": {
       "pass": 0,
-      "fail": 1,
-      "skip": 0
+      "fail": 0,
+      "skip": 1
     },
     "ledgerly-admin": {
-      "pass": 9,
-      "fail": 1,
-      "skip": 0
-    },
-    "ledgerly-admin-resource": {
-      "pass": 0,
-      "fail": 2,
-      "skip": 0
+      "pass": 4,
+      "fail": 0,
+      "skip": 8
     },
     "internal-admin-order-return": {
-      "pass": 1,
-      "fail": 0,
-      "skip": 0
-    },
-    "internal-admin-order-return-resource": {
-      "pass": 0,
-      "fail": 15,
-      "skip": 0
-    },
-    "internal-admin-order": {
       "pass": 2,
       "fail": 0,
-      "skip": 0
+      "skip": 24
+    },
+    "internal-admin-order": {
+      "pass": 3,
+      "fail": 0,
+      "skip": 6
     },
     "internal-admin-order-resource": {
       "pass": 0,
-      "fail": 2,
+      "fail": 1,
       "skip": 0
     },
-    "internal-admin-store": {
+    "internal-admin-package-box": {
       "pass": 1,
       "fail": 0,
-      "skip": 0
+      "skip": 3
     },
     "internal-admin-store-resource": {
       "pass": 0,
@@ -140,23 +147,28 @@
       "skip": 0
     },
     "internal-storage-upload": {
-      "pass": 0,
-      "fail": 2,
-      "skip": 2
+      "pass": 1,
+      "fail": 0,
+      "skip": 5
     },
     "internal-ledgerly-webhook": {
+      "pass": 0,
+      "fail": 0,
+      "skip": 1
+    },
+    "internal-media-preview": {
       "pass": 0,
       "fail": 1,
       "skip": 0
     },
     "internal-order-return": {
       "pass": 2,
-      "fail": 2,
-      "skip": 0
+      "fail": 0,
+      "skip": 4
     },
     "internal-order-return-resource": {
       "pass": 0,
-      "fail": 3,
+      "fail": 2,
       "skip": 0
     },
     "internal-account-order-resource": {
@@ -164,15 +176,45 @@
       "fail": 2,
       "skip": 0
     },
-    "internal-storefront": {
-      "pass": 3,
+    "internal-razorpay-webhook": {
+      "pass": 0,
       "fail": 0,
-      "skip": 0
+      "skip": 1
+    },
+    "internal-xpress-bees-return-webhook": {
+      "pass": 0,
+      "fail": 0,
+      "skip": 1
+    },
+    "internal-xpress-bees-shipment-webhook": {
+      "pass": 0,
+      "fail": 0,
+      "skip": 1
+    },
+    "internal-zoho-invoice-webhook": {
+      "pass": 0,
+      "fail": 0,
+      "skip": 1
+    },
+    "internal-zoho-item-webhook": {
+      "pass": 0,
+      "fail": 0,
+      "skip": 1
+    },
+    "internal-zoho-order-status-webhook": {
+      "pass": 0,
+      "fail": 0,
+      "skip": 1
+    },
+    "internal-zoho-shipment-webhook": {
+      "pass": 0,
+      "fail": 0,
+      "skip": 1
     },
     "internal-zoho-stock-webhook": {
       "pass": 0,
-      "fail": 1,
-      "skip": 0
+      "fail": 0,
+      "skip": 1
     }
   },
   "results": [
@@ -204,7 +246,7 @@
       "code": 200,
       "2xx": true,
       "note": "seed product",
-      "responseTimeMs": 175
+      "responseTimeMs": 128
     },
     {
       "module": "storefront",
@@ -214,7 +256,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 60
+      "responseTimeMs": 105
     },
     {
       "module": "storefront",
@@ -224,7 +266,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 59
+      "responseTimeMs": 216
     },
     {
       "module": "storefront",
@@ -234,7 +276,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 47
+      "responseTimeMs": 103
     },
     {
       "module": "storefront",
@@ -244,7 +286,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 96
+      "responseTimeMs": 95
     },
     {
       "module": "storefront",
@@ -254,7 +296,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 59
+      "responseTimeMs": 61
     },
     {
       "module": "storefront",
@@ -274,7 +316,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 73
+      "responseTimeMs": 33
     },
     {
       "module": "storefront",
@@ -284,17 +326,17 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 361
+      "responseTimeMs": 240
     },
     {
       "module": "storefront",
       "method": "GET",
-      "path": "/api/v1/products/api-test-seed-1788137572",
+      "path": "/api/v1/products/api-test-seed-1789016908",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 75
+      "responseTimeMs": 32
     },
     {
       "module": "admin-banners",
@@ -304,7 +346,7 @@
       "code": 200,
       "2xx": true,
       "note": "create",
-      "responseTimeMs": 76
+      "responseTimeMs": 105
     },
     {
       "module": "admin-banners",
@@ -314,27 +356,27 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 68
+      "responseTimeMs": 38
     },
     {
       "module": "admin-banners",
       "method": "PUT",
-      "path": "/api/v1/admin/banners/50501",
+      "path": "/api/v1/admin/banners/4073851",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 86
+      "responseTimeMs": 116
     },
     {
       "module": "admin-banners",
       "method": "DELETE",
-      "path": "/api/v1/admin/banners/50501",
+      "path": "/api/v1/admin/banners/4073851",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 349
+      "responseTimeMs": 126
     },
     {
       "module": "admin-categories",
@@ -344,77 +386,57 @@
       "code": 200,
       "2xx": true,
       "note": "create",
-      "responseTimeMs": 97
-    },
-    {
-      "module": "admin-categories",
-      "method": "GET",
-      "path": "/api/v1/admin/categories",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 50
-    },
-    {
-      "module": "admin-categories",
-      "method": "PUT",
-      "path": "/api/v1/admin/categories/50551",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 80
-    },
-    {
-      "module": "admin-categories",
-      "method": "DELETE",
-      "path": "/api/v1/admin/categories/50551",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 86
-    },
-    {
-      "module": "admin-coupons",
-      "method": "POST",
-      "path": "/api/v1/admin/coupons",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "create",
-      "responseTimeMs": 69
-    },
-    {
-      "module": "admin-coupons",
-      "method": "GET",
-      "path": "/api/v1/admin/coupons",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
       "responseTimeMs": 70
     },
     {
-      "module": "admin-coupons",
-      "method": "PUT",
-      "path": "/api/v1/admin/coupons/50601",
+      "module": "admin-categories",
+      "method": "GET",
+      "path": "/api/v1/admin/categories",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 97
+      "responseTimeMs": 59
+    },
+    {
+      "module": "admin-categories",
+      "method": "PUT",
+      "path": "/api/v1/admin/categories/4073901",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 71
+    },
+    {
+      "module": "admin-categories",
+      "method": "DELETE",
+      "path": "/api/v1/admin/categories/4073901",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 71
     },
     {
       "module": "admin-coupons",
-      "method": "DELETE",
-      "path": "/api/v1/admin/coupons/50601",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 58
+      "method": "POST",
+      "path": "/api/v1/admin/coupons",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "admin-coupons",
+      "method": "\u2014",
+      "path": "/api/v1/admin/coupons/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skip: no id from POST",
+      "responseTimeMs": null
     },
     {
       "module": "admin-policies",
@@ -424,7 +446,7 @@
       "code": 200,
       "2xx": true,
       "note": "create",
-      "responseTimeMs": 85
+      "responseTimeMs": 40
     },
     {
       "module": "admin-policies",
@@ -434,27 +456,27 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 91
+      "responseTimeMs": 60
     },
     {
       "module": "admin-policies",
       "method": "PUT",
-      "path": "/api/v1/admin/policies/50651",
+      "path": "/api/v1/admin/policies/4073951",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 77
+      "responseTimeMs": 71
     },
     {
       "module": "admin-policies",
       "method": "DELETE",
-      "path": "/api/v1/admin/policies/50651",
+      "path": "/api/v1/admin/policies/4073951",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 82
+      "responseTimeMs": 54
     },
     {
       "module": "admin-blog-posts",
@@ -464,7 +486,7 @@
       "code": 200,
       "2xx": true,
       "note": "create",
-      "responseTimeMs": 86
+      "responseTimeMs": 42
     },
     {
       "module": "admin-blog-posts",
@@ -474,27 +496,27 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 46
+      "responseTimeMs": 65
     },
     {
       "module": "admin-blog-posts",
       "method": "PUT",
-      "path": "/api/v1/admin/blog-posts/50701",
+      "path": "/api/v1/admin/blog-posts/4074001",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 72
+      "responseTimeMs": 178
     },
     {
       "module": "admin-blog-posts",
       "method": "DELETE",
-      "path": "/api/v1/admin/blog-posts/50701",
+      "path": "/api/v1/admin/blog-posts/4074001",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 66
+      "responseTimeMs": 38
     },
     {
       "module": "admin-home-sections",
@@ -504,7 +526,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 93
+      "responseTimeMs": 58
     },
     {
       "module": "admin-home-sections",
@@ -514,7 +536,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 125
+      "responseTimeMs": 162
     },
     {
       "module": "admin-page-visibility",
@@ -524,7 +546,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 46
+      "responseTimeMs": 55
     },
     {
       "module": "admin-page-visibility",
@@ -534,7 +556,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 71
+      "responseTimeMs": 57
     },
     {
       "module": "admin",
@@ -544,7 +566,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 78
+      "responseTimeMs": 74
     },
     {
       "module": "admin",
@@ -554,7 +576,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 38
+      "responseTimeMs": 54
     },
     {
       "module": "admin",
@@ -564,7 +586,7 @@
       "code": 204,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 98
+      "responseTimeMs": 38
     },
     {
       "module": "admin",
@@ -574,7 +596,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 1490
+      "responseTimeMs": 66
     },
     {
       "module": "admin",
@@ -584,7 +606,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 313
+      "responseTimeMs": 51
     },
     {
       "module": "admin",
@@ -594,12 +616,22 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 46
+      "responseTimeMs": 58
     },
     {
       "module": "admin",
       "method": "PUT",
       "path": "/api/v1/admin/site-settings",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "customer",
+      "method": "GET",
+      "path": "/api/v1/account/profile",
       "status": "PASS",
       "code": 200,
       "2xx": true,
@@ -608,23 +640,13 @@
     },
     {
       "module": "customer",
-      "method": "GET",
-      "path": "/api/v1/account/profile",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 35
-    },
-    {
-      "module": "customer",
       "method": "PUT",
       "path": "/api/v1/account/profile",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 48
+      "responseTimeMs": 47
     },
     {
       "module": "customer",
@@ -634,7 +656,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 111
+      "responseTimeMs": 210
     },
     {
       "module": "customer",
@@ -644,7 +666,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 64
+      "responseTimeMs": 79
     },
     {
       "module": "customer",
@@ -654,7 +676,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 63
+      "responseTimeMs": 153
     },
     {
       "module": "customer",
@@ -677,6 +699,16 @@
       "responseTimeMs": null
     },
     {
+      "module": "internal-storefront",
+      "method": "GET",
+      "path": "/api/v1/about-page",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 56
+    },
+    {
       "module": "internal-account",
       "method": "GET",
       "path": "/api/v1/account/addresses",
@@ -684,7 +716,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 56
+      "responseTimeMs": 64
     },
     {
       "module": "internal-account",
@@ -694,7 +726,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 90
+      "responseTimeMs": 86
     },
     {
       "module": "internal-account",
@@ -704,7 +736,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 52
+      "responseTimeMs": 75
     },
     {
       "module": "internal-account-resource",
@@ -744,7 +776,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 93
+      "responseTimeMs": 54
     },
     {
       "module": "internal-account",
@@ -754,7 +786,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 53
+      "responseTimeMs": 58
     },
     {
       "module": "internal-account-order",
@@ -764,7 +796,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 202
+      "responseTimeMs": 160
     },
     {
       "module": "internal-account-order",
@@ -774,7 +806,7 @@
       "code": 400,
       "2xx": false,
       "note": "{\"detail\":\"Email does not match signed-in account\",\"instance\":\"/internal/v1/account/profile/bootstrap\",\"status\":400,\"title\":\"Bad Request\"}",
-      "responseTimeMs": 116
+      "responseTimeMs": 54
     },
     {
       "module": "internal-account",
@@ -784,7 +816,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 75
+      "responseTimeMs": 47
     },
     {
       "module": "internal-account",
@@ -794,7 +826,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 84
+      "responseTimeMs": 65
     },
     {
       "module": "internal-account",
@@ -804,7 +836,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 88
+      "responseTimeMs": 63
     },
     {
       "module": "internal-account-resource",
@@ -824,17 +856,117 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 56
+      "responseTimeMs": 68
+    },
+    {
+      "module": "internal-admin-cancellation-request",
+      "method": "GET",
+      "path": "/api/v1/admin/cancellation-requests",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 93
+    },
+    {
+      "module": "internal-admin-cancellation-request",
+      "method": "POST",
+      "path": "/api/v1/admin/cancellation-requests/{requestNumber}/approve",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-cancellation-request",
+      "method": "POST",
+      "path": "/api/v1/admin/cancellation-requests/{requestNumber}/record-cod-refund",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-cancellation-request",
+      "method": "POST",
+      "path": "/api/v1/admin/cancellation-requests/{requestNumber}/reject",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-cancellation-request",
+      "method": "POST",
+      "path": "/api/v1/admin/cancellation-requests/{requestNumber}/retry-refund",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-store",
+      "method": "GET",
+      "path": "/api/v1/admin/contact-messages",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 99
+    },
+    {
+      "module": "internal-admin-store",
+      "method": "DELETE",
+      "path": "/api/v1/admin/contact-messages/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-store",
+      "method": "GET",
+      "path": "/api/v1/admin/coupons",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 87
+    },
+    {
+      "module": "internal-admin-store",
+      "method": "DELETE",
+      "path": "/api/v1/admin/coupons/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-store",
+      "method": "PUT",
+      "path": "/api/v1/admin/coupons/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
     },
     {
       "module": "internal-admin-import",
       "method": "POST",
       "path": "/api/v1/admin/import/sku-wise-print",
       "status": "FAIL",
-      "code": 500,
+      "code": 0,
       "2xx": false,
-      "note": "{\"timestamp\":\"2026-08-31T00:53:01.010Z\",\"status\":500,\"error\":\"Internal Server Error\",\"path\":\"/internal/v1/admin/import/sku-wise-print\"}",
-      "responseTimeMs": 127
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
     },
     {
       "module": "ledgerly-admin",
@@ -844,7 +976,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 53
+      "responseTimeMs": 67
     },
     {
       "module": "ledgerly-admin",
@@ -854,47 +986,47 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 113
+      "responseTimeMs": 460
     },
     {
       "module": "ledgerly-admin",
       "method": "POST",
       "path": "/api/v1/admin/ledgerly/pull-order-tracking",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 340
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
     },
     {
       "module": "ledgerly-admin",
       "method": "POST",
       "path": "/api/v1/admin/ledgerly/pull-products",
       "status": "FAIL",
-      "code": 500,
+      "code": 0,
       "2xx": false,
-      "note": "{\"timestamp\":\"2026-08-31T00:53:01.721Z\",\"status\":500,\"error\":\"Internal Server Error\",\"path\":\"/api/v1/admin/ledgerly/pull-products\"}",
-      "responseTimeMs": 194
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
     },
     {
       "module": "ledgerly-admin",
       "method": "PUT",
       "path": "/api/v1/admin/ledgerly/pull-products-auto-create-category",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 262
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
     },
     {
       "module": "ledgerly-admin",
       "method": "POST",
       "path": "/api/v1/admin/ledgerly/retry-orders",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 962
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
     },
     {
       "module": "ledgerly-admin",
@@ -904,46 +1036,46 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 54
+      "responseTimeMs": 30
     },
     {
       "module": "ledgerly-admin",
       "method": "PUT",
       "path": "/api/v1/admin/ledgerly/settings",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 47
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
     },
     {
-      "module": "ledgerly-admin-resource",
+      "module": "ledgerly-admin",
       "method": "POST",
       "path": "/api/v1/admin/ledgerly/sync-orders/by-number/{orderNumber}",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
-      "note": "no path param",
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
       "module": "ledgerly-admin",
       "method": "POST",
       "path": "/api/v1/admin/ledgerly/sync-products",
-      "status": "PASS",
-      "code": 200,
-      "2xx": true,
-      "note": "",
-      "responseTimeMs": 505
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
     },
     {
-      "module": "ledgerly-admin-resource",
+      "module": "ledgerly-admin",
       "method": "POST",
       "path": "/api/v1/admin/ledgerly/sync-products/{id}",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
-      "note": "no path param",
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
@@ -954,7 +1086,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 68
+      "responseTimeMs": 85
     },
     {
       "module": "internal-admin-order-return",
@@ -964,156 +1096,256 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 106
+      "responseTimeMs": 5563
     },
     {
-      "module": "internal-admin-order-return-resource",
+      "module": "internal-admin-order-return",
+      "method": "GET",
+      "path": "/api/v1/admin/order-returns/summary",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 63
+    },
+    {
+      "module": "internal-admin-order-return",
       "method": "POST",
       "path": "/api/v1/admin/order-returns/{returnNumber}/accept",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
-      "note": "no path param",
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
-      "module": "internal-admin-order-return-resource",
+      "module": "internal-admin-order-return",
       "method": "POST",
       "path": "/api/v1/admin/order-returns/{returnNumber}/allocate-replacement",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
-      "note": "no path param",
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
-      "module": "internal-admin-order-return-resource",
+      "module": "internal-admin-order-return",
       "method": "POST",
       "path": "/api/v1/admin/order-returns/{returnNumber}/approve",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
-      "note": "no path param",
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
-      "module": "internal-admin-order-return-resource",
+      "module": "internal-admin-order-return",
+      "method": "POST",
+      "path": "/api/v1/admin/order-returns/{returnNumber}/book-outbound",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-order-return",
+      "method": "POST",
+      "path": "/api/v1/admin/order-returns/{returnNumber}/book-pickup",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-order-return",
+      "method": "POST",
+      "path": "/api/v1/admin/order-returns/{returnNumber}/close-pickup-failed",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-order-return",
       "method": "POST",
       "path": "/api/v1/admin/order-returns/{returnNumber}/complete",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
-      "note": "no path param",
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
-      "module": "internal-admin-order-return-resource",
+      "module": "internal-admin-order-return",
+      "method": "POST",
+      "path": "/api/v1/admin/order-returns/{returnNumber}/complete-package",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-order-return",
       "method": "POST",
       "path": "/api/v1/admin/order-returns/{returnNumber}/convert-to-refund",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
-      "note": "no path param",
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
-      "module": "internal-admin-order-return-resource",
+      "module": "internal-admin-order-return",
       "method": "POST",
       "path": "/api/v1/admin/order-returns/{returnNumber}/delivered",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
-      "note": "no path param",
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
-      "module": "internal-admin-order-return-resource",
+      "module": "internal-admin-order-return",
       "method": "POST",
       "path": "/api/v1/admin/order-returns/{returnNumber}/inspect",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
-      "note": "no path param",
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
-      "module": "internal-admin-order-return-resource",
+      "module": "internal-admin-order-return",
       "method": "POST",
       "path": "/api/v1/admin/order-returns/{returnNumber}/mark-received",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
-      "note": "no path param",
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
-      "module": "internal-admin-order-return-resource",
+      "module": "internal-admin-order-return",
+      "method": "POST",
+      "path": "/api/v1/admin/order-returns/{returnNumber}/package-rates",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-order-return",
       "method": "POST",
       "path": "/api/v1/admin/order-returns/{returnNumber}/picked-up",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
-      "note": "no path param",
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
-      "module": "internal-admin-order-return-resource",
+      "module": "internal-admin-order-return",
+      "method": "POST",
+      "path": "/api/v1/admin/order-returns/{returnNumber}/pickup-failed",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-order-return",
       "method": "POST",
       "path": "/api/v1/admin/order-returns/{returnNumber}/pickup-requested",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
-      "note": "no path param",
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
-      "module": "internal-admin-order-return-resource",
+      "module": "internal-admin-order-return",
       "method": "POST",
       "path": "/api/v1/admin/order-returns/{returnNumber}/ready-to-ship",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
-      "note": "no path param",
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
-      "module": "internal-admin-order-return-resource",
+      "module": "internal-admin-order-return",
+      "method": "POST",
+      "path": "/api/v1/admin/order-returns/{returnNumber}/record-cod-refund",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-order-return",
       "method": "POST",
       "path": "/api/v1/admin/order-returns/{returnNumber}/refund",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
-      "note": "no path param",
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
-      "module": "internal-admin-order-return-resource",
+      "module": "internal-admin-order-return",
       "method": "POST",
       "path": "/api/v1/admin/order-returns/{returnNumber}/reject",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
-      "note": "no path param",
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
-      "module": "internal-admin-order-return-resource",
+      "module": "internal-admin-order-return",
       "method": "POST",
       "path": "/api/v1/admin/order-returns/{returnNumber}/repacking",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
-      "note": "no path param",
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
-      "module": "internal-admin-order-return-resource",
+      "module": "internal-admin-order-return",
+      "method": "POST",
+      "path": "/api/v1/admin/order-returns/{returnNumber}/reschedule-pickup",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-order-return",
+      "method": "POST",
+      "path": "/api/v1/admin/order-returns/{returnNumber}/settle-price-difference",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-order-return",
       "method": "POST",
       "path": "/api/v1/admin/order-returns/{returnNumber}/shipped",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
-      "note": "no path param",
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
@@ -1124,7 +1356,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 70
+      "responseTimeMs": 228
     },
     {
       "module": "internal-admin-order",
@@ -1134,7 +1366,17 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 88
+      "responseTimeMs": 1033
+    },
+    {
+      "module": "internal-admin-order",
+      "method": "GET",
+      "path": "/api/v1/admin/orders/ordered-logins",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 82
     },
     {
       "module": "internal-admin-order-resource",
@@ -1147,13 +1389,103 @@
       "responseTimeMs": null
     },
     {
-      "module": "internal-admin-order-resource",
+      "module": "internal-admin-order",
+      "method": "POST",
+      "path": "/api/v1/admin/orders/{orderNumber}/book-shipment",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-order",
+      "method": "POST",
+      "path": "/api/v1/admin/orders/{orderNumber}/cancel",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-order",
+      "method": "POST",
+      "path": "/api/v1/admin/orders/{orderNumber}/cancel-shipment",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-order",
+      "method": "POST",
+      "path": "/api/v1/admin/orders/{orderNumber}/complete-package",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-order",
       "method": "POST",
       "path": "/api/v1/admin/orders/{orderNumber}/mark-cod-collected",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
-      "note": "no path param",
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-order",
+      "method": "POST",
+      "path": "/api/v1/admin/orders/{orderNumber}/package-rates",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-package-box",
+      "method": "GET",
+      "path": "/api/v1/admin/package-boxes",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 41
+    },
+    {
+      "module": "internal-admin-package-box",
+      "method": "POST",
+      "path": "/api/v1/admin/package-boxes",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-package-box",
+      "method": "DELETE",
+      "path": "/api/v1/admin/package-boxes/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-package-box",
+      "method": "PUT",
+      "path": "/api/v1/admin/package-boxes/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
@@ -1164,7 +1496,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 250
+      "responseTimeMs": 39
     },
     {
       "module": "internal-admin-store-resource",
@@ -1174,6 +1506,46 @@
       "code": 0,
       "2xx": false,
       "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-store",
+      "method": "GET",
+      "path": "/api/v1/admin/store-addresses",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 70
+    },
+    {
+      "module": "internal-admin-store",
+      "method": "POST",
+      "path": "/api/v1/admin/store-addresses",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-store",
+      "method": "DELETE",
+      "path": "/api/v1/admin/store-addresses/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-store",
+      "method": "PUT",
+      "path": "/api/v1/admin/store-addresses/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
@@ -1189,22 +1561,42 @@
     {
       "module": "internal-storage-upload",
       "method": "POST",
+      "path": "/api/v1/admin/uploads/catalogue-pdf",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: user interaction (multipart file upload)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-storage-upload",
+      "method": "POST",
       "path": "/api/v1/admin/uploads/delete",
       "status": "FAIL",
-      "code": 500,
+      "code": 0,
       "2xx": false,
-      "note": "{\"timestamp\":\"2026-08-31T00:53:05.468Z\",\"status\":500,\"error\":\"Internal Server Error\",\"path\":\"/internal/v1/admin/uploads/delete\"}",
-      "responseTimeMs": 862
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-storage-upload",
+      "method": "POST",
+      "path": "/api/v1/admin/uploads/derivatives",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
     },
     {
       "module": "internal-storage-upload",
       "method": "GET",
       "path": "/api/v1/admin/uploads/objects",
-      "status": "FAIL",
-      "code": 500,
-      "2xx": false,
-      "note": "{\"timestamp\":\"2026-08-31T00:53:05.536Z\",\"status\":500,\"error\":\"Internal Server Error\",\"path\":\"/internal/v1/admin/uploads/objects\"}",
-      "responseTimeMs": 73
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 3449
     },
     {
       "module": "internal-storage-upload",
@@ -1217,6 +1609,16 @@
       "responseTimeMs": null
     },
     {
+      "module": "internal-storefront",
+      "method": "POST",
+      "path": "/api/v1/contact-messages",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
       "module": "internal-account-order",
       "method": "GET",
       "path": "/api/v1/coupons/active",
@@ -1224,17 +1626,37 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 39
+      "responseTimeMs": 134
+    },
+    {
+      "module": "internal-storefront",
+      "method": "GET",
+      "path": "/api/v1/gift-page",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 113
     },
     {
       "module": "internal-ledgerly-webhook",
       "method": "POST",
       "path": "/api/v1/ledgerly/webhooks",
       "status": "FAIL",
-      "code": 401,
+      "code": 0,
       "2xx": false,
-      "note": "{\"detail\":\"Missing X-Ledgerly-Signature\",\"instance\":\"/internal/v1/ledgerly/webhooks\",\"status\":401,\"title\":\"Unauthorized\"}",
-      "responseTimeMs": 47
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-media-preview",
+      "method": "GET",
+      "path": "/api/v1/media/preview",
+      "status": "FAIL",
+      "code": 400,
+      "2xx": false,
+      "note": "{\"detail\":\"Required parameter 'u' is not present.\",\"instance\":\"/internal/v1/media/preview\",\"status\":400,\"title\":\"Bad Request\"}",
+      "responseTimeMs": 56
     },
     {
       "module": "internal-order-return",
@@ -1244,17 +1666,17 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 48
+      "responseTimeMs": 184
     },
     {
       "module": "internal-order-return",
       "method": "POST",
       "path": "/api/v1/order-returns",
       "status": "FAIL",
-      "code": 404,
+      "code": 0,
       "2xx": false,
-      "note": "{\"detail\":\"Order not found\",\"instance\":\"/internal/v1/order-returns\",\"status\":404,\"title\":\"Not Found\"}",
-      "responseTimeMs": 54
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
     },
     {
       "module": "internal-order-return",
@@ -1264,7 +1686,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 43
+      "responseTimeMs": 80
     },
     {
       "module": "internal-order-return-resource",
@@ -1281,10 +1703,10 @@
       "method": "POST",
       "path": "/api/v1/order-returns/exchange",
       "status": "FAIL",
-      "code": 404,
+      "code": 0,
       "2xx": false,
-      "note": "{\"detail\":\"Order not found\",\"instance\":\"/internal/v1/order-returns/exchange\",\"status\":404,\"title\":\"Not Found\"}",
-      "responseTimeMs": 58
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
     },
     {
       "module": "internal-order-return-resource",
@@ -1297,13 +1719,23 @@
       "responseTimeMs": null
     },
     {
-      "module": "internal-order-return-resource",
+      "module": "internal-order-return",
+      "method": "POST",
+      "path": "/api/v1/order-returns/uploads",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: user interaction (multipart file upload)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-order-return",
       "method": "POST",
       "path": "/api/v1/order-returns/{returnNumber}/cancel",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
-      "note": "no path param",
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
@@ -1311,20 +1743,20 @@
       "method": "POST",
       "path": "/api/v1/orders/retry-payment",
       "status": "FAIL",
-      "code": 404,
+      "code": 0,
       "2xx": false,
-      "note": "{\"detail\":\"Order not found\",\"instance\":\"/internal/v1/orders/retry-payment\",\"status\":404,\"title\":\"Not Found\"}",
-      "responseTimeMs": 59
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
     },
     {
       "module": "internal-account-order",
       "method": "POST",
       "path": "/api/v1/orders/sync-payment",
       "status": "FAIL",
-      "code": 404,
+      "code": 0,
       "2xx": false,
-      "note": "{\"detail\":\"Order not found\",\"instance\":\"/internal/v1/orders/sync-payment\",\"status\":404,\"title\":\"Not Found\"}",
-      "responseTimeMs": 63
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
     },
     {
       "module": "internal-account-order-resource",
@@ -1337,13 +1769,43 @@
       "responseTimeMs": null
     },
     {
-      "module": "internal-account-order-resource",
+      "module": "internal-account-order",
       "method": "POST",
       "path": "/api/v1/orders/{orderNumber}/cancel",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-account-order-resource",
+      "method": "GET",
+      "path": "/api/v1/orders/{orderNumber}/cancel-request",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
       "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-account-order",
+      "method": "POST",
+      "path": "/api/v1/orders/{orderNumber}/cancel-request",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-account-order",
+      "method": "POST",
+      "path": "/api/v1/orders/{orderNumber}/cancel-request/withdraw",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
@@ -1354,17 +1816,17 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 72
+      "responseTimeMs": 148
     },
     {
       "module": "internal-storefront",
       "method": "GET",
-      "path": "/api/v1/products/api-test-seed-1788137572",
+      "path": "/api/v1/products/api-test-seed-1791551378",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 42
+      "responseTimeMs": 148
     },
     {
       "module": "internal-storefront",
@@ -1374,17 +1836,87 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 54
+      "responseTimeMs": 91
+    },
+    {
+      "module": "internal-razorpay-webhook",
+      "method": "POST",
+      "path": "/api/v1/webhooks/razorpay",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-xpress-bees-return-webhook",
+      "method": "POST",
+      "path": "/api/v1/webhooks/xpressbees/returns",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-xpress-bees-shipment-webhook",
+      "method": "POST",
+      "path": "/api/v1/webhooks/xpressbees/shipments",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-zoho-invoice-webhook",
+      "method": "POST",
+      "path": "/api/v1/zoho/invoice-webhook",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-zoho-item-webhook",
+      "method": "POST",
+      "path": "/api/v1/zoho/item-webhook",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-zoho-order-status-webhook",
+      "method": "POST",
+      "path": "/api/v1/zoho/order-status-webhook",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-zoho-shipment-webhook",
+      "method": "POST",
+      "path": "/api/v1/zoho/shipment-webhook",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
     },
     {
       "module": "internal-zoho-stock-webhook",
       "method": "POST",
       "path": "/api/v1/zoho/stock-webhook",
       "status": "FAIL",
-      "code": 401,
+      "code": 0,
       "2xx": false,
-      "note": "{\"detail\":\"Missing X-Zoho-Stock-Signature\",\"instance\":\"/internal/v1/zoho/stock-webhook\",\"status\":401,\"title\":\"Unauthorized\"}",
-      "responseTimeMs": 56
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
     }
   ]
 }

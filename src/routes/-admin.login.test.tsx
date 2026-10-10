@@ -11,6 +11,7 @@ const authMock = vi.hoisted(() => ({
   signOut: vi.fn(),
   user: null as null | { id: number; email?: string; login?: string },
   isAdmin: false,
+  staffRole: null as null | string,
   loading: false,
 }));
 const toastMock = vi.hoisted(() => ({
@@ -49,16 +50,28 @@ describe("admin login route", () => {
     vi.clearAllMocks();
     authMock.user = null;
     authMock.isAdmin = false;
+    authMock.staffRole = null;
     authMock.loading = false;
   });
 
   it("exposes document metadata", () => {
-    expect((Route as any).head().meta[0].title).toBe("Admin Login · Mini's n More");
+    expect((Route as any).head().meta[0].title).toBe("Staff Login · Mini's n More");
+    expect((Route as any).head().links[0]).toEqual(
+      expect.objectContaining({ rel: "preload", as: "image", fetchPriority: "high" }),
+    );
+  });
+
+  it("renders a motion kids hero from existing store photography", () => {
+    renderAdminLogin();
+    const hero = screen.getByRole("img", { name: /smiling baby/i }) as HTMLImageElement;
+    expect(hero.getAttribute("src")).toMatch(/hero-smiling-baby/i);
+    expect(screen.getAllByText(/minis today, memories forever/i).length).toBeGreaterThan(0);
   });
 
   it("navigates authenticated admins to admin", async () => {
     authMock.user = { id: 1 };
     authMock.isAdmin = true;
+    authMock.staffRole = "ROLE_ADMIN";
     renderAdminLogin();
     await waitFor(() => expect(navMock).toHaveBeenCalledWith({ to: "/admin" }));
   });
@@ -68,7 +81,7 @@ describe("admin login route", () => {
     authMock.isAdmin = false;
     renderAdminLogin();
     await waitFor(() =>
-      expect(screen.getByText(/does not have admin access/i)).toBeInTheDocument(),
+      expect(screen.getByText(/does not have staff access/i)).toBeInTheDocument(),
     );
     expect(navMock).not.toHaveBeenCalled();
   });
@@ -109,7 +122,7 @@ describe("admin login route", () => {
     expect(toastMock.error).toHaveBeenCalledWith("No access");
   });
 
-  it("navigates to admin after a successful sign in", async () => {
+  it("signs in without navigating until a staff role is present", async () => {
     authMock.signIn.mockResolvedValueOnce({ error: null });
     renderAdminLogin();
 
@@ -117,47 +130,14 @@ describe("admin login route", () => {
     await userEvent.type(screen.getByPlaceholderText("Password (min 6)"), "secret1");
     await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
-    await waitFor(() => expect(navMock).toHaveBeenCalledWith({ to: "/admin" }));
+    await waitFor(() => expect(authMock.signIn).toHaveBeenCalledWith("admin@example.com", "secret1"));
+    expect(navMock).not.toHaveBeenCalled();
   });
 
-  it("shows signup copy and switches back to sign in", async () => {
+  it("does not offer signup", () => {
     renderAdminLogin();
-
-    await userEvent.click(screen.getByRole("button", { name: "Need an account? Sign up" }));
-    expect(screen.getByRole("heading", { name: "Admin sign up" })).toBeInTheDocument();
-    expect(screen.getByText(/grant admin access/i)).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: "Have an account? Sign in" }));
-    expect(screen.getByRole("heading", { name: "Admin sign in" })).toBeInTheDocument();
-  });
-
-  it("switches to sign up and starts Google OAuth for admin redirect", async () => {
-    authMock.signUp.mockResolvedValueOnce({ error: null });
-    renderAdminLogin();
-
-    await userEvent.click(screen.getByRole("button", { name: "Need an account? Sign up" }));
-    await userEvent.type(screen.getByPlaceholderText("you@store.in"), "new@example.com");
-    await userEvent.type(screen.getByPlaceholderText("Password (min 6)"), "secret1");
-    await userEvent.click(screen.getByRole("button", { name: "Create account" }));
-
-    await waitFor(() => expect(authMock.signUp).toHaveBeenCalledWith("new@example.com", "secret1"));
-    expect(toastMock.success).toHaveBeenCalledWith(
-      "Account created. Check your inbox to confirm.",
-    );
-
-    await userEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
-    expect(authMock.signInWithOAuth).toHaveBeenCalledWith("google", "/admin");
-  });
-
-  it("resets Google busy state when OAuth start fails", async () => {
-    authMock.signInWithOAuth.mockImplementationOnce(() => {
-      throw new Error("blocked");
-    });
-    renderAdminLogin();
-
-    await userEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
-
-    expect(screen.getByRole("button", { name: "Continue with Google" })).not.toBeDisabled();
+    expect(screen.queryByRole("button", { name: /sign up/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /google/i })).toBeNull();
   });
 
   it("validates email and password before submit and shows field errors", async () => {
@@ -193,16 +173,15 @@ describe("admin login route", () => {
     expect(password).toHaveAttribute("type", "password");
   });
 
-  it("reports signup errors without navigating", async () => {
-    authMock.signUp.mockResolvedValueOnce({ error: "Email taken" });
+  it("reports sign-in errors without navigating", async () => {
+    authMock.signIn.mockResolvedValueOnce({ error: "No access" });
     renderAdminLogin();
 
-    await userEvent.click(screen.getByRole("button", { name: "Need an account? Sign up" }));
-    await userEvent.type(screen.getByPlaceholderText("you@store.in"), "new@example.com");
+    await userEvent.type(screen.getByPlaceholderText("you@store.in"), "admin@example.com");
     await userEvent.type(screen.getByPlaceholderText("Password (min 6)"), "secret1");
-    await userEvent.click(screen.getByRole("button", { name: "Create account" }));
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
-    await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Email taken"));
+    await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("No access"));
     expect(navMock).not.toHaveBeenCalled();
   });
 });

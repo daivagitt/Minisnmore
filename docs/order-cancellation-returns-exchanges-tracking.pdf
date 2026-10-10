@@ -1,0 +1,420 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [7 0 R 9 0 R 11 0 R 13 0 R 15 0 R 17 0 R 19 0 R] /Count 7 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+5 0 obj
+<< /Title (Order Cancellation, Returns, Exchanges, and Tracking Status) /Author (Mini's n More) /Creator (Codex local PDF renderer) >>
+endobj
+6 0 obj
+<< /Length 4076 >>
+stream
+0.18 0.16 0.26 rg BT /F2 22 Tf 1 0 0 1 58.00 759.89 Tm (Order Cancellation, Returns, Exchanges, and) Tj ET
+0.18 0.16 0.26 rg BT /F2 22 Tf 1 0 0 1 58.00 732.89 Tm (Tracking Status) Tj ET
+0.73 0.38 0.55 RG 0.6 w 58 695.89 m 540.28 695.89 l S
+0.33 0.28 0.38 rg BT /F2 12 Tf 1 0 0 1 58.00 675.89 Tm (Mini's n More - Functional and Technical Guide) Tj ET
+0.42 0.42 0.46 rg BT /F1 9.5 Tf 1 0 0 1 58.00 655.89 Tm (28 September 2026) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 623.89 Tm (This document explains how order cancellation, returns, exchanges, refunds, and shipment tracking work) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 609.69 Tm (in the current Mini's n More implementation. It distinguishes the main order status from) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 595.49 Tm (customer-facing tracking and from cancellation or return case statuses.) Tj ET
+0.24 0.18 0.29 rg BT /F2 15 Tf 1 0 0 1 58.00 554.29 Tm (1. Status model: three separate layers) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 530.29 Tm (The system maintains three related but independent status layers.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 509.09 Tm (1.) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 86.53 509.09 Tm (Main order status: PENDING, CONFIRMED, HAND_WRAPPED, CANCELLED, or FULFILLED.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 491.59 Tm (2.) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 86.53 491.59 Tm (Customer-facing tracking status: pending, confirmed, hand_wrapped, awaiting_pickup, shipped,) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 86.53 478.09 Tm (out_for_delivery, delivery_failed, delivered, or cancelled.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 460.59 Tm (3.) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 86.53 460.59 Tm (Case status: a cancellation request or a return/exchange request has its own lifecycle.) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 443.09 Tm (The distinction matters. For example, returning or exchanging a delivered order does not change the) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 428.89 Tm (original order's delivery tracking from delivered. Instead, a separate return/exchange case records the) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 414.69 Tm (reverse pickup and replacement journey.) Tj ET
+0.24 0.18 0.29 rg BT /F2 15 Tf 1 0 0 1 58.00 373.49 Tm (2. Normal order tracking) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 337.49 Tm (2.1 Customer-facing progression) Tj ET
+0.965 0.955 0.972 rg 58 218.99 482.28 107.50 re f
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 311.49 Tm (pending) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 298.99 Tm (  -> confirmed) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 286.49 Tm (  -> hand_wrapped) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 273.99 Tm (  -> awaiting_pickup) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 261.49 Tm (  -> shipped) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 248.99 Tm (  -> out_for_delivery) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 236.49 Tm (  -> delivered) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 213.99 Tm (A delivery exception can produce this branch:) Tj ET
+0.965 0.955 0.972 rg 58 167.29 482.28 32.50 re f
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 184.79 Tm (out_for_delivery -> delivery_failed -> out_for_delivery -> delivered) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 162.29 Tm (The tracking_status response field is calculated when an order response is built. It is not maintained as a) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 148.09 Tm (single independent database status.) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 114.89 Tm (2.2 How tracking_status is resolved) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 96.89 Tm (cancelled) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 117.40 96.89 Tm (The main order is CANCELLED, or Ledgerly reports a cancelled or void status.) Tj ET
+0.46 0.42 0.48 rg BT /F1 8 Tf 1 0 0 1 289.64 29 Tm (1) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Length 5968 >>
+stream
+0.46 0.42 0.48 rg BT /F1 8 Tf 1 0 0 1 58 808.89 Tm (Mini's n More - Order Lifecycle Guide) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 777.89 Tm (pending) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 109.95 777.89 Tm (The order is PENDING and payment is not paid. COD fulfilment may still advance even while) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 109.95 764.39 Tm (payment remains pending.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 746.89 Tm (awaiting_pickup) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 147.58 746.89 Tm (An ExpressBees AWB exists, but the carrier has not recorded a pickup or transit scan.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 729.39 Tm (delivered) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 117.40 729.39 Tm (The main order is FULFILLED, or a trusted external source reports delivery. Locally booked) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 117.40 715.89 Tm (shipments use their local carrier status instead of being overwritten by Zoho.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 698.39 Tm (out_for_delivery) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 151.70 698.39 Tm (The local carrier reports an out-for-delivery milestone.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 680.89 Tm (delivery_failed) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 142.09 680.89 Tm (The local carrier reports an undelivered or failed-delivery milestone.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 663.39 Tm (shipped) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 109.95 663.39 Tm (The carrier reports pickup/transit, an applicable tracking number or shipment date exists, or) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 109.95 649.89 Tm (Zoho/Ledgerly reports a shipped state.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 632.39 Tm (hand_wrapped) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 139.94 632.39 Tm (The main order is HAND_WRAPPED and no later fulfilment signal exists.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 614.89 Tm (confirmed) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 122.88 614.89 Tm (The order is CONFIRMED, or it is a paid transitional PENDING record.) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 585.39 Tm (2.3 ExpressBees booking versus physical shipment) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 567.39 Tm (Generating an ExpressBees AWB only creates a booking and label. It does not mean the parcel has) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 553.19 Tm (physically left the warehouse.) Tj ET
+0.965 0.955 0.972 rg 58 431.49 482.28 107.50 re f
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 523.99 Tm (AWB created:) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 511.49 Tm (  shipment_carrier_status = booked) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 498.99 Tm (  tracking_status = awaiting_pickup) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 486.49 Tm () Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 473.99 Tm (First physical pickup/transit scan:) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 461.49 Tm (  shipment_carrier_status = picked_up / in_transit / hub...) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 448.99 Tm (  tracking_status = shipped) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 426.49 Tm (When ExpressBees reports delivered, the system records the delivery timestamp, changes the main order) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 412.29 Tm (to FULFILLED, and exposes tracking_status as delivered.) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 391.09 Tm (Carrier scans are not always received in chronological order. Once a parcel is out for delivery, a weaker) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 376.89 Tm (hub or in-transit scan is ignored so the customer tracker does not regress to shipped. A delivery-failed) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 362.69 Tm (scan may follow out-for-delivery, and a later reattempt may return it to out-for-delivery. Delivered is) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 348.49 Tm (terminal.) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 315.29 Tm (2.4 Tracking update sources) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 297.29 Tm (Order tracking can be updated by:) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 276.09 Tm (-) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 82.90 276.09 Tm (ExpressBees shipment webhooks.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 258.59 Tm (-) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 82.90 258.59 Tm (ExpressBees tracking API pulls.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 241.09 Tm (-) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 82.90 241.09 Tm (Zoho package, shipment, and sales-order webhooks.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 223.59 Tm (-) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 82.90 223.59 Tm (Scheduled Zoho tracking pulls, normally every 15 minutes.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 206.09 Tm (-) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 82.90 206.09 Tm (Scheduled Ledgerly tracking pulls.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 188.59 Tm (-) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 82.90 188.59 Tm (A stale-data refresh when an authenticated customer opens order details.) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 171.09 Tm (Authenticated order details attempt to refresh external tracking when it is older than five minutes.) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 156.89 Tm (Public order tracking returns cached fields and deliberately does not block while calling Ledgerly, Zoho, or) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 142.69 Tm (ExpressBees.) Tj ET
+0.24 0.18 0.29 rg BT /F2 15 Tf 1 0 0 1 58.00 101.49 Tm (3. Order cancellation scenarios) Tj ET
+0.46 0.42 0.48 rg BT /F1 8 Tf 1 0 0 1 289.64 29 Tm (2) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 8 0 R >>
+endobj
+10 0 obj
+<< /Length 4534 >>
+stream
+0.46 0.42 0.48 rg BT /F1 8 Tf 1 0 0 1 58 808.89 Tm (Mini's n More - Order Lifecycle Guide) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 765.89 Tm (3.1 Cancellation request lifecycle) Tj ET
+0.965 0.955 0.972 rg 58 697.39 482.28 57.50 re f
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 739.89 Tm (REQUESTED -> APPROVED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 727.39 Tm (          -> REJECTED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 714.89 Tm (          -> WITHDRAWN) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 680.39 Tm (3.2 Customer submits a cancellation request) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 662.39 Tm (Submitting a cancellation request creates a separate REQUESTED case. It does not immediately cancel) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 648.19 Tm (the order.) Tj ET
+0.965 0.955 0.972 rg 58 576.49 482.28 57.50 re f
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 618.99 Tm (cancellation_request.status = REQUESTED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 606.49 Tm (order.status                = unchanged) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 593.99 Tm (tracking_status             = unchanged) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 571.49 Tm (While the request is pending, the customer cannot submit another pending request. Normal shipment) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 557.29 Tm (booking is placed on hold. An administrator may override this hold only by supplying an audited reason. The) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 543.09 Tm (customer can withdraw the request while it is still pending.) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 509.89 Tm (3.3 Administrator approves before dispatch) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 491.89 Tm (Approval performs the real cancellation:) Tj ET
+0.965 0.955 0.972 rg 58 420.19 482.28 57.50 re f
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 462.69 Tm (cancellation_request.status = APPROVED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 450.19 Tm (order.status                = CANCELLED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 437.69 Tm (tracking_status             = cancelled) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 415.19 Tm (Approval also saves the reason, restores reserved inventory, synchronizes the cancellation to Zoho and) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 400.99 Tm (Ledgerly when applicable, writes lifecycle events, and sends the customer notification.) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 379.79 Tm (For a paid online order, the Razorpay refund is attempted before the order is marked cancelled. After) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 365.59 Tm (success, payment_status becomes REFUNDED and the refund identifier is recorded.) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 344.39 Tm (For collected COD, the order can be cancelled before the manual refund is recorded:) Tj ET
+0.965 0.955 0.972 rg 58 260.19 482.28 70.00 re f
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 315.19 Tm (order.status                = CANCELLED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 302.69 Tm (cancellation_request.status = APPROVED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 290.19 Tm (payment_status              = PAID) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 277.69 Tm (cod_refund_pending          = true) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 255.19 Tm (An administrator must then record the refund method and transaction reference. At that point) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 240.99 Tm (payment_status changes to REFUNDED.) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 207.79 Tm (3.4 Administrator rejects the request) Tj ET
+0.965 0.955 0.972 rg 58 139.29 482.28 57.50 re f
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 181.79 Tm (cancellation_request.status = REJECTED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 169.29 Tm (order.status                = unchanged) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 156.79 Tm (tracking_status             = unchanged) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 134.29 Tm (The rejection reason is stored and communicated to the customer. Fulfilment can continue normally.) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 101.09 Tm (3.5 Customer withdraws the request) Tj ET
+0.46 0.42 0.48 rg BT /F1 8 Tf 1 0 0 1 289.64 29 Tm (3) Tj ET
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 10 0 R >>
+endobj
+12 0 obj
+<< /Length 4813 >>
+stream
+0.46 0.42 0.48 rg BT /F1 8 Tf 1 0 0 1 58 808.89 Tm (Mini's n More - Order Lifecycle Guide) Tj ET
+0.965 0.955 0.972 rg 58 727.39 482.28 57.50 re f
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 769.89 Tm (cancellation_request.status = WITHDRAWN) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 757.39 Tm (order.status                = unchanged) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 744.89 Tm (tracking_status             = unchanged) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 722.39 Tm (With no REQUESTED cancellation remaining, the shipment hold is removed.) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 689.19 Tm (3.6 Cancellation after dispatch) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 671.19 Tm (An order cannot be cancelled after the system resolves tracking to shipped, out_for_delivery,) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 656.99 Tm (delivery_failed, or delivered. The customer must wait for delivery and use the return workflow if) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 642.79 Tm (eligible.) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 609.59 Tm (3.7 Shipment cancellation is not order cancellation) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 591.59 Tm (Cancelling a carrier booking is a separate operation. It cancels the ExpressBees booking when applicable) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 577.39 Tm (and clears the AWB, carrier, tracking URL, shipment date, label, provider request, and logistics mode. It) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 563.19 Tm (does not set the main order to CANCELLED.) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 541.99 Tm (After carrier-booking cancellation, calculated tracking normally returns to confirmed or hand_wrapped.) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 527.79 Tm (The order can then be rebooked or separately cancelled through the cancellation-request workflow.) Tj ET
+0.24 0.18 0.29 rg BT /F2 15 Tf 1 0 0 1 58.00 486.59 Tm (4. Return scenarios) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 450.59 Tm (4.1 Eligibility) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 432.59 Tm (The current implementation requires all of the following:) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 411.39 Tm (-) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 82.90 411.39 Tm (Returns and refunds are enabled.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 393.89 Tm (-) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 82.90 393.89 Tm (The order is paid.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 376.39 Tm (-) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 82.90 376.39 Tm (The order is not cancelled.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 358.89 Tm (-) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 82.90 358.89 Tm (Delivery can be recognized by the system.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 341.39 Tm (-) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 82.90 341.39 Tm (The request is within the configured three-day return window.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 323.89 Tm (-) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 82.90 323.89 Tm (No other open return or exchange already exists for the order.) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 294.39 Tm (4.2 Successful return lifecycle) Tj ET
+0.965 0.955 0.972 rg 58 163.39 482.28 120.00 re f
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 268.39 Tm (REQUESTED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 255.89 Tm (  -> APPROVED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 243.39 Tm (  -> PICKUP_SCHEDULED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 230.89 Tm (  -> PICKED_UP) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 218.39 Tm (  -> RECEIVED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 205.89 Tm (  -> INSPECTED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 193.39 Tm (  -> ACCEPTED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 180.89 Tm (  -> REFUNDED) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 158.39 Tm (PICKUP_REQUESTED is also available where scheduling and booking are separate operational steps.) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 125.19 Tm (4.3 Request creation and amounts) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 107.19 Tm (The customer selects return lines and quantities. The system snapshots requested quantity, item gross) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 92.99 Tm (amount, allocated order discount, and expected refundable amount. This supports partial-item and) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 78.79 Tm (partial-quantity returns.) Tj ET
+0.46 0.42 0.48 rg BT /F1 8 Tf 1 0 0 1 289.64 29 Tm (4) Tj ET
+endstream
+endobj
+13 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 12 0 R >>
+endobj
+14 0 obj
+<< /Length 5094 >>
+stream
+0.46 0.42 0.48 rg BT /F1 8 Tf 1 0 0 1 58 808.89 Tm (Mini's n More - Order Lifecycle Guide) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 777.89 Tm (The original delivered order remains FULFILLED with tracking_status delivered. The new return case) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 763.69 Tm (independently starts at REQUESTED.) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 730.49 Tm (4.4 Review decisions) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 712.49 Tm (An administrator can approve or reject the request while it is REQUESTED. A rejected request closes) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 698.29 Tm (without changing the original order or payment. The customer may cancel their own case only while it) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 684.09 Tm (remains REQUESTED, producing case status CANCELLED.) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 650.89 Tm (4.5 Reverse pickup tracking) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 632.89 Tm (Booking a pickup stores logistics mode, carrier name, reverse AWB, tracking URL, pickup window, and) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 618.69 Tm (provider reference. The case becomes PICKUP_SCHEDULED.) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 597.49 Tm (ExpressBees reverse milestones map as follows:) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 576.29 Tm (pickup_scheduled / out_for_pickup) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 203.00 576.29 Tm (PICKUP_SCHEDULED) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 558.79 Tm (picked_up) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 119.75 558.79 Tm (PICKED_UP) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 541.29 Tm (received / warehouse_received) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 203.00 541.29 Tm (RECEIVED) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 523.79 Tm (pickup_failed / customer_na / no_product) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 203.00 523.79 Tm (PICKUP_FAILED) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 506.29 Tm (Manual and self-ship cases use equivalent administrator actions.) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 473.09 Tm (4.6 Pickup failure) Tj ET
+0.965 0.955 0.972 rg 58 429.59 482.28 32.50 re f
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 447.09 Tm (PICKUP_SCHEDULED -> PICKUP_FAILED) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 424.59 Tm (The administrator can reschedule, which returns the case to APPROVED before booking again, or close) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 410.39 Tm (the failed case as CANCELLED. Closing a failed exchange pickup also releases any reserved replacement) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 396.19 Tm (stock.) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 362.99 Tm (4.7 Inspection and partial acceptance) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 344.99 Tm (After warehouse receipt, the case advances from RECEIVED to INSPECTED. The administrator may) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 330.79 Tm (accept or reject it. For multi-line returns, accepted quantity may be lower than requested quantity, and) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 316.59 Tm (refund values are recalculated proportionally. Accepted restockable units are returned to inventory.) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 283.39 Tm (4.8 Refund outcomes) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 265.39 Tm (Online payment) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 143.76 265.39 Tm (The refund is processed through Razorpay.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 247.89 Tm (Collected COD) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 138.96 247.89 Tm (The administrator must record the refund method and a payment reference.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 230.39 Tm (Uncollected COD) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 148.76 230.39 Tm (The case may finalize without sending a payment refund.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 212.89 Tm (Full refund) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 125.92 212.89 Tm (The original order payment_status becomes REFUNDED.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 195.39 Tm (Partial refund) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 140.62 195.39 Tm (The original order payment_status becomes PARTIALLY_REFUNDED.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 177.89 Tm (Refund failure) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 140.62 177.89 Tm (The case becomes FAILED and the administrator can retry.) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 160.39 Tm (After successful refund processing, the return case becomes REFUNDED.) Tj ET
+0.24 0.18 0.29 rg BT /F2 15 Tf 1 0 0 1 58.00 119.19 Tm (5. Exchange scenarios) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 83.19 Tm (5.1 Successful exchange lifecycle) Tj ET
+0.46 0.42 0.48 rg BT /F1 8 Tf 1 0 0 1 289.64 29 Tm (5) Tj ET
+endstream
+endobj
+15 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 14 0 R >>
+endobj
+16 0 obj
+<< /Length 5293 >>
+stream
+0.46 0.42 0.48 rg BT /F1 8 Tf 1 0 0 1 58 808.89 Tm (Mini's n More - Order Lifecycle Guide) Tj ET
+0.965 0.955 0.972 rg 58 602.39 482.28 182.50 re f
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 769.89 Tm (REQUESTED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 757.39 Tm (  -> APPROVED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 744.89 Tm (  -> PICKUP_SCHEDULED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 732.39 Tm (  -> PICKED_UP) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 719.89 Tm (  -> RECEIVED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 707.39 Tm (  -> INSPECTED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 694.89 Tm (  -> ACCEPTED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 682.39 Tm (  -> ITEM_ALLOCATED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 669.89 Tm (  -> REPACKING) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 657.39 Tm (  -> READY_TO_SHIP) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 644.89 Tm (  -> SHIPPED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 632.39 Tm (  -> DELIVERED) Tj ET
+0.18 0.16 0.20 rg BT /F1 8.8 Tf 1 0 0 1 70.00 619.89 Tm (  -> COMPLETED) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 585.39 Tm (5.2 Request validation) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 567.39 Tm (The customer selects the original order item, replacement size, replacement colour, and reason. The) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 553.19 Tm (system verifies that the product supports variants, the selected replacement is sellable, no full return is) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 538.99 Tm (already open for the order, and no exchange is already open for the same item.) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 505.79 Tm (5.3 Approval, reservation, and price difference) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 487.79 Tm (Approving an exchange reserves replacement stock immediately. The system calculates the original) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 473.59 Tm (item's net amount after discount, the replacement amount, and the price difference.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 452.39 Tm (Replacement costs more) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 186.09 452.39 Tm (The exact difference must be COLLECTED.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 434.89 Tm (Replacement costs less) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 180.61 434.89 Tm (The exact difference must be REFUNDED.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 417.39 Tm (Same price) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 126.51 417.39 Tm (Settlement is NOT_REQUIRED.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 399.89 Tm (Operational exception) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 172.57 399.89 Tm (An administrator may explicitly mark the difference WAIVED.) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 382.39 Tm (Replacement allocation and outbound shipment booking are blocked while settlement remains PENDING.) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 349.19 Tm (5.4 After inspection) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 331.19 Tm (An accepted exchange advances through ITEM_ALLOCATED, REPACKING, and READY_TO_SHIP. If the) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 316.99 Tm (original item is restockable, its inventory is restored.) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 295.79 Tm (If the replacement can no longer be supplied, an accepted exchange may be converted into a refund. A) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 281.59 Tm (failed refund conversion may be retried from FAILED.) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 248.39 Tm (5.5 Replacement shipment tracking) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 230.39 Tm (The replacement shipment stores its own outbound logistics mode, carrier, AWB, tracking URL, label URL,) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 216.19 Tm (and provider request identifier. Booking a manual or ExpressBees outbound shipment changes) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 201.99 Tm (READY_TO_SHIP to SHIPPED.) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 180.79 Tm (ExpressBees replacement milestones map as follows:) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 159.59 Tm (shipped / in_transit) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 164.24 159.59 Tm (SHIPPED) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 142.09 Tm (out_for_delivery) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 151.70 142.09 Tm (The case remains SHIPPED and an out-for-delivery notification is sent.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 124.59 Tm (delivered) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 117.40 124.59 Tm (The case advances through DELIVERED to COMPLETED.) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 107.09 Tm (The exchange enum has no distinct OUT_FOR_DELIVERY state. That intermediate milestone is) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 92.89 Tm (represented through notification while the stored case remains SHIPPED.) Tj ET
+0.46 0.42 0.48 rg BT /F1 8 Tf 1 0 0 1 289.64 29 Tm (6) Tj ET
+endstream
+endobj
+17 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 16 0 R >>
+endobj
+18 0 obj
+<< /Length 4744 >>
+stream
+0.46 0.42 0.48 rg BT /F1 8 Tf 1 0 0 1 58 808.89 Tm (Mini's n More - Order Lifecycle Guide) Tj ET
+0.24 0.18 0.29 rg BT /F2 15 Tf 1 0 0 1 58.00 757.89 Tm (6. Customer and administrator visibility) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 721.89 Tm (6.1 Administrator view) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 703.89 Tm (Administrators can see and update the complete case status, reverse AWB and tracking URL, pickup) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 689.69 Tm (failure reason, replacement AWB and tracking URL, inspection decisions, settlement details, refund) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 675.49 Tm (identifiers, and manual COD refund details.) Tj ET
+0.34 0.23 0.35 rg BT /F2 11.8 Tf 1 0 0 1 58.00 642.29 Tm (6.2 Customer view) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 624.29 Tm (Customers see the return/exchange case status, rejection reason, replacement choice, and replacement) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 610.09 Tm (outbound tracking link and AWB. They may cancel a case only while its status is REQUESTED.) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 588.89 Tm (In the current implementation, reverse-pickup AWB and reverse tracking URL are stored and visible to) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 574.69 Tm (administrators but are not included in the customer return response. The customer account currently) Tj ET
+0.12 0.12 0.14 rg BT /F1 10.2 Tf 1 0 0 1 58.00 560.49 Tm (renders the replacement shipment tracking link only.) Tj ET
+0.24 0.18 0.29 rg BT /F2 15 Tf 1 0 0 1 58.00 519.29 Tm (7. Implementation observations) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 495.29 Tm (1.) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 86.53 495.29 Tm (The return-window calculation currently gives shipment_date first priority as its delivery anchor. If) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 86.53 481.79 Tm (shipment_date represents dispatch rather than delivery, the three-day return period can begin too) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 86.53 468.29 Tm (early. A dedicated shipment_delivered_at timestamp or explicit delivered event should take priority for) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 86.53 454.79 Tm (strict "three days from delivery" behavior.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 437.29 Tm (2.) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 86.53 437.29 Tm (The original order's tracking remains delivered throughout a return or exchange. Customer interfaces) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 86.53 423.79 Tm (should always display the separate return/exchange status alongside it to avoid confusion.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 406.29 Tm (3.) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 86.53 406.29 Tm (For better customer visibility, the return response could expose reverse_awb and tracking_url, just as) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 86.53 392.79 Tm (it already exposes outbound_awb and outbound_tracking_url for replacement shipments.) Tj ET
+0.24 0.18 0.29 rg BT /F2 15 Tf 1 0 0 1 58.00 355.29 Tm (8. Quick operational reference) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 331.29 Tm (Cancellation) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 130.82 331.29 Tm (Use only before dispatch. REQUESTED places fulfilment on hold; APPROVED cancels the order;) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 130.82 317.79 Tm (REJECTED or WITHDRAWN leaves the order active.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 300.29 Tm (Return) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 108.48 300.29 Tm (Delivered paid order -> reverse pickup -> receive -> inspect -> accept -> refund.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 282.79 Tm (Exchange) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 118.28 282.79 Tm (Delivered paid order -> reserve replacement -> reverse pickup -> inspect -> settle difference) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 118.28 269.29 Tm (-> allocate -> ship replacement -> complete.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 251.79 Tm (Forward tracking) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 155.91 251.79 Tm (Update automatically from carrier/Zoho/Ledgerly events and pulls. Do not equate AWB) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 155.91 238.29 Tm (creation with physical shipment for ExpressBees.) Tj ET
+0.30 0.24 0.33 rg BT /F2 9.8 Tf 1 0 0 1 63.00 220.79 Tm (Reverse tracking) Tj ET
+0.12 0.12 0.14 rg BT /F1 9.8 Tf 1 0 0 1 152.77 220.79 Tm (Update the return/exchange case status, not the original order's tracking_status.) Tj ET
+0.46 0.42 0.48 rg BT /F1 8 Tf 1 0 0 1 289.64 29 Tm (7) Tj ET
+endstream
+endobj
+19 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 18 0 R >>
+endobj
+xref
+0 20
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000162 00000 n 
+0000000232 00000 n 
+0000000307 00000 n 
+0000000457 00000 n 
+0000004585 00000 n 
+0000004727 00000 n 
+0000010747 00000 n 
+0000010889 00000 n 
+0000015476 00000 n 
+0000015620 00000 n 
+0000020486 00000 n 
+0000020630 00000 n 
+0000025777 00000 n 
+0000025921 00000 n 
+0000031267 00000 n 
+0000031411 00000 n 
+0000036208 00000 n 
+trailer
+<< /Size 20 /Root 1 0 R /Info 5 0 R >>
+startxref
+36352
+%%EOF

@@ -93,6 +93,7 @@
       }
       .status.pass { background: var(--pass); }
       .status.fail { background: var(--fail); }
+      .status.skip { background: #64748b; }
       table {
         width: 100%;
         border-collapse: collapse;
@@ -164,7 +165,8 @@
         
         <div class="meta">
           <span class="meta-chip">Mini&#x27;s n More</span>
-          <span class="meta-chip">Build <code style="background:transparent;color:inherit;padding:0;">local</code></span>
+          <span class="meta-chip">Build <code style="background:transparent;color:inherit;padding:0;">202610091843-api-perf</code></span>
+          <span class="meta-chip">Generated <code style="background:transparent;color:inherit;padding:0;">9 Oct 2026, 6:43 PM IST (13:13 UTC)</code></span>
         </div>
       </header>
       <main class="content">
@@ -172,12 +174,12 @@
       <section class="panel">
         <h2>API &amp; performance testing</h2>
         <p class="muted">Open an HTML report below — each shows endpoint, status code, and response time.</p>
-        <div class="links"><a class="link-card" href="lifecycle-report.html"><strong>API lifecycle (all endpoints)</strong><span>76 requests · 66 passed · 0 failed</span></a>
-<a class="link-card" href="../postman/index.html"><strong>Postman smoke + load + register</strong><span>Smoke, storefront load, POST /api/register at 15/25/35 users</span></a></div>
+        <div class="links"><a class="link-card" href="lifecycle-report.html"><strong>API lifecycle (all endpoints)</strong><span>170 requests · 77 passed · 12 failed</span></a>
+<a class="link-card" href="../postman/index.html"><strong>Postman smoke + load</strong><span>Smoke, load at 10/25 VUs — all GET endpoints with response time</span></a></div>
       </section>
     
       </main>
-      <footer>Generated 8 September 2026 · Jenkins · <strong>Daiva Technologies</strong></footer>
+      <footer>Generated 9 Oct 2026, 6:43 PM IST (13:13 UTC) · <strong>Daiva Technologies</strong></footer>
     </div>
   </body>
 </html>

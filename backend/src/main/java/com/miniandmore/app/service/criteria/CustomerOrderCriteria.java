@@ -26,7 +26,10 @@ public class CustomerOrderCriteria implements Serializable, Criteria {
     /**
      * Class for filtering OrderStatus
      */
-    public static class OrderStatusFilter extends Filter<OrderStatus> {
+    public static class OrderStatusFilter extends Filter<OrderStatus> implements Serializable {
+
+        @Serial
+        private static final long serialVersionUID = 1L;
 
         public OrderStatusFilter() {}
 
@@ -43,7 +46,10 @@ public class CustomerOrderCriteria implements Serializable, Criteria {
     /**
      * Class for filtering PaymentStatus
      */
-    public static class PaymentStatusFilter extends Filter<PaymentStatus> {
+    public static class PaymentStatusFilter extends Filter<PaymentStatus> implements Serializable {
+
+        @Serial
+        private static final long serialVersionUID = 1L;
 
         public PaymentStatusFilter() {}
 

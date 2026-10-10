@@ -14,6 +14,7 @@ import com.miniandmore.app.domain.enumeration.DiscountType;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.repository.*;
+import com.miniandmore.app.service.CouponDiscountOutcome;
 import com.miniandmore.app.service.LedgerlySyncService;
 import com.miniandmore.app.service.OrderEventService;
 import com.miniandmore.app.service.StorePricingTestSupport;
@@ -73,6 +74,12 @@ class InternalAccountOrderResourcePrivateLogicTest {
     private com.miniandmore.app.service.RazorpayRefundService razorpayRefundService;
 
     @Mock
+    private com.miniandmore.app.service.OrderCancellationService orderCancellationService;
+
+    @Mock
+    private com.miniandmore.app.service.OrderShipmentService orderShipmentService;
+
+    @Mock
     private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     private InternalAccountOrderResource resource;
@@ -98,6 +105,8 @@ class InternalAccountOrderResourcePrivateLogicTest {
             StorePricingTestSupport.defaultPricing(),
             orderEventService,
             razorpayRefundService,
+            orderCancellationService,
+            orderShipmentService,
             transactionManager
         );
         ReflectionTestUtils.setField(resource, "razorpayKeyId", "rzp_test");
@@ -171,7 +180,7 @@ class InternalAccountOrderResourcePrivateLogicTest {
     @Test
     void calculateCouponDiscount_invalidAndWelcome10() {
         when(couponRepository.findOneByCodeIgnoreCase("MISSING")).thenReturn(Optional.empty());
-        Optional<Map<String, Object>> missing = (Optional<Map<String, Object>>) ReflectionTestUtils.invokeMethod(
+        Optional<CouponDiscountOutcome> missing = (Optional<CouponDiscountOutcome>) ReflectionTestUtils.invokeMethod(
             resource,
             "calculateCouponDiscount",
             "MISSING",
@@ -183,14 +192,14 @@ class InternalAccountOrderResourcePrivateLogicTest {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("customer1", "pw"));
         when(customerOrderRepository.existsByUserLoginAndStatusNot("customer1", OrderStatus.CANCELLED)).thenReturn(true);
 
-        Optional<Map<String, Object>> blocked = (Optional<Map<String, Object>>) ReflectionTestUtils.invokeMethod(
+        Optional<CouponDiscountOutcome> blocked = (Optional<CouponDiscountOutcome>) ReflectionTestUtils.invokeMethod(
             resource,
             "calculateCouponDiscount",
             "WELCOME10",
             BigDecimal.valueOf(500),
             Optional.of("customer1")
         );
-        assertThat(blocked.orElseThrow()).containsKey("error");
+        assertThat(blocked.orElseThrow().hasError()).isTrue();
     }
 
     @Test
@@ -383,7 +392,11 @@ class InternalAccountOrderResourcePrivateLogicTest {
         Map<String, Object> summary = (Map<String, Object>) ReflectionTestUtils.invokeMethod(resource, "publicTrackingSummary", order);
         @SuppressWarnings("unchecked")
         Map<String, Object> orderMap = (Map<String, Object>) summary.get("order");
-        assertThat(orderMap).containsKey("tracking_number").doesNotContainKey("total");
+        assertThat(orderMap)
+            .containsEntry("tracking_number", "AWB-1")
+            .containsEntry("shipment_date", "2026-08-01")
+            .containsEntry("shipment_delivered_at", "")
+            .doesNotContainKey("total");
     }
 
     @Test
@@ -396,7 +409,7 @@ class InternalAccountOrderResourcePrivateLogicTest {
             .minOrder(BigDecimal.ZERO)
             .expiresAt(Instant.now().minusSeconds(3600));
         when(couponRepository.findOneByCodeIgnoreCase("OLD")).thenReturn(Optional.of(expired));
-        Optional<Map<String, Object>> expiredResult = (Optional<Map<String, Object>>) ReflectionTestUtils.invokeMethod(
+        Optional<CouponDiscountOutcome> expiredResult = (Optional<CouponDiscountOutcome>) ReflectionTestUtils.invokeMethod(
             resource,
             "calculateCouponDiscount",
             "OLD",
@@ -412,7 +425,7 @@ class InternalAccountOrderResourcePrivateLogicTest {
             .discountValue(BigDecimal.TEN)
             .minOrder(BigDecimal.ZERO);
         when(couponRepository.findOneByCodeIgnoreCase("OFF")).thenReturn(Optional.of(inactive));
-        Optional<Map<String, Object>> inactiveResult = (Optional<Map<String, Object>>) ReflectionTestUtils.invokeMethod(
+        Optional<CouponDiscountOutcome> inactiveResult = (Optional<CouponDiscountOutcome>) ReflectionTestUtils.invokeMethod(
             resource,
             "calculateCouponDiscount",
             "OFF",
@@ -428,14 +441,14 @@ class InternalAccountOrderResourcePrivateLogicTest {
             .discountValue(BigDecimal.valueOf(50))
             .minOrder(BigDecimal.valueOf(1000));
         when(couponRepository.findOneByCodeIgnoreCase("BIG")).thenReturn(Optional.of(minOrder));
-        Optional<Map<String, Object>> minResult = (Optional<Map<String, Object>>) ReflectionTestUtils.invokeMethod(
+        Optional<CouponDiscountOutcome> minResult = (Optional<CouponDiscountOutcome>) ReflectionTestUtils.invokeMethod(
             resource,
             "calculateCouponDiscount",
             "BIG",
             BigDecimal.valueOf(500),
             Optional.of("customer1")
         );
-        assertThat(minResult.orElseThrow().get("error")).isEqualTo("Add ₹500 more to unlock this offer");
+        assertThat(minResult.orElseThrow().error()).isEqualTo("Add ₹500 more to unlock this offer");
     }
 
     @Test
@@ -449,7 +462,7 @@ class InternalAccountOrderResourcePrivateLogicTest {
             .maxDiscount(BigDecimal.valueOf(100));
         when(couponRepository.findOneByCodeIgnoreCase("FLAT200")).thenReturn(Optional.of(coupon));
 
-        Optional<Map<String, Object>> result = (Optional<Map<String, Object>>) ReflectionTestUtils.invokeMethod(
+        Optional<CouponDiscountOutcome> result = (Optional<CouponDiscountOutcome>) ReflectionTestUtils.invokeMethod(
             resource,
             "calculateCouponDiscount",
             "FLAT200",
@@ -457,7 +470,7 @@ class InternalAccountOrderResourcePrivateLogicTest {
             Optional.of("customer1")
         );
 
-        assertThat((BigDecimal) result.orElseThrow().get("discount")).isEqualByComparingTo("100.00");
+        assertThat(result.orElseThrow().discount()).isEqualByComparingTo("100.00");
     }
 
     @Test
@@ -476,7 +489,7 @@ class InternalAccountOrderResourcePrivateLogicTest {
             new com.miniandmore.app.service.BogoDiscountCalculator.Line(1, BigDecimal.valueOf(1000)),
             new com.miniandmore.app.service.BogoDiscountCalculator.Line(1, BigDecimal.valueOf(400))
         );
-        Optional<Map<String, Object>> result = (Optional<Map<String, Object>>) ReflectionTestUtils.invokeMethod(
+        Optional<CouponDiscountOutcome> result = (Optional<CouponDiscountOutcome>) ReflectionTestUtils.invokeMethod(
             resource,
             "calculateCouponDiscount",
             "BOGO1",
@@ -485,7 +498,7 @@ class InternalAccountOrderResourcePrivateLogicTest {
             lines
         );
 
-        assertThat((BigDecimal) result.orElseThrow().get("discount")).isEqualByComparingTo("400.00");
+        assertThat(result.orElseThrow().discount()).isEqualByComparingTo("400.00");
     }
 
     @Test
@@ -504,7 +517,7 @@ class InternalAccountOrderResourcePrivateLogicTest {
             new com.miniandmore.app.service.BogoDiscountCalculator.Line(1, BigDecimal.valueOf(1000)),
             new com.miniandmore.app.service.BogoDiscountCalculator.Line(1, BigDecimal.valueOf(400))
         );
-        Optional<Map<String, Object>> result = (Optional<Map<String, Object>>) ReflectionTestUtils.invokeMethod(
+        Optional<CouponDiscountOutcome> result = (Optional<CouponDiscountOutcome>) ReflectionTestUtils.invokeMethod(
             resource,
             "calculateCouponDiscount",
             "BOGO1",
@@ -513,7 +526,7 @@ class InternalAccountOrderResourcePrivateLogicTest {
             lines
         );
 
-        assertThat((BigDecimal) result.orElseThrow().get("discount")).isEqualByComparingTo("400.00");
+        assertThat(result.orElseThrow().discount()).isEqualByComparingTo("400.00");
     }
 
     @Test
@@ -526,7 +539,7 @@ class InternalAccountOrderResourcePrivateLogicTest {
             .minOrder(BigDecimal.valueOf(1000));
         when(couponRepository.findOneByCodeIgnoreCase("SAVE10")).thenReturn(Optional.of(coupon));
 
-        Optional<Map<String, Object>> result = (Optional<Map<String, Object>>) ReflectionTestUtils.invokeMethod(
+        Optional<CouponDiscountOutcome> result = (Optional<CouponDiscountOutcome>) ReflectionTestUtils.invokeMethod(
             resource,
             "calculateCouponDiscount",
             "SAVE10",
@@ -535,7 +548,7 @@ class InternalAccountOrderResourcePrivateLogicTest {
             List.of()
         );
 
-        assertThat(result.orElseThrow().get("error")).isEqualTo("Add ₹300 more to unlock this offer");
+        assertThat(result.orElseThrow().error()).isEqualTo("Add ₹300 more to unlock this offer");
     }
 
     @Test
@@ -550,7 +563,7 @@ class InternalAccountOrderResourcePrivateLogicTest {
             .bogoGetQty(1);
         when(couponRepository.findOneByCodeIgnoreCase("BOGO1")).thenReturn(Optional.of(coupon));
 
-        Optional<Map<String, Object>> result = (Optional<Map<String, Object>>) ReflectionTestUtils.invokeMethod(
+        Optional<CouponDiscountOutcome> result = (Optional<CouponDiscountOutcome>) ReflectionTestUtils.invokeMethod(
             resource,
             "calculateCouponDiscount",
             "BOGO1",
@@ -559,7 +572,7 @@ class InternalAccountOrderResourcePrivateLogicTest {
             List.of(new com.miniandmore.app.service.BogoDiscountCalculator.Line(1, BigDecimal.valueOf(1000)))
         );
 
-        assertThat(result.orElseThrow().get("error")).isEqualTo("Add 1 more item to use this BOGO offer");
+        assertThat(result.orElseThrow().error()).isEqualTo("Add 1 more item to use this BOGO offer");
     }
 
     @Test
@@ -751,5 +764,29 @@ class InternalAccountOrderResourcePrivateLogicTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> payment = (Map<String, Object>) ReflectionTestUtils.invokeMethod(resource, "paymentSummary", order);
         assertThat(payment.get("payment_status")).isEqualTo("paid");
+    }
+
+    @Test
+    void orderSummary_packedOrder_allowsCustomerCancelUntilDispatched() {
+        CustomerOrder order = new CustomerOrder()
+            .id(12L)
+            .orderNumber("MNM-12")
+            .status(OrderStatus.HAND_WRAPPED)
+            .paymentStatus(PaymentStatus.PAID)
+            .paymentMethod("online")
+            .total(BigDecimal.valueOf(100))
+            .packedAt(Instant.parse("2026-09-30T00:00:00Z"))
+            .placedAt(Instant.parse("2026-08-10T10:00:00Z"));
+        OrderItem item = new OrderItem().id(1L).productId("1").productName("Dress").qty(1).price(BigDecimal.TEN);
+        when(orderItemRepository.findAllByOrderId(12L)).thenReturn(List.of(item));
+        when(orderCancellationService.canCustomerShowCancelAction(order)).thenReturn(true);
+        when(orderCancellationService.shouldContactCareToCancel(order)).thenReturn(false);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> summary = (Map<String, Object>) ReflectionTestUtils.invokeMethod(resource, "orderSummary", order);
+
+        assertThat(summary.get("can_cancel")).isEqualTo(true);
+        assertThat(summary.get("contact_care_to_cancel")).isEqualTo(false);
+        assertThat(summary.get("packed_at")).isEqualTo("2026-09-30T00:00:00Z");
     }
 }

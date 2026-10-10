@@ -129,3 +129,4 @@ razorpay:
   key-secret: ${RAZORPAY_KEY_SECRET:}
   payment-demo: ${RAZORPAY_PAYMENT_DEMO:false}
   refund-demo: ${RAZORPAY_REFUND_DEMO:false}
+  webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}

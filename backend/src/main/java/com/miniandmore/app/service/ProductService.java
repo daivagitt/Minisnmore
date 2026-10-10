@@ -73,12 +73,14 @@ public class ProductService {
         LOG.debug("Request to update Product : {}", productDTO);
         String frozenVariantsJson = null;
         String frozenColorsJson = null;
+        Optional<Product> existing = Optional.empty();
         if (productDTO.getId() != null) {
-            Optional<Product> existing = productRepository.findById(productDTO.getId());
+            existing = productRepository.findById(productDTO.getId());
             frozenVariantsJson = existing.map(Product::getVariantsJson).orElse(null);
             frozenColorsJson = existing.map(Product::getColorsJson).orElse(null);
         }
         Product product = productMapper.toEntity(productDTO);
+        copyServerOwnedFields(existing.orElse(null), product);
         normalizeVariants(product, frozenVariantsJson, frozenColorsJson);
         product = productRepository.save(product);
         return productMapper.toDto(product);
@@ -106,6 +108,14 @@ public class ProductService {
             })
             .map(productRepository::save)
             .map(productMapper::toDto);
+    }
+
+    /** Fields the admin DTO cannot round-trip; PUT {@code toEntity} would otherwise null them. */
+    private static void copyServerOwnedFields(Product existing, Product product) {
+        if (existing == null || product == null) {
+            return;
+        }
+        product.setZohoImageDocsJson(existing.getZohoImageDocsJson());
     }
 
     private void normalizeVariants(Product product, String frozenVariantsJson, String frozenColorsJson) {

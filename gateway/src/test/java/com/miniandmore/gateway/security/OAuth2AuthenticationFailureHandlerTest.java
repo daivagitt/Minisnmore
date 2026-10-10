@@ -5,8 +5,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.miniandmore.gateway.config.ApplicationProperties;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -58,6 +62,40 @@ class OAuth2AuthenticationFailureHandlerTest {
         OAuth2Error unknown = new OAuth2Error("custom_code", "Please allow email access", null);
         assertThat(OAuth2AuthenticationFailureHandler.friendlyMessage(new OAuth2AuthenticationException(unknown)))
             .isEqualTo("Please allow email access");
+    }
+
+    @ParameterizedTest
+    @MethodSource("oauthCodeMappings")
+    void friendlyMessage_mapsAllKnownOAuthCodes(String code, String fragment) {
+        OAuth2Error error = new OAuth2Error(code, null, null);
+        assertThat(OAuth2AuthenticationFailureHandler.friendlyMessage(new OAuth2AuthenticationException(error))).contains(fragment);
+    }
+
+    private static Stream<Arguments> oauthCodeMappings() {
+        return Stream.of(
+            Arguments.of("unauthorized_client", "misconfigured"),
+            Arguments.of("invalid_grant", "expired"),
+            Arguments.of("invalid_token", "expired"),
+            Arguments.of("invalid_scope", "permissions"),
+            Arguments.of("insufficient_scope", "permissions"),
+            Arguments.of("account_selection_required", "complete sign-in"),
+            Arguments.of("interaction_required", "complete sign-in"),
+            Arguments.of("login_required", "complete sign-in")
+        );
+    }
+
+    @Test
+    void friendlyMessage_hidesTechnicalDescription() {
+        OAuth2Error error = new OAuth2Error("unknown", "java.lang.NullPointerException at org.foo.Bar", null);
+        assertThat(OAuth2AuthenticationFailureHandler.friendlyMessage(new OAuth2AuthenticationException(error)))
+            .contains("Social sign-in failed");
+    }
+
+    @Test
+    void friendlyMessage_usesShortNonTechnicalDescription() {
+        OAuth2Error error = new OAuth2Error("unknown", "Please verify your email", null);
+        assertThat(OAuth2AuthenticationFailureHandler.friendlyMessage(new OAuth2AuthenticationException(error)))
+            .isEqualTo("Please verify your email");
     }
 
     @Test

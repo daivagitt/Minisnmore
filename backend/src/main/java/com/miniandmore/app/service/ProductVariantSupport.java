@@ -765,6 +765,7 @@ public class ProductVariantSupport {
      * Update an existing matrix row or append a new one (Zoho Books grouped items / new SKUs).
      * @param addIfMissing when false, behaves like {@link #mergePulledVariantFromZoho}
      */
+    @SuppressWarnings("java:S107")
     public boolean upsertPulledVariantFromZoho(
         Product product,
         String variantSku,
@@ -779,6 +780,9 @@ public class ProductVariantSupport {
         if (product == null || StringUtils.isBlank(variantSku)) {
             return false;
         }
+        if (stock != null && ZohoInboundStock.isNegative(stock)) {
+            throw new IllegalArgumentException(ZohoInboundStock.negativeStockMessage(stock));
+        }
         List<VariantRow> rows = new ArrayList<>(parseProduct(product));
         // Zoho item_id is stable when an admin renames a SKU. Prefer it so a rename updates the
         // existing row instead of appending a duplicate and later stale-deactivating the old row.
@@ -789,8 +793,14 @@ public class ProductVariantSupport {
         }
         Optional<VariantRow> match = byItemId.or(() -> bySku);
         VariantRow matched = match.orElse(null);
-        String incomingSize = normalize(size) != null ? normalize(size) : matched != null ? matched.size() : null;
-        String incomingColor = normalize(color) != null ? normalize(color) : matched != null ? matched.color() : null;
+        String incomingSize = normalize(size);
+        if (incomingSize == null && matched != null) {
+            incomingSize = matched.size();
+        }
+        String incomingColor = normalize(color);
+        if (incomingColor == null && matched != null) {
+            incomingColor = matched.color();
+        }
         if ((matched != null || addIfMissing) && normalize(incomingSize) != null && normalize(incomingColor) != null) {
             for (VariantRow existing : rows) {
                 // Inactive rows retain their identity too; silently reusing their combination can
@@ -1215,7 +1225,11 @@ public class ProductVariantSupport {
         }
 
         private static String stringValue(Object value) {
-            return value == null ? null : value.toString().trim().isEmpty() ? null : value.toString().trim();
+            if (value == null) {
+                return null;
+            }
+            String s = value.toString().trim();
+            return s.isEmpty() ? null : s;
         }
 
         private static BigDecimal toBigDecimal(Object value) {

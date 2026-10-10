@@ -33,7 +33,7 @@ class ImagePreviewServiceTest {
     @BeforeEach
     void setUp() {
         service = new ImagePreviewService(storage, httpClient);
-        when(storage.publicBaseUrl()).thenReturn("https://cdn.example.com/my-bucket");
+        org.mockito.Mockito.lenient().when(storage.publicBaseUrl()).thenReturn("https://cdn.example.com/my-bucket");
     }
 
     @Test
@@ -83,5 +83,85 @@ class ImagePreviewServiceTest {
 
         verify(storage, never()).putPublicImage(any(), any());
         verify(storage, never()).ensureImageDerivatives(any(), any());
+    }
+
+    @Test
+    void defaultConstructor_instantiates() {
+        ImagePreviewService defaultService = new ImagePreviewService(storage);
+        assertThat(defaultService).isNotNull();
+    }
+
+    @Test
+    void preview_downloadsPublic_whenNotInStorage_success() throws Exception {
+        byte[] original = ImagePreviewSupportTest.jpeg(300, 300, Color.BLUE);
+        when(storage.getObjectBytes("products/photo.jpg.thumb.jpg")).thenReturn(Optional.empty());
+        when(storage.getObjectBytes("products/photo.jpg")).thenReturn(Optional.empty());
+
+        java.net.http.HttpResponse<java.io.InputStream> httpResp = org.mockito.Mockito.mock(java.net.http.HttpResponse.class);
+        when(httpResp.statusCode()).thenReturn(200);
+        when(httpResp.body()).thenReturn(new java.io.ByteArrayInputStream(original));
+        when(httpResp.headers()).thenReturn(java.net.http.HttpHeaders.of(java.util.Map.of(), (k, v) -> true));
+        org.mockito.Mockito.doReturn(httpResp).when(httpClient).send(any(java.net.http.HttpRequest.class), any());
+
+        byte[] result = service.preview("https://cdn.example.com/my-bucket/products/photo.jpg", 240);
+        assertThat(result).isNotEmpty();
+    }
+
+    @Test
+    void preview_downloadsPublic_non200_throwsNotFound() throws Exception {
+        when(storage.getObjectBytes("products/photo.jpg.thumb.jpg")).thenReturn(Optional.empty());
+        when(storage.getObjectBytes("products/photo.jpg")).thenReturn(Optional.empty());
+
+        java.net.http.HttpResponse<java.io.InputStream> httpResp = org.mockito.Mockito.mock(java.net.http.HttpResponse.class);
+        when(httpResp.statusCode()).thenReturn(404);
+        org.mockito.Mockito.doReturn(httpResp).when(httpClient).send(any(java.net.http.HttpRequest.class), any());
+
+        assertThatThrownBy(() -> service.preview("https://cdn.example.com/my-bucket/products/photo.jpg", 240))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    void preview_downloadsPublic_tooLargeHeader_throwsBadRequest() throws Exception {
+        when(storage.getObjectBytes("products/photo.jpg.thumb.jpg")).thenReturn(Optional.empty());
+        when(storage.getObjectBytes("products/photo.jpg")).thenReturn(Optional.empty());
+
+        java.net.http.HttpResponse<java.io.InputStream> httpResp = org.mockito.Mockito.mock(java.net.http.HttpResponse.class);
+        when(httpResp.statusCode()).thenReturn(200);
+        when(httpResp.headers()).thenReturn(
+            java.net.http.HttpHeaders.of(java.util.Map.of("Content-Length", java.util.List.of("20000000")), (k, v) -> true)
+        );
+        org.mockito.Mockito.doReturn(httpResp).when(httpClient).send(any(java.net.http.HttpRequest.class), any());
+
+        assertThatThrownBy(() -> service.preview("https://cdn.example.com/my-bucket/products/photo.jpg", 240))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void preview_downloadsPublic_emptyBody_throwsNotFound() throws Exception {
+        when(storage.getObjectBytes("products/photo.jpg.thumb.jpg")).thenReturn(Optional.empty());
+        when(storage.getObjectBytes("products/photo.jpg")).thenReturn(Optional.empty());
+
+        java.net.http.HttpResponse<java.io.InputStream> httpResp = org.mockito.Mockito.mock(java.net.http.HttpResponse.class);
+        when(httpResp.statusCode()).thenReturn(200);
+        when(httpResp.headers()).thenReturn(java.net.http.HttpHeaders.of(java.util.Map.of(), (k, v) -> true));
+        when(httpResp.body()).thenReturn(new java.io.ByteArrayInputStream(new byte[0]));
+        org.mockito.Mockito.doReturn(httpResp).when(httpClient).send(any(java.net.http.HttpRequest.class), any());
+
+        assertThatThrownBy(() -> service.preview("https://cdn.example.com/my-bucket/products/photo.jpg", 240))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    void preview_downloadsPublic_networkError_throwsNotFound() throws Exception {
+        when(storage.getObjectBytes("products/photo.jpg.thumb.jpg")).thenReturn(Optional.empty());
+        when(storage.getObjectBytes("products/photo.jpg")).thenReturn(Optional.empty());
+        when(httpClient.send(any(java.net.http.HttpRequest.class), any())).thenThrow(new java.io.IOException("network timeout"));
+
+        assertThatThrownBy(() -> service.preview("https://cdn.example.com/my-bucket/products/photo.jpg", 240))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
     }
 }

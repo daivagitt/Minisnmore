@@ -8,6 +8,9 @@ import org.springframework.http.HttpStatus;
 
 final class RazorpayErrorMapper {
 
+    private static final String ALREADY_BEEN_REFUNDED = "already been refunded";
+    private static final String FULLY_REFUNDED = "fully refunded";
+
     private RazorpayErrorMapper() {}
 
     record ParsedRazorpayError(String code, String description, String reason) {}
@@ -42,7 +45,7 @@ final class RazorpayErrorMapper {
                     "Add funds in the Razorpay Dashboard or wait for recent payments to settle, then try again."
                 );
             }
-            if (normalized.contains("already been refunded") || normalized.contains("fully refunded")) {
+            if (normalized.contains(ALREADY_BEEN_REFUNDED) || normalized.contains(FULLY_REFUNDED)) {
                 return "This payment has already been refunded.";
             }
             if (normalized.contains("not captured")) {
@@ -62,7 +65,7 @@ final class RazorpayErrorMapper {
 
     static boolean isAlreadyRefundedError(ParsedRazorpayError error) {
         String description = StringUtils.defaultString(error.description()).toLowerCase(Locale.ROOT);
-        return description.contains("already been refunded") || description.contains("fully refunded");
+        return description.contains(ALREADY_BEEN_REFUNDED) || description.contains(FULLY_REFUNDED);
     }
 
     static HttpStatus refundHttpStatus(ParsedRazorpayError error, int razorpayStatus) {
@@ -70,7 +73,7 @@ final class RazorpayErrorMapper {
         if (description.contains("enough balance") || description.contains("insufficient balance")) {
             return HttpStatus.CONFLICT;
         }
-        if (description.contains("already been refunded") || description.contains("fully refunded")) {
+        if (description.contains(ALREADY_BEEN_REFUNDED) || description.contains(FULLY_REFUNDED)) {
             return HttpStatus.CONFLICT;
         }
         if (razorpayStatus >= 400 && razorpayStatus < 500) {

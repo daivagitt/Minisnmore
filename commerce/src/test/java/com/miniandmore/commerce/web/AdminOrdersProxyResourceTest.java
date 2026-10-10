@@ -1,5 +1,6 @@
 package com.miniandmore.commerce.web;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,6 +39,19 @@ class AdminOrdersProxyResourceTest {
         mockMvc.perform(get("/api/v1/admin/orders/cod-pending")).andExpect(status().isOk()).andExpect(content().string("[]"));
 
         verify(catalog).get("/internal/v1/admin/orders/cod-pending");
+    }
+
+    @Test
+    void orderedLogins_delegatesToCatalog() throws Exception {
+        when(catalog.get("/internal/v1/admin/orders/ordered-logins"))
+            .thenReturn(ResponseEntity.ok("{\"logins\":[\"today.customer\"]}"));
+
+        mockMvc
+            .perform(get("/api/v1/admin/orders/ordered-logins"))
+            .andExpect(status().isOk())
+            .andExpect(content().string("{\"logins\":[\"today.customer\"]}"));
+
+        verify(catalog).get("/internal/v1/admin/orders/ordered-logins");
     }
 
     @Test
@@ -115,5 +129,73 @@ class AdminOrdersProxyResourceTest {
             .andExpect(content().string("{\"order\":{}}"));
 
         verify(catalog).get("/internal/v1/admin/orders/MNM-42");
+    }
+
+    @Test
+    void bookShipment_delegatesToCatalog() throws Exception {
+        when(catalog.post(eq("/internal/v1/admin/orders/MNM-42/book-shipment"), any()))
+            .thenReturn(ResponseEntity.ok("{\"order\":{}}"));
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/orders/MNM-42/book-shipment")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content("{\"mode\":\"xpressbees\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(content().string("{\"order\":{}}"));
+
+        verify(catalog).post(eq("/internal/v1/admin/orders/MNM-42/book-shipment"), any());
+    }
+
+    @Test
+    void packageRates_delegatesToCatalog() throws Exception {
+        when(catalog.post(eq("/internal/v1/admin/orders/MNM-42/package-rates"), any()))
+            .thenReturn(ResponseEntity.ok("{\"chargeable_weight_grams\":500}"));
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/orders/MNM-42/package-rates")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content("{\"length_cm\":10,\"breadth_cm\":10,\"height_cm\":10}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(content().string("{\"chargeable_weight_grams\":500}"));
+
+        verify(catalog).post(eq("/internal/v1/admin/orders/MNM-42/package-rates"), any());
+    }
+
+    @Test
+    void completePackage_delegatesToCatalog() throws Exception {
+        when(catalog.post(eq("/internal/v1/admin/orders/MNM-42/complete-package"), any()))
+            .thenReturn(ResponseEntity.ok("{\"order\":{}}"));
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/orders/MNM-42/complete-package")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content("{\"length_cm\":10,\"breadth_cm\":10,\"height_cm\":10}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(content().string("{\"order\":{}}"));
+
+        verify(catalog).post(eq("/internal/v1/admin/orders/MNM-42/complete-package"), any());
+    }
+
+    @Test
+    void cancelOrder_delegatesToCatalog() throws Exception {
+        when(catalog.post(eq("/internal/v1/admin/orders/MNM-42/cancel"), any()))
+            .thenReturn(ResponseEntity.ok("{\"order\":{}}"));
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/orders/MNM-42/cancel")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"Out of stock item\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(content().string("{\"order\":{}}"));
+
+        verify(catalog).post(eq("/internal/v1/admin/orders/MNM-42/cancel"), any());
     }
 }

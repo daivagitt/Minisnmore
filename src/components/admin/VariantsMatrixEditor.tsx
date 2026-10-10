@@ -61,6 +61,7 @@ export function VariantsMatrixEditor({
   onPullFromZoho,
   pullingRowKeys,
   freezeColors = false,
+  pullDisabled = false,
 }: {
   parentSku: string;
   sizes: string[];
@@ -78,6 +79,7 @@ export function VariantsMatrixEditor({
   pullingRowKeys?: Set<string>;
   /** Print/colour names come from Zoho pull — matrix rows show them read-only. */
   freezeColors?: boolean;
+  pullDisabled?: boolean;
 }) {
   const settings = useSiteSettings();
   const discountPercent = settings.store_discount_percent ?? 20;
@@ -396,7 +398,7 @@ export function VariantsMatrixEditor({
                         type="button"
                         className="h-8 w-8 grid place-items-center rounded-lg hover:bg-muted text-muted-foreground disabled:opacity-50"
                         onClick={() => onPullFromZoho(r, index)}
-                        disabled={pulling}
+                        disabled={pulling || pullDisabled}
                         aria-label={`Pull ${r.sku || "variant"} from Zoho`}
                         title="Pull this variant row from Zoho"
                       >

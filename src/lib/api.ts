@@ -1,9 +1,9 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string | undefined;
 
-const SAME_ORIGIN_STOREFRONT_HOSTS = new Set([
-  "minisnmore.com",
-  "www.minisnmore.com",
-]);
+function isSameOriginStorefrontHost(hostname: string) {
+  const host = hostname.toLowerCase();
+  return host === "minisnmore.com" || host.endsWith(".minisnmore.com");
+}
 
 export const AUTH_TOKEN_KEY = "mnm_backend_jwt";
 
@@ -32,7 +32,7 @@ function getApiBaseUrl() {
   // another environment's VITE_API_BASE_URL.
   if (
     typeof window !== "undefined" &&
-    SAME_ORIGIN_STOREFRONT_HOSTS.has(window.location.hostname.toLowerCase())
+    isSameOriginStorefrontHost(window.location.hostname)
   ) {
     return "";
   }
@@ -85,6 +85,12 @@ async function parseBody(response: Response) {
 const FIELD_LABELS: Record<string, string> = {
   slug: "Slug",
   name: "Name",
+  lengthCm: "Length (cm)",
+  breadthCm: "Width (cm)",
+  heightCm: "Height (cm)",
+  length_cm: "Length (cm)",
+  breadth_cm: "Width (cm)",
+  height_cm: "Height (cm)",
   title: "Title",
   content: "Content",
   body: "Body",
@@ -157,6 +163,13 @@ const FIELD_LABELS: Record<string, string> = {
   image_url: "Image",
   link_url: "Link URL",
   cta_label: "CTA label",
+  eyebrow: "Eyebrow label",
+  trust_fabric_label: "Organic / fabric line",
+  trust_shipping_label: "Shipping line",
+  trust_dyes_label: "Dyes line",
+  trustFabricLabel: "Organic / fabric line",
+  trustShippingLabel: "Shipping line",
+  trustDyesLabel: "Dyes line",
   discount_type: "Discount type",
   discount_value: "Discount value",
   min_order: "Minimum order",
@@ -182,6 +195,9 @@ const FIELD_LABELS: Record<string, string> = {
   discountValue: "Discount value",
   maxDiscount: "Maximum discount",
   email: "Email",
+  phone: "Contact number",
+  address: "Address",
+  comment: "Comments",
   login: "Login",
   password: "Password",
   username: "Email",

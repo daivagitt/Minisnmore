@@ -77,6 +77,14 @@ class ZohoInvoiceStatusTest {
     }
 
     @Test
+    void isPaid_matchesPaidOnly() {
+        assertThat(ZohoInvoiceStatus.isPaid("paid")).isTrue();
+        assertThat(ZohoInvoiceStatus.isPaid("Paid")).isTrue();
+        assertThat(ZohoInvoiceStatus.isPaid("overdue")).isFalse();
+        assertThat(ZohoInvoiceStatus.isPaid("partially_paid")).isFalse();
+    }
+
+    @Test
     void applyInvoice_sentDoesNotOverwriteShippedZohoOrderStatus() {
         CustomerOrder order = new CustomerOrder();
         order.setStatus(OrderStatus.CONFIRMED);

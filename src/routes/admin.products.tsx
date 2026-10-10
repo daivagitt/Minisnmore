@@ -1,11 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { AdminCollapsibleSection, AdminPage, Field, inputCls } from "@/components/admin/AdminPage";
+import {
+  AdminCollapsibleSection,
+  AdminPage,
+  AdminSectionToggles,
+  Field,
+  inputCls,
+} from "@/components/admin/AdminPage";
+import { useAdminSections } from "@/hooks/useAdminSections";
 import { AgeRangeField } from "@/components/admin/AgeRangeField";
 import { CommaListField } from "@/components/admin/CommaListField";
 import { NumberField } from "@/components/admin/NumberField";
 import { VariantsMatrixEditor, validateVariantRows } from "@/components/admin/VariantsMatrixEditor";
-import { suggestParentSku, summarizeZohoVariantLinkage, isVariantsItemStructure, normalizeAdminProductPricing, type VariantEditorRow } from "@/lib/admin-variants";
+import { suggestParentSku, summarizeZohoVariantLinkage, isVariantsItemStructure, normalizeAdminProductPricing, digitsOnlyZohoId, zohoItemGroupId, type VariantEditorRow } from "@/lib/admin-variants";
 import { parseAgeRangeField } from "@/lib/comma-list-field";
 import { ImageSpecHint } from "@/components/admin/ImageSpecHint";
 import { ADMIN_IMAGE_SPECS } from "@/lib/admin-image-specs";
@@ -14,6 +21,7 @@ import { ColorImagesEditor } from "@/components/admin/ColorImagesEditor";
 import { AdminProductImage } from "@/components/admin/AdminProductImage";
 import { DisplayImageField } from "@/components/admin/DisplayImageField";
 import { AdminSizeAvailabilityPreview } from "@/components/admin/AdminSizeAvailabilityPreview";
+import { CopyButton } from "@/components/CopyButton";
 import { SizeChartEditor } from "@/components/admin/SizeChartEditor";
 import { SizeNotesEditor } from "@/components/admin/SizeNotesEditor";
 import { DETAILS_KICKER_MAX_LEN } from "@/lib/product-details-kicker";
@@ -52,13 +60,14 @@ import {
   normalizeProductImageUrl,
   pullZohoProduct,
   pullZohoProductByIdentity,
+  pullZohoProductGroup,
   pullZohoProductVariant,
   saveCategory,
   saveProduct,
   slugifyProductSlug,
   syncZohoProduct,
   uploadAdminImage,
-  formatZohoSyncFailures,
+  formatZohoSyncFailureToast,
   formatZohoSyncSummary,
   type ProductRow,
 } from "@/lib/backend-data";
@@ -76,15 +85,7 @@ import { DEFAULT_STORE_DISCOUNT_PERCENT, sellingFromMrp } from "@/lib/pricing";
 
 export const Route = createFileRoute("/admin/products")({ component: ProductsPage });
 
-const PRODUCT_EDITOR_SECTIONS = ["merch", "copy", "notes", "chart", "gallery"] as const;
-type ProductEditorSection = (typeof PRODUCT_EDITOR_SECTIONS)[number];
-const DEFAULT_PRODUCT_EDITOR_SECTIONS: Record<ProductEditorSection, boolean> = {
-  merch: false,
-  copy: false,
-  notes: false,
-  chart: false,
-  gallery: false,
-};
+type ProductEditorSection = "merch" | "copy" | "notes" | "chart" | "gallery";
 
 type Product = ProductRow;
 const empty: Product = {
@@ -180,19 +181,16 @@ function ProductsPage() {
   const [zohoPulling, setZohoPulling] = useState<Set<number>>(() => new Set());
   const [zohoVariantPulling, setZohoVariantPulling] = useState<Set<string>>(() => new Set());
   const [zohoIdentityPulling, setZohoIdentityPulling] = useState(false);
+  const [zohoGroupPulling, setZohoGroupPulling] = useState<string | null>(null);
   const [zohoPullSku, setZohoPullSku] = useState("");
   const [zohoPullItemId, setZohoPullItemId] = useState("");
+  const [zohoPullGroupId, setZohoPullGroupId] = useState("");
+  const zohoPullBusy = zohoIdentityPulling || zohoGroupPulling !== null;
   const [clearingVariantPhotos, setClearingVariantPhotos] = useState<Set<number>>(() => new Set());
   const [imageUploading, setImageUploading] = useState<number | null>(null);
   const [skuWiseImporting, setSkuWiseImporting] = useState(false);
-  const [editorSections, setEditorSections] = useState(DEFAULT_PRODUCT_EDITOR_SECTIONS);
-
-  const setEditorSection = (id: ProductEditorSection, open: boolean) =>
-    setEditorSections((prev) => ({ ...prev, [id]: open }));
-  const expandAllEditorSections = () =>
-    setEditorSections(Object.fromEntries(PRODUCT_EDITOR_SECTIONS.map((id) => [id, true])) as Record<ProductEditorSection, boolean>);
-  const collapseAllEditorSections = () =>
-    setEditorSections(Object.fromEntries(PRODUCT_EDITOR_SECTIONS.map((id) => [id, false])) as Record<ProductEditorSection, boolean>);
+  const editorSections = useAdminSections<ProductEditorSection>();
+  const resetEditorSections = editorSections.reset;
 
   const load = async () => {
     setLoading(true);
@@ -228,8 +226,8 @@ function ProductsPage() {
   }, []);
 
   useEffect(() => {
-    setEditorSections(DEFAULT_PRODUCT_EDITOR_SECTIONS);
-  }, [editing]);
+    resetEditorSections();
+  }, [editing, resetEditorSections]);
 
   const upload = async (files: FileList, i: number) => {
     const accepted: File[] = [];
@@ -325,6 +323,10 @@ function ProductsPage() {
   };
 
   const pullFromZoho = async (i: number, p: Product) => {
+    if (zohoPullBusy) {
+      toast.error("Wait for the current Zoho pull to finish.");
+      return;
+    }
     if (!p.id) {
       toast.error("Save the product first, then pull from Zoho.");
       return;
@@ -336,9 +338,8 @@ function ProductsPage() {
     setZohoPulling((prev) => new Set(prev).add(i));
     try {
       const summary = await pullZohoProduct(Number(p.id));
-      const details = formatZohoSyncFailures(summary);
       if (summary.failed > 0) {
-        toast.error(details[0] ?? formatZohoSyncSummary(summary, "Product pull"));
+        toast.error(formatZohoSyncFailureToast(summary, "Product pull"));
       } else {
         toast.success(formatZohoSyncSummary(summary, "Product pull"));
       }
@@ -362,12 +363,15 @@ function ProductsPage() {
       toast.error("Enter a Zoho item id or SKU to pull.");
       return;
     }
+    if (zohoGroupPulling !== null || zohoPulling.size > 0 || zohoVariantPulling.size > 0) {
+      toast.error("Wait for the current Zoho pull to finish.");
+      return;
+    }
     setZohoIdentityPulling(true);
     try {
       const summary = await pullZohoProductByIdentity({ sku, zohoItemId });
-      const details = formatZohoSyncFailures(summary);
       if (summary.failed > 0) {
-        toast.error(details[0] ?? formatZohoSyncSummary(summary, "Product pull"));
+        toast.error(formatZohoSyncFailureToast(summary, "Product pull"));
       } else {
         toast.success(formatZohoSyncSummary(summary, "Product pull"));
         setZohoPullSku("");
@@ -380,6 +384,39 @@ function ProductsPage() {
       showApiError(error, "Zoho product pull failed");
     } finally {
       setZohoIdentityPulling(false);
+    }
+  };
+
+  const pullByZohoGroup = async (groupId?: string, productIndex?: number) => {
+    const itemGroupId = digitsOnlyZohoId(groupId ?? zohoPullGroupId);
+    if (!itemGroupId) {
+      toast.error(groupId ? "This product is not linked to a Zoho item group." : "Enter a Zoho item group ID to pull.");
+      return;
+    }
+    if (zohoIdentityPulling || zohoPulling.size > 0 || zohoVariantPulling.size > 0) {
+      toast.error("Wait for the current Zoho pull to finish.");
+      return;
+    }
+    setZohoGroupPulling(itemGroupId);
+    try {
+      const summary = await pullZohoProductGroup(itemGroupId);
+      if (summary.failed > 0) {
+        toast.error(formatZohoSyncFailureToast(summary, "Variant group pull"));
+      } else {
+        toast.success(formatZohoSyncSummary(summary, "Variant group pull"));
+        if (!groupId) setZohoPullGroupId("");
+      }
+      invalidateProducts();
+      await load();
+      if (productIndex != null) {
+        setEditing(productIndex);
+      } else {
+        paging.setPage(1);
+      }
+    } catch (error) {
+      showApiError(error, "Zoho variant group pull failed");
+    } finally {
+      setZohoGroupPulling(null);
     }
   };
 
@@ -404,6 +441,10 @@ function ProductsPage() {
       toast.error("Variant Zoho item id or SKU is required before pulling from Zoho.");
       return;
     }
+    if (zohoPullBusy) {
+      toast.error("Wait for the current Zoho pull to finish.");
+      return;
+    }
     const key = variantPullKey(product, row, rowIndex);
     setZohoVariantPulling((prev) => new Set(prev).add(key));
     try {
@@ -411,9 +452,8 @@ function ProductsPage() {
         sku: row.sku,
         zohoItemId: row.zohoItemId,
       });
-      const details = formatZohoSyncFailures(summary);
       if (summary.failed > 0) {
-        toast.error(details[0] ?? formatZohoSyncSummary(summary, "Variant pull"));
+        toast.error(formatZohoSyncFailureToast(summary, "Variant pull"));
       } else {
         toast.success(formatZohoSyncSummary(summary, "Variant pull"));
       }
@@ -625,7 +665,7 @@ function ProductsPage() {
         </div>
       }
     >
-      <div className="glass-strong rounded-3xl p-4 mb-4">
+      <div className="glass-strong rounded-3xl p-4 mb-4 space-y-3">
         <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
           <input
             className={inputCls()}
@@ -639,19 +679,19 @@ function ProductsPage() {
               value={zohoPullItemId}
               onChange={(e) => setZohoPullItemId(e.target.value)}
               placeholder="Zoho item ID"
-              disabled={zohoIdentityPulling}
+              disabled={zohoPullBusy}
             />
             <input
               className={inputCls()}
               value={zohoPullSku}
               onChange={(e) => setZohoPullSku(e.target.value)}
               placeholder="Zoho SKU"
-              disabled={zohoIdentityPulling}
+              disabled={zohoPullBusy}
             />
             <button
               type="button"
               onClick={() => void pullByZohoIdentity()}
-              disabled={zohoIdentityPulling || (!zohoPullItemId.trim() && !zohoPullSku.trim())}
+              disabled={zohoPullBusy || (!zohoPullItemId.trim() && !zohoPullSku.trim())}
               className="rounded-full bg-primary text-primary-foreground px-4 py-2.5 text-sm flex items-center justify-center gap-2 disabled:opacity-60"
               title="Pull one Zoho item by item ID or SKU, creating a local product or variant parent if needed"
             >
@@ -659,6 +699,26 @@ function ProductsPage() {
               Pull Zoho item
             </button>
           </div>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] lg:ml-auto lg:min-w-[620px]">
+          <input
+            className={inputCls()}
+            inputMode="numeric"
+            value={zohoPullGroupId}
+            onChange={(e) => setZohoPullGroupId(digitsOnlyZohoId(e.target.value))}
+            placeholder="Zoho item group ID"
+            disabled={zohoPullBusy}
+          />
+          <button
+            type="button"
+            onClick={() => void pullByZohoGroup()}
+            disabled={zohoPullBusy || !zohoPullGroupId.trim()}
+            className="rounded-full bg-primary text-primary-foreground px-4 py-2.5 text-sm flex items-center justify-center gap-2 disabled:opacity-60"
+            title="Pull all child variants and the parent category from a Zoho item group"
+          >
+            {zohoGroupPulling === digitsOnlyZohoId(zohoPullGroupId) ? <Loader2 className="h-4 w-4 animate-spin" /> : <CloudDownload className="h-4 w-4" />}
+            Pull group
+          </button>
         </div>
       </div>
 
@@ -693,11 +753,14 @@ function ProductsPage() {
             const previewImage = resolveStorefrontProductImages(p.images, p.colors).image;
             return (
               <div key={p.id ?? `new-${i}`} className="glass-strong rounded-3xl overflow-hidden">
-                <button
-                  onClick={() => setEditing(isOpen ? null : i)}
-                  className="w-full p-4 flex items-center gap-4 text-left hover:bg-white/30"
-                >
-                  <div className="h-14 w-14 rounded-xl bg-muted overflow-hidden grid place-items-center text-xs text-muted-foreground">
+                <div className="w-full p-4 flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setEditing(isOpen ? null : i)}
+                    aria-expanded={isOpen}
+                    aria-label={isOpen ? "Collapse product" : "Edit product"}
+                    className="h-14 w-14 shrink-0 rounded-xl bg-muted overflow-hidden grid place-items-center text-xs text-muted-foreground hover:bg-white/40"
+                  >
                     {previewImage ? (
                       <AdminProductImage
                         src={normalizeImageUrl(String(previewImage)) ?? ""}
@@ -708,18 +771,33 @@ function ProductsPage() {
                     ) : (
                       "—"
                     )}
-                  </div>
+                  </button>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">
-                      {p.name || <span className="italic text-muted-foreground">Untitled</span>}
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="font-medium truncate select-text cursor-text" title={p.name || undefined}>
+                        {p.name || <span className="italic text-muted-foreground">Untitled</span>}
+                      </div>
+                      {p.name ? (
+                        <CopyButton
+                          value={p.name}
+                          label="Copy product name"
+                          title="Copy product name"
+                          successMessage="Product name copied"
+                          className="h-7 w-7"
+                        />
+                      ) : null}
                     </div>
-                    <div className="text-xs text-muted-foreground truncate">
+                    <button
+                      type="button"
+                      onClick={() => setEditing(isOpen ? null : i)}
+                      className="block w-full text-left text-xs text-muted-foreground truncate hover:text-foreground"
+                    >
                       /{p.slug || "(no slug)"}
                       {p.category_name ? ` · ${p.category_name}` : ""}
                       {p.price != null ? ` · ₹${Number(p.price).toLocaleString("en-IN")}` : ""}
-                    </div>
+                    </button>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 shrink-0">
                     {p.featured && <Award className="h-4 w-4 text-primary" aria-label="Featured" />}
                     {p.best_seller && (
                       <Star className="h-4 w-4 text-amber-500" aria-label="Best seller" />
@@ -734,37 +812,31 @@ function ProductsPage() {
                       </span>
                     )}
                   </div>
-                </button>
+                </div>
                 {isOpen && (
                   <div className="p-5 border-t border-white/40 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                    <AdminSectionToggles sections={editorSections}>
                       <p className="text-xs text-muted-foreground">Fields marked with * are required.</p>
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={expandAllEditorSections}
-                          className="text-xs text-primary story-link"
-                        >
-                          Expand all
-                        </button>
-                        <button
-                          type="button"
-                          onClick={collapseAllEditorSections}
-                          className="text-xs text-primary story-link"
-                        >
-                          Collapse all
-                        </button>
-                      </div>
-                    </div>
+                    </AdminSectionToggles>
                     <div className="grid sm:grid-cols-3 gap-3">
                       <Field label="Name" required>
-                        <input
-                          className={inputCls()}
-                          maxLength={ADMIN_NAME_MAX_LEN}
-                          value={p.name}
-                          onChange={(e) => update(i, { name: e.target.value })}
-                          required
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            className={inputCls()}
+                            maxLength={ADMIN_NAME_MAX_LEN}
+                            value={p.name}
+                            onChange={(e) => update(i, { name: e.target.value })}
+                            required
+                          />
+                          {p.name ? (
+                            <CopyButton
+                              value={p.name}
+                              label="Copy product name"
+                              title="Copy product name"
+                              successMessage="Product name copied"
+                            />
+                          ) : null}
+                        </div>
                       </Field>
                       <Field label="Slug">
                         <input
@@ -941,8 +1013,7 @@ function ProductsPage() {
                     <AdminCollapsibleSection
                       title="Sizes, colours & variants"
                       hint="Size list, colour galleries, display image, and the variants matrix."
-                      open={editorSections.merch}
-                      onOpenChange={(open) => setEditorSection("merch", open)}
+                      {...editorSections.panel("merch")}
                     >
                     {(p.item_structure ?? "SIMPLE").toUpperCase() === "VARIANTS" ? (
                       <>
@@ -976,6 +1047,8 @@ function ProductsPage() {
                           value={p.variants_json}
                           freezeColors
                           pullingRowKeys={pullingVariantRowKeysForProduct(p)}
+                          pullDisabled={zohoPullBusy}
+                          onPullFromZoho={(row, rowIndex) => void pullVariantFromZoho(i, p, row, rowIndex)}
                           onChange={(next) =>
                             update(i, {
                               ...next,
@@ -1014,8 +1087,7 @@ function ProductsPage() {
                     <AdminCollapsibleSection
                       title="Description & story"
                       hint="Storefront copy. Closed by default to keep the editor shorter."
-                      open={editorSections.copy}
-                      onOpenChange={(open) => setEditorSection("copy", open)}
+                      {...editorSections.panel("copy")}
                     >
                     <Field label="Description">
                       <textarea
@@ -1038,8 +1110,7 @@ function ProductsPage() {
                     <AdminCollapsibleSection
                       title="Size callouts"
                       hint="Short notes shown on the product photo for a chosen size."
-                      open={editorSections.notes}
-                      onOpenChange={(open) => setEditorSection("notes", open)}
+                      {...editorSections.panel("notes")}
                     >
                     <SizeNotesEditor
                       sizes={catalogSizesForProduct({
@@ -1057,8 +1128,7 @@ function ProductsPage() {
                     <AdminCollapsibleSection
                       title="Size chart"
                       hint="Measurement table shown on the product page."
-                      open={editorSections.chart}
-                      onOpenChange={(open) => setEditorSection("chart", open)}
+                      {...editorSections.panel("chart")}
                     >
                     <SizeChartEditor
                       value={p.size_chart ?? null}
@@ -1073,8 +1143,7 @@ function ProductsPage() {
                     <AdminCollapsibleSection
                       title="Gallery images"
                       hint="Main product photos used on shop cards when a display image is not set."
-                      open={editorSections.gallery}
-                      onOpenChange={(open) => setEditorSection("gallery", open)}
+                      {...editorSections.panel("gallery")}
                     >
                     <Field label="Images">
                       <ImageSpecHint spec={ADMIN_IMAGE_SPECS.productGallery} className="mb-2" />
@@ -1239,7 +1308,7 @@ function ProductsPage() {
                       {p.id && (
                         <button
                           type="button"
-                          disabled={zohoPulling.has(i)}
+                          disabled={zohoPulling.has(i) || zohoPullBusy}
                           onClick={() => void pullFromZoho(i, p)}
                           className="rounded-full glass px-4 py-2 text-sm flex items-center gap-2 disabled:opacity-50"
                           title="Pull this product's latest fields, stock, variants, and image from Zoho Books"
@@ -1252,6 +1321,22 @@ function ProductsPage() {
                           {zohoPulling.has(i) ? "Pulling…" : "Pull from Zoho"}
                         </button>
                       )}
+                      {p.id && zohoItemGroupId(p) ? (
+                        <button
+                          type="button"
+                          disabled={zohoPullBusy || zohoPulling.has(i) || pullingVariantRowKeysForProduct(p).size > 0}
+                          onClick={() => void pullByZohoGroup(zohoItemGroupId(p) ?? undefined, i)}
+                          className="rounded-full glass px-4 py-2 text-sm flex items-center gap-2 disabled:opacity-50"
+                          title="Pull every child variant in this Zoho item group, including SKUs not yet on this product"
+                        >
+                          {zohoGroupPulling === zohoItemGroupId(p) ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <CloudDownload className="h-4 w-4" />
+                          )}
+                          {zohoGroupPulling === zohoItemGroupId(p) ? "Pulling group…" : "Pull group"}
+                        </button>
+                      ) : null}
                       {p.id && isVariantsItemStructure(p.item_structure) && (
                         <button
                           type="button"

@@ -138,6 +138,55 @@ class ImagePreviewSupportTest {
     void resizeToJpeg_rejectsEmptyBytes() {
         assertThatThrownBy(() -> ImagePreviewSupport.resizeToJpeg(new byte[0], 240))
             .isInstanceOf(ImagePreviewSupport.UnreadableImageException.class);
+        assertThatThrownBy(() -> ImagePreviewSupport.resizeToJpeg(null, 240))
+            .isInstanceOf(ImagePreviewSupport.UnreadableImageException.class);
+    }
+
+    @Test
+    void resizeToJpeg_rejectsCorruptBytes() {
+        assertThatThrownBy(() -> ImagePreviewSupport.resizeToJpeg(new byte[] { 1, 2, 3, 4 }, 240))
+            .isInstanceOf(ImagePreviewSupport.UnreadableImageException.class);
+    }
+
+    @Test
+    void resizeToJpeg_qualityClamping() throws Exception {
+        byte[] source = jpeg(100, 100, Color.GREEN);
+        // quality <= 0
+        byte[] low = ImagePreviewSupport.resizeToJpeg(source, 100, -1f);
+        assertThat(low).isNotEmpty();
+        // quality > 0.95
+        byte[] high = ImagePreviewSupport.resizeToJpeg(source, 100, 1.0f);
+        assertThat(high).isNotEmpty();
+        // quality between 0 and 0.5
+        byte[] mid = ImagePreviewSupport.resizeToJpeg(source, 100, 0.2f);
+        assertThat(mid).isNotEmpty();
+    }
+
+    @Test
+    void objectKeyFromPublicUrl_edgeCases() {
+        // Null inputs
+        assertThat(ImagePreviewSupport.objectKeyFromPublicUrl(null, "https://cdn.example.com/a.jpg")).isEmpty();
+        assertThat(ImagePreviewSupport.objectKeyFromPublicUrl("https://cdn.example.com", null)).isEmpty();
+
+        // Invalid URI syntax
+        assertThat(ImagePreviewSupport.objectKeyFromPublicUrl("not a uri :::", "https://cdn.example.com/a.jpg")).isEmpty();
+
+        // Port mismatch
+        assertThat(ImagePreviewSupport.objectKeyFromPublicUrl("https://cdn.example.com:8443", "https://cdn.example.com/a.jpg")).isEmpty();
+
+        // Backslash in path
+        assertThat(ImagePreviewSupport.objectKeyFromPublicUrl("https://cdn.example.com", "https://cdn.example.com/a\\b.jpg")).isEmpty();
+
+        // Empty key or dot-dot
+        assertThat(ImagePreviewSupport.objectKeyFromPublicUrl("https://cdn.example.com/bucket", "https://cdn.example.com/bucket/")).isEmpty();
+    }
+
+    @Test
+    void unreadableImageException_withCause() {
+        Throwable cause = new IOException("disk error");
+        ImagePreviewSupport.UnreadableImageException ex = new ImagePreviewSupport.UnreadableImageException("failed", cause);
+        assertThat(ex.getMessage()).isEqualTo("failed");
+        assertThat(ex.getCause()).isSameAs(cause);
     }
 
     static byte[] jpeg(int width, int height, Color color) throws IOException {

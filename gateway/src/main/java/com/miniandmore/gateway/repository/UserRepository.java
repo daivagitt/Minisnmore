@@ -28,11 +28,72 @@ public interface UserRepository extends R2dbcRepository<User, Long> {
     @Query("SELECT COUNT(*) FROM jhi_user")
     Mono<Long> count();
 
+    @Query("SELECT COUNT(*) FROM jhi_user WHERE activated = true")
+    Mono<Long> countActivatedUsers();
+
+    @Query(
+        """
+        SELECT COUNT(DISTINCT u.id) FROM jhi_user u
+        WHERE EXISTS (
+          SELECT 1 FROM jhi_user_authority ua
+          WHERE ua.user_id = u.id
+            AND ua.authority_name IN ('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_SALES','ROLE_OPERATIONS','ROLE_CUSTOMER_SUPPORT')
+        )
+        """
+    )
+    Mono<Long> countStaffUsers();
+
+    @Query("SELECT COUNT(DISTINCT user_id) FROM jhi_user_authority WHERE authority_name = :authority")
+    Mono<Long> countUsersWithAuthority(String authority);
+
     @Query("SELECT * FROM jhi_user ORDER BY id LIMIT :limit OFFSET :offset")
     Flux<User> findAllByIdNotNull(Pageable pageable);
 
+    @Query(
+        """
+        SELECT u.* FROM jhi_user u
+        WHERE EXISTS (
+          SELECT 1 FROM jhi_user_authority ua
+          WHERE ua.user_id = u.id
+            AND ua.authority_name IN ('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_SALES','ROLE_OPERATIONS','ROLE_CUSTOMER_SUPPORT')
+        )
+        ORDER BY u.id
+        LIMIT :limit OFFSET :offset
+        """
+    )
+    Flux<User> findAllStaffUsers(long limit, long offset);
+
+    @Query("SELECT * FROM jhi_user ORDER BY created_date DESC NULLS LAST, id DESC LIMIT :limit OFFSET :offset")
+    Flux<User> findAllUsersForAdmin(long limit, long offset);
+
+    @Query(
+        """
+        SELECT COUNT(DISTINCT u.id) FROM jhi_user u
+        WHERE NOT EXISTS (
+          SELECT 1 FROM jhi_user_authority ua
+          WHERE ua.user_id = u.id
+            AND ua.authority_name IN ('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_SALES','ROLE_OPERATIONS','ROLE_CUSTOMER_SUPPORT')
+        )
+        """
+    )
+    Mono<Long> countCustomerUsers();
+
+    @Query(
+        """
+        SELECT u.* FROM jhi_user u
+        WHERE NOT EXISTS (
+          SELECT 1 FROM jhi_user_authority ua
+          WHERE ua.user_id = u.id
+            AND ua.authority_name IN ('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_SALES','ROLE_OPERATIONS','ROLE_CUSTOMER_SUPPORT')
+        )
+        ORDER BY u.created_date DESC NULLS LAST, u.id DESC
+        LIMIT :limit OFFSET :offset
+        """
+    )
+    Flux<User> findAllCustomerUsers(long limit, long offset);
+
     @Query("SELECT * FROM jhi_user WHERE activated = true ORDER BY id LIMIT :limit OFFSET :offset")
-    Flux<User> findAllByActivatedIsTrue(Pageable pageable);
+    Flux<User> findAllActivatedUsers(long limit, long offset);
 
     @Query("DELETE FROM jhi_user WHERE activated = false AND login = :login")
     Mono<Void> deleteInactiveByLogin(String login);
@@ -61,8 +122,8 @@ public interface UserRepository extends R2dbcRepository<User, Long> {
     @Query("SELECT password_hash FROM jhi_user WHERE id = :userId")
     Mono<String> findPasswordHashByUserId(Long userId);
 
-    @Query("SELECT authority_name FROM jhi_user_authority WHERE user_id = :userId")
-    reactor.core.publisher.Flux<String> findAuthorityNamesByUserId(Long userId);
+    @Query("SELECT user_id, authority_name FROM jhi_user_authority WHERE user_id = ANY(:userIds)")
+    Flux<UserAuthorityAssignment> findAuthorityNamesByUserIds(Long[] userIds);
 
     @Query("SELECT COALESCE(MAX(id), 0) FROM jhi_user")
     Mono<Long> findMaxId();

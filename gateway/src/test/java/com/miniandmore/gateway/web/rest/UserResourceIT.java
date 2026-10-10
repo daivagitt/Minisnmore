@@ -95,7 +95,9 @@ class UserResourceIT {
     /**
      * Delete all the users from the database.
      */
-    public static void deleteEntities(EntityManager em) {}
+    public static void deleteEntities(EntityManager em) {
+        // Test suite relies on transactional rollback; explicit deletion is intentionally skipped.
+    }
 
     /**
      * Setups the database with one user.
@@ -129,7 +131,7 @@ class UserResourceIT {
         userDTO.setActivated(true);
         userDTO.setImageUrl(DEFAULT_IMAGEURL);
         userDTO.setLangKey(DEFAULT_LANGKEY);
-        userDTO.setAuthorities(Collections.singleton(AuthoritiesConstants.USER));
+        userDTO.setAuthorities(Collections.singleton(AuthoritiesConstants.SALES));
 
         var returnedUserDTO = webTestClient
             .post()
@@ -166,7 +168,7 @@ class UserResourceIT {
         userDTO.setActivated(true);
         userDTO.setImageUrl(DEFAULT_IMAGEURL);
         userDTO.setLangKey(DEFAULT_LANGKEY);
-        userDTO.setAuthorities(Collections.singleton(AuthoritiesConstants.USER));
+        userDTO.setAuthorities(Collections.singleton(AuthoritiesConstants.SALES));
 
         // An entity with an existing ID cannot be created, so this API call must fail
         webTestClient
@@ -196,7 +198,7 @@ class UserResourceIT {
         userDTO.setActivated(true);
         userDTO.setImageUrl(DEFAULT_IMAGEURL);
         userDTO.setLangKey(DEFAULT_LANGKEY);
-        userDTO.setAuthorities(Collections.singleton(AuthoritiesConstants.USER));
+        userDTO.setAuthorities(Collections.singleton(AuthoritiesConstants.SALES));
 
         // Create the User
         webTestClient
@@ -226,7 +228,7 @@ class UserResourceIT {
         userDTO.setActivated(true);
         userDTO.setImageUrl(DEFAULT_IMAGEURL);
         userDTO.setLangKey(DEFAULT_LANGKEY);
-        userDTO.setAuthorities(Collections.singleton(AuthoritiesConstants.USER));
+        userDTO.setAuthorities(Collections.singleton(AuthoritiesConstants.SALES));
 
         // Create the User
         webTestClient
@@ -246,6 +248,7 @@ class UserResourceIT {
     void getAllUsers() {
         // Initialize the database
         userRepository.save(user).block();
+        userRepository.saveUserAuthority(user.getId(), AuthoritiesConstants.SALES).block();
 
         // Get all the users
         AdminUserDTO foundUser = webTestClient
@@ -266,6 +269,7 @@ class UserResourceIT {
         assertThat(foundUser.getEmail()).isEqualTo(DEFAULT_EMAIL);
         assertThat(foundUser.getImageUrl()).isEqualTo(DEFAULT_IMAGEURL);
         assertThat(foundUser.getLangKey()).isEqualTo(DEFAULT_LANGKEY);
+        assertThat(foundUser.getAuthorities()).contains(AuthoritiesConstants.SALES);
     }
 
     @Test
@@ -306,6 +310,7 @@ class UserResourceIT {
     void updateUser() throws Exception {
         // Initialize the database
         userRepository.save(user).block();
+        userRepository.saveUserAuthority(user.getId(), AuthoritiesConstants.SALES).block();
         int databaseSizeBeforeUpdate = userRepository.findAll().collectList().block().size();
 
         // Update the user
@@ -324,7 +329,7 @@ class UserResourceIT {
         userDTO.setCreatedDate(updatedUser.getCreatedDate());
         userDTO.setLastModifiedBy(updatedUser.getLastModifiedBy());
         userDTO.setLastModifiedDate(updatedUser.getLastModifiedDate());
-        userDTO.setAuthorities(Collections.singleton(AuthoritiesConstants.USER));
+        userDTO.setAuthorities(Collections.singleton(AuthoritiesConstants.SALES));
 
         webTestClient
             .put()
@@ -355,6 +360,7 @@ class UserResourceIT {
     void updateUserLogin() throws Exception {
         // Initialize the database
         userRepository.save(user).block();
+        userRepository.saveUserAuthority(user.getId(), AuthoritiesConstants.SALES).block();
         int databaseSizeBeforeUpdate = userRepository.findAll().collectList().block().size();
 
         // Update the user
@@ -373,7 +379,7 @@ class UserResourceIT {
         userDTO.setCreatedDate(updatedUser.getCreatedDate());
         userDTO.setLastModifiedBy(updatedUser.getLastModifiedBy());
         userDTO.setLastModifiedDate(updatedUser.getLastModifiedDate());
-        userDTO.setAuthorities(Collections.singleton(AuthoritiesConstants.USER));
+        userDTO.setAuthorities(Collections.singleton(AuthoritiesConstants.SALES));
 
         webTestClient
             .put()
@@ -434,7 +440,7 @@ class UserResourceIT {
         userDTO.setCreatedDate(updatedUser.getCreatedDate());
         userDTO.setLastModifiedBy(updatedUser.getLastModifiedBy());
         userDTO.setLastModifiedDate(updatedUser.getLastModifiedDate());
-        userDTO.setAuthorities(Collections.singleton(AuthoritiesConstants.USER));
+        userDTO.setAuthorities(Collections.singleton(AuthoritiesConstants.SALES));
 
         webTestClient
             .put()
@@ -479,7 +485,7 @@ class UserResourceIT {
         userDTO.setCreatedDate(updatedUser.getCreatedDate());
         userDTO.setLastModifiedBy(updatedUser.getLastModifiedBy());
         userDTO.setLastModifiedDate(updatedUser.getLastModifiedDate());
-        userDTO.setAuthorities(Collections.singleton(AuthoritiesConstants.USER));
+        userDTO.setAuthorities(Collections.singleton(AuthoritiesConstants.SALES));
 
         webTestClient
             .put()
@@ -495,6 +501,7 @@ class UserResourceIT {
     void deleteUser() {
         // Initialize the database
         userRepository.save(user).block();
+        userRepository.saveUserAuthority(user.getId(), AuthoritiesConstants.SALES).block();
         int databaseSizeBeforeDelete = userRepository.findAll().collectList().block().size();
 
         // Delete the user

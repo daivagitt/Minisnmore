@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+    <changeSet id="20260921193000-1" author="miniandmore">
+        <sql dbms="postgresql">
+            INSERT INTO page_visibility (id, page_key, visible)
+            VALUES (nextval('sequence_generator'), 'contact', true)
+            ON CONFLICT (page_key) DO NOTHING;
+
+            UPDATE home_section
+            SET enabled = false,
+                subtitle = 'Moved to the Contact us page.'
+            WHERE section_key = 'write_to_us';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

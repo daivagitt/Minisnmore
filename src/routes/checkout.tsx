@@ -159,8 +159,14 @@ function Checkout() {
     validateCoupon({ data: couponValidationData(code, cartTotal, cart) })
       .then((res) => {
         if (cancelled) return;
-        if (res.ok) setAppliedCoupon({ code: res.code!, discount: res.discount! });
-        else {
+        if (res.ok) {
+          setAppliedCoupon({
+            code: res.code!,
+            discount: res.discount!,
+            nudge: res.nudge,
+            bogoDetails: res.bogo_details,
+          });
+        } else {
           setAppliedCoupon(null);
           toast.message(res.error ?? `${code} no longer applies to this cart`);
         }
@@ -354,7 +360,12 @@ function Checkout() {
         toast.error(res.error);
         return;
       }
-      setAppliedCoupon({ code: res.code!, discount: res.discount! });
+      setAppliedCoupon({
+        code: res.code!,
+        discount: res.discount!,
+        nudge: res.nudge,
+        bogoDetails: res.bogo_details,
+      });
       toast.success("Coupon applied");
     } catch {
       setAppliedCoupon(null);
@@ -994,14 +1005,28 @@ function Checkout() {
               <button onClick={() => applyCoupon()} className="rounded-full bg-foreground text-background px-4 text-sm">Apply</button>
             </div>
             {appliedCoupon && (
-              <div className="mt-2 text-xs text-primary flex items-center justify-between">
-                <span>{appliedCoupon.code} · −₹{appliedCoupon.discount.toLocaleString("en-IN")}</span>
-                <button
-                  onClick={() => { setAppliedCoupon(null); setCouponInput(""); }}
-                  className="text-muted-foreground hover:text-destructive"
-                >
-                  remove
-                </button>
+              <div className="mt-2 space-y-1.5">
+                <div className="text-xs text-primary flex items-center justify-between">
+                  <span className="font-medium">{appliedCoupon.code} · −₹{appliedCoupon.discount.toLocaleString("en-IN")}</span>
+                  <button
+                    onClick={() => { setAppliedCoupon(null); setCouponInput(""); }}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    remove
+                  </button>
+                </div>
+                {appliedCoupon.bogoDetails && (
+                  <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary" />
+                    <span>{appliedCoupon.bogoDetails}</span>
+                  </div>
+                )}
+                {appliedCoupon.nudge && (
+                  <div className="text-xs font-medium text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-xl px-2.5 py-1.5 flex items-center gap-1.5">
+                    <span>✨</span>
+                    <span>{appliedCoupon.nudge}</span>
+                  </div>
+                )}
               </div>
             )}
             <CouponOffers subtotal={cartTotal} itemCount={cartCount} activeCode={appliedCoupon?.code} onApply={(c) => applyCoupon(c)} />

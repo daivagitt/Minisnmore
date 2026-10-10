@@ -1,0 +1,147 @@
+{
+  "branch": "uat3",
+  "generatedAt": "2026-10-09T18:44:29+05:30",
+  "frontendUnitTests": {
+    "command": "npm run test:coverage",
+    "total": 1060,
+    "passed": 1060,
+    "failed": 0,
+    "skipped": 0,
+    "buildNote": "Re-run on uat3 after QA coverage tests + local fixes"
+  },
+  "backendUnitTests": {
+    "command": "mvnw test jacoco:report (gateway, catalog, store, commerce)",
+    "total": 4487,
+    "passed": 4487,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "buildResult": "Unit suites only; leftover UserResourceIT surefire XML excluded from the unit report"
+  },
+  "backendCoverage": {
+    "instruction": 93.0,
+    "branch": 81.5,
+    "line": 93.0,
+    "thresholdsMet": true
+  },
+  "frontendCoverage": {
+    "statements": 95.65,
+    "branches": 88.85,
+    "functions": 94.91,
+    "lines": 97.25,
+    "thresholdsMet": true
+  },
+  "javadoc": {
+    "status": "generated",
+    "modules": {
+      "gateway": 221,
+      "catalog": 824,
+      "store": 50,
+      "commerce": 52
+    },
+    "warnings": "Maven javadoc:javadoc with -Dmaven.javadoc.failOnError=false -Ddoclint=none"
+  },
+  "sonarqube": {
+    "status": "blocked",
+    "sonarServerUrl": "http://127.0.0.1:9000",
+    "sonarServerStatus": "UP",
+    "sonarServerVersion": "26.7.0.124771",
+    "frontendProjectKey": "frontend",
+    "backendProjectKey": "mnm-backend",
+    "frontendQualityGate": null,
+    "backendQualityGate": null,
+    "frontendMetrics": null,
+    "backendMetrics": null,
+    "coverageInputsUsed": true,
+    "coverageInputsReady": {
+      "frontendLcov": "coverage/frontend/lcov.info",
+      "backendJacocoXml": [
+        "gateway/target/site/jacoco/jacoco.xml",
+        "backend/target/site/jacoco/jacoco.xml",
+        "store/target/site/jacoco/jacoco.xml",
+        "commerce/target/site/jacoco/jacoco.xml"
+      ],
+      "allPresent": true
+    },
+    "reason": "SONAR_TOKEN not set; SonarScanner rejected upload without token (not authorized to analyze/create project). Admin basic auth with repo default passwords invalid on this Sonar instance."
+  },
+  "postman": {
+    "folders": 24,
+    "requests": 178,
+    "duplicateMethodUrl": 0,
+    "validJson": true,
+    "openapiSource": "https://uat.minisnmore.com/v3/api-docs/catalog"
+  },
+  "apiTesting": {
+    "newmanSmoke": {
+      "requests": 9,
+      "assertionsPassed": 9,
+      "assertionsFailed": 0,
+      "httpStatus": {
+        "200": 9
+      },
+      "newmanExitCode": 0
+    },
+    "lifecycle": {
+      "requestsRun": 170,
+      "pass2xx": 77,
+      "fail": 12,
+      "skipped": 81,
+      "passRatePct": 86.5,
+      "adminLogin": 200,
+      "customerLogin": 200,
+      "limitations": "API_TEST_NO_MAIL=true skips mail-sending admin endpoints; 12 residual fails are mostly unresolved path params plus two 400s"
+    },
+    "newmanLoad": {
+      "10": {
+        "requests": 240,
+        "failed": 0,
+        "assertions": 240
+      },
+      "25": {
+        "requests": 600,
+        "failed": 0,
+        "assertions": 600
+      }
+    }
+  },
+  "swagger": {
+    "paths": 155,
+    "operations": 178,
+    "schemas": 85,
+    "duplicateOperationIds": 0,
+    "source": "live UAT OpenAPI"
+  },
+  "performance": {
+    "vus": 10,
+    "duration": "45s",
+    "requests": 4810,
+    "throughputRps": 105.67,
+    "avgResponseMs": 42.3,
+    "p95ResponseMs": 163.9,
+    "httpFailRate": 0,
+    "checksPassRate": 1.0,
+    "runs": [
+      {
+        "vus": 10,
+        "duration": "45s",
+        "requests": 4810,
+        "throughputRps": 105.67,
+        "avgResponseMs": 42.3,
+        "p95ResponseMs": 163.9,
+        "httpFailRate": 0,
+        "checksPassRate": 1.0
+      },
+      {
+        "vus": 25,
+        "duration": "45s",
+        "requests": 12081,
+        "throughputRps": 265.07,
+        "avgResponseMs": 42.06,
+        "p95ResponseMs": 127.69,
+        "httpFailRate": 0,
+        "checksPassRate": 1.0
+      }
+    ]
+  }
+}

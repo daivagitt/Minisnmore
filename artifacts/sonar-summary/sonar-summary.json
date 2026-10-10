@@ -1,17 +1,252 @@
 {
-  "generatedAt": "2026-09-08T00:00:00+00:00",
+  "generatedAt": "2026-09-28T00:00:00+00:00",
   "frontend": {
     "key": "frontend",
     "label": "Frontend",
     "missing": false,
-    "coverage": "94.5",
-    "line_coverage": "98.4",
-    "branch_coverage": "89.6",
+    "coverage": "93.6",
+    "line_coverage": "97.2",
+    "branch_coverage": "89.3",
+    "bugs": "2",
+    "vulnerabilities": "0",
+    "code_smells": "35",
+    "duplication": "3.3",
+    "ncloc": "3385",
+    "reliability": "3.0",
+    "security": "1.0",
+    "maintainability": "1.0",
+    "gate": "OK",
+    "gate_conditions": [
+      {
+        "status": "OK",
+        "metricKey": "bugs",
+        "comparator": "GT",
+        "errorThreshold": "50",
+        "actualValue": "2"
+      },
+      {
+        "status": "OK",
+        "metricKey": "line_coverage",
+        "comparator": "LT",
+        "errorThreshold": "94",
+        "actualValue": "97.2"
+      }
+    ],
+    "issues": [
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6571",
+        "file": "src/lib/coupons.functions.ts",
+        "line": 69,
+        "message": "\"percent\" is overridden by string in this union type."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6571",
+        "file": "src/lib/coupons.functions.ts",
+        "line": 69,
+        "message": "\"flat\" is overridden by string in this union type."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6571",
+        "file": "src/lib/coupons.functions.ts",
+        "line": 69,
+        "message": "\"bogo\" is overridden by string in this union type."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6571",
+        "file": "src/lib/coupons.functions.ts",
+        "line": 75,
+        "message": "\"same_sku\" is overridden by string in this union type."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6571",
+        "file": "src/lib/coupons.functions.ts",
+        "line": 75,
+        "message": "\"all\" is overridden by string in this union type."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6571",
+        "file": "src/lib/coupons.functions.ts",
+        "line": 75,
+        "message": "\"category\" is overridden by string in this union type."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "typescript:S3776",
+        "file": "src/lib/coupons.functions.ts",
+        "line": 102,
+        "message": "Refactor this function to reduce its Cognitive Complexity from 19 to the 15 allowed."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6606",
+        "file": "src/lib/product-fit.ts",
+        "line": 135,
+        "message": "Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6606",
+        "file": "src/lib/product-fit.ts",
+        "line": 152,
+        "message": "Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6606",
+        "file": "src/lib/product-fit.ts",
+        "line": 347,
+        "message": "Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6606",
+        "file": "src/lib/product-fit.ts",
+        "line": 348,
+        "message": "Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator."
+      },
+      {
+        "type": "BUG",
+        "severity": "MAJOR",
+        "rule": "typescript:S3923",
+        "file": "src/lib/product-fit.ts",
+        "line": 61,
+        "message": "This conditional operation returns the same value whether the condition is \"true\" or \"false\"."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "typescript:S3358",
+        "file": "src/lib/product-fit.ts",
+        "line": 285,
+        "message": "Extract this nested ternary operation into an independent statement."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "typescript:S3358",
+        "file": "src/lib/product-fit.ts",
+        "line": 291,
+        "message": "Extract this nested ternary operation into an independent statement."
+      },
+      {
+        "type": "BUG",
+        "severity": "MAJOR",
+        "rule": "typescript:S6959",
+        "file": "src/lib/product-fit.ts",
+        "line": 391,
+        "message": "Add an initial value to this \"reduce()\" call."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "BLOCKER",
+        "rule": "typescript:S2699",
+        "file": "src/hooks/useAuth.test.tsx",
+        "line": 702,
+        "message": "Add at least one assertion to this test case."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "typescript:S3776",
+        "file": "src/lib/product-fit.ts",
+        "line": 426,
+        "message": "Refactor this function to reduce its Cognitive Complexity from 27 to the 15 allowed."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "typescript:S3776",
+        "file": "src/store/shop.tsx",
+        "line": 206,
+        "message": "Refactor this function to reduce its Cognitive Complexity from 28 to the 15 allowed."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6594",
+        "file": "src/lib/api.ts",
+        "line": 371,
+        "message": "Use the \"RegExp.exec()\" method instead."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "typescript:S3776",
+        "file": "src/lib/api.ts",
+        "line": 394,
+        "message": "Refactor this function to reduce its Cognitive Complexity from 20 to the 15 allowed."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "typescript:S3776",
+        "file": "src/routes/login.tsx",
+        "line": 32,
+        "message": "Refactor this function to reduce its Cognitive Complexity from 60 to the 15 allowed."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S1874",
+        "file": "src/routes/login.tsx",
+        "line": 121,
+        "message": "'FormEvent' is deprecated."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "typescript:S3358",
+        "file": "src/routes/login.tsx",
+        "line": 216,
+        "message": "Extract this nested ternary operation into an independent statement."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "typescript:S3358",
+        "file": "src/routes/login.tsx",
+        "line": 227,
+        "message": "Extract this nested ternary operation into an independent statement."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "typescript:S6759",
+        "file": "src/hooks/useAuth.tsx",
+        "line": 109,
+        "message": "Mark the props of the component as read-only."
+      }
+    ]
+  },
+  "backend": {
+    "key": "mnm-backend",
+    "label": "Backend",
+    "missing": false,
+    "coverage": "93.0",
+    "line_coverage": "93.0",
+    "branch_coverage": "81.5",
     "bugs": "1",
     "vulnerabilities": "0",
-    "code_smells": "24",
-    "duplication": "3.0",
-    "ncloc": "2459",
+    "code_smells": "165",
+    "duplication": "5.5",
+    "ncloc": "19501",
     "reliability": "3.0",
     "security": "1.0",
     "maintainability": "1.0",
@@ -28,445 +263,210 @@
         "status": "OK",
         "metricKey": "line_coverage",
         "comparator": "LT",
-        "errorThreshold": "94",
-        "actualValue": "98.4"
+        "errorThreshold": "90",
+        "actualValue": "93.0"
       }
     ],
     "issues": [
       {
         "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "typescript:S6564",
-        "file": "src/lib/product-fit.ts",
-        "line": 32,
-        "message": "Remove this redundant type alias and replace its occurrences with \"MeasurementLimits\"."
-      },
-      {
-        "type": "BUG",
-        "severity": "MAJOR",
-        "rule": "typescript:S6959",
-        "file": "src/lib/product-fit.ts",
-        "line": 192,
-        "message": "Add an initial value to this \"reduce()\" call."
+        "severity": "MINOR",
+        "rule": "java:S135",
+        "file": "backend/src/main/java/com/miniandmore/app/service/AdminConfigChangeMailService.java",
+        "line": 156,
+        "message": "Reduce the total number of break and continue statements in this loop to use at most one."
       },
       {
         "type": "CODE_SMELL",
         "severity": "CRITICAL",
-        "rule": "typescript:S3776",
-        "file": "src/lib/product-fit.ts",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/AdminConfigChangeMailService.java",
         "line": 226,
-        "message": "Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "typescript:S3776",
-        "file": "src/store/shop.tsx",
-        "line": 189,
-        "message": "Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MINOR",
-        "rule": "typescript:S6594",
-        "file": "src/lib/api.ts",
-        "line": 365,
-        "message": "Use the \"RegExp.exec()\" method instead."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "typescript:S3776",
-        "file": "src/lib/api.ts",
-        "line": 388,
-        "message": "Refactor this function to reduce its Cognitive Complexity from 20 to the 15 allowed."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "typescript:S3776",
-        "file": "src/routes/admin.login.tsx",
-        "line": 14,
-        "message": "Refactor this function to reduce its Cognitive Complexity from 17 to the 15 allowed."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "typescript:S3776",
-        "file": "src/routes/login.tsx",
-        "line": 25,
-        "message": "Refactor this function to reduce its Cognitive Complexity from 60 to the 15 allowed."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MINOR",
-        "rule": "typescript:S1874",
-        "file": "src/routes/login.tsx",
-        "line": 107,
-        "message": "'FormEvent' is deprecated."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "typescript:S3358",
-        "file": "src/routes/login.tsx",
-        "line": 173,
-        "message": "Extract this nested ternary operation into an independent statement."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "typescript:S3358",
-        "file": "src/routes/login.tsx",
-        "line": 184,
-        "message": "Extract this nested ternary operation into an independent statement."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MINOR",
-        "rule": "typescript:S6759",
-        "file": "src/hooks/useAuth.tsx",
-        "line": 85,
-        "message": "Mark the props of the component as read-only."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "typescript:S3358",
-        "file": "src/hooks/useAuth.tsx",
-        "line": 172,
-        "message": "Extract this nested ternary operation into an independent statement."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "typescript:S6481",
-        "file": "src/hooks/useAuth.tsx",
-        "line": 311,
-        "message": "The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "typescript:S3358",
-        "file": "src/lib/api.ts",
-        "line": 46,
-        "message": "Extract this nested ternary operation into an independent statement."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "typescript:S4624",
-        "file": "src/lib/api.ts",
-        "line": 46,
-        "message": "Refactor this code to not use nested template literals."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MINOR",
-        "rule": "typescript:S6594",
-        "file": "src/lib/api.ts",
-        "line": 235,
-        "message": "Use the \"RegExp.exec()\" method instead."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MINOR",
-        "rule": "typescript:S6594",
-        "file": "src/lib/api.ts",
-        "line": 238,
-        "message": "Use the \"RegExp.exec()\" method instead."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MINOR",
-        "rule": "typescript:S6594",
-        "file": "src/lib/api.ts",
-        "line": 241,
-        "message": "Use the \"RegExp.exec()\" method instead."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MINOR",
-        "rule": "typescript:S1874",
-        "file": "src/routes/admin.login.tsx",
-        "line": 31,
-        "message": "'FormEvent' is deprecated."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "typescript:S3358",
-        "file": "src/routes/admin.login.tsx",
-        "line": 132,
-        "message": "Extract this nested ternary operation into an independent statement."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MINOR",
-        "rule": "typescript:S1874",
-        "file": "src/routes/login.tsx",
-        "line": 66,
-        "message": "'FormEvent' is deprecated."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "typescript:S3358",
-        "file": "src/routes/login.tsx",
-        "line": 309,
-        "message": "Extract this nested ternary operation into an independent statement."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MINOR",
-        "rule": "typescript:S6759",
-        "file": "src/store/shop.tsx",
-        "line": 132,
-        "message": "Mark the props of the component as read-only."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "typescript:S6481",
-        "file": "src/store/shop.tsx",
-        "line": 428,
-        "message": "The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook."
-      }
-    ]
-  },
-  "backend": {
-    "key": "mnm-backend",
-    "label": "Backend",
-    "missing": false,
-    "coverage": "88.0",
-    "line_coverage": "95.6",
-    "branch_coverage": "71.7",
-    "bugs": "0",
-    "vulnerabilities": "0",
-    "code_smells": "101",
-    "duplication": "7.1",
-    "ncloc": "14212",
-    "reliability": "1.0",
-    "security": "1.0",
-    "maintainability": "1.0",
-    "gate": "OK",
-    "gate_conditions": [
-      {
-        "status": "OK",
-        "metricKey": "bugs",
-        "comparator": "GT",
-        "errorThreshold": "50",
-        "actualValue": "0"
-      },
-      {
-        "status": "OK",
-        "metricKey": "line_coverage",
-        "comparator": "LT",
-        "errorThreshold": "94",
-        "actualValue": "95.6"
-      }
-    ],
-    "issues": [
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "java:S1144",
-        "file": "backend/src/main/java/com/miniandmore/app/service/LedgerlyWebhookHandlerService.java",
-        "line": 189,
-        "message": "Remove this unused private \"sign\" method."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "java:S3776",
-        "file": "backend/src/main/java/com/miniandmore/app/service/LedgerlyProductMergeService.java",
-        "line": 116,
-        "message": "Refactor this method to reduce its Cognitive Complexity from 25 to the 15 allowed."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MINOR",
-        "rule": "java:S135",
-        "file": "backend/src/main/java/com/miniandmore/app/service/LedgerlyProductMergeService.java",
-        "line": 141,
-        "message": "Reduce the total number of break and continue statements in this loop to use at most one."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "java:S3776",
-        "file": "backend/src/main/java/com/miniandmore/app/service/LedgerlySyncService.java",
-        "line": 274,
-        "message": "Refactor this method to reduce its Cognitive Complexity from 16 to the 15 allowed."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MINOR",
-        "rule": "java:S135",
-        "file": "backend/src/main/java/com/miniandmore/app/service/LedgerlySyncService.java",
-        "line": 282,
-        "message": "Reduce the total number of break and continue statements in this loop to use at most one."
+        "message": "Define a constant instead of duplicating this literal \"(empty)\" 6 times."
       },
       {
         "type": "CODE_SMELL",
         "severity": "CRITICAL",
         "rule": "java:S1192",
-        "file": "backend/src/main/java/com/miniandmore/app/service/OrderReturnService.java",
-        "line": 121,
-        "message": "Define a constant instead of duplicating this literal \"Order not found\" 3 times."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "java:S3776",
-        "file": "backend/src/main/java/com/miniandmore/app/service/OrderReturnService.java",
-        "line": 457,
-        "message": "Refactor this method to reduce its Cognitive Complexity from 28 to the 15 allowed."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "INFO",
-        "rule": "java:S6541",
-        "file": "backend/src/main/java/com/miniandmore/app/service/OrderReturnService.java",
-        "line": 457,
-        "message": "A \"Brain Method\" was detected. Refactor it to reduce at least one of the following metrics: LOC from 94 to 64, Complexity from 15 to 14, Nesting Level from 4 to 2, Number of Variables from 13 to 6."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MAJOR",
-        "rule": "java:S1141",
-        "file": "backend/src/main/java/com/miniandmore/app/service/OrderReturnService.java",
-        "line": 504,
-        "message": "Extract this nested try block into a separate method."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "java:S1192",
-        "file": "backend/src/main/java/com/miniandmore/app/service/OrderReturnService.java",
-        "line": 559,
-        "message": "Define a constant instead of duplicating this literal \"order_number\" 3 times."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "java:S1192",
-        "file": "backend/src/main/java/com/miniandmore/app/service/OrderReturnService.java",
-        "line": 560,
-        "message": "Define a constant instead of duplicating this literal \"eligible\" 4 times."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "java:S1192",
-        "file": "backend/src/main/java/com/miniandmore/app/service/OrderReturnService.java",
-        "line": 561,
-        "message": "Define a constant instead of duplicating this literal \"message\" 3 times."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "java:S1192",
-        "file": "backend/src/main/java/com/miniandmore/app/service/OrderReturnService.java",
-        "line": 562,
-        "message": "Define a constant instead of duplicating this literal \"enabled\" 4 times."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "java:S1192",
-        "file": "backend/src/main/java/com/miniandmore/app/service/OrderReturnService.java",
-        "line": 563,
-        "message": "Define a constant instead of duplicating this literal \"window_days\" 4 times."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "java:S3776",
-        "file": "backend/src/main/java/com/miniandmore/app/service/ProductColorImagesSupport.java",
-        "line": 61,
-        "message": "Refactor this method to reduce its Cognitive Complexity from 16 to the 15 allowed."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "java:S3776",
-        "file": "backend/src/main/java/com/miniandmore/app/service/ProductColorImagesSupport.java",
-        "line": 120,
-        "message": "Refactor this method to reduce its Cognitive Complexity from 17 to the 15 allowed."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "java:S3776",
-        "file": "backend/src/main/java/com/miniandmore/app/service/ProductColorImagesSupport.java",
-        "line": 184,
-        "message": "Refactor this method to reduce its Cognitive Complexity from 19 to the 15 allowed."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MINOR",
-        "rule": "java:S135",
-        "file": "backend/src/main/java/com/miniandmore/app/service/ProductColorImagesSupport.java",
-        "line": 203,
-        "message": "Reduce the total number of break and continue statements in this loop to use at most one."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "java:S3776",
-        "file": "backend/src/main/java/com/miniandmore/app/service/ProductVariantSupport.java",
-        "line": 342,
-        "message": "Refactor this method to reduce its Cognitive Complexity from 36 to the 15 allowed."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MINOR",
-        "rule": "java:S135",
-        "file": "backend/src/main/java/com/miniandmore/app/service/ProductVariantSupport.java",
-        "line": 348,
-        "message": "Reduce the total number of break and continue statements in this loop to use at most one."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "java:S1192",
-        "file": "backend/src/main/java/com/miniandmore/app/service/ProductVariantSupport.java",
-        "line": 357,
-        "message": "Define a constant instead of duplicating this literal \"imageUrl\" 3 times."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "java:S1192",
-        "file": "backend/src/main/java/com/miniandmore/app/service/ProductVariantSupport.java",
-        "line": 358,
-        "message": "Define a constant instead of duplicating this literal \"swatchUrl\" 3 times."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "CRITICAL",
-        "rule": "java:S1192",
-        "file": "backend/src/main/java/com/miniandmore/app/service/ProductVariantSupport.java",
-        "line": 359,
-        "message": "Define a constant instead of duplicating this literal \"imageUrls\" 6 times."
-      },
-      {
-        "type": "CODE_SMELL",
-        "severity": "MINOR",
-        "rule": "java:S135",
-        "file": "backend/src/main/java/com/miniandmore/app/service/ProductVariantSupport.java",
-        "line": 379,
-        "message": "Reduce the total number of break and continue statements in this loop to use at most one."
+        "file": "backend/src/main/java/com/miniandmore/app/service/AdminConfigChangeMailService.java",
+        "line": 310,
+        "message": "Define a constant instead of duplicating this literal \"(set)\" 5 times."
       },
       {
         "type": "CODE_SMELL",
         "severity": "MAJOR",
         "rule": "java:S107",
-        "file": "backend/src/main/java/com/miniandmore/app/service/ProductVariantSupport.java",
-        "line": 645,
-        "message": "Method has 9 parameters, which is greater than 7 authorized."
+        "file": "backend/src/main/java/com/miniandmore/app/service/BogoDiscountCalculator.java",
+        "line": 108,
+        "message": "Method has 8 parameters, which is greater than 7 authorized."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "INFO",
+        "rule": "java:S1133",
+        "file": "backend/src/main/java/com/miniandmore/app/service/BogoDiscountCalculator.java",
+        "line": 133,
+        "message": "Do not forget to remove this deprecated code someday."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MINOR",
+        "rule": "java:S135",
+        "file": "backend/src/main/java/com/miniandmore/app/service/BogoDiscountCalculator.java",
+        "line": 341,
+        "message": "Reduce the total number of break and continue statements in this loop to use at most one."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderEventService.java",
+        "line": 147,
+        "message": "Use already-defined constant 'TYPE_OUT_FOR_DELIVERY' instead of duplicating its value here."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderEventService.java",
+        "line": 163,
+        "message": "Use already-defined constant 'TYPE_DELIVERY_FAILED' instead of duplicating its value here."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderMailService.java",
+        "line": 100,
+        "message": "Define a constant instead of duplicating this literal \"cancellationNumber\" 3 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderMailService.java",
+        "line": 101,
+        "message": "Define a constant instead of duplicating this literal \"cancellationReason\" 3 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderMailService.java",
+        "line": 115,
+        "message": "Define a constant instead of duplicating this literal \"adminNotes\" 3 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderMailService.java",
+        "line": 123,
+        "message": "Define a constant instead of duplicating this literal \"refundAmount\" 3 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderMailService.java",
+        "line": 124,
+        "message": "Define a constant instead of duplicating this literal \"refundAmountFormatted\" 4 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderMailService.java",
+        "line": 128,
+        "message": "Define a constant instead of duplicating this literal \"resolvedOnFormatted\" 3 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "java:S3358",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderMailService.java",
+        "line": 155,
+        "message": "Extract this nested ternary operation into an independent statement."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "java:S3358",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderMailService.java",
+        "line": 156,
+        "message": "Extract this nested ternary operation into an independent statement."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderMailService.java",
+        "line": 161,
+        "message": "Define a constant instead of duplicating this literal \"paymentMethod\" 3 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "java:S3358",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderMailService.java",
+        "line": 169,
+        "message": "Extract this nested ternary operation into an independent statement."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "java:S3358",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderMailService.java",
+        "line": 170,
+        "message": "Extract this nested ternary operation into an independent statement."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderMailService.java",
+        "line": 182,
+        "message": "Define a constant instead of duplicating this literal \"mail/orderReturnEmail\" 4 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderMailService.java",
+        "line": 234,
+        "message": "Define a constant instead of duplicating this literal \"trackingUrl\" 3 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S3776",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderMailService.java",
+        "line": 251,
+        "message": "Refactor this method to reduce its Cognitive Complexity from 23 to the 15 allowed."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "rule": "java:S3358",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderMailService.java",
+        "line": 291,
+        "message": "Extract this nested ternary operation into an independent statement."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S1192",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderMailService.java",
+        "line": 334,
+        "message": "Define a constant instead of duplicating this literal \"https://minisnmore.com\" 3 times."
+      },
+      {
+        "type": "CODE_SMELL",
+        "severity": "CRITICAL",
+        "rule": "java:S3776",
+        "file": "backend/src/main/java/com/miniandmore/app/service/OrderReturnService.java",
+        "line": 171,
+        "message": "Refactor this method to reduce its Cognitive Complexity from 16 to the 15 allowed."
       }
     ]
   }

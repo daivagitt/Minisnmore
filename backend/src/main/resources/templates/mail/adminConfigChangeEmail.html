@@ -1,7 +1,7 @@
 <!doctype html>
 <html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="en">
   <head>
-    <title th:text="#{email.admin.config.title}">Admin configuration changed</title>
+    <title th:text="${subject}">Admin configuration changed</title>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   </head>
@@ -15,9 +15,9 @@
     "
   >
     <span
-      th:text="#{email.admin.config.preheader}"
+      th:text="${preheader}"
       style="display: none !important; visibility: hidden; opacity: 0; color: transparent; height: 0; width: 0; overflow: hidden; mso-hide: all;"
-      >Site settings were updated in admin.</span
+      >Configuration was updated in admin.</span
     >
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4eff1; padding: 24px 12px;">
       <tr>
@@ -50,13 +50,17 @@
                 <p style="margin: 0 0 8px; font-size: 20px; font-weight: bold; color: #3a2e34;" th:text="#{email.admin.config.headline}">
                   Admin configuration updated
                 </p>
-                <p style="margin: 0;" th:text="#{email.admin.config.intro}">
-                  Site settings were saved in the Minis n More admin. Review the changes below.
+                <p style="margin: 0;" th:text="${intro}">
+                  Configuration was saved in the Minis n More admin. Review the changes below.
                 </p>
               </td>
             </tr>
             <tr>
               <td style="padding: 12px 26px 0; font-size: 14px; color: #5f4f56;">
+                <p style="margin: 0 0 4px;">
+                  <strong th:text="#{email.admin.config.area}">Section</strong>:
+                  <span th:text="${area}">Site settings</span>
+                </p>
                 <p style="margin: 0 0 4px;">
                   <strong th:text="#{email.admin.config.changedBy}">Changed by</strong>:
                   <span th:text="${changedBy}">admin</span>

@@ -7,6 +7,7 @@ import {
   suggestParentSku,
   suggestVariantSku,
   summarizeZohoVariantLinkage,
+  zohoItemGroupId,
   variantAmountBlur,
   variantAmountInput,
   rowsFromVariantsJson,
@@ -170,5 +171,41 @@ describe("admin-variants SKU helpers", () => {
     const out = serializeVariantRows(rows);
     expect(out).toContain("pink-03.jpg");
     expect(out).toContain("pink-36.jpg");
+  });
+});
+
+describe("zohoItemGroupId", () => {
+  it("returns digits-only parent id when it is not a variant item id", () => {
+    expect(
+      zohoItemGroupId({
+        item_structure: "VARIANTS",
+        zoho_item_id: "3624052000000394593",
+        variants_json: JSON.stringify([
+          { sku: "JB-03", size: "0-3", color: "Navy", zohoItemId: "3624052000000394600", active: true },
+        ]),
+      }),
+    ).toBe("3624052000000394593");
+  });
+
+  it("returns null when parent id is itself a variant item id", () => {
+    expect(
+      zohoItemGroupId({
+        item_structure: "VARIANTS",
+        zoho_item_id: "3624052000000394600",
+        variants_json: JSON.stringify([
+          { sku: "JB-03", size: "0-3", color: "Navy", zohoItemId: "3624052000000394600", active: true },
+        ]),
+      }),
+    ).toBeNull();
+  });
+
+  it("returns null when parent id is not digits", () => {
+    expect(
+      zohoItemGroupId({
+        item_structure: "VARIANTS",
+        zoho_item_id: "grp-horizon",
+        variants_json: "[]",
+      }),
+    ).toBeNull();
   });
 });

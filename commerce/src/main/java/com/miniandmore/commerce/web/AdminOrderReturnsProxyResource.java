@@ -24,6 +24,11 @@ public class AdminOrderReturnsProxyResource {
         return catalog.get(builder.build(true).toUriString());
     }
 
+    @GetMapping("/summary")
+    public ResponseEntity<String> summary() {
+        return catalog.get("/internal/v1/admin/order-returns/summary");
+    }
+
     @PostMapping("/{returnNumber}/approve")
     public ResponseEntity<String> approve(@PathVariable String returnNumber, @RequestBody(required = false) Object body) {
         return catalog.post(CatalogInternalClient.encodedPath("/internal/v1/admin/order-returns/{returnNumber}/approve", returnNumber), body);
@@ -121,5 +126,77 @@ public class AdminOrderReturnsProxyResource {
     @PostMapping("/{returnNumber}/refund")
     public ResponseEntity<String> refund(@PathVariable String returnNumber, @RequestBody(required = false) Object body) {
         return catalog.post(CatalogInternalClient.encodedPath("/internal/v1/admin/order-returns/{returnNumber}/refund", returnNumber), body);
+    }
+
+    @PostMapping("/{returnNumber}/record-cod-refund")
+    public ResponseEntity<String> recordCodRefund(@PathVariable String returnNumber, @RequestBody Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/admin/order-returns/{returnNumber}/record-cod-refund", returnNumber),
+            body
+        );
+    }
+
+    @PostMapping("/{returnNumber}/book-pickup")
+    public ResponseEntity<String> bookPickup(@PathVariable String returnNumber, @RequestBody Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/admin/order-returns/{returnNumber}/book-pickup", returnNumber),
+            body
+        );
+    }
+
+    @PostMapping("/{returnNumber}/pickup-failed")
+    public ResponseEntity<String> pickupFailed(@PathVariable String returnNumber, @RequestBody Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/admin/order-returns/{returnNumber}/pickup-failed", returnNumber),
+            body
+        );
+    }
+
+    @PostMapping("/{returnNumber}/reschedule-pickup")
+    public ResponseEntity<String> reschedulePickup(@PathVariable String returnNumber, @RequestBody(required = false) Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/admin/order-returns/{returnNumber}/reschedule-pickup", returnNumber),
+            body
+        );
+    }
+
+    @PostMapping("/{returnNumber}/close-pickup-failed")
+    public ResponseEntity<String> closePickupFailed(@PathVariable String returnNumber, @RequestBody(required = false) Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/admin/order-returns/{returnNumber}/close-pickup-failed", returnNumber),
+            body
+        );
+    }
+
+    @PostMapping("/{returnNumber}/settle-price-difference")
+    public ResponseEntity<String> settlePriceDifference(@PathVariable String returnNumber, @RequestBody Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/admin/order-returns/{returnNumber}/settle-price-difference", returnNumber),
+            body
+        );
+    }
+
+    @PostMapping("/{returnNumber}/book-outbound")
+    public ResponseEntity<String> bookOutbound(@PathVariable String returnNumber, @RequestBody Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/admin/order-returns/{returnNumber}/book-outbound", returnNumber),
+            body
+        );
+    }
+
+    @PostMapping("/{returnNumber}/package-rates")
+    public ResponseEntity<String> packageRates(@PathVariable String returnNumber, @RequestBody Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/admin/order-returns/{returnNumber}/package-rates", returnNumber),
+            body
+        );
+    }
+
+    @PostMapping("/{returnNumber}/complete-package")
+    public ResponseEntity<String> completePackage(@PathVariable String returnNumber, @RequestBody Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/admin/order-returns/{returnNumber}/complete-package", returnNumber),
+            body
+        );
     }
 }

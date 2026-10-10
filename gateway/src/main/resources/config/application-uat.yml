@@ -29,6 +29,18 @@ spring:
               uri: http://127.0.0.1:8084
               predicates:
                 - Path=/internal/v1/zoho/invoice-webhook,/api/v1/zoho/invoice-webhook
+            - id: miniandmore-xpressbees-return-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/webhooks/xpressbees/returns,/api/v1/webhooks/xpressbees/returns
+            - id: miniandmore-xpressbees-shipment-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/webhooks/xpressbees/shipments,/api/v1/webhooks/xpressbees/shipments
+            - id: miniandmore-razorpay-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/webhooks/razorpay,/api/v1/webhooks/razorpay
             - id: miniandmore-ledgerly-api
               uri: http://127.0.0.1:8081
               predicates:
@@ -43,7 +55,7 @@ spring:
             - id: miniandmore-commerce-api
               uri: http://127.0.0.1:8082
               predicates:
-                - Path=/api/v1/orders/**,/api/v1/account/**,/api/v1/payments,/api/v1/coupons/**,/api/v1/order-returns/**,/api/v1/admin/order-returns/**
+                - Path=/api/v1/orders/**,/api/v1/account/**,/api/v1/payments,/api/v1/coupons/**,/api/v1/order-returns/**,/api/v1/admin/order-returns/**,/api/v1/admin/orders,/api/v1/admin/orders/**,/api/v1/admin/cancellation-requests,/api/v1/admin/cancellation-requests/**
             - id: miniandmore-store-api
               uri: http://127.0.0.1:8081
               predicates:

@@ -94,6 +94,35 @@ public class ZohoBooksClient {
         return requireItem(get("/items/" + itemId + "?" + orgIdParam()), itemId, null);
     }
 
+    /**
+     * Retrieves a Zoho item group, including all of its sellable variant rows. Zoho Books exposes
+     * this endpoint for organisations with Inventory item groups enabled.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getItemGroup(String itemGroupId) {
+        String requestedId = StringUtils.trimToNull(itemGroupId);
+        if (requestedId == null) {
+            throw new IllegalArgumentException("Zoho item group id is required");
+        }
+        Map<String, Object> response = requireSuccess(get("/itemgroups/" + encode(requestedId) + "?" + orgIdParam()));
+        Object wrapped = response.get("item_group");
+        Map<String, Object> group = wrapped instanceof Map<?, ?> ? (Map<String, Object>) wrapped : response;
+        String returnedId = StringUtils.firstNonBlank(
+            itemIdentifier(group.get("group_id")),
+            itemIdentifier(group.get("itemgroup_id"))
+        );
+        if (returnedId == null) {
+            throw new IllegalStateException("Zoho returned an item group without a valid group_id");
+        }
+        if (!requestedId.equals(returnedId)) {
+            throw new IllegalStateException("Zoho returned an item group identity mismatch");
+        }
+        if (!(group.get("items") instanceof List<?> items) || items.stream().anyMatch(item -> !(item instanceof Map))) {
+            throw new IllegalStateException("Zoho returned missing or invalid item group items");
+        }
+        return group;
+    }
+
     public Map<String, Object> createItem(Map<String, Object> payload) {
         return requireItem(post("/items?" + orgIdParam(), payload), null, payload.get("sku"));
     }
@@ -444,8 +473,30 @@ public class ZohoBooksClient {
         return post("/creditnotes/" + creditNoteId + "/status/open?" + orgIdParam(), Map.of());
     }
 
+    public Map<String, Object> voidCreditNote(String creditNoteId) {
+        return post("/creditnotes/" + creditNoteId + "/status/void?" + orgIdParam(), Map.of());
+    }
+
+    public Map<String, Object> refundCreditNote(String creditNoteId, Map<String, Object> payload) {
+        return post("/creditnotes/" + creditNoteId + "/refunds?" + orgIdParam(), payload);
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> listBankAccounts() {
+        Map<String, Object> response = get("/bankaccounts?" + orgIdParam());
+        return (List<Map<String, Object>>) response.getOrDefault("bankaccounts", List.of());
+    }
+
     public Map<String, Object> getInvoice(String invoiceId) {
         return get("/invoices/" + invoiceId + "?" + orgIdParam());
+    }
+
+    public Map<String, Object> listInvoicePayments(String invoiceId) {
+        return get("/invoices/" + invoiceId + "/payments?" + orgIdParam());
+    }
+
+    public void deleteInvoicePayment(String invoiceId, String invoicePaymentId) {
+        delete("/invoices/" + invoiceId + "/payments/" + invoicePaymentId + "?" + orgIdParam());
     }
 
     /**
@@ -565,8 +616,74 @@ public class ZohoBooksClient {
             .toList();
     }
 
+    public Map<String, Object> createInvoice(Map<String, Object> payload) {
+        return post("/invoices?" + orgIdParam(), payload);
+    }
+
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> findInvoiceByReferenceNumber(String referenceNumber) {
+        String trimmed = StringUtils.trimToNull(referenceNumber);
+        if (trimmed == null) {
+            return null;
+        }
+        Map<String, Object> response = get("/invoices?" + orgIdParam() + "&reference_number=" + encode(trimmed));
+        List<Map<String, Object>> invoices = (List<Map<String, Object>>) response.getOrDefault("invoices", List.of());
+        for (Map<String, Object> invoice : invoices) {
+            String reference = stringValue(invoice.get("reference_number"));
+            if (trimmed.equalsIgnoreCase(StringUtils.trimToEmpty(reference))) {
+                return invoice;
+            }
+        }
+        return null;
+    }
+
+    public Map<String, Object> getCreditNote(String creditNoteId) {
+        return get("/creditnotes/" + creditNoteId + "?" + orgIdParam());
+    }
+
+    public Map<String, Object> applyCreditNoteToInvoices(String creditNoteId, Map<String, Object> payload) {
+        return post("/creditnotes/" + creditNoteId + "/invoices?" + orgIdParam(), payload);
+    }
+
     public Map<String, Object> createCreditNote(Map<String, Object> payload) {
         return post("/creditnotes?" + orgIdParam(), payload);
+    }
+
+    /**
+     * Reuse an existing cancellation/return credit note when a retry lost the persisted id locally.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> findCreditNoteByReferenceNumber(String referenceNumber) {
+        String trimmed = StringUtils.trimToNull(referenceNumber);
+        if (trimmed == null) {
+            return null;
+        }
+        Map<String, Object> response = get("/creditnotes?" + orgIdParam() + "&reference_number=" + encode(trimmed));
+        List<Map<String, Object>> creditNotes = (List<Map<String, Object>>) response.getOrDefault("creditnotes", List.of());
+        Map<String, Object> best = null;
+        int bestRank = -1;
+        for (Map<String, Object> creditNote : creditNotes) {
+            String reference = stringValue(creditNote.get("reference_number"));
+            if (!trimmed.equalsIgnoreCase(StringUtils.trimToEmpty(reference))) {
+                continue;
+            }
+            int rank = creditNoteReuseRank(stringValue(creditNote.get("status")));
+            if (rank > bestRank) {
+                best = creditNote;
+                bestRank = rank;
+            }
+        }
+        return best;
+    }
+
+    private static int creditNoteReuseRank(String status) {
+        String normalized = StringUtils.lowerCase(StringUtils.trimToEmpty(status));
+        return switch (normalized) {
+            case "void", "voided" -> -1;
+            case "draft" -> 1;
+            case "open", "pending" -> 2;
+            default -> 0;
+        };
     }
 
     public Map<String, Object> createCustomerPayment(Map<String, Object> payload) {
@@ -594,6 +711,10 @@ public class ZohoBooksClient {
     private Map<String, Object> put(String path, Object body) {
         RestClient.RequestBodySpec spec = client().put().uri(path).contentType(MediaType.APPLICATION_JSON);
         return (Map<String, Object>) authorize(spec.body(body)).retrieve().body(Map.class);
+    }
+
+    private void delete(String path) {
+        authorize(client().delete().uri(path)).retrieve().toBodilessEntity();
     }
 
     private String encode(String value) {

@@ -53,6 +53,12 @@ public class ZohoProductFieldMapper {
         if (StringUtils.isNotBlank(product.getHsn())) {
             payload.put("hsn_or_sac", product.getHsn().trim());
         }
+        String nativeCategoryId = product.getCategory() == null
+            ? null
+            : StringUtils.trimToNull(product.getCategory().getZohoCategoryId());
+        if (nativeCategoryId != null) {
+            payload.put("category_id", nativeCategoryId);
+        }
         // Setting tax_id on the item itself means Zoho applies it (and computes CGST+SGST or IGST
         // from place_of_supply) on every sales order/invoice line automatically, no per-order wiring needed.
         String gstTaxId = StringUtils.trimToNull(applicationProperties.getZoho().getGstTaxId());
@@ -83,7 +89,7 @@ public class ZohoProductFieldMapper {
             .category()
             .ifPresent(def -> {
                 String categoryName = categoryName(product);
-                if (categoryName != null) {
+                if (nativeCategoryId == null && categoryName != null) {
                     addCustomField(customFields, def, categoryName);
                 }
             });
@@ -123,15 +129,42 @@ public class ZohoProductFieldMapper {
             .flatMap(this::parseInteger)
             .ifPresent(product::setAgeMaxMonths);
         applyMissingCatalogFromItemLabels(product, item);
-        Optional<String> categoryNotice = fields
-            .category()
-            .flatMap(def -> readCustomValue(valuesByApiName, def))
+        Optional<String> customCategory = fields.category().flatMap(def -> readCustomValue(valuesByApiName, def));
+        String nativeCategoryId = nativeCategoryId(item).orElse(null);
+        Optional<String> categoryNotice = customCategory
+            .or(() -> nativeCategoryName(item))
             .flatMap(name -> categoryResolver.resolve(name, autoCreateCategory))
             .map(category -> {
+                if (nativeCategoryId != null && StringUtils.isBlank(category.getZohoCategoryId())) {
+                    category.setZohoCategoryId(nativeCategoryId);
+                }
                 product.setCategory(category);
                 return "Assigned category " + category.getName();
             });
         return categoryNotice;
+    }
+
+    private static Optional<String> nativeCategoryId(Map<String, Object> item) {
+        Object category = item.get("category");
+        String categoryId = stringValue(item.get("category_id"));
+        if (StringUtils.isBlank(categoryId) && category instanceof Map<?, ?> categoryMap) {
+            categoryId = stringValue(categoryMap.get("category_id"));
+        }
+        return Optional.ofNullable(StringUtils.trimToNull(categoryId));
+    }
+
+    private static Optional<String> nativeCategoryName(Map<String, Object> item) {
+        Object category = item.get("category");
+        String categoryName = stringValue(item.get("category_name"));
+        if (StringUtils.isBlank(categoryName) && category instanceof Map<?, ?> categoryMap) {
+            categoryName = firstNonBlank(
+                stringValue(categoryMap.get("name")),
+                stringValue(categoryMap.get("category_name"))
+            );
+        } else if (StringUtils.isBlank(categoryName)) {
+            categoryName = stringValue(category);
+        }
+        return Optional.ofNullable(StringUtils.trimToNull(categoryName));
     }
 
     private static String categoryName(Product product) {
@@ -153,6 +186,13 @@ public class ZohoProductFieldMapper {
         cachedScope = scope;
         cacheExpiresAt = Instant.now().plusSeconds(300);
         return cachedIndex;
+    }
+
+    /** Force the next product to rediscover field ids after Zoho rejects a cached definition. */
+    public synchronized void invalidateFieldCache() {
+        cachedIndex = null;
+        cachedScope = null;
+        cacheExpiresAt = Instant.MIN;
     }
 
     FieldIndex buildIndex(List<Map<String, Object>> rawFields) {
@@ -191,7 +231,9 @@ public class ZohoProductFieldMapper {
             String label = normalizedLabel(raw);
             String apiName = stringValue(raw.get("api_name"));
             if (matchesLabel(label, preferredLabels) || matchesApiSuffix(apiName, apiSuffixes)) {
-                String fieldId = firstNonBlank(stringValue(raw.get("field_id")), stringValue(raw.get("customfield_id")));
+                // Item update/create payloads require the custom-field id when Zoho exposes both
+                // the generic settings field id and the entity-specific customfield_id.
+                String fieldId = firstNonBlank(stringValue(raw.get("customfield_id")), stringValue(raw.get("field_id")));
                 if (StringUtils.isBlank(fieldId)) {
                     continue;
                 }

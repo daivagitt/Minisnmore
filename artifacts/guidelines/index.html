@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Guidelines · Daiva Technologies</title>
+    <style>
+      :root {
+        --brand: #1e3a8a;
+        --brand-light: #3b82f6;
+        --brand-accent: #0ea5e9;
+        --surface: #ffffff;
+        --surface-muted: #f8fafc;
+        --border: #e2e8f0;
+        --text: #0f172a;
+        --text-muted: #64748b;
+        --pass: #15803d;
+        --fail: #b91c1c;
+        --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+        --radius: 14px;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        line-height: 1.55;
+        color: var(--text);
+        background: linear-gradient(180deg, #eff6ff 0%, #f8fafc 220px, #f1f5f9 100%);
+        min-height: 100vh;
+      }
+      .page { max-width: 1100px; margin: 0 auto; padding: 28px 20px 48px; }
+      .brand-bar {
+        background: linear-gradient(135deg, var(--brand) 0%, var(--brand-light) 55%, var(--brand-accent) 100%);
+        color: #fff;
+        border-radius: calc(var(--radius) + 4px);
+        padding: 28px 30px;
+        box-shadow: var(--shadow);
+      }
+      .brand-top {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 18px;
+        margin-bottom: 16px;
+      }
+      .brand-logo {
+        display: block;
+        height: 48px;
+        width: auto;
+        max-width: min(100%, 260px);
+      }
+      .brand-bar .eyebrow {
+        margin: 0 0 6px;
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        opacity: 0.9;
+        font-weight: 700;
+      }
+      .brand-bar h1 { margin: 0 0 8px; font-size: 1.85rem; font-weight: 700; }
+      .brand-bar p { margin: 0; opacity: 0.95; }
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 18px;
+      }
+      .meta-chip {
+        background: rgba(255, 255, 255, 0.16);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 0.9rem;
+      }
+      .content { margin-top: 24px; }
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 22px 24px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        margin-bottom: 18px;
+      }
+      .panel h2 { margin: 0 0 12px; font-size: 1.2rem; }
+      .status {
+        display: inline-block;
+        padding: 5px 12px;
+        border-radius: 999px;
+        color: #fff;
+        font-weight: 700;
+        font-size: 0.85rem;
+        letter-spacing: 0.04em;
+      }
+      .status.pass { background: var(--pass); }
+      .status.fail { background: var(--fail); }
+      .status.skip { background: #64748b; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+      th, td {
+        border-bottom: 1px solid var(--border);
+        padding: 10px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th { background: var(--surface-muted); font-size: 0.92rem; }
+      tr:last-child td { border-bottom: none; }
+      code {
+        background: #eef2ff;
+        color: #312e81;
+        padding: 2px 7px;
+        border-radius: 6px;
+        font-size: 0.92em;
+      }
+      a { color: var(--brand-light); text-decoration: none; font-weight: 600; }
+      a:hover { text-decoration: underline; }
+      .links { display: grid; gap: 12px; }
+      .link-card {
+        display: block;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 16px 18px;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+      .link-card:hover {
+        border-color: #93c5fd;
+        box-shadow: var(--shadow);
+        text-decoration: none;
+      }
+      .link-card strong { display: block; font-size: 1.05rem; color: var(--text); margin-bottom: 4px; }
+      .link-card span { color: var(--text-muted); font-weight: 400; font-size: 0.95rem; }
+      .muted { color: var(--text-muted); }
+      .stats { display: flex; flex-wrap: wrap; gap: 14px; margin: 14px 0 0; }
+      .stat {
+        background: var(--surface-muted);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 16px;
+        min-width: 120px;
+      }
+      .stat strong { display: block; font-size: 1.35rem; }
+      .stat span { color: var(--text-muted); font-size: 0.88rem; }
+      footer {
+        margin-top: 28px;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+      }
+      footer strong { color: var(--brand); }
+     .back { margin: 0 0 12px; font-size: 0.92rem; } </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="brand-bar">
+        <div class="brand-top">
+          <img class="brand-logo" src="../daiva-logo.svg" alt="Daiva Technologies logo" width="240" height="48" decoding="async" />
+        </div>
+        <h1>Guidelines</h1>
+        <p>Mandatory API, database, frontend, and backend standards for AI agents and developers.</p>
+        <div class="meta">
+          <span class="meta-chip">Mini&#x27;s n More</span>
+          <span class="meta-chip">Build <code style="background:transparent;color:inherit;padding:0;">local</code></span>
+          <span class="meta-chip">Generated <code style="background:transparent;color:inherit;padding:0;">10 Oct 2026, 11:25 AM IST (05:55 UTC)</code></span>
+        </div>
+      </header>
+      <main class="content">
+        
+      <p class="back"><a href="../index.html">← Reports hub</a></p>
+      
+      <section class="panel">
+        <h2>API</h2>
+        <p class="muted">REST design, auth, security, and production checklist.</p>
+        <div class="links"><a class="link-card" href="viewer.html?doc=Api_rules/API_STANDARDS.md"><strong>API standards</strong><span>Mandatory REST contract, versioning, and error shape</span></a>
+<a class="link-card" href="viewer.html?doc=Api_rules/AUTH_STANDARDS.md"><strong>Auth standards</strong><span>JWT, headers, and RBAC rules</span></a>
+<a class="link-card" href="viewer.html?doc=Api_rules/SECURITY_HARDENING.md"><strong>Security hardening</strong><span>Transport, input validation, and secrets</span></a>
+<a class="link-card" href="viewer.html?doc=Api_rules/PERFORMANCE_SLA.md"><strong>Performance SLA</strong><span>Latency budgets for API responses</span></a></div>
+      </section>
+            
+      <section class="panel">
+        <h2>Database</h2>
+        <p class="muted">PostgreSQL schema, migrations, indexing, and naming.</p>
+        <div class="links"><a class="link-card" href="viewer.html?doc=Database_rules/DATABASE_STANDARDS.md"><strong>Database standards</strong><span>Schema design and non-negotiable integrity rules</span></a>
+<a class="link-card" href="viewer.html?doc=Database_rules/MIGRATION_STANDARDS.md"><strong>Migration standards</strong><span>Versioned, reversible schema changes</span></a>
+<a class="link-card" href="viewer.html?doc=Database_rules/INDEXING_STANDARDS.md"><strong>Indexing standards</strong><span>Hot-path indexes and query performance</span></a>
+<a class="link-card" href="viewer.html?doc=Database_rules/NAMING_CONVENTIONS.md"><strong>Naming conventions</strong><span>Tables, columns, and constraint names</span></a></div>
+      </section>
+            
+      <section class="panel">
+        <h2>Frontend</h2>
+        <p class="muted">React / TypeScript storefront standards.</p>
+        <div class="links"><a class="link-card" href="viewer.html?doc=Frontend_rules/FRONTEND_STANDARDS.md"><strong>Frontend standards</strong><span>Type safety, accessibility, and performance budgets</span></a></div>
+      </section>
+            
+      <section class="panel">
+        <h2>Backend</h2>
+        <p class="muted">Service layering, security, and observability.</p>
+        <div class="links"><a class="link-card" href="viewer.html?doc=Backend_rules/BACKEND_STANDARDS.md"><strong>Backend standards</strong><span>Clean layers, fail-safe defaults, and ops</span></a></div>
+      </section>
+            
+    
+      </main>
+      <footer>Generated 10 Oct 2026, 11:25 AM IST (05:55 UTC) · <strong>Daiva Technologies</strong></footer>
+    </div>
+  </body>
+</html>

@@ -28,6 +28,18 @@ public class BannerDTO implements Serializable {
     @Size(max = 80)
     private String ctaLabel;
 
+    @Size(max = 80)
+    private String eyebrow;
+
+    @Size(max = 80)
+    private String trustFabricLabel;
+
+    @Size(max = 80)
+    private String trustShippingLabel;
+
+    @Size(max = 80)
+    private String trustDyesLabel;
+
     @NotNull
     @Min(value = 0)
     private Integer sortOrder;
@@ -83,6 +95,38 @@ public class BannerDTO implements Serializable {
         this.ctaLabel = ctaLabel;
     }
 
+    public String getEyebrow() {
+        return eyebrow;
+    }
+
+    public void setEyebrow(String eyebrow) {
+        this.eyebrow = eyebrow;
+    }
+
+    public String getTrustFabricLabel() {
+        return trustFabricLabel;
+    }
+
+    public void setTrustFabricLabel(String trustFabricLabel) {
+        this.trustFabricLabel = trustFabricLabel;
+    }
+
+    public String getTrustShippingLabel() {
+        return trustShippingLabel;
+    }
+
+    public void setTrustShippingLabel(String trustShippingLabel) {
+        this.trustShippingLabel = trustShippingLabel;
+    }
+
+    public String getTrustDyesLabel() {
+        return trustDyesLabel;
+    }
+
+    public void setTrustDyesLabel(String trustDyesLabel) {
+        this.trustDyesLabel = trustDyesLabel;
+    }
+
     public Integer getSortOrder() {
         return sortOrder;
     }
@@ -130,6 +174,10 @@ public class BannerDTO implements Serializable {
             ", imageUrl='" + getImageUrl() + "'" +
             ", linkUrl='" + getLinkUrl() + "'" +
             ", ctaLabel='" + getCtaLabel() + "'" +
+            ", eyebrow='" + getEyebrow() + "'" +
+            ", trustFabricLabel='" + getTrustFabricLabel() + "'" +
+            ", trustShippingLabel='" + getTrustShippingLabel() + "'" +
+            ", trustDyesLabel='" + getTrustDyesLabel() + "'" +
             ", sortOrder=" + getSortOrder() +
             ", active='" + getActive() + "'" +
             "}";

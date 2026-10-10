@@ -168,4 +168,13 @@ class ProductDescriptionCodecTest {
 
         assertThat(encoded).isEqualTo("Category: Essentials\nFabric: Cotton");
     }
+
+    @Test
+    void encode_noMetadata_returnsBodyOrNull() {
+        Product empty = new Product();
+        assertThat(codec.encode(empty, null)).isNull();
+
+        Product bodyOnly = new Product().description("Simple description");
+        assertThat(codec.encode(bodyOnly, null)).isEqualTo("Simple description");
+    }
 }

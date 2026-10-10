@@ -1,5 +1,5 @@
 {
-  "id": "9dc96782-2a8d-45aa-9cc3-5af6738c50d0",
+  "id": "2367a04f-3e48-4a55-b0b5-8fef6471336c",
   "name": "Minis n More \u2014 API testing (production)",
   "values": [
     {
@@ -16,7 +16,7 @@
     },
     {
       "key": "baseUrl",
-      "value": "https://minisnmore.com",
+      "value": "http://127.0.0.1:9184",
       "type": "default",
       "enabled": true
     },
@@ -29,6 +29,12 @@
     {
       "key": "id",
       "value": "1",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "itemGroupId",
+      "value": "{{id}}",
       "type": "default",
       "enabled": true
     },
@@ -76,6 +82,12 @@
     },
     {
       "key": "productId",
+      "value": "{{id}}",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "requestNumber",
       "value": "{{id}}",
       "type": "default",
       "enabled": true

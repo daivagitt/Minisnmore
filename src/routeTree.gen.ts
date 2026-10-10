@@ -16,11 +16,17 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SubscribeRouteImport } from './routes/subscribe'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as ShippingRouteImport } from './routes/shipping'
+import { Route as SalesRouteImport } from './routes/sales'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as OperationsRouteImport } from './routes/operations'
 import { Route as NewArrivalsRouteImport } from './routes/new-arrivals'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as InviteRouteImport } from './routes/invite'
 import { Route as GiftRouteImport } from './routes/gift'
+import { Route as CustomersupportRouteImport } from './routes/customersupport'
+import { Route as ContactUsRouteImport } from './routes/contact-us'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as CartRouteImport } from './routes/cart'
 import { Route as BlogRouteImport } from './routes/blog'
@@ -33,25 +39,47 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as BlogIndexRouteImport } from './routes/blog.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AccountIndexRouteImport } from './routes/account.index'
+import { Route as SalesProductsRouteImport } from './routes/sales.products'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
+import { Route as OperationsReturnsRouteImport } from './routes/operations.returns'
+import { Route as OperationsProductsRouteImport } from './routes/operations.products'
+import { Route as OperationsOrdersRouteImport } from './routes/operations.orders'
+import { Route as OperationsInvoicesRouteImport } from './routes/operations.invoices'
+import { Route as OperationsDashboardRouteImport } from './routes/operations.dashboard'
+import { Route as OperationsCustomersRouteImport } from './routes/operations.customers'
+import { Route as OperationsContactMessagesRouteImport } from './routes/operations.contact-messages'
+import { Route as OperationsCancellationsRouteImport } from './routes/operations.cancellations'
+import { Route as CustomersupportReturnsRouteImport } from './routes/customersupport.returns'
+import { Route as CustomersupportOrdersRouteImport } from './routes/customersupport.orders'
+import { Route as CustomersupportCustomersRouteImport } from './routes/customersupport.customers'
+import { Route as CustomersupportContactMessagesRouteImport } from './routes/customersupport.contact-messages'
+import { Route as CustomersupportCancellationsRouteImport } from './routes/customersupport.cancellations'
 import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AdminZohoRouteImport } from './routes/admin.zoho'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminSubscribeRouteImport } from './routes/admin.subscribe'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminReturnsRouteImport } from './routes/admin.returns'
+import { Route as AdminRbacRouteImport } from './routes/admin.rbac'
 import { Route as AdminProductsRouteImport } from './routes/admin.products'
 import { Route as AdminPoliciesRouteImport } from './routes/admin.policies'
 import { Route as AdminPagesRouteImport } from './routes/admin.pages'
+import { Route as AdminPackageTypesRouteImport } from './routes/admin.package-types'
 import { Route as AdminOrdersRouteImport } from './routes/admin.orders'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminInvoicesRouteImport } from './routes/admin.invoices'
 import { Route as AdminHomeRouteImport } from './routes/admin.home'
+import { Route as AdminGiftRouteImport } from './routes/admin.gift'
 import { Route as AdminDiscountRouteImport } from './routes/admin.discount'
+import { Route as AdminCustomersRouteImport } from './routes/admin.customers'
 import { Route as AdminCouponsRouteImport } from './routes/admin.coupons'
+import { Route as AdminContactMessagesRouteImport } from './routes/admin.contact-messages'
 import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
+import { Route as AdminCancellationsRouteImport } from './routes/admin.cancellations'
 import { Route as AdminBlogRouteImport } from './routes/admin.blog'
 import { Route as AdminBannersRouteImport } from './routes/admin.banners'
+import { Route as AdminAddressesRouteImport } from './routes/admin.addresses'
 import { Route as AdminAboutRouteImport } from './routes/admin.about'
 import { Route as AccountWishlistRouteImport } from './routes/account.wishlist'
 import { Route as AccountTrackRouteImport } from './routes/account.track'
@@ -67,6 +95,8 @@ import { Route as AccountOrdersIndexRouteImport } from './routes/account.orders.
 import { Route as AdminIntegrationsLedgerlyRouteImport } from './routes/admin.integrations.ledgerly'
 import { Route as AccountResetFinishRouteImport } from './routes/account.reset.finish'
 import { Route as AccountOrdersOrderNumberRouteImport } from './routes/account.orders.$orderNumber'
+import { Route as OperationsOrdersOrderNumberInvoiceRouteImport } from './routes/operations.orders_.$orderNumber.invoice'
+import { Route as CustomersupportOrdersOrderNumberInvoiceRouteImport } from './routes/customersupport.orders_.$orderNumber.invoice'
 import { Route as AdminOrdersOrderNumberInvoiceRouteImport } from './routes/admin.orders_.$orderNumber.invoice'
 import { Route as AccountOrdersOrderNumberInvoiceRouteImport } from './routes/account.orders.$orderNumber_.invoice'
 
@@ -105,6 +135,11 @@ const ShippingRoute = ShippingRouteImport.update({
   path: '/shipping',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SalesRoute = SalesRouteImport.update({
+  id: '/sales',
+  path: '/sales',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
@@ -113,6 +148,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OperationsRoute = OperationsRouteImport.update({
+  id: '/operations',
+  path: '/operations',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NewArrivalsRoute = NewArrivalsRouteImport.update({
@@ -125,9 +165,29 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InviteRoute = InviteRouteImport.update({
+  id: '/invite',
+  path: '/invite',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GiftRoute = GiftRouteImport.update({
   id: '/gift',
   path: '/gift',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CustomersupportRoute = CustomersupportRouteImport.update({
+  id: '/customersupport',
+  path: '/customersupport',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactUsRoute = ContactUsRouteImport.update({
+  id: '/contact-us',
+  path: '/contact-us',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CheckoutRoute = CheckoutRouteImport.update({
@@ -190,11 +250,85 @@ const AccountIndexRoute = AccountIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AccountRoute,
 } as any)
+const SalesProductsRoute = SalesProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => SalesRoute,
+} as any)
 const ProductSlugRoute = ProductSlugRouteImport.update({
   id: '/product/$slug',
   path: '/product/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OperationsReturnsRoute = OperationsReturnsRouteImport.update({
+  id: '/returns',
+  path: '/returns',
+  getParentRoute: () => OperationsRoute,
+} as any)
+const OperationsProductsRoute = OperationsProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => OperationsRoute,
+} as any)
+const OperationsOrdersRoute = OperationsOrdersRouteImport.update({
+  id: '/orders',
+  path: '/orders',
+  getParentRoute: () => OperationsRoute,
+} as any)
+const OperationsInvoicesRoute = OperationsInvoicesRouteImport.update({
+  id: '/invoices',
+  path: '/invoices',
+  getParentRoute: () => OperationsRoute,
+} as any)
+const OperationsDashboardRoute = OperationsDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => OperationsRoute,
+} as any)
+const OperationsCustomersRoute = OperationsCustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
+  getParentRoute: () => OperationsRoute,
+} as any)
+const OperationsContactMessagesRoute =
+  OperationsContactMessagesRouteImport.update({
+    id: '/contact-messages',
+    path: '/contact-messages',
+    getParentRoute: () => OperationsRoute,
+  } as any)
+const OperationsCancellationsRoute = OperationsCancellationsRouteImport.update({
+  id: '/cancellations',
+  path: '/cancellations',
+  getParentRoute: () => OperationsRoute,
+} as any)
+const CustomersupportReturnsRoute = CustomersupportReturnsRouteImport.update({
+  id: '/returns',
+  path: '/returns',
+  getParentRoute: () => CustomersupportRoute,
+} as any)
+const CustomersupportOrdersRoute = CustomersupportOrdersRouteImport.update({
+  id: '/orders',
+  path: '/orders',
+  getParentRoute: () => CustomersupportRoute,
+} as any)
+const CustomersupportCustomersRoute =
+  CustomersupportCustomersRouteImport.update({
+    id: '/customers',
+    path: '/customers',
+    getParentRoute: () => CustomersupportRoute,
+  } as any)
+const CustomersupportContactMessagesRoute =
+  CustomersupportContactMessagesRouteImport.update({
+    id: '/contact-messages',
+    path: '/contact-messages',
+    getParentRoute: () => CustomersupportRoute,
+  } as any)
+const CustomersupportCancellationsRoute =
+  CustomersupportCancellationsRouteImport.update({
+    id: '/cancellations',
+    path: '/cancellations',
+    getParentRoute: () => CustomersupportRoute,
+  } as any)
 const BlogSlugRoute = BlogSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
@@ -208,6 +342,11 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
 const AdminZohoRoute = AdminZohoRouteImport.update({
   id: '/zoho',
   path: '/zoho',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminSubscribeRoute = AdminSubscribeRouteImport.update({
@@ -225,6 +364,11 @@ const AdminReturnsRoute = AdminReturnsRouteImport.update({
   path: '/returns',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminRbacRoute = AdminRbacRouteImport.update({
+  id: '/rbac',
+  path: '/rbac',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminProductsRoute = AdminProductsRouteImport.update({
   id: '/products',
   path: '/products',
@@ -238,6 +382,11 @@ const AdminPoliciesRoute = AdminPoliciesRouteImport.update({
 const AdminPagesRoute = AdminPagesRouteImport.update({
   id: '/pages',
   path: '/pages',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPackageTypesRoute = AdminPackageTypesRouteImport.update({
+  id: '/package-types',
+  path: '/package-types',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminOrdersRoute = AdminOrdersRouteImport.update({
@@ -260,9 +409,19 @@ const AdminHomeRoute = AdminHomeRouteImport.update({
   path: '/home',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminGiftRoute = AdminGiftRouteImport.update({
+  id: '/gift',
+  path: '/gift',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminDiscountRoute = AdminDiscountRouteImport.update({
   id: '/discount',
   path: '/discount',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCustomersRoute = AdminCustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminCouponsRoute = AdminCouponsRouteImport.update({
@@ -270,9 +429,19 @@ const AdminCouponsRoute = AdminCouponsRouteImport.update({
   path: '/coupons',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminContactMessagesRoute = AdminContactMessagesRouteImport.update({
+  id: '/contact-messages',
+  path: '/contact-messages',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
   id: '/categories',
   path: '/categories',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCancellationsRoute = AdminCancellationsRouteImport.update({
+  id: '/cancellations',
+  path: '/cancellations',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminBlogRoute = AdminBlogRouteImport.update({
@@ -283,6 +452,11 @@ const AdminBlogRoute = AdminBlogRouteImport.update({
 const AdminBannersRoute = AdminBannersRouteImport.update({
   id: '/banners',
   path: '/banners',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAddressesRoute = AdminAddressesRouteImport.update({
+  id: '/addresses',
+  path: '/addresses',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminAboutRoute = AdminAboutRouteImport.update({
@@ -362,6 +536,18 @@ const AccountOrdersOrderNumberRoute =
     path: '/$orderNumber',
     getParentRoute: () => AccountOrdersRoute,
   } as any)
+const OperationsOrdersOrderNumberInvoiceRoute =
+  OperationsOrdersOrderNumberInvoiceRouteImport.update({
+    id: '/orders_/$orderNumber/invoice',
+    path: '/orders/$orderNumber/invoice',
+    getParentRoute: () => OperationsRoute,
+  } as any)
+const CustomersupportOrdersOrderNumberInvoiceRoute =
+  CustomersupportOrdersOrderNumberInvoiceRouteImport.update({
+    id: '/orders_/$orderNumber/invoice',
+    path: '/orders/$orderNumber/invoice',
+    getParentRoute: () => CustomersupportRoute,
+  } as any)
 const AdminOrdersOrderNumberInvoiceRoute =
   AdminOrdersOrderNumberInvoiceRouteImport.update({
     id: '/orders_/$orderNumber/invoice',
@@ -385,11 +571,17 @@ export interface FileRoutesByFullPath {
   '/blog': typeof BlogRouteWithChildren
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
+  '/contact': typeof ContactRoute
+  '/contact-us': typeof ContactUsRoute
+  '/customersupport': typeof CustomersupportRouteWithChildren
   '/gift': typeof GiftRoute
+  '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/new-arrivals': typeof NewArrivalsRoute
+  '/operations': typeof OperationsRouteWithChildren
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sales': typeof SalesRouteWithChildren
   '/shipping': typeof ShippingRoute
   '/shop': typeof ShopRoute
   '/subscribe': typeof SubscribeRoute
@@ -408,25 +600,47 @@ export interface FileRoutesByFullPath {
   '/account/track': typeof AccountTrackRoute
   '/account/wishlist': typeof AccountWishlistRoute
   '/admin/about': typeof AdminAboutRoute
+  '/admin/addresses': typeof AdminAddressesRoute
   '/admin/banners': typeof AdminBannersRoute
   '/admin/blog': typeof AdminBlogRoute
+  '/admin/cancellations': typeof AdminCancellationsRoute
   '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/contact-messages': typeof AdminContactMessagesRoute
   '/admin/coupons': typeof AdminCouponsRoute
+  '/admin/customers': typeof AdminCustomersRoute
   '/admin/discount': typeof AdminDiscountRoute
+  '/admin/gift': typeof AdminGiftRoute
   '/admin/home': typeof AdminHomeRoute
   '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/orders': typeof AdminOrdersRoute
+  '/admin/package-types': typeof AdminPackageTypesRoute
   '/admin/pages': typeof AdminPagesRoute
   '/admin/policies': typeof AdminPoliciesRoute
   '/admin/products': typeof AdminProductsRoute
+  '/admin/rbac': typeof AdminRbacRoute
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/subscribe': typeof AdminSubscribeRoute
+  '/admin/users': typeof AdminUsersRoute
   '/admin/zoho': typeof AdminZohoRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/customersupport/cancellations': typeof CustomersupportCancellationsRoute
+  '/customersupport/contact-messages': typeof CustomersupportContactMessagesRoute
+  '/customersupport/customers': typeof CustomersupportCustomersRoute
+  '/customersupport/orders': typeof CustomersupportOrdersRoute
+  '/customersupport/returns': typeof CustomersupportReturnsRoute
+  '/operations/cancellations': typeof OperationsCancellationsRoute
+  '/operations/contact-messages': typeof OperationsContactMessagesRoute
+  '/operations/customers': typeof OperationsCustomersRoute
+  '/operations/dashboard': typeof OperationsDashboardRoute
+  '/operations/invoices': typeof OperationsInvoicesRoute
+  '/operations/orders': typeof OperationsOrdersRoute
+  '/operations/products': typeof OperationsProductsRoute
+  '/operations/returns': typeof OperationsReturnsRoute
   '/product/$slug': typeof ProductSlugRoute
+  '/sales/products': typeof SalesProductsRoute
   '/account/': typeof AccountIndexRoute
   '/admin/': typeof AdminIndexRoute
   '/blog/': typeof BlogIndexRoute
@@ -436,6 +650,8 @@ export interface FileRoutesByFullPath {
   '/account/orders/': typeof AccountOrdersIndexRoute
   '/account/orders/$orderNumber/invoice': typeof AccountOrdersOrderNumberInvoiceRoute
   '/admin/orders/$orderNumber/invoice': typeof AdminOrdersOrderNumberInvoiceRoute
+  '/customersupport/orders/$orderNumber/invoice': typeof CustomersupportOrdersOrderNumberInvoiceRoute
+  '/operations/orders/$orderNumber/invoice': typeof OperationsOrdersOrderNumberInvoiceRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -444,11 +660,17 @@ export interface FileRoutesByTo {
   '/best-sellers': typeof BestSellersRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
+  '/contact': typeof ContactRoute
+  '/contact-us': typeof ContactUsRoute
+  '/customersupport': typeof CustomersupportRouteWithChildren
   '/gift': typeof GiftRoute
+  '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/new-arrivals': typeof NewArrivalsRoute
+  '/operations': typeof OperationsRouteWithChildren
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sales': typeof SalesRouteWithChildren
   '/shipping': typeof ShippingRoute
   '/shop': typeof ShopRoute
   '/subscribe': typeof SubscribeRoute
@@ -466,25 +688,47 @@ export interface FileRoutesByTo {
   '/account/track': typeof AccountTrackRoute
   '/account/wishlist': typeof AccountWishlistRoute
   '/admin/about': typeof AdminAboutRoute
+  '/admin/addresses': typeof AdminAddressesRoute
   '/admin/banners': typeof AdminBannersRoute
   '/admin/blog': typeof AdminBlogRoute
+  '/admin/cancellations': typeof AdminCancellationsRoute
   '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/contact-messages': typeof AdminContactMessagesRoute
   '/admin/coupons': typeof AdminCouponsRoute
+  '/admin/customers': typeof AdminCustomersRoute
   '/admin/discount': typeof AdminDiscountRoute
+  '/admin/gift': typeof AdminGiftRoute
   '/admin/home': typeof AdminHomeRoute
   '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/orders': typeof AdminOrdersRoute
+  '/admin/package-types': typeof AdminPackageTypesRoute
   '/admin/pages': typeof AdminPagesRoute
   '/admin/policies': typeof AdminPoliciesRoute
   '/admin/products': typeof AdminProductsRoute
+  '/admin/rbac': typeof AdminRbacRoute
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/subscribe': typeof AdminSubscribeRoute
+  '/admin/users': typeof AdminUsersRoute
   '/admin/zoho': typeof AdminZohoRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/customersupport/cancellations': typeof CustomersupportCancellationsRoute
+  '/customersupport/contact-messages': typeof CustomersupportContactMessagesRoute
+  '/customersupport/customers': typeof CustomersupportCustomersRoute
+  '/customersupport/orders': typeof CustomersupportOrdersRoute
+  '/customersupport/returns': typeof CustomersupportReturnsRoute
+  '/operations/cancellations': typeof OperationsCancellationsRoute
+  '/operations/contact-messages': typeof OperationsContactMessagesRoute
+  '/operations/customers': typeof OperationsCustomersRoute
+  '/operations/dashboard': typeof OperationsDashboardRoute
+  '/operations/invoices': typeof OperationsInvoicesRoute
+  '/operations/orders': typeof OperationsOrdersRoute
+  '/operations/products': typeof OperationsProductsRoute
+  '/operations/returns': typeof OperationsReturnsRoute
   '/product/$slug': typeof ProductSlugRoute
+  '/sales/products': typeof SalesProductsRoute
   '/account': typeof AccountIndexRoute
   '/admin': typeof AdminIndexRoute
   '/blog': typeof BlogIndexRoute
@@ -494,6 +738,8 @@ export interface FileRoutesByTo {
   '/account/orders': typeof AccountOrdersIndexRoute
   '/account/orders/$orderNumber/invoice': typeof AccountOrdersOrderNumberInvoiceRoute
   '/admin/orders/$orderNumber/invoice': typeof AdminOrdersOrderNumberInvoiceRoute
+  '/customersupport/orders/$orderNumber/invoice': typeof CustomersupportOrdersOrderNumberInvoiceRoute
+  '/operations/orders/$orderNumber/invoice': typeof OperationsOrdersOrderNumberInvoiceRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -506,11 +752,17 @@ export interface FileRoutesById {
   '/blog': typeof BlogRouteWithChildren
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
+  '/contact': typeof ContactRoute
+  '/contact-us': typeof ContactUsRoute
+  '/customersupport': typeof CustomersupportRouteWithChildren
   '/gift': typeof GiftRoute
+  '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/new-arrivals': typeof NewArrivalsRoute
+  '/operations': typeof OperationsRouteWithChildren
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sales': typeof SalesRouteWithChildren
   '/shipping': typeof ShippingRoute
   '/shop': typeof ShopRoute
   '/subscribe': typeof SubscribeRoute
@@ -529,25 +781,47 @@ export interface FileRoutesById {
   '/account/track': typeof AccountTrackRoute
   '/account/wishlist': typeof AccountWishlistRoute
   '/admin/about': typeof AdminAboutRoute
+  '/admin/addresses': typeof AdminAddressesRoute
   '/admin/banners': typeof AdminBannersRoute
   '/admin/blog': typeof AdminBlogRoute
+  '/admin/cancellations': typeof AdminCancellationsRoute
   '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/contact-messages': typeof AdminContactMessagesRoute
   '/admin/coupons': typeof AdminCouponsRoute
+  '/admin/customers': typeof AdminCustomersRoute
   '/admin/discount': typeof AdminDiscountRoute
+  '/admin/gift': typeof AdminGiftRoute
   '/admin/home': typeof AdminHomeRoute
   '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/orders': typeof AdminOrdersRoute
+  '/admin/package-types': typeof AdminPackageTypesRoute
   '/admin/pages': typeof AdminPagesRoute
   '/admin/policies': typeof AdminPoliciesRoute
   '/admin/products': typeof AdminProductsRoute
+  '/admin/rbac': typeof AdminRbacRoute
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/subscribe': typeof AdminSubscribeRoute
+  '/admin/users': typeof AdminUsersRoute
   '/admin/zoho': typeof AdminZohoRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/customersupport/cancellations': typeof CustomersupportCancellationsRoute
+  '/customersupport/contact-messages': typeof CustomersupportContactMessagesRoute
+  '/customersupport/customers': typeof CustomersupportCustomersRoute
+  '/customersupport/orders': typeof CustomersupportOrdersRoute
+  '/customersupport/returns': typeof CustomersupportReturnsRoute
+  '/operations/cancellations': typeof OperationsCancellationsRoute
+  '/operations/contact-messages': typeof OperationsContactMessagesRoute
+  '/operations/customers': typeof OperationsCustomersRoute
+  '/operations/dashboard': typeof OperationsDashboardRoute
+  '/operations/invoices': typeof OperationsInvoicesRoute
+  '/operations/orders': typeof OperationsOrdersRoute
+  '/operations/products': typeof OperationsProductsRoute
+  '/operations/returns': typeof OperationsReturnsRoute
   '/product/$slug': typeof ProductSlugRoute
+  '/sales/products': typeof SalesProductsRoute
   '/account/': typeof AccountIndexRoute
   '/admin/': typeof AdminIndexRoute
   '/blog/': typeof BlogIndexRoute
@@ -557,6 +831,8 @@ export interface FileRoutesById {
   '/account/orders/': typeof AccountOrdersIndexRoute
   '/account/orders/$orderNumber_/invoice': typeof AccountOrdersOrderNumberInvoiceRoute
   '/admin/orders_/$orderNumber/invoice': typeof AdminOrdersOrderNumberInvoiceRoute
+  '/customersupport/orders_/$orderNumber/invoice': typeof CustomersupportOrdersOrderNumberInvoiceRoute
+  '/operations/orders_/$orderNumber/invoice': typeof OperationsOrdersOrderNumberInvoiceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -570,11 +846,17 @@ export interface FileRouteTypes {
     | '/blog'
     | '/cart'
     | '/checkout'
+    | '/contact'
+    | '/contact-us'
+    | '/customersupport'
     | '/gift'
+    | '/invite'
     | '/login'
     | '/new-arrivals'
+    | '/operations'
     | '/privacy'
     | '/reset-password'
+    | '/sales'
     | '/shipping'
     | '/shop'
     | '/subscribe'
@@ -593,25 +875,47 @@ export interface FileRouteTypes {
     | '/account/track'
     | '/account/wishlist'
     | '/admin/about'
+    | '/admin/addresses'
     | '/admin/banners'
     | '/admin/blog'
+    | '/admin/cancellations'
     | '/admin/categories'
+    | '/admin/contact-messages'
     | '/admin/coupons'
+    | '/admin/customers'
     | '/admin/discount'
+    | '/admin/gift'
     | '/admin/home'
     | '/admin/invoices'
     | '/admin/login'
     | '/admin/orders'
+    | '/admin/package-types'
     | '/admin/pages'
     | '/admin/policies'
     | '/admin/products'
+    | '/admin/rbac'
     | '/admin/returns'
     | '/admin/settings'
     | '/admin/subscribe'
+    | '/admin/users'
     | '/admin/zoho'
     | '/auth/callback'
     | '/blog/$slug'
+    | '/customersupport/cancellations'
+    | '/customersupport/contact-messages'
+    | '/customersupport/customers'
+    | '/customersupport/orders'
+    | '/customersupport/returns'
+    | '/operations/cancellations'
+    | '/operations/contact-messages'
+    | '/operations/customers'
+    | '/operations/dashboard'
+    | '/operations/invoices'
+    | '/operations/orders'
+    | '/operations/products'
+    | '/operations/returns'
     | '/product/$slug'
+    | '/sales/products'
     | '/account/'
     | '/admin/'
     | '/blog/'
@@ -621,6 +925,8 @@ export interface FileRouteTypes {
     | '/account/orders/'
     | '/account/orders/$orderNumber/invoice'
     | '/admin/orders/$orderNumber/invoice'
+    | '/customersupport/orders/$orderNumber/invoice'
+    | '/operations/orders/$orderNumber/invoice'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -629,11 +935,17 @@ export interface FileRouteTypes {
     | '/best-sellers'
     | '/cart'
     | '/checkout'
+    | '/contact'
+    | '/contact-us'
+    | '/customersupport'
     | '/gift'
+    | '/invite'
     | '/login'
     | '/new-arrivals'
+    | '/operations'
     | '/privacy'
     | '/reset-password'
+    | '/sales'
     | '/shipping'
     | '/shop'
     | '/subscribe'
@@ -651,25 +963,47 @@ export interface FileRouteTypes {
     | '/account/track'
     | '/account/wishlist'
     | '/admin/about'
+    | '/admin/addresses'
     | '/admin/banners'
     | '/admin/blog'
+    | '/admin/cancellations'
     | '/admin/categories'
+    | '/admin/contact-messages'
     | '/admin/coupons'
+    | '/admin/customers'
     | '/admin/discount'
+    | '/admin/gift'
     | '/admin/home'
     | '/admin/invoices'
     | '/admin/login'
     | '/admin/orders'
+    | '/admin/package-types'
     | '/admin/pages'
     | '/admin/policies'
     | '/admin/products'
+    | '/admin/rbac'
     | '/admin/returns'
     | '/admin/settings'
     | '/admin/subscribe'
+    | '/admin/users'
     | '/admin/zoho'
     | '/auth/callback'
     | '/blog/$slug'
+    | '/customersupport/cancellations'
+    | '/customersupport/contact-messages'
+    | '/customersupport/customers'
+    | '/customersupport/orders'
+    | '/customersupport/returns'
+    | '/operations/cancellations'
+    | '/operations/contact-messages'
+    | '/operations/customers'
+    | '/operations/dashboard'
+    | '/operations/invoices'
+    | '/operations/orders'
+    | '/operations/products'
+    | '/operations/returns'
     | '/product/$slug'
+    | '/sales/products'
     | '/account'
     | '/admin'
     | '/blog'
@@ -679,6 +1013,8 @@ export interface FileRouteTypes {
     | '/account/orders'
     | '/account/orders/$orderNumber/invoice'
     | '/admin/orders/$orderNumber/invoice'
+    | '/customersupport/orders/$orderNumber/invoice'
+    | '/operations/orders/$orderNumber/invoice'
   id:
     | '__root__'
     | '/'
@@ -690,11 +1026,17 @@ export interface FileRouteTypes {
     | '/blog'
     | '/cart'
     | '/checkout'
+    | '/contact'
+    | '/contact-us'
+    | '/customersupport'
     | '/gift'
+    | '/invite'
     | '/login'
     | '/new-arrivals'
+    | '/operations'
     | '/privacy'
     | '/reset-password'
+    | '/sales'
     | '/shipping'
     | '/shop'
     | '/subscribe'
@@ -713,25 +1055,47 @@ export interface FileRouteTypes {
     | '/account/track'
     | '/account/wishlist'
     | '/admin/about'
+    | '/admin/addresses'
     | '/admin/banners'
     | '/admin/blog'
+    | '/admin/cancellations'
     | '/admin/categories'
+    | '/admin/contact-messages'
     | '/admin/coupons'
+    | '/admin/customers'
     | '/admin/discount'
+    | '/admin/gift'
     | '/admin/home'
     | '/admin/invoices'
     | '/admin/login'
     | '/admin/orders'
+    | '/admin/package-types'
     | '/admin/pages'
     | '/admin/policies'
     | '/admin/products'
+    | '/admin/rbac'
     | '/admin/returns'
     | '/admin/settings'
     | '/admin/subscribe'
+    | '/admin/users'
     | '/admin/zoho'
     | '/auth/callback'
     | '/blog/$slug'
+    | '/customersupport/cancellations'
+    | '/customersupport/contact-messages'
+    | '/customersupport/customers'
+    | '/customersupport/orders'
+    | '/customersupport/returns'
+    | '/operations/cancellations'
+    | '/operations/contact-messages'
+    | '/operations/customers'
+    | '/operations/dashboard'
+    | '/operations/invoices'
+    | '/operations/orders'
+    | '/operations/products'
+    | '/operations/returns'
     | '/product/$slug'
+    | '/sales/products'
     | '/account/'
     | '/admin/'
     | '/blog/'
@@ -741,6 +1105,8 @@ export interface FileRouteTypes {
     | '/account/orders/'
     | '/account/orders/$orderNumber_/invoice'
     | '/admin/orders_/$orderNumber/invoice'
+    | '/customersupport/orders_/$orderNumber/invoice'
+    | '/operations/orders_/$orderNumber/invoice'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -753,11 +1119,17 @@ export interface RootRouteChildren {
   BlogRoute: typeof BlogRouteWithChildren
   CartRoute: typeof CartRoute
   CheckoutRoute: typeof CheckoutRoute
+  ContactRoute: typeof ContactRoute
+  ContactUsRoute: typeof ContactUsRoute
+  CustomersupportRoute: typeof CustomersupportRouteWithChildren
   GiftRoute: typeof GiftRoute
+  InviteRoute: typeof InviteRoute
   LoginRoute: typeof LoginRoute
   NewArrivalsRoute: typeof NewArrivalsRoute
+  OperationsRoute: typeof OperationsRouteWithChildren
   PrivacyRoute: typeof PrivacyRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SalesRoute: typeof SalesRouteWithChildren
   ShippingRoute: typeof ShippingRoute
   ShopRoute: typeof ShopRoute
   SubscribeRoute: typeof SubscribeRoute
@@ -820,6 +1192,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShippingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sales': {
+      id: '/sales'
+      path: '/sales'
+      fullPath: '/sales'
+      preLoaderRoute: typeof SalesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reset-password': {
       id: '/reset-password'
       path: '/reset-password'
@@ -832,6 +1211,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/operations': {
+      id: '/operations'
+      path: '/operations'
+      fullPath: '/operations'
+      preLoaderRoute: typeof OperationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/new-arrivals': {
@@ -848,11 +1234,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/invite': {
+      id: '/invite'
+      path: '/invite'
+      fullPath: '/invite'
+      preLoaderRoute: typeof InviteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/gift': {
       id: '/gift'
       path: '/gift'
       fullPath: '/gift'
       preLoaderRoute: typeof GiftRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/customersupport': {
+      id: '/customersupport'
+      path: '/customersupport'
+      fullPath: '/customersupport'
+      preLoaderRoute: typeof CustomersupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact-us': {
+      id: '/contact-us'
+      path: '/contact-us'
+      fullPath: '/contact-us'
+      preLoaderRoute: typeof ContactUsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/checkout': {
@@ -939,12 +1353,110 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountIndexRouteImport
       parentRoute: typeof AccountRoute
     }
+    '/sales/products': {
+      id: '/sales/products'
+      path: '/products'
+      fullPath: '/sales/products'
+      preLoaderRoute: typeof SalesProductsRouteImport
+      parentRoute: typeof SalesRoute
+    }
     '/product/$slug': {
       id: '/product/$slug'
       path: '/product/$slug'
       fullPath: '/product/$slug'
       preLoaderRoute: typeof ProductSlugRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/operations/returns': {
+      id: '/operations/returns'
+      path: '/returns'
+      fullPath: '/operations/returns'
+      preLoaderRoute: typeof OperationsReturnsRouteImport
+      parentRoute: typeof OperationsRoute
+    }
+    '/operations/products': {
+      id: '/operations/products'
+      path: '/products'
+      fullPath: '/operations/products'
+      preLoaderRoute: typeof OperationsProductsRouteImport
+      parentRoute: typeof OperationsRoute
+    }
+    '/operations/orders': {
+      id: '/operations/orders'
+      path: '/orders'
+      fullPath: '/operations/orders'
+      preLoaderRoute: typeof OperationsOrdersRouteImport
+      parentRoute: typeof OperationsRoute
+    }
+    '/operations/invoices': {
+      id: '/operations/invoices'
+      path: '/invoices'
+      fullPath: '/operations/invoices'
+      preLoaderRoute: typeof OperationsInvoicesRouteImport
+      parentRoute: typeof OperationsRoute
+    }
+    '/operations/dashboard': {
+      id: '/operations/dashboard'
+      path: '/dashboard'
+      fullPath: '/operations/dashboard'
+      preLoaderRoute: typeof OperationsDashboardRouteImport
+      parentRoute: typeof OperationsRoute
+    }
+    '/operations/customers': {
+      id: '/operations/customers'
+      path: '/customers'
+      fullPath: '/operations/customers'
+      preLoaderRoute: typeof OperationsCustomersRouteImport
+      parentRoute: typeof OperationsRoute
+    }
+    '/operations/contact-messages': {
+      id: '/operations/contact-messages'
+      path: '/contact-messages'
+      fullPath: '/operations/contact-messages'
+      preLoaderRoute: typeof OperationsContactMessagesRouteImport
+      parentRoute: typeof OperationsRoute
+    }
+    '/operations/cancellations': {
+      id: '/operations/cancellations'
+      path: '/cancellations'
+      fullPath: '/operations/cancellations'
+      preLoaderRoute: typeof OperationsCancellationsRouteImport
+      parentRoute: typeof OperationsRoute
+    }
+    '/customersupport/returns': {
+      id: '/customersupport/returns'
+      path: '/returns'
+      fullPath: '/customersupport/returns'
+      preLoaderRoute: typeof CustomersupportReturnsRouteImport
+      parentRoute: typeof CustomersupportRoute
+    }
+    '/customersupport/orders': {
+      id: '/customersupport/orders'
+      path: '/orders'
+      fullPath: '/customersupport/orders'
+      preLoaderRoute: typeof CustomersupportOrdersRouteImport
+      parentRoute: typeof CustomersupportRoute
+    }
+    '/customersupport/customers': {
+      id: '/customersupport/customers'
+      path: '/customers'
+      fullPath: '/customersupport/customers'
+      preLoaderRoute: typeof CustomersupportCustomersRouteImport
+      parentRoute: typeof CustomersupportRoute
+    }
+    '/customersupport/contact-messages': {
+      id: '/customersupport/contact-messages'
+      path: '/contact-messages'
+      fullPath: '/customersupport/contact-messages'
+      preLoaderRoute: typeof CustomersupportContactMessagesRouteImport
+      parentRoute: typeof CustomersupportRoute
+    }
+    '/customersupport/cancellations': {
+      id: '/customersupport/cancellations'
+      path: '/cancellations'
+      fullPath: '/customersupport/cancellations'
+      preLoaderRoute: typeof CustomersupportCancellationsRouteImport
+      parentRoute: typeof CustomersupportRoute
     }
     '/blog/$slug': {
       id: '/blog/$slug'
@@ -965,6 +1477,13 @@ declare module '@tanstack/react-router' {
       path: '/zoho'
       fullPath: '/admin/zoho'
       preLoaderRoute: typeof AdminZohoRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/subscribe': {
@@ -988,6 +1507,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminReturnsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/rbac': {
+      id: '/admin/rbac'
+      path: '/rbac'
+      fullPath: '/admin/rbac'
+      preLoaderRoute: typeof AdminRbacRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/products': {
       id: '/admin/products'
       path: '/products'
@@ -1007,6 +1533,13 @@ declare module '@tanstack/react-router' {
       path: '/pages'
       fullPath: '/admin/pages'
       preLoaderRoute: typeof AdminPagesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/package-types': {
+      id: '/admin/package-types'
+      path: '/package-types'
+      fullPath: '/admin/package-types'
+      preLoaderRoute: typeof AdminPackageTypesRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/orders': {
@@ -1037,11 +1570,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminHomeRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/gift': {
+      id: '/admin/gift'
+      path: '/gift'
+      fullPath: '/admin/gift'
+      preLoaderRoute: typeof AdminGiftRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/discount': {
       id: '/admin/discount'
       path: '/discount'
       fullPath: '/admin/discount'
       preLoaderRoute: typeof AdminDiscountRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/customers': {
+      id: '/admin/customers'
+      path: '/customers'
+      fullPath: '/admin/customers'
+      preLoaderRoute: typeof AdminCustomersRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/coupons': {
@@ -1051,11 +1598,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCouponsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/contact-messages': {
+      id: '/admin/contact-messages'
+      path: '/contact-messages'
+      fullPath: '/admin/contact-messages'
+      preLoaderRoute: typeof AdminContactMessagesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/categories': {
       id: '/admin/categories'
       path: '/categories'
       fullPath: '/admin/categories'
       preLoaderRoute: typeof AdminCategoriesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/cancellations': {
+      id: '/admin/cancellations'
+      path: '/cancellations'
+      fullPath: '/admin/cancellations'
+      preLoaderRoute: typeof AdminCancellationsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/blog': {
@@ -1070,6 +1631,13 @@ declare module '@tanstack/react-router' {
       path: '/banners'
       fullPath: '/admin/banners'
       preLoaderRoute: typeof AdminBannersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/addresses': {
+      id: '/admin/addresses'
+      path: '/addresses'
+      fullPath: '/admin/addresses'
+      preLoaderRoute: typeof AdminAddressesRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/about': {
@@ -1177,6 +1745,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountOrdersOrderNumberRouteImport
       parentRoute: typeof AccountOrdersRoute
     }
+    '/operations/orders_/$orderNumber/invoice': {
+      id: '/operations/orders_/$orderNumber/invoice'
+      path: '/orders/$orderNumber/invoice'
+      fullPath: '/operations/orders/$orderNumber/invoice'
+      preLoaderRoute: typeof OperationsOrdersOrderNumberInvoiceRouteImport
+      parentRoute: typeof OperationsRoute
+    }
+    '/customersupport/orders_/$orderNumber/invoice': {
+      id: '/customersupport/orders_/$orderNumber/invoice'
+      path: '/orders/$orderNumber/invoice'
+      fullPath: '/customersupport/orders/$orderNumber/invoice'
+      preLoaderRoute: typeof CustomersupportOrdersOrderNumberInvoiceRouteImport
+      parentRoute: typeof CustomersupportRoute
+    }
     '/admin/orders_/$orderNumber/invoice': {
       id: '/admin/orders_/$orderNumber/invoice'
       path: '/orders/$orderNumber/invoice'
@@ -1245,21 +1827,29 @@ const AccountRouteWithChildren =
 
 interface AdminRouteChildren {
   AdminAboutRoute: typeof AdminAboutRoute
+  AdminAddressesRoute: typeof AdminAddressesRoute
   AdminBannersRoute: typeof AdminBannersRoute
   AdminBlogRoute: typeof AdminBlogRoute
+  AdminCancellationsRoute: typeof AdminCancellationsRoute
   AdminCategoriesRoute: typeof AdminCategoriesRoute
+  AdminContactMessagesRoute: typeof AdminContactMessagesRoute
   AdminCouponsRoute: typeof AdminCouponsRoute
+  AdminCustomersRoute: typeof AdminCustomersRoute
   AdminDiscountRoute: typeof AdminDiscountRoute
+  AdminGiftRoute: typeof AdminGiftRoute
   AdminHomeRoute: typeof AdminHomeRoute
   AdminInvoicesRoute: typeof AdminInvoicesRoute
   AdminLoginRoute: typeof AdminLoginRoute
   AdminOrdersRoute: typeof AdminOrdersRoute
+  AdminPackageTypesRoute: typeof AdminPackageTypesRoute
   AdminPagesRoute: typeof AdminPagesRoute
   AdminPoliciesRoute: typeof AdminPoliciesRoute
   AdminProductsRoute: typeof AdminProductsRoute
+  AdminRbacRoute: typeof AdminRbacRoute
   AdminReturnsRoute: typeof AdminReturnsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSubscribeRoute: typeof AdminSubscribeRoute
+  AdminUsersRoute: typeof AdminUsersRoute
   AdminZohoRoute: typeof AdminZohoRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminIntegrationsLedgerlyRoute: typeof AdminIntegrationsLedgerlyRoute
@@ -1268,21 +1858,29 @@ interface AdminRouteChildren {
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAboutRoute: AdminAboutRoute,
+  AdminAddressesRoute: AdminAddressesRoute,
   AdminBannersRoute: AdminBannersRoute,
   AdminBlogRoute: AdminBlogRoute,
+  AdminCancellationsRoute: AdminCancellationsRoute,
   AdminCategoriesRoute: AdminCategoriesRoute,
+  AdminContactMessagesRoute: AdminContactMessagesRoute,
   AdminCouponsRoute: AdminCouponsRoute,
+  AdminCustomersRoute: AdminCustomersRoute,
   AdminDiscountRoute: AdminDiscountRoute,
+  AdminGiftRoute: AdminGiftRoute,
   AdminHomeRoute: AdminHomeRoute,
   AdminInvoicesRoute: AdminInvoicesRoute,
   AdminLoginRoute: AdminLoginRoute,
   AdminOrdersRoute: AdminOrdersRoute,
+  AdminPackageTypesRoute: AdminPackageTypesRoute,
   AdminPagesRoute: AdminPagesRoute,
   AdminPoliciesRoute: AdminPoliciesRoute,
   AdminProductsRoute: AdminProductsRoute,
+  AdminRbacRoute: AdminRbacRoute,
   AdminReturnsRoute: AdminReturnsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminSubscribeRoute: AdminSubscribeRoute,
+  AdminUsersRoute: AdminUsersRoute,
   AdminZohoRoute: AdminZohoRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminIntegrationsLedgerlyRoute: AdminIntegrationsLedgerlyRoute,
@@ -1303,6 +1901,68 @@ const BlogRouteChildren: BlogRouteChildren = {
 
 const BlogRouteWithChildren = BlogRoute._addFileChildren(BlogRouteChildren)
 
+interface CustomersupportRouteChildren {
+  CustomersupportCancellationsRoute: typeof CustomersupportCancellationsRoute
+  CustomersupportContactMessagesRoute: typeof CustomersupportContactMessagesRoute
+  CustomersupportCustomersRoute: typeof CustomersupportCustomersRoute
+  CustomersupportOrdersRoute: typeof CustomersupportOrdersRoute
+  CustomersupportReturnsRoute: typeof CustomersupportReturnsRoute
+  CustomersupportOrdersOrderNumberInvoiceRoute: typeof CustomersupportOrdersOrderNumberInvoiceRoute
+}
+
+const CustomersupportRouteChildren: CustomersupportRouteChildren = {
+  CustomersupportCancellationsRoute: CustomersupportCancellationsRoute,
+  CustomersupportContactMessagesRoute: CustomersupportContactMessagesRoute,
+  CustomersupportCustomersRoute: CustomersupportCustomersRoute,
+  CustomersupportOrdersRoute: CustomersupportOrdersRoute,
+  CustomersupportReturnsRoute: CustomersupportReturnsRoute,
+  CustomersupportOrdersOrderNumberInvoiceRoute:
+    CustomersupportOrdersOrderNumberInvoiceRoute,
+}
+
+const CustomersupportRouteWithChildren = CustomersupportRoute._addFileChildren(
+  CustomersupportRouteChildren,
+)
+
+interface OperationsRouteChildren {
+  OperationsCancellationsRoute: typeof OperationsCancellationsRoute
+  OperationsContactMessagesRoute: typeof OperationsContactMessagesRoute
+  OperationsCustomersRoute: typeof OperationsCustomersRoute
+  OperationsDashboardRoute: typeof OperationsDashboardRoute
+  OperationsInvoicesRoute: typeof OperationsInvoicesRoute
+  OperationsOrdersRoute: typeof OperationsOrdersRoute
+  OperationsProductsRoute: typeof OperationsProductsRoute
+  OperationsReturnsRoute: typeof OperationsReturnsRoute
+  OperationsOrdersOrderNumberInvoiceRoute: typeof OperationsOrdersOrderNumberInvoiceRoute
+}
+
+const OperationsRouteChildren: OperationsRouteChildren = {
+  OperationsCancellationsRoute: OperationsCancellationsRoute,
+  OperationsContactMessagesRoute: OperationsContactMessagesRoute,
+  OperationsCustomersRoute: OperationsCustomersRoute,
+  OperationsDashboardRoute: OperationsDashboardRoute,
+  OperationsInvoicesRoute: OperationsInvoicesRoute,
+  OperationsOrdersRoute: OperationsOrdersRoute,
+  OperationsProductsRoute: OperationsProductsRoute,
+  OperationsReturnsRoute: OperationsReturnsRoute,
+  OperationsOrdersOrderNumberInvoiceRoute:
+    OperationsOrdersOrderNumberInvoiceRoute,
+}
+
+const OperationsRouteWithChildren = OperationsRoute._addFileChildren(
+  OperationsRouteChildren,
+)
+
+interface SalesRouteChildren {
+  SalesProductsRoute: typeof SalesProductsRoute
+}
+
+const SalesRouteChildren: SalesRouteChildren = {
+  SalesProductsRoute: SalesProductsRoute,
+}
+
+const SalesRouteWithChildren = SalesRoute._addFileChildren(SalesRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
@@ -1313,11 +1973,17 @@ const rootRouteChildren: RootRouteChildren = {
   BlogRoute: BlogRouteWithChildren,
   CartRoute: CartRoute,
   CheckoutRoute: CheckoutRoute,
+  ContactRoute: ContactRoute,
+  ContactUsRoute: ContactUsRoute,
+  CustomersupportRoute: CustomersupportRouteWithChildren,
   GiftRoute: GiftRoute,
+  InviteRoute: InviteRoute,
   LoginRoute: LoginRoute,
   NewArrivalsRoute: NewArrivalsRoute,
+  OperationsRoute: OperationsRouteWithChildren,
   PrivacyRoute: PrivacyRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SalesRoute: SalesRouteWithChildren,
   ShippingRoute: ShippingRoute,
   ShopRoute: ShopRoute,
   SubscribeRoute: SubscribeRoute,

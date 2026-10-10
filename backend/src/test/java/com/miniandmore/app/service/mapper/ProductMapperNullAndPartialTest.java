@@ -95,8 +95,62 @@ class ProductMapperNullAndPartialTest {
     }
 
     @Test
+    void productMapper_partialUpdateCatalogAndMediaJsonFields() {
+        ProductMapper mapper = MapperTestSupport.productMapper();
+        Product entity = new Product().slug("p").name("P").price(BigDecimal.TEN).currency("INR").active(true);
+        ProductDTO patch = new ProductDTO();
+        patch.setUnits("pair");
+        patch.setSizeChartJson("{\"sections\":[]}");
+        patch.setSizeNotesJson("[]");
+        patch.setColorImagesJson("{}");
+        patch.setItemStructure("VARIANTS");
+        patch.setVariantsJson("[]");
+        patch.setImagesJson("[]");
+        patch.setDetailsKicker("Kicker");
+
+        mapper.partialUpdate(entity, patch);
+
+        assertThat(entity.getUnits()).isEqualTo("pair");
+        assertThat(entity.getSizeChartJson()).isEqualTo("{\"sections\":[]}");
+        assertThat(entity.getSizeNotesJson()).isEqualTo("[]");
+        assertThat(entity.getColorImagesJson()).isEqualTo("{}");
+        assertThat(entity.getItemStructure()).isEqualTo("VARIANTS");
+        assertThat(entity.getVariantsJson()).isEqualTo("[]");
+        assertThat(entity.getImagesJson()).isEqualTo("[]");
+        assertThat(entity.getDetailsKicker()).isEqualTo("Kicker");
+    }
+
+    @Test
     void productMapper_toDtoCategoryName_nullCategory() {
         ProductMapper mapper = MapperTestSupport.productMapper();
         assertThat(mapper.toDtoCategoryName(null)).isNull();
+    }
+
+    @Test
+    void productMapper_roundTrip_preservesExtendedFields() {
+        ProductMapper mapper = MapperTestSupport.productMapper();
+        ProductDTO dto = new ProductDTO();
+        dto.setSlug("round-trip");
+        dto.setName("Round Trip");
+        dto.setSku("RT-SKU");
+        dto.setUnits("piece");
+        dto.setPrice(BigDecimal.valueOf(499));
+        dto.setCompareAtPrice(BigDecimal.valueOf(599));
+        dto.setCurrency("INR");
+        dto.setItemStructure("VARIANTS");
+        dto.setVariantsJson("[]");
+        dto.setZohoItemId("zoho-rt");
+        dto.setLedgerlyItemId("ledgerly-rt");
+        dto.setActive(true);
+
+        Product entity = mapper.toEntity(dto);
+        ProductDTO back = mapper.toDto(entity);
+
+        assertThat(back.getSlug()).isEqualTo("round-trip");
+        assertThat(back.getUnits()).isEqualTo("piece");
+        assertThat(back.getZohoItemId()).isEqualTo("zoho-rt");
+        assertThat(back.getLedgerlyItemId()).isEqualTo("ledgerly-rt");
+        assertThat(mapper.toDto((Product) null)).isNull();
+        assertThat(mapper.toEntity((ProductDTO) null)).isNull();
     }
 }

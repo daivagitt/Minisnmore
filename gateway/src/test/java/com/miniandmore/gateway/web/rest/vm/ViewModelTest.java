@@ -43,8 +43,10 @@ class ViewModelTest {
         ManagedUserVM vm = new ManagedUserVM();
         vm.setLogin("user");
         vm.setPassword("password");
+        vm.setSubscribed(true);
 
         assertThat(vm.getLogin()).isEqualTo("user");
+        assertThat(vm.getSubscribed()).isTrue();
         assertThat(ManagedUserVM.PASSWORD_MIN_LENGTH).isPositive();
     }
 }

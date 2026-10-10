@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260910120200-1" author="codex">
+        <createTable tableName="xpressbees_return_webhook_event">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="event_id" type="varchar(160)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="return_number" type="varchar(48)"/>
+            <column name="reverse_awb" type="varchar(80)"/>
+            <column name="provider_status" type="varchar(80)"/>
+            <column name="local_status" type="varchar(80)"/>
+            <column name="received_at" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+</databaseChangeLog>

@@ -162,12 +162,35 @@ public class SiteSetting implements Serializable {
 
     public static final int DEFAULT_DELIVERY_ETA_BUFFER_DAYS = 3;
     public static final int MAX_DELIVERY_ETA_BUFFER_DAYS = 30;
+    public static final int DEFAULT_RETURN_WINDOW_DAYS = 3;
+    public static final int MAX_RETURN_WINDOW_DAYS = 90;
+    public static final int DEFAULT_REFUND_MIN_BUSINESS_DAYS = 2;
+    public static final int DEFAULT_REFUND_MAX_BUSINESS_DAYS = 5;
+    public static final int MAX_REFUND_BUSINESS_DAYS = 30;
 
     @NotNull
     @Min(0)
     @Max(MAX_DELIVERY_ETA_BUFFER_DAYS)
     @Column(name = "delivery_eta_buffer_days")
     private Integer deliveryEtaBufferDays;
+
+    @NotNull
+    @Min(1)
+    @Max(MAX_RETURN_WINDOW_DAYS)
+    @Column(name = "return_window_days")
+    private Integer returnWindowDays;
+
+    @NotNull
+    @Min(1)
+    @Max(MAX_REFUND_BUSINESS_DAYS)
+    @Column(name = "refund_min_business_days")
+    private Integer refundMinBusinessDays;
+
+    @NotNull
+    @Min(1)
+    @Max(MAX_REFUND_BUSINESS_DAYS)
+    @Column(name = "refund_max_business_days")
+    private Integer refundMaxBusinessDays;
 
     @NotNull
     @DecimalMin(value = "0")
@@ -199,6 +222,9 @@ public class SiteSetting implements Serializable {
 
     @Column(name = "about_page_json", columnDefinition = "text")
     private String aboutPageJson;
+
+    @Column(name = "gift_page_json", columnDefinition = "text")
+    private String giftPageJson;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
@@ -644,6 +670,76 @@ public class SiteSetting implements Serializable {
         this.deliveryEtaBufferDays = deliveryEtaBufferDays;
     }
 
+    public Integer getReturnWindowDays() {
+        return this.returnWindowDays;
+    }
+
+    public SiteSetting returnWindowDays(Integer returnWindowDays) {
+        this.setReturnWindowDays(returnWindowDays);
+        return this;
+    }
+
+    public void setReturnWindowDays(Integer returnWindowDays) {
+        this.returnWindowDays = returnWindowDays;
+    }
+
+    public Integer getRefundMinBusinessDays() {
+        return this.refundMinBusinessDays;
+    }
+
+    public SiteSetting refundMinBusinessDays(Integer refundMinBusinessDays) {
+        this.setRefundMinBusinessDays(refundMinBusinessDays);
+        return this;
+    }
+
+    public void setRefundMinBusinessDays(Integer refundMinBusinessDays) {
+        this.refundMinBusinessDays = refundMinBusinessDays;
+    }
+
+    public Integer getRefundMaxBusinessDays() {
+        return this.refundMaxBusinessDays;
+    }
+
+    public SiteSetting refundMaxBusinessDays(Integer refundMaxBusinessDays) {
+        this.setRefundMaxBusinessDays(refundMaxBusinessDays);
+        return this;
+    }
+
+    public void setRefundMaxBusinessDays(Integer refundMaxBusinessDays) {
+        this.refundMaxBusinessDays = refundMaxBusinessDays;
+    }
+
+    public static int resolveReturnWindowDays(Integer value) {
+        if (value == null || value < 1 || value > MAX_RETURN_WINDOW_DAYS) {
+            return DEFAULT_RETURN_WINDOW_DAYS;
+        }
+        return value;
+    }
+
+    public static int resolveRefundMinBusinessDays(Integer value) {
+        if (value == null || value < 1 || value > MAX_REFUND_BUSINESS_DAYS) {
+            return DEFAULT_REFUND_MIN_BUSINESS_DAYS;
+        }
+        return value;
+    }
+
+    public static int resolveRefundMaxBusinessDays(Integer min, Integer max) {
+        int resolvedMin = resolveRefundMinBusinessDays(min);
+        if (max == null || max < 1 || max > MAX_REFUND_BUSINESS_DAYS) {
+            return Math.max(resolvedMin, DEFAULT_REFUND_MAX_BUSINESS_DAYS);
+        }
+        return Math.max(resolvedMin, max);
+    }
+
+    public static String formatRefundBusinessDaysLabel(int min, int max) {
+        int low = Math.max(1, min);
+        int high = Math.max(low, max);
+        if (low == high) {
+            return low == 1 ? "1 business day" : low + " business days";
+        }
+        return low + "–" + high + " business days";
+    }
+
     public BigDecimal getStoreDiscountPercent() {
         return this.storeDiscountPercent;
     }
@@ -711,6 +807,14 @@ public class SiteSetting implements Serializable {
 
     public void setAboutPageJson(String aboutPageJson) {
         this.aboutPageJson = aboutPageJson;
+    }
+
+    public String getGiftPageJson() {
+        return giftPageJson;
+    }
+
+    public void setGiftPageJson(String giftPageJson) {
+        this.giftPageJson = giftPageJson;
     }
 
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here

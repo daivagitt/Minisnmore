@@ -5,6 +5,7 @@ import { getMyProfile, updateMyProfile, ProfileUpdate } from "@/lib/orders.funct
 import { useAuth } from "@/hooks/useAuth";
 import { useAccountData } from "@/lib/account";
 import { Loader2, User as UserIcon, Save, Check } from "lucide-react";
+import { SubscribeOptIn } from "@/components/SubscribeOptIn";
 
 type FieldErrors = { full_name?: string; phone?: string };
 
@@ -33,6 +34,7 @@ function ProfilePage() {
   const [saved, setSaved] = useState(false);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
+  const [subscribed, setSubscribed] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [touched, setTouched] = useState<{ full_name?: boolean; phone?: boolean }>({});
 
@@ -40,6 +42,7 @@ function ProfilePage() {
     if (profile) {
       setFullName(profile.full_name ?? "");
       setPhone(profile.phone ?? "");
+      setSubscribed(profile.subscribed === true);
       setLoading(false);
       return;
     }
@@ -48,7 +51,8 @@ function ProfilePage() {
       .then((r) => {
         setFullName(r.profile?.full_name ?? "");
         setPhone(r.profile?.phone ?? "");
-        setCachedProfile(r.profile ?? { full_name: "", phone: "" });
+        setSubscribed(r.profile?.subscribed === true);
+        setCachedProfile(r.profile ?? { full_name: "", phone: "", subscribed: false });
       })
       .finally(() => setLoading(false));
   }, [profile, setCachedProfile]);
@@ -57,6 +61,7 @@ function ProfilePage() {
     if (!loadingProfile && profile) {
       setFullName(profile.full_name ?? "");
       setPhone(profile.phone ?? "");
+      setSubscribed(profile.subscribed === true);
       setLoading(false);
     }
   }, [loadingProfile, profile]);
@@ -73,8 +78,8 @@ function ProfilePage() {
     setSaving(true);
     setSaved(false);
     try {
-      await updateMyProfile({ data: { full_name: fullName.trim(), phone: phone.trim() } });
-      setCachedProfile({ full_name: fullName.trim(), phone: phone.trim() });
+      await updateMyProfile({ data: { full_name: fullName.trim(), phone: phone.trim(), subscribed } });
+      setCachedProfile({ full_name: fullName.trim(), phone: phone.trim(), subscribed });
       await refreshProfile();
       setSaved(true);
       setTimeout(() => setSaved(false), 2200);
@@ -144,6 +149,13 @@ function ProfilePage() {
               <p className="mt-1 text-xs text-destructive">{errors.phone}</p>
             ) : null}
           </div>
+          </div>
+          <div className="rounded-2xl border border-white/50 bg-white/60 px-4 py-3">
+            <SubscribeOptIn
+              checked={subscribed}
+              onChange={setSubscribed}
+              helper="Missed this during registration? Subscribe here, or uncheck to unsubscribe."
+            />
           </div>
           <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm disabled:opacity-60">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}

@@ -1,0 +1,247 @@
+{
+  "info": {
+    "name": "Minis n More API \u2014 Smoke (public 2xx only)",
+    "description": "Runnable without auth. Only public GET storefront APIs that should return 2xx on UAT.\n\nRun entire collection in Postman Runner \u2014 no login required.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://minisnmore.com"
+    },
+    {
+      "key": "productSlug",
+      "value": "12"
+    },
+    {
+      "key": "blogSlug",
+      "value": "sample-slug"
+    }
+  ],
+  "item": [
+    {
+      "name": "Storefront (public GET)",
+      "item": [
+        {
+          "name": "GET banners",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/banners"
+          }
+        },
+        {
+          "name": "GET blog-posts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/blog-posts"
+          }
+        },
+        {
+          "name": "GET blog-posts by slug",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/blog-posts/a-cozy-nest-for-sweet-dreams"
+          }
+        },
+        {
+          "name": "GET categories",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/categories"
+          }
+        },
+        {
+          "name": "GET home-sections",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/home-sections"
+          }
+        },
+        {
+          "name": "GET page-visibility",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/page-visibility"
+          }
+        },
+        {
+          "name": "GET products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/products"
+          }
+        },
+        {
+          "name": "GET products by slug",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/products/{{productSlug}}"
+          }
+        },
+        {
+          "name": "GET site-settings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200,201,202,204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/site-settings"
+          }
+        }
+      ]
+    }
+  ]
+}

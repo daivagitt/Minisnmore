@@ -1,0 +1,775 @@
+{
+  "info": {
+    "name": "Minis n More API \u2014 Performance (all GET + register)",
+    "description": "Generated from OpenAPI: 24 GET endpoints + POST /api/register. Run via Newman parallel workers at 15/25/35 users.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://minisnmore.com"
+    },
+    {
+      "key": "workerSeed",
+      "value": "1"
+    },
+    {
+      "key": "registerPassword",
+      "value": "Zero@1234"
+    },
+    {
+      "key": "adminAuthToken",
+      "value": ""
+    },
+    {
+      "key": "customerAuthToken",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "account-order-resource",
+      "item": [
+        {
+          "name": "GET /api/v1/account/profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerAuthToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/account/profile"
+          }
+        },
+        {
+          "name": "GET /api/v1/orders",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerAuthToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/orders"
+          }
+        },
+        {
+          "name": "GET /api/v1/payments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/payments"
+          }
+        }
+      ]
+    },
+    {
+      "name": "account-resource",
+      "item": [
+        {
+          "name": "GET /api/account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/account"
+          }
+        }
+      ]
+    },
+    {
+      "name": "admin-store-resource",
+      "item": [
+        {
+          "name": "GET /api/v1/admin/banners",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/banners"
+          }
+        },
+        {
+          "name": "GET /api/v1/admin/blog-posts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/blog-posts"
+          }
+        },
+        {
+          "name": "GET /api/v1/admin/categories",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/categories"
+          }
+        },
+        {
+          "name": "GET /api/v1/admin/coupons",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/coupons"
+          }
+        },
+        {
+          "name": "GET /api/v1/admin/dashboard",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/dashboard"
+          }
+        },
+        {
+          "name": "GET /api/v1/admin/home-sections",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/home-sections"
+          }
+        },
+        {
+          "name": "GET /api/v1/admin/page-visibility",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/page-visibility"
+          }
+        },
+        {
+          "name": "GET /api/v1/admin/policies",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/policies"
+          }
+        },
+        {
+          "name": "GET /api/v1/admin/products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/products"
+          }
+        },
+        {
+          "name": "GET /api/v1/admin/site-settings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/site-settings"
+          }
+        },
+        {
+          "name": "GET /api/v1/admin/zoho-settings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/zoho-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "authenticate-controller",
+      "item": [
+        {
+          "name": "GET /api/authenticate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/authenticate"
+          }
+        }
+      ]
+    },
+    {
+      "name": "storefront-resource",
+      "item": [
+        {
+          "name": "GET /api/v1/banners",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/banners"
+          }
+        },
+        {
+          "name": "GET /api/v1/blog-posts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/blog-posts"
+          }
+        },
+        {
+          "name": "GET /api/v1/categories",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/categories"
+          }
+        },
+        {
+          "name": "GET /api/v1/home-sections",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/home-sections"
+          }
+        },
+        {
+          "name": "GET /api/v1/page-visibility",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/page-visibility"
+          }
+        },
+        {
+          "name": "GET /api/v1/products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/products"
+          }
+        },
+        {
+          "name": "GET /api/v1/products/{slug}",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/products/basic-shorts-set"
+          }
+        },
+        {
+          "name": "GET /api/v1/site-settings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/site-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "account",
+      "item": []
+    }
+  ]
+}

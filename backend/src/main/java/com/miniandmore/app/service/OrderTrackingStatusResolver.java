@@ -3,6 +3,7 @@ package com.miniandmore.app.service;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
+import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import org.apache.commons.lang3.StringUtils;
 
 public final class OrderTrackingStatusResolver {
@@ -18,18 +19,32 @@ public final class OrderTrackingStatusResolver {
         if (order.getPaymentStatus() != PaymentStatus.PAID && order.getStatus() == OrderStatus.PENDING) {
             return "pending";
         }
+        if (isExpressBeesCarrierCancelled(order)) {
+            return XpressBeesShipmentStatus.CARRIER_CANCELLED;
+        }
+        if (isExpressBeesAwaitingPickup(order)) {
+            return "awaiting_pickup";
+        }
+        boolean localShipment = OrderShipmentService.hasLocalForwardShipment(order);
         if (
             order.getStatus() == OrderStatus.FULFILLED ||
-            LedgerlyOrderStatus.isDelivered(ledgerlyStatus) ||
-            ZohoOrderStatus.isDelivered(order.getZohoOrderStatus())
+            (!localShipment && LedgerlyOrderStatus.isDelivered(ledgerlyStatus)) ||
+            (!localShipment && ZohoOrderStatus.isDelivered(order.getZohoOrderStatus()))
         ) {
             return "delivered";
         }
+        if (localShipment && XpressBeesShipmentStatus.isOutForDelivery(order.getShipmentCarrierStatus())) {
+            return "out_for_delivery";
+        }
+        if (localShipment && XpressBeesShipmentStatus.isUndelivered(order.getShipmentCarrierStatus())) {
+            return "delivery_failed";
+        }
         if (
-            LedgerlyOrderStatus.isShipped(ledgerlyStatus) ||
-            ZohoOrderStatus.isShipped(order.getZohoOrderStatus()) ||
+            XpressBeesShipmentStatus.isPickedUpOrInTransit(order.getShipmentCarrierStatus()) ||
             StringUtils.isNotBlank(order.getTrackingNumber()) ||
-            StringUtils.isNotBlank(order.getShipmentDate())
+            StringUtils.isNotBlank(order.getShipmentDate()) ||
+            (!localShipment && LedgerlyOrderStatus.isShipped(ledgerlyStatus)) ||
+            (!localShipment && ZohoOrderStatus.isShipped(order.getZohoOrderStatus()))
         ) {
             return "shipped";
         }
@@ -42,5 +57,60 @@ public final class OrderTrackingStatusResolver {
             return "confirmed";
         }
         return "pending";
+    }
+
+    /** True once the parcel has left the warehouse (shipped, out for delivery, delivery failed, or delivered). */
+    public static boolean isDispatched(String trackingStatus) {
+        return "shipped".equals(trackingStatus) || "out_for_delivery".equals(trackingStatus) || "delivery_failed".equals(trackingStatus) || "delivered".equals(trackingStatus);
+    }
+
+    /**
+     * Customer cancellation is blocked once a forward shipment is booked (awaiting pickup) or has left the warehouse.
+     * Carrier-cancelled AWBs remain open so the order can be rebooked or cancelled.
+     */
+    public static boolean blocksCustomerCancellation(CustomerOrder order) {
+        if (order == null) {
+            return false;
+        }
+        String tracking = resolve(order);
+        if (XpressBeesShipmentStatus.CARRIER_CANCELLED.equals(tracking)) {
+            return false;
+        }
+        return "awaiting_pickup".equals(tracking) || isDispatched(tracking);
+    }
+
+    /**
+     * ExpressBees AWB generation only prints a label. Customer "shipped" waits for a pickup scan.
+     */
+    static boolean isExpressBeesAwaitingPickup(CustomerOrder order) {
+        if (order.getShipmentLogisticsMode() != ReturnLogisticsMode.XPRESSBEES) {
+            return false;
+        }
+        if (StringUtils.isBlank(order.getTrackingNumber()) || order.getShipmentCancelledAt() != null) {
+            return false;
+        }
+        String carrierStatus = order.getShipmentCarrierStatus();
+        return !XpressBeesShipmentStatus.isCancelled(carrierStatus) &&
+            !XpressBeesShipmentStatus.isPickedUpOrInTransit(carrierStatus) &&
+            !XpressBeesShipmentStatus.isOutForDelivery(carrierStatus) &&
+            !XpressBeesShipmentStatus.isUndelivered(carrierStatus) &&
+            !XpressBeesShipmentStatus.isDelivered(carrierStatus);
+    }
+
+    /**
+     * ExpressBees voided the AWB before pickup. The customer order stays open so Admin
+     * can rebook a shipment or cancel the order — same fork as exchange pickup-failed.
+     */
+    static boolean isExpressBeesCarrierCancelled(CustomerOrder order) {
+        if (order == null || order.getShipmentLogisticsMode() != ReturnLogisticsMode.XPRESSBEES) {
+            return false;
+        }
+        if (StringUtils.isBlank(order.getTrackingNumber()) || order.getShipmentCancelledAt() != null) {
+            return false;
+        }
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FULFILLED) {
+            return false;
+        }
+        return XpressBeesShipmentStatus.isCancelled(order.getShipmentCarrierStatus());
     }
 }

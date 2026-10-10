@@ -53,7 +53,7 @@ public class PublicUserResource {
         }
 
         return userService
-            .countManagedUsers()
+            .countPublicUsers()
             .map(total -> new PageImpl<>(new ArrayList<>(), pageable, total))
             .map(page ->
                 PaginationUtil.generatePaginationHttpHeaders(

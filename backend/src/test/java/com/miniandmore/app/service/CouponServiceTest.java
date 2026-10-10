@@ -28,6 +28,9 @@ class CouponServiceTest {
     @Mock
     private CouponMapper couponMapper;
 
+    @Mock
+    private AdminConfigChangeMailService adminConfigChangeMailService;
+
     @InjectMocks
     private CouponService couponService;
 
@@ -48,6 +51,7 @@ class CouponServiceTest {
         couponService.save(input);
 
         assertThat(input.getDiscountValue()).isEqualByComparingTo("100");
+        verify(adminConfigChangeMailService).notifyCouponChangedAfterCommit(null, expected);
     }
 
     @Test
@@ -166,8 +170,17 @@ class CouponServiceTest {
 
     @Test
     void delete() {
+        Coupon entity = new Coupon().id(ID);
+        CouponDTO previous = new CouponDTO();
+        previous.setId(ID);
+        previous.setCode("GONE");
+        when(couponRepository.findById(ID)).thenReturn(Optional.of(entity));
+        when(couponMapper.toDto(entity)).thenReturn(previous);
+
         couponService.delete(ID);
+
         verify(couponRepository).deleteById(ID);
+        verify(adminConfigChangeMailService).notifyCouponChangedAfterCommit(previous, null);
     }
 
 }

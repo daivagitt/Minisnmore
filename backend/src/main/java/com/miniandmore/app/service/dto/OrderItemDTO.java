@@ -55,6 +55,10 @@ public class OrderItemDTO implements Serializable {
     private BigDecimal taxPct;
 
     @NotNull
+    @DecimalMin(value = "0")
+    private BigDecimal discountAllocation = BigDecimal.ZERO;
+
+    @NotNull
     private CustomerOrderDTO order;
 
     public Long getId() {
@@ -161,6 +165,14 @@ public class OrderItemDTO implements Serializable {
         this.taxPct = taxPct;
     }
 
+    public BigDecimal getDiscountAllocation() {
+        return discountAllocation;
+    }
+
+    public void setDiscountAllocation(BigDecimal discountAllocation) {
+        this.discountAllocation = discountAllocation == null ? BigDecimal.ZERO : discountAllocation;
+    }
+
     public CustomerOrderDTO getOrder() {
         return order;
     }
@@ -206,6 +218,7 @@ public class OrderItemDTO implements Serializable {
             ", mrp=" + getMrp() +
             ", hsn='" + getHsn() + "'" +
             ", taxPct=" + getTaxPct() +
+            ", discountAllocation=" + getDiscountAllocation() +
             ", order=" + getOrder() +
             "}";
     }

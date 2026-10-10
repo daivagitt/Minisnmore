@@ -55,7 +55,7 @@ class SiteSettingServiceTest {
         verify(siteSettingMapper).toEntity(input);
         verify(siteSettingRepository).save(entity);
         verify(siteSettingMapper).toDto(saved);
-        verify(adminConfigChangeMailService).notifySiteSettingsChanged(null, expected);
+        verify(adminConfigChangeMailService).notifySiteSettingsChangedAfterCommit(null, expected);
     }
 
     @Test
@@ -82,7 +82,7 @@ class SiteSettingServiceTest {
         verify(entityManager).detach(existing);
         verify(siteSettingMapper).toEntity(input);
         verify(siteSettingRepository).save(entity);
-        verify(adminConfigChangeMailService).notifySiteSettingsChanged(previous, expected);
+        verify(adminConfigChangeMailService).notifySiteSettingsChangedAfterCommit(previous, expected);
     }
 
     @Test
@@ -122,6 +122,30 @@ class SiteSettingServiceTest {
     }
 
     @Test
+    void update_preservesExistingReturnPolicyDaysWhenOlderClientOmitsThem() {
+        SiteSettingDTO input = new SiteSettingDTO();
+        input.setId(ID);
+        SiteSetting existing = new SiteSetting()
+            .id(ID)
+            .returnWindowDays(7)
+            .refundMinBusinessDays(3)
+            .refundMaxBusinessDays(8);
+        SiteSetting mapped = new SiteSetting().id(ID);
+        when(siteSettingRepository.findById(ID)).thenReturn(Optional.of(existing));
+        when(siteSettingMapper.toDto(existing)).thenReturn(new SiteSettingDTO());
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.of(existing));
+        when(siteSettingMapper.toEntity(input)).thenReturn(mapped);
+        when(siteSettingRepository.save(mapped)).thenReturn(mapped);
+        when(siteSettingMapper.toDto(mapped)).thenReturn(input);
+
+        siteSettingService.update(input);
+
+        assertThat(input.getReturnWindowDays()).isEqualTo(7);
+        assertThat(input.getRefundMinBusinessDays()).isEqualTo(3);
+        assertThat(input.getRefundMaxBusinessDays()).isEqualTo(8);
+    }
+
+    @Test
     void partialUpdate_found() {
         SiteSettingDTO input = new SiteSettingDTO();
         input.setId(ID);
@@ -141,7 +165,7 @@ class SiteSettingServiceTest {
         verify(entityManager).detach(existing);
         verify(siteSettingMapper).partialUpdate(existing, input);
         verify(siteSettingRepository).save(existing);
-        verify(adminConfigChangeMailService).notifySiteSettingsChanged(previous, expected);
+        verify(adminConfigChangeMailService).notifySiteSettingsChangedAfterCommit(previous, expected);
     }
 
     @Test

@@ -1,4 +1,5 @@
 import { CopyButton } from "@/components/CopyButton";
+import { formatOrderDate } from "@/lib/dates";
 import {
   TRACKING_STAGES,
   type OrderTrackingFields,
@@ -52,7 +53,7 @@ export function OrderTrackingCard({ order, showHeader = true }: Props) {
         </>
       )}
 
-      {(order.tracking_number || order.tracking_carrier || order.shipment_date) && (
+      {(order.tracking_number || order.tracking_carrier || order.shipment_date || order.shipment_delivered_at || order.tracking_url) && (
         <div className={`glass rounded-2xl p-4 text-sm space-y-1 ${showHeader ? "mt-4" : ""}`}>
           {order.tracking_carrier && (
             <div>
@@ -73,9 +74,22 @@ export function OrderTrackingCard({ order, showHeader = true }: Props) {
               />
             </div>
           )}
-          {order.shipment_date && (
+          {order.shipment_date &&
+            ["shipped", "out_for_delivery", "delivery_failed", "delivered", "fulfilled"].includes((order.tracking_status ?? "").toLowerCase()) && (
             <div>
               <span className="text-muted-foreground">Shipped on:</span> {order.shipment_date}
+            </div>
+          )}
+          {order.shipment_delivered_at && ["delivered", "fulfilled"].includes((order.tracking_status ?? order.status ?? "").toLowerCase()) && (
+            <div>
+              <span className="text-muted-foreground">Delivered on:</span> {formatOrderDate(order.shipment_delivered_at)}
+            </div>
+          )}
+          {order.tracking_url && (order.tracking_status ?? "").toLowerCase() !== "carrier_cancelled" && (
+            <div>
+              <a href={order.tracking_url} target="_blank" rel="noreferrer" className="underline">
+                Track shipment
+              </a>
             </div>
           )}
         </div>

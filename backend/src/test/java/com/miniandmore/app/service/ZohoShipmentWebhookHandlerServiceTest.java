@@ -90,6 +90,30 @@ class ZohoShipmentWebhookHandlerServiceTest {
     }
 
     @Test
+    void handle_localForwardShipment_doesNotApplyZohoStatus() {
+        String body =
+            "{\"eventId\":\"evt-ship-local\",\"zohoSalesOrderId\":\"so-local\",\"shipment_id\":\"ship-local\",\"status\":\"delivered\"," +
+            "\"tracking_number\":\"ZOHO-AWB\",\"carrier\":\"DTDC\"}";
+        CustomerOrder order = order("MNM-LOCAL", "so-local", OrderStatus.CONFIRMED);
+        order.setTrackingNumber("XB-LOCAL");
+        order.setTrackingCarrier("XpressBees");
+        order.setShipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES);
+        order.setShipmentCarrierStatus("booked");
+        when(webhookEventRepository.existsByEventId("evt-ship-local")).thenReturn(false);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-local")).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(order)).thenReturn(order);
+
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(order.getTrackingNumber()).isEqualTo("XB-LOCAL");
+        assertThat(order.getTrackingCarrier()).isEqualTo("XpressBees");
+        assertThat(result).containsEntry("status", "CONFIRMED");
+        verify(orderEventService, never()).syncLifecycleEvents(any());
+        verifySavedEvent("evt-ship-local", "so-local", null, "ship-local", "delivered");
+    }
+
+    @Test
     void handle_deliveredShipment_marksOrderFulfilledAndCopiesTracking() {
         String body =
             "{\"eventId\":\"evt-ship-3\",\"zohoSalesOrderId\":\"so-3\",\"shipment_id\":\"ship-3\",\"status\":\"delivered\"," +
@@ -560,6 +584,34 @@ class ZohoShipmentWebhookHandlerServiceTest {
         assertThat(order.getTrackingNumber()).isNull();
         assertThat(order.getTrackingCarrier()).isNull();
         assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("hand_wrapped");
+    }
+
+    @Test
+    void handle_missingShipmentFields_returnsBadRequest() {
+        String body = "{\"eventId\":\"evt-missing\"}";
+        assertThatThrownBy(() -> handler.handle(body, null, SECRET))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Provide zohoSalesOrderId or salesorder_number");
+    }
+
+    @Test
+    void handle_missingEventId_returnsBadRequest() {
+        String body = "{\"salesorder_id\":\"so-no-event\",\"package\":{\"tracking_number\":\"TRK-1\"}}";
+        assertThatThrownBy(() -> handler.handle(body, null, SECRET))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Missing eventId");
+    }
+
+    @Test
+    void handle_duplicateEventWithDataIntegrity_returnsDuplicateResult() {
+        String body =
+            "{\"eventId\":\"dup-evt\",\"salesorder_id\":\"so-dup\",\"package\":{\"status\":\"shipped\",\"tracking_number\":\"TRK-DUP\",\"package_id\":\"pkg-dup\",\"shipment_id\":\"ship-dup\"}}";
+        CustomerOrder order = order("MNM-DUP", "so-dup", OrderStatus.CONFIRMED);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-dup")).thenReturn(Optional.of(order));
+        when(webhookEventRepository.existsByEventId("dup-evt")).thenReturn(false);
+        when(webhookEventRepository.saveAndFlush(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("dup"));
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+        assertThat(result.get("duplicate")).isEqualTo(true);
     }
 
     private void verifySavedEvent(String eventId, String zohoSalesOrderId, String packageId, String shipmentId, String status) {

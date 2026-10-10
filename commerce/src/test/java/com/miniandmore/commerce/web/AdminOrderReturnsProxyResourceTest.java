@@ -36,6 +36,12 @@ class AdminOrderReturnsProxyResourceTest {
     }
 
     @Test
+    void summary_delegatesToCatalog() throws Exception {
+        when(catalog.get("/internal/v1/admin/order-returns/summary")).thenReturn(ResponseEntity.ok("{}"));
+        mockMvc.perform(get("/api/v1/admin/order-returns/summary")).andExpect(status().isOk());
+    }
+
+    @Test
     void list_withoutStatus_andApprove() throws Exception {
         when(catalog.get("/internal/v1/admin/order-returns")).thenReturn(ResponseEntity.ok("[]"));
         when(catalog.post(eq("/internal/v1/admin/order-returns/R1/approve"), any())).thenReturn(ResponseEntity.ok("{}"));
@@ -91,6 +97,15 @@ class AdminOrderReturnsProxyResourceTest {
             "shipped",
             "delivered",
             "complete",
+            "record-cod-refund",
+            "book-pickup",
+            "pickup-failed",
+            "reschedule-pickup",
+            "close-pickup-failed",
+            "settle-price-difference",
+            "book-outbound",
+            "package-rates",
+            "complete-package",
         };
         for (String path : paths) {
             when(catalog.post(eq("/internal/v1/admin/order-returns/R3/" + path), any())).thenReturn(ResponseEntity.ok("{}"));

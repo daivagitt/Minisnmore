@@ -11,8 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Service Implementation for managing {@link com.miniandmore.app.domain.SiteSetting}.
@@ -56,6 +54,7 @@ public class SiteSettingService {
         defaultStoreDiscountPercent(siteSettingDTO);
         defaultCodFee(siteSettingDTO);
         defaultDeliveryEtaBufferDays(siteSettingDTO);
+        defaultReturnPolicyDays(siteSettingDTO);
         SiteSetting siteSetting = siteSettingMapper.toEntity(siteSettingDTO);
         siteSetting = siteSettingRepository.save(siteSetting);
         SiteSettingDTO saved = siteSettingMapper.toDto(siteSetting);
@@ -75,6 +74,7 @@ public class SiteSettingService {
         defaultStoreDiscountPercent(siteSettingDTO);
         defaultCodFee(siteSettingDTO);
         defaultDeliveryEtaBufferDays(siteSettingDTO);
+        defaultReturnPolicyDays(siteSettingDTO);
         SiteSetting siteSetting = siteSettingMapper.toEntity(siteSettingDTO);
         siteSetting = siteSettingRepository.save(siteSetting);
         SiteSettingDTO saved = siteSettingMapper.toDto(siteSetting);
@@ -96,7 +96,7 @@ public class SiteSettingService {
             .findById(siteSettingDTO.getId())
             .map(existingSiteSetting -> {
                 siteSettingMapper.partialUpdate(existingSiteSetting, siteSettingDTO);
-
+                normalizeReturnPolicyFields(existingSiteSetting);
                 return existingSiteSetting;
             })
             .map(siteSettingRepository::save)
@@ -143,25 +143,7 @@ public class SiteSettingService {
     }
 
     private void notifyConfigChanged(SiteSettingDTO previous, SiteSettingDTO current) {
-        Runnable send = () -> {
-            try {
-                adminConfigChangeMailService.notifySiteSettingsChanged(previous, current);
-            } catch (RuntimeException ex) {
-                LOG.warn("Admin configuration email failed", ex);
-            }
-        };
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(
-                new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        send.run();
-                    }
-                }
-            );
-            return;
-        }
-        send.run();
+        adminConfigChangeMailService.notifySiteSettingsChangedAfterCommit(previous, current);
     }
 
     private void defaultStoreDiscountPercent(SiteSettingDTO dto) {
@@ -204,5 +186,45 @@ public class SiteSettingService {
         if (dto.getDeliveryEtaBufferDays() == null) {
             dto.setDeliveryEtaBufferDays(SiteSetting.DEFAULT_DELIVERY_ETA_BUFFER_DAYS);
         }
+    }
+
+    private void defaultReturnPolicyDays(SiteSettingDTO dto) {
+        SiteSetting existing = siteSettingRepository.findFirstByOrderByIdAsc().orElse(null);
+        if (dto.getReturnWindowDays() == null) {
+            dto.setReturnWindowDays(
+                existing != null && existing.getReturnWindowDays() != null
+                    ? existing.getReturnWindowDays()
+                    : SiteSetting.DEFAULT_RETURN_WINDOW_DAYS
+            );
+        }
+        if (dto.getRefundMinBusinessDays() == null) {
+            dto.setRefundMinBusinessDays(
+                existing != null && existing.getRefundMinBusinessDays() != null
+                    ? existing.getRefundMinBusinessDays()
+                    : SiteSetting.DEFAULT_REFUND_MIN_BUSINESS_DAYS
+            );
+        }
+        if (dto.getRefundMaxBusinessDays() == null) {
+            dto.setRefundMaxBusinessDays(
+                existing != null && existing.getRefundMaxBusinessDays() != null
+                    ? existing.getRefundMaxBusinessDays()
+                    : SiteSetting.DEFAULT_REFUND_MAX_BUSINESS_DAYS
+            );
+        }
+        int min = SiteSetting.resolveRefundMinBusinessDays(dto.getRefundMinBusinessDays());
+        int max = SiteSetting.resolveRefundMaxBusinessDays(min, dto.getRefundMaxBusinessDays());
+        dto.setRefundMinBusinessDays(min);
+        dto.setRefundMaxBusinessDays(max);
+        dto.setReturnWindowDays(SiteSetting.resolveReturnWindowDays(dto.getReturnWindowDays()));
+    }
+
+    private void normalizeReturnPolicyFields(SiteSetting entity) {
+        if (entity.getReturnWindowDays() != null) {
+            entity.setReturnWindowDays(SiteSetting.resolveReturnWindowDays(entity.getReturnWindowDays()));
+        }
+        int min = SiteSetting.resolveRefundMinBusinessDays(entity.getRefundMinBusinessDays());
+        int max = SiteSetting.resolveRefundMaxBusinessDays(min, entity.getRefundMaxBusinessDays());
+        entity.setRefundMinBusinessDays(min);
+        entity.setRefundMaxBusinessDays(max);
     }
 }

@@ -16,6 +16,13 @@ public final class ZohoOrderStatus {
     private ZohoOrderStatus() {}
 
     public static void applySalesOrderTracking(CustomerOrder order, Map<String, Object> salesOrder) {
+        if (OrderShipmentService.hasLocalForwardShipment(order)) {
+            String status = stringValue(salesOrder.get("status"));
+            if (StringUtils.isNotBlank(status)) {
+                order.setZohoOrderStatus(status);
+            }
+            return;
+        }
         String status = stringValue(salesOrder.get("status"));
         if (StringUtils.isNotBlank(status)) {
             order.setZohoOrderStatus(status);
@@ -55,7 +62,7 @@ public final class ZohoOrderStatus {
 
     @SuppressWarnings("unchecked")
     public static void applyDeliveryChallans(CustomerOrder order, List<Map<String, Object>> challans) {
-        if (challans == null || challans.isEmpty()) {
+        if (challans == null || challans.isEmpty() || OrderShipmentService.hasLocalForwardShipment(order)) {
             return;
         }
         boolean delivered = false;
@@ -82,12 +89,18 @@ public final class ZohoOrderStatus {
         }
         if (delivered && order.getStatus() != OrderStatus.CANCELLED) {
             order.setStatus(OrderStatus.FULFILLED);
+            challans.stream().filter(ZohoOrderStatus::indicatesDelivery).findFirst().ifPresent(challan -> OrderDeliverySupport.markDelivered(order, challan));
         }
     }
 
     /** A Zoho package is the operations-owned proof that wrapping/packing is complete. */
     public static void applyPackages(CustomerOrder order, List<Map<String, Object>> packages) {
-        if (packages == null || packages.isEmpty() || order.getStatus() == OrderStatus.CANCELLED) {
+        if (
+            packages == null ||
+            packages.isEmpty() ||
+            order.getStatus() == OrderStatus.CANCELLED ||
+            OrderShipmentService.hasLocalForwardShipment(order)
+        ) {
             return;
         }
         for (Map<String, Object> pkg : packages) {
@@ -117,15 +130,16 @@ public final class ZohoOrderStatus {
                 order.setShipmentDate(LocalDate.now().toString());
             }
         }
-        if (packages.stream().anyMatch(ZohoOrderStatus::isFulfilledShipment)) {
+        java.util.Optional<Map<String, Object>> deliveredPackage = packages.stream().filter(ZohoOrderStatus::isFulfilledShipment).findFirst();
+        if (deliveredPackage.isPresent()) {
             order.setStatus(OrderStatus.FULFILLED);
+            OrderDeliverySupport.markDelivered(order, deliveredPackage.orElseThrow());
             return;
         }
         if (order.getStatus() != OrderStatus.CONFIRMED) {
             return;
         }
-        String trackingStatus = OrderTrackingStatusResolver.resolve(order);
-        if ("shipped".equals(trackingStatus) || "delivered".equals(trackingStatus)) {
+        if (OrderTrackingStatusResolver.isDispatched(OrderTrackingStatusResolver.resolve(order))) {
             return;
         }
         order.setStatus(OrderStatus.HAND_WRAPPED);
@@ -296,6 +310,7 @@ public final class ZohoOrderStatus {
         // explicit "delivered" signal here for Zoho organizations that expose one directly.
         if ("delivered".equals(status) || "delivered".equals(shippedStatus) || "delivered".equals(shippedStatusCamel) || indicatesDelivery(salesOrder)) {
             order.setStatus(OrderStatus.FULFILLED);
+            OrderDeliverySupport.markDelivered(order, salesOrder);
             return;
         }
         // Sales-order "fulfilled"/invoiced is not physical delivery. Never demote a store

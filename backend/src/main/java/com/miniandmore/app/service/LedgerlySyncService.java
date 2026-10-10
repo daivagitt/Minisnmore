@@ -552,16 +552,6 @@ public class LedgerlySyncService {
         return value == null ? null : value.toString();
     }
 
-    private BigDecimal toBigDecimal(Object value) {
-        if (value == null) {
-            return BigDecimal.ZERO;
-        }
-        if (value instanceof BigDecimal bd) {
-            return bd;
-        }
-        return new BigDecimal(value.toString());
-    }
-
     private int toInteger(Object value) {
         if (value == null) {
             return 0;

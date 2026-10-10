@@ -36,6 +36,7 @@ class AuthorityResourceTest {
     }
 
     @Test
+    @WithMockUser(authorities = AuthoritiesConstants.SUPER_ADMIN)
     void createAuthority_returnsCreated() {
         Authority authority = new Authority();
         authority.setName("ROLE_TEST");
@@ -53,6 +54,7 @@ class AuthorityResourceTest {
     }
 
     @Test
+    @WithMockUser(authorities = AuthoritiesConstants.SUPER_ADMIN)
     void createAuthority_existing_returnsBadRequest() {
         Authority authority = new Authority();
         authority.setName("ROLE_TEST");
@@ -96,6 +98,7 @@ class AuthorityResourceTest {
     }
 
     @Test
+    @WithMockUser(authorities = AuthoritiesConstants.SUPER_ADMIN)
     void deleteAuthority_returnsNoContent() {
         when(authorityRepository.deleteById(AuthoritiesConstants.USER)).thenReturn(Mono.empty());
 

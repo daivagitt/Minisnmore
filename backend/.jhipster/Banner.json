@@ -39,6 +39,30 @@
       "fieldValidateRulesMaxlength": "80"
     },
     {
+      "fieldName": "eyebrow",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "80"
+    },
+    {
+      "fieldName": "trustFabricLabel",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "80"
+    },
+    {
+      "fieldName": "trustShippingLabel",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "80"
+    },
+    {
+      "fieldName": "trustDyesLabel",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "80"
+    },
+    {
       "fieldName": "sortOrder",
       "fieldType": "Integer",
       "fieldValidateRules": ["required", "min"],

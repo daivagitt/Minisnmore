@@ -5,17 +5,23 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.domain.*;
+import com.miniandmore.app.domain.enumeration.CouponEligibilityScope;
 import com.miniandmore.app.domain.enumeration.DiscountType;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
+import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import com.miniandmore.app.security.AuthoritiesConstants;
 import com.miniandmore.app.security.SecurityUtils;
 import com.miniandmore.app.service.LedgerlySyncService;
+import com.miniandmore.app.service.OrderShipmentService;
 import com.miniandmore.app.service.OrderEventService;
 import com.miniandmore.app.service.ZohoSyncService;
 import com.miniandmore.app.service.BogoDiscountCalculator;
+import com.miniandmore.app.service.CouponDiscountOutcome;
+import com.miniandmore.app.service.DiscountLineAllocator;
+import com.miniandmore.app.service.OrderCancellationService;
 import com.miniandmore.app.service.OrderTrackingStatusResolver;
 import com.miniandmore.app.service.ProductVariantSupport;
 import com.miniandmore.app.service.ProductVariantSupport.VariantRow;
@@ -82,6 +88,8 @@ public class InternalAccountOrderResource {
     private final StorePricingService storePricingService;
     private final OrderEventService orderEventService;
     private final RazorpayRefundService razorpayRefundService;
+    private final OrderCancellationService orderCancellationService;
+    private final OrderShipmentService orderShipmentService;
     private final TransactionTemplate inventoryRestoreTransaction;
 
     @Value("${razorpay.key-id:DEMO}")
@@ -103,6 +111,8 @@ public class InternalAccountOrderResource {
         StorePricingService storePricingService,
         OrderEventService orderEventService,
         RazorpayRefundService razorpayRefundService,
+        OrderCancellationService orderCancellationService,
+        OrderShipmentService orderShipmentService,
         PlatformTransactionManager transactionManager
     ) {
         this.dataAccess = dataAccess;
@@ -114,13 +124,15 @@ public class InternalAccountOrderResource {
         this.storePricingService = storePricingService;
         this.orderEventService = orderEventService;
         this.razorpayRefundService = razorpayRefundService;
+        this.orderCancellationService = orderCancellationService;
+        this.orderShipmentService = orderShipmentService;
         this.inventoryRestoreTransaction = new TransactionTemplate(transactionManager);
     }
 
     @PostMapping("/coupons/validate")
     public ApiResponse<Map<String, Object>> validateCoupon(@Valid @RequestBody CouponValidationRequest request) {
         Optional<String> login = SecurityUtils.getCurrentUserLogin();
-        Optional<Map<String, Object>> discount = calculateCouponDiscount(
+        Optional<CouponDiscountOutcome> discount = calculateCouponDiscount(
             request.code(),
             request.subtotal(),
             login,
@@ -129,14 +141,20 @@ public class InternalAccountOrderResource {
         if (discount.isEmpty()) {
             return ApiResponse.ok(Map.of("ok", false, FIELD_ERROR, "Invalid or expired coupon"));
         }
-        Map<String, Object> result = discount.orElseThrow();
-        if (result.containsKey(FIELD_ERROR)) {
-            return ApiResponse.ok(Map.of("ok", false, FIELD_ERROR, result.get(FIELD_ERROR)));
+        CouponDiscountOutcome result = discount.orElseThrow();
+        if (result.hasError()) {
+            return ApiResponse.ok(Map.of("ok", false, FIELD_ERROR, result.error()));
         }
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("ok", true);
         data.put("code", request.code().trim().toUpperCase(Locale.ROOT));
-        data.put(FIELD_DISCOUNT, result.get(FIELD_DISCOUNT));
+        data.put(FIELD_DISCOUNT, result.discount());
+        if (result.nudge() != null) {
+            data.put("nudge", result.nudge());
+        }
+        if (result.bogoDetails() != null) {
+            data.put("bogo_details", result.bogoDetails());
+        }
         return ApiResponse.ok(data);
     }
 
@@ -170,16 +188,22 @@ public class InternalAccountOrderResource {
         data.put("max_discount", coupon.getMaxDiscount());
         data.put("bogo_buy_qty", BogoDiscountCalculator.clampQty(coupon.getBogoBuyQty()));
         data.put("bogo_get_qty", BogoDiscountCalculator.clampQty(coupon.getBogoGetQty()));
+        data.put(
+            "eligibility_scope",
+            BogoDiscountCalculator.resolveScope(coupon.getEligibilityScope()).name().toLowerCase(Locale.ROOT)
+        );
+        data.put("eligibility_category_id", coupon.getEligibilityCategoryId());
         return data;
     }
 
     @GetMapping("/account/profile")
-    public ApiResponse<Map<String, String>> profile() {
+    public ApiResponse<Map<String, Object>> profile() {
         String login = requireLogin();
         Optional<CustomerProfile> profile = dataAccess.customerProfileRepository().findOneByUserLogin(login);
-        Map<String, String> data = new LinkedHashMap<>();
+        Map<String, Object> data = new LinkedHashMap<>();
         data.put("full_name", profile.map(CustomerProfile::getFullName).map(StringUtils::defaultString).orElse(""));
         data.put(FIELD_PHONE, profile.map(CustomerProfile::getPhone).map(StringUtils::defaultString).orElse(""));
+        data.put("subscribed", profile.map(CustomerProfile::getSubscribed).map(Boolean.TRUE::equals).orElse(false));
         return ApiResponse.ok(data);
     }
 
@@ -203,6 +227,9 @@ public class InternalAccountOrderResource {
             .orElseGet(() -> new CustomerProfile().userLogin(login));
         profile.setFullName(StringUtils.trimToNull(request.full_name()));
         profile.setPhone(StringUtils.trimToNull(request.phone()));
+        if (request.subscribed() != null) {
+            profile.setSubscribed(request.subscribed());
+        }
         dataAccess.customerProfileRepository().save(profile);
         ledgerlySyncService.syncCustomerProfileAsync(login);
         return ApiResponse.ok(Map.of("ok", true));
@@ -220,14 +247,22 @@ public class InternalAccountOrderResource {
         if (!login.equalsIgnoreCase(email)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email does not match signed-in account");
         }
-        CustomerProfile profile = dataAccess
-            .customerProfileRepository()
-            .findOneByUserLogin(login)
-            .orElseGet(() -> new CustomerProfile().userLogin(login));
-        if (StringUtils.isNotBlank(profile.getFullName())) {
+        Optional<CustomerProfile> existing = dataAccess.customerProfileRepository().findOneByUserLogin(login);
+        boolean isNew = existing.isEmpty();
+        CustomerProfile profile = existing.orElseGet(() -> new CustomerProfile().userLogin(login));
+        boolean changed = false;
+        if (StringUtils.isBlank(profile.getFullName())) {
+            profile.setFullName(StringUtils.trimToNull(request.full_name()));
+            changed = true;
+        }
+        // Signup opt-in only seeds a new profile; later opt-outs from the profile page must not be undone.
+        if (isNew && Boolean.TRUE.equals(request.subscribed())) {
+            profile.setSubscribed(true);
+            changed = true;
+        }
+        if (!changed) {
             return ApiResponse.ok(Map.of("ok", true));
         }
-        profile.setFullName(StringUtils.trimToNull(request.full_name()));
         dataAccess.customerProfileRepository().save(profile);
         ledgerlySyncService.syncCustomerProfileAsync(login);
         return ApiResponse.ok(Map.of("ok", true));
@@ -307,8 +342,11 @@ public class InternalAccountOrderResource {
             .placedAt(Instant.now());
         CustomerOrder saved = dataAccess.customerOrderRepository().save(order);
         List<OrderItem> orderItems = new ArrayList<>();
-        for (ReservedOrderItem reservedItem : reserved) {
+        List<BigDecimal> lineDiscounts = totals.lineDiscounts();
+        for (int i = 0; i < reserved.size(); i++) {
+            ReservedOrderItem reservedItem = reserved.get(i);
             OrderItemRequest itemRequest = reservedItem.request();
+            BigDecimal lineDiscount = i < lineDiscounts.size() ? lineDiscounts.get(i) : BigDecimal.ZERO;
             OrderItem item = new OrderItem()
                 .order(saved)
                 .productId(itemRequest.product_id())
@@ -322,7 +360,8 @@ public class InternalAccountOrderResource {
                 .price(reservedItem.unitPrice())
                 .mrp(reservedItem.mrp())
                 .hsn(StringUtils.trimToNull(reservedItem.product().getHsn()))
-                .taxPct(reservedItem.product().getTaxPct());
+                .taxPct(reservedItem.product().getTaxPct())
+                .discountAllocation(roundInr(lineDiscount));
             orderItems.add(item);
         }
         dataAccess.orderItemRepository().saveAll(orderItems);
@@ -403,7 +442,7 @@ public class InternalAccountOrderResource {
     }
 
     @PostMapping("/orders/verify-payment")
-    @Transactional
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public ApiResponse<Map<String, Object>> verifyPayment(@Valid @RequestBody VerifyPaymentRequest request) {
         String login = requireLogin();
         CustomerOrder order = requireOwnedOrder(request.orderId(), login);
@@ -502,65 +541,55 @@ public class InternalAccountOrderResource {
         return ApiResponse.ok(Map.of("order", orderDetail(order)));
     }
 
+    @PostMapping("/orders/{orderNumber}/cancel-request")
+    public ApiResponse<Map<String, Object>> submitCancelRequest(
+        @PathVariable String orderNumber,
+        @Valid @RequestBody CancelOrderRequest request
+    ) {
+        String login = requireLogin();
+        var cancellationRequest = orderCancellationService.submitRequest(login, orderNumber, request.reason());
+        CustomerOrder order = dataAccess
+            .customerOrderRepository()
+            .findOneByOrderNumberAndUserLogin(orderNumber, login)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("order", orderDetail(order));
+        data.put("cancellation_request", orderCancellationService.toCustomerDto(cancellationRequest));
+        return ApiResponse.ok(data);
+    }
+
+    @GetMapping("/orders/{orderNumber}/cancel-request")
+    public ApiResponse<Map<String, Object>> getCancelRequest(@PathVariable String orderNumber) {
+        String login = requireLogin();
+        var cancellationRequest = orderCancellationService.getVisibleForUser(login, orderNumber);
+        if (cancellationRequest == null) {
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("cancellation_request", null);
+            return ApiResponse.ok(data);
+        }
+        return ApiResponse.ok(Map.of("cancellation_request", orderCancellationService.toCustomerDto(cancellationRequest)));
+    }
+
+    @PostMapping("/orders/{orderNumber}/cancel-request/withdraw")
+    public ApiResponse<Map<String, Object>> withdrawCancelRequest(@PathVariable String orderNumber) {
+        String login = requireLogin();
+        var cancellationRequest = orderCancellationService.withdrawByCustomer(login, orderNumber);
+        CustomerOrder order = dataAccess
+            .customerOrderRepository()
+            .findOneByOrderNumberAndUserLogin(orderNumber, login)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("order", orderDetail(order));
+        data.put("cancellation_request", orderCancellationService.toCustomerDto(cancellationRequest));
+        return ApiResponse.ok(data);
+    }
+
     @PostMapping("/orders/{orderNumber}/cancel")
     public ApiResponse<Map<String, Object>> cancelOrder(
         @PathVariable String orderNumber,
         @Valid @RequestBody CancelOrderRequest request
     ) {
-        String login = requireLogin();
-        CustomerOrder order = dataAccess
-            .customerOrderRepository()
-            .findOneByOrderNumberAndUserLogin(orderNumber, login)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
-
-        if (order.getStatus() == OrderStatus.CANCELLED) {
-            syncCancellationToZoho(order);
-            return ApiResponse.ok(Map.of("order", orderDetail(order)));
-        }
-
-        order = refreshTrackingIfStale(order);
-        String trackingStatus = OrderTrackingStatusResolver.resolve(order);
-        if (order.getStatus() == OrderStatus.FULFILLED || "shipped".equals(trackingStatus) || "delivered".equals(trackingStatus)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "This order has already been dispatched and can no longer be cancelled");
-        }
-
-        // Only an "online" (Razorpay) payment can be refunded through this API. A COD order
-        // marked paid via markCodCollected() was settled in cash with no razorpay_payment_id —
-        // refunding that is a manual/offline process, not something to attempt here.
-        boolean onlinePayment =
-            "online".equalsIgnoreCase(order.getPaymentMethod()) && StringUtils.isNotBlank(order.getRazorpayPaymentId());
-        String refundId = null;
-        if (order.getPaymentStatus() == PaymentStatus.PAID && onlinePayment) {
-            refundId = razorpayRefundService.refundPayment(order, order.getTotal());
-            // The refund above is a real, irreversible call to Razorpay. Persist its outcome
-            // immediately, on its own, before touching anything else that could still fail
-            // (inventory restore below has been seen to throw on transient errors) — otherwise a
-            // later failure would roll back paymentStatus/status while the money has already left,
-            // and a retry (which only skips the refund when status is already CANCELLED) would
-            // refund the customer a second time.
-            order.setPaymentStatus(PaymentStatus.REFUNDED);
-            order = dataAccess.customerOrderRepository().save(order);
-        }
-
-        CustomerOrder orderForInventoryRestore = order;
-        try {
-            // restoreInventoryForCancellation takes a PESSIMISTIC_WRITE lock per product (see
-            // ProductRepository#findOneForInventoryUpdate), which needs its own real transaction —
-            // this method is no longer @Transactional (that's the whole point of the fix above), so
-            // give it one explicitly rather than relying on an enclosing one that no longer exists.
-            inventoryRestoreTransaction.executeWithoutResult(status -> restoreInventoryForCancellation(orderForInventoryRestore));
-        } catch (RuntimeException ex) {
-            // Any refund above is already durably recorded; inventory reconciliation is
-            // best-effort here so it can never re-expose the order to a duplicate refund attempt.
-            LOG.warn("Inventory restore failed while cancelling {}: {}", order.getOrderNumber(), ex.getMessage());
-        }
-        order.setStatus(OrderStatus.CANCELLED);
-        order.setCancellationReason(StringUtils.normalizeSpace(request.reason()).trim());
-        CustomerOrder cancelled = dataAccess.customerOrderRepository().save(order);
-        syncCancellationToLedgerly(cancelled, refundId);
-        syncCancellationToZoho(cancelled);
-        orderEventService.syncLifecycleEvents(cancelled);
-        return ApiResponse.ok(Map.of("order", orderDetail(cancelled)));
+        return submitCancelRequest(orderNumber, request);
     }
 
     @GetMapping("/payments")
@@ -681,7 +710,7 @@ public class InternalAccountOrderResource {
         if (!isWelcome10Coupon(code)) {
             return Optional.empty();
         }
-        if (!SecurityUtils.isAuthenticated()) {
+        if (userLogin == null || userLogin.isEmpty() || !SecurityUtils.isAuthenticated()) {
             return Optional.of("Sign in to use WELCOME10 on your first order");
         }
         if (!isFirstOrderEligible(userLogin.orElseThrow())) {
@@ -690,11 +719,11 @@ public class InternalAccountOrderResource {
         return Optional.empty();
     }
 
-    private Optional<Map<String, Object>> calculateCouponDiscount(String code, BigDecimal subtotal, Optional<String> userLogin) {
+    private Optional<CouponDiscountOutcome> calculateCouponDiscount(String code, BigDecimal subtotal, Optional<String> userLogin) {
         return calculateCouponDiscount(code, subtotal, userLogin, List.of());
     }
 
-    private Optional<Map<String, Object>> calculateCouponDiscount(
+    private Optional<CouponDiscountOutcome> calculateCouponDiscount(
         String code,
         BigDecimal subtotal,
         Optional<String> userLogin,
@@ -705,7 +734,7 @@ public class InternalAccountOrderResource {
         }
         Optional<String> welcome10Error = welcome10EligibilityError(code, userLogin);
         if (welcome10Error.isPresent()) {
-            return Optional.of(Map.of(FIELD_ERROR, welcome10Error.orElseThrow()));
+            return Optional.of(CouponDiscountOutcome.error(welcome10Error.orElseThrow()));
         }
         Optional<Coupon> couponOpt = dataAccess.couponRepository().findOneByCodeIgnoreCase(code.trim());
         if (couponOpt.isEmpty()) {
@@ -718,11 +747,16 @@ public class InternalAccountOrderResource {
         if (coupon.getExpiresAt() != null && coupon.getExpiresAt().isBefore(Instant.now())) {
             return Optional.empty();
         }
-        BigDecimal effectiveSubtotal = couponSubtotal(subtotal, lines);
-        if (effectiveSubtotal.compareTo(coupon.getMinOrder()) < 0) {
-            return Optional.of(Map.of(FIELD_ERROR, minOrderEligibilityMessage(coupon.getMinOrder(), effectiveSubtotal)));
+        BigDecimal effectiveSubtotal = couponSubtotal(
+            subtotal,
+            lines,
+            coupon.getEligibilityScope(),
+            coupon.getEligibilityCategoryId()
+        );
+        BigDecimal minOrder = coupon.getMinOrder() != null ? coupon.getMinOrder() : BigDecimal.ZERO;
+        if (effectiveSubtotal.compareTo(minOrder) < 0) {
+            return Optional.of(CouponDiscountOutcome.error(minOrderEligibilityMessage(minOrder, effectiveSubtotal)));
         }
-        BigDecimal discount;
         if (coupon.getDiscountType() == DiscountType.BOGO) {
             BogoDiscountCalculator.Result bogo = BogoDiscountCalculator.calculate(
                 coupon.getBogoBuyQty(),
@@ -730,13 +764,27 @@ public class InternalAccountOrderResource {
                 coupon.getDiscountValue(),
                 coupon.getMaxDiscount(),
                 effectiveSubtotal,
-                lines
+                lines,
+                coupon.getEligibilityScope(),
+                coupon.getEligibilityCategoryId()
             );
             if (!bogo.eligible()) {
-                return Optional.of(Map.of(FIELD_ERROR, bogoEligibilityMessage(bogo.missingItems())));
+                return Optional.of(CouponDiscountOutcome.error(bogoEligibilityMessage(bogo.missingItems())));
             }
-            discount = bogo.discount();
-        } else if (coupon.getDiscountType() == DiscountType.PERCENT) {
+            BigDecimal discount = roundInr(bogo.discount().max(BigDecimal.ZERO).min(effectiveSubtotal));
+            String nudge = bogo.nextTierMissing() > 0
+                ? bogoNextTierMessage(bogo.nextTierMissing(), coupon.getBogoGetQty(), coupon.getDiscountValue())
+                : null;
+            String details = bogoSummaryMessage(
+                bogo.appliedGroups(),
+                coupon.getBogoBuyQty(),
+                coupon.getBogoGetQty(),
+                coupon.getDiscountValue()
+            );
+            return Optional.of(CouponDiscountOutcome.ok(discount, bogo.discountByLineIndex(), nudge, details));
+        }
+        BigDecimal discount;
+        if (coupon.getDiscountType() == DiscountType.PERCENT) {
             discount = effectiveSubtotal
                 .multiply(coupon.getDiscountValue())
                 .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
@@ -753,7 +801,13 @@ public class InternalAccountOrderResource {
         // Preserve paise: the invoice workbook applies percentage discounts to two decimals
         // (for example, 10% of ₹279.20 is ₹27.92).
         discount = roundInr(discount);
-        return Optional.of(Map.of(FIELD_DISCOUNT, discount));
+        Map<Integer, BigDecimal> lineAllocations = DiscountLineAllocator.allocateProportionally(
+            discount,
+            lines,
+            coupon.getEligibilityScope(),
+            coupon.getEligibilityCategoryId()
+        );
+        return Optional.of(CouponDiscountOutcome.ok(discount, lineAllocations, null, null));
     }
 
     private static String bogoEligibilityMessage(int missingItems) {
@@ -761,6 +815,39 @@ public class InternalAccountOrderResource {
             return "Add 1 more item to use this BOGO offer";
         }
         return "Add " + missingItems + " more items to use this BOGO offer";
+    }
+
+    private static String bogoNextTierMessage(int nextTierMissing, Integer getQty, BigDecimal discountValue) {
+        int get = BogoDiscountCalculator.clampQty(getQty);
+        boolean isFree = discountValue == null || discountValue.compareTo(BigDecimal.valueOf(100)) >= 0;
+        String reward = isFree
+            ? (get == 1 ? "1 more free item" : get + " more free items")
+            : (get == 1 ? "the next item at " + formatPercent(discountValue) + "% off" : get + " more items at " + formatPercent(discountValue) + "% off");
+        if (nextTierMissing <= 1) {
+            return "Add 1 more item to get " + reward + "!";
+        }
+        return "Add " + nextTierMissing + " more items to get " + reward + "!";
+    }
+
+    private static String bogoSummaryMessage(int appliedGroups, Integer buyQty, Integer getQty, BigDecimal discountValue) {
+        int buy = BogoDiscountCalculator.clampQty(buyQty);
+        int get = BogoDiscountCalculator.clampQty(getQty);
+        boolean isFree = discountValue == null || discountValue.compareTo(BigDecimal.valueOf(100)) >= 0;
+        int totalDiscountedItems = appliedGroups * get;
+        if (isFree) {
+            return totalDiscountedItems <= 1
+                ? "Buy " + buy + " Get " + get + " Free applied (1 free item)"
+                : "Buy " + buy + " Get " + get + " Free applied (" + totalDiscountedItems + " free items)";
+        }
+        return "Buy " + buy + " Get " + get + " at " + formatPercent(discountValue) + "% off applied (" + totalDiscountedItems + " items discounted)";
+    }
+
+    private static String formatPercent(BigDecimal value) {
+        if (value == null) return "100";
+        if (value.scale() <= 0 || value.remainder(BigDecimal.ONE).compareTo(BigDecimal.ZERO) == 0) {
+            return value.setScale(0, RoundingMode.HALF_UP).toPlainString();
+        }
+        return value.stripTrailingZeros().toPlainString();
     }
 
     private static String minOrderEligibilityMessage(BigDecimal minOrder, BigDecimal subtotal) {
@@ -771,25 +858,62 @@ public class InternalAccountOrderResource {
         return "Add ₹" + shortfall.setScale(0, RoundingMode.CEILING).toPlainString() + " more to unlock this offer";
     }
 
-    private static BigDecimal couponSubtotal(BigDecimal requestSubtotal, List<BogoDiscountCalculator.Line> lines) {
+    private static BigDecimal couponSubtotal(
+        BigDecimal requestSubtotal,
+        List<BogoDiscountCalculator.Line> lines,
+        CouponEligibilityScope scope,
+        Long eligibilityCategoryId
+    ) {
         if (lines == null || lines.isEmpty()) {
             return requestSubtotal == null ? BigDecimal.ZERO : requestSubtotal;
         }
-        return lines
-            .stream()
-            .map(line -> line.unitPrice().multiply(BigDecimal.valueOf(line.qty())))
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return BogoDiscountCalculator.qualifyingSubtotal(lines, scope, eligibilityCategoryId);
     }
 
-    private static List<BogoDiscountCalculator.Line> couponLines(List<CouponLineRequest> items) {
+    private List<BogoDiscountCalculator.Line> couponLines(List<CouponLineRequest> items) {
         if (items == null || items.isEmpty()) {
             return List.of();
         }
-        return items
-            .stream()
-            .filter(item -> item != null && item.qty() != null && item.price() != null)
-            .map(item -> new BogoDiscountCalculator.Line(item.qty(), item.price()))
-            .toList();
+        List<BogoDiscountCalculator.Line> lines = new ArrayList<>();
+        for (int i = 0; i < items.size(); i++) {
+            CouponLineRequest item = items.get(i);
+            if (item == null || item.qty() == null || item.price() == null) {
+                continue;
+            }
+            Long categoryId = null;
+            if (StringUtils.isNotBlank(item.product_id())) {
+                // Prefer server category so validate matches checkout (never trust client category alone).
+                categoryId = lookupProductCategoryId(item.product_id());
+            }
+            if (categoryId == null) {
+                categoryId = item.category_id();
+            }
+            lines.add(
+                new BogoDiscountCalculator.Line(
+                    item.qty(),
+                    item.price(),
+                    i,
+                    blankToNull(item.product_id()),
+                    blankToNull(item.sku()),
+                    categoryId
+                )
+            );
+        }
+        return lines;
+    }
+
+    private Long lookupProductCategoryId(String productIdRaw) {
+        try {
+            Long productId = Long.parseLong(StringUtils.trimToEmpty(productIdRaw));
+            return dataAccess
+                .productRepository()
+                .findById(productId)
+                .map(Product::getCategory)
+                .map(Category::getId)
+                .orElse(null);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private Totals calculateTotals(
@@ -804,20 +928,38 @@ public class InternalAccountOrderResource {
             .stream()
             .map(item -> item.unitPrice().multiply(BigDecimal.valueOf(item.request().qty())))
             .reduce(BigDecimal.ZERO, BigDecimal::add);
-        List<BogoDiscountCalculator.Line> lines = items
-            .stream()
-            .map(item -> new BogoDiscountCalculator.Line(item.request().qty(), item.unitPrice()))
-            .toList();
-        Optional<Map<String, Object>> couponResult = calculateCouponDiscount(
+        List<BogoDiscountCalculator.Line> lines = new ArrayList<>();
+        for (int i = 0; i < items.size(); i++) {
+            ReservedOrderItem item = items.get(i);
+            Long categoryId = item.product().getCategory() != null ? item.product().getCategory().getId() : null;
+            lines.add(
+                new BogoDiscountCalculator.Line(
+                    item.request().qty(),
+                    item.unitPrice(),
+                    i,
+                    item.request().product_id(),
+                    blankToNull(item.variantSku()),
+                    categoryId
+                )
+            );
+        }
+        Optional<CouponDiscountOutcome> couponResult = calculateCouponDiscount(
             couponCode,
             subtotal,
             Optional.ofNullable(login),
             lines
         );
-        if (couponResult.map(m -> m.containsKey(FIELD_ERROR)).orElse(false)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, couponResult.orElseThrow().get(FIELD_ERROR).toString());
+        if (couponResult.map(CouponDiscountOutcome::hasError).orElse(false)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, couponResult.orElseThrow().error());
         }
-        BigDecimal discount = couponResult.map(m -> (BigDecimal) m.get(FIELD_DISCOUNT)).orElse(BigDecimal.ZERO);
+        BigDecimal discount = couponResult.map(CouponDiscountOutcome::discount).orElse(BigDecimal.ZERO);
+        Map<Integer, BigDecimal> allocations = couponResult
+            .map(CouponDiscountOutcome::lineAllocations)
+            .orElse(Map.of());
+        List<BigDecimal> lineDiscounts = new ArrayList<>(items.size());
+        for (int i = 0; i < items.size(); i++) {
+            lineDiscounts.add(roundInr(allocations.getOrDefault(i, BigDecimal.ZERO)));
+        }
         BigDecimal afterDiscount = roundInr(subtotal.subtract(discount).max(BigDecimal.ZERO));
         CommerceSettings commerce = commerceSettings();
         BigDecimal shipping = calculateShipping(afterDiscount, shippingMode, commerce);
@@ -839,7 +981,7 @@ public class InternalAccountOrderResource {
                 .add(roundedDonation)
                 .add(commerce.pricesIncludeGst() ? BigDecimal.ZERO : productTax)
         );
-        return new Totals(subtotal, discount, shipping, codFee, tax, total);
+        return new Totals(subtotal, discount, shipping, codFee, tax, total, List.copyOf(lineDiscounts));
     }
 
     /** INR rounded to paise — mirrors src/lib/money.ts#roundInr. */
@@ -1067,7 +1209,12 @@ public class InternalAccountOrderResource {
         }
         // Paid orders no longer carry the temporary reservation flag, but their stock was still
         // deducted at checkout and must be restored when they are cancelled before dispatch.
-        if (!Boolean.TRUE.equals(order.getInventoryReserved()) && order.getPaymentStatus() != PaymentStatus.REFUNDED) {
+        if (
+            !Boolean.TRUE.equals(order.getInventoryReserved()) &&
+            order.getPaymentStatus() != PaymentStatus.REFUNDED &&
+            order.getPaymentStatus() != PaymentStatus.REFUND_INITIATED &&
+            order.getPaymentStatus() != PaymentStatus.REFUND_FAILED
+        ) {
             return;
         }
         order.setInventoryReserved(true);
@@ -1267,18 +1414,12 @@ public class InternalAccountOrderResource {
         data.put("payment_method", order.getPaymentMethod());
         data.put(FIELD_TOTAL, order.getTotal());
         data.put("created_at", orderCreatedAtIso(order));
-        data.put("can_cancel", canCancel(order));
+        data.put("can_cancel", orderCancellationService.canCustomerShowCancelAction(order));
+        data.put("contact_care_to_cancel", orderCancellationService.shouldContactCareToCancel(order));
+        data.put("packed_at", order.getPackedAt() == null ? "" : order.getPackedAt().toString());
         data.put("order_items", dataAccess.orderItemRepository().findAllByOrderId(order.getId()).stream().map(this::orderItem).toList());
         trackingFields(order).forEach(data::putIfAbsent);
         return data;
-    }
-
-    private boolean canCancel(CustomerOrder order) {
-        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FULFILLED) {
-            return false;
-        }
-        String trackingStatus = OrderTrackingStatusResolver.resolve(order);
-        return !"shipped".equals(trackingStatus) && !"delivered".equals(trackingStatus);
     }
 
     Map<String, Object> orderDetail(CustomerOrder order) {
@@ -1293,6 +1434,12 @@ public class InternalAccountOrderResource {
         data.put("shipping_address", readJson(order.getShippingAddressJson()));
         data.put("notes", order.getNotes());
         data.put("cancellation_reason", order.getCancellationReason());
+        var cancellationRequest = orderCancellationService.getVisibleForUser(order.getUserLogin(), order.getOrderNumber());
+        data.put(
+            "cancellation_request",
+            cancellationRequest != null ? orderCancellationService.toCustomerDto(cancellationRequest) : null
+        );
+        data.put("pending_cancellation", orderCancellationService.hasPendingRequest(order.getId()));
         data.put("razorpay_order_id", order.getRazorpayOrderId());
         data.put("razorpay_payment_id", order.getRazorpayPaymentId());
         data.put("invoice_pdf_url", invoicePdfUrl(order));
@@ -1335,7 +1482,9 @@ public class InternalAccountOrderResource {
         limited.put("tracking_status", fields.get("tracking_status"));
         limited.put("tracking_number", fields.get("tracking_number"));
         limited.put("tracking_carrier", fields.get("tracking_carrier"));
+        limited.put("tracking_url", fields.get("tracking_url"));
         limited.put("shipment_date", fields.get("shipment_date"));
+        limited.put("shipment_delivered_at", fields.get("shipment_delivered_at"));
         return limited;
     }
 
@@ -1346,7 +1495,9 @@ public class InternalAccountOrderResource {
         fields.put("tracking_status", OrderTrackingStatusResolver.resolve(order));
         fields.put("tracking_number", StringUtils.defaultString(order.getTrackingNumber()));
         fields.put("tracking_carrier", StringUtils.defaultString(order.getTrackingCarrier()));
+        fields.put("tracking_url", StringUtils.defaultString(order.getTrackingUrl()));
         fields.put("shipment_date", StringUtils.defaultString(order.getShipmentDate()));
+        fields.put("shipment_delivered_at", instant(order.getShipmentDeliveredAt()));
         return fields;
     }
 
@@ -1380,6 +1531,17 @@ public class InternalAccountOrderResource {
                 }
             }
         }
+        if (order.getShipmentLogisticsMode() == ReturnLogisticsMode.XPRESSBEES && !orderShipmentService.isExpressBeesTrackingFresh(order)) {
+            try {
+                CustomerOrder pulled = orderShipmentService.refreshExpressBeesTracking(order);
+                if (pulled != order) {
+                    refreshed = true;
+                    order = pulled;
+                }
+            } catch (Exception ex) {
+                LOG.warn("ExpressBees tracking refresh failed for {}: {}", order.getOrderNumber(), ex.getMessage());
+            }
+        }
         if (refreshed) {
             return dataAccess.customerOrderRepository().findById(order.getId()).orElse(order);
         }
@@ -1397,7 +1559,7 @@ public class InternalAccountOrderResource {
         return data;
     }
 
-    private Map<String, Object> orderItem(OrderItem item) {
+    Map<String, Object> orderItem(OrderItem item) {
         Map<String, Object> data = new LinkedHashMap<>();
         Product product = orderItemProduct(item).orElse(null);
         data.put("id", item.getId());
@@ -1527,7 +1689,11 @@ public class InternalAccountOrderResource {
 
     private String orderCreatedAtIso(CustomerOrder order) {
         Instant placed = resolveOrderPlacedAt(order);
-        return placed == null ? "" : placed.toString();
+        return instant(placed);
+    }
+
+    private static String instant(Instant value) {
+        return value == null ? "" : value.toString();
     }
 
     private static long toPaise(BigDecimal total) {
@@ -1549,7 +1715,10 @@ public class InternalAccountOrderResource {
 
     public record CouponLineRequest(
         @NotNull @Min(1) @Max(50) Integer qty,
-        @NotNull @DecimalMin("0") BigDecimal price
+        @NotNull @DecimalMin("0") BigDecimal price,
+        @Size(max = 120) String product_id,
+        @Size(max = 120) String sku,
+        Long category_id
     ) {}
 
     public record ProfileUpdateRequest(
@@ -1560,7 +1729,8 @@ public class InternalAccountOrderResource {
         @NotBlank
         @Size(max = 20)
         @Pattern(regexp = "^(\\+91[\\s-]?)?[6-9]\\d{4}[\\s-]?\\d{5}$", message = "Enter a valid 10-digit Indian mobile number")
-        String phone
+        String phone,
+        Boolean subscribed
     ) {}
 
     public record ProfileBootstrapRequest(
@@ -1568,7 +1738,8 @@ public class InternalAccountOrderResource {
         @Size(min = 2, max = 120)
         @Pattern(regexp = "^\\p{L}[\\p{L} .'-]*$", message = "Full name may only contain letters, spaces, apostrophes, periods and hyphens")
         String full_name,
-        @NotBlank @Email @Size(max = 160) String email
+        @NotBlank @Email @Size(max = 160) String email,
+        Boolean subscribed
     ) {}
 
     public record AddressRequest(
@@ -1633,7 +1804,8 @@ public class InternalAccountOrderResource {
         BigDecimal shipping,
         BigDecimal codFee,
         BigDecimal tax,
-        BigDecimal total
+        BigDecimal total,
+        List<BigDecimal> lineDiscounts
     ) {}
 
     private record ReservedOrderItem(Product product, OrderItemRequest request, String variantSku, BigDecimal unitPrice, BigDecimal mrp) {}

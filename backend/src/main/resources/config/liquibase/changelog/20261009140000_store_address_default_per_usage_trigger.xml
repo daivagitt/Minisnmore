@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20261009140000-1" author="miniandmore" dbms="postgresql">
+        <sql splitStatements="false">
+            CREATE OR REPLACE FUNCTION enforce_store_address_one_default_per_usage()
+            RETURNS TRIGGER AS $func$
+            DECLARE
+                addr_id BIGINT;
+                usage_val VARCHAR(20);
+                is_default_addr BOOLEAN;
+            BEGIN
+                IF TG_TABLE_NAME = 'store_address' THEN
+                    IF COALESCE(NEW.is_default, FALSE) IS NOT TRUE THEN
+                        RETURN NEW;
+                    END IF;
+                    addr_id := NEW.id;
+                    FOR usage_val IN
+                        SELECT sau.usage FROM store_address_usage sau WHERE sau.store_address_id = addr_id
+                    LOOP
+                        IF EXISTS (
+                            SELECT 1
+                            FROM store_address_usage sau2
+                            INNER JOIN store_address sa ON sa.id = sau2.store_address_id
+                            WHERE sau2.usage = usage_val
+                              AND sa.is_default IS TRUE
+                              AND sa.id &lt;&gt; addr_id
+                        ) THEN
+                            RAISE EXCEPTION 'Another address is already the default for usage %', usage_val
+                                USING ERRCODE = '23505';
+                        END IF;
+                    END LOOP;
+                    RETURN NEW;
+                END IF;
+
+                addr_id := NEW.store_address_id;
+                usage_val := NEW.usage;
+                SELECT sa.is_default INTO is_default_addr FROM store_address sa WHERE sa.id = addr_id;
+                IF COALESCE(is_default_addr, FALSE) IS NOT TRUE THEN
+                    RETURN NEW;
+                END IF;
+                IF EXISTS (
+                    SELECT 1
+                    FROM store_address_usage sau2
+                    INNER JOIN store_address sa ON sa.id = sau2.store_address_id
+                    WHERE sau2.usage = usage_val
+                      AND sa.is_default IS TRUE
+                      AND sa.id &lt;&gt; addr_id
+                ) THEN
+                    RAISE EXCEPTION 'Another address is already the default for usage %', usage_val
+                        USING ERRCODE = '23505';
+                END IF;
+                RETURN NEW;
+            END;
+            $func$ LANGUAGE plpgsql;
+        </sql>
+        <rollback>
+            DROP FUNCTION IF EXISTS enforce_store_address_one_default_per_usage();
+        </rollback>
+    </changeSet>
+
+    <changeSet id="20261009140000-2" author="miniandmore" dbms="postgresql">
+        <sql>
+            DROP TRIGGER IF EXISTS trg_store_address_default_usage ON store_address;
+            CREATE TRIGGER trg_store_address_default_usage
+                BEFORE INSERT OR UPDATE OF is_default ON store_address
+                FOR EACH ROW
+                WHEN (NEW.is_default IS TRUE)
+                EXECUTE FUNCTION enforce_store_address_one_default_per_usage();
+
+            DROP TRIGGER IF EXISTS trg_store_address_usage_default_usage ON store_address_usage;
+            CREATE TRIGGER trg_store_address_usage_default_usage
+                BEFORE INSERT OR UPDATE ON store_address_usage
+                FOR EACH ROW
+                EXECUTE FUNCTION enforce_store_address_one_default_per_usage();
+        </sql>
+        <rollback>
+            DROP TRIGGER IF EXISTS trg_store_address_usage_default_usage ON store_address_usage;
+            DROP TRIGGER IF EXISTS trg_store_address_default_usage ON store_address;
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

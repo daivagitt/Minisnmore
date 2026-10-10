@@ -713,6 +713,41 @@ class LedgerlySyncServiceTest {
     }
 
     @Test
+    void pullInventory_emptyInventoryList_returnsZeroSuccess() {
+        when(ledgerlyClient.pullInventory()).thenReturn(Map.of("inventory", List.of()));
+        when(productRepository.findAll()).thenReturn(List.of());
+
+        Map<String, Object> result = service.pullInventory();
+
+        assertThat(result).containsEntry("successCount", 0).containsEntry("failureCount", 0);
+    }
+
+    @Test
+    void pullInventory_skipsUnlinkedSkuRow() {
+        when(ledgerlyClient.pullInventory()).thenReturn(Map.of("inventory", List.of(Map.of("sku", "NO-SUCH-SKU", "stock", 3))));
+        when(productRepository.findAll()).thenReturn(List.of());
+
+        Map<String, Object> result = service.pullInventory();
+
+        assertThat(result).containsEntry("skippedCount", 1);
+    }
+
+    @Test
+    void pullInventory_invalidVariantsJsonOnParent_recordsFailure() {
+        Product product = product(74L).sku("MATRIX").itemStructure("VARIANTS").variantsJson("[]");
+        when(ledgerlyClient.pullInventory()).thenReturn(
+            Map.of("inventory", List.of(Map.of("sku", "MATRIX", "ledgerlyItemId", "item-74", "variantsJson", "not-json")))
+        );
+        when(productRepository.findAll()).thenReturn(List.of(product));
+        when(productRepository.findOneByLedgerlyItemId("item-74")).thenReturn(Optional.of(product));
+
+        Map<String, Object> result = service.pullInventory();
+
+        assertThat(result).containsEntry("failureCount", 1);
+        verify(productRepository, never()).save(product);
+    }
+
+    @Test
     void pullInventory_parentStockOnlyOnVariants_skipsOverwrite() {
         Product product = product(73L).sku("HORIZON").itemStructure("VARIANTS").variantsJson("[]");
         when(ledgerlyClient.pullInventory()).thenReturn(
@@ -974,18 +1009,14 @@ class LedgerlySyncServiceTest {
     }
 
     @Test
-    void toBigDecimal_and_toInteger_handleTypes() {
-        BigDecimal fromBd = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "toBigDecimal", BigDecimal.TEN);
-        BigDecimal fromString = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "toBigDecimal", "12.5");
-        BigDecimal fromNull = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "toBigDecimal", new Object[] { null });
+    void toInteger_handleTypes() {
         Integer fromNumber = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "toInteger", 7);
         Integer fromStringInt = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "toInteger", "9");
+        Integer fromNull = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "toInteger", new Object[] { null });
 
-        assertThat(fromBd).isEqualByComparingTo("10");
-        assertThat(fromString).isEqualByComparingTo("12.5");
-        assertThat(fromNull).isEqualByComparingTo("0");
         assertThat(fromNumber).isEqualTo(7);
         assertThat(fromStringInt).isEqualTo(9);
+        assertThat(fromNull).isEqualTo(0);
     }
 
     @Test

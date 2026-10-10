@@ -8,6 +8,7 @@ import com.miniandmore.gateway.security.OAuth2AuthenticationSuccessHandler;
 import com.miniandmore.gateway.security.WebFluxCookieOAuth2AuthorizationRequestRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
 import org.springframework.security.authentication.UserDetailsRepositoryReactiveAuthenticationManager;
 import org.springframework.security.config.annotation.method.configuration.EnableReactiveMethodSecurity;
@@ -63,6 +64,7 @@ public class SecurityConfiguration {
                     .pathMatchers("/api/register").permitAll()
                     .pathMatchers("/api/activate").permitAll()
                     .pathMatchers("/api/account/reset-password/**").permitAll()
+                    .pathMatchers("/api/account/invite/finish").permitAll()
                     .pathMatchers("/api/account/resend-activation").permitAll()
                     .pathMatchers("/api/users").permitAll()
                     // Social login (OAuth2 authorization + callback)
@@ -74,8 +76,15 @@ public class SecurityConfiguration {
                     .pathMatchers("/management/prometheus").permitAll()
                     .pathMatchers("/management/**").hasAuthority(AuthoritiesConstants.ADMIN)
                     // Gateway user administration
-                    .pathMatchers("/api/admin/**").hasAuthority(AuthoritiesConstants.ADMIN)
-                    .pathMatchers("/api/authorities/**").hasAuthority(AuthoritiesConstants.ADMIN)
+                    .pathMatchers(HttpMethod.GET, "/api/admin/users")
+                    .hasAnyAuthority(
+                        AuthoritiesConstants.ADMIN,
+                        AuthoritiesConstants.SUPER_ADMIN,
+                        AuthoritiesConstants.OPERATIONS,
+                        AuthoritiesConstants.CUSTOMER_SUPPORT
+                    )
+                    .pathMatchers("/api/admin/**").hasAnyAuthority(AuthoritiesConstants.ADMIN, AuthoritiesConstants.SUPER_ADMIN)
+                    .pathMatchers("/api/authorities/**").hasAnyAuthority(AuthoritiesConstants.ADMIN, AuthoritiesConstants.SUPER_ADMIN)
                     .pathMatchers("/api/**").authenticated()
                     .anyExchange().permitAll()
             )

@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { oauthCallbackErrorMessage } from "@/lib/auth-errors";
@@ -10,6 +11,9 @@ import { savePendingProfile } from "@/lib/pending-profile";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Eye, EyeOff } from "lucide-react";
+import { SubscribeOptIn } from "@/components/SubscribeOptIn";
+import loginHero from "@/assets/hero-smiling-baby.jpg";
+
 
 const Search = z.object({
   redirect: z.string().optional(),
@@ -18,7 +22,10 @@ const Search = z.object({
 
 export const Route = createFileRoute("/login")({
   validateSearch: (s) => Search.parse(s),
-  head: () => ({ meta: [{ title: "Sign in · Mini's n More" }] }),
+  head: () => ({
+    meta: [{ title: "Sign in · Mini's n More" }],
+    links: [{ rel: "preload", as: "image", href: loginHero, fetchPriority: "high" }],
+  }),
   component: LoginPage,
 });
 
@@ -45,10 +52,13 @@ export function LoginPage() {
   const [googleBusy, setGoogleBusy] = useState(false);
   const [signInError, setSignInError] = useState<string | null>(null);
   const [resendBusy, setResendBusy] = useState(false);
+  const [subscribed, setSubscribed] = useState(true);
   const oauthErrorShown = useRef(false);
 
   useEffect(() => {
-    if (!loading && user) nav({ to: afterLogin as any });
+    if (!loading && user) {
+      void nav({ to: afterLogin as any });
+    }
   }, [user, loading, nav, afterLogin]);
 
   useEffect(() => {
@@ -88,7 +98,7 @@ export function LoginPage() {
     setSignInError(null);
     const { error } = mode === "signin"
       ? await signIn(email, password)
-      : await signUp(email, password, fullName.trim());
+      : await signUp(email, password, fullName.trim(), subscribed);
     setBusy(false);
     if (error) {
       if (mode === "signin") setSignInError(error);
@@ -96,7 +106,11 @@ export function LoginPage() {
       return;
     }
     if (mode === "signup") {
-      savePendingProfile({ full_name: fullName.trim(), email: email.trim().toLowerCase() });
+      savePendingProfile({
+        full_name: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        subscribed,
+      });
       toast.success("Almost there — check your inbox and open the activation link to finish.");
       setMode("signin");
       return;
@@ -166,8 +180,37 @@ export function LoginPage() {
   };
 
   return (
-    <div className="px-4 max-w-md mx-auto">
-      <div className="glass-strong rounded-[2rem] p-8 md:p-10">
+    <div className="px-3 md:px-6 pb-10">
+      <section className="relative overflow-hidden rounded-[2rem] min-h-[calc(100dvh-9.5rem)] bg-[hsl(var(--secondary)/0.22)]">
+        <motion.img
+          src={loginHero}
+          alt="Smiling baby wrapped in organic muslin"
+          className="absolute inset-0 h-full w-full object-cover object-[80%_top] md:object-[74%_8%] lg:object-[70%_6%]"
+          initial={{ scale: 1 }}
+          animate={{ scale: 1.04 }}
+          transition={{ duration: 22, ease: [0.22, 1, 0.36, 1] }}
+          style={{ transformOrigin: "70% 18%" }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/45 to-background/90 lg:bg-gradient-to-r lg:from-background/92 lg:via-background/55 lg:to-transparent pointer-events-none" />
+        <motion.p
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.3 }}
+          className="hidden lg:block absolute bottom-10 right-10 xl:right-14 max-w-md text-right font-display text-3xl xl:text-4xl text-white drop-shadow-[0_8px_24px_rgba(40,20,10,0.45)] text-balance"
+        >
+          Minis today, memories forever.
+        </motion.p>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, delay: 0.1 }}
+          className="relative z-10 flex min-h-[calc(100dvh-9.5rem)] items-end lg:items-center p-4 sm:p-6 lg:p-10 xl:pl-14"
+        >
+          <div className="w-full max-w-md">
+            <p className="lg:hidden font-display text-2xl sm:text-3xl text-white drop-shadow-[0_8px_24px_rgba(40,20,10,0.45)] text-balance mb-4">
+              Minis today, memories forever.
+            </p>
+          <div className="glass-strong rounded-[2rem] p-8 md:p-10 w-full">
         <div className="text-xs uppercase tracking-[0.28em] text-primary">Welcome</div>
         <h1 className="font-display text-3xl md:text-4xl mt-2">
           {mode === "signin" ? "Sign in" : mode === "signup" ? "Create account" : "Reset password"}
@@ -285,6 +328,13 @@ export function LoginPage() {
                 <p className="mt-1 text-xs text-destructive">{passwordError}</p>
               ) : null}
             </div>
+            {mode === "signup" && (
+              <SubscribeOptIn
+                checked={subscribed}
+                onChange={setSubscribed}
+                checkedHint="We'll send occasional emails and offers. Untick if you'd rather not."
+              />
+            )}
             {mode === "signin" && (
               <div className="text-right -mt-1 space-y-1">
                 <button type="button" onClick={() => { setMode("forgot"); setForgotSent(false); setSignInError(null); }} className="text-xs story-link text-primary">
@@ -360,7 +410,10 @@ export function LoginPage() {
         <div className="mt-6 text-center">
           <Link to="/" className="text-xs text-muted-foreground story-link">← Back to store</Link>
         </div>
-      </div>
+          </div>
+          </div>
+        </motion.div>
+      </section>
     </div>
   );
 }

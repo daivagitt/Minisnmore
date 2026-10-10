@@ -1,0 +1,21 @@
+# One Liquibase changelog path per line (relative to catalog JAR classpath).
+# Used by uat-restart-isolated-catalog.sh and prod-restart-isolated-catalog.sh.
+#
+# Intentionally omitted vs master.xml: 20260929180000_backfill_shipment_delivered_at,
+# 20260930180000_seed_shop_merchandising_sections (data seed; run via monolith/full Liquibase or ad-hoc).
+config/liquibase/changelog/20260930160000_add_customer_order_package_type.xml
+config/liquibase/changelog/20261001120000_add_customer_order_zoho_credit_note_id.xml
+config/liquibase/changelog/20261001180000_add_order_return_replacement_invoice.xml
+config/liquibase/changelog/20261002120000_add_razorpay_webhook_event.xml
+config/liquibase/changelog/20261002160000_add_return_and_refund_policy_days.xml
+config/liquibase/changelog/20261002180000_add_order_return_original_restocked_at.xml
+config/liquibase/changelog/20261002190000_add_order_return_outbound_package_fields.xml
+config/liquibase/changelog/20261002210000_add_order_return_carrier_status.xml
+config/liquibase/changelog/20261007120000_added_entity_StoreAddress.xml
+config/liquibase/changelog/20261007140000_add_product_zoho_image_docs_json.xml
+config/liquibase/changelog/20261008120000_added_entity_PackageBox.xml
+config/liquibase/changelog/20261008140000_add_package_type_weight_and_order_link.xml
+config/liquibase/changelog/20261009120000_store_address_multi_usage.xml
+config/liquibase/changelog/20261009140000_store_address_default_per_usage_trigger.xml
+config/liquibase/changelog/20261009150000_add_banner_eyebrow.xml
+config/liquibase/changelog/20261009160000_add_banner_trust_labels.xml

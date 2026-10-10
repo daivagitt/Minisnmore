@@ -28,6 +28,11 @@ import tech.jhipster.service.filter.StringFilter;
 @ExtendWith(MockitoExtension.class)
 class QueryServiceUnitTest {
 
+    @Test
+    void queryServiceSuiteLoads() {
+        assertThat(true).isTrue();
+    }
+
     @Nested
     class BannerQueryServiceTests {
 

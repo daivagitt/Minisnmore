@@ -199,10 +199,11 @@ Create-order responses use **camelCase** for Razorpay integration fields. `total
 | `total` | number | Order total (INR) |
 | `created_at` | string | ISO-8601 instant |
 | `order_items` | array | Line items — see below |
-| `tracking_status` | string | `pending`, `confirmed`, `hand_wrapped`, `shipped`, `delivered`, `cancelled` |
+| `tracking_status` | string | `pending`, `confirmed`, `hand_wrapped`, `awaiting_pickup`, `shipped`, `out_for_delivery`, `delivered`, `cancelled` |
 | `tracking_number` | string | Carrier tracking id (may be empty) |
 | `tracking_carrier` | string | Carrier name (may be empty) |
-| `shipment_date` | string | `YYYY-MM-DD` or empty |
+| `shipment_date` | string | Dispatch date `YYYY-MM-DD` or empty. This is **not** the return-window clock. |
+| `shipment_delivered_at` | string | Physical delivery instant (ISO-8601) or empty. Return eligibility uses this field. |
 
 ### Order detail (additional fields)
 
@@ -236,7 +237,9 @@ Create-order responses use **camelCase** for Razorpay integration fields. `total
     "tracking_status": "confirmed",
     "tracking_number": "",
     "tracking_carrier": "",
-    "shipment_date": ""
+    "tracking_url": "",
+    "shipment_date": "",
+    "shipment_delivered_at": ""
   }
 }
 ```
@@ -273,11 +276,35 @@ Create-order responses use **camelCase** for Razorpay integration fields. `total
 ```json
 {
   "order_number": "MNM-20260818-ABC",
-  "reason": "Product arrived damaged in transit"
+  "reason": "Product arrived damaged in transit",
+  "image_urls": ["https://cdn.example.com/my-bucket/returns/20260930-abc.jpg"]
 }
 ```
 
-`reason`: 10–4000 characters.
+| Field | Constraints |
+|-------|-------------|
+| `reason` | 10–4000 characters |
+| `image_urls` | Optional. Up to **5** absolute `http`/`https` URLs (max **600** chars each). When storage is configured, each URL must be a photo uploaded via `POST /api/v1/order-returns/uploads` (object key under `returns/`). |
+
+### `POST /api/v1/order-returns/exchange`
+
+Same optional `image_urls` as create return (see above), plus `order_item_id`, `replacement_size`, and `replacement_color`.
+
+### `POST /api/v1/order-returns/uploads`
+
+Multipart upload for return/exchange photos. **Auth required.**
+
+| Part | Value |
+|------|--------|
+| `file` | Image file (jpeg/png/webp/gif; size limits enforced server-side) |
+
+**Response `data`:**
+
+```json
+{ "publicUrl": "https://cdn.example.com/my-bucket/returns/20260930-abc.jpg" }
+```
+
+Use `publicUrl` values in `image_urls` when creating a return or exchange.
 
 ### `POST /api/v1/order-returns/{returnNumber}/cancel`
 
@@ -291,6 +318,7 @@ Create-order responses use **camelCase** for Razorpay integration fields. `total
 | `return_number` | string | e.g. `RET-MNM-…` |
 | `status` | string | `requested`, `approved`, `rejected`, `received`, `refunded`, `failed`, `cancelled` |
 | `reason` | string |
+| `image_urls` | string[] \| omitted when empty |
 | `rejection_reason` | string \| null |
 | `refund_amount` | number \| null |
 | `requested_at`, `resolved_at` | string (ISO-8601) \| null |
@@ -304,6 +332,11 @@ Create-order responses use **camelCase** for Razorpay integration fields. `total
 ```json
 {
   "order_number": "MNM-20260818-ABC",
+  "enabled": true,
+  "window_days": 3,
+  "tracking_status": "delivered",
+  "delivered_at": "2026-09-29T09:57:19.311890Z",
+  "return_deadline": "2026-10-02T09:57:19.311890Z",
   "eligible": true
 }
 ```
@@ -313,8 +346,13 @@ Create-order responses use **camelCase** for Razorpay integration fields. `total
 ```json
 {
   "order_number": "MNM-20260818-ABC",
+  "enabled": true,
+  "window_days": 3,
+  "tracking_status": "delivered",
+  "delivered_at": "2026-09-20T10:00:00Z",
+  "return_deadline": "2026-09-23T10:00:00Z",
   "eligible": false,
-  "message": "Return window has expired"
+  "message": "Return window has expired (3 days from delivery)"
 }
 ```
 

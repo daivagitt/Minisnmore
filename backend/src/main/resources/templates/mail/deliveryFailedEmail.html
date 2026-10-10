@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="en">
+<head>
+<meta charset="UTF-8">
+<title th:text="#{email.order.delivery_failed.title(${orderNumber})}">Delivery Update</title>
+</head>
+<body style="margin:0; padding:0; background-color:#fdf1ec; font-family: Arial, Helvetica, sans-serif;">
+  <span style="display:none !important; visibility:hidden; opacity:0; color:transparent; height:0; width:0; overflow:hidden;" th:text="'Delivery attempt for order ' + ${orderNumber} + ' was unsuccessful.'">Delivery attempt was unsuccessful.</span>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fdf1ec; padding:32px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border:1px solid #f6dce2; border-radius:18px;">
+          <tr>
+            <td style="padding:40px 44px;">
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding-bottom:20px;">
+                    <img src="https://pub-f227d5520be64479a318380ac346334d.r2.dev/prod/home/1789526139661-e9b78d4b-bb41-4129-b569-8a77875247a7-M-logo.png" alt="Mini's n More" width="56" style="display:block; width:56px; max-width:56px; height:auto; border:0;">
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding-bottom:24px;">
+                    <span style="font-family: Georgia, 'Times New Roman', serif; font-size:26px; color:#7a2f3e;">📦 Delivery Update</span>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="font-size:15px; color:#333333; line-height:1.6; margin:0 0 16px 0;">
+                Dear <span th:text="${customerName}">Customer</span>,
+              </p>
+              <p style="font-size:15px; color:#333333; line-height:1.6; margin:0 0 16px 0;">
+                The delivery attempt for order <b style="color:#c2447a;" th:text="${orderNumber}">MNM-XXXXXXXXX</b> was unsuccessful. Don't worry — our delivery partner will reattempt delivery shortly.
+              </p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fdf1ec; border-radius:14px; margin:8px 0 16px 0;">
+                <tr>
+                  <td style="padding:20px 24px;">
+                    <div style="font-size:14px; color:#5a4a4a; margin-bottom:6px;"><b>Order</b> <span style="color:#c2447a;" th:text="${orderNumber}">MNM-XXXXXXXXX</span></div>
+                    <div style="font-size:14px; color:#5a4a4a; margin-bottom:6px;"><b>Status</b> Delivery attempt unsuccessful</div>
+                    <div style="font-size:14px; color:#5a4a4a; margin-bottom:6px;"><b>Next step</b> Reattempt scheduled by delivery partner</div>
+                    <div style="font-size:14px; color:#5a4a4a; margin-top:6px;" th:if="${!#strings.isEmpty(trackingNumber)}"><b>Tracking Ref</b> <span th:text="${trackingNumber}">XB123</span> <span th:if="${!#strings.isEmpty(trackingCarrier)}" th:text="'(' + ${trackingCarrier} + ')'"></span></div>
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fdf1ec; border-radius:14px; margin:0 0 8px 0;">
+                <tr>
+                  <td style="padding:20px 24px;">
+                    <div style="font-size:14px; color:#5a4a4a; font-weight:bold; margin-bottom:6px;">Delivery Address</div>
+                    <div style="font-size:13px; color:#5a4a4a; line-height:1.6;">
+                      <span th:text="${addressName}">Customer</span><br>
+                      <span th:each="line : ${addressLines}"><span th:text="${line}">38, SLV Layout Phase 2</span><br></span>
+                      <span th:if="${!#strings.isEmpty(addressPhone)}" th:text="'Mobile: ' + ${addressPhone}">Mobile: 9740199455</span>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+              <p style="font-size:12px; color:#b79aa0; margin:0 0 28px 0;">&nbsp;</p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding-bottom:16px;">
+                    <a th:href="${trackingUrl != null ? trackingUrl : orderUrl}" style="background-color:#e87ea0; color:#ffffff; text-decoration:none; font-size:15px; font-weight:bold; padding:14px 32px; border-radius:30px; display:inline-block;">📦 Track Shipment</a>
+                  </td>
+                </tr>
+                <tr th:if="${trackingUrl != null}">
+                  <td align="center" style="padding-bottom:12px;">
+                    <a th:href="${trackingUrl}" th:text="${trackingUrl}" style="color:#d16b87; font-size:13px; text-decoration:underline; word-break:break-all;">https://shipmentv2.xpressbees.com/orders/tracking/14344950061557</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-bottom:12px; font-size:13px; color:#5a4a4a;">
+                    <span th:if="${trackingUrl != null}">You can also track it from your account: </span>
+                    <a th:href="${orderUrl}" th:text="${orderUrl}" style="color:#d16b87; font-size:13px; text-decoration:underline; word-break:break-all;">https://minisnmore.com/account/orders/MNM-XXXXXXXXX</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-bottom:28px;">
+                    <p style="font-size:13px; color:#5a4a4a; margin:0 0 8px 0;">Need help? Reach out to our care team:</p>
+                    <a th:href="'mailto:' + ${supportEmail} + '?subject=Delivery issue · Order ' + ${orderNumber}" style="color:#d16b87; font-size:13px; text-decoration:underline;" th:text="${supportEmail}">hello@minisnmore.com</a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="font-size:14px; color:#333333; margin:0 0 4px 0;">Warm regards,</p>
+              <p style="font-size:14px; color:#333333; font-weight:bold; margin:0 0 24px 0;">Team Minis n More</p>
+
+              <p style="font-size:12px; color:#c9adb4; margin:0;">Made for little ones. Chosen with love. 🌸</p>
+
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

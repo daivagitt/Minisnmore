@@ -27,10 +27,15 @@ import {
   resolveHomeSectionProducts,
   sectionProductSlugs,
 } from "@/lib/home-products";
+import { HOME_HERO_BANNER_LIMIT } from "@/lib/home-section-limit";
 import { parseWatchReels, resolveWatchShopReels } from "@/lib/watch-reels";
 import { parseFabricStoryVideo } from "@/lib/asset-url";
 import { productMatchesCategory } from "@/lib/shop-filters";
 import { toDirectDownloadUrl, triggerPublicFileDownload } from "@/lib/utils";
+import { commerceFromSiteSettings } from "@/lib/commerce";
+import { buildHomeMarqueeOffers, homeStorefrontTrustCopy } from "@/lib/home-storefront-copy";
+import { bannerToHeroSlide } from "@/lib/banner-hero-slide";
+import { DEFAULT_HERO_DYES_LABEL, homeSectionPayloadRecord, mergeHeroSectionTrustDefaults } from "@/lib/banner-trust";
 import heroBaby from "@/assets/hero-smiling-baby.jpg";
 import lifestyle from "@/assets/lifestyle-mother.webp";
 import heroComfort from "@/assets/hero-comfort-carousel.webp";
@@ -41,6 +46,7 @@ import giftBox from "@/assets/gift-box.jpg";
 import heroInfant from "@/assets/hero-infant-organic.jpg";
 import heroFounders from "@/assets/hero-founders-atelier.jpg";
 import fabricStoryVideo from "@/assets/videos/fabric-story-children.mp4";
+import { canonicalUrl, SOCIAL_SHARE_IMAGE } from "@/lib/site-seo";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -49,11 +55,11 @@ export const Route = createFileRoute("/")({
       { name: "description", content: "Soft, organic, beautifully made baby clothing for the first 24 months. 100% certified organic cotton, hand-loomed knits and feather-soft muslins." },
       { property: "og:title", content: "Mini's n More — Minis today, memories forever" },
       { property: "og:description", content: "Hand-finished organic baby clothing with thoughtful gifting and heirloom quality." },
-      { property: "og:image", content: "https://minisnmore.com/og-share.jpg" },
-      { name: "twitter:image", content: "https://minisnmore.com/og-share.jpg" },
+      { property: "og:image", content: SOCIAL_SHARE_IMAGE },
+      { name: "twitter:image", content: SOCIAL_SHARE_IMAGE },
     ],
     links: [
-      { rel: "canonical", href: "https://minisnmore.com/" },
+      { rel: "canonical", href: canonicalUrl("/") },
       { rel: "preload", as: "image", href: heroBaby, fetchPriority: "high" },
       { rel: "preload", as: "image", href: heroInfant },
       { rel: "preload", as: "image", href: lifestyle },
@@ -71,14 +77,7 @@ const defaultByAgeCats = [
   { label: "Kidoo", note: "18–24M", img: giftBox, to: "/shop" as const, search: { age: "18-24m" as const } },
 ];
 
-const offers = [
-  { icon: BadgePercent, t: "WELCOME10 · 10% off your first order" },
-  { icon: Truck, t: "Free shipping over ₹1499" },
-  { icon: ShieldCheck, t: "100% Certified Organic Cotton" },
-  { icon: Wind, t: "Comfort First Design — soft, breathable fabrics" },
-];
-
-type HeroSlide = {
+type HeroSlideCopy = {
   id: string;
   eyebrow: string;
   title: string;
@@ -91,6 +90,12 @@ type HeroSlide = {
   imageFocus?: string;
 };
 
+type HeroSlide = HeroSlideCopy & {
+  fabricLabel: string;
+  shippingLabel: string;
+  dyesLabel: string;
+};
+
 const HERO_FOCUS_FALLBACK = "object-[center_20%] md:object-[right_20%]";
 /** First two slides: babies sit on the right of landscape photos — pin them into the tall mobile crop. */
 const HERO_FOCUS_BY_INDEX = [
@@ -98,7 +103,7 @@ const HERO_FOCUS_BY_INDEX = [
   "object-[78%_28%] md:object-[70%_28%]",
 ] as const;
 
-const defaultHeroSlides: HeroSlide[] = [
+const defaultHeroSlides: HeroSlideCopy[] = [
   {
     id: "slide-premium",
     eyebrow: "Premium · Thoughtfully designed",
@@ -158,6 +163,19 @@ function Home() {
   const settings = useSiteSettings();
   const liveProducts = useProducts();
   const productsLoaded = useProductsLoaded();
+  const commerce = commerceFromSiteSettings(settings);
+  const freeShippingMinInr = commerce.freeShippingMinInr;
+  const storefrontTrust = useMemo(() => homeStorefrontTrustCopy(freeShippingMinInr), [freeShippingMinInr]);
+  const offers = useMemo(() => buildHomeMarqueeOffers(freeShippingMinInr), [freeShippingMinInr]);
+  const defaultTrust = useMemo(
+    () =>
+      mergeHeroSectionTrustDefaults(homeSectionPayloadRecord(byKey.get("hero")?.payload), {
+        fabricLabel: storefrontTrust.fabricLabel,
+        shippingLabel: storefrontTrust.heroShippingLabel,
+        dyesLabel: DEFAULT_HERO_DYES_LABEL,
+      }),
+    [byKey, storefrontTrust],
+  );
 
   const byAgeCats = useMemo(() => {
     const payload = byKey.get("by_age")?.payload;
@@ -171,22 +189,30 @@ function Home() {
   const heroSlides: HeroSlide[] = useMemo(() => {
     const fromCms: HeroSlide[] = banners
       .filter((b) => b.image_url)
-      .map((b, i) => ({
-        id: b.id,
-        eyebrow: i === 0 ? "Featured" : "Just in",
-        title: b.title || "Minis today, memories forever.",
-        subtitle: b.subtitle || "Hand-finished organic clothing for your little one's softest beginnings.",
-        cta: b.cta_label || "Shop now",
-        link: b.link_url || "/shop",
-        image: b.image_url as string,
-        align: "left",
-        imageFocus: HERO_FOCUS_BY_INDEX[i] ?? HERO_FOCUS_FALLBACK,
-      }));
+      .map((b, i) =>
+        bannerToHeroSlide(
+          {
+            id: b.id,
+            title: b.title,
+            subtitle: b.subtitle,
+            link_url: b.link_url,
+            cta_label: b.cta_label,
+            eyebrow: b.eyebrow,
+            trust_fabric_label: b.trust_fabric_label,
+            trust_shipping_label: b.trust_shipping_label,
+            trust_dyes_label: b.trust_dyes_label,
+            image_url: b.image_url as string,
+          },
+          i,
+          HERO_FOCUS_BY_INDEX[i] ?? HERO_FOCUS_FALLBACK,
+          defaultTrust,
+        ),
+      );
     if (fromCms.length > 0) {
-      return fromCms.slice(0, HOME_SECTION_PRODUCT_LIMIT);
+      return fromCms.slice(0, HOME_HERO_BANNER_LIMIT);
     }
-    return defaultHeroSlides;
-  }, [banners]);
+    return defaultHeroSlides.map((slide) => ({ ...slide, ...defaultTrust }));
+  }, [banners, defaultTrust]);
 
   const newArrivals = useMemo(
     () =>
@@ -385,11 +411,15 @@ function Home() {
         <FabricStorySection
           payload={byKey.get("fabric_story")?.payload as Record<string, unknown> | undefined}
           title={titleFor("fabric_story", "Fabric story")}
+          fabricFeatureTitle={storefrontTrust.fabricStoryFeatureTitle}
         />
       )}
 
       {/* TRUST BADGES */}
-      <TrustBadges />
+      <TrustBadges
+        trustBadgeTitle={storefrontTrust.trustBadgeTitle}
+        trustBadgeDesc={storefrontTrust.trustBadgeDesc}
+      />
 
       {/* BRAND STORY — vision/mission */}
       {isEnabled("brand_story") && (
@@ -549,9 +579,11 @@ function FeaturedTabs() {
 function FabricStorySection({
   payload,
   title,
+  fabricFeatureTitle,
 }: {
   payload: Record<string, unknown> | undefined;
   title: string;
+  fabricFeatureTitle: string;
 }) {
   const fromCms = parseFabricStoryVideo(payload);
   const videoSrc = fromCms || fabricStoryVideo;
@@ -593,7 +625,7 @@ function FabricStorySection({
             </p>
             <div className="grid grid-cols-2 gap-4 mt-7 items-stretch">
               {[
-                { t: "100% Certified Organic Cotton", d: "Skin-safe, no harsh dyes" },
+                { t: fabricFeatureTitle, d: "Skin-safe, no harsh dyes" },
                 { t: "Hand-finished trims", d: "Tested for safety" },
               ].map((f) => (
                 <div
@@ -823,9 +855,9 @@ function HeroCarousel({
               </Link>
             </div>
             <div className="mt-4 md:mt-5 flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5"><Leaf className="h-3.5 w-3.5 text-primary" /> 100% Certified Organic Cotton</span>
-              <span className="inline-flex items-center gap-1.5"><Truck className="h-3.5 w-3.5 text-primary" /> Free shipping ₹1499+</span>
-              <span className="hidden sm:inline-flex items-center gap-1.5"><Leaf className="h-3.5 w-3.5 text-primary" /> Azo-free dyes</span>
+              <span className="inline-flex items-center gap-1.5"><Leaf className="h-3.5 w-3.5 text-primary" /> {slide.fabricLabel}</span>
+              <span className="inline-flex items-center gap-1.5"><Truck className="h-3.5 w-3.5 text-primary" /> {slide.shippingLabel}</span>
+              <span className="hidden sm:inline-flex items-center gap-1.5"><Leaf className="h-3.5 w-3.5 text-primary" /> {slide.dyesLabel}</span>
             </div>
           </motion.div>
         </AnimatePresence>
@@ -873,8 +905,7 @@ function HeroCarousel({
 
 /* ----------------------------- Trust Badges ----------------------------- */
 
-const trustBadges = [
-  { icon: Leaf, title: "Organic Cotton", desc: "100% certified organic cotton, free from harmful chemicals" },
+const staticTrustBadges = [
   { icon: Smile, title: "Skin Friendly", desc: "Hypoallergenic fabrics gentle on sensitive newborn skin" },
   { icon: Feather, title: "Ultra Soft & Gentle", desc: "Butter-soft hand-feel that gets cosier with every wash" },
   { icon: Wind, title: "Breathable", desc: "Airflow-friendly weaves to keep your baby cool and comfy" },
@@ -886,7 +917,17 @@ const trustBadges = [
   { icon: Sparkles, title: "Smart Wear", desc: "Thoughtful cuts for play & rest" },
 ] as const;
 
-function TrustBadges() {
+function TrustBadges({
+  trustBadgeTitle,
+  trustBadgeDesc,
+}: {
+  trustBadgeTitle: string;
+  trustBadgeDesc: string;
+}) {
+  const trustBadges = [
+    { icon: Leaf, title: trustBadgeTitle, desc: trustBadgeDesc },
+    ...staticTrustBadges,
+  ];
   return (
     <section className="px-4 md:px-6">
       <div className="mx-auto max-w-6xl">

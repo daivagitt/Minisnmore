@@ -48,5 +48,17 @@ class TechnicalStructureTest {
         .ignoreDependency(
             belongToAnyOf(com.miniandmore.app.client.ZohoBooksIntegrationClient.class),
             belongToAnyOf(com.miniandmore.app.service.ZohoSyncService.class)
+        )
+        .ignoreDependency(
+            belongToAnyOf(com.miniandmore.app.client.ZohoBooksIntegrationClient.class),
+            belongToAnyOf(com.miniandmore.app.service.ZohoExchangeInvoiceService.class)
+        )
+        .ignoreDependency(
+            belongToAnyOf(com.miniandmore.app.service.OrderCancellationExecutor.class),
+            belongToAnyOf(com.miniandmore.app.web.rest.v1.AccountOrderDataAccess.class)
+        )
+        .ignoreDependency(
+            belongToAnyOf(com.miniandmore.app.client.XpressBeesClient.class),
+            belongToAnyOf(com.miniandmore.app.service.OrderPackageService.class)
         );
 }

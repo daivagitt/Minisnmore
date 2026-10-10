@@ -5,8 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.stream.Stream;
 import org.assertj.core.api.Condition;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 class ProductCriteriaTest {
 
@@ -72,6 +75,79 @@ class ProductCriteriaTest {
         var productCriteria = new ProductCriteria();
 
         assertThat(productCriteria).hasToString("ProductCriteria{}");
+    }
+
+    @Test
+    void equals_sameInstanceNullAndWrongType() {
+        var productCriteria = new ProductCriteria();
+        assertThat(productCriteria.equals(productCriteria)).isTrue();
+        assertThat(productCriteria.equals(null)).isFalse();
+        assertThat(productCriteria.equals("ProductCriteria")).isFalse();
+    }
+
+    @ParameterizedTest
+    @MethodSource("unequalCriteriaPairs")
+    void equals_falseWhenAnyFilterDiffers(ProductCriteria left, ProductCriteria right) {
+        assertThat(left).isNotEqualTo(right);
+        assertThat(left.hashCode()).isNotEqualTo(right.hashCode());
+    }
+
+    private static Stream<org.junit.jupiter.params.provider.Arguments> unequalCriteriaPairs() {
+        return Stream.of(
+            pair(withId(1L), withId(2L)),
+            pair(withSlug("a"), withSlug("b")),
+            pair(withName("n1"), withName("n2")),
+            pair(withSku("s1"), withSku("s2")),
+            pair(withFabric("f1"), withFabric("f2")),
+            pair(withFeatured(true), withFeatured(false)),
+            pair(withDistinct(true), withDistinct(false))
+        );
+    }
+
+    private static org.junit.jupiter.params.provider.Arguments pair(ProductCriteria left, ProductCriteria right) {
+        return org.junit.jupiter.params.provider.Arguments.of(left, right);
+    }
+
+    private static ProductCriteria withId(Long id) {
+        var c = new ProductCriteria();
+        c.id().setEquals(id);
+        return c;
+    }
+
+    private static ProductCriteria withSlug(String slug) {
+        var c = new ProductCriteria();
+        c.slug().setEquals(slug);
+        return c;
+    }
+
+    private static ProductCriteria withName(String name) {
+        var c = new ProductCriteria();
+        c.name().setEquals(name);
+        return c;
+    }
+
+    private static ProductCriteria withSku(String sku) {
+        var c = new ProductCriteria();
+        c.sku().setEquals(sku);
+        return c;
+    }
+
+    private static ProductCriteria withFabric(String fabric) {
+        var c = new ProductCriteria();
+        c.fabricType().setEquals(fabric);
+        return c;
+    }
+
+    private static ProductCriteria withFeatured(Boolean featured) {
+        var c = new ProductCriteria();
+        c.featured().setEquals(featured);
+        return c;
+    }
+
+    private static ProductCriteria withDistinct(Boolean distinct) {
+        var c = new ProductCriteria();
+        c.setDistinct(distinct);
+        return c;
     }
 
     private static void setAllFilters(ProductCriteria productCriteria) {

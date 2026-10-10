@@ -56,6 +56,10 @@ public class User extends AbstractAuditingEntity<Long> implements Persistable<Lo
     @Column("activated")
     private boolean activated = false;
 
+    @NotNull
+    @Column("subscribed")
+    private boolean subscribed = false;
+
     @Size(min = 2, max = 10)
     @Column("lang_key")
     private String langKey;
@@ -139,6 +143,14 @@ public class User extends AbstractAuditingEntity<Long> implements Persistable<Lo
 
     public void setActivated(boolean activated) {
         this.activated = activated;
+    }
+
+    public boolean isSubscribed() {
+        return subscribed;
+    }
+
+    public void setSubscribed(boolean subscribed) {
+        this.subscribed = subscribed;
     }
 
     public String getLangKey() {

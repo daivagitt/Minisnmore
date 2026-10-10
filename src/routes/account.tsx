@@ -1,5 +1,6 @@
 import { createFileRoute, Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { SHOW_M2_POST_ORDER_UI } from "@/lib/feature-flags";
 import { useAuth } from "@/hooks/useAuth";
 import { AccountDataProvider } from "@/lib/account";
 import newbornBaby from "@/assets/cat-newborn.webp";
@@ -32,7 +33,7 @@ const navGroups: { label: string; items: { to: string; label: string; icon: any;
     label: "Orders",
     items: [
       { to: "/account/orders", label: "My Orders", icon: Package },
-      { to: "/account/returns", label: "Returns & refunds", icon: RotateCcw },
+      { to: "/account/returns", label: "Returns & exchanges", icon: RotateCcw },
       { to: "/account/track", label: "Track Order", icon: Truck },
     ],
   },
@@ -46,7 +47,11 @@ const navGroups: { label: string; items: { to: string; label: string; icon: any;
   },
 ];
 
-const flatNavItems = navGroups.flatMap((g) => g.items);
+const visibleNavGroups = navGroups.map((g) => ({
+  ...g,
+  items: g.items.filter((it) => SHOW_M2_POST_ORDER_UI || it.to !== "/account/returns"),
+}));
+const flatNavItems = visibleNavGroups.flatMap((g) => g.items);
 
 function AccountLayout() {
   const { user, loading, signOut } = useAuth();
@@ -72,7 +77,7 @@ function AccountLayout() {
           <div className="font-medium text-sm mt-1 truncate text-foreground">{user?.email ?? "…"}</div>
         </div>
         <nav className="mt-4 flex flex-col gap-4 flex-1">
-          {navGroups.map((g) => (
+          {visibleNavGroups.map((g) => (
             <div key={g.label} className="flex flex-col gap-1.5">
               <div className="px-3 pt-1 pb-1 text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{g.label}</div>
               {g.items.map((it) => {
@@ -151,7 +156,7 @@ function AccountLayout() {
         <figure className="relative overflow-hidden rounded-[2rem] min-h-[360px] shadow-soft">
           <img
             src={newbornBaby}
-            alt="Softly wrapped newborn in organic babywear"
+            alt="Smiling baby in organic cotton onesie"
             className="absolute inset-0 h-full w-full object-cover"
             loading="lazy"
             decoding="async"

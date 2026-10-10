@@ -316,7 +316,7 @@ def build_body(
       <section class="panel">
         <h2>Summary</h2>
         <p>Status: {status_pill(status)}</p>
-        {('<p class="muted">Backend totals include business-logic service layers (gateway + catalog services, store, commerce). Legacy Zoho integration, schedulers, and generated mappers are excluded — matching the Sonar quality gate.</p>' if kind == 'backend' else '')}
+        {('<p class="muted">Backend totals are unfiltered JaCoCo executable lines for gateway, catalog, store, and commerce. Sonar lines of code (NCLOC 19,501) is a separate metric and is not this denominator.</p>' if kind == 'backend' else '')}
         <div class="stats">
           {stat_block("Line coverage", pct(line_pct))}
           {stat_block("Lines covered", f"{line_covered:,} / {line_total:,}")}
@@ -363,9 +363,9 @@ def main() -> None:
     else:
         jacoco_paths = [Path(p.strip()) for p in args.input.split(",") if p.strip()]
         if len(jacoco_paths) > 1:
-            total, rows = merge_jacoco_xmls(jacoco_paths, business_logic_only=True)
+            total, rows = merge_jacoco_xmls(jacoco_paths, business_logic_only=False)
         else:
-            total, rows = parse_jacoco_xml(jacoco_paths[0], business_logic_only=True)
+            total, rows = parse_jacoco_xml(jacoco_paths[0], business_logic_only=False)
         title = "Backend Code Coverage Report"
 
     body = build_body(

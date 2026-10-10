@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 48" role="img" aria-label="Daiva Technologies">
+  <defs>
+    <linearGradient id="dt" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#dbeafe"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="4" width="40" height="40" rx="10" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>
+  <text x="20" y="32" text-anchor="middle" font-family="Segoe UI, system-ui, sans-serif" font-size="18" font-weight="700" fill="url(#dt)">DT</text>
+  <text x="52" y="21" font-family="Segoe UI, system-ui, sans-serif" font-size="17" font-weight="700" fill="#ffffff">Daiva</text>
+  <text x="52" y="38" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="500" fill="rgba(255,255,255,0.88)" letter-spacing="0.06em">TECHNOLOGIES</text>
+</svg>

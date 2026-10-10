@@ -57,14 +57,35 @@ COD orders are `CONFIRMED` at placement but `payment_status` stays `PENDING` unt
 | `pending` | Awaiting payment | Payment not `PAID` and order not cancelled |
 | `confirmed` | Order confirmed | Accepted, but wrapping has not yet been marked complete |
 | `hand_wrapped` | Hand-wrapped | A package was created for the linked Zoho sales order |
-| `shipped` | On the way | Tracking number, shipment date, or Zoho/Ledgerly shipped signal |
+| `awaiting_pickup` | Waiting for pickup | ExpressBees AWB/label exists, but the courier has not scanned pickup yet |
+| `shipped` | On the way | Courier pickup / in-transit, manual AWB, shipment date, or Zoho/Ledgerly shipped signal |
+| `out_for_delivery` | Out for delivery | ExpressBees reports `OUT FOR DELIVERY` (or `OFD`) for the booked AWB |
+| `delivery_failed` | Delivery attempt unsuccessful | ExpressBees reports undelivered / delivery failed (reattempt expected) |
 | `delivered` | Delivered | Order `FULFILLED` or an explicit Zoho/Ledgerly delivered signal |
 | `cancelled` | Cancelled | Order `CANCELLED` or cancelled in external system |
+
+### ExpressBees → customer update
+
+| ExpressBees status | Customer sees | Customer notification |
+|--------------------|---------------|-----------------------|
+| Pickup / in-transit | On the way | None for ExpressBees (manual carriers still email on ship) |
+| `OUT FOR DELIVERY` | Out for delivery | Out-for-delivery email with the ExpressBees tracking link and the account order link |
+| Undelivered / failed delivery | Delivery attempt unsuccessful | Delivery-failed email (once) |
+| `Delivered` | Delivered | Delivered email |
+
+The tracking link is only available once an AWB exists and always uses
+`https://shipmentv2.xpressbees.com/orders/tracking/{AWB}` (override with `XPRESSBEES_TRACKING_URL_TEMPLATE`).
+Pickup / in-transit scans move the tracker to "On the way" without emailing; manual (non-ExpressBees)
+shipments still send the out-for-delivery email when they ship because no OFD scan is available.
+Once a shipment reaches OFD, later weaker hub/in-transit scans do not regress the customer status.
+Exchange replacements booked through ExpressBees follow the same OFD email rule using the outbound AWB
+(webhook must deliver an OFD scan; there is no booking-time fallback for XB outbound).
 
 ### Inputs to tracking status
 
 - `status`, `payment_status`
 - `tracking_number`, `shipment_date`, `tracking_carrier`
+- `shipment_logistics_mode`, `shipment_carrier_status` (ExpressBees booked ≠ shipped)
 - `zoho_order_status` (from Zoho Books sales order / delivery challan pull)
 - `ledgerly_order_status` (from Ledgerly tracking pull)
 
@@ -88,8 +109,8 @@ Separate entity: one or more return requests per order (`order_return` table). L
 
 - Order must be **`payment_status = PAID`**
 - Order must **not** be `CANCELLED`
-- Order must be **delivered** (delivery anchor resolved from shipment date, fulfilled status, or tracking)
-- Within **7 days** of delivery (`RETURN_WINDOW_DAYS`)
+- Order must be **delivered** (`shipment_delivered_at` is set; dispatch `shipment_date` does not count)
+- Within **3 days** of that physical delivery timestamp (`RETURN_WINDOW_DAYS`)
 
 Check: `GET /api/v1/order-returns/eligibility/{orderNumber}`
 
@@ -126,9 +147,17 @@ Hand-wrapped (Zoho package created)
   status: HAND_WRAPPED
   tracking_status: hand_wrapped
 
-Shipped
+ExpressBees label booked
+  tracking_number set
+  tracking_status: awaiting_pickup  (not yet "On the way")
+
+Courier pickup / in-transit
   tracking_status: shipped
-  (+ tracking_number or shipment_date from ops / Zoho / Ledgerly)
+  (+ shipment_date from pickup scan, manual AWB, Zoho, or Ledgerly)
+
+ExpressBees OUT FOR DELIVERY
+  tracking_status: out_for_delivery
+  (out-for-delivery email sent with https://shipmentv2.xpressbees.com/orders/tracking/{AWB})
 
 Delivered
   status: FULFILLED

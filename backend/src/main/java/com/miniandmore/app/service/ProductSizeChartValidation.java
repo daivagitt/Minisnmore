@@ -13,7 +13,12 @@ import org.springframework.web.server.ResponseStatusException;
 /** Validates local chart writes only. Charts are deliberately not part of the Zoho contract. */
 final class ProductSizeChartValidation {
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final String SECTIONS = "sections";
+    private static final String BANDS = "bands";
+    private static final String ROWS = "rows";
+    private static final String LABEL = "label";
     private static final Pattern NUMBER = Pattern.compile("^(\\d+(?:\\.\\d+)?)\\s*(?:cm|in(?:ch(?:es)?)?|[\"″])?$", Pattern.CASE_INSENSITIVE);
+    @SuppressWarnings("java:S5843")
     private static final Pattern RANGE = Pattern.compile("^(\\d+(?:\\.\\d+)?)\\s*(?:[-–—]|to)\\s*(\\d+(?:\\.\\d+)?)\\s*(?:cm|in(?:ch(?:es)?)?|[\"″])?$", Pattern.CASE_INSENSITIVE);
 
     private ProductSizeChartValidation() {}
@@ -22,29 +27,29 @@ final class ProductSizeChartValidation {
         if (json == null || json.isBlank()) return;
         try {
             JsonNode chart = JSON.readTree(json);
-            if (chart == null || !chart.isObject() || !chart.path("sections").isArray() || chart.path("sections").isEmpty()) {
+            if (chart == null || !chart.isObject() || !chart.path(SECTIONS).isArray() || chart.path(SECTIONS).isEmpty()) {
                 throw new IllegalArgumentException("Chart needs sections");
             }
             boolean numeric = false;
-            for (JsonNode section : chart.path("sections")) {
+            for (JsonNode section : chart.path(SECTIONS)) {
                 if (!section.path("title").isTextual() || section.path("title").asText().isBlank() ||
-                    !section.path("bands").isArray() || section.path("bands").isEmpty() ||
-                    !section.path("rows").isArray() || section.path("rows").isEmpty()) {
+                    !section.path(BANDS).isArray() || section.path(BANDS).isEmpty() ||
+                    !section.path(ROWS).isArray() || section.path(ROWS).isEmpty()) {
                     throw new IllegalArgumentException("Every section needs a title, size bands, and rows");
                 }
                 Set<String> bands = new HashSet<>();
-                for (JsonNode band : section.path("bands")) {
+                for (JsonNode band : section.path(BANDS)) {
                     if (!band.isTextual() || band.asText().isBlank() || !bands.add(normalizeBand(band.asText()))) {
                         throw new IllegalArgumentException("Empty or duplicate size band");
                     }
                 }
                 Set<String> labels = new HashSet<>();
-                for (JsonNode row : section.path("rows")) {
-                    if (!row.path("label").isTextual() || row.path("label").asText().isBlank() ||
-                        !labels.add(row.path("label").asText().trim().toLowerCase(Locale.ROOT)) || !row.path("values").isObject()) {
+                for (JsonNode row : section.path(ROWS)) {
+                    if (!row.path(LABEL).isTextual() || row.path(LABEL).asText().isBlank() ||
+                        !labels.add(row.path(LABEL).asText().trim().toLowerCase(Locale.ROOT)) || !row.path("values").isObject()) {
                         throw new IllegalArgumentException("Invalid or duplicate measurement row");
                     }
-                    for (JsonNode band : section.path("bands")) {
+                    for (JsonNode band : section.path(BANDS)) {
                         JsonNode value = row.path("values").path(band.asText());
                         if (value.isMissingNode() || value.isNull()) continue;
                         if (value.isNumber()) {

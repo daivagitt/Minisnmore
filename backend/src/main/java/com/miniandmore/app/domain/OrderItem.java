@@ -77,6 +77,11 @@ public class OrderItem implements Serializable {
     @Column(name = "tax_pct", precision = 5, scale = 2)
     private BigDecimal taxPct;
 
+    @NotNull
+    @DecimalMin(value = "0")
+    @Column(name = "discount_allocation", precision = 21, scale = 2, nullable = false)
+    private BigDecimal discountAllocation = BigDecimal.ZERO;
+
     @ManyToOne(optional = false)
     @NotNull
     @JsonIgnoreProperties(value = { "itemses" }, allowSetters = true)
@@ -253,6 +258,19 @@ public class OrderItem implements Serializable {
         this.taxPct = taxPct;
     }
 
+    public BigDecimal getDiscountAllocation() {
+        return this.discountAllocation;
+    }
+
+    public OrderItem discountAllocation(BigDecimal discountAllocation) {
+        this.setDiscountAllocation(discountAllocation);
+        return this;
+    }
+
+    public void setDiscountAllocation(BigDecimal discountAllocation) {
+        this.discountAllocation = discountAllocation == null ? BigDecimal.ZERO : discountAllocation;
+    }
+
     public CustomerOrder getOrder() {
         return this.order;
     }
@@ -302,6 +320,7 @@ public class OrderItem implements Serializable {
             ", mrp=" + getMrp() +
             ", hsn='" + getHsn() + "'" +
             ", taxPct=" + getTaxPct() +
+            ", discountAllocation=" + getDiscountAllocation() +
             "}";
     }
 }

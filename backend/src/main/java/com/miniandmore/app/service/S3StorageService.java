@@ -51,7 +51,8 @@ public class S3StorageService {
         "banners",
         "home",
         "blog",
-        "about"
+        "about",
+        "returns"
     );
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("jpg", "jpeg", "png", "webp", "gif");
     /** Browser-controlled headers must not be returned to clients. */

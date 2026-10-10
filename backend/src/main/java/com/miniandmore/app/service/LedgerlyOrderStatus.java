@@ -44,6 +44,9 @@ public final class LedgerlyOrderStatus {
         if (shipmentDate != null) {
             order.setShipmentDate(shipmentDate);
         }
+        if (isDelivered(resolveFromPullResponse(response))) {
+            OrderDeliverySupport.markDelivered(order, response);
+        }
     }
 
     public static boolean shouldReplace(String current, String incoming) {

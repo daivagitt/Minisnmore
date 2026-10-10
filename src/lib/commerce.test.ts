@@ -3,6 +3,10 @@ import {
   commerceFromRow,
   DEFAULT_COMMERCE,
   DEFAULT_DELIVERY_ETA_BUFFER_DAYS,
+  formatFreeShippingMinInr,
+  freeShippingHeroBadgeLabel,
+  freeShippingOfferMarqueeLabel,
+  freeShippingStorefrontLabels,
   parseDeliveryEtaBufferDays,
 } from "./commerce";
 
@@ -26,6 +30,26 @@ describe("commerceFromRow", () => {
     expect(commerceFromRow({}).codFeeInr).toBe(99);
     expect(commerceFromRow({ cod_fee_inr: -1 }).codFeeInr).toBe(99);
     expect(commerceFromRow({ cod_fee_inr: 0 }).codFeeInr).toBe(0);
+  });
+});
+
+describe("free shipping storefront labels", () => {
+  it("formats INR thresholds for hero and marquee copy", () => {
+    expect(formatFreeShippingMinInr(2500)).toBe("2,500");
+    expect(freeShippingHeroBadgeLabel(2500)).toBe("Free shipping ₹2,500+");
+    expect(freeShippingOfferMarqueeLabel(1499)).toBe("Free shipping over ₹1,499");
+  });
+
+  it("returns consistent copy variants for cart and PDP", () => {
+    const labels = freeShippingStorefrontLabels(1999);
+    expect(labels).toEqual({
+      marquee: "Free shipping over ₹1,999",
+      hero: "Free shipping ₹1,999+",
+      pdpShort: "Free ₹1,999+",
+      pdpTitle: "Free shipping order above 1,999",
+      cartBadge: "Free Delivery Above ₹1,999",
+    });
+    expect(labels.marquee).not.toContain("1499");
   });
 });
 

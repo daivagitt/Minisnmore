@@ -1,6 +1,8 @@
 package com.miniandmore.gateway.security;
 
 import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
@@ -83,6 +85,18 @@ public final class SecurityUtils {
             .map(SecurityContext::getAuthentication)
             .map(Authentication::getAuthorities)
             .map(authorities -> authorities.stream().map(GrantedAuthority::getAuthority).noneMatch(AuthoritiesConstants.ANONYMOUS::equals));
+    }
+
+    public static Mono<Set<String>> getCurrentUserAuthorities() {
+        return ReactiveSecurityContextHolder.getContext()
+            .map(SecurityContext::getAuthentication)
+            .map(authentication ->
+                authentication
+                    .getAuthorities()
+                    .stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .collect(Collectors.toSet())
+            );
     }
 
     /**

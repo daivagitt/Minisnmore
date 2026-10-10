@@ -22,6 +22,9 @@ public class CustomerProfileDTO implements Serializable {
     @Size(max = 20)
     private String phone;
 
+    @NotNull
+    private Boolean subscribed;
+
     public Long getId() {
         return id;
     }
@@ -52,6 +55,14 @@ public class CustomerProfileDTO implements Serializable {
 
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+
+    public Boolean getSubscribed() {
+        return subscribed;
+    }
+
+    public void setSubscribed(Boolean subscribed) {
+        this.subscribed = subscribed;
     }
 
     @Override

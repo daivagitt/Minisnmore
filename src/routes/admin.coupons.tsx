@@ -10,8 +10,10 @@ import {
   bulkSave,
   deleteCoupon,
   getCouponValidationErrors,
+  listCategories,
   listCoupons,
   saveCoupon,
+  type CategoryRow,
   type CouponRow,
 } from "@/lib/backend-data";
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from "@/lib/dates";
@@ -27,18 +29,23 @@ const empty: Coupon = {
   max_discount: null,
   bogo_buy_qty: 1,
   bogo_get_qty: 1,
+  eligibility_scope: "all",
+  eligibility_category_id: null,
   expires_at: null,
   active: true,
 };
 
 function CouponsPage() {
   const [rows, setRows] = useState<Coupon[]>([]);
+  const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     setLoading(true);
     try {
-      setRows(await listCoupons());
+      const [couponRows, categoryRows] = await Promise.all([listCoupons(), listCategories(true)]);
+      setRows(couponRows);
+      setCategories(categoryRows);
     } catch (error) {
       showApiError(error, "Could not load coupons");
     }
@@ -51,7 +58,7 @@ function CouponsPage() {
   const save = async (c: Coupon) => {
     const payload = {
       ...c,
-      code: c.code.toUpperCase(),
+      code: c.code.trim().toUpperCase(),
     };
     const errors = getCouponValidationErrors(payload);
     if (errors.length) {
@@ -101,11 +108,14 @@ function CouponsPage() {
               { key: "max_discount", example: 500 },
               { key: "bogo_buy_qty", example: 1, note: "BOGO only. Items the customer must buy." },
               { key: "bogo_get_qty", example: 1, note: "BOGO only. Free/discounted items." },
+              { key: "eligibility_scope", example: "all", note: "all, same_sku, or category" },
+              { key: "eligibility_category_id", example: 3, note: "Required when eligibility_scope=category" },
               { key: "expires_at", example: "2026-12-31", note: "ISO date or blank" },
               { key: "active", example: "TRUE" },
             ]}
             transform={(r) => {
               const type = String(r.discount_type ?? "percent").toLowerCase();
+              const scope = String(r.eligibility_scope ?? "all").toLowerCase();
               const row: Coupon = {
                 code: String(r.code ?? "").trim().toUpperCase(),
                 discount_type: type,
@@ -116,6 +126,11 @@ function CouponsPage() {
                   r.max_discount === "" || r.max_discount == null ? null : Number(r.max_discount),
                 bogo_buy_qty: type === "bogo" ? Number(r.bogo_buy_qty ?? 1) : 1,
                 bogo_get_qty: type === "bogo" ? Number(r.bogo_get_qty ?? 1) : 1,
+                eligibility_scope: scope,
+                eligibility_category_id:
+                  r.eligibility_category_id === "" || r.eligibility_category_id == null
+                    ? null
+                    : String(r.eligibility_category_id),
                 expires_at: r.expires_at ? new Date(r.expires_at).toISOString() : null,
                 active: String(r.active ?? "true").toLowerCase() !== "false",
               };
@@ -271,6 +286,55 @@ function CouponsPage() {
                 min={0}
                 placeholder="Optional"
               />
+              <Field label="Applies to">
+                <select
+                  className={inputCls()}
+                  value={c.eligibility_scope ?? "all"}
+                  onChange={(e) => {
+                    const eligibility_scope = e.target.value;
+                    setRows((r) =>
+                      r.map((x, j) =>
+                        j === i
+                          ? {
+                              ...x,
+                              eligibility_scope,
+                              eligibility_category_id:
+                                eligibility_scope === "category" ? x.eligibility_category_id : null,
+                            }
+                          : x,
+                      ),
+                    );
+                  }}
+                >
+                  <option value="all">Entire cart</option>
+                  <option value="same_sku">Same SKU only</option>
+                  <option value="category">One category</option>
+                </select>
+              </Field>
+              {String(c.eligibility_scope).toLowerCase() === "category" && (
+                <Field label="Category">
+                  <select
+                    className={inputCls()}
+                    value={c.eligibility_category_id ?? ""}
+                    onChange={(e) =>
+                      setRows((r) =>
+                        r.map((x, j) =>
+                          j === i
+                            ? { ...x, eligibility_category_id: e.target.value || null }
+                            : x,
+                        ),
+                      )
+                    }
+                  >
+                    <option value="">Select category</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
               <Field label="Expires at">
                 <input
                   type="datetime-local"

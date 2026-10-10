@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  TRACKING_STAGES,
   isTerminalTrackingState,
   resolveTrackingStage,
   shouldShowOrderTrackingLink,
@@ -11,6 +12,17 @@ import {
 } from "@/lib/order-tracking";
 
 describe("order-tracking helpers", () => {
+  it("renders the complete six-stage delivery timeline in order", () => {
+    expect(TRACKING_STAGES.map((stage) => stage.key)).toEqual([
+      "pending",
+      "processing",
+      "awaiting_pickup",
+      "shipped",
+      "out_for_delivery",
+      "delivered",
+    ]);
+  });
+
   it("detects terminal delivery states", () => {
     expect(isTerminalTrackingState({ status: "fulfilled" })).toBe(true);
     expect(isTerminalTrackingState({ tracking_status: "delivered" })).toBe(true);
@@ -23,6 +35,13 @@ describe("order-tracking helpers", () => {
     expect(shouldShowOrderTrackingLink({ payment_status: "pending", status: "confirmed" })).toBe(false);
     expect(shouldShowOrderTrackingLink({ payment_status: "paid", status: "confirmed" })).toBe(true);
     expect(shouldShowOrderTrackingLink({ payment_status: "paid", status: "fulfilled" })).toBe(false);
+    expect(
+      shouldShowOrderTrackingLink({
+        payment_status: "paid",
+        status: "confirmed",
+        tracking_status: "carrier_cancelled",
+      }),
+    ).toBe(false);
   });
 
   it("keeps confirmed separate from the explicit Hand-wrapped state", () => {
@@ -35,14 +54,52 @@ describe("order-tracking helpers", () => {
     expect(trackingStageLabel({ tracking_status: "hand_wrapped" }, "processing")).toBe("Hand-wrapped");
   });
 
-  it("marks Hand-wrapped complete only once shipped", () => {
-    expect(resolveTrackingStage({ tracking_status: "shipped" })).toBe(2);
-    expect(resolveTrackingStage({ status: "confirmed", tracking_status: "shipped" })).toBe(2);
+  it("maps ExpressBees carrier cancellation to awaiting pickup with a distinct label", () => {
+    expect(resolveTrackingStage({ tracking_status: "carrier_cancelled" })).toBe(2);
+    expect(trackingStatusLabel({ tracking_status: "carrier_cancelled" })).toBe("ExpressBees cancelled");
+    expect(trackingActivityTitle({ tracking_status: "carrier_cancelled" })).toBe("ExpressBees cancelled");
+    expect(
+      trackingStageDetail({ tracking_status: "carrier_cancelled" }, "awaiting_pickup", "current"),
+    ).toMatch(/cancelled this shipment booking/i);
+    expect(isTerminalTrackingState({ tracking_status: "carrier_cancelled" })).toBe(false);
+  });
+
+  it("shows Waiting for pickup as a distinct stage before shipping", () => {
+    expect(resolveTrackingStage({ tracking_status: "shipped" })).toBe(3);
+    expect(resolveTrackingStage({ status: "confirmed", tracking_status: "shipped" })).toBe(3);
+    expect(resolveTrackingStage({ tracking_status: "awaiting_pickup" })).toBe(2);
+    expect(trackingStatusLabel({ tracking_status: "awaiting_pickup" })).toBe("Waiting for pickup");
+    expect(trackingStageLabel({ tracking_status: "confirmed" }, "awaiting_pickup")).toBe("Waiting for pickup");
+    expect(trackingStageDetail({ tracking_status: "awaiting_pickup" }, "awaiting_pickup", "current")).toMatch(
+      /courier collects/i,
+    );
+  });
+
+  it("maps ExpressBees OUT FOR DELIVERY and Delivered to their own stages", () => {
+    expect(resolveTrackingStage({ tracking_status: "out_for_delivery" })).toBe(4);
+    expect(trackingStatusLabel({ tracking_status: "out_for_delivery" })).toBe("Out for delivery");
+    expect(resolveTrackingStage({ tracking_status: "delivered" })).toBe(5);
+    expect(trackingStatusLabel({ tracking_status: "delivered" })).toBe("Delivered");
+    expect(isTerminalTrackingState({ tracking_status: "out_for_delivery" })).toBe(false);
+    expect(
+      trackingActivityDate({ tracking_status: "out_for_delivery", shipment_date: "2026-08-10", created_at: "2026-08-01" }),
+    ).toEqual({ prefix: "Shipped", value: "2026-08-10" });
+  });
+
+  it("maps delivery_failed to out_for_delivery stage with custom label and detail", () => {
+    expect(resolveTrackingStage({ tracking_status: "delivery_failed" })).toBe(4);
+    expect(trackingStatusLabel({ tracking_status: "delivery_failed" })).toBe("Delivery attempt unsuccessful");
+    expect(trackingActivityTitle({ tracking_status: "delivery_failed" })).toBe("Delivery attempt unsuccessful");
+    expect(isTerminalTrackingState({ tracking_status: "delivery_failed" })).toBe(false);
+    expect(
+      trackingActivityDate({ tracking_status: "delivery_failed", shipment_date: "2026-08-10", created_at: "2026-08-01" }),
+    ).toEqual({ prefix: "Shipped", value: "2026-08-10" });
   });
 
   it("builds activity titles from tracking_status", () => {
     expect(trackingActivityTitle({ tracking_status: "confirmed" })).toBe("Order confirmed");
     expect(trackingActivityTitle({ tracking_status: "hand_wrapped" })).toBe("Hand-wrapped");
+    expect(trackingActivityTitle({ tracking_status: "awaiting_pickup" })).toBe("Waiting for pickup");
     expect(trackingActivityTitle({ tracking_status: "shipped" })).toBe("On the way");
     expect(trackingActivityTitle({ tracking_status: "delivered" })).toBe("Delivered");
     expect(trackingActivityTitle({ status: "cancelled" })).toBe("Order cancelled");
@@ -66,6 +123,15 @@ describe("order-tracking helpers", () => {
       trackingActivityDate({
         tracking_status: "shipped",
         shipment_date: "2026-08-10",
+        created_at: "2026-08-01T10:00:00Z",
+      }),
+    ).toEqual({ prefix: "Shipped", value: "2026-08-10" });
+
+    expect(
+      trackingActivityDate({
+        tracking_status: "delivered",
+        shipment_date: "2026-08-10",
+        shipment_delivered_at: "2026-08-12T09:57:19Z",
         created_at: "2026-08-01T10:00:00Z",
       }),
     ).toEqual({ prefix: "Shipped", value: "2026-08-10" });

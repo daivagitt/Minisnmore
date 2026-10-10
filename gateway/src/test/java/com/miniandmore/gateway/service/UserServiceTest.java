@@ -2,6 +2,7 @@ package com.miniandmore.gateway.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
@@ -64,6 +65,7 @@ class UserServiceTest {
         userService = new UserService(userRepository, authorityRepository, userAuthoritiesLoader, passwordEncoder);
         user = sampleUser();
         lenient().when(userAuthoritiesLoader.withAuthorities(any(User.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        lenient().when(userAuthoritiesLoader.attachAuthorities(anyList())).thenAnswer(inv -> Flux.fromIterable(inv.getArgument(0)));
         lenient().when(passwordEncoder.encode(anyString())).thenReturn("encoded");
         lenient()
             .when(userRepository.save(any(User.class)))
@@ -154,6 +156,7 @@ class UserServiceTest {
     @Test
     void registerUser_createsNewUser() {
         AdminUserDTO dto = adminDto("newuser", "new@localhost");
+        dto.setSubscribed(true);
         Authority authority = new Authority();
         authority.setName(AuthoritiesConstants.USER);
         when(userRepository.findOneByLogin("newuser")).thenReturn(Mono.empty());
@@ -168,7 +171,10 @@ class UserServiceTest {
         when(userRepository.saveUserAuthority(anyLong(), anyString())).thenReturn(Mono.empty());
 
         StepVerifier.create(userService.registerUser(dto, "password").contextWrite(securityContext()))
-            .assertNext(registered -> assertThat(registered.getLogin()).isEqualTo("newuser"))
+            .assertNext(registered -> {
+                assertThat(registered.getLogin()).isEqualTo("newuser");
+                assertThat(registered.isSubscribed()).isTrue();
+            })
             .verifyComplete();
     }
 
@@ -206,26 +212,85 @@ class UserServiceTest {
     }
 
     @Test
-    void createUser_persistsActivatedUser() {
+    void createUser_invitesInactiveStaffUser() {
         AdminUserDTO dto = adminDto("created", "created@localhost");
-        dto.setAuthorities(Set.of(AuthoritiesConstants.USER));
-        Authority authority = new Authority();
-        authority.setName(AuthoritiesConstants.USER);
-        org.mockito.Mockito.doReturn(Mono.just(authority)).when(authorityRepository).findById(AuthoritiesConstants.USER);
-        org.mockito.Mockito.doReturn(Mono.empty()).when(userRepository).deleteUserAuthorities(anyLong());
+        dto.setAuthorities(Set.of(AuthoritiesConstants.SALES));
         User saved = sampleUser();
-        saved.setLogin("newuser");
-        saved.setEmail("new@localhost");
-        org.mockito.Mockito.doReturn(Mono.just(saved)).when(userRepository).save(org.mockito.Mockito.any(User.class));
+        saved.setLogin("created");
+        saved.setEmail("created@localhost");
+        saved.setActivated(false);
+        org.mockito.Mockito
+            .doAnswer(invocation -> {
+                User persisted = invocation.getArgument(0);
+                persisted.setId(1L);
+                return Mono.just(persisted);
+            })
+            .when(userRepository)
+            .save(org.mockito.Mockito.any(User.class));
 
-        StepVerifier.create(userService.createUser(dto).contextWrite(securityContext())).expectNextCount(1).verifyComplete();
+        StepVerifier.create(userService.createUser(dto).contextWrite(securityContext()))
+            .assertNext(created -> {
+                assertThat(created.isActivated()).isFalse();
+                assertThat(created.getActivationKey()).isNotBlank();
+            })
+            .verifyComplete();
+    }
+
+    @Test
+    void completeInvite_activatesStaffAndClearsKey() {
+        user.setActivated(false);
+        user.setActivationKey("invite-key");
+        Authority sales = new Authority();
+        sales.setName(AuthoritiesConstants.SALES);
+        user.setAuthorities(Set.of(sales));
+        when(userRepository.findOneByActivationKey("invite-key")).thenReturn(Mono.just(user));
+
+        StepVerifier.create(userService.completeInvite("newpass123", "invite-key"))
+            .assertNext(activated -> {
+                assertThat(activated.isActivated()).isTrue();
+                assertThat(activated.getActivationKey()).isNull();
+                assertThat(activated.getPassword()).isEqualTo("encoded");
+            })
+            .verifyComplete();
+    }
+
+    @Test
+    void completeInvite_rejectsShopperActivationKey() {
+        user.setActivated(false);
+        user.setActivationKey("shopper-key");
+        when(userRepository.findOneByActivationKey("shopper-key")).thenReturn(Mono.just(user));
+
+        StepVerifier.create(userService.completeInvite("newpass123", "shopper-key")).verifyComplete();
+        verify(userRepository, never()).save(user);
+    }
+
+    @Test
+    void updateStaffUser_rejectsActivatingPendingInvite() {
+        user.setActivated(false);
+        user.setActivationKey("invite-key");
+        Authority sales = new Authority();
+        sales.setName(AuthoritiesConstants.SALES);
+        user.setAuthorities(Set.of(sales));
+        AdminUserDTO dto = adminDto("user", "user@localhost");
+        dto.setId(1L);
+        dto.setActivated(true);
+        dto.setAuthorities(Set.of(AuthoritiesConstants.SALES));
+        when(userRepository.findById(1L)).thenReturn(Mono.just(user));
+
+        StepVerifier.create(userService.updateStaffUser(dto, Set.of(AuthoritiesConstants.SUPER_ADMIN)))
+            .expectErrorSatisfies(error -> {
+                assertThat(error).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+                assertThat(error.getMessage()).contains("invitation email");
+            })
+            .verify();
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
     void updateUser_updatesFields() {
         AdminUserDTO dto = adminDto("user", "user@localhost");
         dto.setId(1L);
-        dto.setAuthorities(Set.of(AuthoritiesConstants.USER));
+        dto.setAuthorities(Set.of(AuthoritiesConstants.SALES));
         Authority authority = new Authority();
         authority.setName(AuthoritiesConstants.USER);
         when(userRepository.findById(1L)).thenReturn(Mono.just(user));
@@ -283,18 +348,27 @@ class UserServiceTest {
 
     @Test
     void getAllManagedUsers_mapsToDto() {
-        when(userRepository.findAllByIdNotNull(PageRequest.of(0, 20))).thenReturn(Flux.just(user));
+        when(userRepository.findAllUsersForAdmin(20, 0)).thenReturn(Flux.just(user));
 
         StepVerifier.create(userService.getAllManagedUsers(PageRequest.of(0, 20)))
             .assertNext(dto -> assertThat(dto.getLogin()).isEqualTo("user"))
             .verifyComplete();
+        verify(userAuthoritiesLoader).attachAuthorities(anyList());
+        verify(userAuthoritiesLoader, never()).withAuthorities(any(User.class));
     }
 
     @Test
     void getAllPublicUsers_mapsToDto() {
-        when(userRepository.findAllByActivatedIsTrue(PageRequest.of(0, 20))).thenReturn(Flux.just(user));
+        when(userRepository.findAllActivatedUsers(20, 0)).thenReturn(Flux.just(user));
 
         StepVerifier.create(userService.getAllPublicUsers(PageRequest.of(0, 20))).expectNextCount(1).verifyComplete();
+    }
+
+    @Test
+    void countPublicUsers_delegatesToActivatedCount() {
+        when(userRepository.countActivatedUsers()).thenReturn(Mono.just(7L));
+
+        StepVerifier.create(userService.countPublicUsers()).expectNext(7L).verifyComplete();
     }
 
     @Test
@@ -333,6 +407,28 @@ class UserServiceTest {
     }
 
     @Test
+    void removeNotActivatedUsers_deletesStaleStaffInvites() {
+        User staleStaff = sampleUser();
+        staleStaff.setActivated(false);
+        Authority sales = new Authority();
+        sales.setName(AuthoritiesConstants.SALES);
+        staleStaff.setAuthorities(Set.of(sales));
+        when(userAuthoritiesLoader.withAuthorities(staleStaff)).thenReturn(Mono.just(staleStaff));
+        when(userRepository.findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(any(Instant.class))).thenAnswer(invocation -> {
+            Instant cutoff = invocation.getArgument(0);
+            if (cutoff.isBefore(Instant.now().minus(13, ChronoUnit.DAYS))) {
+                return Flux.just(staleStaff);
+            }
+            return Flux.empty();
+        });
+        when(userRepository.delete(staleStaff)).thenReturn(Mono.empty());
+
+        userService.removeNotActivatedUsers();
+
+        verify(userRepository).delete(staleStaff);
+    }
+
+    @Test
     void removeNotActivatedUsers_blocksUntilComplete() {
         when(
             userRepository.findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(any(Instant.class))
@@ -340,7 +436,8 @@ class UserServiceTest {
 
         userService.removeNotActivatedUsers();
 
-        verify(userRepository).findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(any(Instant.class));
+        verify(userRepository, org.mockito.Mockito.times(2))
+            .findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(any(Instant.class));
     }
 
     @Test
@@ -393,6 +490,97 @@ class UserServiceTest {
         when(userRepository.findOneByEmailIgnoreCase("user@localhost")).thenReturn(Mono.just(user));
 
         StepVerifier.create(userService.registerUser(dto, "password")).expectError(EmailAlreadyUsedException.class).verify();
+    }
+
+    @Test
+    void createStaffUser_assignsCanonicalSalesRole() {
+        AdminUserDTO dto = adminDto("sales1", "sales1@localhost");
+        dto.setAuthorities(Set.of(AuthoritiesConstants.SALES));
+
+        StepVerifier.create(userService.createStaffUser(dto, Set.of(AuthoritiesConstants.SUPER_ADMIN)).contextWrite(securityContext()))
+            .assertNext(saved -> {
+                assertThat(saved.isActivated()).isFalse();
+                assertThat(saved.getAuthorities()).extracting(Authority::getName).contains(AuthoritiesConstants.SALES);
+            })
+            .verifyComplete();
+    }
+
+    @Test
+    void updateStaffUser_blocksRemovingLastSuperAdmin() {
+        User superAdmin = sampleUser();
+        superAdmin.setLogin("super");
+        Authority sa = new Authority();
+        sa.setName(AuthoritiesConstants.SUPER_ADMIN);
+        superAdmin.setAuthorities(Set.of(sa));
+        when(userRepository.findById(1L)).thenReturn(Mono.just(superAdmin));
+        when(userAuthoritiesLoader.withAuthorities(superAdmin)).thenReturn(Mono.just(superAdmin));
+        when(userRepository.countUsersWithAuthority(AuthoritiesConstants.SUPER_ADMIN)).thenReturn(Mono.just(1L));
+
+        AdminUserDTO dto = new AdminUserDTO(superAdmin);
+        dto.setAuthorities(Set.of(AuthoritiesConstants.ADMIN));
+
+        StepVerifier.create(userService.updateStaffUser(dto, Set.of(AuthoritiesConstants.SUPER_ADMIN)))
+            .expectErrorMatches(ex -> ex instanceof org.springframework.web.server.ResponseStatusException)
+            .verify();
+    }
+
+    @Test
+    void updateStaffUser_blocksDeactivatingLastSuperAdmin() {
+        User superAdmin = sampleUser();
+        superAdmin.setLogin("super");
+        Authority sa = new Authority();
+        sa.setName(AuthoritiesConstants.SUPER_ADMIN);
+        superAdmin.setAuthorities(Set.of(sa));
+        when(userRepository.findById(1L)).thenReturn(Mono.just(superAdmin));
+        when(userAuthoritiesLoader.withAuthorities(superAdmin)).thenReturn(Mono.just(superAdmin));
+        when(userRepository.countUsersWithAuthority(AuthoritiesConstants.SUPER_ADMIN)).thenReturn(Mono.just(1L));
+
+        AdminUserDTO dto = new AdminUserDTO(superAdmin);
+        dto.setActivated(false);
+
+        StepVerifier.create(userService.updateStaffUser(dto, Set.of(AuthoritiesConstants.SUPER_ADMIN)))
+            .expectErrorMatches(ex ->
+                ex instanceof org.springframework.web.server.ResponseStatusException &&
+                ((org.springframework.web.server.ResponseStatusException) ex).getReason().contains("last Super Admin")
+            )
+            .verify();
+    }
+
+    @Test
+    void registerUser_deletesInactiveUserWithSameEmail() {
+        AdminUserDTO dto = adminDto("newuser", "new@localhost");
+        when(userRepository.findOneByLogin("newuser")).thenReturn(Mono.empty());
+        User inactiveByEmail = sampleUser();
+        inactiveByEmail.setActivated(false);
+        when(userRepository.findOneByEmailIgnoreCase("new@localhost")).thenReturn(Mono.just(inactiveByEmail));
+        when(userRepository.deleteUserAuthorities(inactiveByEmail.getId())).thenReturn(Mono.empty());
+        when(userRepository.delete(inactiveByEmail)).thenReturn(Mono.empty());
+        Authority authority = new Authority();
+        authority.setName(AuthoritiesConstants.USER);
+        when(authorityRepository.findById(AuthoritiesConstants.USER)).thenReturn(Mono.just(authority));
+
+        StepVerifier.create(userService.registerUser(dto, "password").contextWrite(securityContext()))
+            .expectNextCount(1)
+            .verifyComplete();
+
+        verify(userRepository).delete(inactiveByEmail);
+    }
+
+    @Test
+    void deleteStaffUser_removesManagedStaffAccount() {
+        User staff = sampleUser();
+        staff.setLogin("sales-user");
+        Authority sales = new Authority();
+        sales.setName(AuthoritiesConstants.SALES);
+        staff.setAuthorities(Set.of(sales));
+        when(userRepository.findOneByLogin("sales-user")).thenReturn(Mono.just(staff));
+        when(userAuthoritiesLoader.withAuthorities(staff)).thenReturn(Mono.just(staff));
+        when(userRepository.delete(staff)).thenReturn(Mono.empty());
+
+        StepVerifier.create(userService.deleteStaffUser("sales-user", Set.of(AuthoritiesConstants.SUPER_ADMIN)))
+            .verifyComplete();
+
+        verify(userRepository).delete(staff);
     }
 
     private static AdminUserDTO adminDto(String login, String email) {

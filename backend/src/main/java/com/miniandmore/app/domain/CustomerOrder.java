@@ -2,8 +2,10 @@ package com.miniandmore.app.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
+import com.miniandmore.app.domain.enumeration.PackageType;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
+import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
@@ -138,6 +140,10 @@ public class CustomerOrder implements Serializable {
     @Column(name = "zoho_invoice_id", length = 120)
     private String zohoInvoiceId;
 
+    @Size(max = 120)
+    @Column(name = "zoho_credit_note_id", length = 120)
+    private String zohoCreditNoteId;
+
     @Size(max = 600)
     @Column(name = "zoho_invoice_pdf_url", length = 600)
     private String zohoInvoicePdfUrl;
@@ -194,6 +200,73 @@ public class CustomerOrder implements Serializable {
     @Size(max = 20)
     @Column(name = "shipment_date", length = 20)
     private String shipmentDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "shipment_logistics_mode", length = 16)
+    private ReturnLogisticsMode shipmentLogisticsMode;
+
+    @Size(max = 500)
+    @Column(name = "tracking_url", length = 500)
+    private String trackingUrl;
+
+    @Size(max = 500)
+    @Column(name = "shipment_label_url", length = 500)
+    private String shipmentLabelUrl;
+
+    @Size(max = 120)
+    @Column(name = "shipment_provider_request_id", length = 120)
+    private String shipmentProviderRequestId;
+
+    @Size(max = 80)
+    @Column(name = "shipment_carrier_status", length = 80)
+    private String shipmentCarrierStatus;
+
+    @Column(name = "shipment_delivered_at")
+    private Instant shipmentDeliveredAt;
+
+    @Column(name = "shipment_cancelled_at")
+    private Instant shipmentCancelledAt;
+
+    @Size(max = 50)
+    @Column(name = "shipment_cancelled_by", length = 50)
+    private String shipmentCancelledBy;
+
+    @Size(max = 500)
+    @Column(name = "shipment_cancellation_reason", length = 500)
+    private String shipmentCancellationReason;
+
+    @Column(name = "package_weight_grams")
+    private Integer packageWeightGrams;
+
+    @Column(name = "package_length_cm")
+    private Integer packageLengthCm;
+
+    @Column(name = "package_breadth_cm")
+    private Integer packageBreadthCm;
+
+    @Column(name = "package_height_cm")
+    private Integer packageHeightCm;
+
+    @Column(name = "package_chargeable_weight_grams")
+    private Integer packageChargeableWeightGrams;
+
+    @Size(max = 40)
+    @Column(name = "package_courier_id", length = 40)
+    private String packageCourierId;
+
+    @Size(max = 120)
+    @Column(name = "package_courier_name", length = 120)
+    private String packageCourierName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "package_type", length = 20)
+    private PackageType packageType;
+
+    @Column(name = "package_box_id")
+    private Long packageBoxId;
+
+    @Column(name = "packed_at")
+    private Instant packedAt;
 
     @Column(name = "ledgerly_tracking_last_pulled_at")
     private Instant ledgerlyTrackingLastPulledAt;
@@ -529,6 +602,19 @@ public class CustomerOrder implements Serializable {
         this.zohoInvoiceId = zohoInvoiceId;
     }
 
+    public String getZohoCreditNoteId() {
+        return this.zohoCreditNoteId;
+    }
+
+    public CustomerOrder zohoCreditNoteId(String zohoCreditNoteId) {
+        this.setZohoCreditNoteId(zohoCreditNoteId);
+        return this;
+    }
+
+    public void setZohoCreditNoteId(String zohoCreditNoteId) {
+        this.zohoCreditNoteId = zohoCreditNoteId;
+    }
+
     public String getZohoInvoicePdfUrl() {
         return this.zohoInvoicePdfUrl;
     }
@@ -722,6 +808,238 @@ public class CustomerOrder implements Serializable {
 
     public void setShipmentDate(String shipmentDate) {
         this.shipmentDate = shipmentDate;
+    }
+
+    public ReturnLogisticsMode getShipmentLogisticsMode() {
+        return this.shipmentLogisticsMode;
+    }
+
+    public CustomerOrder shipmentLogisticsMode(ReturnLogisticsMode shipmentLogisticsMode) {
+        this.setShipmentLogisticsMode(shipmentLogisticsMode);
+        return this;
+    }
+
+    public void setShipmentLogisticsMode(ReturnLogisticsMode shipmentLogisticsMode) {
+        this.shipmentLogisticsMode = shipmentLogisticsMode;
+    }
+
+    public String getTrackingUrl() {
+        return this.trackingUrl;
+    }
+
+    public CustomerOrder trackingUrl(String trackingUrl) {
+        this.setTrackingUrl(trackingUrl);
+        return this;
+    }
+
+    public void setTrackingUrl(String trackingUrl) {
+        this.trackingUrl = trackingUrl;
+    }
+
+    public String getShipmentLabelUrl() {
+        return this.shipmentLabelUrl;
+    }
+
+    public CustomerOrder shipmentLabelUrl(String shipmentLabelUrl) {
+        this.setShipmentLabelUrl(shipmentLabelUrl);
+        return this;
+    }
+
+    public void setShipmentLabelUrl(String shipmentLabelUrl) {
+        this.shipmentLabelUrl = shipmentLabelUrl;
+    }
+
+    public String getShipmentProviderRequestId() {
+        return this.shipmentProviderRequestId;
+    }
+
+    public CustomerOrder shipmentProviderRequestId(String shipmentProviderRequestId) {
+        this.setShipmentProviderRequestId(shipmentProviderRequestId);
+        return this;
+    }
+
+    public void setShipmentProviderRequestId(String shipmentProviderRequestId) {
+        this.shipmentProviderRequestId = shipmentProviderRequestId;
+    }
+
+    public String getShipmentCarrierStatus() {
+        return shipmentCarrierStatus;
+    }
+
+    public CustomerOrder shipmentCarrierStatus(String shipmentCarrierStatus) {
+        this.setShipmentCarrierStatus(shipmentCarrierStatus);
+        return this;
+    }
+
+    public void setShipmentCarrierStatus(String shipmentCarrierStatus) {
+        this.shipmentCarrierStatus = shipmentCarrierStatus;
+    }
+
+    public Instant getShipmentDeliveredAt() {
+        return shipmentDeliveredAt;
+    }
+
+    public CustomerOrder shipmentDeliveredAt(Instant shipmentDeliveredAt) {
+        this.setShipmentDeliveredAt(shipmentDeliveredAt);
+        return this;
+    }
+
+    public void setShipmentDeliveredAt(Instant shipmentDeliveredAt) {
+        this.shipmentDeliveredAt = shipmentDeliveredAt;
+    }
+
+    public Instant getShipmentCancelledAt() {
+        return shipmentCancelledAt;
+    }
+
+    public void setShipmentCancelledAt(Instant shipmentCancelledAt) {
+        this.shipmentCancelledAt = shipmentCancelledAt;
+    }
+
+    public String getShipmentCancelledBy() {
+        return shipmentCancelledBy;
+    }
+
+    public void setShipmentCancelledBy(String shipmentCancelledBy) {
+        this.shipmentCancelledBy = shipmentCancelledBy;
+    }
+
+    public String getShipmentCancellationReason() {
+        return shipmentCancellationReason;
+    }
+
+    public void setShipmentCancellationReason(String shipmentCancellationReason) {
+        this.shipmentCancellationReason = shipmentCancellationReason;
+    }
+
+    public Integer getPackageWeightGrams() {
+        return packageWeightGrams;
+    }
+
+    public CustomerOrder packageWeightGrams(Integer packageWeightGrams) {
+        this.setPackageWeightGrams(packageWeightGrams);
+        return this;
+    }
+
+    public void setPackageWeightGrams(Integer packageWeightGrams) {
+        this.packageWeightGrams = packageWeightGrams;
+    }
+
+    public Integer getPackageLengthCm() {
+        return packageLengthCm;
+    }
+
+    public CustomerOrder packageLengthCm(Integer packageLengthCm) {
+        this.setPackageLengthCm(packageLengthCm);
+        return this;
+    }
+
+    public void setPackageLengthCm(Integer packageLengthCm) {
+        this.packageLengthCm = packageLengthCm;
+    }
+
+    public Integer getPackageBreadthCm() {
+        return packageBreadthCm;
+    }
+
+    public CustomerOrder packageBreadthCm(Integer packageBreadthCm) {
+        this.setPackageBreadthCm(packageBreadthCm);
+        return this;
+    }
+
+    public void setPackageBreadthCm(Integer packageBreadthCm) {
+        this.packageBreadthCm = packageBreadthCm;
+    }
+
+    public Integer getPackageHeightCm() {
+        return packageHeightCm;
+    }
+
+    public CustomerOrder packageHeightCm(Integer packageHeightCm) {
+        this.setPackageHeightCm(packageHeightCm);
+        return this;
+    }
+
+    public void setPackageHeightCm(Integer packageHeightCm) {
+        this.packageHeightCm = packageHeightCm;
+    }
+
+    public Integer getPackageChargeableWeightGrams() {
+        return packageChargeableWeightGrams;
+    }
+
+    public CustomerOrder packageChargeableWeightGrams(Integer packageChargeableWeightGrams) {
+        this.setPackageChargeableWeightGrams(packageChargeableWeightGrams);
+        return this;
+    }
+
+    public void setPackageChargeableWeightGrams(Integer packageChargeableWeightGrams) {
+        this.packageChargeableWeightGrams = packageChargeableWeightGrams;
+    }
+
+    public String getPackageCourierId() {
+        return packageCourierId;
+    }
+
+    public CustomerOrder packageCourierId(String packageCourierId) {
+        this.setPackageCourierId(packageCourierId);
+        return this;
+    }
+
+    public void setPackageCourierId(String packageCourierId) {
+        this.packageCourierId = packageCourierId;
+    }
+
+    public String getPackageCourierName() {
+        return packageCourierName;
+    }
+
+    public CustomerOrder packageCourierName(String packageCourierName) {
+        this.setPackageCourierName(packageCourierName);
+        return this;
+    }
+
+    public void setPackageCourierName(String packageCourierName) {
+        this.packageCourierName = packageCourierName;
+    }
+
+    public PackageType getPackageType() {
+        return packageType;
+    }
+
+    public CustomerOrder packageType(PackageType packageType) {
+        this.setPackageType(packageType);
+        return this;
+    }
+
+    public void setPackageType(PackageType packageType) {
+        this.packageType = packageType;
+    }
+
+    public Long getPackageBoxId() {
+        return packageBoxId;
+    }
+
+    public CustomerOrder packageBoxId(Long packageBoxId) {
+        this.setPackageBoxId(packageBoxId);
+        return this;
+    }
+
+    public void setPackageBoxId(Long packageBoxId) {
+        this.packageBoxId = packageBoxId;
+    }
+
+    public Instant getPackedAt() {
+        return packedAt;
+    }
+
+    public CustomerOrder packedAt(Instant packedAt) {
+        this.setPackedAt(packedAt);
+        return this;
+    }
+
+    public void setPackedAt(Instant packedAt) {
+        this.packedAt = packedAt;
     }
 
     public Instant getLedgerlyTrackingLastPulledAt() {

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20261002210000-1-reverse" author="miniandmore">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="order_return" columnName="reverse_carrier_status"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="order_return">
+            <column name="reverse_carrier_status" type="varchar(40)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20261002210000-2-outbound" author="miniandmore">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="order_return" columnName="outbound_carrier_status"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="order_return">
+            <column name="outbound_carrier_status" type="varchar(40)"/>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>

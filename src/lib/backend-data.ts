@@ -2,6 +2,10 @@ import { api, ApiError } from "@/lib/api";
 import { numberFieldOr, requireNumberField } from "@/lib/admin-number-field";
 import { validateVariantRows } from "@/lib/admin-variants";
 import { MAX_DELIVERY_ETA_BUFFER_DAYS } from "@/lib/commerce";
+import {
+  MAX_REFUND_BUSINESS_DAYS,
+  MAX_RETURN_WINDOW_DAYS,
+} from "@/lib/refund-policy";
 import { internalSitePathError } from "@/lib/internal-links";
 import {
   isExampleOrPlaceholderUrl,
@@ -42,6 +46,7 @@ import {
   detailsKickerValidationErrors,
   normalizeDetailsKicker,
 } from "@/lib/product-details-kicker";
+import { getBannerEyebrowValidationErrors, getBannerTrustValidationErrors } from "@/lib/banner-trust";
 
 type Id = string | number;
 type JsonRecord = Record<string, unknown>;
@@ -284,6 +289,8 @@ export function getBannerValidationErrors(row: BannerRow): string[] {
   const hasCta = !!(row.cta_label ?? "").trim();
   if (hasLink && !hasCta) errors.push("CTA label is required when Link URL is set.");
   if (hasCta && !hasLink) errors.push("Link URL is required when CTA label is set.");
+  errors.push(...getBannerEyebrowValidationErrors(row.eyebrow));
+  errors.push(...getBannerTrustValidationErrors(row));
   const sortError = requireNumberField(row.sort_order, "Sort order", { allowZero: true });
   if (sortError) errors.push(sortError);
   return errors;
@@ -362,6 +369,13 @@ export function getCouponValidationErrors(row: CouponRow): string[] {
     const getError = requireNumberField(row.bogo_get_qty, "BOGO get quantity", { min: 1, max: 10 });
     if (getError) errors.push(getError);
   }
+  const scope = String(row.eligibility_scope ?? "all").toLowerCase();
+  if (!["all", "same_sku", "category"].includes(scope)) {
+    errors.push("Eligibility scope must be all, same_sku, or category.");
+  }
+  if (scope === "category" && !row.eligibility_category_id) {
+    errors.push("Category is required when eligibility scope is category.");
+  }
   return errors;
 }
 
@@ -432,6 +446,34 @@ export function getSiteSettingsValidationErrors(row: SiteSettingsRow): string[] 
     max: MAX_DELIVERY_ETA_BUFFER_DAYS,
   });
   if (etaBufferError) errors.push(etaBufferError);
+  if (row.return_window_days != null) {
+    const returnWindowError = requireNumberField(row.return_window_days, "Return window days", {
+      min: 1,
+      max: MAX_RETURN_WINDOW_DAYS,
+    });
+    if (returnWindowError) errors.push(returnWindowError);
+  }
+  if (row.refund_min_business_days != null) {
+    const refundMinError = requireNumberField(row.refund_min_business_days, "Refund min business days", {
+      min: 1,
+      max: MAX_REFUND_BUSINESS_DAYS,
+    });
+    if (refundMinError) errors.push(refundMinError);
+  }
+  if (row.refund_max_business_days != null) {
+    const refundMaxError = requireNumberField(row.refund_max_business_days, "Refund max business days", {
+      min: 1,
+      max: MAX_REFUND_BUSINESS_DAYS,
+    });
+    if (refundMaxError) errors.push(refundMaxError);
+  }
+  if (
+    row.refund_min_business_days != null &&
+    row.refund_max_business_days != null &&
+    row.refund_max_business_days < row.refund_min_business_days
+  ) {
+    errors.push("Refund max business days must be at least the min.");
+  }
   const discountError = requireNumberField(row.store_discount_percent, "Store discount", {
     allowZero: true,
     max: GST_RATE_MAX,
@@ -843,6 +885,11 @@ export type BannerRow = {
   image_url: string | null;
   link_url: string | null;
   cta_label: string | null;
+  /** Small overline above the title (e.g. "Featured"). */
+  eyebrow: string | null;
+  trust_fabric_label: string | null;
+  trust_shipping_label: string | null;
+  trust_dyes_label: string | null;
   sort_order: number | null;
   active: boolean;
 };
@@ -854,6 +901,10 @@ type BannerDto = {
   imageUrl?: string | null;
   linkUrl?: string | null;
   ctaLabel?: string | null;
+  eyebrow?: string | null;
+  trustFabricLabel?: string | null;
+  trustShippingLabel?: string | null;
+  trustDyesLabel?: string | null;
   sortOrder?: number;
   active?: boolean;
 };
@@ -865,6 +916,10 @@ export const fromBannerDto = (dto: BannerDto): BannerRow => ({
   image_url: dto.imageUrl ?? null,
   link_url: dto.linkUrl ?? null,
   cta_label: dto.ctaLabel ?? null,
+  eyebrow: dto.eyebrow ?? null,
+  trust_fabric_label: dto.trustFabricLabel ?? null,
+  trust_shipping_label: dto.trustShippingLabel ?? null,
+  trust_dyes_label: dto.trustDyesLabel ?? null,
   sort_order: dto.sortOrder != null ? Number(dto.sortOrder) : null,
   active: dto.active ?? true,
 });
@@ -876,6 +931,10 @@ const toBannerDto = (row: BannerRow): BannerDto => ({
   imageUrl: nullable(row.image_url) as string | null,
   linkUrl: nullable(row.link_url) as string | null,
   ctaLabel: nullable(row.cta_label) as string | null,
+  eyebrow: nullable(row.eyebrow) as string | null,
+  trustFabricLabel: nullable(row.trust_fabric_label) as string | null,
+  trustShippingLabel: nullable(row.trust_shipping_label) as string | null,
+  trustDyesLabel: nullable(row.trust_dyes_label) as string | null,
   sortOrder: Number(row.sort_order) || 0,
   active: !!row.active,
 });
@@ -893,6 +952,10 @@ export const saveBanner = (row: BannerRow) => {
     image_url: row.image_url?.trim() ?? "",
     link_url: row.link_url?.trim() || null,
     cta_label: row.cta_label?.trim() || null,
+    eyebrow: row.eyebrow?.trim() || null,
+    trust_fabric_label: row.trust_fabric_label?.trim() || null,
+    trust_shipping_label: row.trust_shipping_label?.trim() || null,
+    trust_dyes_label: row.trust_dyes_label?.trim() || null,
   };
   assertValidBanner(normalized);
   return normalized.id
@@ -1046,6 +1109,8 @@ export type CouponRow = {
   max_discount: number | null;
   bogo_buy_qty: number | null;
   bogo_get_qty: number | null;
+  eligibility_scope: "all" | "same_sku" | "category" | string;
+  eligibility_category_id: string | null;
   expires_at: string | null;
   active: boolean;
 };
@@ -1058,6 +1123,8 @@ type CouponDto = {
   maxDiscount?: number | null;
   bogoBuyQty?: number | null;
   bogoGetQty?: number | null;
+  eligibilityScope?: "ALL" | "SAME_SKU" | "CATEGORY" | null;
+  eligibilityCategoryId?: number | null;
   expiresAt?: string | null;
   active: boolean;
 };
@@ -1072,23 +1139,36 @@ export const fromCouponDto = (dto: CouponDto): CouponRow => ({
   max_discount: dto.maxDiscount == null ? null : Number(dto.maxDiscount),
   bogo_buy_qty: dto.bogoBuyQty == null ? 1 : Number(dto.bogoBuyQty),
   bogo_get_qty: dto.bogoGetQty == null ? 1 : Number(dto.bogoGetQty),
+  eligibility_scope: String(dto.eligibilityScope ?? "ALL").toLowerCase(),
+  eligibility_category_id:
+    dto.eligibilityCategoryId == null ? null : String(dto.eligibilityCategoryId),
   expires_at: dto.expiresAt ?? null,
   active: !!dto.active,
 });
 
-const toCouponDto = (row: CouponRow): CouponDto => ({
-  id: idValue(row.id),
-  code: row.code,
-  discountType:
-    row.discount_type === "flat" ? "FLAT" : row.discount_type === "bogo" ? "BOGO" : "PERCENT",
-  discountValue: row.discount_value as number,
-  minOrder: numberFieldOr(row.min_order, 0),
-  maxDiscount: row.max_discount == null ? null : Number(row.max_discount),
-  bogoBuyQty: numberFieldOr(row.bogo_buy_qty, 1),
-  bogoGetQty: numberFieldOr(row.bogo_get_qty, 1),
-  expiresAt: row.expires_at,
-  active: !!row.active,
-});
+const toCouponDto = (row: CouponRow): CouponDto => {
+  const scope = String(row.eligibility_scope ?? "all").toLowerCase();
+  const eligibilityScope =
+    scope === "same_sku" ? "SAME_SKU" : scope === "category" ? "CATEGORY" : "ALL";
+  return {
+    id: idValue(row.id),
+    code: row.code,
+    discountType:
+      row.discount_type === "flat" ? "FLAT" : row.discount_type === "bogo" ? "BOGO" : "PERCENT",
+    discountValue: row.discount_value as number,
+    minOrder: numberFieldOr(row.min_order, 0),
+    maxDiscount: row.max_discount == null ? null : Number(row.max_discount),
+    bogoBuyQty: numberFieldOr(row.bogo_buy_qty, 1),
+    bogoGetQty: numberFieldOr(row.bogo_get_qty, 1),
+    eligibilityScope,
+    eligibilityCategoryId:
+      eligibilityScope === "CATEGORY" && row.eligibility_category_id
+        ? Number(row.eligibility_category_id)
+        : null,
+    expiresAt: row.expires_at,
+    active: !!row.active,
+  };
+};
 
 export const listCoupons = () =>
   listAdmin<CouponDto>("coupons").then((rows) => rows.map(fromCouponDto));
@@ -1114,8 +1194,12 @@ export type SiteSettingsRow = Record<string, string | number | boolean | null | 
   free_shipping_min_inr?: number | null;
   cod_fee_inr?: number | null;
   delivery_eta_buffer_days?: number | null;
+  return_window_days?: number | null;
+  refund_min_business_days?: number | null;
+  refund_max_business_days?: number | null;
   store_discount_percent?: number | null;
   about_page_json?: string | null;
+  gift_page_json?: string | null;
 };
 
 const siteStringMap: Record<string, string> = {
@@ -1151,6 +1235,7 @@ const siteStringMap: Record<string, string> = {
   subscribe_plans_json: "subscribePlansJson",
   subscribe_features_json: "subscribeFeaturesJson",
   about_page_json: "aboutPageJson",
+  gift_page_json: "giftPageJson",
 };
 
 function fromSiteSettingDto(dto: Record<string, unknown> | null): SiteSettingsRow | null {
@@ -1165,6 +1250,9 @@ function fromSiteSettingDto(dto: Record<string, unknown> | null): SiteSettingsRo
   row.free_shipping_min_inr = dto.freeShippingMinInr as number | undefined;
   row.cod_fee_inr = dto.codFeeInr as number | undefined;
   row.delivery_eta_buffer_days = dto.deliveryEtaBufferDays as number | undefined;
+  row.return_window_days = dto.returnWindowDays as number | undefined;
+  row.refund_min_business_days = dto.refundMinBusinessDays as number | undefined;
+  row.refund_max_business_days = dto.refundMaxBusinessDays as number | undefined;
   row.store_discount_percent = dto.storeDiscountPercent as number | undefined;
   return row;
 }
@@ -1180,6 +1268,9 @@ function toSiteSettingDto(row: SiteSettingsRow) {
   payload.freeShippingMinInr = row.free_shipping_min_inr ?? null;
   payload.codFeeInr = row.cod_fee_inr ?? null;
   payload.deliveryEtaBufferDays = row.delivery_eta_buffer_days ?? null;
+  payload.returnWindowDays = row.return_window_days ?? null;
+  payload.refundMinBusinessDays = row.refund_min_business_days ?? null;
+  payload.refundMaxBusinessDays = row.refund_max_business_days ?? null;
   payload.storeDiscountPercent = row.store_discount_percent ?? null;
   return payload;
 }
@@ -1221,6 +1312,13 @@ export type AboutPageApiContent = {
 
 export const getAboutPage = () =>
   api.get<AboutPageApiContent | null>("/api/v1/about-page").then((row) => row ?? {});
+
+export type GiftPageApiContent = {
+  gift_page_json?: string;
+};
+
+export const getGiftPage = () =>
+  api.get<GiftPageApiContent | null>("/api/v1/gift-page").then((row) => row ?? {});
 
 export const getAdminSiteSettings = () =>
   api
@@ -1696,9 +1794,9 @@ export const testZohoConnection = () =>
   api.get<ZohoConnectionStatus>("/api/v1/admin/zoho/test", { auth: true });
 
 export type ZohoSyncFailure = {
-  productId: number;
-  productName: string;
-  message: string;
+  productId?: number;
+  productName?: string;
+  message?: string;
 };
 
 export type ZohoSyncSummary = {
@@ -1732,6 +1830,13 @@ export const pullZohoInventory = () =>
 export const pullZohoProducts = (options?: { full?: boolean }) =>
   api.post<ZohoSyncSummary>(
     `/api/v1/admin/zoho/pull-products${options?.full ? "?full=true" : ""}`,
+    undefined,
+    { auth: true },
+  );
+
+export const pullZohoProductGroup = (itemGroupId: string) =>
+  api.post<ZohoSyncSummary>(
+    `/api/v1/admin/zoho/pull-item-groups/${encodeURIComponent(itemGroupId.trim())}`,
     undefined,
     { auth: true },
   );
@@ -1802,9 +1907,26 @@ export function formatZohoSyncSummary(summary: ZohoSyncSummary, label: string) {
 }
 
 export function formatZohoSyncFailures(summary: ZohoSyncSummary): string[] {
-  const failures = (summary.failures ?? []).map((f) => `${f.productName}: ${f.message}`);
-  const notices = (summary.notices ?? []).map((f) => `Note — ${f.productName}: ${f.message}`);
+  const label = (f: ZohoSyncFailure) =>
+    f.productName?.trim() || (f.productId != null ? `Product ${f.productId}` : "Item");
+  const failures = (summary.failures ?? []).map((f) => `${label(f)}: ${f.message ?? "Failed"}`);
+  const notices = (summary.notices ?? []).map((f) => `Note — ${label(f)}: ${f.message ?? ""}`);
   return [...failures, ...notices];
+}
+
+/** Toast line for failed Zoho sync runs: summary counts plus first failure (and +N more when needed). */
+export function formatZohoSyncFailureToast(summary: ZohoSyncSummary, label: string): string {
+  const summaryLine = formatZohoSyncSummary(summary, label);
+  const details = formatZohoSyncFailures(summary);
+  if (summary.failed > 0) {
+    const first = details[0];
+    const more = details.length > 1 ? ` (+${details.length - 1} more)` : "";
+    return first ? `${summaryLine} — ${first}${more}` : summaryLine;
+  }
+  if ((summary.notices?.length ?? 0) > 0 && details[0]) {
+    return details[0];
+  }
+  return summaryLine;
 }
 
 export const getZohoSettings = async (): Promise<ZohoSettingsRow | null> => {

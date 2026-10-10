@@ -226,6 +226,20 @@ public class AccountResource {
             .then();
     }
 
+    /**
+     * {@code POST /account/invite/finish} : Activate an invited staff user and set their password.
+     */
+    @PostMapping(path = "/account/invite/finish")
+    public Mono<Void> finishInvite(@RequestBody KeyAndPasswordVM keyAndPassword) {
+        if (isPasswordLengthInvalid(keyAndPassword.getNewPassword())) {
+            throw new InvalidPasswordException();
+        }
+        return userService
+            .completeInvite(keyAndPassword.getNewPassword(), keyAndPassword.getKey())
+            .switchIfEmpty(Mono.error(new BadRequestAlertException("Invalid invitation key", "userManagement", "invalidinvitekey")))
+            .then();
+    }
+
     private static boolean isPasswordLengthInvalid(String password) {
         return (
             StringUtils.isEmpty(password) ||

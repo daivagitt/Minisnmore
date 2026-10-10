@@ -87,6 +87,9 @@ public class Product implements Serializable {
     @Column(name = "color_images_json", columnDefinition = "text")
     private String colorImagesJson;
 
+    @Column(name = "zoho_image_docs_json", columnDefinition = "text")
+    private String zohoImageDocsJson;
+
     @Size(max = 40)
     @Column(name = "item_structure", length = 40)
     private String itemStructure;
@@ -440,6 +443,19 @@ public class Product implements Serializable {
 
     public void setColorImagesJson(String colorImagesJson) {
         this.colorImagesJson = colorImagesJson;
+    }
+
+    public String getZohoImageDocsJson() {
+        return this.zohoImageDocsJson;
+    }
+
+    public Product zohoImageDocsJson(String zohoImageDocsJson) {
+        this.setZohoImageDocsJson(zohoImageDocsJson);
+        return this;
+    }
+
+    public void setZohoImageDocsJson(String zohoImageDocsJson) {
+        this.zohoImageDocsJson = zohoImageDocsJson;
     }
 
     public String getItemStructure() {

@@ -5,8 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.stream.Stream;
 import org.assertj.core.api.Condition;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 class SiteSettingCriteriaTest {
 
@@ -72,6 +75,46 @@ class SiteSettingCriteriaTest {
         var siteSettingCriteria = new SiteSettingCriteria();
 
         assertThat(siteSettingCriteria).hasToString("SiteSettingCriteria{}");
+    }
+
+    @Test
+    void equals_sameInstanceNullAndWrongType() {
+        var siteSettingCriteria = new SiteSettingCriteria();
+        assertThat(siteSettingCriteria.equals(siteSettingCriteria)).isTrue();
+        assertThat(siteSettingCriteria.equals(null)).isFalse();
+        assertThat(siteSettingCriteria.equals("SiteSettingCriteria")).isFalse();
+    }
+
+    @ParameterizedTest
+    @MethodSource("unequalCriteriaPairs")
+    void equals_falseWhenAnyFilterDiffers(SiteSettingCriteria left, SiteSettingCriteria right) {
+        assertThat(left).isNotEqualTo(right);
+    }
+
+    private static Stream<org.junit.jupiter.params.provider.Arguments> unequalCriteriaPairs() {
+        return Stream.of(
+            org.junit.jupiter.params.provider.Arguments.of(withBrand("A"), withBrand("B")),
+            org.junit.jupiter.params.provider.Arguments.of(withContactEmail("a@b.com"), withContactEmail("c@d.com")),
+            org.junit.jupiter.params.provider.Arguments.of(withDistinct(true), withDistinct(false))
+        );
+    }
+
+    private static SiteSettingCriteria withBrand(String brand) {
+        var c = new SiteSettingCriteria();
+        c.brandName().setEquals(brand);
+        return c;
+    }
+
+    private static SiteSettingCriteria withContactEmail(String email) {
+        var c = new SiteSettingCriteria();
+        c.contactEmail().setEquals(email);
+        return c;
+    }
+
+    private static SiteSettingCriteria withDistinct(Boolean distinct) {
+        var c = new SiteSettingCriteria();
+        c.setDistinct(distinct);
+        return c;
     }
 
     private static void setAllFilters(SiteSettingCriteria siteSettingCriteria) {

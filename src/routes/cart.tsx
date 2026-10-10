@@ -4,11 +4,11 @@ import { motion } from "framer-motion";
 import { Plus, Minus, X, Tag, ShieldCheck, Truck } from "lucide-react";
 import { useShop } from "@/store/shop";
 import { cartLineColorLabel, cartLineImage, cartPricingTotals } from "@/lib/cart-catalog";
-import { FIT_LIMITS } from "@/lib/product-fit";
+import { maxPurchasableQty } from "@/lib/purchasable-qty";
 import { toast } from "sonner";
 import { validateCoupon, couponValidationData } from "@/lib/coupons.functions";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
-import { commerceFromSiteSettings } from "@/lib/commerce";
+import { commerceFromSiteSettings, freeShippingStorefrontLabels } from "@/lib/commerce";
 import { orderTotals } from "@/lib/money";
 import { DEFAULT_STORE_DISCOUNT_PERCENT } from "@/lib/pricing";
 import { LazyImage } from "@/components/LazyImage";
@@ -36,8 +36,14 @@ function CartPage() {
     validateCoupon({ data: couponValidationData(code, cartTotal, cart) })
       .then((res) => {
         if (cancelled) return;
-        if (res.ok) setAppliedCoupon({ code: res.code!, discount: res.discount! });
-        else {
+        if (res.ok) {
+          setAppliedCoupon({
+            code: res.code!,
+            discount: res.discount!,
+            nudge: res.nudge,
+            bogoDetails: res.bogo_details,
+          });
+        } else {
           setAppliedCoupon(null);
           toast.message(res.error ?? `${code} no longer applies to this cart`);
         }
@@ -56,7 +62,12 @@ function CartPage() {
         toast.error(result.error);
         return;
       }
-      setAppliedCoupon({ code: result.code!, discount: result.discount! });
+      setAppliedCoupon({
+        code: result.code!,
+        discount: result.discount!,
+        nudge: result.nudge,
+        bogoDetails: result.bogo_details,
+      });
       toast.success("Coupon applied");
     } catch {
       toast.error("Could not validate coupon");
@@ -65,6 +76,7 @@ function CartPage() {
 
   const discount = appliedCoupon?.discount ?? 0;
   const commerce = commerceFromSiteSettings(settings);
+  const freeShippingLabels = freeShippingStorefrontLabels(commerce.freeShippingMinInr);
   const pricing = useMemo(() => cartPricingTotals(cart), [cart]);
   const storeDiscountPercent = settings.store_discount_percent ?? DEFAULT_STORE_DISCOUNT_PERCENT;
   const totals = orderTotals({ subtotal: cartTotal, discount, shipMode: "std", commerce });
@@ -105,7 +117,14 @@ function CartPage() {
                 <div className="glass rounded-full flex items-center">
                   <button onClick={() => updateQty(item.product.id, item.qty - 1, item.size, item.color)} className="h-8 w-8 grid place-items-center" aria-label="Decrease"><Minus className="h-3.5 w-3.5" /></button>
                   <span className="text-sm w-7 text-center">{item.qty}</span>
-                  <button onClick={() => updateQty(item.product.id, item.qty + 1, item.size, item.color)} disabled={item.qty >= FIT_LIMITS.qtyMax} className="h-8 w-8 grid place-items-center disabled:opacity-30" aria-label="Increase"><Plus className="h-3.5 w-3.5" /></button>
+                  <button
+                    onClick={() => updateQty(item.product.id, item.qty + 1, item.size, item.color)}
+                    disabled={item.qty >= maxPurchasableQty(item.product, { size: item.size, color: item.color, sku: item.variantSku })}
+                    className="h-8 w-8 grid place-items-center disabled:opacity-30"
+                    aria-label="Increase"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
                 </div>
                 <div className="text-right">
                   <div className="font-medium">₹{(item.qty * item.unitPrice).toLocaleString("en-IN")}</div>
@@ -130,10 +149,26 @@ function CartPage() {
             </div>
             <button onClick={() => apply()} className="rounded-full bg-foreground text-background px-4 text-sm">Apply</button>
           </div>
-          {appliedCoupon && <div className="mt-2 text-xs text-primary flex items-center justify-between">
-            <span>{appliedCoupon.code} · −₹{appliedCoupon.discount.toLocaleString("en-IN")}</span>
-            <button onClick={() => { setAppliedCoupon(null); setCode(""); }} className="text-muted-foreground hover:text-destructive">remove</button>
-          </div>}
+          {appliedCoupon && (
+            <div className="mt-2 space-y-1.5">
+              <div className="text-xs text-primary flex items-center justify-between">
+                <span className="font-medium">{appliedCoupon.code} · −₹{appliedCoupon.discount.toLocaleString("en-IN")}</span>
+                <button onClick={() => { setAppliedCoupon(null); setCode(""); }} className="text-muted-foreground hover:text-destructive">remove</button>
+              </div>
+              {appliedCoupon.bogoDetails && (
+                <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary" />
+                  <span>{appliedCoupon.bogoDetails}</span>
+                </div>
+              )}
+              {appliedCoupon.nudge && (
+                <div className="text-xs font-medium text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-xl px-2.5 py-1.5 flex items-center gap-1.5 animate-pulse">
+                  <span>✨</span>
+                  <span>{appliedCoupon.nudge}</span>
+                </div>
+              )}
+            </div>
+          )}
           <CouponOffers subtotal={cartTotal} itemCount={cartCount} activeCode={appliedCoupon?.code} onApply={(c) => apply(c)} />
         </div>
 
@@ -151,7 +186,7 @@ function CartPage() {
             val={shipping === 0 ? "Free" : `₹${shipping}`}
             hint={
               cartTotal < commerce.freeShippingMinInr
-                ? `Add ₹${(commerce.freeShippingMinInr - cartTotal).toLocaleString("en-IN")} for Free Delivery Above ₹${commerce.freeShippingMinInr.toLocaleString("en-IN")}`
+                ? `Add ₹${(commerce.freeShippingMinInr - cartTotal).toLocaleString("en-IN")} for ${freeShippingLabels.cartBadge}`
                 : undefined
             }
           />
@@ -165,7 +200,7 @@ function CartPage() {
 
         <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
           <div className="glass rounded-2xl p-2.5 flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5 text-primary" /> Secure pay</div>
-          <div className="glass rounded-2xl p-2.5 flex items-center gap-2"><Truck className="h-3.5 w-3.5 text-primary" /> Free Delivery Above ₹{commerce.freeShippingMinInr.toLocaleString("en-IN")}</div>
+          <div className="glass rounded-2xl p-2.5 flex items-center gap-2"><Truck className="h-3.5 w-3.5 text-primary" /> {freeShippingLabels.cartBadge}</div>
         </div>
       </aside>
     </div>

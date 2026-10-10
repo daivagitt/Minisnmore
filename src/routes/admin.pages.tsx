@@ -15,6 +15,7 @@ const LABELS: Record<string, { name: string; desc: string }> = {
   subscribe: { name: "Subscribe", desc: "Monthly subscription plans" },
   track: { name: "Track", desc: "Order tracking page" },
   blog: { name: "Blogs", desc: "Stories & articles" },
+  contact: { name: "Contact Us", desc: "Dedicated write-to-us page" },
 };
 
 type Row = PageVisibilityRow;

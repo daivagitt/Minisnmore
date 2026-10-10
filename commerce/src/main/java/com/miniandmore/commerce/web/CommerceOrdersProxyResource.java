@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1")
 public class CommerceOrdersProxyResource {
 
+    private static final String ACCOUNT_ADDRESSES_PATH = "/internal/v1/account/addresses/";
+
     private final CatalogInternalClient catalog;
 
     public CommerceOrdersProxyResource(CatalogInternalClient catalog) {
@@ -52,17 +54,17 @@ public class CommerceOrdersProxyResource {
 
     @PutMapping("/account/addresses/{id}")
     public ResponseEntity<String> updateAddress(@PathVariable Long id, @RequestBody Object body) {
-        return catalog.put("/internal/v1/account/addresses/" + id, body);
+        return catalog.put(ACCOUNT_ADDRESSES_PATH + id, body);
     }
 
     @DeleteMapping("/account/addresses/{id}")
     public ResponseEntity<String> deleteAddress(@PathVariable Long id) {
-        return catalog.delete("/internal/v1/account/addresses/" + id);
+        return catalog.delete(ACCOUNT_ADDRESSES_PATH + id);
     }
 
     @PutMapping("/account/addresses/{id}/default")
     public ResponseEntity<String> setDefaultAddress(@PathVariable Long id) {
-        return catalog.put("/internal/v1/account/addresses/" + id + "/default", Map.of());
+        return catalog.put(ACCOUNT_ADDRESSES_PATH + id + "/default", Map.of());
     }
 
     @PostMapping("/account/addresses/sync")
@@ -148,6 +150,27 @@ public class CommerceOrdersProxyResource {
     @PostMapping("/orders/{orderNumber}/cancel")
     public ResponseEntity<String> cancelOrder(@PathVariable String orderNumber, @RequestBody Object body) {
         return catalog.post(CatalogInternalClient.encodedPath("/internal/v1/orders/{orderNumber}/cancel", orderNumber), body);
+    }
+
+    @PostMapping("/orders/{orderNumber}/cancel-request")
+    public ResponseEntity<String> submitCancelRequest(@PathVariable String orderNumber, @RequestBody Object body) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/orders/{orderNumber}/cancel-request", orderNumber),
+            body
+        );
+    }
+
+    @GetMapping("/orders/{orderNumber}/cancel-request")
+    public ResponseEntity<String> getCancelRequest(@PathVariable String orderNumber) {
+        return catalog.get(CatalogInternalClient.encodedPath("/internal/v1/orders/{orderNumber}/cancel-request", orderNumber));
+    }
+
+    @PostMapping("/orders/{orderNumber}/cancel-request/withdraw")
+    public ResponseEntity<String> withdrawCancelRequest(@PathVariable String orderNumber) {
+        return catalog.post(
+            CatalogInternalClient.encodedPath("/internal/v1/orders/{orderNumber}/cancel-request/withdraw", orderNumber),
+            Map.of()
+        );
     }
 
     @GetMapping("/payments")

@@ -2,6 +2,7 @@ package com.miniandmore.app.web.rest.internal;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -118,6 +119,12 @@ class InternalAdminStoreResourceTest {
     private CouponMapper couponMapper;
 
     @MockitoBean
+    private ContactMessageService contactMessageService;
+
+    @MockitoBean
+    private StoreAddressService storeAddressService;
+
+    @MockitoBean
     private LedgerlySyncService ledgerlySyncService;
 
     @MockitoBean
@@ -194,6 +201,7 @@ class InternalAdminStoreResourceTest {
         mockMvc.perform(get("/internal/v1/admin/site-settings")).andExpect(status().isOk());
         mockMvc.perform(get("/internal/v1/admin/policies")).andExpect(status().isOk());
         mockMvc.perform(get("/internal/v1/admin/coupons")).andExpect(status().isOk());
+        mockMvc.perform(get("/internal/v1/admin/store-addresses")).andExpect(status().isOk());
     }
 
     @Test
@@ -614,6 +622,75 @@ class InternalAdminStoreResourceTest {
         when(productRepository.existsById(404L)).thenReturn(false);
 
         mockMvc.perform(delete("/internal/v1/admin/products/404")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void contactMessages_returns200() throws Exception {
+        ContactMessageDTO dto = new ContactMessageDTO();
+        dto.setId(21L);
+        dto.setEmail("care@example.com");
+        when(contactMessageService.findAllNewestFirst()).thenReturn(List.of(dto));
+
+        mockMvc
+            .perform(get("/internal/v1/admin/contact-messages"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].email").value("care@example.com"));
+    }
+
+    @Test
+    void deleteContactMessage_deletesWhenExists() throws Exception {
+        mockMvc.perform(delete("/internal/v1/admin/contact-messages/21")).andExpect(status().isOk());
+
+        verify(contactMessageService).delete(21L);
+    }
+
+    @Test
+    void deleteContactMessage_whenMissing_returnsNotFound() throws Exception {
+        doThrow(new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Contact message not found"))
+            .when(contactMessageService)
+            .delete(404L);
+
+        mockMvc.perform(delete("/internal/v1/admin/contact-messages/404")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void storeAddresses_returns200() throws Exception {
+        StoreAddressDTO dto = new StoreAddressDTO();
+        dto.setId(31L);
+        dto.setFullName("Warehouse");
+        dto.setUsages(java.util.EnumSet.of(com.miniandmore.app.domain.enumeration.StoreAddressUsage.SHIPMENT));
+        when(storeAddressService.findAllNewestFirst()).thenReturn(List.of(dto));
+
+        mockMvc
+            .perform(get("/internal/v1/admin/store-addresses"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].fullName").value("Warehouse"));
+    }
+
+    @Test
+    void createStoreAddress_returnsSavedDto() throws Exception {
+        StoreAddressDTO dto = new StoreAddressDTO();
+        dto.setId(32L);
+        dto.setFullName("Invoice office");
+        when(storeAddressService.save(any(StoreAddressDTO.class))).thenReturn(dto);
+
+        mockMvc
+            .perform(
+                post("/internal/v1/admin/store-addresses")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"fullName\":\"Invoice office\",\"phone\":\"9876543210\",\"line1\":\"12 Flower Lane\",\"city\":\"Bengaluru\",\"state\":\"Karnataka\",\"pincode\":\"560001\",\"usages\":[\"INVOICE\"]}"
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.fullName").value("Invoice office"));
+    }
+
+    @Test
+    void deleteStoreAddress_deletesWhenExists() throws Exception {
+        mockMvc.perform(delete("/internal/v1/admin/store-addresses/31")).andExpect(status().isOk());
+
+        verify(storeAddressService).delete(31L);
     }
 
     private static CategoryDTO categoryDto(Long id, String name) {

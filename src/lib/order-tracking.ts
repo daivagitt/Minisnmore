@@ -1,4 +1,4 @@
-import { CheckCircle2, Home, Package, Truck, type LucideIcon } from "lucide-react";
+import { CheckCircle2, Clock3, Home, MapPin, Package, Truck, type LucideIcon } from "lucide-react";
 import { needsOnlinePayment } from "@/lib/order-status";
 
 export type TrackingStageState = "current" | "done" | "upcoming";
@@ -26,6 +26,16 @@ export const TRACKING_STAGES = [
     },
   },
   {
+    key: "awaiting_pickup",
+    icon: Clock3,
+    label: "Waiting for pickup",
+    detail: {
+      current: "The shipping label is ready. We'll mark it on the way when the courier collects the parcel.",
+      done: "Collected by the courier.",
+      upcoming: "After packing, we'll prepare the shipping label and wait for courier collection.",
+    },
+  },
+  {
     key: "shipped",
     icon: Truck,
     label: "On the way",
@@ -33,6 +43,16 @@ export const TRACKING_STAGES = [
       current: "Your parcel is with the courier — tracking updates appear as they move.",
       done: "Handed to the courier.",
       upcoming: "Tracking appears once we dispatch.",
+    },
+  },
+  {
+    key: "out_for_delivery",
+    icon: MapPin,
+    label: "Out for delivery",
+    detail: {
+      current: "Your parcel is out for delivery today — please keep your phone handy.",
+      done: "Out for delivery.",
+      upcoming: "The courier will take it out for delivery soon.",
     },
   },
   {
@@ -49,7 +69,7 @@ export const TRACKING_STAGES = [
 
 /**
  * Confirmed orders stay at stage 0 until a package is created for the Zoho sales order.
- * The Hand-wrapped phase completes once the order ships.
+ * Waiting for pickup is a distinct stage after hand-wrapping and before physical dispatch.
  */
 const STATUS_INDEX: Record<string, number> = {
   pending: 0,
@@ -57,9 +77,13 @@ const STATUS_INDEX: Record<string, number> = {
   processing: 1,
   hand_wrapped: 1,
   wrapped: 1,
-  shipped: 2,
-  delivered: 3,
-  fulfilled: 3,
+  awaiting_pickup: 2,
+  carrier_cancelled: 2,
+  shipped: 3,
+  out_for_delivery: 4,
+  delivery_failed: 4,
+  delivered: 5,
+  fulfilled: 5,
   cancelled: -1,
 };
 
@@ -68,7 +92,9 @@ export type OrderTrackingFields = {
   tracking_status?: string;
   tracking_number?: string;
   tracking_carrier?: string;
+  tracking_url?: string;
   shipment_date?: string;
+  shipment_delivered_at?: string;
   payment_status?: string;
   payment_method?: string;
 };
@@ -97,6 +123,9 @@ export function trackingStatusLabel(order: OrderTrackingFields) {
   const key = normalizedTrackingKey(order);
   if (key === "cancelled" || key === "canceled") return "Cancelled";
   if (key === "confirmed") return "Order confirmed";
+  if (key === "awaiting_pickup") return "Waiting for pickup";
+  if (key === "carrier_cancelled") return "ExpressBees cancelled";
+  if (key === "delivery_failed") return "Delivery attempt unsuccessful";
   if (isHandWrapped(order)) return "Hand-wrapped";
   const stage = TRACKING_STAGES.find((s) => s.key === key);
   if (stage) return stage.label;
@@ -106,7 +135,12 @@ export function trackingStatusLabel(order: OrderTrackingFields) {
 /** Label for a timeline row — stage 0 becomes "Order confirmed" after payment. */
 export function trackingStageLabel(order: OrderTrackingFields, stageKey: string): string {
   const key = normalizedTrackingKey(order);
-  if (stageKey === "pending" && (key === "confirmed" || isHandWrapped(order))) return "Order confirmed";
+  if (
+    stageKey === "pending" &&
+    (key === "confirmed" || isHandWrapped(order) || key === "awaiting_pickup" || key === "carrier_cancelled")
+  ) {
+    return "Order confirmed";
+  }
   return TRACKING_STAGES.find((s) => s.key === stageKey)?.label ?? stageKey;
 }
 
@@ -123,6 +157,12 @@ export function trackingStageDetail(
     if (state === "done") return "Order confirmed.";
   }
   const stage = TRACKING_STAGES.find((s) => s.key === stageKey);
+  if (stageKey === "awaiting_pickup" && key === "carrier_cancelled" && state === "current") {
+    return "The courier cancelled this shipment booking. We are arranging a new pickup.";
+  }
+  if (stageKey === "out_for_delivery" && key === "delivery_failed" && state === "current") {
+    return "Delivery attempt was unsuccessful. A reattempt is scheduled by the courier.";
+  }
   if (stage) return stage.detail[state];
   if (state === "done") return "Completed";
   if (state === "current") return "In progress";
@@ -143,6 +183,7 @@ export function shouldShowOrderTrackingLink(
 ): boolean {
   if (!order) return false;
   if (order.payment_status && order.payment_status !== "paid") return false;
+  if (String(order.tracking_status ?? "").toLowerCase() === "carrier_cancelled") return false;
   return !isTerminalTrackingState(order);
 }
 
@@ -156,6 +197,9 @@ export function trackingActivityTitle(order: OrderTrackingFields): string {
   const key = normalizedTrackingKey(order);
   if (key === "cancelled" || key === "canceled") return "Order cancelled";
   if (key === "confirmed") return "Order confirmed";
+  if (key === "awaiting_pickup") return "Waiting for pickup";
+  if (key === "carrier_cancelled") return "ExpressBees cancelled";
+  if (key === "delivery_failed") return "Delivery attempt unsuccessful";
   if (isHandWrapped(order)) return "Hand-wrapped";
   const stage = TRACKING_STAGES.find((s) => s.key === key);
   if (stage) return stage.label;
@@ -165,6 +209,7 @@ export function trackingActivityTitle(order: OrderTrackingFields): string {
 export function trackingActivityIcon(order: OrderTrackingFields): LucideIcon {
   const key = normalizedTrackingKey(order);
   if (key === "cancelled" || key === "canceled") return Package;
+  if (key === "carrier_cancelled") return trackingStageIcon("awaiting_pickup");
   if (isHandWrapped(order)) return Package;
   return trackingStageIcon(key);
 }
@@ -180,7 +225,7 @@ export function trackingActivityDate(order: OrderTrackingFields & { created_at?:
     return { prefix: "Payment pending", value: order.created_at ?? "" };
   }
   const key = normalizedTrackingKey(order);
-  const shipped = key === "shipped" || key === "delivered";
+  const shipped = key === "shipped" || key === "out_for_delivery" || key === "delivery_failed" || key === "delivered";
   if (shipped && order.shipment_date) {
     return { prefix: "Shipped", value: order.shipment_date };
   }

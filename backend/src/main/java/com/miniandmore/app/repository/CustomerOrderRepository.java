@@ -3,11 +3,14 @@ package com.miniandmore.app.repository;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
+import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
 import com.miniandmore.app.domain.enumeration.LedgerlySyncStatus;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.*;
@@ -41,9 +44,13 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     Optional<CustomerOrder> findOneByOrderNumberAndUserLogin(@Param("orderNumber") String orderNumber, @Param("login") String login);
 
     @Query(
-        value = "select customerOrder from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
+        value = "select customerOrder from CustomerOrder customerOrder where " +
+        "(customerOrder.paymentStatus = :paymentStatus or (customerOrder.status = com.miniandmore.app.domain.enumeration.OrderStatus.CANCELLED and " +
+        "(customerOrder.zohoSalesOrderId is not null or customerOrder.zohoInvoiceId is not null))) and " +
         "(customerOrder.zohoSyncStatus in :statuses or customerOrder.zohoSyncStatus is null) order by customerOrder.id asc",
-        countQuery = "select count(customerOrder) from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
+        countQuery = "select count(customerOrder) from CustomerOrder customerOrder where " +
+        "(customerOrder.paymentStatus = :paymentStatus or (customerOrder.status = com.miniandmore.app.domain.enumeration.OrderStatus.CANCELLED and " +
+        "(customerOrder.zohoSalesOrderId is not null or customerOrder.zohoInvoiceId is not null))) and " +
         "(customerOrder.zohoSyncStatus in :statuses or customerOrder.zohoSyncStatus is null)"
     )
     Page<CustomerOrder> findPaidOrdersForZohoRetry(
@@ -81,6 +88,16 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     Page<CustomerOrder> findPaidOrdersMissingLedgerlySalesOrder(@Param("paymentStatus") PaymentStatus paymentStatus, Pageable pageable);
 
     Optional<CustomerOrder> findOneByOrderNumber(String orderNumber);
+
+    Optional<CustomerOrder> findFirstByRazorpayPaymentId(String razorpayPaymentId);
+
+    Optional<CustomerOrder> findFirstByRazorpayOrderId(String razorpayOrderId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select customerOrder from CustomerOrder customerOrder where customerOrder.orderNumber = :orderNumber")
+    Optional<CustomerOrder> findOneByOrderNumberForUpdate(@Param("orderNumber") String orderNumber);
+
+    Optional<CustomerOrder> findFirstByTrackingNumber(String trackingNumber);
 
     Optional<CustomerOrder> findOneByZohoSalesOrderId(String zohoSalesOrderId);
 
@@ -121,6 +138,16 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
         "select (count(customerOrder) > 0) from CustomerOrder customerOrder where lower(customerOrder.userLogin) = lower(:login) and customerOrder.status <> :status"
     )
     boolean existsByUserLoginAndStatusNot(@Param("login") String login, @Param("status") OrderStatus status);
+
+    /**
+     * Distinct lowercased logins that have at least one order whose status is not in {@code statuses}
+     * (admin users “Ordered” column). Callers typically exclude CANCELLED and unpaid PENDING.
+     */
+    @Query(
+        "select distinct lower(customerOrder.userLogin) from CustomerOrder customerOrder " +
+        "where customerOrder.userLogin is not null and customerOrder.userLogin <> '' and customerOrder.status not in :statuses"
+    )
+    List<String> findDistinctUserLoginsWithStatusNotIn(@Param("statuses") Collection<OrderStatus> statuses);
 
     @Query(
         value = "select customerOrder from CustomerOrder customerOrder where customerOrder.paymentStatus = :paymentStatus and " +
@@ -167,5 +194,22 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
         @Param("paymentStatus") PaymentStatus paymentStatus,
         @Param("statuses") List<OrderStatus> statuses,
         Pageable pageable
+    );
+
+    @Query(
+        """
+        select count(customerOrder) from CustomerOrder customerOrder
+        where customerOrder.shipmentLogisticsMode = :mode
+          and lower(customerOrder.shipmentCarrierStatus) in :carrierStatuses
+          and customerOrder.shipmentCancelledAt is null
+          and customerOrder.status not in :excludedStatuses
+          and customerOrder.trackingNumber is not null
+          and trim(customerOrder.trackingNumber) <> ''
+        """
+    )
+    long countExpressBeesCarrierCancelled(
+        @Param("mode") ReturnLogisticsMode mode,
+        @Param("carrierStatuses") Collection<String> carrierStatuses,
+        @Param("excludedStatuses") Collection<OrderStatus> excludedStatuses
     );
 }

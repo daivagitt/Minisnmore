@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -50,12 +51,13 @@ import org.springframework.web.client.RestClientResponseException;
  */
 @Service
 @Transactional
-public class ZohoSyncService {
+public class ZohoSyncService implements ZohoCreditNoteOrderSupport {
 
     private static final Logger LOG = LoggerFactory.getLogger(ZohoSyncService.class);
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$", Pattern.CASE_INSENSITIVE);
     private static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
     private static final String COD_PAYMENT_TERMS_LABEL = "Cash on Delivery";
+    private static final String PREPAID_PAYMENT_DESCRIPTION = "Razorpay prepaid payment";
     private static final String COD_FEE_LINE_NAME = "COD handling fee";
     /** Zoho sales-order custom field: channel = Online (org-specific field id). */
     private static final String SALES_ORDER_CHANNEL_CUSTOM_FIELD_ID = "3624052000000835002";
@@ -78,6 +80,8 @@ public class ZohoSyncService {
     private final ZohoBooksAccountResolver accountResolver;
     private final ZohoCatalogStockAdjuster stockAdjuster;
     private final ZohoStockReconcileService stockReconcileService;
+    private final ZohoCreditNoteService creditNoteService;
+    private final ZohoOrderCancellationSync orderCancellationSync;
 
     public ZohoSyncService(
         ZohoBooksClient booksClient,
@@ -98,6 +102,51 @@ public class ZohoSyncService {
         ZohoCatalogStockAdjuster stockAdjuster,
         ZohoStockReconcileService stockReconcileService
     ) {
+        this(
+            booksClient,
+            objectMapper,
+            applicationProperties,
+            itemImageSync,
+            productFieldMapper,
+            descriptionCodec,
+            variantSupport,
+            productRepository,
+            zohoSettingRepository,
+            customerOrderRepository,
+            customerProfileRepository,
+            orderItemRepository,
+            s3StorageService,
+            orderEventService,
+            accountResolver,
+            stockAdjuster,
+            stockReconcileService,
+            null,
+            null
+        );
+    }
+
+    @Autowired
+    public ZohoSyncService(
+        ZohoBooksClient booksClient,
+        ObjectMapper objectMapper,
+        ApplicationProperties applicationProperties,
+        ZohoItemImageSync itemImageSync,
+        ZohoProductFieldMapper productFieldMapper,
+        ProductDescriptionCodec descriptionCodec,
+        ProductVariantSupport variantSupport,
+        ProductRepository productRepository,
+        ZohoSettingRepository zohoSettingRepository,
+        CustomerOrderRepository customerOrderRepository,
+        CustomerProfileRepository customerProfileRepository,
+        OrderItemRepository orderItemRepository,
+        S3StorageService s3StorageService,
+        OrderEventService orderEventService,
+        ZohoBooksAccountResolver accountResolver,
+        ZohoCatalogStockAdjuster stockAdjuster,
+        ZohoStockReconcileService stockReconcileService,
+        ZohoCreditNoteService creditNoteService,
+        ZohoOrderCancellationSync orderCancellationSync
+    ) {
         this.booksClient = booksClient;
         this.objectMapper = objectMapper;
         this.applicationProperties = applicationProperties;
@@ -115,6 +164,35 @@ public class ZohoSyncService {
         this.accountResolver = accountResolver;
         this.stockAdjuster = stockAdjuster;
         this.stockReconcileService = stockReconcileService;
+        if (creditNoteService != null && orderCancellationSync != null) {
+            this.creditNoteService = creditNoteService;
+            this.orderCancellationSync = orderCancellationSync;
+        } else {
+            ZohoCreditNoteService localCreditNotes = new ZohoCreditNoteService(
+                booksClient,
+                objectMapper,
+                customerOrderRepository,
+                orderItemRepository,
+                accountResolver,
+                this
+            );
+            this.creditNoteService = localCreditNotes;
+            this.orderCancellationSync = new ZohoOrderCancellationSync(customerOrderRepository, booksClient, localCreditNotes);
+        }
+    }
+
+    @Override
+    public String resolveZohoContact(CustomerOrder order) {
+        return resolveOrCreateContact(order);
+    }
+
+    @Override
+    public Optional<String> resolveZohoItemId(OrderItem item) {
+        return resolveZohoItemIdForOrderLine(item);
+    }
+
+    static String cancellationCreditNoteReference(String orderNumber) {
+        return ZohoCreditNoteService.cancellationCreditNoteReference(orderNumber);
     }
 
     public Map<String, Object> testConnection() {
@@ -502,19 +580,29 @@ public class ZohoSyncService {
         try {
             return openingStock ? createItemSelfHealing(payload) : booksClient.updateItem(itemId, payload);
         } catch (RestClientResponseException e) {
+            if (isInvalidCustomFields(e) && payload.containsKey("custom_fields")) {
+                productFieldMapper.invalidateFieldCache();
+                Map<String, Object> withoutCustomFields = new LinkedHashMap<>(payload);
+                withoutCustomFields.remove("custom_fields");
+                LOG.warn(
+                    "Zoho rejected one or more product custom fields (code 120100); retrying item {} without custom fields",
+                    StringUtils.firstNonBlank(stringValue(payload.get("sku")), itemId, "create")
+                );
+                return saveZohoItem(openingStock, itemId, withoutCustomFields);
+            }
             if (!openingStock && isItemNotFound(e)) {
                 // The stored zohoItemId points at an item that no longer exists in this Zoho org
                 // (deleted in Zoho, org changed, or the id was never actually created). Re-create it
                 // instead of failing the whole sync; stock is reconciled separately after push, so a
                 // fresh create without initial-stock fields is safe.
                 LOG.warn("Zoho item {} no longer exists; re-creating instead of updating: {}", itemId, e.getMessage());
-                return createItemSelfHealing(payload);
+                return saveZohoItem(true, null, payload);
             }
             if (!openingStock && isDestinationGroupMissingAttributes(e)) {
                 Map<String, Object> withExistingAttributes = copyExistingGroupAttributes(itemId, payload);
                 if (!withExistingAttributes.equals(payload)) {
                     LOG.warn("Zoho item {} requires its destination-group attributes; retrying update with existing attributes", itemId);
-                    return booksClient.updateItem(itemId, withExistingAttributes);
+                    return saveZohoItem(false, itemId, withExistingAttributes);
                 }
             }
             if (
@@ -526,7 +614,7 @@ public class ZohoSyncService {
                 LOG.warn("Zoho rejected variant group/attribute fields; retrying as a plain item: {}", e.getMessage());
                 Map<String, Object> plain = new LinkedHashMap<>(payload);
                 stripExtraVariantFields(plain);
-                return openingStock ? createItemSelfHealing(plain) : booksClient.updateItem(itemId, plain);
+                return saveZohoItem(openingStock, itemId, plain);
             }
             throw e;
         }
@@ -591,6 +679,16 @@ public class ZohoSyncService {
             return false;
         }
         return body.contains("\"code\":1001") || body.contains("already exists");
+    }
+
+    private static boolean isInvalidCustomFields(RestClientResponseException exception) {
+        String body = StringUtils.defaultString(exception.getResponseBodyAsString()).toLowerCase();
+        if (exception.getStatusCode().value() != 400) {
+            return false;
+        }
+        return body.contains("\"code\":120100") ||
+            body.contains("\"code\": 120100") ||
+            (body.contains("custom field") && body.contains("does not exist"));
     }
 
     private static boolean isDestinationGroupMissingAttributes(RestClientResponseException exception) {
@@ -900,6 +998,101 @@ public class ZohoSyncService {
         attachVariantParent(parent, variantParents);
         pullSingleZohoItem(itemId, sku, autoCreateCategory, builder, variantParents, label, parent);
         return builder.build().toMap();
+    }
+
+    public Map<String, Object> pullProductGroup(String itemGroupId) {
+        itemImageSync.beginImageImportPass();
+        ZohoSyncSummary.Builder builder = ZohoSyncSummary.builder();
+        String requestedGroupId = StringUtils.trimToNull(itemGroupId);
+        if (requestedGroupId == null) {
+            builder.failure("Zoho item group", "Zoho item group id is required");
+            return builder.build().toMap();
+        }
+
+        Optional<ZohoSetting> setting = zohoSettingRepository.findActiveOrLatest();
+        boolean autoCreateCategory = setting
+            .map(s -> Boolean.TRUE.equals(s.getPullProductsAutoCreateCategory()))
+            .orElse(applicationProperties.getZoho().isPullProductsAutoCreateCategory());
+        List<Product> variantParents = new ArrayList<>(
+            productRepository.findAll().stream().filter(variantSupport::isVariants).toList()
+        );
+
+        try {
+            Map<String, Object> group = booksClient.getItemGroup(requestedGroupId);
+            List<Map<String, Object>> items = itemGroupItems(group);
+            if (items.isEmpty()) {
+                builder.failure(requestedGroupId, "Zoho item group has no variants");
+                return builder.build().toMap();
+            }
+            for (Map<String, Object> item : items) {
+                Map<String, Object> variant = itemGroupVariant(group, item, requestedGroupId);
+                String sku = StringUtils.trimToNull(stringValue(variant.get("sku")));
+                if (sku == null) {
+                    builder.failure(requestedGroupId, "Zoho item group contains a variant without a SKU");
+                    continue;
+                }
+                upsertPulledProduct(variant, autoCreateCategory, builder, variantParents, null, true);
+            }
+        } catch (RestClientResponseException e) {
+            builder.failure(requestedGroupId, exceptionMessage(e));
+        } catch (ResourceAccessException e) {
+            builder.failure(requestedGroupId, "Zoho unreachable while reading item group: " + exceptionMessage(e));
+        } catch (Exception e) {
+            LOG.warn("Zoho item group pull failed for {}: {}", requestedGroupId, exceptionMessage(e), e);
+            builder.failure(requestedGroupId, exceptionMessage(e));
+        }
+        return builder.build().toMap();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> itemGroupItems(Map<String, Object> group) {
+        Object raw = group == null ? null : group.get("items");
+        if (!(raw instanceof List<?> items)) {
+            throw new IllegalStateException("Zoho returned missing or invalid item group items");
+        }
+        return (List<Map<String, Object>>) items;
+    }
+
+    private Map<String, Object> itemGroupVariant(
+        Map<String, Object> group,
+        Map<String, Object> item,
+        String requestedGroupId
+    ) {
+        Object groupCustomFields = group.get("custom_fields");
+        Object itemCustomFields = item.get("custom_fields");
+        Map<String, Object> variant = new LinkedHashMap<>(group);
+        variant.remove("items");
+        variant.remove("attributes");
+        variant.putAll(item);
+        List<Object> combinedCustomFields = new ArrayList<>();
+        if (groupCustomFields instanceof List<?> fields) {
+            combinedCustomFields.addAll(fields);
+        }
+        if (itemCustomFields instanceof List<?> fields) {
+            combinedCustomFields.addAll(fields);
+        }
+        if (!combinedCustomFields.isEmpty()) {
+            variant.put("custom_fields", combinedCustomFields);
+        }
+        variant.put("group_id", StringUtils.firstNonBlank(
+            stringValue(group.get("group_id")),
+            stringValue(group.get("itemgroup_id")),
+            requestedGroupId
+        ));
+        String groupName = StringUtils.firstNonBlank(
+            stringValue(group.get("group_name")),
+            stringValue(group.get("itemgroup_name"))
+        );
+        if (groupName != null) {
+            variant.put("group_name", groupName);
+        }
+        if (!variant.containsKey("item_id") && variant.containsKey("variant_id")) {
+            variant.put("item_id", variant.get("variant_id"));
+        }
+        if (!variant.containsKey("name") && variant.containsKey("variant_name")) {
+            variant.put("name", variant.get("variant_name"));
+        }
+        return variant;
     }
 
     public Map<String, Object> pullExternalProduct(String sku, String zohoItemId) {
@@ -1321,8 +1514,14 @@ public class ZohoSyncService {
             product.setPrice(rate);
         }
         Object stockOnHand = zohoItem.get("stock_on_hand");
+        String stockFailure = null;
         if (stockOnHand != null && !isBlankNumber(stockOnHand) && !variantSupport.isVariants(product)) {
-            product.setStock(nonNegativeStock(stockOnHand));
+            int parsedStock = toInteger(stockOnHand);
+            if (parsedStock < 0) {
+                stockFailure = ZohoInboundStock.negativeStockMessage(parsedStock);
+            } else {
+                product.setStock(parsedStock);
+            }
         }
         applyPulledDescription(product, stringValue(zohoItem.get("description")));
         Optional<String> fieldNotice = Optional.ofNullable(
@@ -1339,8 +1538,9 @@ public class ZohoSyncService {
             }
         }
         product.setActive(true);
-        savePulledProductResult(product, sku, imageFailure, builder);
-        if (created) {
+        String pullFailure = combinePullFailures(stockFailure, imageFailure);
+        savePulledProductResult(product, sku, pullFailure, builder);
+        if (created && pullFailure == null) {
             builder.notice(sku, "Created from Zoho pull");
         }
         return true;
@@ -1402,9 +1602,17 @@ public class ZohoSyncService {
         Map<String, Object> zohoItem = item;
         BigDecimal rate = blankToBigDecimal(zohoItem.get("rate"));
         BigDecimal mrp = blankToBigDecimal(zohoItem.get("label_rate"));
-        Integer stock = zohoItem.get("stock_on_hand") != null && !isBlankNumber(zohoItem.get("stock_on_hand"))
-            ? nonNegativeStock(zohoItem.get("stock_on_hand"))
-            : null;
+        Integer stock = null;
+        if (zohoItem.get("stock_on_hand") != null && !isBlankNumber(zohoItem.get("stock_on_hand"))) {
+            int parsedStock = toInteger(zohoItem.get("stock_on_hand"));
+            if (parsedStock < 0) {
+                // Refuse the whole variant/group row merge so admin pulls surface a clear failure
+                // instead of partially updating the matrix while leaving stock unchanged.
+                savePulledProductResult(product, variantSku, ZohoInboundStock.negativeStockMessage(parsedStock), builder);
+                return true;
+            }
+            stock = parsedStock;
+        }
         String size = ZohoBooksItemAttributes.size(zohoItem);
         String color = ZohoBooksItemAttributes.color(zohoItem);
         if (
@@ -1467,6 +1675,16 @@ public class ZohoSyncService {
         product.setActive(true);
         savePulledProductResult(product, variantSku, imageFailure, builder);
         return true;
+    }
+
+    private static String combinePullFailures(String first, String second) {
+        if (first == null) {
+            return second;
+        }
+        if (second == null) {
+            return first;
+        }
+        return first + "; " + second;
     }
 
     private void savePulledProductResult(Product product, String sku, String failure, ZohoSyncSummary.Builder builder) {
@@ -2179,7 +2397,14 @@ public class ZohoSyncService {
                             );
                             continue;
                         }
-                        int stock = nonNegativeStock(stockValue);
+                        int stock = toInteger(stockValue);
+                        if (stock < 0) {
+                            builder.failure(
+                                StringUtils.firstNonBlank(sku, itemId, "missing-item"),
+                                ZohoInboundStock.negativeStockMessage(stock)
+                            );
+                            continue;
+                        }
                         Optional<Product> product = StringUtils.isNotBlank(itemId)
                             ? productRepository.findOneByZohoItemId(itemId)
                             : Optional.empty();
@@ -2261,6 +2486,10 @@ public class ZohoSyncService {
         customerOrderRepository
             .findById(orderId)
             .ifPresent(order -> {
+                if (order.getStatus() == OrderStatus.CANCELLED) {
+                    cancelOrder(orderId);
+                    return;
+                }
                 try {
                     String customerId = resolveOrCreateContact(order);
                     String salesOrderId = order.getZohoSalesOrderId();
@@ -2283,8 +2512,8 @@ public class ZohoSyncService {
                         Map<String, Object> invoice = (Map<String, Object>) invoiceResponse.getOrDefault("invoice", invoiceResponse);
                         linkInvoiceToOrder(order, stringValue(invoice.get("invoice_id")));
                     }
-                    if (isCodOrder(order) && order.getPaymentStatus() == PaymentStatus.PAID) {
-                        recordCodPaymentIfNeeded(order, customerId);
+                    if (order.getPaymentStatus() == PaymentStatus.PAID) {
+                        recordCollectedPaymentIfNeeded(order, customerId);
                     }
                     order.setZohoSyncStatus(ZohoSyncStatus.SYNCED);
                     order.setZohoLastSyncedAt(Instant.now());
@@ -2310,7 +2539,7 @@ public class ZohoSyncService {
             );
             return Map.of("salesorder", existing);
         }
-        return createSalesOrderSelfHealing(order, customerId, true, true, false);
+        return createSalesOrderSelfHealing(order, customerId, true, true, true, false);
     }
 
     private void reconcileOrderStockAfterDocumentSync(CustomerOrder order) {
@@ -2325,13 +2554,34 @@ public class ZohoSyncService {
         String customerId,
         boolean includeGstTreatment,
         boolean includePlaceOfSupply,
+        boolean includeChannelCustomField,
         boolean itemsRepaired
     ) {
         try {
             Map<String, Object> payload = buildSalesOrderPayload(order, customerId, includeGstTreatment, includePlaceOfSupply);
-            applyOnlineChannelCustomField(payload);
+            if (includeChannelCustomField) {
+                applyOnlineChannelCustomField(payload);
+            }
             return booksClient.createSalesOrder(payload);
         } catch (RestClientResponseException e) {
+            if (includeChannelCustomField && isInvalidCustomFields(e)) {
+                Map<String, Object> createdAnyway = booksClient.findSalesOrderByReferenceNumber(order.getOrderNumber());
+                if (createdAnyway != null && StringUtils.isNotBlank(stringValue(createdAnyway.get("salesorder_id")))) {
+                    return Map.of("salesorder", createdAnyway);
+                }
+                LOG.warn(
+                    "Zoho rejected the Online sales-order custom field (code 120100) for order {}; retrying without it",
+                    order.getOrderNumber()
+                );
+                return createSalesOrderSelfHealing(
+                    order,
+                    customerId,
+                    includeGstTreatment,
+                    includePlaceOfSupply,
+                    false,
+                    itemsRepaired
+                );
+            }
             if (includeGstTreatment && isInvalidGstTreatment(e)) {
                 Map<String, Object> createdAnyway = booksClient.findSalesOrderByReferenceNumber(order.getOrderNumber());
                 if (createdAnyway != null && StringUtils.isNotBlank(stringValue(createdAnyway.get("salesorder_id")))) {
@@ -2341,7 +2591,14 @@ public class ZohoSyncService {
                     "Zoho organization does not accept gst_treatment for order {}; retrying without that field",
                     order.getOrderNumber()
                 );
-                return createSalesOrderSelfHealing(order, customerId, false, includePlaceOfSupply, itemsRepaired);
+                return createSalesOrderSelfHealing(
+                    order,
+                    customerId,
+                    false,
+                    includePlaceOfSupply,
+                    includeChannelCustomField,
+                    itemsRepaired
+                );
             }
             if (includePlaceOfSupply && isInvalidPlaceOfSupply(e)) {
                 Map<String, Object> createdAnyway = booksClient.findSalesOrderByReferenceNumber(order.getOrderNumber());
@@ -2352,14 +2609,28 @@ public class ZohoSyncService {
                     "Zoho organization does not accept place_of_supply for order {}; retrying without that field",
                     order.getOrderNumber()
                 );
-                return createSalesOrderSelfHealing(order, customerId, includeGstTreatment, false, itemsRepaired);
+                return createSalesOrderSelfHealing(
+                    order,
+                    customerId,
+                    includeGstTreatment,
+                    false,
+                    includeChannelCustomField,
+                    itemsRepaired
+                );
             }
             if (itemsRepaired || !isUnavailableSalesOrderItem(e)) {
                 throw e;
             }
             LOG.warn("Zoho rejected stale/inactive items for order {}; repairing order-line mappings and retrying", order.getOrderNumber());
             repairOrderLineZohoItems(order);
-            return createSalesOrderSelfHealing(order, customerId, includeGstTreatment, includePlaceOfSupply, true);
+            return createSalesOrderSelfHealing(
+                order,
+                customerId,
+                includeGstTreatment,
+                includePlaceOfSupply,
+                includeChannelCustomField,
+                true
+            );
         }
     }
 
@@ -2503,31 +2774,7 @@ public class ZohoSyncService {
     }
 
     public void cancelOrder(Long orderId) {
-        customerOrderRepository
-            .findById(orderId)
-            .ifPresent(order -> {
-                String invoiceId = StringUtils.trimToNull(order.getZohoInvoiceId());
-                if (invoiceId != null) {
-                    try {
-                        booksClient.voidInvoice(invoiceId);
-                    } catch (RuntimeException e) {
-                        LOG.warn("Could not void Zoho invoice {} for cancelled order {}: {}", invoiceId, order.getOrderNumber(), e.getMessage());
-                    }
-                }
-                String salesOrderId = StringUtils.trimToNull(order.getZohoSalesOrderId());
-                if (salesOrderId != null) {
-                    try {
-                        booksClient.voidSalesOrder(salesOrderId, "Customer cancelled before dispatch");
-                    } catch (RuntimeException e) {
-                        LOG.warn(
-                            "Could not void Zoho sales order {} for cancelled order {}: {}",
-                            salesOrderId,
-                            order.getOrderNumber(),
-                            e.getMessage()
-                        );
-                    }
-                }
-            });
+        orderCancellationSync.cancelOrder(orderId);
     }
 
     private String resolveOrCreateContact(CustomerOrder order) {
@@ -2614,7 +2861,7 @@ public class ZohoSyncService {
                 payload.put("place_of_supply", placeOfSupply);
             }
         }
-        payload.put("line_items", buildOrderLineItems(order, null));
+        payload.put("line_items", buildOrderLineItems(order));
         BigDecimal shipping = moneyOrZero(order.getShipping());
         if (shipping.compareTo(BigDecimal.ZERO) > 0) {
             payload.put("shipping_charge", shipping);
@@ -2711,37 +2958,31 @@ public class ZohoSyncService {
         return IndiaPlaceOfSupplyCodes.lookup(normalized);
     }
 
-    private List<Map<String, Object>> buildOrderLineItems(CustomerOrder order, Map<String, Map<String, Object>> invoiceLinesByItemId) {
+    private List<Map<String, Object>> buildOrderLineItems(CustomerOrder order) {
         List<Map<String, Object>> lineItems = new ArrayList<>();
         List<OrderItem> items = orderItemRepository.findAllByOrderId(order.getId());
         if (items.isEmpty()) {
             items = new ArrayList<>(order.getItemses());
         }
         for (OrderItem item : items) {
+            int quantity = Optional.ofNullable(item.getQty()).orElse(0);
+            if (quantity <= 0) {
+                continue;
+            }
             Map<String, Object> line = new LinkedHashMap<>();
             Product product = resolveOrderProduct(item).orElse(null);
             line.put("name", variantDisplayName(item.getProductName(), item.getItemSize(), item.getColor()));
             String sku = zohoOrderLineSku(item, product);
             line.put("description", sku == null ? "" : "SKU: " + sku);
             line.put("rate", item.getPrice());
-            line.put("quantity", item.getQty());
-            Optional<String> zohoItemId = resolveZohoItemId(item);
-            String linkedItemId = zohoItemId.orElseThrow(
-                () -> new IllegalStateException("Zoho item is required for order line " + item.getProductName())
+            line.put("quantity", quantity);
+            Optional<String> zohoItemId = resolveZohoItemIdForOrderLine(item);
+            line.put(
+                "item_id",
+                zohoItemId.orElseThrow(
+                    () -> new IllegalStateException("Zoho item is required for order line " + item.getProductName())
+                )
             );
-            line.put("item_id", linkedItemId);
-            if (invoiceLinesByItemId != null && zohoItemId.isPresent()) {
-                Map<String, Object> invoiceLine = invoiceLinesByItemId.get(zohoItemId.orElseThrow());
-                if (invoiceLine != null) {
-                    String invoiceItemId = firstNonBlank(
-                        stringValue(invoiceLine.get("line_item_id")),
-                        stringValue(invoiceLine.get("invoice_item_id"))
-                    );
-                    if (StringUtils.isNotBlank(invoiceItemId)) {
-                        line.put("invoice_item_id", invoiceItemId);
-                    }
-                }
-            }
             lineItems.add(line);
         }
         BigDecimal codFee = moneyOrZero(order.getCodFee());
@@ -2788,40 +3029,56 @@ public class ZohoSyncService {
         return null;
     }
 
-    private void recordCodPaymentIfNeeded(CustomerOrder order, String customerId) {
+    private void recordCollectedPaymentIfNeeded(CustomerOrder order, String customerId) {
         String invoiceId = StringUtils.trimToNull(order.getZohoInvoiceId());
-        if (invoiceId == null) {
+        if (invoiceId == null || StringUtils.isBlank(customerId) || order.getPaymentStatus() != PaymentStatus.PAID) {
             return;
         }
-        BigDecimal balanceDue = resolveInvoiceBalanceDue(invoiceId);
+        final BigDecimal balanceDue;
+        try {
+            balanceDue = resolveInvoiceBalanceDue(invoiceId);
+        } catch (RuntimeException e) {
+            LOG.warn("Could not read Zoho invoice balance for {}: {}", order.getOrderNumber(), e.getMessage());
+            throw e;
+        }
         if (balanceDue.compareTo(BigDecimal.ZERO) <= 0) {
-            LOG.debug("Zoho invoice {} already settled for COD order {}", invoiceId, order.getOrderNumber());
+            LOG.debug("Zoho invoice {} already settled for order {}", invoiceId, order.getOrderNumber());
             return;
         }
+        boolean cod = isCodOrder(order);
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("customer_id", customerId);
-        payload.put("payment_mode", "cash");
+        payload.put("payment_mode", cod ? "cash" : "others");
         payload.put("amount", balanceDue);
         payload.put("date", LocalDate.now(INDIA).toString());
-        payload.put("reference_number", order.getOrderNumber());
-        payload.put("description", COD_PAYMENT_TERMS_LABEL);
+        payload.put(
+            "reference_number",
+            StringUtils.left(firstNonBlank(order.getRazorpayPaymentId(), order.getOrderNumber()), 50)
+        );
+        payload.put("description", cod ? COD_PAYMENT_TERMS_LABEL : PREPAID_PAYMENT_DESCRIPTION);
         Map<String, Object> invoicePayment = new LinkedHashMap<>();
         invoicePayment.put("invoice_id", invoiceId);
         invoicePayment.put("amount_applied", balanceDue);
         payload.put("invoices", List.of(invoicePayment));
         try {
             booksClient.createCustomerPayment(payload);
-            LOG.debug("Recorded Zoho cash payment for COD order {}", order.getOrderNumber());
+            LOG.debug("Recorded Zoho {} payment for order {}", payload.get("payment_mode"), order.getOrderNumber());
         } catch (RuntimeException e) {
-            LOG.warn("Could not record Zoho COD payment for {}: {}", order.getOrderNumber(), e.getMessage());
+            LOG.warn("Could not record Zoho payment for {}: {}", order.getOrderNumber(), e.getMessage());
         }
     }
 
     private BigDecimal resolveInvoiceBalanceDue(String invoiceId) {
         try {
             Map<String, Object> response = booksClient.getInvoice(invoiceId);
+            if (response == null || response.isEmpty()) {
+                throw new IllegalStateException("Zoho invoice " + invoiceId + " response was empty");
+            }
             @SuppressWarnings("unchecked")
             Map<String, Object> invoice = (Map<String, Object>) response.getOrDefault("invoice", response);
+            if (invoice == null || invoice.isEmpty()) {
+                throw new IllegalStateException("Zoho invoice " + invoiceId + " payload was empty");
+            }
             String status = StringUtils.lowerCase(StringUtils.trimToEmpty(stringValue(invoice.get("status"))));
             if ("paid".equals(status)) {
                 return BigDecimal.ZERO;
@@ -2829,7 +3086,7 @@ public class ZohoSyncService {
             return moneyOrZero(toBigDecimal(invoice.get("balance")));
         } catch (RuntimeException e) {
             LOG.debug("Could not read Zoho invoice {} balance: {}", invoiceId, e.getMessage());
-            return BigDecimal.ZERO;
+            throw e;
         }
     }
 
@@ -2910,7 +3167,7 @@ public class ZohoSyncService {
             .orElse(null);
     }
 
-    private Optional<String> resolveZohoItemId(OrderItem item) {
+    private Optional<String> resolveZohoItemIdForOrderLine(OrderItem item) {
         Product product = resolveOrderProduct(item).orElse(null);
         String variantSku = StringUtils.trimToNull(item.getVariantSku());
         if (product != null && variantSupport.isVariants(product)) {
@@ -3036,34 +3293,6 @@ public class ZohoSyncService {
         return null;
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Map<String, Object>> indexInvoiceLinesByItemId(String invoiceId) {
-        Map<String, Map<String, Object>> indexed = new LinkedHashMap<>();
-        if (StringUtils.isBlank(invoiceId)) {
-            return indexed;
-        }
-        try {
-            Map<String, Object> response = booksClient.getInvoice(invoiceId);
-            Map<String, Object> invoice = (Map<String, Object>) response.getOrDefault("invoice", response);
-            Object rawLines = invoice.get("line_items");
-            if (!(rawLines instanceof List<?> lines)) {
-                return indexed;
-            }
-            for (Object lineObj : lines) {
-                if (!(lineObj instanceof Map<?, ?> line)) {
-                    continue;
-                }
-                String itemId = stringValue(line.get("item_id"));
-                if (StringUtils.isNotBlank(itemId)) {
-                    indexed.put(itemId, (Map<String, Object>) line);
-                }
-            }
-        } catch (RuntimeException e) {
-            LOG.warn("Could not load Zoho invoice {} for credit note line mapping: {}", invoiceId, e.getMessage());
-        }
-        return indexed;
-    }
-
     private static String firstNonBlank(String... values) {
         for (String value : values) {
             if (StringUtils.isNotBlank(value)) {
@@ -3166,7 +3395,7 @@ public class ZohoSyncService {
         for (CustomerOrder order : paidPage.getContent()) {
             try {
                 syncOrder(order.getId());
-                builder.success();
+                recordOrderRetryOutcome(builder, order);
             } catch (Exception e) {
                 builder.orderFailure(order.getOrderNumber(), e.getMessage());
             }
@@ -3178,12 +3407,23 @@ public class ZohoSyncService {
         for (CustomerOrder order : codPage.getContent()) {
             try {
                 syncOrder(order.getId());
-                builder.success();
+                recordOrderRetryOutcome(builder, order);
             } catch (Exception e) {
                 builder.orderFailure(order.getOrderNumber(), e.getMessage());
             }
         }
         return builder.build().toMap();
+    }
+
+    private void recordOrderRetryOutcome(ZohoSyncSummary.Builder builder, CustomerOrder order) {
+        Long orderId = order.getId();
+        CustomerOrder refreshed = orderId != null ? customerOrderRepository.findById(orderId).orElse(order) : order;
+        if (refreshed.getZohoSyncStatus() == ZohoSyncStatus.SYNCED) {
+            builder.success();
+            return;
+        }
+        String message = StringUtils.defaultIfBlank(refreshed.getZohoSyncError(), "Zoho sync did not complete");
+        builder.orderFailure(order.getOrderNumber(), message);
     }
 
     /**
@@ -3197,6 +3437,11 @@ public class ZohoSyncService {
                 String salesOrderId = StringUtils.trimToNull(order.getZohoSalesOrderId());
                 if (salesOrderId == null) {
                     pullInvoiceStatusOnly(order);
+                    return;
+                }
+                if (OrderShipmentService.hasLocalForwardShipment(order)) {
+                    order.setZohoTrackingLastPulledAt(Instant.now());
+                    customerOrderRepository.save(order);
                     return;
                 }
                 try {
@@ -3283,35 +3528,47 @@ public class ZohoSyncService {
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Optional<String> createCreditNote(Long orderId, String returnNumber) {
-        Optional<CustomerOrder> orderOpt = customerOrderRepository.findById(orderId);
-        if (orderOpt.isEmpty()) {
-            return Optional.empty();
-        }
-        CustomerOrder order = orderOpt.orElseThrow();
-        String customerId = resolveOrCreateContact(order);
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("customer_id", customerId);
-        payload.put("reference_number", returnNumber);
-        String invoiceId = StringUtils.trimToNull(order.getZohoInvoiceId());
-        if (invoiceId != null) {
-            payload.put("invoice_id", invoiceId);
-        }
-        Map<String, Map<String, Object>> invoiceLinesByItemId = indexInvoiceLinesByItemId(invoiceId);
-        payload.put("line_items", buildOrderLineItems(order, invoiceLinesByItemId));
-        Map<String, Object> response = booksClient.createCreditNote(payload);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> creditNote = (Map<String, Object>) response.getOrDefault("creditnote", response);
-        String creditNoteId = stringValue(creditNote.get("creditnote_id"));
-        if (StringUtils.isNotBlank(creditNoteId) && accountResolver.isStockAdjustmentEnabled()) {
-            try {
-                booksClient.markCreditNoteAsOpen(creditNoteId);
-                LOG.debug("Opened Zoho credit note {} for inventory return", creditNoteId);
-            } catch (RuntimeException e) {
-                LOG.warn("Could not open Zoho credit note {} (stock may not increment): {}", creditNoteId, e.getMessage());
-            }
-            stockReconcileService.reconcileOrderProducts(order);
-        }
-        return Optional.ofNullable(creditNoteId).filter(StringUtils::isNotBlank);
+        return creditNoteService.createCreditNote(orderId, returnNumber);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public Optional<String> createCreditNote(Long orderId, String returnNumber, Map<Long, Integer> returnedQtyByOrderItemId) {
+        return creditNoteService.createCreditNote(orderId, returnNumber, returnedQtyByOrderItemId);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public Optional<String> createCreditNote(
+        Long orderId,
+        String returnNumber,
+        Map<Long, Integer> returnedQtyByOrderItemId,
+        boolean linkToSourceInvoice
+    ) {
+        return creditNoteService.createCreditNote(orderId, returnNumber, returnedQtyByOrderItemId, linkToSourceInvoice);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void applyCreditNoteToInvoice(String creditNoteId, String invoiceId) {
+        creditNoteService.applyCreditNoteToInvoice(creditNoteId, invoiceId);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public Optional<String> attachCreditNoteToSourceInvoice(
+        Long orderId,
+        String returnNumber,
+        String creditNoteId,
+        Map<Long, Integer> returnedQtyByOrderItemId
+    ) {
+        return creditNoteService.attachCreditNoteToSourceInvoice(
+            orderId,
+            returnNumber,
+            creditNoteId,
+            returnedQtyByOrderItemId
+        );
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void refundOpenCreditNoteBalance(String creditNoteId, String referenceNumber) {
+        creditNoteService.refundOpenCreditNoteBalance(creditNoteId, referenceNumber);
     }
 
     private static final java.util.regex.Pattern NON_SLUG = java.util.regex.Pattern.compile("[^a-z0-9]+");
@@ -3395,10 +3652,6 @@ public class ZohoSyncService {
             return 0;
         }
         return new BigDecimal(text).intValue();
-    }
-
-    private int nonNegativeStock(Object value) {
-        return Math.max(0, toInteger(value));
     }
 
     private static boolean isZohoAuthFailure(RuntimeException e) {

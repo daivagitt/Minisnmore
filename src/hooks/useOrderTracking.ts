@@ -32,6 +32,15 @@ export type TrackingOrder = OrderTrackingFields & {
     price?: number;
   }>;
   shipping_address?: Record<string, string>;
+  can_cancel?: boolean;
+  contact_care_to_cancel?: boolean;
+  pending_cancellation?: boolean;
+  packed_at?: string;
+  cancellation_request?: {
+    status?: string;
+    reason?: string;
+    rejection_reason?: string;
+  } | null;
 };
 
 type Mode = "public" | "authenticated";

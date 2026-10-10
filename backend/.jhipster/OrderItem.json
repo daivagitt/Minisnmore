@@ -55,6 +55,12 @@
       "fieldType": "BigDecimal",
       "fieldValidateRules": ["required", "min"],
       "fieldValidateRulesMin": "0"
+    },
+    {
+      "fieldName": "discountAllocation",
+      "fieldType": "BigDecimal",
+      "fieldValidateRules": ["required", "min"],
+      "fieldValidateRulesMin": "0"
     }
   ],
   "jpaMetamodelFiltering": true,

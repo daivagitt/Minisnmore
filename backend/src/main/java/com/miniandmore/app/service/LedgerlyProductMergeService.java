@@ -345,10 +345,9 @@ public class LedgerlyProductMergeService {
         if ((mrp == null || mrp.compareTo(BigDecimal.ZERO) <= 0) && item.get("compareAtPrice") != null) {
             mrp = toBigDecimal(item.get("compareAtPrice"));
         }
-        if (decoded != null && decoded.compareAtPrice() != null && decoded.compareAtPrice().compareTo(BigDecimal.ZERO) > 0) {
-            if (mrp == null || mrp.compareTo(BigDecimal.ZERO) <= 0) {
-                mrp = decoded.compareAtPrice();
-            }
+        if (decoded != null && decoded.compareAtPrice() != null && decoded.compareAtPrice().compareTo(BigDecimal.ZERO) > 0
+            && (mrp == null || mrp.compareTo(BigDecimal.ZERO) <= 0)) {
+            mrp = decoded.compareAtPrice();
         }
 
         if (mrp != null && mrp.compareTo(BigDecimal.ZERO) > 0) {
@@ -367,6 +366,7 @@ public class LedgerlyProductMergeService {
     }
 
     /** @deprecated use product.getPrice() — selling maps to Ledgerly rate */
+    @Deprecated
     BigDecimal storeSellingPrice(Product product) {
         if (product.getPrice() != null && product.getPrice().compareTo(BigDecimal.ZERO) > 0) {
             return product.getPrice();

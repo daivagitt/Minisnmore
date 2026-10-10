@@ -69,6 +69,92 @@ class OrderTrackingStatusResolverTest {
     }
 
     @Test
+    void resolve_expressBeesOutForDeliveryAndDelivered() {
+        CustomerOrder order = paidOrder()
+            .trackingNumber("14344950061557")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("out_for_delivery");
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("out_for_delivery");
+        assertThat(OrderTrackingStatusResolver.isDispatched("out_for_delivery")).isTrue();
+
+        order.shipmentCarrierStatus("delivered").status(OrderStatus.FULFILLED);
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivered");
+    }
+
+    @Test
+    void resolve_expressBeesDeliveryFailed() {
+        CustomerOrder order = paidOrder()
+            .trackingNumber("14344950061557")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("delivery_failed");
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("delivery_failed");
+        assertThat(OrderTrackingStatusResolver.isDispatched("delivery_failed")).isTrue();
+    }
+
+    @Test
+    void resolve_expressBeesCarrierCancelledStaysOpenForAdmin() {
+        CustomerOrder order = paidOrder()
+            .trackingNumber("XB-1")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("carrier_cancelled");
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("carrier_cancelled");
+        assertThat(OrderTrackingStatusResolver.isDispatched("carrier_cancelled")).isFalse();
+        assertThat(OrderTrackingStatusResolver.blocksCustomerCancellation(order)).isFalse();
+    }
+
+    @Test
+    void blocksCustomerCancellation_trueForAwaitingPickupAndShipped() {
+        CustomerOrder awaiting = paidOrder()
+            .trackingNumber("XB-1")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("booked");
+        assertThat(OrderTrackingStatusResolver.blocksCustomerCancellation(awaiting)).isTrue();
+
+        CustomerOrder manualBooked = paidOrder()
+            .trackingNumber("MAN-1")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.MANUAL);
+        assertThat(OrderTrackingStatusResolver.blocksCustomerCancellation(manualBooked)).isTrue();
+
+        CustomerOrder packed = paidOrder().status(OrderStatus.HAND_WRAPPED);
+        assertThat(OrderTrackingStatusResolver.blocksCustomerCancellation(packed)).isFalse();
+    }
+
+    @Test
+    void resolve_expressBeesBookedAwbIsAwaitingPickup() {
+        CustomerOrder order = paidOrder()
+            .trackingNumber("XB-1")
+            .shipmentDate("2026-09-16")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("booked");
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("awaiting_pickup");
+    }
+
+    @Test
+    void resolve_expressBeesBookedIgnoresZohoShipmentStatus() {
+        CustomerOrder order = paidOrder()
+            .trackingNumber("XB-1")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("booked")
+            .zohoOrderStatus("delivered");
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("awaiting_pickup");
+    }
+
+    @Test
+    void resolve_expressBeesPickedUpIsShipped() {
+        CustomerOrder order = paidOrder()
+            .trackingNumber("XB-1")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("picked_up");
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("shipped");
+    }
+
+    @Test
     void resolve_confirmedForConfirmedPaidOrder() {
         CustomerOrder order = paidOrder().status(OrderStatus.CONFIRMED);
 

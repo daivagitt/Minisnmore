@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 from urllib.parse import quote
@@ -15,10 +16,31 @@ from report_theme import PROJECT_NAME, esc, link_card, page_shell  # noqa: E402
 
 SECTIONS: list[tuple[str, str, list[tuple[str, str, str]]]] = [
     (
+        "Journey wireframes",
+        "Customer, admin, and delivery discussion screens for the call.",
+        [
+            (
+                "./wireframes/index.html",
+                "Open wireframes",
+                "Shop, checkout, cancel/return/exchange, wrap, book shipment, COD, reverse pickup",
+            ),
+        ],
+    ),
+    (
         "Frontend unit tests",
         "Vitest — React storefront test suites.",
         [
-            ("./frontend/unit-tests/index.html", "Unit test report", "All Vitest suites with pass/fail per file"),
+            (
+                "./frontend/unit-tests/scenarios/index.html",
+                "Unit test scenarios",
+                "Per-route and per-component accordion — each Vitest case with ID, scenario, and pass/fail",
+            ),
+            ("./frontend/unit-tests/index.html", "Unit test summary", "Pass/fail totals per Vitest file"),
+            (
+                "./frontend/unit-tests/scenarios/frontend-unit-scenarios-report.json",
+                "Unit scenario results (JSON)",
+                "Machine-readable Vitest case results for dashboards",
+            ),
         ],
     ),
     (
@@ -81,25 +103,49 @@ SECTIONS: list[tuple[str, str, list[tuple[str, str, str]]]] = [
         ],
     ),
     (
-        "Live Ledgerly integration tests",
-        "Real UAT calls to Ledgerly (connection, sync, pull inventory, order retry).",
+        "Ledgerly unit tests",
+        "Catalog core Surefire suites for Ledgerly sync, merge, and admin APIs.",
         [
-            ("./backend/ledgerly-live/index.html", "Live API test report", "Admin JWT + catalog core → Ledgerly commerce API"),
-            ("./backend/ledgerly-unit-tests/index.html", "Ledgerly unit tests", "Surefire — catalog core (50+ tests)"),
+            ("./backend/ledgerly-unit-tests/index.html", "Ledgerly unit tests", "Surefire — catalog core"),
+        ],
+    ),
+    (
+        "Zoho unit tests",
+        "Legacy Zoho Books client and sync unit tests in the catalog service (replaced by Ledgerly).",
+        [
+            ("./backend/zoho-unit-tests/index.html", "Zoho unit tests", "Surefire — Zoho classes in catalog core"),
+        ],
+    ),
+    (
+        "End-to-end test scenarios",
+        "Positive and negative scenarios across auth, storefront, account, checkout, cancel/return/exchange, admin, RBAC, webhooks and pages.",
+        [
             (
-                "./backend/ledgerly-scenario-integration/index.html",
-                "Scenario integration tests",
-                "Coupon checkout, Ledgerly sync, inventory pull, shipment tracking (UAT flows)",
+                "./backend/e2e-scenarios/index.html",
+                "E2E scenario report",
+                "Every scenario with expected vs actual — split into positive and negative, grouped by module",
+            ),
+            (
+                "./backend/e2e-scenarios/e2e-scenarios-report.json",
+                "E2E scenario results (JSON)",
+                "Machine-readable results for dashboards",
             ),
         ],
     ),
     (
-        "Live Zoho integration tests",
-        "Legacy Zoho Books integration (deprecated — replaced by Ledgerly).",
+        "Manual UI tests",
+        "Positive and negative screen-level cases (smoke, regression, responsive, security) evaluated against the frontend codebase on every reports run.",
         [
-            ("./backend/zoho-live/index.html", "Live API test report", "Admin JWT + legacy integration service → Zoho Books"),
-            ("./backend/zoho-unit-tests/index.html", "Zoho unit tests", "Surefire — legacy integration module"),
-            ("./backend/coverage/integration/index.html", "Zoho JaCoCo coverage", "Integration service only"),
+            (
+                "./manual-ui-tests/index.html",
+                "Manual UI test report",
+                "Per-screen accordion with Test Case ID, scenario, manual steps, expected result, priority, type, and pass/fail",
+            ),
+            (
+                "./manual-ui-tests/manual-ui-tests-report.json",
+                "Manual UI results (JSON)",
+                "Machine-readable results for dashboards",
+            ),
         ],
     ),
     (
@@ -108,7 +154,6 @@ SECTIONS: list[tuple[str, str, list[tuple[str, str, str]]]] = [
         [
             ("./backend/api/index.html", "API test dashboard", "Lifecycle runner — all routable endpoints"),
             ("./backend/api/lifecycle-report.html", "Lifecycle HTML report", "Per-endpoint status and response time"),
-            ("./backend/scenario-integration/index.html", "Scenario integration tests", "Legacy Zoho + general UAT flows"),
         ],
     ),
     (
@@ -116,6 +161,33 @@ SECTIONS: list[tuple[str, str, list[tuple[str, str, str]]]] = [
         "Load tests at 15 / 25 / 35 concurrent users.",
         [
             ("./backend/postman/index.html", "Postman load reports", "Newman storefront load at 15/25/35 users"),
+        ],
+    ),
+    (
+        "Guidelines",
+        "Mandatory API and database standards for AI agents and developers.",
+        [
+            ("./guidelines/index.html", "All guidelines", "API, database, frontend, and backend standards"),
+            (
+                "./guidelines/viewer.html?doc=Api_rules/API_STANDARDS.md",
+                "API standards",
+                "REST design, auth, security, and production checklist",
+            ),
+            (
+                "./guidelines/viewer.html?doc=Database_rules/DATABASE_STANDARDS.md",
+                "Database standards",
+                "PostgreSQL schema, migrations, and naming",
+            ),
+            (
+                "./guidelines/viewer.html?doc=Frontend_rules/FRONTEND_STANDARDS.md",
+                "Frontend standards",
+                "React / TypeScript, accessibility, and performance",
+            ),
+            (
+                "./guidelines/viewer.html?doc=Backend_rules/BACKEND_STANDARDS.md",
+                "Backend standards",
+                "Service layering, security, and observability",
+            ),
         ],
     ),
 ]
@@ -174,7 +246,7 @@ SONAR_PROJECTS: list[tuple[str, str, str]] = [
 def existing_links(links: list[tuple[str, str, str]], out_dir: Path) -> list[tuple[str, str, str]]:
     present: list[tuple[str, str, str]] = []
     for href, title, description in links:
-        rel = href.removeprefix("./")
+        rel = href.removeprefix("./").split("#", 1)[0].split("?", 1)[0]
         if (out_dir / rel).is_file():
             present.append((href, title, description))
     return present
@@ -182,6 +254,48 @@ def existing_links(links: list[tuple[str, str, str]], out_dir: Path) -> list[tup
 
 def section_id(title: str) -> str:
     return title.lower().replace(" ", "-").replace("&", "and")
+
+
+def quick_access_html(out_dir: Path) -> str:
+    """Prominent links — scenario tables live on child pages, not this hub."""
+    featured: list[tuple[str, str, str]] = []
+    if (out_dir / "frontend/unit-tests/scenarios/index.html").is_file():
+        featured.append(
+            (
+                "./frontend/unit-tests/scenarios/index.html",
+                "Frontend unit test scenarios",
+                "Vitest — accordion per route/component with test case ID and pass/fail",
+            )
+        )
+    if (out_dir / "manual-ui-tests/index.html").is_file():
+        featured.append(
+            (
+                "./manual-ui-tests/index.html",
+                "Manual UI test report",
+                "Screen-level positive/negative cases with manual steps (storefront, admin, account)",
+            )
+        )
+    if (out_dir / "backend/e2e-scenarios/index.html").is_file():
+        featured.append(
+            (
+                "./backend/e2e-scenarios/index.html",
+                "API E2E scenarios",
+                "Live API positive/negative journeys grouped by module",
+            )
+        )
+    if not featured:
+        return ""
+    cards = "\n".join(link_card(href, title, desc) for href, title, desc in featured)
+    return f"""
+      <section class="panel panel-highlight" id="scenario-reports">
+        <h2>Scenario reports</h2>
+        <p class="muted">These open <strong>separate pages</strong> with expandable tables. This dashboard only lists links — scroll to
+        <a href="#frontend-unit-tests">Frontend unit tests</a> or <a href="#manual-ui-tests">Manual UI tests</a> for the same entries.</p>
+        <div class="links">
+          {cards}
+        </div>
+      </section>
+    """
 
 
 def section_html(title: str, blurb: str, links: list[tuple[str, str, str]]) -> str:
@@ -203,6 +317,28 @@ def ensure_brand_assets(out_dir: Path) -> None:
     logo_src = Path(__file__).resolve().parents[1] / "assets" / "daiva-technologies-logo.svg"
     if logo_src.is_file():
         shutil.copy2(logo_src, out_dir / "daiva-logo.svg")
+
+
+def ensure_guidelines(out_dir: Path) -> None:
+    src = Path(__file__).resolve().parents[2] / "artifacts" / "guidelines"
+    if not any(src.rglob("*.md")):
+        return
+    script = Path(__file__).resolve().parent / "generate-guidelines-report.py"
+    subprocess.run(
+        [sys.executable, str(script), "--source", str(src), "--output", str(out_dir / "guidelines")],
+        check=False,
+    )
+
+
+def ensure_wireframes(out_dir: Path) -> None:
+    src = Path(__file__).resolve().parents[2] / "docs" / "wireframes" / "index.html"
+    if not src.is_file():
+        return
+    dest_dir = out_dir / "wireframes"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    html = src.read_text(encoding="utf-8")
+    html = html.replace('href="../../report.html"', 'href="../index.html"')
+    (dest_dir / "index.html").write_text(html, encoding="utf-8")
 
 
 def sonar_dashboard_url(base_url: str, project_key: str) -> str:
@@ -246,6 +382,8 @@ def main() -> None:
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     ensure_brand_assets(out_dir)
+    ensure_wireframes(out_dir)
+    ensure_guidelines(out_dir)
     write_sonar_hub(out_dir, args.sonar_url)
 
     parts: list[str] = []
@@ -270,6 +408,11 @@ def main() -> None:
 
     extra_css = """
       .content .panel { scroll-margin-top: 24px; }
+      .panel-highlight {
+        border-color: #93c5fd;
+        background: linear-gradient(180deg, #eff6ff 0%, #ffffff 120px);
+      }
+      .panel-highlight .link-card { border-color: #bfdbfe; }
       .toc { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 20px; }
       .toc a {
         background: var(--surface);
@@ -281,6 +424,8 @@ def main() -> None:
       }
     """
     toc_links = []
+    if quick_access_html(out_dir):
+        toc_links.append('<a href="#scenario-reports">Scenario reports</a>')
     for title, _, links in EXTERNAL_SECTIONS:
         toc_links.append(f'<a href="#{esc(section_id(title))}">{esc(title)}</a>')
     for title, _, links in SECTIONS:
@@ -291,8 +436,8 @@ def main() -> None:
     (out_dir / "index.html").write_text(
         page_shell(
             f"{PROJECT_NAME} Reports",
-            toc_html + index_body,
-            subtitle="Unit tests, coverage, JavaDoc, API, Ledgerly, and SonarQube — one dashboard.",
+            toc_html + quick_access_html(out_dir) + index_body,
+            subtitle="Unit tests, coverage, JavaDoc, API, Ledgerly, SonarQube, guidelines, and journey wireframes — one dashboard.",
             extra_css=extra_css,
         ),
         encoding="utf-8",

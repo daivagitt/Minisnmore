@@ -49,8 +49,10 @@ if [ -f /etc/mini-and-more/prod.env ]; then
   set +a
 fi
 export VITE_API_BASE_URL="${VITE_API_BASE_URL:-https://minisnmore.com}"
+export VITE_SITE_ENV="${VITE_SITE_ENV:-production}"
+export VITE_SITE_ORIGIN="${VITE_SITE_ORIGIN:-https://minisnmore.com}"
 
-echo "=== Production frontend build (VITE_API_BASE_URL=$VITE_API_BASE_URL) ==="
+echo "=== Production frontend build (VITE_API_BASE_URL=$VITE_API_BASE_URL VITE_SITE_ENV=$VITE_SITE_ENV) ==="
 echo "Node: $(node -v 2>/dev/null || echo missing)  npm: $(npm -v 2>/dev/null || echo missing)"
 echo "Memory: $(free -h 2>/dev/null | awk '/Mem:/ {print $3 "/" $2}' || echo n/a)  $(date -u '+%H:%M:%S UTC')"
 export NPM_CONFIG_AUDIT=false

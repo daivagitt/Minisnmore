@@ -17,6 +17,7 @@ export type Product = {
   colors: { name: string; hex: string; swatchUrl?: string; imageUrl?: string; imageUrls?: string[] }[]; sizes: string[];
   rating: number; reviewCount: number;
   category: "Newborn" | "Infant" | "Toddler";
+  categoryId?: string;
   categorySlug?: string;
   categoryName?: string;
   sku?: string;
@@ -123,6 +124,13 @@ export const ages: AgeRange[] = ["0-3m", "3-6m", "6-12m", "12-18m", "18-24m"];
 // values may still exist on legacy products in the database but are hidden
 // from the UI.
 export const fabrics: Fabric[] = ["Organic Cotton", "Muslin"];
+
+/** Primary fabric line for storefront trust copy (hero, marquee, badges). */
+export const PRIMARY_STOREFRONT_FABRIC: Fabric = "Organic Cotton";
+
+export function certifiedFabricLabel(fabric: Fabric = PRIMARY_STOREFRONT_FABRIC): string {
+  return `100% Certified ${fabric}`;
+}
 
 export const reviews = [
   { id: "r1", author: "Ananya S.", rating: 5, date: "2 weeks ago", title: "Softest fabric ever",

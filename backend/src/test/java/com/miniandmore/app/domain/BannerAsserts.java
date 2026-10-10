@@ -52,6 +52,10 @@ public class BannerAsserts {
             .satisfies(a -> assertThat(a.getImageUrl()).as("check imageUrl").isEqualTo(expected.getImageUrl()))
             .satisfies(a -> assertThat(a.getLinkUrl()).as("check linkUrl").isEqualTo(expected.getLinkUrl()))
             .satisfies(a -> assertThat(a.getCtaLabel()).as("check ctaLabel").isEqualTo(expected.getCtaLabel()))
+            .satisfies(a -> assertThat(a.getEyebrow()).as("check eyebrow").isEqualTo(expected.getEyebrow()))
+            .satisfies(a -> assertThat(a.getTrustFabricLabel()).as("check trustFabricLabel").isEqualTo(expected.getTrustFabricLabel()))
+            .satisfies(a -> assertThat(a.getTrustShippingLabel()).as("check trustShippingLabel").isEqualTo(expected.getTrustShippingLabel()))
+            .satisfies(a -> assertThat(a.getTrustDyesLabel()).as("check trustDyesLabel").isEqualTo(expected.getTrustDyesLabel()))
             .satisfies(a -> assertThat(a.getSortOrder()).as("check sortOrder").isEqualTo(expected.getSortOrder()))
             .satisfies(a -> assertThat(a.getActive()).as("check active").isEqualTo(expected.getActive()));
     }

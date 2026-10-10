@@ -194,26 +194,9 @@ def project_detail(row: dict) -> str:
     """
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--output-dir", default="artifacts/sonar-summary")
-    parser.add_argument("--sonar-url", default=os.environ.get("SONAR_HOST_URL", "http://127.0.0.1:9000/sonar"))
-    args = parser.parse_args()
-
-    token = os.environ.get("SONAR_TOKEN", "")
-    if not token:
-        print("SONAR_TOKEN not set", file=sys.stderr)
-        sys.exit(1)
-
-    out = Path(args.output_dir)
+def write_summary_artifacts(out: Path, payload: dict) -> None:
     out.mkdir(parents=True, exist_ok=True)
-
-    rows = [fetch_project(args.sonar_url, token, key, label) for key, label in PROJECTS]
-    payload = {
-        "generatedAt": generated_at_iso(),
-        "frontend": rows[0],
-        "backend": rows[1],
-    }
+    rows = [payload["frontend"], payload["backend"]]
     (out / "sonar-summary.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     refreshed = generated_at_utc_label()
@@ -238,6 +221,8 @@ def main() -> None:
         </div>
         <h2>SonarQube — Frontend &amp; Backend</h2>
         <p class="muted">Backend project <code>mnm-backend</code> combines gateway, catalog, store, and commerce.
+        <strong>Lines of code</strong> is Sonar NCLOC (19,501). Coverage uses JaCoCo executable lines
+        (currently 28,287 across the four services) — those are different metrics.
         Frontend uses Vitest-scoped coverage.</p>
         {summary_table(rows)}
       </section>
@@ -266,6 +251,38 @@ def main() -> None:
 
         shutil.copy2(logo_src, out / "daiva-logo.svg")
     print(f"Wrote {out / 'index.html'}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output-dir", default="artifacts/sonar-summary")
+    parser.add_argument("--sonar-url", default=os.environ.get("SONAR_HOST_URL", "http://127.0.0.1:9000/sonar"))
+    parser.add_argument(
+        "--from-json",
+        metavar="PATH",
+        help="Render branded HTML from an existing sonar-summary.json (no Sonar API)",
+    )
+    args = parser.parse_args()
+
+    out = Path(args.output_dir)
+
+    if args.from_json:
+        payload = json.loads(Path(args.from_json).read_text(encoding="utf-8"))
+        write_summary_artifacts(out, payload)
+        return
+
+    token = os.environ.get("SONAR_TOKEN", "")
+    if not token:
+        print("SONAR_TOKEN not set", file=sys.stderr)
+        sys.exit(1)
+
+    rows = [fetch_project(args.sonar_url, token, key, label) for key, label in PROJECTS]
+    payload = {
+        "generatedAt": generated_at_iso(),
+        "frontend": rows[0],
+        "backend": rows[1],
+    }
+    write_summary_artifacts(out, payload)
 
 
 if __name__ == "__main__":

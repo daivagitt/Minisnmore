@@ -70,12 +70,23 @@ describe("login route", () => {
     authMock.loading = false;
     searchMock.redirect = "/account";
     searchMock.error = undefined;
+    sessionStorage.clear();
   });
 
   it("validates search params and exposes document metadata", () => {
     expect((Route as any).validateSearch({ redirect: "/checkout" })).toEqual({ redirect: "/checkout" });
     expect((Route as any).validateSearch({})).toEqual({});
     expect((Route as any).head().meta[0].title).toBe("Sign in · Mini's n More");
+    expect((Route as any).head().links[0]).toEqual(
+      expect.objectContaining({ rel: "preload", as: "image", fetchPriority: "high" }),
+    );
+  });
+
+  it("renders a motion kids hero from existing store photography", () => {
+    renderLogin();
+    const hero = screen.getByRole("img", { name: /smiling baby/i }) as HTMLImageElement;
+    expect(hero.getAttribute("src")).toMatch(/hero-smiling-baby/i);
+    expect(screen.getAllByText(/minis today, memories forever/i).length).toBeGreaterThan(0);
   });
 
   it("redirects an already signed-in user to the search redirect target", async () => {
@@ -128,11 +139,51 @@ describe("login route", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Create account$/ }));
 
     await waitFor(() =>
-      expect(authMock.signUp).toHaveBeenCalledWith("new@example.com", "secret1", "New Parent"),
+      expect(authMock.signUp).toHaveBeenCalledWith("new@example.com", "secret1", "New Parent", true),
     );
     expect(toastMock.success).toHaveBeenCalledWith(
       "Almost there — check your inbox and open the activation link to finish.",
     );
+    expect(JSON.parse(sessionStorage.getItem("mnm_pending_profile") ?? "{}")).toEqual({
+      full_name: "New Parent",
+      email: "new@example.com",
+      subscribed: true,
+    });
+  });
+
+  it("saves an opt-out subscribe preference during sign up", async () => {
+    authMock.signUp.mockResolvedValueOnce({ error: null });
+    renderLogin();
+
+    await userEvent.click(screen.getByRole("button", { name: "New here? Create an account" }));
+    const checkbox = screen.getByRole("checkbox", { name: /subscribe to emails and offers/i }) as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
+    await userEvent.type(screen.getByPlaceholderText("Full name"), "New Parent");
+    await userEvent.type(screen.getByPlaceholderText("you@email.com"), "new@example.com");
+    await userEvent.type(screen.getByPlaceholderText("Password (min 6)"), "secret1");
+    await userEvent.click(screen.getByRole("checkbox", { name: /subscribe to emails and offers/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^Create account$/ }));
+
+    await waitFor(() =>
+      expect(authMock.signUp).toHaveBeenCalledWith("new@example.com", "secret1", "New Parent", false),
+    );
+    expect(JSON.parse(sessionStorage.getItem("mnm_pending_profile") ?? "{}")).toEqual({
+      full_name: "New Parent",
+      email: "new@example.com",
+      subscribed: false,
+    });
+  });
+
+  it("keeps an unticked subscribe choice when toggling between sign in and sign up", async () => {
+    renderLogin();
+
+    await userEvent.click(screen.getByRole("button", { name: "New here? Create an account" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /subscribe to emails and offers/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Have an account? Sign in" }));
+    await userEvent.click(screen.getByRole("button", { name: "New here? Create an account" }));
+
+    const checkbox = screen.getByRole("checkbox", { name: /subscribe to emails and offers/i }) as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
   });
 
   it("rejects an invalid full name during sign up", async () => {

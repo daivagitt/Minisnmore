@@ -31,6 +31,14 @@ ADMIN_PASS = os.environ.get("LEDGERLY_TEST_ADMIN_PASS", "admin6")
 
 CTX = ssl.create_default_context()
 
+# Order retry / tracking pulls can move orders to shipped/delivered and fire customer emails
+# from Care@minisnmore.com, so they are skipped unless API_TEST_NO_MAIL=false.
+NO_MAIL = os.environ.get("API_TEST_NO_MAIL", "true").lower() not in ("0", "false", "no")
+NO_MAIL_SKIP = {
+    ("POST", "/api/v1/admin/ledgerly/retry-orders"),
+    ("POST", "/api/v1/admin/ledgerly/pull-order-tracking"),
+}
+
 
 def login() -> tuple[int, str | None]:
     body = json.dumps({"username": ADMIN_USER, "password": ADMIN_PASS, "rememberMe": True}).encode()
@@ -107,10 +115,11 @@ def call(method: str, path: str, token: str, body: dict | None = None) -> dict:
 def build_html(report: dict) -> str:
     rows = report.get("results") or []
     pass_n = sum(1 for r in rows if r.get("ok"))
+    skip_n = sum(1 for r in rows if r.get("skipped"))
     tr = []
     for r in rows:
-        code = r.get("code") or "—"
-        css = "code-ok" if r.get("ok") else "code-fail"
+        code = "skip" if r.get("skipped") else (r.get("code") or "—")
+        css = "code-ok" if r.get("ok") else ("code-skip" if r.get("skipped") else "code-fail")
         tr.append(
             f"<tr><td><code>{r['method']}</code></td><td><code>{r['path']}</code></td>"
             f'<td class="{css}">{code}</td><td>{r.get("ms", "—")} ms</td>'
@@ -121,12 +130,12 @@ def build_html(report: dict) -> str:
 <style>
 body{{font-family:system-ui,sans-serif;margin:24px;max-width:1100px}}
 table{{width:100%;border-collapse:collapse}} th,td{{border-bottom:1px solid #e2e8f0;padding:8px;text-align:left}}
-.code-ok{{color:#15803d;font-weight:600}} .code-fail{{color:#b91c1c;font-weight:600}}
+.code-ok{{color:#15803d;font-weight:600}} .code-fail{{color:#b91c1c;font-weight:600}} .code-skip{{color:#64748b;font-weight:600}}
 .meta{{color:#64748b;margin-bottom:16px}}
 </style></head><body>
 <h1>Ledgerly live API integration tests</h1>
 <p class="meta">Target: <strong>{report.get("baseUrl")}</strong> · {report.get("finishedAt")} ·
-Passed <strong>{pass_n}</strong> / {len(rows)} (2xx)</p>
+Passed <strong>{pass_n}</strong> / {len(rows) - skip_n} (2xx) · Skipped {skip_n}</p>
 <table><thead><tr><th>Method</th><th>Path</th><th>Status</th><th>Time</th><th>Note</th></tr></thead>
 <tbody>{''.join(tr)}</tbody></table>
 <p class="meta">Admin JWT + live Ledgerly commerce API (settings, sync, pull, retry). Non-2xx may mean missing token or rate limits.</p>
@@ -165,6 +174,19 @@ def main() -> int:
         ("POST", "/api/v1/admin/ledgerly/pull-order-tracking", None),
     ]
     for method, path, body in endpoints:
+        if NO_MAIL and (method, path) in NO_MAIL_SKIP:
+            results.append(
+                {
+                    "method": method,
+                    "path": path,
+                    "ok": False,
+                    "skipped": True,
+                    "code": 0,
+                    "ms": 0,
+                    "note": "skipped: no-mail mode (can trigger order emails via Care@minisnmore.com)",
+                }
+            )
+            continue
         results.append(call(method, path, token, body))
 
     report = {
@@ -176,7 +198,8 @@ def main() -> int:
     OUT_JSON.write_text(json.dumps(report, indent=2), encoding="utf-8")
     OUT_HTML.write_text(build_html(report), encoding="utf-8")
     pass_n = sum(1 for r in results if r.get("ok"))
-    print(f"Ledgerly live: {pass_n}/{len(results)} passed → {OUT_HTML}")
+    skip_n = sum(1 for r in results if r.get("skipped"))
+    print(f"Ledgerly live: {pass_n}/{len(results) - skip_n} passed, {skip_n} skipped → {OUT_HTML}")
     return 0 if pass_n == len(results) else 0
 
 

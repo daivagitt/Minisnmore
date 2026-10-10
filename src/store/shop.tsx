@@ -10,7 +10,6 @@ import {
 } from "react";
 import type { Product } from "@/data/products";
 import { useAuth } from "@/hooks/useAuth";
-import { FIT_LIMITS } from "@/lib/product-fit";
 import { roundInr } from "@/lib/money";
 import {
   defaultSellableSelection,
@@ -22,6 +21,7 @@ import {
 } from "@/lib/product-variants";
 import { RemoveFromCartDialog } from "@/components/RemoveFromCartDialog";
 import { cartsEqual, sanitizeCartWithCatalog, type CartSyncResult } from "@/lib/cart-catalog";
+import { maxPurchasableQty } from "@/lib/purchasable-qty";
 import { normalizeWishlistIds, wishlistAlreadyExistsMessage } from "@/lib/wishlist";
 import {
   listMyCart,
@@ -49,7 +49,12 @@ export type CartItem = {
   unitPrice: number;
 };
 
-export type AppliedCoupon = { code: string; discount: number };
+export type AppliedCoupon = {
+  code: string;
+  discount: number;
+  nudge?: string | null;
+  bogoDetails?: string | null;
+};
 
 type ShopState = {
   cart: CartItem[];
@@ -118,7 +123,9 @@ function coerceCoupon(raw: unknown): AppliedCoupon | null {
   const row = raw as Partial<AppliedCoupon>;
   if (typeof row.code !== "string" || !row.code.trim()) return null;
   const discount = typeof row.discount === "number" && Number.isFinite(row.discount) ? row.discount : 0;
-  return { code: row.code, discount };
+  const nudge = typeof row.nudge === "string" && row.nudge.trim() ? row.nudge.trim() : undefined;
+  const bogoDetails = typeof row.bogoDetails === "string" && row.bogoDetails.trim() ? row.bogoDetails.trim() : undefined;
+  return { code: row.code, discount, nudge, bogoDetails };
 }
 
 function normalizeCartItem(raw: CartItem): CartItem {
@@ -366,20 +373,29 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     }
     const variantSku = variant?.sku ?? opts.variantSku;
     const unitPrice = lineUnitPrice(p, { size, color, sku: variantSku });
-    const qty = opts.qty ?? 1;
+    const maxQty = maxPurchasableQty(p, { size, color, sku: variantSku });
+    const qty = Math.min(maxQty, Math.max(0, opts.qty ?? 1));
+    if (qty < 1) {
+      toast.error(isVariantsProduct(p) ? "That size/color is out of stock" : "This item is out of stock");
+      return;
+    }
+    const matchesLine = (x: CartItem) =>
+      x.product.id === p.id &&
+      (variantSku ? x.variantSku === variantSku : x.size === size && x.color === color);
     setCart((c) => {
-      const i = c.findIndex(
-        (x) =>
-          x.product.id === p.id &&
-          (variantSku ? x.variantSku === variantSku : x.size === size && x.color === color),
-      );
+      const i = c.findIndex(matchesLine);
       if (i >= 0) {
+        if (c[i].qty >= maxQty) return c;
         const next = [...c];
-        next[i] = { ...next[i], qty: Math.min(FIT_LIMITS.qtyMax, next[i].qty + qty), unitPrice, variantSku };
+        next[i] = { ...next[i], qty: Math.min(maxQty, c[i].qty + qty), unitPrice, variantSku };
         return next;
       }
-      return [...c, { product: p, qty: Math.min(FIT_LIMITS.qtyMax, qty), size, color, variantSku, unitPrice }];
+      return [...c, { product: p, qty, size, color, variantSku, unitPrice }];
     });
+    const existing = cart.find(matchesLine);
+    if (existing && existing.qty >= maxQty) {
+      toast.error(`Only ${maxQty} left in stock`);
+    }
     setCartOpen(true);
   };
   const matches = (x: CartItem, id: string, size?: string, color?: string, variantSku?: string) =>
@@ -406,10 +422,18 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     const item = cart.find((x) => matches(x, id, size, color, variantSku));
     if (!item) return;
     userEditedDuringSyncRef.current = true;
-    const n = Math.max(0, Math.min(FIT_LIMITS.qtyMax, qty));
+    const maxQty = maxPurchasableQty(item.product, {
+      size: size ?? item.size,
+      color: color ?? item.color,
+      sku: variantSku ?? item.variantSku,
+    });
+    const n = Math.max(0, Math.min(maxQty, qty));
     if (n === 0) {
       promptRemoveFromCart(id, size, color, variantSku);
       return;
+    }
+    if (qty > maxQty) {
+      toast.error(`Only ${maxQty} left in stock`);
     }
     setCart((c) =>
       c.map((x) => (matches(x, id, size, color, variantSku) ? { ...x, qty: n } : x)),

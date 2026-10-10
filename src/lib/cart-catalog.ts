@@ -2,8 +2,8 @@ import type { Product } from "@/data/products";
 import type { CartItem } from "@/store/shop";
 import { galleryForSelectedColor } from "@/lib/product-gallery";
 import { resolveStorefrontColorLabel } from "@/lib/expected-prints";
-import { FIT_LIMITS } from "@/lib/product-fit";
 import { roundInr } from "@/lib/money";
+import { maxPurchasableQty } from "@/lib/purchasable-qty";
 import {
   findVariant,
   isSimpleProductSellable,
@@ -51,14 +51,7 @@ function cartLineColorForLookup(item: CartItem, product: Product): string {
 }
 
 function maxQtyForLine(product: Product, item: CartItem): number {
-  const variant = findVariant(product, { size: item.size, color: item.color, sku: item.variantSku });
-  if (isVariantsProduct(product) && variant) {
-    return Math.min(FIT_LIMITS.qtyMax, Math.max(0, variant.stock));
-  }
-  if (product.stock != null) {
-    return Math.min(FIT_LIMITS.qtyMax, Math.max(0, product.stock));
-  }
-  return FIT_LIMITS.qtyMax;
+  return maxPurchasableQty(product, { size: item.size, color: item.color, sku: item.variantSku });
 }
 
 /** True when a cart line can still be purchased from the live (active) catalog. */

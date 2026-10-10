@@ -117,6 +117,18 @@ public class SiteSettingDTO implements Serializable {
     @Max(SiteSetting.MAX_DELIVERY_ETA_BUFFER_DAYS)
     private Integer deliveryEtaBufferDays;
 
+    @Min(1)
+    @Max(SiteSetting.MAX_RETURN_WINDOW_DAYS)
+    private Integer returnWindowDays;
+
+    @Min(1)
+    @Max(SiteSetting.MAX_REFUND_BUSINESS_DAYS)
+    private Integer refundMinBusinessDays;
+
+    @Min(1)
+    @Max(SiteSetting.MAX_REFUND_BUSINESS_DAYS)
+    private Integer refundMaxBusinessDays;
+
     @NotNull
     @DecimalMin(value = "0")
     @DecimalMax(value = "100")
@@ -139,6 +151,8 @@ public class SiteSettingDTO implements Serializable {
     private String subscribeFeaturesJson;
 
     private String aboutPageJson;
+
+    private String giftPageJson;
 
     public Long getId() {
         return id;
@@ -412,6 +426,30 @@ public class SiteSettingDTO implements Serializable {
         this.deliveryEtaBufferDays = deliveryEtaBufferDays;
     }
 
+    public Integer getReturnWindowDays() {
+        return returnWindowDays;
+    }
+
+    public void setReturnWindowDays(Integer returnWindowDays) {
+        this.returnWindowDays = returnWindowDays;
+    }
+
+    public Integer getRefundMinBusinessDays() {
+        return refundMinBusinessDays;
+    }
+
+    public void setRefundMinBusinessDays(Integer refundMinBusinessDays) {
+        this.refundMinBusinessDays = refundMinBusinessDays;
+    }
+
+    public Integer getRefundMaxBusinessDays() {
+        return refundMaxBusinessDays;
+    }
+
+    public void setRefundMaxBusinessDays(Integer refundMaxBusinessDays) {
+        this.refundMaxBusinessDays = refundMaxBusinessDays;
+    }
+
     public BigDecimal getStoreDiscountPercent() {
         return storeDiscountPercent;
     }
@@ -474,6 +512,14 @@ public class SiteSettingDTO implements Serializable {
 
     public void setAboutPageJson(String aboutPageJson) {
         this.aboutPageJson = aboutPageJson;
+    }
+
+    public String getGiftPageJson() {
+        return giftPageJson;
+    }
+
+    public void setGiftPageJson(String giftPageJson) {
+        this.giftPageJson = giftPageJson;
     }
 
     @Override

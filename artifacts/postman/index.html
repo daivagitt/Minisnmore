@@ -93,6 +93,7 @@
       }
       .status.pass { background: var(--pass); }
       .status.fail { background: var(--fail); }
+      .status.skip { background: #64748b; }
       table {
         width: 100%;
         border-collapse: collapse;
@@ -170,10 +171,11 @@
           <img class="brand-logo" src="../daiva-logo.svg" alt="Daiva Technologies logo" width="240" height="48" decoding="async" />
         </div>
         <h1>Mini&#x27;s n More API tests</h1>
-        <p>Smoke + load (68-op surface, 15/25/35 users)</p>
+        <p>Smoke + load (all GET endpoints)</p>
         <div class="meta">
           <span class="meta-chip">Mini&#x27;s n More</span>
-          <span class="meta-chip">Build <code style="background:transparent;color:inherit;padding:0;">local</code></span>
+          <span class="meta-chip">Build <code style="background:transparent;color:inherit;padding:0;">202610091843-api-perf</code></span>
+          <span class="meta-chip">Generated <code style="background:transparent;color:inherit;padding:0;">9 Oct 2026, 6:43 PM IST (13:13 UTC)</code></span>
         </div>
       </header>
       <main class="content">
@@ -182,156 +184,157 @@
         <h2>API smoke tests</h2>
         <p class="section-note">Status: <span class="status pass">PASS</span> · Target <code>https://uat.minisnmore.com</code></p>
         <div class="stats">
-          <div class="stat"><strong>8</strong><span>Requests</span></div>
-          <div class="stat"><strong>8</strong><span>Passed</span></div>
-          <div class="stat"><strong></strong><span>Failed</span></div>
-          <div class="stat"><strong>65 ms</strong><span>Avg response</span></div>
+          <div class="stat"><strong>9</strong><span>Requests</span></div>
+          <div class="stat"><strong>9</strong><span>Passed</span></div>
+          <div class="stat"><strong>0</strong><span>Failed</span></div>
+          <div class="stat"><strong>39 ms</strong><span>Avg response</span></div>
         </div>
         <table class="data">
           <thead>
             <tr><th>Endpoint</th><th>Status code</th><th>Response time</th></tr>
           </thead>
           <tbody>
-            <tr class=""><td><code>GET /api/v1/banners</code></td><td><span class="code-ok">200</span></td><td class="time">83 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/blog-posts</code></td><td><span class="code-ok">200</span></td><td class="time">23 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/categories</code></td><td><span class="code-ok">200</span></td><td class="time">53 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/home-sections</code></td><td><span class="code-ok">200</span></td><td class="time">28 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/page-visibility</code></td><td><span class="code-ok">200</span></td><td class="time">24 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/products</code></td><td><span class="code-ok">200</span></td><td class="time">238 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/products/{{productSlug}}</code></td><td><span class="code-ok">200</span></td><td class="time">43 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/site-settings</code></td><td><span class="code-ok">200</span></td><td class="time">27 ms</td></tr>
+            <tr class=""><td><code>GET /api/v1/banners</code></td><td><span class="code-ok">200</span></td><td class="time">87 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/blog-posts</code></td><td><span class="code-ok">200</span></td><td class="time">35 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/blog-posts/a-cozy-nest-for-sweet-dreams</code></td><td><span class="code-ok">200</span></td><td class="time">32 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/categories</code></td><td><span class="code-ok">200</span></td><td class="time">25 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/home-sections</code></td><td><span class="code-ok">200</span></td><td class="time">26 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/page-visibility</code></td><td><span class="code-ok">200</span></td><td class="time">22 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/products</code></td><td><span class="code-ok">200</span></td><td class="time">60 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/products/{{productSlug}}</code></td><td><span class="code-ok">200</span></td><td class="time">32 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/site-settings</code></td><td><span class="code-ok">200</span></td><td class="time">29 ms</td></tr>
           </tbody>
         </table>
       </section>
       
       <section class="panel">
-        <h2>API load · 15 Newman workers</h2>
-        <p class="section-note">Status: <span class="status pass">PASS</span> · all GET endpoints + POST /api/register</p>
+        <h2>Load · 10 virtual users (all GET endpoints) · 45s</h2>
+        <p class="section-note">
+          Status: <span class="status pass">PASS</span> · 43 OpenAPI GET endpoints under concurrent load
+        </p>
         <div class="stats">
-          <div class="stat"><strong>375</strong><span>Assertions passed</span></div>
-          <div class="stat"><strong>413 ms</strong><span>Avg response</span></div>
+          <div class="stat"><strong>43</strong><span>Endpoints</span></div>
+          <div class="stat"><strong>0</strong><span>Failed endpoints</span></div>
+          <div class="stat"><strong>43 ms</strong><span>Overall avg</span></div>
         </div>
         <table class="data">
           <thead>
-            <tr><th>Endpoint</th><th>Status code</th><th>Response time</th></tr>
+            <tr><th>Endpoint</th><th>Status</th><th>Avg response</th><th>p95 response</th></tr>
           </thead>
           <tbody>
-            <tr class=""><td><code>GET /api/account</code></td><td><span class="code-ok">200</span></td><td class="time">18 ms</td></tr>
-<tr class=""><td><code>GET /api/authenticate</code></td><td><span class="code-ok">204</span></td><td class="time">21 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/account/profile</code></td><td><span class="code-ok">200</span></td><td class="time">493 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/banners</code></td><td><span class="code-ok">200</span></td><td class="time">82 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/blog-posts</code></td><td><span class="code-ok">200</span></td><td class="time">45 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/categories</code></td><td><span class="code-ok">200</span></td><td class="time">109 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/coupons</code></td><td><span class="code-ok">200</span></td><td class="time">70 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/dashboard</code></td><td><span class="code-ok">200</span></td><td class="time">106 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/home-sections</code></td><td><span class="code-ok">200</span></td><td class="time">74 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/page-visibility</code></td><td><span class="code-ok">200</span></td><td class="time">58 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/policies</code></td><td><span class="code-ok">200</span></td><td class="time">56 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/products</code></td><td><span class="code-ok">200</span></td><td class="time">352 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/site-settings</code></td><td><span class="code-ok">200</span></td><td class="time">61 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/zoho-settings</code></td><td><span class="code-ok">200</span></td><td class="time">66 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/banners</code></td><td><span class="code-ok">200</span></td><td class="time">80 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/blog-posts</code></td><td><span class="code-ok">200</span></td><td class="time">41 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/categories</code></td><td><span class="code-ok">200</span></td><td class="time">88 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/home-sections</code></td><td><span class="code-ok">200</span></td><td class="time">48 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/orders</code></td><td><span class="code-ok">200</span></td><td class="time">121 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/page-visibility</code></td><td><span class="code-ok">200</span></td><td class="time">36 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/payments</code></td><td><span class="code-ok">200</span></td><td class="time">126 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/products</code></td><td><span class="code-ok">200</span></td><td class="time">332 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/products/tying-cap</code></td><td><span class="code-ok">200</span></td><td class="time">78 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/site-settings</code></td><td><span class="code-ok">200</span></td><td class="time">65 ms</td></tr>
-<tr class=""><td><code>POST /api/register</code></td><td><span class="code-ok">201</span></td><td class="time">7688 ms</td></tr>
+            <tr class=""><td><code>GET /api/v1/about-page</code></td><td><span class="code-ok">200</span></td><td class="time">18 ms</td><td class="time">29 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/account/addresses</code></td><td><span class="code-ok">200</span></td><td class="time">22 ms</td><td class="time">57 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/account/cart</code></td><td><span class="code-ok">200</span></td><td class="time">23 ms</td><td class="time">86 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/account/notifications</code></td><td><span class="code-ok">200</span></td><td class="time">70 ms</td><td class="time">159 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/account/profile</code></td><td><span class="code-ok">200</span></td><td class="time">23 ms</td><td class="time">80 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/account/wishlist</code></td><td><span class="code-ok">200</span></td><td class="time">22 ms</td><td class="time">69 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/banners</code></td><td><span class="code-ok">200</span></td><td class="time">23 ms</td><td class="time">69 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/blog-posts</code></td><td><span class="code-ok">200</span></td><td class="time">21 ms</td><td class="time">65 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/cancellation-requests</code></td><td><span class="code-ok">200</span></td><td class="time">32 ms</td><td class="time">91 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/categories</code></td><td><span class="code-ok">200</span></td><td class="time">18 ms</td><td class="time">44 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/contact-messages</code></td><td><span class="code-ok">200</span></td><td class="time">17 ms</td><td class="time">43 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/coupons</code></td><td><span class="code-ok">200</span></td><td class="time">18 ms</td><td class="time">43 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/dashboard</code></td><td><span class="code-ok">200</span></td><td class="time">30 ms</td><td class="time">66 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/home-sections</code></td><td><span class="code-ok">200</span></td><td class="time">21 ms</td><td class="time">52 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/ledgerly/integration-status</code></td><td><span class="code-ok">200</span></td><td class="time">22 ms</td><td class="time">68 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/ledgerly/settings</code></td><td><span class="code-ok">200</span></td><td class="time">24 ms</td><td class="time">97 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/ledgerly/test</code></td><td><span class="code-ok">200</span></td><td class="time">54 ms</td><td class="time">181 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/order-returns</code></td><td><span class="code-ok">200</span></td><td class="time">222 ms</td><td class="time">415 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/order-returns/summary</code></td><td><span class="code-ok">200</span></td><td class="time">26 ms</td><td class="time">49 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/orders</code></td><td><span class="code-ok">200</span></td><td class="time">89 ms</td><td class="time">168 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/orders/cod-pending</code></td><td><span class="code-ok">200</span></td><td class="time">514 ms</td><td class="time">840 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/orders/ordered-logins</code></td><td><span class="code-ok">200</span></td><td class="time">22 ms</td><td class="time">47 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/package-boxes</code></td><td><span class="code-ok">200</span></td><td class="time">18 ms</td><td class="time">31 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/page-visibility</code></td><td><span class="code-ok">200</span></td><td class="time">17 ms</td><td class="time">38 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/policies</code></td><td><span class="code-ok">200</span></td><td class="time">19 ms</td><td class="time">33 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/products</code></td><td><span class="code-ok">200</span></td><td class="time">29 ms</td><td class="time">54 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/site-settings</code></td><td><span class="code-ok">200</span></td><td class="time">19 ms</td><td class="time">45 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/store-addresses</code></td><td><span class="code-ok">200</span></td><td class="time">17 ms</td><td class="time">35 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/zoho-settings</code></td><td><span class="code-ok">200</span></td><td class="time">17 ms</td><td class="time">32 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/banners</code></td><td><span class="code-ok">200</span></td><td class="time">14 ms</td><td class="time">32 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/blog-posts</code></td><td><span class="code-ok">200</span></td><td class="time">16 ms</td><td class="time">40 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/categories</code></td><td><span class="code-ok">200</span></td><td class="time">15 ms</td><td class="time">35 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/coupons/active</code></td><td><span class="code-ok">200</span></td><td class="time">21 ms</td><td class="time">46 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/gift-page</code></td><td><span class="code-ok">200</span></td><td class="time">18 ms</td><td class="time">32 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/home-sections</code></td><td><span class="code-ok">200</span></td><td class="time">16 ms</td><td class="time">28 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/order-returns</code></td><td><span class="code-ok">200</span></td><td class="time">37 ms</td><td class="time">69 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/order-returns/config</code></td><td><span class="code-ok">200</span></td><td class="time">20 ms</td><td class="time">37 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/orders</code></td><td><span class="code-ok">200</span></td><td class="time">105 ms</td><td class="time">302 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/page-visibility</code></td><td><span class="code-ok">200</span></td><td class="time">15 ms</td><td class="time">32 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/payments</code></td><td><span class="code-ok">200</span></td><td class="time">28 ms</td><td class="time">68 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/products</code></td><td><span class="code-ok">200</span></td><td class="time">47 ms</td><td class="time">105 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/site-settings</code></td><td><span class="code-ok">200</span></td><td class="time">16 ms</td><td class="time">35 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/subscribe-page</code></td><td><span class="code-ok">200</span></td><td class="time">17 ms</td><td class="time">32 ms</td></tr>
           </tbody>
         </table>
       </section>
     
       <section class="panel">
-        <h2>API load · 25 Newman workers</h2>
-        <p class="section-note">Status: <span class="status pass">PASS</span> · all GET endpoints + POST /api/register</p>
+        <h2>Load · 25 virtual users (all GET endpoints) · 45s</h2>
+        <p class="section-note">
+          Status: <span class="status pass">PASS</span> · 43 OpenAPI GET endpoints under concurrent load
+        </p>
         <div class="stats">
-          <div class="stat"><strong>625</strong><span>Assertions passed</span></div>
-          <div class="stat"><strong>623 ms</strong><span>Avg response</span></div>
+          <div class="stat"><strong>43</strong><span>Endpoints</span></div>
+          <div class="stat"><strong>0</strong><span>Failed endpoints</span></div>
+          <div class="stat"><strong>43 ms</strong><span>Overall avg</span></div>
         </div>
         <table class="data">
           <thead>
-            <tr><th>Endpoint</th><th>Status code</th><th>Response time</th></tr>
+            <tr><th>Endpoint</th><th>Status</th><th>Avg response</th><th>p95 response</th></tr>
           </thead>
           <tbody>
-            <tr class=""><td><code>GET /api/account</code></td><td><span class="code-ok">200</span></td><td class="time">73 ms</td></tr>
-<tr class=""><td><code>GET /api/authenticate</code></td><td><span class="code-ok">204</span></td><td class="time">43 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/account/profile</code></td><td><span class="code-ok">200</span></td><td class="time">797 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/banners</code></td><td><span class="code-ok">200</span></td><td class="time">177 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/blog-posts</code></td><td><span class="code-ok">200</span></td><td class="time">147 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/categories</code></td><td><span class="code-ok">200</span></td><td class="time">213 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/coupons</code></td><td><span class="code-ok">200</span></td><td class="time">148 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/dashboard</code></td><td><span class="code-ok">200</span></td><td class="time">214 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/home-sections</code></td><td><span class="code-ok">200</span></td><td class="time">165 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/page-visibility</code></td><td><span class="code-ok">200</span></td><td class="time">154 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/policies</code></td><td><span class="code-ok">200</span></td><td class="time">140 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/products</code></td><td><span class="code-ok">200</span></td><td class="time">517 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/site-settings</code></td><td><span class="code-ok">200</span></td><td class="time">135 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/zoho-settings</code></td><td><span class="code-ok">200</span></td><td class="time">146 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/banners</code></td><td><span class="code-ok">200</span></td><td class="time">148 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/blog-posts</code></td><td><span class="code-ok">200</span></td><td class="time">141 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/categories</code></td><td><span class="code-ok">200</span></td><td class="time">180 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/home-sections</code></td><td><span class="code-ok">200</span></td><td class="time">140 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/orders</code></td><td><span class="code-ok">200</span></td><td class="time">188 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/page-visibility</code></td><td><span class="code-ok">200</span></td><td class="time">138 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/payments</code></td><td><span class="code-ok">200</span></td><td class="time">219 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/products</code></td><td><span class="code-ok">200</span></td><td class="time">493 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/products/tying-cap</code></td><td><span class="code-ok">200</span></td><td class="time">137 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/site-settings</code></td><td><span class="code-ok">200</span></td><td class="time">71 ms</td></tr>
-<tr class=""><td><code>POST /api/register</code></td><td><span class="code-ok">201</span></td><td class="time">10656 ms</td></tr>
+            <tr class=""><td><code>GET /api/v1/about-page</code></td><td><span class="code-ok">200</span></td><td class="time">20 ms</td><td class="time">38 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/account/addresses</code></td><td><span class="code-ok">200</span></td><td class="time">22 ms</td><td class="time">47 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/account/cart</code></td><td><span class="code-ok">200</span></td><td class="time">22 ms</td><td class="time">47 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/account/notifications</code></td><td><span class="code-ok">200</span></td><td class="time">54 ms</td><td class="time">101 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/account/profile</code></td><td><span class="code-ok">200</span></td><td class="time">22 ms</td><td class="time">48 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/account/wishlist</code></td><td><span class="code-ok">200</span></td><td class="time">23 ms</td><td class="time">51 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/banners</code></td><td><span class="code-ok">200</span></td><td class="time">20 ms</td><td class="time">45 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/blog-posts</code></td><td><span class="code-ok">200</span></td><td class="time">21 ms</td><td class="time">46 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/cancellation-requests</code></td><td><span class="code-ok">200</span></td><td class="time">34 ms</td><td class="time">84 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/categories</code></td><td><span class="code-ok">200</span></td><td class="time">22 ms</td><td class="time">44 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/contact-messages</code></td><td><span class="code-ok">200</span></td><td class="time">22 ms</td><td class="time">48 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/coupons</code></td><td><span class="code-ok">200</span></td><td class="time">22 ms</td><td class="time">51 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/dashboard</code></td><td><span class="code-ok">200</span></td><td class="time">30 ms</td><td class="time">62 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/home-sections</code></td><td><span class="code-ok">200</span></td><td class="time">22 ms</td><td class="time">44 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/ledgerly/integration-status</code></td><td><span class="code-ok">200</span></td><td class="time">21 ms</td><td class="time">47 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/ledgerly/settings</code></td><td><span class="code-ok">200</span></td><td class="time">21 ms</td><td class="time">51 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/ledgerly/test</code></td><td><span class="code-ok">200</span></td><td class="time">50 ms</td><td class="time">99 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/order-returns</code></td><td><span class="code-ok">200</span></td><td class="time">193 ms</td><td class="time">333 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/order-returns/summary</code></td><td><span class="code-ok">200</span></td><td class="time">27 ms</td><td class="time">50 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/orders</code></td><td><span class="code-ok">200</span></td><td class="time">91 ms</td><td class="time">156 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/orders/cod-pending</code></td><td><span class="code-ok">200</span></td><td class="time">482 ms</td><td class="time">775 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/orders/ordered-logins</code></td><td><span class="code-ok">200</span></td><td class="time">24 ms</td><td class="time">44 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/package-boxes</code></td><td><span class="code-ok">200</span></td><td class="time">22 ms</td><td class="time">44 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/page-visibility</code></td><td><span class="code-ok">200</span></td><td class="time">19 ms</td><td class="time">38 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/policies</code></td><td><span class="code-ok">200</span></td><td class="time">26 ms</td><td class="time">51 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/products</code></td><td><span class="code-ok">200</span></td><td class="time">38 ms</td><td class="time">70 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/site-settings</code></td><td><span class="code-ok">200</span></td><td class="time">21 ms</td><td class="time">39 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/store-addresses</code></td><td><span class="code-ok">200</span></td><td class="time">20 ms</td><td class="time">41 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/admin/zoho-settings</code></td><td><span class="code-ok">200</span></td><td class="time">22 ms</td><td class="time">46 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/banners</code></td><td><span class="code-ok">200</span></td><td class="time">19 ms</td><td class="time">41 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/blog-posts</code></td><td><span class="code-ok">200</span></td><td class="time">19 ms</td><td class="time">40 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/categories</code></td><td><span class="code-ok">200</span></td><td class="time">19 ms</td><td class="time">44 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/coupons/active</code></td><td><span class="code-ok">200</span></td><td class="time">25 ms</td><td class="time">51 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/gift-page</code></td><td><span class="code-ok">200</span></td><td class="time">21 ms</td><td class="time">48 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/home-sections</code></td><td><span class="code-ok">200</span></td><td class="time">19 ms</td><td class="time">37 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/order-returns</code></td><td><span class="code-ok">200</span></td><td class="time">38 ms</td><td class="time">77 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/order-returns/config</code></td><td><span class="code-ok">200</span></td><td class="time">22 ms</td><td class="time">46 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/orders</code></td><td><span class="code-ok">200</span></td><td class="time">86 ms</td><td class="time">161 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/page-visibility</code></td><td><span class="code-ok">200</span></td><td class="time">17 ms</td><td class="time">37 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/payments</code></td><td><span class="code-ok">200</span></td><td class="time">35 ms</td><td class="time">63 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/products</code></td><td><span class="code-ok">200</span></td><td class="time">49 ms</td><td class="time">83 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/site-settings</code></td><td><span class="code-ok">200</span></td><td class="time">20 ms</td><td class="time">38 ms</td></tr>
+<tr class=""><td><code>GET /api/v1/subscribe-page</code></td><td><span class="code-ok">200</span></td><td class="time">20 ms</td><td class="time">43 ms</td></tr>
           </tbody>
         </table>
       </section>
     
-      <section class="panel">
-        <h2>API load · 35 Newman workers</h2>
-        <p class="section-note">Status: <span class="status pass">PASS</span> · all GET endpoints + POST /api/register</p>
-        <div class="stats">
-          <div class="stat"><strong>875</strong><span>Assertions passed</span></div>
-          <div class="stat"><strong>864 ms</strong><span>Avg response</span></div>
-        </div>
-        <table class="data">
-          <thead>
-            <tr><th>Endpoint</th><th>Status code</th><th>Response time</th></tr>
-          </thead>
-          <tbody>
-            <tr class=""><td><code>GET /api/account</code></td><td><span class="code-ok">200</span></td><td class="time">196 ms</td></tr>
-<tr class=""><td><code>GET /api/authenticate</code></td><td><span class="code-ok">204</span></td><td class="time">67 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/account/profile</code></td><td><span class="code-ok">200</span></td><td class="time">1128 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/banners</code></td><td><span class="code-ok">200</span></td><td class="time">175 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/blog-posts</code></td><td><span class="code-ok">200</span></td><td class="time">227 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/categories</code></td><td><span class="code-ok">200</span></td><td class="time">260 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/coupons</code></td><td><span class="code-ok">200</span></td><td class="time">191 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/dashboard</code></td><td><span class="code-ok">200</span></td><td class="time">230 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/home-sections</code></td><td><span class="code-ok">200</span></td><td class="time">227 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/page-visibility</code></td><td><span class="code-ok">200</span></td><td class="time">217 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/policies</code></td><td><span class="code-ok">200</span></td><td class="time">197 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/products</code></td><td><span class="code-ok">200</span></td><td class="time">685 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/site-settings</code></td><td><span class="code-ok">200</span></td><td class="time">185 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/admin/zoho-settings</code></td><td><span class="code-ok">200</span></td><td class="time">203 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/banners</code></td><td><span class="code-ok">200</span></td><td class="time">172 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/blog-posts</code></td><td><span class="code-ok">200</span></td><td class="time">190 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/categories</code></td><td><span class="code-ok">200</span></td><td class="time">252 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/home-sections</code></td><td><span class="code-ok">200</span></td><td class="time">174 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/orders</code></td><td><span class="code-ok">200</span></td><td class="time">275 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/page-visibility</code></td><td><span class="code-ok">200</span></td><td class="time">121 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/payments</code></td><td><span class="code-ok">200</span></td><td class="time">307 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/products</code></td><td><span class="code-ok">200</span></td><td class="time">525 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/products/tying-cap</code></td><td><span class="code-ok">200</span></td><td class="time">123 ms</td></tr>
-<tr class=""><td><code>GET /api/v1/site-settings</code></td><td><span class="code-ok">200</span></td><td class="time">99 ms</td></tr>
-<tr class=""><td><code>POST /api/register</code></td><td><span class="code-ok">201</span></td><td class="time">15186 ms</td></tr>
-          </tbody>
-        </table>
-      </section>
-    
-      
       <p class="muted">Functional coverage for all ~170 endpoints (POST/PUT/DELETE): <a href="../api-tests/lifecycle-report.html">API lifecycle report</a></p>
     
       </main>
-      <footer>Generated 8 September 2026 · Jenkins · <strong>Daiva Technologies</strong></footer>
+      <footer>Generated 9 Oct 2026, 6:43 PM IST (13:13 UTC) · <strong>Daiva Technologies</strong></footer>
     </div>
   </body>
 </html>

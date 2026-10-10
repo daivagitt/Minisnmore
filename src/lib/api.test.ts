@@ -172,6 +172,31 @@ describe("api client", () => {
     expect(backendOAuthUrl("google")).toBe("/oauth2/authorization/google");
   });
 
+  it("keeps UAT storefront API calls same-origin when a bundle has the production URL", async () => {
+    const originalWindow = globalThis.window;
+    vi.stubGlobal("window", {
+      ...originalWindow,
+      location: {
+        ...originalWindow.location,
+        hostname: "uat.minisnmore.com",
+      },
+    });
+    const { api } = await loadApi("https://minisnmore.com");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await api.get("/api/authenticate");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/authenticate",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
   it("builds backend OAuth URLs from the configured API origin", async () => {
     const { backendOAuthUrl } = await loadApi("https://uat.minisnmore.com/");
     expect(backendOAuthUrl("google")).toBe("https://uat.minisnmore.com/oauth2/authorization/google");

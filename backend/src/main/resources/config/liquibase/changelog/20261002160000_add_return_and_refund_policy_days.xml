@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20261002160000-1" author="minisandmore">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="site_setting" columnName="return_window_days"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="site_setting">
+            <column name="return_window_days" type="integer" defaultValueNumeric="3">
+                <constraints nullable="true"/>
+            </column>
+            <column name="refund_min_business_days" type="integer" defaultValueNumeric="2">
+                <constraints nullable="true"/>
+            </column>
+            <column name="refund_max_business_days" type="integer" defaultValueNumeric="5">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+        <sql>
+            UPDATE site_setting
+            SET return_window_days = COALESCE(return_window_days, 3),
+                refund_min_business_days = COALESCE(refund_min_business_days, 2),
+                refund_max_business_days = COALESCE(refund_max_business_days, 5);
+        </sql>
+    </changeSet>
+</databaseChangeLog>

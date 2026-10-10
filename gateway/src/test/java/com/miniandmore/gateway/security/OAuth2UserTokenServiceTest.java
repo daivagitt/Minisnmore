@@ -1,5 +1,6 @@
 package com.miniandmore.gateway.security;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -94,6 +95,37 @@ class OAuth2UserTokenServiceTest {
     }
 
     @Test
+    void tokenFor_deletesInactiveDuplicateBeforeCreatingAccount() {
+        User inactive = new User();
+        inactive.setId(7L);
+        inactive.setLogin("new@localhost");
+        inactive.setActivated(false);
+        DefaultOAuth2User oauthUser = oauthUser("email", Map.of("email", "new@localhost", "name", "New User"));
+        when(userRepository.findOneByLogin("new@localhost")).thenReturn(Mono.just(inactive));
+        when(userRepository.deleteUserAuthorities(7L)).thenReturn(Mono.empty());
+        when(userRepository.delete(inactive)).thenReturn(Mono.empty());
+        when(userRepository.findOneByEmailIgnoreCase("new@localhost")).thenReturn(Mono.empty());
+        when(userRepository.findOneWithAuthoritiesByEmailIgnoreCaseForOAuth("new@localhost")).thenReturn(Mono.empty());
+
+        StepVerifier.create(service.tokenFor(oauthUser)).expectNext("token").verifyComplete();
+
+        org.mockito.Mockito.verify(userRepository).deleteUserAuthorities(7L);
+        org.mockito.Mockito.verify(userRepository).delete(inactive);
+    }
+
+    @Test
+    void tokenFor_existingInactiveUser_activatesAndPersists() {
+        User user = userWithRole();
+        user.setActivated(false);
+        DefaultOAuth2User oauthUser = oauthUser("email", Map.of("email", "user@localhost", "given_name", "John", "family_name", "Doe"));
+        when(userRepository.findOneWithAuthoritiesByEmailIgnoreCaseForOAuth("user@localhost")).thenReturn(Mono.just(user));
+
+        StepVerifier.create(service.tokenFor(oauthUser)).expectNext("token").verifyComplete();
+
+        org.mockito.Mockito.verify(userService).saveUser(org.mockito.ArgumentMatchers.argThat(saved -> saved.isActivated()));
+    }
+
+    @Test
     void tokenFor_existingUser_returnsJwt() {
         User user = userWithRole();
         user.setIsPersisted();
@@ -182,6 +214,30 @@ class OAuth2UserTokenServiceTest {
         when(authorityRepository.findById(AuthoritiesConstants.USER)).thenReturn(Mono.just(new Authority().name(AuthoritiesConstants.USER)));
 
         StepVerifier.create(service.tokenFor(oauthUser)).expectNext("token").verifyComplete();
+    }
+
+    @Test
+    void resolveGivenName_usesFirstNameAttribute() {
+        DefaultOAuth2User oauthUser = oauthUser("email", Map.of("email", "a@b.com", "first_name", "Ann"));
+        java.util.Optional<String> given = ReflectionTestUtils.invokeMethod(service, "resolveGivenName", oauthUser);
+        assertThat(given).contains("Ann");
+    }
+
+    @Test
+    void facebookPictureUrl_stringValue_returnsTrimmedUrl() {
+        java.util.Optional<String> url = ReflectionTestUtils.invokeMethod(
+            service,
+            "facebookPictureUrl",
+            " https://avatar.test/p.jpg "
+        );
+        assertThat(url).contains("https://avatar.test/p.jpg");
+    }
+
+    @Test
+    void loginForEmail_truncatesOverFiftyCharacters() {
+        String longLocal = "a".repeat(55);
+        String email = longLocal + "@example.com";
+        assertThat(OAuth2UserTokenService.loginForEmail(email)).hasSize(50);
     }
 
     @Test

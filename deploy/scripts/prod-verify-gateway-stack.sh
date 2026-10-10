@@ -4,6 +4,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="${REPO_ROOT:-$(cd "${SCRIPT_DIR}/../.." && pwd)}"
 # shellcheck source=lib/nginx-prod-site.sh
 source "${SCRIPT_DIR}/lib/nginx-prod-site.sh"
 # shellcheck source=lib/gateway-env.sh
@@ -19,6 +20,18 @@ FAIL=0
 pass() { echo "OK  $*"; }
 fail() { echo "FAIL $*"; FAIL=1; }
 
+echo "=== Gateway YAML commerce route parity (repo) ==="
+if [ -x "${SCRIPT_DIR}/verify-gateway-commerce-route-parity.sh" ]; then
+  if REPO_ROOT="$REPO_ROOT" bash "${SCRIPT_DIR}/verify-gateway-commerce-route-parity.sh"; then
+    pass "commerce Path= predicates match across gateway profiles"
+  else
+    fail "gateway commerce route parity — fix YAML or run verify-gateway-commerce-route-parity.sh"
+  fi
+else
+  pass "parity script not present (skipped)"
+fi
+
+echo ""
 echo "=== Env (must not contain SPRING_CLOUD_GATEWAY route overrides) ==="
 if compgen -e | grep -qE '^SPRING_CLOUD_GATEWAY.*ROUTES'; then
   fail "SPRING_CLOUD_GATEWAY*ROUTES* still in shell env — run prod-fix-gateway-route-env.sh"

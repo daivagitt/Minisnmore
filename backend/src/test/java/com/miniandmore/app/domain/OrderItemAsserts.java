@@ -55,7 +55,13 @@ public class OrderItemAsserts {
             .satisfies(a -> assertThat(a.getItemSize()).as("check itemSize").isEqualTo(expected.getItemSize()))
             .satisfies(a -> assertThat(a.getColor()).as("check color").isEqualTo(expected.getColor()))
             .satisfies(a -> assertThat(a.getQty()).as("check qty").isEqualTo(expected.getQty()))
-            .satisfies(a -> assertThat(a.getPrice()).as("check price").usingComparator(bigDecimalCompareTo).isEqualTo(expected.getPrice()));
+            .satisfies(a -> assertThat(a.getPrice()).as("check price").usingComparator(bigDecimalCompareTo).isEqualTo(expected.getPrice()))
+            .satisfies(a ->
+                assertThat(a.getDiscountAllocation())
+                    .as("check discountAllocation")
+                    .usingComparator(bigDecimalCompareTo)
+                    .isEqualTo(expected.getDiscountAllocation())
+            );
     }
 
     /**

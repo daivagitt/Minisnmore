@@ -7,9 +7,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { getMyProfile, listMyOrders, listMyPayments } from "@/lib/orders.functions";
+import { getMyProfile, listMyOrders, listMyPayments, type AccountProfile } from "@/lib/orders.functions";
 
-type Profile = { full_name?: string | null; phone?: string | null };
+type Profile = Partial<AccountProfile>;
 type AccountData = {
   profile: Profile | null;
   orders: any[] | null;
@@ -37,9 +37,9 @@ export function AccountDataProvider({ children, enabled = true }: { children: Re
     setLoadingProfile(true);
     try {
       const result = await getMyProfile();
-      setProfile(result.profile ?? { full_name: "", phone: "" });
+      setProfile(result.profile ?? { full_name: "", phone: "", subscribed: false });
     } catch {
-      setProfile({ full_name: "", phone: "" });
+      setProfile({ full_name: "", phone: "", subscribed: false });
     } finally {
       setLoadingProfile(false);
     }

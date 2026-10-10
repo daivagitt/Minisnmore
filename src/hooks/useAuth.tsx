@@ -4,6 +4,12 @@ import { authErrorMessage } from "@/lib/auth-errors";
 import { isOAuthProviderEnabled } from "@/lib/oauth-providers";
 import { bootstrapProfileFromSignup, fullNameFieldError } from "@/lib/orders.functions";
 import { clearPendingProfile, readPendingProfile, resolveSignupProfileSeed } from "@/lib/pending-profile";
+import {
+  isCmsAdminRole,
+  isStaffAuthorities,
+  primaryStaffRole,
+  type StaffRole,
+} from "@/lib/staff-roles";
 
 export type AuthUser = {
   id: number;
@@ -12,6 +18,7 @@ export type AuthUser = {
   firstName?: string | null;
   lastName?: string | null;
   activated?: boolean;
+  subscribed?: boolean;
 };
 
 export type AuthSession = {
@@ -25,16 +32,21 @@ type AccountDto = AuthUser & {
 type Ctx = {
   user: AuthUser | null;
   session: AuthSession | null;
+  authorities: string[];
+  staffRole: StaffRole | null;
   isAdmin: boolean;
+  isCmsAdmin: boolean;
+  isStaff: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, fullName?: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, fullName: string | undefined, subscribed: boolean) => Promise<{ error: string | null }>;
   signInWithOAuth: (provider: "google" | "apple" | "facebook", redirectPath?: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   completeOAuthSignIn: (token: string) => Promise<{ error: string | null }>;
   resendActivationEmail: (email: string) => Promise<{ error: string | null }>;
   requestPasswordReset: (email: string) => Promise<{ error: string | null }>;
   completePasswordReset: (key: string, newPassword: string) => Promise<{ error: string | null }>;
+  completeInvite: (key: string, newPassword: string) => Promise<{ error: string | null }>;
   refreshSession: () => Promise<void>;
 };
 
@@ -47,7 +59,13 @@ async function seedProfileFromSignup(user: AuthUser): Promise<boolean> {
   if (!resolved?.full_name || !resolved.email) return true;
 
   try {
-    await bootstrapProfileFromSignup({ data: { full_name: resolved.full_name, email: resolved.email } });
+    await bootstrapProfileFromSignup({
+      data: {
+        full_name: resolved.full_name,
+        email: resolved.email,
+        ...(resolved.subscribed ? { subscribed: true } : {}),
+      },
+    });
     if (pending && pending.email.trim().toLowerCase() === resolved.email) {
       clearPendingProfile(pending.email);
     }
@@ -60,11 +78,14 @@ async function seedProfileFromSignup(user: AuthUser): Promise<boolean> {
   }
 }
 
-async function loadAccountFromToken(token: string): Promise<{ user: AuthUser; isAdmin: boolean } | null> {
+async function loadAccountFromToken(
+  token: string,
+): Promise<{ user: AuthUser; authorities: string[]; staffRole: StaffRole | null; isAdmin: boolean } | null> {
   setAuthToken(token);
   try {
     const account = await api.get<AccountDto>("/api/account", { auth: true, unwrap: false });
     const authorities = account.authorities ?? [];
+    const staffRole = primaryStaffRole(authorities);
     return {
       user: {
         id: account.id,
@@ -73,8 +94,11 @@ async function loadAccountFromToken(token: string): Promise<{ user: AuthUser; is
         firstName: account.firstName,
         lastName: account.lastName,
         activated: account.activated,
+        subscribed: account.subscribed === true,
       },
-      isAdmin: authorities.includes("ROLE_ADMIN"),
+      authorities,
+      staffRole,
+      isAdmin: isCmsAdminRole(staffRole),
     };
   } catch {
     setAuthToken(null);
@@ -86,6 +110,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<AuthSession | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [authorities, setAuthorities] = useState<string[]>([]);
+  const [staffRole, setStaffRole] = useState<StaffRole | null>(null);
   const [loading, setLoading] = useState(true);
   const refreshRef = useRef(0);
   const profileSeedStateRef = useRef<{
@@ -94,9 +120,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     done: boolean;
   }>({ accountKey: null, inFlight: null, done: false });
 
-  const maybeSeedProfile = useCallback((accountUser: AuthUser, accountIsAdmin: boolean) => {
+  const maybeSeedProfile = useCallback((accountUser: AuthUser, skipShopperSeed: boolean) => {
     const accountKey = `${accountUser.id}:${(accountUser.email ?? accountUser.login).trim().toLowerCase()}`;
-    if (accountIsAdmin) {
+    if (skipShopperSeed) {
       profileSeedStateRef.current = { accountKey, inFlight: null, done: true };
       return;
     }
@@ -114,18 +140,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const applyAccount = useCallback((account: { user: AuthUser; isAdmin: boolean } | null, token: string | null) => {
+  const applyAccount = useCallback((
+    account: { user: AuthUser; authorities: string[]; staffRole: StaffRole | null; isAdmin: boolean } | null,
+    token: string | null,
+  ) => {
     if (!account || !token) {
       setUser(null);
       setSession(null);
       setIsAdmin(false);
+      setAuthorities([]);
+      setStaffRole(null);
       profileSeedStateRef.current = { accountKey: null, inFlight: null, done: false };
       return;
     }
     setUser(account.user);
     setSession({ access_token: token });
     setIsAdmin(account.isAdmin);
-    maybeSeedProfile(account.user, account.isAdmin);
+    setAuthorities(account.authorities);
+    setStaffRole(account.staffRole);
+    maybeSeedProfile(account.user, isStaffAuthorities(account.authorities));
   }, [maybeSeedProfile]);
 
   const refreshSession = useCallback(async () => {
@@ -214,7 +247,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, fullName?: string) => {
+  const signUp = async (email: string, password: string, fullName: string | undefined, subscribed: boolean) => {
     const trimmed = email.trim().toLowerCase();
     if (fullName !== undefined) {
       const nameError = fullNameFieldError(fullName);
@@ -233,6 +266,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           firstName,
           lastName,
           langKey: "en",
+          subscribed,
         },
         { unwrap: false },
       );
@@ -306,12 +340,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const completeInvite = async (key: string, newPassword: string) => {
+    try {
+      await api.post("/api/account/invite/finish", { key, newPassword }, { unwrap: false });
+      return { error: null };
+    } catch (error) {
+      return { error: authErrorMessage(error) };
+    }
+  };
+
   return (
     <AuthCtx.Provider
       value={{
         user,
         session,
+        authorities,
+        staffRole,
         isAdmin,
+        isCmsAdmin: isAdmin,
+        isStaff: staffRole != null,
         loading,
         signIn,
         signUp,
@@ -321,6 +368,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         resendActivationEmail,
         requestPasswordReset,
         completePasswordReset,
+        completeInvite,
         refreshSession,
       }}
     >

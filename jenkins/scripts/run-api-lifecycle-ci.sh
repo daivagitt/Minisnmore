@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-export API_TEST_BASE_URL="${API_TEST_BASE_URL:-https://minisnmore.com}"
+export API_TEST_BASE_URL="${API_TEST_BASE_URL:-https://uat.minisnmore.com}"
 export API_LIFECYCLE_REPORT="${API_LIFECYCLE_REPORT:-artifacts/api-tests/lifecycle-report.json}"
 export API_LIFECYCLE_ALLOW_FAILURES="${API_LIFECYCLE_ALLOW_FAILURES:-false}"
 
@@ -25,8 +25,6 @@ python3 jenkins/scripts/lifecycle-report-to-junit.py \
 python3 jenkins/scripts/generate-lifecycle-api-report.py \
   --input "$API_LIFECYCLE_REPORT" \
   --output artifacts/api-tests/lifecycle-report.html
-
-cp -f deploy/postman/api-run-report.md artifacts/api-tests/lifecycle-report.md 2>/dev/null || true
 
 echo "Lifecycle report: ${API_LIFECYCLE_REPORT}"
 echo "HTML report: artifacts/api-tests/lifecycle-report.html"

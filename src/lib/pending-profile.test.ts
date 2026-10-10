@@ -18,6 +18,22 @@ describe("resolveSignupProfileSeed", () => {
     ).toEqual({
       full_name: "New Parent",
       email: "parent@example.com",
+      subscribed: false,
+      stalePending: false,
+    });
+  });
+
+  it("carries a subscribe preference from pending signup data", () => {
+    expect(
+      resolveSignupProfileSeed(user, {
+        full_name: "New Parent",
+        email: "parent@example.com",
+        subscribed: true,
+      }),
+    ).toEqual({
+      full_name: "New Parent",
+      email: "parent@example.com",
+      subscribed: true,
       stalePending: false,
     });
   });
@@ -31,6 +47,7 @@ describe("resolveSignupProfileSeed", () => {
     ).toEqual({
       full_name: "Jane Doe",
       email: "parent@example.com",
+      subscribed: false,
       stalePending: true,
     });
   });
@@ -39,6 +56,16 @@ describe("resolveSignupProfileSeed", () => {
     expect(resolveSignupProfileSeed(user, null)).toEqual({
       full_name: "Jane Doe",
       email: "parent@example.com",
+      subscribed: false,
+      stalePending: false,
+    });
+  });
+
+  it("falls back to the auth user subscribe flag when no pending profile exists", () => {
+    expect(resolveSignupProfileSeed({ ...user, subscribed: true }, null)).toEqual({
+      full_name: "Jane Doe",
+      email: "parent@example.com",
+      subscribed: true,
       stalePending: false,
     });
   });

@@ -289,4 +289,175 @@ class LedgerlyItemImageSyncTest {
 
         assertThat(result.get("Green")).containsExactly("https://external.example.com/green.webp");
     }
+
+    @Test
+    void importItemImage_whenEnabled_blankUploadUrl_fallsBackToSource() throws Exception {
+        applicationProperties.getLedgerly().setSyncProductImages(true);
+        Product product = new Product().id(9L).sku("SKU-9");
+        HttpClient mockHttpClient = mock(HttpClient.class);
+        @SuppressWarnings("unchecked")
+        HttpResponse<byte[]> mockResponse = mock(HttpResponse.class);
+        ReflectionTestUtils.setField(itemImageSync, "httpClient", mockHttpClient);
+        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(mockResponse);
+        when(mockResponse.statusCode()).thenReturn(200);
+        when(mockResponse.body()).thenReturn("img".getBytes());
+        when(mockResponse.headers()).thenReturn(
+            java.net.http.HttpHeaders.of(Map.of("content-type", List.of("image/jpeg")), (a, b) -> true)
+        );
+        when(s3StorageService.uploadObject(eq("products"), anyString(), any(byte[].class), eq("image/jpeg"))).thenReturn("  ");
+
+        itemImageSync.importItemImage(product, "https://external.example.com/blank-upload.jpg");
+
+        assertThat(new ObjectMapper().readValue(product.getImagesJson(), String[].class))
+            .containsExactly("https://external.example.com/blank-upload.jpg");
+    }
+
+    @Test
+    void importItemImage_whenEnabled_interrupted_setsInterruptFlagAndFallsBack() throws Exception {
+        applicationProperties.getLedgerly().setSyncProductImages(true);
+        Product product = new Product().id(10L).sku("SKU-10");
+        HttpClient mockHttpClient = mock(HttpClient.class);
+        ReflectionTestUtils.setField(itemImageSync, "httpClient", mockHttpClient);
+        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenThrow(new InterruptedException("stopped"));
+
+        itemImageSync.importItemImage(product, "https://external.example.com/interrupted.jpg");
+
+        assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        Thread.interrupted();
+        assertThat(new ObjectMapper().readValue(product.getImagesJson(), String[].class))
+            .containsExactly("https://external.example.com/interrupted.jpg");
+    }
+
+    @Test
+    void importItemImage_whenEnabled_oversizedImage_fallsBack() throws Exception {
+        applicationProperties.getLedgerly().setSyncProductImages(true);
+        applicationProperties.getStorage().getS3().setMaxUploadBytes(4L);
+        Product product = new Product().id(11L).sku("SKU-11");
+        HttpClient mockHttpClient = mock(HttpClient.class);
+        @SuppressWarnings("unchecked")
+        HttpResponse<byte[]> mockResponse = mock(HttpResponse.class);
+        ReflectionTestUtils.setField(itemImageSync, "httpClient", mockHttpClient);
+        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(mockResponse);
+        when(mockResponse.statusCode()).thenReturn(200);
+        when(mockResponse.body()).thenReturn("12345".getBytes());
+
+        itemImageSync.importItemImage(product, "https://external.example.com/huge.jpg");
+
+        assertThat(new ObjectMapper().readValue(product.getImagesJson(), String[].class))
+            .containsExactly("https://external.example.com/huge.jpg");
+    }
+
+    @Test
+    void importColorImages_whenEnabled_usesExtensionWhenContentTypeMissing() throws Exception {
+        applicationProperties.getLedgerly().setSyncProductImages(true);
+        Product product = new Product().id(12L).sku("SKU-12");
+        HttpClient mockHttpClient = mock(HttpClient.class);
+        @SuppressWarnings("unchecked")
+        HttpResponse<byte[]> mockResponse = mock(HttpResponse.class);
+        ReflectionTestUtils.setField(itemImageSync, "httpClient", mockHttpClient);
+        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(mockResponse);
+        when(mockResponse.statusCode()).thenReturn(200);
+        when(mockResponse.body()).thenReturn("png".getBytes());
+        when(mockResponse.headers()).thenReturn(java.net.http.HttpHeaders.of(Map.of(), (a, b) -> true));
+        when(s3StorageService.uploadObject(eq("products"), contains(".png"), any(byte[].class), eq("image/png")))
+            .thenReturn("https://cdn.example.com/products/SKU-12-red-1.png");
+
+        Map<String, List<String>> result = itemImageSync.importColorImages(
+            product,
+            Map.of("Red", List.of("https://external.example.com/red.png"))
+        );
+
+        assertThat(result.get("Red")).containsExactly("https://cdn.example.com/products/SKU-12-red-1.png");
+    }
+
+    @Test
+    void readImages_invalidJson_stillSetsPrimaryFromExternalUrl() throws Exception {
+        Product product = new Product().sku("SKU-BAD").imagesJson("not-json-array");
+
+        itemImageSync.importItemImage(product, "https://external.example.com/new.jpg");
+
+        assertThat(new ObjectMapper().readValue(product.getImagesJson(), String[].class))
+            .containsExactly("https://external.example.com/new.jpg");
+    }
+
+    @Test
+    void isOnStoreCdn_blankPublicBaseUrl_treatsExternalAsOffCdn() throws Exception {
+        applicationProperties.getStorage().getS3().setPublicBaseUrl(" ");
+        applicationProperties.getLedgerly().setSyncProductImages(false);
+        Product product = new Product().sku("SKU-CDN");
+
+        itemImageSync.importItemImage(product, "https://cdn.example.com/uat/products/x.jpg");
+
+        assertThat(new ObjectMapper().readValue(product.getImagesJson(), String[].class))
+            .containsExactly("https://cdn.example.com/uat/products/x.jpg");
+    }
+
+    @Test
+    void importColorImages_skipsBlankColorNamesAndNullUrlLists() {
+        applicationProperties.getLedgerly().setSyncProductImages(false);
+        Product product = new Product().sku("SKU-COL");
+
+        java.util.Map<String, List<String>> source = new java.util.LinkedHashMap<>();
+        source.put(" ", List.of("https://external.example.com/x.jpg"));
+        source.put("Teal", null);
+        Map<String, List<String>> result = itemImageSync.importColorImages(product, source);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void importColorImages_whenEnabled_interrupted_setsInterruptFlagAndFallsBack() throws Exception {
+        applicationProperties.getLedgerly().setSyncProductImages(true);
+        Product product = new Product().id(13L).sku("SKU-13");
+        HttpClient mockHttpClient = mock(HttpClient.class);
+        ReflectionTestUtils.setField(itemImageSync, "httpClient", mockHttpClient);
+        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenThrow(new InterruptedException("stopped"));
+
+        Map<String, List<String>> result = itemImageSync.importColorImages(
+            product,
+            Map.of("Purple", List.of("https://external.example.com/purple.webp"))
+        );
+
+        assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        Thread.interrupted();
+        assertThat(result.get("Purple")).containsExactly("https://external.example.com/purple.webp");
+    }
+
+    @Test
+    void importColorImages_whenEnabled_webpFromUrlExtension_uploadsWithWebpFilename() throws Exception {
+        applicationProperties.getLedgerly().setSyncProductImages(true);
+        Product product = new Product().id(14L).sku("SKU-14");
+        HttpClient mockHttpClient = mock(HttpClient.class);
+        @SuppressWarnings("unchecked")
+        HttpResponse<byte[]> mockResponse = mock(HttpResponse.class);
+        ReflectionTestUtils.setField(itemImageSync, "httpClient", mockHttpClient);
+        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(mockResponse);
+        when(mockResponse.statusCode()).thenReturn(200);
+        when(mockResponse.body()).thenReturn("webp".getBytes());
+        when(mockResponse.headers()).thenReturn(java.net.http.HttpHeaders.of(Map.of(), (a, b) -> true));
+        when(s3StorageService.uploadObject(eq("products"), org.mockito.ArgumentMatchers.endsWith(".webp"), any(byte[].class), eq("image/webp")))
+            .thenReturn("https://cdn.example.com/products/SKU-14-purple-1.webp");
+
+        Map<String, List<String>> result = itemImageSync.importColorImages(
+            product,
+            Map.of("Purple", List.of("https://external.example.com/purple.webp"))
+        );
+
+        assertThat(result.get("Purple")).containsExactly("https://cdn.example.com/products/SKU-14-purple-1.webp");
+    }
+
+    @Test
+    void importItemImage_exactPublicBaseUrl_passthroughWithoutUpload() throws Exception {
+        applicationProperties.getLedgerly().setSyncProductImages(true);
+        Product product = new Product().sku("SKU-BASE");
+
+        itemImageSync.importItemImage(product, "https://cdn.example.com");
+
+        verifyNoInteractions(s3StorageService);
+        assertThat(new ObjectMapper().readValue(product.getImagesJson(), String[].class))
+            .containsExactly("https://cdn.example.com");
+    }
+
 }

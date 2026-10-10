@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260910120500-1" author="miniandmore">
+        <createTable tableName="order_return_item">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="order_return_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="order_item_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="requested_qty" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <column name="received_qty" type="integer"/>
+            <column name="accepted_qty" type="integer"/>
+            <column name="unit_amount" type="decimal(21,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="gross_amount" type="decimal(21,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="discount_allocation" type="decimal(21,2)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="refund_amount" type="decimal(21,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="disposition" type="varchar(32)"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="order_return_item" baseColumnNames="order_return_id"
+            constraintName="fk_order_return_item__return" referencedTableName="order_return" referencedColumnNames="id"/>
+        <addForeignKeyConstraint baseTableName="order_return_item" baseColumnNames="order_item_id"
+            constraintName="fk_order_return_item__order_item" referencedTableName="order_item" referencedColumnNames="id"/>
+        <addUniqueConstraint tableName="order_return_item" columnNames="order_return_id,order_item_id"
+            constraintName="ux_order_return_item__return_order_item"/>
+        <createIndex indexName="idx_order_return_item__return" tableName="order_return_item">
+            <column name="order_return_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="20260910120500-2" author="miniandmore">
+        <addColumn tableName="order_return">
+            <column name="original_item_amount" type="decimal(21,2)"/>
+            <column name="replacement_item_amount" type="decimal(21,2)"/>
+            <column name="price_difference" type="decimal(21,2)"/>
+            <column name="settlement_status" type="varchar(20)"/>
+            <column name="settlement_method" type="varchar(40)"/>
+            <column name="settlement_reference" type="varchar(160)"/>
+            <column name="settlement_amount" type="decimal(21,2)"/>
+            <column name="settled_at" type="${datetimeType}"/>
+            <column name="settled_by" type="varchar(50)"/>
+            <column name="replacement_reserved_at" type="${datetimeType}"/>
+            <column name="replacement_reservation_released_at" type="${datetimeType}"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20260910120500-3" author="miniandmore">
+        <addColumn tableName="customer_order">
+            <column name="shipment_carrier_status" type="varchar(80)"/>
+            <column name="shipment_delivered_at" type="${datetimeType}"/>
+            <column name="shipment_cancelled_at" type="${datetimeType}"/>
+            <column name="shipment_cancelled_by" type="varchar(50)"/>
+            <column name="shipment_cancellation_reason" type="varchar(500)"/>
+        </addColumn>
+        <createTable tableName="xpressbees_shipment_webhook_event">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="event_id" type="varchar(160)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="ux_xb_shipment_webhook__event_id"/>
+            </column>
+            <column name="order_number" type="varchar(40)"/>
+            <column name="awb" type="varchar(120)"/>
+            <column name="provider_status" type="varchar(80)"/>
+            <column name="local_status" type="varchar(80)"/>
+            <column name="received_at" type="${datetimeType}">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+</databaseChangeLog>

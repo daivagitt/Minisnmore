@@ -17,6 +17,7 @@ public class UserSqlHelper {
         columns.add(Column.aliased("last_name", table, columnPrefix + "_last_name"));
         columns.add(Column.aliased("email", table, columnPrefix + "_email"));
         columns.add(Column.aliased("activated", table, columnPrefix + "_activated"));
+        columns.add(Column.aliased("subscribed", table, columnPrefix + "_subscribed"));
         columns.add(Column.aliased("lang_key", table, columnPrefix + "_lang_key"));
         columns.add(Column.aliased("image_url", table, columnPrefix + "_image_url"));
         columns.add(Column.aliased("activation_key", table, columnPrefix + "_activation_key"));

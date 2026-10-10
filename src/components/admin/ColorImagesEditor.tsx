@@ -6,6 +6,7 @@ import { Field } from "@/components/admin/AdminPage";
 import { ImageSpecHint } from "@/components/admin/ImageSpecHint";
 import { ADMIN_IMAGE_SPECS } from "@/lib/admin-image-specs";
 import { IMAGE_ACCEPT, validateAdminImageFile } from "@/lib/admin-image";
+import { snapshotInputFiles } from "@/lib/file-input";
 import { prepareProductImageForUpload } from "@/lib/product-image-normalize";
 import { uploadAdminImage } from "@/lib/backend-data";
 import { getGalleryReorderKey, setDisplayImageDragData } from "@/lib/admin-display-image";
@@ -45,7 +46,7 @@ function UploadTile({
   busy?: boolean;
   multiple?: boolean;
   ariaLabel: string;
-  onFiles: (files: FileList) => void;
+  onFiles: (files: File[]) => void;
 }) {
   return (
     <div
@@ -61,9 +62,8 @@ function UploadTile({
         aria-label={ariaLabel}
         className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
         onChange={(e) => {
-          const files = e.target.files;
-          if (files?.length) onFiles(files);
-          e.target.value = "";
+          const files = snapshotInputFiles(e.currentTarget);
+          if (files.length) onFiles(files);
         }}
       />
       <div className="pointer-events-none absolute inset-0 grid place-items-center">
@@ -114,9 +114,9 @@ export function ColorImagesEditor({
     );
   }
 
-  const validateFiles = (files: FileList): File[] => {
+  const validateFiles = (files: File[]): File[] => {
     const accepted: File[] = [];
-    for (const file of Array.from(files)) {
+    for (const file of files) {
       const result = validateAdminImageFile(file);
       if (result.ok) {
         accepted.push(file);
@@ -146,7 +146,7 @@ export function ColorImagesEditor({
     }
   };
 
-  const handleSwatchUpload = async (index: number, files: FileList) => {
+  const handleSwatchUpload = async (index: number, files: File[]) => {
     const file = validateFiles(files)[0];
     if (!file) return;
     const key = `swatch-${index}`;
@@ -164,7 +164,7 @@ export function ColorImagesEditor({
     }
   };
 
-  const handleGalleryUpload = async (index: number, files: FileList) => {
+  const handleGalleryUpload = async (index: number, files: File[]) => {
     const entry = normalizedColors[index];
     if (!entry) return;
     const current = colorImageUrls(entry);

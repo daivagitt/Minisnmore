@@ -91,6 +91,7 @@ class ZohoWebhookSupportTest {
         assertThat(ZohoWebhookSupport.isStoreOrderNumber("MNM-443B4DB2DCE3")).isTrue();
         assertThat(ZohoWebhookSupport.isStoreOrderNumber("  MNM-443B4DB2DCE3  ")).isTrue();
         assertThat(ZohoWebhookSupport.isStoreOrderNumber("MnM/26-27/0044")).isFalse();
+        assertThat(ZohoWebhookSupport.isStoreOrderNumber("EXINV-RET-MNM-10AF633829D6-1749F0")).isFalse();
         assertThat(ZohoWebhookSupport.isStoreOrderNumber(null)).isFalse();
     }
 }

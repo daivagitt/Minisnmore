@@ -49,6 +49,32 @@ export function isVariantsItemStructure(itemStructure: string | null | undefined
   return (itemStructure ?? "").trim().toUpperCase() === "VARIANTS";
 }
 
+/** Digits-only Zoho item-group id, or empty if the value is not a group id. */
+export function digitsOnlyZohoId(value: string | null | undefined): string {
+  return (value ?? "").replace(/\D/g, "");
+}
+
+/**
+ * Parent {@code zoho_item_id} is a Zoho item-group id only when it is digits and is not itself
+ * one of the variant item ids (a SIMPLE→VARIANTS conversion can leave a child item id there).
+ */
+export function zohoItemGroupId(product: {
+  zoho_item_id?: string | null;
+  item_structure?: string | null;
+  variants_json?: string | null;
+}): string | null {
+  if (!isVariantsItemStructure(product.item_structure)) return null;
+  const parentId = product.zoho_item_id?.trim() || "";
+  if (!/^\d+$/.test(parentId)) return null;
+  const childIds = new Set(
+    rowsFromVariantsJson(product.variants_json)
+      .map((row) => row.zohoItemId?.trim())
+      .filter((id): id is string => Boolean(id)),
+  );
+  if (childIds.has(parentId)) return null;
+  return parentId;
+}
+
 export function variantAmount(value: number | string | ""): number {
   if (value === "" || value == null) return NaN;
   const n = Number(value);

@@ -523,8 +523,8 @@ public class ProductColorImagesSupport {
         LinkedHashMap<String, ColorEntry> richByKey = new LinkedHashMap<>();
         for (ColorEntry entry : rich) {
             String key = entry.name().trim().toLowerCase(Locale.ROOT);
-            if (!key.isEmpty() && !richByKey.containsKey(key)) {
-                richByKey.put(key, entry);
+            if (!key.isEmpty()) {
+                richByKey.putIfAbsent(key, entry);
             }
         }
         List<ColorEntry> matrixEntries = parseColorEntries(matrixColorsJson);
@@ -727,9 +727,7 @@ public class ProductColorImagesSupport {
             }
         }
         String imageUrl = textOrNull(node.get("imageUrl"));
-        if (imageUrl != null && urls.isEmpty()) {
-            urls.add(imageUrl);
-        } else if (imageUrl != null && !urls.contains(imageUrl)) {
+        if (imageUrl != null && !urls.contains(imageUrl)) {
             urls.add(imageUrl);
         }
         List<String> unique = uniqueUrls(urls);

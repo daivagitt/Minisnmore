@@ -23,6 +23,8 @@ import com.miniandmore.app.domain.*;
 import com.miniandmore.app.domain.enumeration.DiscountType;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
+import com.miniandmore.app.domain.enumeration.CancellationRequestStatus;
+import com.miniandmore.app.domain.enumeration.CouponEligibilityScope;
 import com.miniandmore.app.repository.*;
 import com.miniandmore.app.service.LedgerlySyncService;
 import com.miniandmore.app.service.OrderEventService;
@@ -40,10 +42,8 @@ import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -56,7 +56,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(InternalAccountOrderResource.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import({ InternalAccountOrderResourceCoverageTest.DataAccessConfig.class, com.miniandmore.app.web.rest.errors.ResponseStatusExceptionHandler.class })
+@Import({ InternalAccountOrderResourceWebMvcTestConfiguration.class, com.miniandmore.app.web.rest.errors.ResponseStatusExceptionHandler.class })
 class InternalAccountOrderResourceCoverageTest {
 
     private static final String LIVE_SECRET = "live_secret_key";
@@ -100,6 +100,12 @@ class InternalAccountOrderResourceCoverageTest {
     @MockitoBean
     private com.miniandmore.app.service.RazorpayRefundService razorpayRefundService;
 
+    @MockitoBean
+    private com.miniandmore.app.service.OrderCancellationService orderCancellationService;
+
+    @MockitoBean
+    private com.miniandmore.app.service.OrderShipmentService orderShipmentService;
+
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(resource, "razorpayKeyId", "rzp_test_livemode");
@@ -119,7 +125,6 @@ class InternalAccountOrderResourceCoverageTest {
             .inventoryReserved(true)
             .total(BigDecimal.TEN);
         OrderItem item = new OrderItem().productId("1").qty(1).order(order);
-        Product product = new Product().id(1L).stock(4);
         when(customerOrderRepository.findById(50L)).thenReturn(Optional.of(order));
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderItemRepository.findAllByOrderId(50L)).thenReturn(List.of(item));
@@ -137,6 +142,16 @@ class InternalAccountOrderResourceCoverageTest {
             .andExpect(status().isBadRequest());
 
         assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.FAILED);
+    }
+
+    @Test
+    void getCancelRequest_withoutOpenRequest_returnsNull() throws Exception {
+        when(orderCancellationService.getVisibleForUser("customer1", "MNM-NO-CANCEL")).thenReturn(null);
+
+        mockMvc
+            .perform(get("/internal/v1/orders/MNM-NO-CANCEL/cancel-request").with(user("customer1")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.cancellation_request").doesNotExist());
     }
 
     @Test
@@ -267,13 +282,18 @@ class InternalAccountOrderResourceCoverageTest {
             .orderNumber("MNM-DONE")
             .status(OrderStatus.FULFILLED)
             .ledgerlySalesOrderId("SO-2")
-            .trackingNumber("TRK");
+            .trackingNumber("TRK")
+            .shipmentDate("2026-09-29")
+            .shipmentDeliveredAt(Instant.parse("2026-09-29T09:57:19Z"));
         when(customerOrderRepository.findOneByOrderNumber("MNM-DONE")).thenReturn(Optional.of(order));
 
         mockMvc
             .perform(get("/internal/v1/orders/track/MNM-DONE"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.order.tracking_number").value("TRK"));
+            .andExpect(jsonPath("$.data.order.tracking_number").value("TRK"))
+            .andExpect(jsonPath("$.data.order.tracking_status").value("delivered"))
+            .andExpect(jsonPath("$.data.order.shipment_date").value("2026-09-29"))
+            .andExpect(jsonPath("$.data.order.shipment_delivered_at").value("2026-09-29T09:57:19Z"));
     }
 
     @Test
@@ -686,7 +706,6 @@ class InternalAccountOrderResourceCoverageTest {
             .freeShippingMinInr(2500)
             .codFeeInr(149);
         when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.of(settings));
-        CustomerOrder saved = new CustomerOrder().id(403L).orderNumber("MNM-COD").total(BigDecimal.valueOf(1148));
         when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> {
             CustomerOrder order = inv.getArgument(0);
             order.setId(403L);
@@ -884,18 +903,22 @@ class InternalAccountOrderResourceCoverageTest {
             .perform(get("/internal/v1/account/profile").with(user("customer1")))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.full_name").value("Jane"))
-            .andExpect(jsonPath("$.data.phone").value("9876543210"));
+            .andExpect(jsonPath("$.data.phone").value("9876543210"))
+            .andExpect(jsonPath("$.data.subscribed").value(false));
 
         mockMvc
             .perform(
                 put("/internal/v1/account/profile")
                     .with(user("customer1"))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"full_name\":\"Janet\",\"phone\":\"9000000000\"}")
+                    .content("{\"full_name\":\"Janet\",\"phone\":\"9000000000\",\"subscribed\":true}")
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.ok").value(true));
 
+        ArgumentCaptor<CustomerProfile> updated = ArgumentCaptor.forClass(CustomerProfile.class);
+        verify(customerProfileRepository).save(updated.capture());
+        assertThat(updated.getValue().getSubscribed()).isTrue();
         verify(ledgerlySyncService).syncCustomerProfileAsync("customer1");
     }
 
@@ -917,7 +940,49 @@ class InternalAccountOrderResourceCoverageTest {
         ArgumentCaptor<CustomerProfile> profileCaptor = ArgumentCaptor.forClass(CustomerProfile.class);
         verify(customerProfileRepository).save(profileCaptor.capture());
         assertThat(profileCaptor.getValue().getFullName()).isEqualTo("New Parent");
+        assertThat(profileCaptor.getValue().getSubscribed()).isFalse();
         verify(ledgerlySyncService).syncCustomerProfileAsync("parent@example.com");
+    }
+
+    @Test
+    void profile_bootstrapAppliesSubscribeToNewProfile() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("parent@example.com", "n/a"));
+        when(customerProfileRepository.findOneByUserLogin("parent@example.com")).thenReturn(Optional.empty());
+        when(customerProfileRepository.save(any(CustomerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/account/profile/bootstrap")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"full_name\":\"New Parent\",\"email\":\"parent@example.com\",\"subscribed\":true}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(true));
+
+        ArgumentCaptor<CustomerProfile> profileCaptor = ArgumentCaptor.forClass(CustomerProfile.class);
+        verify(customerProfileRepository).save(profileCaptor.capture());
+        assertThat(profileCaptor.getValue().getSubscribed()).isTrue();
+        verify(ledgerlySyncService).syncCustomerProfileAsync("parent@example.com");
+    }
+
+    @Test
+    void profile_bootstrapDoesNotResubscribeExistingProfile() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("parent@example.com", "n/a"));
+        CustomerProfile profile = new CustomerProfile().userLogin("parent@example.com").fullName("Jane").subscribed(false);
+        when(customerProfileRepository.findOneByUserLogin("parent@example.com")).thenReturn(Optional.of(profile));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/account/profile/bootstrap")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"full_name\":\"Other Name\",\"email\":\"parent@example.com\",\"subscribed\":true}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(true));
+
+        assertThat(profile.getSubscribed()).isFalse();
+        verify(customerProfileRepository, never()).save(any());
+        verify(ledgerlySyncService, never()).syncCustomerProfileAsync(any());
     }
 
     @Test
@@ -1070,6 +1135,41 @@ class InternalAccountOrderResourceCoverageTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.order.order_number").value("MNM-55"))
             .andExpect(jsonPath("$.data.order.subtotal").value(400));
+    }
+
+    @Test
+    void orderDetail_includesRejectedCancellationReason() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(56L)
+            .userLogin("customer1")
+            .orderNumber("MNM-56")
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .paymentMethod("online")
+            .subtotal(BigDecimal.valueOf(400))
+            .discount(BigDecimal.ZERO)
+            .shipping(BigDecimal.ZERO)
+            .codFee(BigDecimal.ZERO)
+            .tax(BigDecimal.ZERO)
+            .donation(BigDecimal.ZERO)
+            .total(BigDecimal.valueOf(400))
+            .placedAt(Instant.now());
+        OrderCancellationRequest rejected = new OrderCancellationRequest();
+        rejected.setRequestNumber("CAN-56");
+        rejected.setStatus(CancellationRequestStatus.REJECTED);
+        rejected.setRejectionReason("Order is already packed");
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-56", "customer1")).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(56L)).thenReturn(List.of());
+        when(orderCancellationService.getVisibleForUser("customer1", "MNM-56")).thenReturn(rejected);
+        when(orderCancellationService.toCustomerDto(rejected)).thenReturn(
+            Map.of("status", "rejected", "rejection_reason", "Order is already packed")
+        );
+
+        mockMvc
+            .perform(get("/internal/v1/orders/MNM-56").with(user("customer1")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.cancellation_request.status").value("rejected"))
+            .andExpect(jsonPath("$.data.order.cancellation_request.rejection_reason").value("Order is already packed"));
     }
 
     @Test
@@ -1418,7 +1518,7 @@ class InternalAccountOrderResourceCoverageTest {
     }
 
     @Test
-    void cancelOrder_codBeforeDispatch_restoresInventoryAndCancels() throws Exception {
+    void cancelOrder_codBeforeDispatch_createsCancellationRequest() throws Exception {
         CustomerOrder order = new CustomerOrder()
             .id(80L)
             .userLogin("customer1")
@@ -1427,14 +1527,20 @@ class InternalAccountOrderResourceCoverageTest {
             .paymentStatus(PaymentStatus.PENDING)
             .paymentMethod("cod")
             .inventoryReserved(true)
-            .zohoSalesOrderId("zoho-so-80")
             .total(BigDecimal.valueOf(549));
-        OrderItem item = new OrderItem().productId("1").qty(2).order(order);
-        Product product = new Product().id(1L).stock(3);
+        OrderCancellationRequest request = new OrderCancellationRequest();
+        request.setRequestNumber("CAN-COD-001");
+        request.setStatus(CancellationRequestStatus.REQUESTED);
+        request.setReason("Ordered by mistake");
+        request.setOrder(order);
+        request.setUserLogin("customer1");
         when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-COD-CANCEL", "customer1")).thenReturn(Optional.of(order));
-        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(orderItemRepository.findAllByOrderId(80L)).thenReturn(List.of(item));
-        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
+        when(orderCancellationService.submitRequest("customer1", "MNM-COD-CANCEL", "Ordered by mistake")).thenReturn(request);
+        when(orderCancellationService.getVisibleForUser("customer1", "MNM-COD-CANCEL")).thenReturn(request);
+        when(orderCancellationService.hasPendingRequest(80L)).thenReturn(true);
+        when(orderCancellationService.toCustomerDto(request)).thenReturn(
+            Map.of("request_number", "CAN-COD-001", "status", "requested", "reason", "Ordered by mistake")
+        );
 
         mockMvc
             .perform(
@@ -1444,18 +1550,15 @@ class InternalAccountOrderResourceCoverageTest {
                     .content("{\"reason\":\"Ordered by mistake\"}")
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.order.status").value("cancelled"))
-            .andExpect(jsonPath("$.data.order.can_cancel").value(false));
+            .andExpect(jsonPath("$.data.order.status").value("confirmed"))
+            .andExpect(jsonPath("$.data.cancellation_request.status").value("requested"));
 
-        assertThat(product.getStock()).isEqualTo(5);
-        assertThat(order.getInventoryReleasedAt()).isNotNull();
         verify(razorpayRefundService, never()).refundPayment(any(), any());
-        verify(zohoSyncService).cancelOrder(80L);
-        verify(orderEventService).syncLifecycleEvents(order);
+        verify(zohoSyncService, never()).cancelOrder(anyLong());
     }
 
     @Test
-    void cancelOrder_paidBeforeDispatch_refundsAndRestoresInventory() throws Exception {
+    void cancelOrder_paidBeforeDispatch_createsCancellationRequest() throws Exception {
         CustomerOrder order = new CustomerOrder()
             .id(81L)
             .userLogin("customer1")
@@ -1464,15 +1567,20 @@ class InternalAccountOrderResourceCoverageTest {
             .paymentStatus(PaymentStatus.PAID)
             .paymentMethod("online")
             .razorpayPaymentId("pay_81")
-            .inventoryReserved(false)
             .total(BigDecimal.valueOf(999));
-        OrderItem item = new OrderItem().productId("1").qty(1).order(order);
-        Product product = new Product().id(1L).stock(4);
+        OrderCancellationRequest request = new OrderCancellationRequest();
+        request.setRequestNumber("CAN-PAID-001");
+        request.setStatus(CancellationRequestStatus.REQUESTED);
+        request.setReason("Found a better price elsewhere");
+        request.setOrder(order);
+        request.setUserLogin("customer1");
         when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-PAID-CANCEL", "customer1")).thenReturn(Optional.of(order));
-        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(orderItemRepository.findAllByOrderId(81L)).thenReturn(List.of(item));
-        when(productRepository.findOneForInventoryUpdate(1L)).thenReturn(Optional.of(product));
-        when(razorpayRefundService.refundPayment(order, BigDecimal.valueOf(999))).thenReturn("rfnd_81");
+        when(orderCancellationService.submitRequest("customer1", "MNM-PAID-CANCEL", "Found a better price elsewhere")).thenReturn(request);
+        when(orderCancellationService.getVisibleForUser("customer1", "MNM-PAID-CANCEL")).thenReturn(request);
+        when(orderCancellationService.hasPendingRequest(81L)).thenReturn(true);
+        when(orderCancellationService.toCustomerDto(request)).thenReturn(
+            Map.of("request_number", "CAN-PAID-001", "status", "requested", "reason", "Found a better price elsewhere")
+        );
 
         mockMvc
             .perform(
@@ -1482,17 +1590,14 @@ class InternalAccountOrderResourceCoverageTest {
                     .content("{\"reason\":\"Found a better price elsewhere\"}")
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.order.status").value("cancelled"))
-            .andExpect(jsonPath("$.data.order.payment_status").value("refunded"));
+            .andExpect(jsonPath("$.data.order.status").value("confirmed"))
+            .andExpect(jsonPath("$.data.cancellation_request.status").value("requested"));
 
-        assertThat(product.getStock()).isEqualTo(5);
-        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUNDED);
-        verify(razorpayRefundService).refundPayment(order, BigDecimal.valueOf(999));
-        verify(ledgerlyIntegrationClient).cancelOrder("MNM-PAID-CANCEL", null, "rfnd_81");
+        verify(razorpayRefundService, never()).refundPayment(any(), any());
     }
 
     @Test
-    void cancelOrder_whenRefundFails_keepsOrderAndInventoryUnchanged() throws Exception {
+    void cancelOrder_whenDuplicateRequest_propagatesConflict() throws Exception {
         CustomerOrder order = new CustomerOrder()
             .id(83L)
             .userLogin("customer1")
@@ -1501,11 +1606,10 @@ class InternalAccountOrderResourceCoverageTest {
             .paymentStatus(PaymentStatus.PAID)
             .paymentMethod("online")
             .razorpayPaymentId("pay_83")
-            .inventoryReserved(false)
             .total(BigDecimal.valueOf(750));
         when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-REFUND-FAIL", "customer1")).thenReturn(Optional.of(order));
-        when(razorpayRefundService.refundPayment(order, BigDecimal.valueOf(750))).thenThrow(
-            new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_GATEWAY, "gateway down")
+        when(orderCancellationService.submitRequest(eq("customer1"), eq("MNM-REFUND-FAIL"), any())).thenThrow(
+            new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "A cancellation request is already pending for this order")
         );
 
         mockMvc
@@ -1515,11 +1619,10 @@ class InternalAccountOrderResourceCoverageTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"reason\":\"Changed my mind\"}")
             )
-            .andExpect(status().isBadGateway());
+            .andExpect(status().isConflict());
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
-        verify(orderItemRepository, never()).findAllByOrderId(83L);
         verify(orderEventService, never()).syncLifecycleEvents(order);
     }
 
@@ -1534,6 +1637,8 @@ class InternalAccountOrderResourceCoverageTest {
             .ledgerlyOrderStatus("shipped")
             .total(BigDecimal.valueOf(500));
         when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-SHIPPED", "customer1")).thenReturn(Optional.of(order));
+        when(orderCancellationService.submitRequest(eq("customer1"), eq("MNM-SHIPPED"), any()))
+            .thenThrow(new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "Order has already been dispatched"));
 
         mockMvc
             .perform(
@@ -1558,7 +1663,6 @@ class InternalAccountOrderResourceCoverageTest {
 
     @Test
     void orderDetail_wrongOwner_returns404() throws Exception {
-        CustomerOrder order = new CustomerOrder().id(99L).userLogin("other").orderNumber("MNM-OTHER");
         when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-OTHER", "customer1")).thenReturn(Optional.empty());
 
         mockMvc
@@ -1579,6 +1683,268 @@ class InternalAccountOrderResourceCoverageTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.ok").value(false));
+    }
+
+    @Test
+    void trackOrder_unknownOrderNumber_returnsNotFound() throws Exception {
+        when(customerOrderRepository.findOneByOrderNumber("MNM-MISSING")).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/internal/v1/orders/track/MNM-MISSING")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void withdrawCancelRequest_returnsOrderAndCancellationPayload() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(90L)
+            .userLogin("customer1")
+            .orderNumber("MNM-WITHDRAW")
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .paymentMethod("online")
+            .subtotal(BigDecimal.valueOf(500))
+            .total(BigDecimal.valueOf(500))
+            .placedAt(Instant.now());
+        OrderCancellationRequest withdrawn = new OrderCancellationRequest();
+        withdrawn.setRequestNumber("CAN-WD-1");
+        withdrawn.setStatus(CancellationRequestStatus.WITHDRAWN);
+        withdrawn.setOrder(order);
+        when(orderCancellationService.withdrawByCustomer("customer1", "MNM-WITHDRAW")).thenReturn(withdrawn);
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-WITHDRAW", "customer1")).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(90L)).thenReturn(List.of());
+        when(orderCancellationService.toCustomerDto(withdrawn)).thenReturn(Map.of("status", "withdrawn", "request_number", "CAN-WD-1"));
+
+        mockMvc
+            .perform(post("/internal/v1/orders/MNM-WITHDRAW/cancel-request/withdraw").with(user("customer1")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.order_number").value("MNM-WITHDRAW"))
+            .andExpect(jsonPath("$.data.cancellation_request.status").value("withdrawn"));
+    }
+
+    @Test
+    void getCancelRequest_withOpenRequest_returnsDto() throws Exception {
+        OrderCancellationRequest open = new OrderCancellationRequest();
+        open.setRequestNumber("CAN-OPEN");
+        open.setStatus(CancellationRequestStatus.REQUESTED);
+        when(orderCancellationService.getVisibleForUser("customer1", "MNM-OPEN")).thenReturn(open);
+        when(orderCancellationService.toCustomerDto(open)).thenReturn(Map.of("status", "requested", "request_number", "CAN-OPEN"));
+
+        mockMvc
+            .perform(get("/internal/v1/orders/MNM-OPEN/cancel-request").with(user("customer1")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.cancellation_request.status").value("requested"))
+            .andExpect(jsonPath("$.data.cancellation_request.request_number").value("CAN-OPEN"));
+    }
+
+    @Test
+    void activeCoupons_excludesExpiredCoupons() throws Exception {
+        Coupon active = new Coupon()
+            .code("LIVE")
+            .active(true)
+            .discountType(DiscountType.FLAT)
+            .discountValue(BigDecimal.TEN)
+            .minOrder(BigDecimal.ZERO);
+        Coupon expired = new Coupon()
+            .code("OLD")
+            .active(true)
+            .discountType(DiscountType.FLAT)
+            .discountValue(BigDecimal.TEN)
+            .minOrder(BigDecimal.ZERO)
+            .expiresAt(Instant.now().minusSeconds(60));
+        when(couponRepository.findAllByOrderByIdDesc()).thenReturn(List.of(expired, active));
+
+        mockMvc
+            .perform(get("/internal/v1/coupons/active"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.coupons.length()").value(1))
+            .andExpect(jsonPath("$.data.coupons[0].code").value("LIVE"));
+    }
+
+    @Test
+    void validateCoupon_bogoEligible_includesNudgeAndSummaryDetails() throws Exception {
+        Coupon coupon = new Coupon()
+            .code("BOGO2")
+            .active(true)
+            .discountType(DiscountType.BOGO)
+            .discountValue(BigDecimal.valueOf(100))
+            .minOrder(BigDecimal.ZERO)
+            .bogoBuyQty(1)
+            .bogoGetQty(1);
+        when(couponRepository.findOneByCodeIgnoreCase("BOGO2")).thenReturn(Optional.of(coupon));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/coupons/validate")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"code\":\"BOGO2\",\"subtotal\":1800,\"items\":[{\"qty\":1,\"price\":1000},{\"qty\":1,\"price\":500},{\"qty\":1,\"price\":300}]}"
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(true))
+            .andExpect(jsonPath("$.data.nudge").value(org.hamcrest.Matchers.containsString("Add 1 more item")))
+            .andExpect(jsonPath("$.data.bogo_details").value(org.hamcrest.Matchers.containsString("Buy 1 Get 1 Free")));
+    }
+
+    @Test
+    void validateCoupon_bogoPartialPercent_includesPercentSummary() throws Exception {
+        Coupon coupon = new Coupon()
+            .code("BOGO50")
+            .active(true)
+            .discountType(DiscountType.BOGO)
+            .discountValue(new BigDecimal("50.0"))
+            .minOrder(BigDecimal.ZERO)
+            .bogoBuyQty(1)
+            .bogoGetQty(1);
+        when(couponRepository.findOneByCodeIgnoreCase("BOGO50")).thenReturn(Optional.of(coupon));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/coupons/validate")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"code\":\"BOGO50\",\"subtotal\":1500,\"items\":[{\"qty\":1,\"price\":1000},{\"qty\":1,\"price\":500}]}"
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(true))
+            .andExpect(jsonPath("$.data.bogo_details").value(org.hamcrest.Matchers.containsString("50% off")));
+    }
+
+    @Test
+    void validateCoupon_bogoNeedsMultipleItems_returnsPluralMessage() throws Exception {
+        Coupon coupon = new Coupon()
+            .code("BOGO3")
+            .active(true)
+            .discountType(DiscountType.BOGO)
+            .discountValue(BigDecimal.valueOf(100))
+            .minOrder(BigDecimal.ZERO)
+            .bogoBuyQty(2)
+            .bogoGetQty(1);
+        when(couponRepository.findOneByCodeIgnoreCase("BOGO3")).thenReturn(Optional.of(coupon));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/coupons/validate")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"code\":\"BOGO3\",\"subtotal\":500,\"items\":[{\"qty\":1,\"price\":500}]}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(false))
+            .andExpect(jsonPath("$.data.error").value("Add 2 more items to use this BOGO offer"));
+    }
+
+    @Test
+    void validateCoupon_percentCoupon_respectsMaxDiscountCap() throws Exception {
+        Coupon coupon = new Coupon()
+            .code("PCTCAP")
+            .active(true)
+            .discountType(DiscountType.PERCENT)
+            .discountValue(BigDecimal.valueOf(50))
+            .minOrder(BigDecimal.ZERO)
+            .maxDiscount(BigDecimal.valueOf(100));
+        when(couponRepository.findOneByCodeIgnoreCase("PCTCAP")).thenReturn(Optional.of(coupon));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/coupons/validate")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"code\":\"PCTCAP\",\"subtotal\":1000}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(true))
+            .andExpect(jsonPath("$.data.discount").value(100.0));
+    }
+
+    @Test
+    void validateCoupon_usesProductCategoryFromServerForEligibility() throws Exception {
+        Category dresses = new Category().id(42L);
+        Product dress = new Product().id(7L).category(dresses);
+        when(productRepository.findById(7L)).thenReturn(Optional.of(dress));
+        Coupon coupon = new Coupon()
+            .code("CAT42")
+            .active(true)
+            .discountType(DiscountType.PERCENT)
+            .discountValue(BigDecimal.TEN)
+            .minOrder(BigDecimal.ZERO)
+            .eligibilityScope(CouponEligibilityScope.CATEGORY)
+            .eligibilityCategoryId(42L);
+        when(couponRepository.findOneByCodeIgnoreCase("CAT42")).thenReturn(Optional.of(coupon));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/coupons/validate")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {"code":"CAT42","subtotal":2000,"items":[
+                          {"product_id":"7","qty":1,"price":1000,"category_id":99},
+                          {"product_id":"8","qty":1,"price":1000,"category_id":99}
+                        ]}
+                        """
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(true))
+            .andExpect(jsonPath("$.data.discount").value(100.0));
+    }
+
+    @Test
+    void payments_listsUserOrderSummaries() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(91L)
+            .userLogin("customer1")
+            .orderNumber("MNM-PAY-1")
+            .paymentStatus(PaymentStatus.PAID)
+            .paymentMethod("online")
+            .total(BigDecimal.valueOf(750))
+            .placedAt(Instant.parse("2026-01-15T10:00:00Z"));
+        when(customerOrderRepository.findAllByUserLoginOrderByIdDesc("customer1")).thenReturn(List.of(order));
+
+        mockMvc
+            .perform(get("/internal/v1/payments").with(user("customer1")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.payments[0].order_number").value("MNM-PAY-1"))
+            .andExpect(jsonPath("$.data.payments[0].payment_status").value("paid"));
+    }
+
+    @Test
+    void createOrder_variantInsufficientStock_returnsConflict() throws Exception {
+        Product product = new Product()
+            .id(2L)
+            .name("Horizon Tee")
+            .slug("horizon-tee")
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                """
+                [{"sku":"HORIZON-S-NAVY","size":"S","color":"Navy","rate":999,"stock":1,"active":true}]
+                """
+            )
+            .active(true);
+        when(productRepository.findOneForInventoryUpdate(2L)).thenReturn(Optional.of(product));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "items":[{"product_id":"2","product_name":"Horizon Tee","qty":2,"price":999,"size":"S","color":"Navy"}],
+                          "shipping_address":{"full_name":"Jane","email":"j@example.com","phone":"9876543210","line1":"Line 1","city":"City","state":"State","pincode":"560001"},
+                          "donation":0,
+                          "payment_method":"cod"
+                        }
+                        """
+                    )
+            )
+            .andExpect(status().isConflict())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(org.hamcrest.Matchers.containsString("1 item available")));
     }
 
     @Test
@@ -1614,48 +1980,520 @@ class InternalAccountOrderResourceCoverageTest {
             .andExpect(jsonPath("$.data.razorpayOrderId").value(org.hamcrest.Matchers.startsWith("order_demo_")));
     }
 
-    @TestConfiguration
-    static class DataAccessConfig {
+    @Test
+    void profile_updateCreatesProfileWhenMissing() throws Exception {
+        when(customerProfileRepository.findOneByUserLogin("customer1")).thenReturn(Optional.empty());
+        when(customerProfileRepository.save(any(CustomerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        @Bean
-        ObjectMapper objectMapper() {
-            return new ObjectMapper();
-        }
+        mockMvc
+            .perform(
+                put("/internal/v1/account/profile")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"full_name\":\"Fresh Name\",\"phone\":\"9000000001\",\"subscribed\":false}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(true));
 
-        @Bean
-        com.miniandmore.app.service.StorePricingService storePricingService() {
-            return com.miniandmore.app.service.StorePricingTestSupport.defaultPricing();
-        }
-
-        @Bean
-        com.miniandmore.app.service.ProductVariantSupport productVariantSupport(ObjectMapper objectMapper) {
-            return com.miniandmore.app.service.StorePricingTestSupport.variantSupport(objectMapper);
-        }
-
-        @Bean
-        org.springframework.transaction.PlatformTransactionManager transactionManager() {
-            return org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class);
-        }
-
-        @Bean
-        AccountOrderDataAccess accountOrderDataAccess(
-            CouponRepository couponRepository,
-            CustomerProfileRepository customerProfileRepository,
-            CustomerOrderRepository customerOrderRepository,
-            OrderItemRepository orderItemRepository,
-            ProductRepository productRepository,
-            SiteSettingRepository siteSettingRepository,
-            LedgerlyIntegrationClient ledgerlyIntegrationClient
-        ) {
-            return new AccountOrderDataAccess(
-                couponRepository,
-                customerProfileRepository,
-                customerOrderRepository,
-                orderItemRepository,
-                productRepository,
-                siteSettingRepository,
-                ledgerlyIntegrationClient
-            );
-        }
+        ArgumentCaptor<CustomerProfile> profileCaptor = ArgumentCaptor.forClass(CustomerProfile.class);
+        verify(customerProfileRepository).save(profileCaptor.capture());
+        assertThat(profileCaptor.getValue().getUserLogin()).isEqualTo("customer1");
+        assertThat(profileCaptor.getValue().getFullName()).isEqualTo("Fresh Name");
+        verify(ledgerlySyncService).syncCustomerProfileAsync("customer1");
     }
+
+    @Test
+    void validateCoupon_bogoNeedsOneMoreItem_returnsSingularMessage() throws Exception {
+        Coupon coupon = new Coupon()
+            .code("BOGO-NUDGE")
+            .active(true)
+            .discountType(DiscountType.BOGO)
+            .discountValue(BigDecimal.valueOf(100))
+            .minOrder(BigDecimal.ZERO)
+            .bogoBuyQty(1)
+            .bogoGetQty(1);
+        when(couponRepository.findOneByCodeIgnoreCase("BOGO-NUDGE")).thenReturn(Optional.of(coupon));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/coupons/validate")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"code\":\"BOGO-NUDGE\",\"subtotal\":500,\"items\":[{\"qty\":1,\"price\":500}]}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(false))
+            .andExpect(jsonPath("$.data.error").value("Add 1 more item to use this BOGO offer"));
+    }
+
+    @Test
+    void createOrder_variantStockReservationFailure_returnsConflict() throws Exception {
+        Product product = new Product()
+            .id(501L)
+            .name("Variant Dress")
+            .slug("variant-dress")
+            .price(BigDecimal.TEN)
+            .stock(0)
+            .active(true)
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                """
+                [{"sku":"VAR-501-S","size":"S","color":"Red","rate":10,"stock":2,"active":true}]
+                """
+            );
+        when(productRepository.findOneForInventoryUpdate(501L)).thenReturn(Optional.of(product));
+        when(productRepository.findById(501L)).thenReturn(Optional.of(product));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "items":[{"product_id":"501","product_name":"Variant Dress","variant_sku":"VAR-501-S","item_size":"M","color":"Red","qty":1,"price":10}],
+                          "shipping_address":{"full_name":"Jane","email":"j@example.com","phone":"9876543210","line1":"Line 1","city":"City","state":"State","pincode":"560001"},
+                          "donation":0
+                        }
+                        """
+                    )
+            )
+            .andExpect(status().isConflict())
+            .andExpect(
+                org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                    .string(org.hamcrest.Matchers.containsString("Selected size/color is unavailable"))
+            );
+    }
+
+    @Test
+    void restoreInventoryForCancellation_paidOrderWithoutReservationFlag_restoresSimpleStock() {
+        CustomerOrder order = new CustomerOrder()
+            .id(502L)
+            .orderNumber("MNM-RESTORE-502")
+            .userLogin("customer1")
+            .paymentStatus(PaymentStatus.REFUND_INITIATED)
+            .status(OrderStatus.CONFIRMED)
+            .inventoryReserved(false);
+        Product product = new Product().id(502L).name("Simple").slug("simple").price(BigDecimal.TEN).stock(3).active(true);
+        OrderItem item = new OrderItem().id(1L).productId("502").productName("Simple").qty(2).price(BigDecimal.TEN);
+        order.addItems(item);
+        item.setOrder(order);
+
+        when(orderItemRepository.findAllByOrderId(502L)).thenReturn(List.of(item));
+        when(productRepository.findOneForInventoryUpdate(502L)).thenReturn(Optional.of(product));
+        when(customerOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ReflectionTestUtils.invokeMethod(resource, "restoreInventoryForCancellation", order);
+
+        assertThat(product.getStock()).isEqualTo(5);
+        assertThat(order.getInventoryReleasedAt()).isNotNull();
+        verify(productRepository).save(product);
+    }
+
+    @Test
+    void validateCoupon_welcome10_withoutAuth_requiresSignIn() throws Exception {
+        SecurityContextHolder.clearContext();
+        Coupon coupon = new Coupon()
+            .code("WELCOME10")
+            .active(true)
+            .discountType(com.miniandmore.app.domain.enumeration.DiscountType.PERCENT)
+            .discountValue(BigDecimal.TEN)
+            .minOrder(BigDecimal.ZERO);
+        when(couponRepository.findOneByCodeIgnoreCase("WELCOME10")).thenReturn(Optional.of(coupon));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/coupons/validate")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"code\":\"WELCOME10\",\"subtotal\":1000}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(false))
+            .andExpect(jsonPath("$.data.error").value("Sign in to use WELCOME10 on your first order"));
+    }
+
+    @Test
+    void retryPayment_cancelledOrder_returnsConflict() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(88L)
+            .userLogin("customer1")
+            .orderNumber("MNM-CANCEL-88")
+            .status(OrderStatus.CANCELLED)
+            .paymentStatus(PaymentStatus.PENDING)
+            .razorpayOrderId("order_old");
+        when(customerOrderRepository.findById(88L)).thenReturn(Optional.of(order));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders/retry-payment")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"orderId\":88}")
+            )
+            .andExpect(status().isConflict())
+            .andExpect(
+                org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                    .string(org.hamcrest.Matchers.containsString("This order has been cancelled"))
+            );
+    }
+
+    @Test
+    void retryPayment_missingRazorpaySession_returnsConflict() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(89L)
+            .userLogin("customer1")
+            .orderNumber("MNM-NO-RZP")
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PENDING)
+            .total(BigDecimal.valueOf(200));
+        when(customerOrderRepository.findById(89L)).thenReturn(Optional.of(order));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders/retry-payment")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"orderId\":89}")
+            )
+            .andExpect(status().isConflict())
+            .andExpect(
+                org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                    .string(org.hamcrest.Matchers.containsString("No payment session found for this order"))
+            );
+    }
+
+    @Test
+    void syncProfileFromShippingAddress_updatesPhoneWhenNameMissing() {
+        when(customerProfileRepository.findOneByUserLogin("customer1")).thenReturn(Optional.empty());
+        when(customerProfileRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        InternalAccountOrderResource.AddressRequest shipping = new InternalAccountOrderResource.AddressRequest(
+            null,
+            null,
+            "9988776655",
+            "Line 1",
+            null,
+            "City",
+            "State",
+            "560001",
+            null
+        );
+
+        ReflectionTestUtils.invokeMethod(resource, "syncProfileFromShippingAddress", "customer1", shipping);
+
+        ArgumentCaptor<CustomerProfile> profileCaptor = ArgumentCaptor.forClass(CustomerProfile.class);
+        verify(customerProfileRepository).save(profileCaptor.capture());
+        assertThat(profileCaptor.getValue().getPhone()).isEqualTo("9988776655");
+        verify(ledgerlySyncService).syncCustomerProfileAsync("customer1");
+    }
+
+    @Test
+    void syncCancellationToLedgerly_swallowsIntegrationFailures() {
+        CustomerOrder order = new CustomerOrder()
+            .orderNumber("MNM-CANCEL-SYNC")
+            .ledgerlySalesOrderId("so-ledger");
+        doThrow(new RuntimeException("ledgerly down"))
+            .when(ledgerlyIntegrationClient)
+            .cancelOrder(eq("MNM-CANCEL-SYNC"), eq(null), eq("rfnd-1"));
+
+        ReflectionTestUtils.invokeMethod(resource, "syncCancellationToLedgerly", order, "rfnd-1");
+
+        verify(ledgerlyIntegrationClient).cancelOrder("MNM-CANCEL-SYNC", null, "rfnd-1");
+    }
+
+    @Test
+    void syncCancellationToZoho_swallowsSyncFailures() {
+        CustomerOrder order = new CustomerOrder().id(88L).orderNumber("MNM-ZOHO-CANCEL").zohoSalesOrderId("zoho-so");
+        doThrow(new RuntimeException("zoho down")).when(zohoSyncService).cancelOrder(88L);
+
+        ReflectionTestUtils.invokeMethod(resource, "syncCancellationToZoho", order);
+
+        verify(zohoSyncService).cancelOrder(88L);
+    }
+
+    @Test
+    void restoreInventoryForCancellation_skipsWhenAlreadyReleased() {
+        CustomerOrder order = new CustomerOrder().inventoryReleasedAt(Instant.now()).inventoryReserved(true);
+        ReflectionTestUtils.invokeMethod(resource, "restoreInventoryForCancellation", order);
+        verify(orderItemRepository, never()).findAllByOrderId(anyLong());
+    }
+
+    @Test
+    void validateCoupon_minOrderShortfall_returnsUnlockMessage() throws Exception {
+        Coupon coupon = new Coupon()
+            .code("MIN500")
+            .active(true)
+            .discountType(DiscountType.PERCENT)
+            .discountValue(BigDecimal.TEN)
+            .minOrder(BigDecimal.valueOf(500));
+        when(couponRepository.findOneByCodeIgnoreCase("MIN500")).thenReturn(Optional.of(coupon));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/coupons/validate")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"code\":\"MIN500\",\"subtotal\":350}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(false))
+            .andExpect(jsonPath("$.data.error").value("Add ₹150 more to unlock this offer"));
+    }
+
+    @Test
+    void syncProfileFromShippingAddress_nullAddress_skipsPersistence() {
+        ReflectionTestUtils.invokeMethod(resource, "syncProfileFromShippingAddress", "customer1", null);
+        verify(customerProfileRepository, never()).save(any());
+    }
+
+    @Test
+    void syncProfileFromShippingAddress_blankNameAndPhone_skipsPersistence() {
+        InternalAccountOrderResource.AddressRequest shipping = new InternalAccountOrderResource.AddressRequest(
+            null,
+            null,
+            "   ",
+            "Line 1",
+            null,
+            "City",
+            "State",
+            "560001",
+            null
+        );
+        ReflectionTestUtils.invokeMethod(resource, "syncProfileFromShippingAddress", "customer1", shipping);
+        verify(customerProfileRepository, never()).save(any());
+    }
+
+    @Test
+    void syncCancellationToLedgerly_skipsWhenNoLedgerlyIdsOrRefund() {
+        CustomerOrder order = new CustomerOrder().orderNumber("MNM-NO-LEDGER");
+        ReflectionTestUtils.invokeMethod(resource, "syncCancellationToLedgerly", order, null);
+        verify(ledgerlyIntegrationClient, never()).cancelOrder(any(), any(), any());
+    }
+
+    @Test
+    void syncCancellationToZoho_skipsWhenNoZohoReferences() {
+        CustomerOrder order = new CustomerOrder().id(77L).orderNumber("MNM-NO-ZOHO");
+        ReflectionTestUtils.invokeMethod(resource, "syncCancellationToZoho", order);
+        verify(zohoSyncService, never()).cancelOrder(anyLong());
+    }
+
+    @Test
+    void attemptZohoOrderSync_skipsWhenStatusAlreadyPending() {
+        CustomerOrder order = new CustomerOrder()
+            .id(88L)
+            .paymentStatus(PaymentStatus.PAID)
+            .zohoSyncStatus(com.miniandmore.app.domain.enumeration.ZohoSyncStatus.PENDING);
+        ReflectionTestUtils.invokeMethod(resource, "attemptZohoOrderSync", order);
+        verify(zohoSyncService, never()).syncOrder(anyLong());
+    }
+
+    @Test
+    void attemptZohoOrderSync_codConfirmedOrderQueuesSync() {
+        CustomerOrder order = new CustomerOrder()
+            .id(89L)
+            .paymentStatus(PaymentStatus.PENDING)
+            .paymentMethod("cod")
+            .status(OrderStatus.CONFIRMED);
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+        ReflectionTestUtils.invokeMethod(resource, "attemptZohoOrderSync", order);
+        verify(zohoSyncService).syncOrder(89L);
+        assertThat(order.getZohoSyncStatus()).isEqualTo(com.miniandmore.app.domain.enumeration.ZohoSyncStatus.PENDING);
+    }
+
+    @Test
+    void bogoAndCouponHelperMessages_coverPluralAndPercentBranches() {
+        assertThat((String) ReflectionTestUtils.invokeMethod(InternalAccountOrderResource.class, "bogoEligibilityMessage", 3))
+            .isEqualTo("Add 3 more items to use this BOGO offer");
+        assertThat(
+            (String) ReflectionTestUtils.invokeMethod(
+                InternalAccountOrderResource.class,
+                "bogoNextTierMessage",
+                2,
+                2,
+                BigDecimal.valueOf(50)
+            )
+        ).contains("50% off");
+        assertThat(
+            (String) ReflectionTestUtils.invokeMethod(
+                InternalAccountOrderResource.class,
+                "bogoSummaryMessage",
+                2,
+                1,
+                2,
+                BigDecimal.valueOf(50)
+            )
+        ).contains("4");
+        assertThat((String) ReflectionTestUtils.invokeMethod(InternalAccountOrderResource.class, "formatPercent", new BigDecimal("10.00")))
+            .isEqualTo("10");
+        assertThat(
+            (String) ReflectionTestUtils.invokeMethod(
+                InternalAccountOrderResource.class,
+                "minOrderEligibilityMessage",
+                BigDecimal.TEN,
+                BigDecimal.TEN
+            )
+        ).isEqualTo("Order does not meet the minimum amount for this coupon");
+    }
+
+    @Test
+    void verifyPayment_expiredInventoryReservation_returnsConflict() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(92L)
+            .userLogin("customer1")
+            .orderNumber("MNM-EXP")
+            .paymentStatus(PaymentStatus.PENDING)
+            .inventoryReserved(true)
+            .inventoryReservedUntil(Instant.now().minusSeconds(120))
+            .total(BigDecimal.TEN);
+        when(customerOrderRepository.findById(92L)).thenReturn(Optional.of(order));
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders/verify-payment")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {"orderId":92,"razorpay_order_id":"order_exp","razorpay_payment_id":"pay_exp","razorpay_signature":"%s"}
+                        """
+                            .formatted(hmacSignature("order_exp", "pay_exp", LIVE_SECRET))
+                    )
+            )
+            .andExpect(status().isConflict());
+    }
+
+    @Test
+    void submitCancelRequest_returnsOrderAndCancellationPayload() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(91L)
+            .userLogin("customer1")
+            .orderNumber("MNM-CANCEL-REQ")
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .paymentMethod("online")
+            .subtotal(BigDecimal.valueOf(500))
+            .total(BigDecimal.valueOf(500))
+            .placedAt(Instant.now());
+        OrderCancellationRequest cancellationRequest = new OrderCancellationRequest();
+        cancellationRequest.setRequestNumber("CAN-REQ-1");
+        cancellationRequest.setStatus(CancellationRequestStatus.REQUESTED);
+        cancellationRequest.setOrder(order);
+        when(orderCancellationService.submitRequest("customer1", "MNM-CANCEL-REQ", "Changed my mind")).thenReturn(cancellationRequest);
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-CANCEL-REQ", "customer1")).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(91L)).thenReturn(List.of());
+        when(orderCancellationService.toCustomerDto(cancellationRequest)).thenReturn(Map.of("status", "requested"));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/orders/MNM-CANCEL-REQ/cancel-request")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"Changed my mind\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.order_number").value("MNM-CANCEL-REQ"))
+            .andExpect(jsonPath("$.data.cancellation_request.status").value("requested"));
+    }
+
+    @Test
+    void orderDetail_backfillsInvoicePdfWhenMissing() throws Exception {
+        CustomerOrder order = new CustomerOrder()
+            .id(101L)
+            .userLogin("customer1")
+            .orderNumber("MNM-PDF")
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PAID)
+            .paymentMethod("online")
+            .subtotal(BigDecimal.valueOf(400))
+            .discount(BigDecimal.ZERO)
+            .shipping(BigDecimal.ZERO)
+            .codFee(BigDecimal.ZERO)
+            .tax(BigDecimal.ZERO)
+            .donation(BigDecimal.ZERO)
+            .total(BigDecimal.valueOf(400))
+            .zohoInvoiceId("inv-101")
+            .placedAt(Instant.now());
+        when(customerOrderRepository.findOneByOrderNumberAndUserLogin("MNM-PDF", "customer1")).thenReturn(Optional.of(order));
+        when(orderItemRepository.findAllByOrderId(101L)).thenReturn(List.of());
+        when(zohoSyncService.ensureInvoicePdfCached(101L)).thenReturn("https://cdn.example.com/invoices/101.pdf");
+
+        mockMvc
+            .perform(get("/internal/v1/orders/MNM-PDF").with(user("customer1")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.invoice_pdf_url").value("https://cdn.example.com/invoices/101.pdf"));
+    }
+
+    @Test
+    void activeCoupons_excludesInactiveAndNullExpiryCoupons() throws Exception {
+        Coupon active = new Coupon()
+            .code("ACTIVE10")
+            .active(true)
+            .discountType(DiscountType.PERCENT)
+            .discountValue(BigDecimal.TEN)
+            .expiresAt(Instant.now().plusSeconds(3600));
+        Coupon inactive = new Coupon().code("OFF10").active(false).discountType(DiscountType.PERCENT).discountValue(BigDecimal.TEN);
+        Coupon expired = new Coupon()
+            .code("OLD10")
+            .active(true)
+            .discountType(DiscountType.PERCENT)
+            .discountValue(BigDecimal.TEN)
+            .expiresAt(Instant.now().minusSeconds(60));
+        when(couponRepository.findAllByOrderByIdDesc()).thenReturn(List.of(active, inactive, expired));
+
+        mockMvc
+            .perform(get("/internal/v1/coupons/active").with(user("customer1")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.coupons.length()").value(1))
+            .andExpect(jsonPath("$.data.coupons[0].code").value("ACTIVE10"));
+    }
+
+    @Test
+    void profile_updateSubscribedFlag_persistsPreference() throws Exception {
+        CustomerProfile profile = new CustomerProfile().userLogin("customer1").fullName("Jane").subscribed(false);
+        when(customerProfileRepository.findOneByUserLogin("customer1")).thenReturn(Optional.of(profile));
+        when(customerProfileRepository.save(any(CustomerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc
+            .perform(
+                put("/internal/v1/account/profile")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"full_name\":\"Jane Doe\",\"phone\":\"9876543210\",\"subscribed\":true}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(true));
+
+        assertThat(profile.getSubscribed()).isTrue();
+        assertThat(profile.getFullName()).isEqualTo("Jane Doe");
+    }
+
+    @Test
+    void validateCoupon_nonNumericProductIdUsesClientCategory() throws Exception {
+        Coupon coupon = new Coupon()
+            .code("CAT-FALLBACK")
+            .active(true)
+            .discountType(DiscountType.PERCENT)
+            .discountValue(BigDecimal.TEN)
+            .minOrder(BigDecimal.ZERO)
+            .eligibilityScope(CouponEligibilityScope.CATEGORY)
+            .eligibilityCategoryId(42L);
+        when(couponRepository.findOneByCodeIgnoreCase("CAT-FALLBACK")).thenReturn(Optional.of(coupon));
+
+        mockMvc
+            .perform(
+                post("/internal/v1/coupons/validate")
+                    .with(user("customer1"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {"code":"CAT-FALLBACK","subtotal":1000,"items":[{"product_id":"not-a-number","qty":1,"price":1000,"category_id":42}]}
+                        """
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ok").value(true))
+            .andExpect(jsonPath("$.data.discount").value(100.0));
+    }
+
 }

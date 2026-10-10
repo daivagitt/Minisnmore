@@ -6,6 +6,14 @@ import {
   DEFAULT_DELIVERY_ETA_BUFFER_DAYS,
   parseDeliveryEtaBufferDays,
 } from "@/lib/commerce";
+import {
+  DEFAULT_REFUND_MAX_BUSINESS_DAYS,
+  DEFAULT_REFUND_MIN_BUSINESS_DAYS,
+  DEFAULT_RETURN_WINDOW_DAYS,
+  parseRefundMaxBusinessDays,
+  parseRefundMinBusinessDays,
+  parseReturnWindowDays,
+} from "@/lib/refund-policy";
 
 export type SiteSettings = {
   brand_name: string;
@@ -41,6 +49,9 @@ export type SiteSettings = {
   free_shipping_min_inr: number;
   cod_fee_inr: number;
   delivery_eta_buffer_days: number;
+  return_window_days: number;
+  refund_min_business_days: number;
+  refund_max_business_days: number;
   store_discount_percent: number;
 };
 
@@ -68,6 +79,19 @@ function mergeSiteSettings(data: Partial<SiteSettings> | null | undefined): Site
   merged.delivery_eta_buffer_days = parseDeliveryEtaBufferDays(
     (data as Record<string, unknown> | undefined)?.delivery_eta_buffer_days,
     DEFAULTS.delivery_eta_buffer_days
+  );
+  merged.return_window_days = parseReturnWindowDays(
+    (data as Record<string, unknown> | undefined)?.return_window_days,
+    DEFAULTS.return_window_days
+  );
+  merged.refund_min_business_days = parseRefundMinBusinessDays(
+    (data as Record<string, unknown> | undefined)?.refund_min_business_days,
+    DEFAULTS.refund_min_business_days
+  );
+  merged.refund_max_business_days = parseRefundMaxBusinessDays(
+    (data as Record<string, unknown> | undefined)?.refund_max_business_days,
+    merged.refund_min_business_days,
+    DEFAULTS.refund_max_business_days
   );
   merged.instagram_url = coalesceUrl(merged.instagram_url, DEFAULT_SOCIAL.instagram_url);
   merged.facebook_url = coalesceUrl(merged.facebook_url, DEFAULT_SOCIAL.facebook_url);
@@ -111,6 +135,9 @@ const DEFAULTS: SiteSettings = {
   free_shipping_min_inr: 2500,
   cod_fee_inr: 99,
   delivery_eta_buffer_days: DEFAULT_DELIVERY_ETA_BUFFER_DAYS,
+  return_window_days: DEFAULT_RETURN_WINDOW_DAYS,
+  refund_min_business_days: DEFAULT_REFUND_MIN_BUSINESS_DAYS,
+  refund_max_business_days: DEFAULT_REFUND_MAX_BUSINESS_DAYS,
   store_discount_percent: 20,
 };
 

@@ -283,7 +283,9 @@ describe("ShopProvider branch coverage", () => {
     );
   });
 
-  it("merges cart lines by variant SKU and clamps quantity to the fit limit", async () => {
+  it("merges cart lines by variant SKU and clamps quantity to available stock", async () => {
+    const { toast } = await import("sonner");
+    const stock = variantProduct.variants!.find((v) => v.sku === "HORIZON-M-NAVY")!.stock;
     function Probe() {
       const shop = useShop();
       return (
@@ -333,10 +335,11 @@ describe("ShopProvider branch coverage", () => {
 
     await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
     await userEvent.click(screen.getByRole("button", { name: "add-variant" }));
-    expect(screen.getByTestId("count")).toHaveTextContent(String(FIT_LIMITS.qtyMax));
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent(String(stock)));
 
     await userEvent.click(screen.getByRole("button", { name: "add-same-variant" }));
-    expect(screen.getByTestId("count")).toHaveTextContent(String(FIT_LIMITS.qtyMax));
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent(String(stock)));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(`Only ${stock} left in stock`));
 
     await userEvent.click(screen.getByRole("button", { name: "remove-by-sku" }));
     expect(screen.getByTestId("count")).toHaveTextContent("0");

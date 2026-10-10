@@ -119,10 +119,10 @@ public class ImagePreviewService {
             }
         } catch (ResponseStatusException ex) {
             throw ex;
-        } catch (IOException | InterruptedException ex) {
-            if (ex instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Image could not be previewed");
+        } catch (IOException ex) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Image could not be previewed");
         }
     }

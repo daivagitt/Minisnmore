@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -82,6 +83,31 @@ class ZohoItemImageSyncTest {
         lenient().when(applicationProperties.getStorage()).thenReturn(storage);
     }
 
+    private static Product variantParent(long id, String sku, String color) {
+        return new Product()
+            .id(id)
+            .sku("JABLA")
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                "[{\"sku\":\"" + sku + "\",\"size\":\"0-3\",\"color\":\"" + color + "\",\"rate\":380,\"stock\":0,\"active\":true}]"
+            );
+    }
+
+    private static Map<String, Object> aquaDocuments(String... documentIds) {
+        List<Map<String, Object>> documents = new java.util.ArrayList<>();
+        for (int i = 0; i < documentIds.length; i++) {
+            documents.add(Map.of("document_id", documentIds[i], "attachment_order", i + 1));
+        }
+        return Map.of("sku", "JAB-AQU", "documents", documents);
+    }
+
+    private void stubDocument(String documentId, String bytes, String storedUrl) {
+        when(booksClient.downloadDocument(eq(documentId), any(Long.class)))
+            .thenReturn(Optional.of(new BinaryDownload(bytes.getBytes(), "image/png")));
+        when(s3StorageService.uploadObject(eq("products"), any(), eq(bytes.getBytes()), eq("image/png")))
+            .thenReturn(storedUrl);
+    }
+
 
     @Test
     void importZohoItemImage_storageFailureIsVisibleAndPreservesOldGallery() {
@@ -112,6 +138,22 @@ class ZohoItemImageSyncTest {
         itemImageSync.importZohoItemImage(product, "zoho-1", Map.of("sku", "SKU-1", "image_name", "item.jpg"));
 
         assertThat(product.getImagesJson()).contains("https://cdn.example.com/uat/products/zoho-SKU-1.jpg");
+    }
+
+    @Test
+    void importZohoItemImage_imageNameOnly_secondPullStillDownloads() {
+        Product product = new Product().id(1L).sku("SKU-1");
+        when(booksClient.downloadItemImage(eq("zoho-1"), any(Long.class)))
+            .thenReturn(Optional.of(new BinaryDownload("bytes".getBytes(), "image/jpeg")));
+        when(s3StorageService.uploadObject(eq("products"), any(), any(), eq("image/jpeg")))
+            .thenReturn("https://cdn.example.com/uat/products/zoho-SKU-1.jpg");
+
+        Map<String, Object> item = Map.of("sku", "SKU-1", "image_name", "item.jpg");
+        itemImageSync.importZohoItemImage(product, "zoho-1", item);
+        itemImageSync.beginImageImportPass();
+        itemImageSync.importZohoItemImage(product, "zoho-1", item);
+
+        verify(booksClient, times(2)).downloadItemImage(eq("zoho-1"), any(Long.class));
     }
 
     @Test
@@ -221,6 +263,85 @@ class ZohoItemImageSyncTest {
                 )
             );
         assertThat(product.getColorsJson()).doesNotContain("should-not-lead.jpg");
+    }
+
+    @Test
+    void importZohoVariantColorImage_secondPullSkipsUnchangedDocuments() {
+        Product product = variantParent(40L, "JAB-AQU", "aqua");
+        Map<String, Object> item = aquaDocuments("doc-1", "doc-2");
+        stubDocument("doc-1", "front", "https://cdn.example.com/uat/products/aqua-front.png");
+        stubDocument("doc-2", "back", "https://cdn.example.com/uat/products/aqua-back.png");
+
+        itemImageSync.importZohoVariantColorImage(product, "aqua", "zoho-item-1", item);
+        itemImageSync.beginImageImportPass();
+        itemImageSync.importZohoVariantColorImage(product, "aqua", "zoho-item-1", item);
+
+        verify(booksClient, times(1)).downloadDocument(eq("doc-1"), any(Long.class));
+        verify(booksClient, times(1)).downloadDocument(eq("doc-2"), any(Long.class));
+        assertThat(new ProductColorImagesSupport(new com.fasterxml.jackson.databind.ObjectMapper())
+            .galleryUrlsForColor(product, "aqua"))
+            .containsExactly(
+                "https://cdn.example.com/uat/products/aqua-front.png",
+                "https://cdn.example.com/uat/products/aqua-back.png"
+            );
+    }
+
+    @Test
+    void importZohoVariantColorImage_secondPullDownloadsOnlyChangedDocument() {
+        Product product = variantParent(41L, "JAB-AQU", "aqua");
+        stubDocument("doc-1", "front", "https://cdn.example.com/uat/products/aqua-front.png");
+        stubDocument("doc-2", "back", "https://cdn.example.com/uat/products/aqua-back.png");
+        stubDocument("doc-2b", "back-new", "https://cdn.example.com/uat/products/aqua-back-new.png");
+
+        itemImageSync.importZohoVariantColorImage(product, "aqua", "zoho-item-1", aquaDocuments("doc-1", "doc-2"));
+        itemImageSync.beginImageImportPass();
+        itemImageSync.importZohoVariantColorImage(product, "aqua", "zoho-item-1", aquaDocuments("doc-1", "doc-2b"));
+
+        verify(booksClient, times(1)).downloadDocument(eq("doc-1"), any(Long.class));
+        verify(booksClient, times(1)).downloadDocument(eq("doc-2"), any(Long.class));
+        verify(booksClient, times(1)).downloadDocument(eq("doc-2b"), any(Long.class));
+        assertThat(new ProductColorImagesSupport(new com.fasterxml.jackson.databind.ObjectMapper())
+            .galleryUrlsForColor(product, "aqua"))
+            .containsExactly(
+                "https://cdn.example.com/uat/products/aqua-front.png",
+                "https://cdn.example.com/uat/products/aqua-back-new.png"
+            );
+    }
+
+    @Test
+    void importZohoVariantColorImage_samePassSiblingSizeDoesNotRedownload() {
+        Product product = new Product()
+            .id(42L)
+            .sku("JABLA")
+            .itemStructure("VARIANTS")
+            .variantsJson(
+                """
+                [
+                  {"sku":"JAB-AQU-03","size":"0-3","color":"aqua","rate":380,"stock":1,"active":true},
+                  {"sku":"JAB-AQU-36","size":"3-6","color":"aqua","rate":380,"stock":1,"active":true}
+                ]
+                """
+            );
+        stubDocument("doc-03-1", "front", "https://cdn.example.com/uat/products/aqua-front.png");
+
+        itemImageSync.importZohoVariantColorImage(
+            product,
+            "aqua",
+            "zoho-03",
+            Map.of("sku", "JAB-AQU-03", "documents", List.of(Map.of("document_id", "doc-03-1", "attachment_order", 1)))
+        );
+        itemImageSync.importZohoVariantColorImage(
+            product,
+            "aqua",
+            "zoho-36",
+            Map.of("sku", "JAB-AQU-36", "documents", List.of(Map.of("document_id", "doc-36-1", "attachment_order", 1)))
+        );
+
+        verify(booksClient).downloadDocument(eq("doc-03-1"), any(Long.class));
+        verify(booksClient, never()).downloadDocument(eq("doc-36-1"), any(Long.class));
+        assertThat(new ProductColorImagesSupport(new com.fasterxml.jackson.databind.ObjectMapper())
+            .galleryUrlsForColor(product, "aqua"))
+            .containsExactly("https://cdn.example.com/uat/products/aqua-front.png");
     }
 
     @Test

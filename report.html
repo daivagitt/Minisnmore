@@ -1,0 +1,1086 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mini &amp; More — Engineering &amp; QA Dashboard</title>
+    <style>
+      :root {
+        --navy-950: #070d18;
+        --navy-900: #0b1324;
+        --navy-800: #101b33;
+        --navy-700: #162544;
+        --navy-600: #1e3258;
+        --gold-400: #f0c040;
+        --gold-500: #d4af37;
+        --gold-600: #b8922e;
+        --text: #eef2f8;
+        --text-muted: #9fb0c9;
+        --border: rgba(212, 175, 55, 0.22);
+        --surface: rgba(16, 27, 51, 0.92);
+        --surface-2: rgba(22, 37, 68, 0.88);
+        --pass: #22c55e;
+        --partial: #f59e0b;
+        --fail: #ef4444;
+        --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+        --sidebar-width: 280px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top right, rgba(212, 175, 55, 0.08), transparent 28%),
+          linear-gradient(180deg, var(--navy-950) 0%, var(--navy-900) 100%);
+        min-height: 100vh;
+      }
+
+      a {
+        color: var(--gold-400);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      code {
+        background: rgba(212, 175, 55, 0.12);
+        color: #ffe08a;
+        padding: 0.12rem 0.45rem;
+        border-radius: 0.35rem;
+        font-size: 0.92em;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow: auto;
+        border-right: 1px solid var(--border);
+        background: rgba(7, 13, 24, 0.96);
+        padding: 1.4rem 1rem 2rem;
+      }
+
+      .brand {
+        padding: 0.4rem 0.6rem 1.2rem;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 1rem;
+      }
+
+      .brand img {
+        display: block;
+        max-width: 190px;
+        height: auto;
+        margin-bottom: 0.8rem;
+      }
+
+      .brand h1 {
+        margin: 0 0 0.35rem;
+        font-size: 1.15rem;
+        color: var(--gold-400);
+      }
+
+      .brand p {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 0.88rem;
+        line-height: 1.45;
+      }
+
+      .nav-group {
+        margin-bottom: 1rem;
+      }
+
+      .nav-group h2 {
+        margin: 0 0 0.55rem;
+        padding: 0 0.55rem;
+        font-size: 0.72rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--gold-500);
+      }
+
+      .nav-group a {
+        display: block;
+        padding: 0.55rem 0.7rem;
+        border-radius: 0.55rem;
+        color: var(--text-muted);
+        font-size: 0.92rem;
+        font-weight: 600;
+      }
+
+      .nav-group a:hover,
+      .nav-group a.active {
+        background: rgba(212, 175, 55, 0.12);
+        color: var(--text);
+        text-decoration: none;
+      }
+
+      .main {
+        padding: 1.5rem 1.5rem 4rem;
+      }
+
+      .hero {
+        background: linear-gradient(135deg, rgba(22, 37, 68, 0.95), rgba(11, 19, 36, 0.98));
+        border: 1px solid var(--border);
+        border-radius: 1rem;
+        padding: 1.6rem 1.8rem;
+        box-shadow: var(--shadow);
+        margin-bottom: 1.4rem;
+      }
+
+      .hero .eyebrow {
+        margin: 0 0 0.35rem;
+        color: var(--gold-400);
+        font-size: 0.78rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        font-weight: 700;
+      }
+
+      .hero h2 {
+        margin: 0 0 0.5rem;
+        font-size: clamp(1.5rem, 2vw, 2rem);
+      }
+
+      .hero p {
+        margin: 0;
+        color: var(--text-muted);
+        max-width: 70ch;
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+        margin-top: 1rem;
+      }
+
+      .chip {
+        border: 1px solid var(--border);
+        background: rgba(212, 175, 55, 0.08);
+        border-radius: 999px;
+        padding: 0.35rem 0.75rem;
+        font-size: 0.85rem;
+        color: var(--text);
+      }
+
+      section.panel {
+        scroll-margin-top: 1rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 1rem;
+        padding: 1.35rem 1.45rem;
+        margin-bottom: 1.1rem;
+        box-shadow: var(--shadow);
+      }
+
+      section.panel h2,
+      section.panel h3 {
+        margin-top: 0;
+        color: var(--gold-400);
+      }
+
+      section.panel h3 {
+        font-size: 1rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .muted {
+        color: var(--text-muted);
+      }
+
+      .status-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+        margin: 0.75rem 0 1rem;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.28rem 0.7rem;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .badge.pass {
+        background: rgba(34, 197, 94, 0.18);
+        color: #86efac;
+        border: 1px solid rgba(34, 197, 94, 0.35);
+      }
+
+      .badge.partial {
+        background: rgba(245, 158, 11, 0.18);
+        color: #fcd34d;
+        border: 1px solid rgba(245, 158, 11, 0.35);
+      }
+
+      .badge.fail {
+        background: rgba(239, 68, 68, 0.18);
+        color: #fca5a5;
+        border: 1px solid rgba(239, 68, 68, 0.35);
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 0.85rem;
+        margin: 1rem 0;
+      }
+
+      .card {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 0.85rem;
+        padding: 0.95rem 1rem;
+      }
+
+      .card .label {
+        display: block;
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        margin-bottom: 0.35rem;
+      }
+
+      .card .value {
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: var(--text);
+      }
+
+      .overview-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 0.85rem;
+      }
+
+      .overview-card {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 0.85rem;
+        padding: 1rem;
+      }
+
+      .overview-card h3 {
+        margin: 0 0 0.45rem;
+        font-size: 0.98rem;
+        color: var(--text);
+      }
+
+      .overview-card p {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 0.88rem;
+        line-height: 1.45;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0.85rem 0;
+        font-size: 0.92rem;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 0.65rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--gold-400);
+        background: rgba(212, 175, 55, 0.08);
+      }
+
+      tr:last-child td {
+        border-bottom: none;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+        margin-top: 0.85rem;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.55rem 0.9rem;
+        border-radius: 0.55rem;
+        border: 1px solid var(--gold-600);
+        background: linear-gradient(180deg, rgba(240, 192, 64, 0.18), rgba(212, 175, 55, 0.08));
+        color: var(--gold-400);
+        font-weight: 700;
+        font-size: 0.88rem;
+      }
+
+      .btn:hover {
+        text-decoration: none;
+        background: rgba(240, 192, 64, 0.24);
+      }
+
+      .btn.secondary {
+        border-color: rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+      }
+
+      .notice {
+        border-left: 4px solid var(--gold-500);
+        background: rgba(212, 175, 55, 0.08);
+        padding: 0.85rem 1rem;
+        border-radius: 0.55rem;
+        margin: 0.85rem 0;
+      }
+
+      .notice.warn {
+        border-left-color: var(--partial);
+        background: rgba(245, 158, 11, 0.08);
+      }
+
+      .notice.fail {
+        border-left-color: var(--fail);
+        background: rgba(239, 68, 68, 0.08);
+      }
+
+      .na {
+        color: #fca5a5;
+        font-weight: 700;
+      }
+
+      .summary-table td:first-child {
+        width: 34%;
+        color: var(--text-muted);
+      }
+
+      #backToTop {
+        position: fixed;
+        right: 1.2rem;
+        bottom: 1.2rem;
+        border: 1px solid var(--gold-600);
+        background: rgba(11, 19, 36, 0.95);
+        color: var(--gold-400);
+        border-radius: 999px;
+        padding: 0.7rem 0.95rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: none;
+        z-index: 20;
+      }
+
+      .menu-toggle {
+        display: none;
+        position: fixed;
+        top: 0.85rem;
+        left: 0.85rem;
+        z-index: 30;
+        border: 1px solid var(--border);
+        background: rgba(11, 19, 36, 0.95);
+        color: var(--gold-400);
+        border-radius: 0.55rem;
+        padding: 0.55rem 0.75rem;
+        font-weight: 700;
+      }
+
+      footer {
+        margin-top: 1rem;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        text-align: center;
+      }
+
+      @media (max-width: 960px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .menu-toggle {
+          display: inline-block;
+        }
+
+        .sidebar {
+          position: fixed;
+          left: 0;
+          top: 0;
+          width: min(88vw, var(--sidebar-width));
+          transform: translateX(-110%);
+          transition: transform 0.2s ease;
+          z-index: 25;
+        }
+
+        .sidebar.open {
+          transform: translateX(0);
+        }
+
+        .main {
+          padding: 4.2rem 1rem 4rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <button class="menu-toggle" id="menuToggle" type="button" aria-label="Toggle navigation">Menu</button>
+
+    <div class="layout">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <img src="assets/logo-horizontal.png" alt="Mini and More logo" />
+          <h1>Engineering / QA</h1>
+          <p>Central dashboard for testing, coverage, documentation, quality, and API validation.</p>
+        </div>
+
+        <nav class="nav-group">
+          <h2>Navigation</h2>
+          <a href="#overview">Overview</a>
+          <a href="#frontend-unit-tests">Frontend Unit Tests</a>
+          <a href="#frontend-coverage">Frontend Coverage</a>
+          <a href="#backend-unit-tests">Backend Unit Tests</a>
+          <a href="#backend-coverage">Backend Coverage</a>
+          <a href="#swagger-openapi">Swagger / OpenAPI</a>
+          <a href="#javadoc">JavaDoc</a>
+          <a href="#sonarqube">SonarQube</a>
+          <a href="#api-functional">API Functional Testing</a>
+          <a href="#api-performance">API Performance Testing</a>
+          <a href="#implementation-summary">Implementation Summary</a>
+          <a href="#wireframes">Customer / Admin / Delivery wireframes</a>
+          <a href="#evidence">Evidence / Reports</a>
+          <a href="#build-environment">Build &amp; Environment</a>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="hero">
+          <p class="eyebrow">Mini &amp; More</p>
+          <h2>Engineering, Testing, Documentation &amp; Quality Dashboard</h2>
+          <p>
+            Consolidated view of unit testing, code coverage, API documentation, SonarQube analysis, and API
+            validation results. Metrics below are taken from generated artifacts in this repository unless noted.
+          </p>
+          <div class="chips">
+            <span class="chip">Generated: 2026-09-10</span>
+            <span class="chip">Catalog backend port: 8084</span>
+            <span class="chip">Standalone HTML — no external dependencies</span>
+          </div>
+        </header>
+
+        <section class="panel" id="overview">
+          <h2>Overview</h2>
+          <p class="muted">High-level status for all completed engineering and QA deliverables.</p>
+          <div class="overview-grid">
+            <div class="overview-card">
+              <div class="status-row"><h3>Frontend Unit Testing</h3><span class="badge pass">Pass</span></div>
+              <p>72 test files, 580 tests passed, 0 failed (Vitest).</p>
+            </div>
+            <div class="overview-card">
+              <div class="status-row"><h3>Frontend Code Coverage</h3><span class="badge pass">Pass</span></div>
+              <p>97.9% statements, 93.81% branches, 99.6% functions, 99.62% lines.</p>
+            </div>
+            <div class="overview-card">
+              <div class="status-row"><h3>Backend Unit Testing</h3><span class="badge pass">Pass</span></div>
+              <p>2,024 tests executed, 0 failures, 0 errors, 1 skipped, Maven BUILD SUCCESS.</p>
+            </div>
+            <div class="overview-card">
+              <div class="status-row"><h3>Backend Code Coverage</h3><span class="badge partial">Below Target</span></div>
+              <p><strong>93.91% instruction coverage</strong> — approximately 0.09 points below the strict 94% target.</p>
+            </div>
+            <div class="overview-card">
+              <div class="status-row"><h3>Swagger / OpenAPI</h3><span class="badge pass">Pass</span></div>
+              <p>SpringDoc OpenAPI generated and verified; 18 REST controllers and 141 HTTP handlers in catalog surface.</p>
+            </div>
+            <div class="overview-card">
+              <div class="status-row"><h3>JavaDoc</h3><span class="badge pass">Pass</span></div>
+              <p>Generated successfully with 0 errors and 100 warnings across 6 files.</p>
+            </div>
+            <div class="overview-card">
+              <div class="status-row"><h3>SonarQube</h3><span class="badge pass">Pass</span></div>
+              <p>Local analysis successful for project key <code>miniandmore</code>.</p>
+            </div>
+            <div class="overview-card">
+              <div class="status-row"><h3>API Functional Testing</h3><span class="badge partial">Partial</span></div>
+              <p>131 / 144 Newman requests passed. 13 storefront GET failures due to application 401 responses.</p>
+            </div>
+            <div class="overview-card">
+              <div class="status-row"><h3>Journey wireframes</h3><span class="badge pass">Ready</span></div>
+              <p>Customer, admin, and delivery discussion screens. <a href="docs/wireframes/index.html">Open wireframes</a>.</p>
+            </div>
+            <div class="overview-card">
+              <div class="status-row"><h3>API Performance Testing</h3><span class="badge fail">Fail</span></div>
+              <p>k6 smoke test: 99.33% HTTP failures from the same public-endpoint authentication issue.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" id="frontend-unit-tests">
+          <h2>Frontend Unit Testing</h2>
+          <div class="status-row"><span class="badge pass">Pass</span><span class="muted">Vitest — verified by running <code>npm run test</code></span></div>
+          <div class="cards">
+            <div class="card"><span class="label">Test files</span><span class="value">72</span></div>
+            <div class="card"><span class="label">Total tests</span><span class="value">580</span></div>
+            <div class="card"><span class="label">Passed</span><span class="value">580</span></div>
+            <div class="card"><span class="label">Failed</span><span class="value">0</span></div>
+            <div class="card"><span class="label">Framework</span><span class="value" style="font-size:1rem;">Vitest 4.1.7</span></div>
+            <div class="card"><span class="label">Execution status</span><span class="value" style="font-size:1rem;">Success</span></div>
+          </div>
+          <table class="summary-table">
+            <tr><td>Scope</td><td>Frontend unit tests under <code>src/**/*.{test,spec}.{ts,tsx}</code></td></tr>
+            <tr><td>Environment</td><td>jsdom test environment with project-supported Vitest configuration</td></tr>
+            <tr><td>Evidence HTML report</td><td><span class="na">Not available</span> — Vitest CLI summary only</td></tr>
+          </table>
+        </section>
+
+        <section class="panel" id="frontend-coverage">
+          <h2>Frontend Code Coverage</h2>
+          <div class="status-row"><span class="badge pass">Pass</span><span class="muted">Source: <code>coverage/frontend/coverage-summary.json</code></span></div>
+          <div class="cards">
+            <div class="card"><span class="label">Statements</span><span class="value">97.9%</span></div>
+            <div class="card"><span class="label">Branches</span><span class="value">93.81%</span></div>
+            <div class="card"><span class="label">Functions</span><span class="value">99.6%</span></div>
+            <div class="card"><span class="label">Lines</span><span class="value">99.62%</span></div>
+          </div>
+          <div class="notice">
+            Coverage gate applies to scoped high-risk frontend files configured in <code>vitest.config.ts</code>
+            (API, auth, shop, login routes, and related helpers). No retained baseline HTML artifact was found for a
+            before/after comparison.
+          </div>
+          <div class="actions">
+            <a class="btn" href="coverage/frontend/index.html">View Coverage</a>
+            <a class="btn secondary" href="coverage/frontend/coverage-summary.json">Open JSON Summary</a>
+          </div>
+        </section>
+
+        <section class="panel" id="backend-unit-tests">
+          <h2>Backend Unit Testing</h2>
+          <div class="status-row"><span class="badge pass">Pass</span><span class="muted">Source: Maven Surefire XML reports in <code>backend/target/surefire-reports</code></span></div>
+          <div class="cards">
+            <div class="card"><span class="label">Total tests</span><span class="value">2,024</span></div>
+            <div class="card"><span class="label">Passed</span><span class="value">2,023</span></div>
+            <div class="card"><span class="label">Failed</span><span class="value">0</span></div>
+            <div class="card"><span class="label">Errors</span><span class="value">0</span></div>
+            <div class="card"><span class="label">Skipped</span><span class="value">1</span></div>
+            <div class="card"><span class="label">Build status</span><span class="value" style="font-size:1rem;">BUILD SUCCESS</span></div>
+          </div>
+          <table class="summary-table">
+            <tr><td>Framework</td><td>JUnit 5 + Mockito via Maven Surefire</td></tr>
+            <tr><td>Module</td><td>Catalog backend (<code>backend/</code>)</td></tr>
+            <tr><td>Evidence HTML report</td><td><span class="na">Not available</span> — Surefire XML reports only</td></tr>
+          </table>
+        </section>
+
+        <section class="panel" id="backend-coverage">
+          <h2>Backend Code Coverage</h2>
+          <div class="status-row"><span class="badge partial">93.91% Instruction Coverage</span></div>
+          <div class="notice warn">
+            <strong>Strict 94% target not reached.</strong> Actual instruction coverage is
+            <strong>93.91%</strong> (70,100 covered of 74,644 total instructions). That is approximately
+            <strong>0.09 percentage points</strong> below the strict 94% target. Remaining gaps are mainly larger
+            orchestration, framework/bootstrap, and repository-proxy areas where additional testing was considered
+            disproportionately expensive.
+          </div>
+          <div class="cards">
+            <div class="card"><span class="label">Instructions covered</span><span class="value">70,100</span></div>
+            <div class="card"><span class="label">Total instructions</span><span class="value">74,644</span></div>
+            <div class="card"><span class="label">Instruction coverage</span><span class="value">93.91%</span></div>
+            <div class="card"><span class="label">Branches covered</span><span class="value">6,117</span></div>
+            <div class="card"><span class="label">Total branches</span><span class="value">8,148</span></div>
+            <div class="card"><span class="label">Branch coverage</span><span class="value">75.0%</span></div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th>Before (documented baseline)</th>
+                <th>After (JaCoCo artifact)</th>
+                <th>Change</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Instruction coverage</td>
+                <td>69,227 / 74,644 = 92.7%</td>
+                <td>70,100 / 74,644 = 93.91%</td>
+                <td>+873 instructions covered</td>
+              </tr>
+              <tr>
+                <td>Branch coverage</td>
+                <td>6,000 / 8,148 = 73.6%</td>
+                <td>6,117 / 8,148 = 75.0%</td>
+                <td>+117 branches covered</td>
+              </tr>
+              <tr>
+                <td>Backend tests</td>
+                <td>1,925</td>
+                <td>2,024</td>
+                <td>+99 tests</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="muted">
+            The “before” row comes from the documented backend coverage improvement session. No retained JaCoCo HTML
+            baseline artifact was found in the repository.
+          </p>
+          <h3>Remaining major gaps</h3>
+          <ul class="muted">
+            <li><code>ZohoSyncService</code> orchestration paths</li>
+            <li>Spring configuration / bootstrap code</li>
+            <li>Generated or repository-proxy surfaces with low unit-test ROI</li>
+            <li>Large image-sync and sync-summary helper branches still partially uncovered</li>
+          </ul>
+          <div class="actions">
+            <a class="btn" href="backend/target/site/jacoco/index.html">View JaCoCo Report</a>
+          </div>
+        </section>
+
+        <section class="panel" id="swagger-openapi">
+          <h2>Swagger / OpenAPI</h2>
+          <div class="status-row"><span class="badge pass">Pass</span><span class="muted">SpringDoc OpenAPI 3</span></div>
+          <table class="summary-table">
+            <tr><td>Implementation status</td><td>SpringDoc configured with catalog/commerce API group and public path rewriting; OpenAPI catalog document generated and verified</td></tr>
+            <tr><td>REST controllers in catalog surface</td><td>18 controller classes under <code>backend/src/main/java/.../web/rest</code> (verified by source file count)</td></tr>
+            <tr><td>HTTP handlers / operations</td><td>141 handler mappings and 141 discovered endpoints (<code>postman/endpoint-manifest.json</code>)</td></tr>
+            <tr><td>Explicit OpenAPI annotations</td><td><code>@Tag</code> and <code>@Operation</code> verified on 6 webhook controllers only; remaining operations are documented by SpringDoc from controller mappings</td></tr>
+            <tr><td>OpenAPI catalog endpoint</td><td><code>/v3/api-docs/catalog</code></td></tr>
+            <tr><td>Swagger UI</td><td><code>/swagger-ui/index.html</code> configured for the catalog OpenAPI document</td></tr>
+          </table>
+          <div class="actions">
+            <a class="btn" href="http://localhost:8084/swagger-ui/index.html">Open Swagger</a>
+            <a class="btn secondary" href="http://localhost:8084/v3/api-docs/catalog">Open OpenAPI JSON</a>
+            <a class="btn secondary" href="artifacts/api-docs/index.html">View Archived Swagger Snapshot</a>
+          </div>
+        </section>
+
+        <section class="panel" id="javadoc">
+          <h2>JavaDoc</h2>
+          <div class="status-row"><span class="badge pass">Pass</span><span class="muted">Generated with warnings</span></div>
+          <div class="cards">
+            <div class="card"><span class="label">Status</span><span class="value" style="font-size:1rem;">Generated</span></div>
+            <div class="card"><span class="label">Errors</span><span class="value">0</span></div>
+            <div class="card"><span class="label">Warnings</span><span class="value">100</span></div>
+            <div class="card"><span class="label">Warning files</span><span class="value">6</span></div>
+          </div>
+          <div class="notice warn">
+            JavaDoc generation completed successfully, but <strong>100 warnings across 6 files</strong> remain and are
+            shown here intentionally.
+          </div>
+          <p class="muted">
+            Primary current report: <code>backend/target/reports/apidocs/index.html</code>. Files under
+            <code>artifacts/javadocs/</code> are archived packaged copies from CI artifact publishing, not a separate
+            JavaDoc implementation.
+          </p>
+          <div class="actions">
+            <a class="btn" href="backend/target/reports/apidocs/index.html">View JavaDoc Report</a>
+            <a class="btn secondary" href="artifacts/javadocs/index.html">View Archived JavaDoc Hub</a>
+            <a class="btn secondary" href="artifacts/javadocs/catalog/index.html">View Archived Catalog JavaDoc</a>
+          </div>
+        </section>
+
+        <section class="panel" id="sonarqube">
+          <h2>SonarQube</h2>
+          <div class="status-row"><span class="badge pass">Pass</span><span class="muted">Live local SonarQube analysis for project key <code>miniandmore</code></span></div>
+          <div class="notice">
+            The authoritative current result is the live SonarQube dashboard below. The archived static snapshot is an
+            older export and must not be treated as the current live analysis.
+          </div>
+          <table class="summary-table">
+            <tr><td>Analysis status</td><td>Successful (live local SonarQube)</td></tr>
+            <tr><td>Project key</td><td><code>miniandmore</code> (<code>backend/sonar-project.properties</code>)</td></tr>
+            <tr><td>SonarQube server</td><td><code>http://localhost:9001</code></td></tr>
+            <tr><td>Live dashboard</td><td><code>http://localhost:9001/dashboard?id=miniandmore</code></td></tr>
+            <tr><td>Archived static snapshot</td><td><code>artifacts/sonar-summary/index.html</code> — self-contained export from 2026-08-31; not the current live SonarQube result</td></tr>
+          </table>
+          <div class="actions">
+            <a class="btn" href="http://localhost:9001/dashboard?id=miniandmore">Open SonarQube</a>
+            <a class="btn secondary" href="artifacts/sonar-summary/index.html">View Archived Snapshot</a>
+          </div>
+        </section>
+
+        <section class="panel" id="api-functional">
+          <h2>API Functional Testing</h2>
+          <div class="status-row"><span class="badge partial">Partial — Application Authentication Issue</span></div>
+          <div class="notice warn">
+            Newman completed with <strong>0 HTTP connection failures</strong>, but 13 public storefront/coupon GET
+            requests returned <strong>HTTP 401</strong> with an empty body and a Bearer authentication challenge. This is
+            an application-level authentication/security issue, not a missing-server or Newman setup failure.
+          </div>
+          <div class="cards">
+            <div class="card"><span class="label">Total requests</span><span class="value">144</span></div>
+            <div class="card"><span class="label">Passed requests</span><span class="value">131</span></div>
+            <div class="card"><span class="label">Failed requests</span><span class="value">13</span></div>
+            <div class="card"><span class="label">Total assertions</span><span class="value">175</span></div>
+            <div class="card"><span class="label">Passed assertions</span><span class="value">135</span></div>
+            <div class="card"><span class="label">Failed assertions</span><span class="value">40</span></div>
+            <div class="card"><span class="label">Connection failures</span><span class="value">0</span></div>
+            <div class="card"><span class="label">Duration</span><span class="value">18.5s</span></div>
+          </div>
+          <table class="summary-table">
+            <tr><td>Base URL</td><td><code>http://localhost:8084</code></td></tr>
+            <tr><td>Tooling</td><td>Postman collection + Newman 6.2.2</td></tr>
+            <tr><td>Root cause</td><td>Public storefront/coupon GET endpoints return 401 despite expected public access</td></tr>
+          </table>
+          <h3>Affected endpoints</h3>
+          <table>
+            <thead><tr><th>Endpoint</th><th>Observed result</th></tr></thead>
+            <tbody>
+              <tr><td><code>GET /internal/v1/categories</code></td><td>401 Unauthorized</td></tr>
+              <tr><td><code>GET /internal/v1/products</code></td><td>401 Unauthorized</td></tr>
+              <tr><td><code>GET /internal/v1/products/{slug}</code></td><td>401 Unauthorized</td></tr>
+              <tr><td><code>GET /internal/v1/blog-posts</code></td><td>401 Unauthorized</td></tr>
+              <tr><td><code>GET /internal/v1/blog-posts/{slug}</code></td><td>401 Unauthorized</td></tr>
+              <tr><td><code>GET /internal/v1/banners</code></td><td>401 Unauthorized</td></tr>
+              <tr><td><code>GET /internal/v1/home-sections</code></td><td>401 Unauthorized</td></tr>
+              <tr><td><code>GET /internal/v1/page-visibility</code></td><td>401 Unauthorized</td></tr>
+              <tr><td><code>GET /internal/v1/site-settings</code></td><td>401 Unauthorized</td></tr>
+              <tr><td><code>GET /internal/v1/subscribe-page</code></td><td>401 Unauthorized</td></tr>
+              <tr><td><code>GET /internal/v1/pincode/{pincode}</code></td><td>401 Unauthorized</td></tr>
+              <tr><td><code>GET /internal/v1/policies/{slug}</code></td><td>401 Unauthorized</td></tr>
+              <tr><td><code>GET /internal/v1/coupons/active</code></td><td>401 Unauthorized</td></tr>
+            </tbody>
+          </table>
+          <div class="actions">
+            <a class="btn" href="postman/API-FUNCTIONAL-TESTING-REPORT.md">View Newman Report</a>
+            <a class="btn secondary" href="postman/newman-report.json">Open Newman JSON</a>
+            <a class="btn secondary" href="postman/newman-junit.xml">Open Newman JUnit</a>
+            <a class="btn secondary" href="postman/mini-and-more-api-functional-tests.postman_collection.json">Open Postman Collection</a>
+          </div>
+        </section>
+
+        <section class="panel" id="api-performance">
+          <h2>API Performance Testing</h2>
+          <div class="status-row"><span class="badge fail">Fail — Application Authentication Issue</span></div>
+          <div class="notice fail">
+            k6 smoke test latency numbers must <strong>not</strong> be interpreted as successful application
+            performance. Approximately <strong>99.33% of requests returned HTTP 401</strong>, so the fast rejection times
+            reflect security failures rather than healthy storefront response behavior.
+          </div>
+          <div class="cards">
+            <div class="card"><span class="label">Test type</span><span class="value" style="font-size:1rem;">Smoke</span></div>
+            <div class="card"><span class="label">Total requests</span><span class="value">151</span></div>
+            <div class="card"><span class="label">Successful 2xx</span><span class="value">1</span></div>
+            <div class="card"><span class="label">Failed requests</span><span class="value">150</span></div>
+            <div class="card"><span class="label">Error rate</span><span class="value">99.33%</span></div>
+            <div class="card"><span class="label">Checks</span><span class="value">1 pass / 149 fail</span></div>
+            <div class="card"><span class="label">p90</span><span class="value">67.2 ms</span></div>
+            <div class="card"><span class="label">p95</span><span class="value">118.6 ms</span></div>
+            <div class="card"><span class="label">p99</span><span class="value">751.7 ms</span></div>
+            <div class="card"><span class="label">Average</span><span class="value">56.6 ms</span></div>
+            <div class="card"><span class="label">Minimum</span><span class="value">13.1 ms</span></div>
+            <div class="card"><span class="label">Maximum</span><span class="value">1590.9 ms</span></div>
+            <div class="card"><span class="label">Throughput</span><span class="value">4.76 req/s</span></div>
+          </div>
+          <table class="summary-table">
+            <tr><td>Root cause</td><td>Public storefront GET endpoints return HTTP 401 before controller execution</td></tr>
+            <tr><td>Load test</td><td>Skipped — not meaningful while ~99% of traffic fails authentication</td></tr>
+            <tr><td>Stress test</td><td>Skipped — same authentication failure blocks meaningful measurement</td></tr>
+            <tr><td>Single passing check</td><td><code>GET /management/health</code> during setup</td></tr>
+          </table>
+          <div class="actions">
+            <a class="btn" href="performance/API-PERFORMANCE-TESTING-REPORT.md">View Performance Report</a>
+            <a class="btn secondary" href="performance/k6/results/summary-smoke-2026-09-09T17-00-36-294Z.json">Open k6 JSON Summary</a>
+            <a class="btn secondary" href="performance/k6/results/summary-smoke-2026-09-09T17-00-36-294Z.txt">Open k6 Text Summary</a>
+            <a class="btn secondary" href="performance/k6/results/smoke-run-console.txt">Open k6 Console Output</a>
+          </div>
+        </section>
+
+        <section class="panel" id="wireframes">
+          <h2>Customer / Admin / Delivery wireframes</h2>
+          <div class="status-row"><span class="badge pass">Ready</span><span class="muted">Discussion deck for storefront, admin ops, and courier journeys</span></div>
+          <p>
+            Lo-fi clickable screens for the call: shop through checkout, cancel / return / exchange, wrap and book
+            shipment, COD, reverse pickup, and delivery exceptions. Not visual design.
+          </p>
+          <div class="actions">
+            <a class="btn" href="docs/wireframes/index.html">Open wireframes</a>
+          </div>
+        </section>
+
+        <section class="panel" id="implementation-summary">
+          <h2>Implementation Summary</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Area</th>
+                <th>Implementation</th>
+                <th>Result</th>
+                <th>Status</th>
+                <th>Evidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Frontend unit testing</td>
+                <td>Vitest unit suite for scoped frontend integration surface</td>
+                <td>72 files / 580 tests passed</td>
+                <td><span class="badge pass">Pass</span></td>
+                <td><code>npm run test</code></td>
+              </tr>
+              <tr>
+                <td>Frontend code coverage</td>
+                <td>Vitest v8 coverage on scoped files</td>
+                <td>97.9% statements / 99.62% lines</td>
+                <td><span class="badge pass">Pass</span></td>
+                <td><a href="coverage/frontend/index.html">coverage/frontend</a></td>
+              </tr>
+              <tr>
+                <td>Backend unit testing</td>
+                <td>Maven Surefire on catalog backend</td>
+                <td>2,024 tests, BUILD SUCCESS</td>
+                <td><span class="badge pass">Pass</span></td>
+                <td><code>backend/target/surefire-reports</code></td>
+              </tr>
+              <tr>
+                <td>Backend code coverage</td>
+                <td>JaCoCo during <code>mvn test</code></td>
+                <td>93.91% instruction coverage</td>
+                <td><span class="badge partial">Below 94% target</span></td>
+                <td><a href="backend/target/site/jacoco/index.html">JaCoCo HTML</a></td>
+              </tr>
+              <tr>
+                <td>Swagger / OpenAPI</td>
+                <td>SpringDoc catalog group + Swagger UI</td>
+                <td>141 handlers across 18 controllers</td>
+                <td><span class="badge pass">Pass</span></td>
+                <td><a href="http://localhost:8084/swagger-ui/index.html">Swagger UI</a></td>
+              </tr>
+              <tr>
+                <td>JavaDoc</td>
+                <td>Maven Javadoc for catalog backend</td>
+                <td>0 errors / 100 warnings</td>
+                <td><span class="badge pass">Pass</span></td>
+                <td><a href="backend/target/reports/apidocs/index.html">apidocs</a></td>
+              </tr>
+              <tr>
+                <td>SonarQube</td>
+                <td>Local Sonar scan for <code>miniandmore</code></td>
+                <td>Analysis successful</td>
+                <td><span class="badge pass">Pass</span></td>
+                <td><a href="http://localhost:9001/dashboard?id=miniandmore">Sonar dashboard</a></td>
+              </tr>
+              <tr>
+                <td>API functional testing</td>
+                <td>Postman/Newman controller-accurate suite</td>
+                <td>131 / 144 requests passed</td>
+                <td><span class="badge partial">Partial</span></td>
+                <td><a href="postman/API-FUNCTIONAL-TESTING-REPORT.md">Functional report</a></td>
+              </tr>
+              <tr>
+                <td>API performance testing</td>
+                <td>k6 smoke profile against catalog backend</td>
+                <td>99.33% HTTP failure rate</td>
+                <td><span class="badge fail">Fail</span></td>
+                <td><a href="performance/API-PERFORMANCE-TESTING-REPORT.md">Performance report</a></td>
+              </tr>
+              <tr>
+                <td>Journey wireframes</td>
+                <td>Customer, admin, and delivery discussion screens</td>
+                <td>Clickable HTML deck</td>
+                <td><span class="badge pass">Ready</span></td>
+                <td><a href="docs/wireframes/index.html">docs/wireframes</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="panel" id="evidence">
+          <h2>Evidence / Reports</h2>
+          <p class="muted">Links verified against files present in this repository on 2026-09-10.</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Artifact</th>
+                <th>Location</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Journey wireframes (customer / admin / delivery)</td>
+                <td><code>docs/wireframes/index.html</code></td>
+                <td><a class="btn" href="docs/wireframes/index.html">Open wireframes</a></td>
+              </tr>
+              <tr>
+                <td>Frontend coverage HTML</td>
+                <td><code>coverage/frontend/index.html</code></td>
+                <td><a class="btn" href="coverage/frontend/index.html">View Coverage</a></td>
+              </tr>
+              <tr>
+                <td>Backend JaCoCo HTML</td>
+                <td><code>backend/target/site/jacoco/index.html</code></td>
+                <td><a class="btn" href="backend/target/site/jacoco/index.html">View Coverage</a></td>
+              </tr>
+              <tr>
+                <td>Backend JavaDoc HTML (current)</td>
+                <td><code>backend/target/reports/apidocs/index.html</code></td>
+                <td><a class="btn" href="backend/target/reports/apidocs/index.html">View Report</a></td>
+              </tr>
+              <tr>
+                <td>Archived JavaDoc hub</td>
+                <td><code>artifacts/javadocs/index.html</code></td>
+                <td><a class="btn secondary" href="artifacts/javadocs/index.html">View Archived Report</a></td>
+              </tr>
+              <tr>
+                <td>Swagger UI (live local)</td>
+                <td><code>http://localhost:8084/swagger-ui/index.html</code></td>
+                <td><a class="btn" href="http://localhost:8084/swagger-ui/index.html">Open Swagger</a></td>
+              </tr>
+              <tr>
+                <td>OpenAPI JSON (live local)</td>
+                <td><code>http://localhost:8084/v3/api-docs/catalog</code></td>
+                <td><a class="btn secondary" href="http://localhost:8084/v3/api-docs/catalog">Open OpenAPI JSON</a></td>
+              </tr>
+              <tr>
+                <td>Archived Swagger snapshot</td>
+                <td><code>artifacts/api-docs/index.html</code></td>
+                <td><a class="btn secondary" href="artifacts/api-docs/index.html">Open Archived Snapshot</a></td>
+              </tr>
+              <tr>
+                <td>SonarQube live dashboard</td>
+                <td><code>http://localhost:9001/dashboard?id=miniandmore</code></td>
+                <td><a class="btn" href="http://localhost:9001/dashboard?id=miniandmore">Open SonarQube</a></td>
+              </tr>
+              <tr>
+                <td>Archived SonarQube snapshot (2026-08-31)</td>
+                <td><code>artifacts/sonar-summary/index.html</code></td>
+                <td><a class="btn secondary" href="artifacts/sonar-summary/index.html">View Archived Snapshot</a></td>
+              </tr>
+              <tr>
+                <td>Newman JSON report</td>
+                <td><code>postman/newman-report.json</code></td>
+                <td><a class="btn" href="postman/newman-report.json">View Newman Results</a></td>
+              </tr>
+              <tr>
+                <td>Newman markdown report</td>
+                <td><code>postman/API-FUNCTIONAL-TESTING-REPORT.md</code></td>
+                <td><a class="btn secondary" href="postman/API-FUNCTIONAL-TESTING-REPORT.md">View Newman Report</a></td>
+              </tr>
+              <tr>
+                <td>Postman collection</td>
+                <td><code>postman/mini-and-more-api-functional-tests.postman_collection.json</code></td>
+                <td><a class="btn secondary" href="postman/mini-and-more-api-functional-tests.postman_collection.json">Open Collection</a></td>
+              </tr>
+              <tr>
+                <td>k6 smoke JSON summary</td>
+                <td><code>performance/k6/results/summary-smoke-2026-09-09T17-00-36-294Z.json</code></td>
+                <td><a class="btn" href="performance/k6/results/summary-smoke-2026-09-09T17-00-36-294Z.json">View k6 Results</a></td>
+              </tr>
+              <tr>
+                <td>k6 markdown report</td>
+                <td><code>performance/API-PERFORMANCE-TESTING-REPORT.md</code></td>
+                <td><a class="btn secondary" href="performance/API-PERFORMANCE-TESTING-REPORT.md">View Performance Report</a></td>
+              </tr>
+              <tr>
+                <td>Frontend unit test HTML report</td>
+                <td>—</td>
+                <td><span class="na">Not available</span></td>
+              </tr>
+              <tr>
+                <td>Backend Surefire HTML report</td>
+                <td>—</td>
+                <td><span class="na">Not available</span></td>
+              </tr>
+              <tr>
+                <td>Newman HTML report</td>
+                <td>—</td>
+                <td><span class="na">Not available</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="panel" id="build-environment">
+          <h2>Build &amp; Environment</h2>
+          <p class="muted">Values verified from repository configuration files.</p>
+          <table>
+            <tbody>
+              <tr><td>Frontend framework</td><td>React + Vite + TanStack Start tooling</td></tr>
+              <tr><td>Backend framework</td><td>Spring Boot 4.0.3 (JHipster-generated catalog service)</td></tr>
+              <tr><td>Java version</td><td>21 (<code>backend/pom.xml</code>)</td></tr>
+              <tr><td>Frontend test runner</td><td>Vitest 4.1.7</td></tr>
+              <tr><td>Frontend coverage tool</td><td>@vitest/coverage-v8 4.1.7</td></tr>
+              <tr><td>Backend test runner</td><td>Maven Surefire + JUnit 5</td></tr>
+              <tr><td>Backend coverage tool</td><td>JaCoCo 0.8.14</td></tr>
+              <tr><td>API functional testing</td><td>Postman collection + Newman 6.2.2</td></tr>
+              <tr><td>API performance testing</td><td>k6 v2.2.0</td></tr>
+              <tr><td>OpenAPI tooling</td><td>SpringDoc OpenAPI</td></tr>
+              <tr><td>Catalog backend base URL used in API tests</td><td><code>http://localhost:8084</code></td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <footer>Mini &amp; More engineering dashboard — generated locally, not committed.</footer>
+      </main>
+    </div>
+
+    <button id="backToTop" type="button" aria-label="Back to top">Top</button>
+
+    <script>
+      (function () {
+        var links = Array.prototype.slice.call(document.querySelectorAll(".nav-group a"));
+        var sections = links
+          .map(function (link) {
+            var id = link.getAttribute("href").slice(1);
+            return document.getElementById(id);
+          })
+          .filter(Boolean);
+
+        function setActive() {
+          var current = sections[0];
+          sections.forEach(function (section) {
+            if (window.scrollY + 120 >= section.offsetTop) {
+              current = section;
+            }
+          });
+          links.forEach(function (link) {
+            link.classList.toggle("active", link.getAttribute("href") === "#" + current.id);
+          });
+        }
+
+        links.forEach(function (link) {
+          link.addEventListener("click", function () {
+            document.getElementById("sidebar").classList.remove("open");
+          });
+        });
+
+        document.getElementById("menuToggle").addEventListener("click", function () {
+          document.getElementById("sidebar").classList.toggle("open");
+        });
+
+        var backToTop = document.getElementById("backToTop");
+        window.addEventListener("scroll", function () {
+          setActive();
+          backToTop.style.display = window.scrollY > 500 ? "inline-block" : "none";
+        });
+        backToTop.addEventListener("click", function () {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+
+        setActive();
+      })();
+    </script>
+  </body>
+</html>

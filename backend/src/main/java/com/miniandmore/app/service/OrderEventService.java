@@ -3,6 +3,7 @@ package com.miniandmore.app.service;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
+import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.domain.OrderEvent;
 import com.miniandmore.app.repository.OrderEventRepository;
 import java.math.BigDecimal;
@@ -31,9 +32,13 @@ public class OrderEventService {
     public static final String TYPE_PAYMENT_RECEIVED = "payment_received";
     public static final String TYPE_HAND_WRAPPED = "hand_wrapped";
     public static final String TYPE_SHIPPED = "shipped";
+    public static final String TYPE_OUT_FOR_DELIVERY = "out_for_delivery";
     public static final String TYPE_DELIVERED = "delivered";
     public static final String TYPE_CANCELLED = "cancelled";
     public static final String TYPE_REFUNDED = "refunded";
+    public static final String TYPE_REFUND_INITIATED = "refund_initiated";
+    public static final String TYPE_REFUND_FAILED = "refund_failed";
+    public static final String TYPE_DELIVERY_FAILED = "delivery_failed";
 
     private static final Logger LOG = LoggerFactory.getLogger(OrderEventService.class);
     private static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
@@ -69,9 +74,34 @@ public class OrderEventService {
     }
 
     /**
+     * Records {@code refund_initiated} without mailing the full order total. Exchange Razorpay
+     * settlement already emails the price-difference amount and refund id.
+     */
+    public void recordRefundInitiatedWithoutMail(CustomerOrder order) {
+        if (order == null || order.getId() == null) {
+            return;
+        }
+        recordIfAbsent(
+            order,
+            TYPE_REFUND_INITIATED,
+            titleFor(TYPE_REFUND_INITIATED),
+            bodyFor(order, TYPE_REFUND_INITIATED),
+            Instant.now(),
+            false
+        );
+    }
+
+    /**
      * Idempotent: records any lifecycle events that match the order's current state but are not yet stored.
      */
     public void syncLifecycleEvents(CustomerOrder order) {
+        syncLifecycleEvents(order, true);
+    }
+
+    /**
+     * @param notifyCancelled false when OrderCancellationService will send cancel mail/SMS itself
+     */
+    public void syncLifecycleEvents(CustomerOrder order, boolean notifyCancelled) {
         if (order.getId() == null) {
             return;
         }
@@ -101,13 +131,31 @@ public class OrderEventService {
                 placedAt(order)
             );
         }
+        if (order.getPaymentStatus() == PaymentStatus.REFUND_INITIATED) {
+            recordIfAbsent(
+                order,
+                TYPE_REFUND_INITIATED,
+                titleFor(TYPE_REFUND_INITIATED),
+                bodyFor(order, TYPE_REFUND_INITIATED),
+                Instant.now()
+            );
+        }
         if (order.getPaymentStatus() == PaymentStatus.REFUNDED) {
             recordIfAbsent(order, TYPE_REFUNDED, titleFor(TYPE_REFUNDED), bodyFor(order, TYPE_REFUNDED), Instant.now());
+        }
+        if (order.getPaymentStatus() == PaymentStatus.REFUND_FAILED) {
+            recordIfAbsent(
+                order,
+                TYPE_REFUND_FAILED,
+                titleFor(TYPE_REFUND_FAILED),
+                bodyFor(order, TYPE_REFUND_FAILED),
+                Instant.now()
+            );
         }
 
         String tracking = OrderTrackingStatusResolver.resolve(order);
         switch (tracking) {
-            case "hand_wrapped":
+            case TYPE_HAND_WRAPPED:
                 recordIfAbsent(
                     order,
                     TYPE_HAND_WRAPPED,
@@ -116,16 +164,17 @@ public class OrderEventService {
                     Instant.now()
                 );
                 break;
-            case "cancelled":
+            case TYPE_CANCELLED:
                 recordIfAbsent(
                     order,
                     TYPE_CANCELLED,
                     titleFor(TYPE_CANCELLED),
                     bodyFor(order, TYPE_CANCELLED),
-                    Instant.now()
+                    Instant.now(),
+                    notifyCancelled
                 );
                 break;
-            case "delivered":
+            case TYPE_DELIVERED:
                 recordIfAbsent(
                     order,
                     TYPE_SHIPPED,
@@ -138,10 +187,42 @@ public class OrderEventService {
                     TYPE_DELIVERED,
                     titleFor(TYPE_DELIVERED),
                     bodyFor(order, TYPE_DELIVERED),
-                    shipmentInstant(order).orElse(Instant.now())
+                    deliveryInstant(order).orElse(Instant.now())
                 );
                 break;
-            case "shipped":
+            case TYPE_OUT_FOR_DELIVERY:
+                recordIfAbsent(
+                    order,
+                    TYPE_SHIPPED,
+                    titleFor(TYPE_SHIPPED),
+                    bodyFor(order, TYPE_SHIPPED),
+                    shipmentInstant(order).orElse(Instant.now())
+                );
+                recordIfAbsent(
+                    order,
+                    TYPE_OUT_FOR_DELIVERY,
+                    titleFor(TYPE_OUT_FOR_DELIVERY),
+                    bodyFor(order, TYPE_OUT_FOR_DELIVERY),
+                    Instant.now()
+                );
+                break;
+            case TYPE_DELIVERY_FAILED:
+                recordIfAbsent(
+                    order,
+                    TYPE_SHIPPED,
+                    titleFor(TYPE_SHIPPED),
+                    bodyFor(order, TYPE_SHIPPED),
+                    shipmentInstant(order).orElse(Instant.now())
+                );
+                recordIfAbsent(
+                    order,
+                    TYPE_DELIVERY_FAILED,
+                    titleFor(TYPE_DELIVERY_FAILED),
+                    bodyFor(order, TYPE_DELIVERY_FAILED),
+                    Instant.now()
+                );
+                break;
+            case TYPE_SHIPPED:
                 recordIfAbsent(
                     order,
                     TYPE_SHIPPED,
@@ -181,6 +262,17 @@ public class OrderEventService {
         String body,
         Instant createdAt
     ) {
+        recordIfAbsent(order, eventType, title, body, createdAt, true);
+    }
+
+    private void recordIfAbsent(
+        CustomerOrder order,
+        String eventType,
+        String title,
+        String body,
+        Instant createdAt,
+        boolean queueNotification
+    ) {
         int inserted = orderEventRepository.insertIfAbsent(
             order.getUserLogin(),
             order.getId(),
@@ -190,7 +282,7 @@ public class OrderEventService {
             body,
             createdAt != null ? createdAt : Instant.now()
         );
-        if (inserted > 0) {
+        if (inserted > 0 && queueNotification) {
             queueLifecycleEmail(order, eventType);
         }
     }
@@ -219,6 +311,17 @@ public class OrderEventService {
                     }
                     break;
                 case TYPE_SHIPPED:
+                    // ExpressBees reports a real OUT FOR DELIVERY scan; notify on that event instead of pickup.
+                    if (!isExpressBeesShipment(order)) {
+                        notifyBothChannels(
+                            eventType,
+                            order,
+                            () -> orderMailService.sendOutForDelivery(order),
+                            () -> orderSmsService.sendOutForDelivery(order)
+                        );
+                    }
+                    break;
+                case TYPE_OUT_FOR_DELIVERY:
                     notifyBothChannels(
                         eventType,
                         order,
@@ -240,6 +343,48 @@ public class OrderEventService {
                         order,
                         () -> orderMailService.sendOrderCancelled(order),
                         () -> orderSmsService.sendOrderCancelled(order)
+                    );
+                    break;
+                case TYPE_REFUND_INITIATED:
+                    if (order.getStatus() == OrderStatus.CANCELLED) {
+                        // OrderCancellationService already sent sendRefundInitiated for this cancel.
+                        break;
+                    }
+                    notifyBothChannels(
+                        eventType,
+                        order,
+                        () ->
+                            orderMailService.sendRefundInitiated(
+                                order,
+                                order.getTotal(),
+                                null,
+                                order.getPaymentMethod()
+                            ),
+                        () -> {}
+                    );
+                    break;
+                case TYPE_REFUNDED:
+                    notifyBothChannels(
+                        eventType,
+                        order,
+                        () -> orderMailService.sendRefundCompleted(order, order.getTotal(), null, order.getPaymentMethod()),
+                        () -> {}
+                    );
+                    break;
+                case TYPE_REFUND_FAILED:
+                    notifyBothChannels(
+                        eventType,
+                        order,
+                        () -> orderMailService.sendRefundFailed(order, order.getTotal(), null, order.getPaymentMethod()),
+                        () -> {}
+                    );
+                    break;
+                case TYPE_DELIVERY_FAILED:
+                    notifyBothChannels(
+                        eventType,
+                        order,
+                        () -> orderMailService.sendDeliveryFailed(order),
+                        () -> {}
                     );
                     break;
                 default:
@@ -265,6 +410,10 @@ public class OrderEventService {
         return "cod".equalsIgnoreCase(StringUtils.trimToEmpty(order.getPaymentMethod()));
     }
 
+    private static boolean isExpressBeesShipment(CustomerOrder order) {
+        return order.getShipmentLogisticsMode() == ReturnLogisticsMode.XPRESSBEES;
+    }
+
     private String titleFor(String eventType) {
         switch (eventType) {
             case TYPE_ORDER_PLACED:
@@ -277,12 +426,20 @@ public class OrderEventService {
                 return "Hand-wrapped";
             case TYPE_SHIPPED:
                 return "On the way";
+            case TYPE_OUT_FOR_DELIVERY:
+                return "Out for delivery";
             case TYPE_DELIVERED:
                 return "Delivered";
+            case TYPE_DELIVERY_FAILED:
+                return "Delivery attempt unsuccessful";
             case TYPE_CANCELLED:
                 return "Order cancelled";
+            case TYPE_REFUND_INITIATED:
+                return "Refund initiated";
             case TYPE_REFUNDED:
                 return "Refund processed";
+            case TYPE_REFUND_FAILED:
+                return "Refund failed";
             default:
                 return "Order update";
         }
@@ -294,7 +451,10 @@ public class OrderEventService {
         if (total != null && total.compareTo(BigDecimal.ZERO) > 0) {
             body.append(" · ₹").append(total.setScale(0, java.math.RoundingMode.HALF_UP).toPlainString());
         }
-        if (TYPE_SHIPPED.equals(eventType) && StringUtils.isNotBlank(order.getTrackingNumber())) {
+        if (
+            (TYPE_SHIPPED.equals(eventType) || TYPE_OUT_FOR_DELIVERY.equals(eventType)) &&
+            StringUtils.isNotBlank(order.getTrackingNumber())
+        ) {
             body.append(" · Tracking ").append(order.getTrackingNumber().trim());
         }
         return body.toString();
@@ -318,5 +478,9 @@ public class OrderEventService {
                 return Optional.empty();
             }
         }
+    }
+
+    private Optional<Instant> deliveryInstant(CustomerOrder order) {
+        return Optional.ofNullable(order.getShipmentDeliveredAt()).or(() -> shipmentInstant(order));
     }
 }
