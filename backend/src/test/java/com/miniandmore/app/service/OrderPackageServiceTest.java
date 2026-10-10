@@ -18,6 +18,7 @@ import com.miniandmore.app.domain.enumeration.PackageType;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.OrderItemRepository;
+import com.miniandmore.app.repository.StoreAddressRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -53,6 +54,9 @@ class OrderPackageServiceTest {
 
     @Mock
     private OrderCancellationService orderCancellationService;
+
+    @Mock
+    private StoreAddressRepository storeAddressRepository;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -98,7 +102,8 @@ class OrderPackageServiceTest {
                 eq(10),
                 eq(10),
                 eq("prepaid"),
-                eq(BigDecimal.TEN)
+                eq(BigDecimal.TEN),
+                any()
             )
         )
             .thenReturn(
@@ -133,7 +138,7 @@ class OrderPackageServiceTest {
         CustomerOrder order = confirmedPaid();
         when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
         when(
-            xpressBeesClient.listForwardCourierOptions(eq("560001"), anyInt(), anyInt(), anyInt(), anyInt(), any(), any())
+            xpressBeesClient.listForwardCourierOptions(eq("560001"), anyInt(), anyInt(), anyInt(), anyInt(), any(), any(), any())
         )
             .thenReturn(
             List.of(new XpressBeesClient.CourierOption("1", "Surface Xpressbees 0.5 K.G", 3, "3 days", null, true))
@@ -190,7 +195,7 @@ class OrderPackageServiceTest {
         CustomerOrder order = confirmedPaid().paymentMethod("cod").paymentStatus(PaymentStatus.PENDING);
         when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
         when(
-            xpressBeesClient.listForwardCourierOptions(eq("560001"), anyInt(), anyInt(), anyInt(), anyInt(), any(), any())
+            xpressBeesClient.listForwardCourierOptions(eq("560001"), anyInt(), anyInt(), anyInt(), anyInt(), any(), any(), any())
         )
             .thenReturn(
             List.of(new XpressBeesClient.CourierOption("1", "Surface Xpressbees 0.5 K.G", 3, "3 days", null, true))
@@ -208,7 +213,7 @@ class OrderPackageServiceTest {
         CustomerOrder order = confirmedPaid();
         when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
         when(
-            xpressBeesClient.listForwardCourierOptions(eq("560001"), anyInt(), anyInt(), anyInt(), anyInt(), any(), any())
+            xpressBeesClient.listForwardCourierOptions(eq("560001"), anyInt(), anyInt(), anyInt(), anyInt(), any(), any(), any())
         )
             .thenReturn(List.of());
 
@@ -225,7 +230,7 @@ class OrderPackageServiceTest {
         CustomerOrder order = confirmedPaid();
         when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
         when(
-            xpressBeesClient.listForwardCourierOptions(eq("560001"), anyInt(), anyInt(), anyInt(), anyInt(), any(), any())
+            xpressBeesClient.listForwardCourierOptions(eq("560001"), anyInt(), anyInt(), anyInt(), anyInt(), any(), any(), any())
         )
             .thenReturn(
             List.of(new XpressBeesClient.CourierOption("1", "Surface Xpressbees 0.5 K.G", 3, "3 days", null, true))
@@ -241,7 +246,7 @@ class OrderPackageServiceTest {
         CustomerOrder order = confirmedPaid();
         when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
         when(
-            xpressBeesClient.listForwardCourierOptions(eq("560001"), anyInt(), anyInt(), anyInt(), anyInt(), any(), any())
+            xpressBeesClient.listForwardCourierOptions(eq("560001"), anyInt(), anyInt(), anyInt(), anyInt(), any(), any(), any())
         )
             .thenReturn(
             List.of(new XpressBeesClient.CourierOption("1", "Surface Xpressbees 0.5 K.G", 3, "3 days", null, true))

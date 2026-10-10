@@ -3,6 +3,7 @@ package com.miniandmore.app.web.rest.admin;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -327,6 +328,215 @@ class ZohoAdminResourceTest {
     }
 
     @Test
+    void oauthSetup_returnsConsoleAndAuthTemplate() throws Exception {
+        when(oauthService.oauthSetup()).thenReturn(oauthSetup());
+        when(oauthService.dataCenter()).thenReturn("in");
+        when(oauthService.accountsHost("in")).thenReturn("https://accounts.zoho.in");
+
+        mockMvc
+            .perform(get("/api/v1/admin/zoho/oauth-setup"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.clientType").value("Server-based"))
+            .andExpect(jsonPath("$.apiConsoleUrl").value("https://api-console.zoho.in/"))
+            .andExpect(jsonPath("$.primaryRedirectUri").value("http://localhost:5173/admin/zoho"))
+            .andExpect(jsonPath("$.authorizationUrlTemplate").value(org.hamcrest.Matchers.containsString("accounts.zoho.in")));
+    }
+
+    @Test
+    void testConnection_forbidden_returns403Message() throws Exception {
+        when(settingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(syncService.testConnection()).thenThrow(
+            new RestClientResponseException("403", HttpStatus.FORBIDDEN.value(), "Forbidden", null, null, null)
+        );
+
+        mockMvc
+            .perform(get("/api/v1/admin/zoho/test"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.connected").value(false))
+            .andExpect(jsonPath("$.message").value("Zoho rejected the credentials (HTTP 403). Reconnect or check the org ID."));
+    }
+
+    @Test
+    void testConnection_otherHttpError_returnsGenericMessage() throws Exception {
+        when(settingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(syncService.testConnection()).thenThrow(
+            new RestClientResponseException("500", HttpStatus.INTERNAL_SERVER_ERROR.value(), "Error", null, null, null)
+        );
+
+        mockMvc
+            .perform(get("/api/v1/admin/zoho/test"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value("Zoho returned HTTP 500. Check settings and try again."));
+    }
+
+    @Test
+    void syncProduct_whenFound_returnsSyncFields() throws Exception {
+        Product product = new Product()
+            .id(9L)
+            .zohoItemId("zoho-9")
+            .zohoSyncStatus(ZohoSyncStatus.SYNCED)
+            .variantsJson("[]")
+            .itemStructure("SIMPLE");
+        when(productRepository.findById(9L)).thenReturn(Optional.of(product));
+
+        mockMvc
+            .perform(post("/api/v1/admin/zoho/sync-products/9"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value(9))
+            .andExpect(jsonPath("$.zohoItemId").value("zoho-9"))
+            .andExpect(jsonPath("$.zohoSyncStatus").value("SYNCED"));
+
+        verify(syncService).syncProduct(9L);
+    }
+
+    @Test
+    void syncProduct_whenMissing_returnsNotFoundPayload() throws Exception {
+        when(productRepository.findById(99L)).thenReturn(Optional.empty());
+
+        mockMvc
+            .perform(post("/api/v1/admin/zoho/sync-products/99"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.error").value("not found"));
+    }
+
+    @Test
+    void syncStock_delegatesToSyncService() throws Exception {
+        when(syncService.syncProductStockOnly(3L)).thenReturn(Map.of("ok", true));
+
+        mockMvc
+            .perform(post("/api/v1/admin/zoho/sync-stock/3"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ok").value(true));
+    }
+
+    @Test
+    void pullProducts_rateLimited_returnsBadGateway() throws Exception {
+        when(syncService.pullProducts(false)).thenThrow(
+            new RestClientResponseException("429", HttpStatus.TOO_MANY_REQUESTS.value(), "Too Many", null, null, null)
+        );
+
+        mockMvc
+            .perform(post("/api/v1/admin/zoho/pull-products"))
+            .andExpect(status().isBadGateway())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("rate limit")));
+    }
+
+    @Test
+    void pullProducts_unreachable_returnsBadGateway() throws Exception {
+        when(syncService.pullProducts(false)).thenThrow(new ResourceAccessException("timeout"));
+
+        mockMvc
+            .perform(post("/api/v1/admin/zoho/pull-products"))
+            .andExpect(status().isBadGateway())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("Could not reach Zoho")));
+    }
+
+    @Test
+    void pullProduct_httpError_returnsBadGateway() throws Exception {
+        when(syncService.pullProduct(5L)).thenThrow(
+            new RestClientResponseException("502", HttpStatus.BAD_GATEWAY.value(), "Bad Gateway", null, null, null)
+        );
+
+        mockMvc
+            .perform(post("/api/v1/admin/zoho/pull-products/5"))
+            .andExpect(status().isBadGateway())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("HTTP 502")));
+    }
+
+    @Test
+    void pullExternalProduct_delegatesSkuAndItemId() throws Exception {
+        when(syncService.pullExternalProduct("SKU-X", "zoho-x")).thenReturn(Map.of("successCount", 1));
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/zoho/pull-product")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"sku\":\"SKU-X\",\"zohoItemId\":\"zoho-x\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.successCount").value(1));
+    }
+
+    @Test
+    void pullInventory_delegatesToSyncService() throws Exception {
+        when(syncService.pullInventory()).thenReturn(Map.of("updated", 4));
+
+        mockMvc
+            .perform(post("/api/v1/admin/zoho/pull-inventory"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.updated").value(4));
+    }
+
+    @Test
+    void retryOrders_delegatesToSyncService() throws Exception {
+        when(syncService.retryFailedOrders()).thenReturn(Map.of("retried", 2));
+
+        mockMvc
+            .perform(post("/api/v1/admin/zoho/retry-orders"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.retried").value(2));
+    }
+
+    @Test
+    void pullOrderTracking_delegatesToSyncService() throws Exception {
+        when(syncService.pullAllTracking()).thenReturn(Map.of("pulled", 1));
+
+        mockMvc
+            .perform(post("/api/v1/admin/zoho/pull-order-tracking"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.pulled").value(1));
+    }
+
+    @Test
+    void pullItemGroup_rateLimited_returnsBadGateway() throws Exception {
+        when(syncService.pullProductGroup("123")).thenThrow(
+            new RestClientResponseException("429", HttpStatus.TOO_MANY_REQUESTS.value(), "Too Many", null, null, null)
+        );
+
+        mockMvc
+            .perform(post("/api/v1/admin/zoho/pull-item-groups/123"))
+            .andExpect(status().isBadGateway())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("rate limit")));
+    }
+
+    @Test
+    void completeOAuth_illegalState_returnsBadRequest() throws Exception {
+        when(oauthService.oauthSetup()).thenReturn(oauthSetup());
+        doThrow(new IllegalStateException("invalid state")).when(oauthService).completeOAuth(any(), any());
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/zoho/oauth/complete")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"code\":\"bad\"}")
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(content().string("invalid state"));
+    }
+
+    @Test
+    void connectUrl_returnsAuthorizationUrl() throws Exception {
+        when(oauthService.oauthSetup()).thenReturn(oauthSetup());
+        when(oauthService.buildConnectUrl("http://localhost:5173/admin/zoho")).thenReturn("https://accounts.zoho.in/oauth/v2/auth?demo=1");
+
+        mockMvc
+            .perform(get("/api/v1/admin/zoho/connect-url"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.url").value("https://accounts.zoho.in/oauth/v2/auth?demo=1"));
+    }
+
+    @Test
+    void connectUrl_illegalState_returnsBadRequest() throws Exception {
+        when(oauthService.oauthSetup()).thenReturn(oauthSetup());
+        when(oauthService.buildConnectUrl(any())).thenThrow(new IllegalStateException("OAuth client id missing"));
+
+        mockMvc
+            .perform(get("/api/v1/admin/zoho/connect-url"))
+            .andExpect(status().isBadRequest())
+            .andExpect(content().string("OAuth client id missing"));
+    }
+
+    @Test
     void setPullProductsAutoCreateCategory_persistsFlagAndReturnsStatus() throws Exception {
         ZohoSetting setting = zohoSetting();
         when(settingRepository.findActiveOrLatest()).thenReturn(Optional.of(setting));
@@ -343,6 +553,116 @@ class ZohoAdminResourceTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.pullProductsAutoCreateCategory").value(true));
+    }
+
+    @Test
+    void setPullProductsAutoCreateCategory_newSettingDefaultsConnectedFalse() throws Exception {
+        when(settingRepository.findActiveOrLatest()).thenReturn(Optional.empty());
+        when(settingRepository.save(any(ZohoSetting.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(oauthService.isServerConfigured()).thenReturn(true);
+        when(oauthService.orgId()).thenReturn("org-1");
+        when(oauthService.dataCenter()).thenReturn("in");
+
+        mockMvc
+            .perform(
+                put("/api/v1/admin/zoho/pull-products-auto-create-category")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"enabled\":false}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.connected").value(false));
+    }
+
+    @Test
+    void pullProduct_rateLimited_returnsBadGateway() throws Exception {
+        when(syncService.pullProduct(6L)).thenThrow(
+            new RestClientResponseException("429", HttpStatus.TOO_MANY_REQUESTS.value(), "Too Many", null, null, null)
+        );
+
+        mockMvc
+            .perform(post("/api/v1/admin/zoho/pull-products/6"))
+            .andExpect(status().isBadGateway())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("rate limit")));
+    }
+
+    @Test
+    void pullProduct_unreachable_returnsBadGateway() throws Exception {
+        when(syncService.pullProduct(7L)).thenThrow(new ResourceAccessException("timeout"));
+
+        mockMvc
+            .perform(post("/api/v1/admin/zoho/pull-products/7"))
+            .andExpect(status().isBadGateway())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("Could not reach Zoho")));
+    }
+
+    @Test
+    void pullProductVariant_delegatesSkuAndItemId() throws Exception {
+        when(syncService.pullProductVariant(8L, "SKU-V", "zoho-v")).thenReturn(Map.of("success", 1));
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/zoho/pull-products/8/variants")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"sku\":\"SKU-V\",\"zohoItemId\":\"zoho-v\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(1));
+    }
+
+    @Test
+    void pullProductVariant_rateLimited_returnsBadGateway() throws Exception {
+        when(syncService.pullProductVariant(9L, "SKU-X", null)).thenThrow(
+            new RestClientResponseException("429", HttpStatus.TOO_MANY_REQUESTS.value(), "Too Many", null, null, null)
+        );
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/zoho/pull-products/9/variants")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"sku\":\"SKU-X\"}")
+            )
+            .andExpect(status().isBadGateway())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("rate limit")));
+    }
+
+    @Test
+    void pullExternalProduct_rateLimited_returnsBadGateway() throws Exception {
+        when(syncService.pullExternalProduct("SKU-Y", "zoho-y")).thenThrow(
+            new RestClientResponseException("429", HttpStatus.TOO_MANY_REQUESTS.value(), "Too Many", null, null, null)
+        );
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/zoho/pull-product")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"sku\":\"SKU-Y\",\"zohoItemId\":\"zoho-y\"}")
+            )
+            .andExpect(status().isBadGateway())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("rate limit")));
+    }
+
+    @Test
+    void pullExternalProduct_unreachable_returnsBadGateway() throws Exception {
+        when(syncService.pullExternalProduct(null, "zoho-z")).thenThrow(new ResourceAccessException("timeout"));
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/zoho/pull-product")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"zohoItemId\":\"zoho-z\"}")
+            )
+            .andExpect(status().isBadGateway())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("Could not reach Zoho")));
+    }
+
+    @Test
+    void pullItemGroup_unreachable_returnsBadGateway() throws Exception {
+        when(syncService.pullProductGroup("456")).thenThrow(new ResourceAccessException("timeout"));
+
+        mockMvc
+            .perform(post("/api/v1/admin/zoho/pull-item-groups/456"))
+            .andExpect(status().isBadGateway())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("Could not reach Zoho")));
     }
 
     private static Map<String, Object> oauthSetup() {

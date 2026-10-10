@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "store_address")
@@ -63,10 +65,11 @@ public class StoreAddress implements Serializable {
     @Column(name = "country", length = 80, nullable = false)
     private String country = "India";
 
-    @NotNull
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "store_address_usage", joinColumns = @JoinColumn(name = "store_address_id"))
     @Enumerated(EnumType.STRING)
-    @Column(name = "usage", length = 20, nullable = false)
-    private StoreAddressUsage usage;
+    @Column(name = "usage", nullable = false, length = 20)
+    private Set<StoreAddressUsage> usages = new LinkedHashSet<>();
 
     @NotNull
     @Column(name = "is_default", nullable = false)
@@ -202,17 +205,17 @@ public class StoreAddress implements Serializable {
         this.country = country;
     }
 
-    public StoreAddressUsage getUsage() {
-        return usage;
+    public Set<StoreAddressUsage> getUsages() {
+        return usages;
     }
 
-    public StoreAddress usage(StoreAddressUsage usage) {
-        this.setUsage(usage);
+    public StoreAddress usages(Set<StoreAddressUsage> usages) {
+        this.setUsages(usages);
         return this;
     }
 
-    public void setUsage(StoreAddressUsage usage) {
-        this.usage = usage;
+    public void setUsages(Set<StoreAddressUsage> usages) {
+        this.usages = usages == null ? new LinkedHashSet<>() : new LinkedHashSet<>(usages);
     }
 
     public Boolean getIsDefault() {
@@ -246,6 +249,6 @@ public class StoreAddress implements Serializable {
 
     @Override
     public String toString() {
-        return "StoreAddress{" + "id=" + getId() + ", usage='" + getUsage() + "'" + "}";
+        return "StoreAddress{" + "id=" + getId() + ", usages='" + getUsages() + "'" + "}";
     }
 }

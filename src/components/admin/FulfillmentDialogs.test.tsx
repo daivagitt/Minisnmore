@@ -15,6 +15,19 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ to, children }: { to: string; children: string }) => <a href={to}>{children}</a>,
+}));
+
+const mockPackageBoxes = [
+  { id: "1", name: "Small carton", length_cm: 20, breadth_cm: 15, height_cm: 10, weight_grams: 400 },
+  { id: "2", name: "Large carton", length_cm: 40, breadth_cm: 30, height_cm: 20, weight_grams: 0 },
+];
+
+vi.mock("@/hooks/usePackageBoxes", () => ({
+  usePackageBoxes: () => ({ boxes: mockPackageBoxes, loaded: true, error: null }),
+}));
+
 vi.mock("@/lib/orders.functions", async () => {
   const actual = await vi.importActual<typeof import("@/lib/orders.functions")>("@/lib/orders.functions");
   return {
@@ -87,9 +100,10 @@ describe("Zoho-style fulfillment dialogs", () => {
     expect(screen.getByText(/Package Slip#/)).toBeTruthy();
     expect(screen.getByLabelText("Package type")).toHaveValue("custom");
     expect(screen.getByText("Specify custom dimensions")).toBeTruthy();
-    expect(screen.getByText("Box")).toBeTruthy();
     expect(screen.getByText("Envelope")).toBeTruthy();
-    expect(screen.getByText("All order line items are included in this package. Choose a Zoho parcel type, then save weight and dimensions. Package date is display only.")).toBeTruthy();
+    expect(screen.getByText("Small carton (20×15×10 cm, 400 g)")).toBeTruthy();
+    expect(screen.getByLabelText("Gross weight")).toHaveValue(0.5);
+    expect(screen.getByText("All order line items are included in this package. Choose a package type, then save gross weight and dimensions. Package date is display only.")).toBeTruthy();
     expect(screen.getByText("Body Suit — 6-12 M — Snail")).toBeTruthy();
     expect(screen.queryByText("Stock on Hand")).toBeNull();
     expect(screen.queryByText("Head Office")).toBeNull();
@@ -106,6 +120,7 @@ describe("Zoho-style fulfillment dialogs", () => {
         breadth_cm: 8,
         height_cm: 4,
         package_type: "custom",
+        package_box_id: null,
       }),
     );
   });
@@ -127,6 +142,52 @@ describe("Zoho-style fulfillment dialogs", () => {
     expect(screen.getByLabelText("Length")).toHaveValue(32);
     expect(screen.getByLabelText("Width")).toHaveValue(24);
     expect(screen.getByLabelText("Height")).toHaveValue(2);
+  });
+
+  it("fills dimensions and gross weight from the selected package type", async () => {
+    const user = userEvent.setup();
+    render(<CreatePackageDialog order={order()} open onOpenChange={() => {}} onSaved={() => {}} />);
+    await user.selectOptions(screen.getByLabelText("Package type"), "1");
+    expect(screen.getByLabelText("Package type")).toHaveValue("1");
+    expect(screen.getByLabelText("Length")).toHaveValue(20);
+    expect(screen.getByLabelText("Width")).toHaveValue(15);
+    expect(screen.getByLabelText("Height")).toHaveValue(10);
+    expect(screen.getByLabelText("Gross weight")).toHaveValue(0.4);
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(completeAdminOrderPackage).toHaveBeenCalledWith(
+      "MNM-18",
+      expect.objectContaining({
+        length_cm: 20,
+        breadth_cm: 15,
+        height_cm: 10,
+        weight_grams: 400,
+        package_type: "box",
+        package_box_id: 1,
+      }),
+    );
+  });
+
+  it("restores the saved package type and gross weight when reopening", () => {
+    render(
+      <CreatePackageDialog
+        order={order({
+          packed_at: "2026-10-08T00:00:00Z",
+          package_type: "box",
+          package_box_id: 1,
+          package_weight_grams: 400,
+          package_length_cm: 20,
+          package_breadth_cm: 15,
+          package_height_cm: 10,
+        })}
+        open
+        onOpenChange={() => {}}
+        onSaved={() => {}}
+      />,
+    );
+    expect(screen.getByText("Update Package")).toBeTruthy();
+    expect(screen.getByLabelText("Package type")).toHaveValue("1");
+    expect(screen.getByLabelText("Gross weight")).toHaveValue(0.4);
+    expect(screen.getByLabelText("Length")).toHaveValue(20);
   });
 
   it("fills standard envelope dimensions when Envelope is selected", async () => {
@@ -169,7 +230,7 @@ describe("Zoho-style fulfillment dialogs", () => {
     expect(screen.queryByText("Shipment Order#*")).toBeNull();
   });
 
-  it("opens Create Shipment with package slip, delivery status and shipping methods step", async () => {
+  it("opens Create Shipment with package slip and shipping methods step", async () => {
     const user = userEvent.setup();
     render(
       <BookShipmentDialog
@@ -184,9 +245,31 @@ describe("Zoho-style fulfillment dialogs", () => {
     expect(screen.getAllByText("Create Shipment").length).toBeGreaterThan(0);
     expect(screen.getByDisplayValue("PKG-00018")).toBeTruthy();
     expect(screen.getByDisplayValue("SHP-00018")).toBeTruthy();
-    expect(screen.getByText("MiniMS Delivery Status")).toBeTruthy();
+    expect(screen.queryByText("MiniMS Delivery Status")).toBeNull();
     expect(screen.getByText("Auto-fill from Package")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Create Shipment" })).toBeTruthy();
+  });
+
+  it("books a shipment with the selected package type", async () => {
+    const user = userEvent.setup();
+    render(
+      <BookShipmentDialog
+        order={order({ packed_at: "2026-09-30T00:00:00Z" })}
+        open
+        requiresOverride={false}
+        onOpenChange={() => {}}
+        onSaved={() => {}}
+      />,
+    );
+    await user.selectOptions(screen.getByRole("combobox"), "manual");
+    await user.click(screen.getByRole("button", { name: "Save & Continue" }));
+    await user.selectOptions(screen.getByLabelText("Parcel type"), "1");
+    await user.type(screen.getByLabelText(/AWB/i), "AWB-12345");
+    await user.click(screen.getByRole("button", { name: "Create Shipment" }));
+    expect(bookAdminOrderShipment).toHaveBeenCalledWith(
+      "MNM-18",
+      expect.objectContaining({ package_type: "box", package_box_id: 1 }),
+    );
   });
 
   it("does not complete the package again from the shipment wizard", async () => {

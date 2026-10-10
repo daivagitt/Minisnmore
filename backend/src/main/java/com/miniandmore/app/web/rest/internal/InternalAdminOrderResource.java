@@ -280,7 +280,8 @@ public class InternalAdminOrderResource {
             body.override_reason(),
             body.courier_id(),
             body.courier_name(),
-            body.package_type()
+            body.package_type(),
+            body.package_box_id()
         );
         return ApiResponse.ok(Map.of("order", summary(saved)));
     }
@@ -316,7 +317,8 @@ public class InternalAdminOrderResource {
             body.height_cm(),
             body.courier_id(),
             body.courier_name(),
-            body.package_type()
+            body.package_type(),
+            body.package_box_id()
         );
         return ApiResponse.ok(Map.of("order", summary(saved)));
     }
@@ -337,7 +339,7 @@ public class InternalAdminOrderResource {
     }
 
     @PostMapping("/{orderNumber}/cancel")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_OPERATIONS')")
     public ApiResponse<Map<String, Object>> cancelOrder(
         @PathVariable String orderNumber,
         @Valid @RequestBody CancelOrderRequest body
@@ -420,6 +422,7 @@ public class InternalAdminOrderResource {
             "package_type",
             order.getPackageType() == null ? "custom" : order.getPackageType().toApi()
         );
+        data.put("package_box_id", order.getPackageBoxId());
         data.put("packed_at", instant(order.getPackedAt()));
         if (order.getId() != null) {
             data.put(
@@ -477,7 +480,7 @@ public class InternalAdminOrderResource {
 
     private Map<String, Object> dispatchAddressMap() {
         return StoreAddressService.dispatchAddressPayload(
-            storeAddressRepository.findFirstByUsageAndIsDefaultTrue(StoreAddressUsage.SHIPMENT),
+            storeAddressRepository.findFirstByUsagesContainingAndIsDefaultTrueOrderByIdDesc(StoreAddressUsage.SHIPMENT),
             applicationProperties.getXpressbees()
         );
     }
@@ -521,7 +524,8 @@ public class InternalAdminOrderResource {
         @Size(max = 500) String override_reason,
         @Size(max = 40) String courier_id,
         @Size(max = 120) String courier_name,
-        @Size(max = 20) String package_type
+        @Size(max = 20) String package_type,
+        Long package_box_id
     ) {}
 
     public record CancelShipmentRequest(
@@ -548,6 +552,7 @@ public class InternalAdminOrderResource {
         @NotNull @Min(1) Integer height_cm,
         @Size(max = 40) String courier_id,
         @Size(max = 120) String courier_name,
-        @Size(max = 20) String package_type
+        @Size(max = 20) String package_type,
+        Long package_box_id
     ) {}
 }

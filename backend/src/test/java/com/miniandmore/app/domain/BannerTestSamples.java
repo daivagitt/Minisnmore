@@ -19,6 +19,10 @@ public class BannerTestSamples {
             .imageUrl("imageUrl1")
             .linkUrl("linkUrl1")
             .ctaLabel("ctaLabel1")
+            .eyebrow("eyebrow1")
+            .trustFabricLabel("trustFabricLabel1")
+            .trustShippingLabel("trustShippingLabel1")
+            .trustDyesLabel("trustDyesLabel1")
             .sortOrder(1);
     }
 
@@ -30,6 +34,10 @@ public class BannerTestSamples {
             .imageUrl("imageUrl2")
             .linkUrl("linkUrl2")
             .ctaLabel("ctaLabel2")
+            .eyebrow("eyebrow2")
+            .trustFabricLabel("trustFabricLabel2")
+            .trustShippingLabel("trustShippingLabel2")
+            .trustDyesLabel("trustDyesLabel2")
             .sortOrder(2);
     }
 
@@ -41,6 +49,10 @@ public class BannerTestSamples {
             .imageUrl(UUID.randomUUID().toString())
             .linkUrl(UUID.randomUUID().toString())
             .ctaLabel(UUID.randomUUID().toString())
+            .eyebrow(UUID.randomUUID().toString())
+            .trustFabricLabel(UUID.randomUUID().toString())
+            .trustShippingLabel(UUID.randomUUID().toString())
+            .trustDyesLabel(UUID.randomUUID().toString())
             .sortOrder(intCount.incrementAndGet());
     }
 }

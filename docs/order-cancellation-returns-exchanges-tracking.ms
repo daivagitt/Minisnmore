@@ -113,6 +113,7 @@ REQUESTED -> APPROVED
 Customer submits a cancellation request
 .PP
 Submitting a cancellation request creates a separate REQUESTED case. It does not immediately cancel the order.
+Customers may request cancellation after packing or hand-wrapping, until an administrator books a shipment (tracking becomes awaiting_pickup).
 .DS L
 cancellation_request.status = REQUESTED
 order.status                = unchanged
@@ -166,9 +167,9 @@ tracking_status             = unchanged
 With no REQUESTED cancellation remaining, the shipment hold is removed.
 .
 .NH 2
-Cancellation after dispatch
+Cancellation after shipment booking
 .PP
-An order cannot be cancelled after the system resolves tracking to shipped, out_for_delivery, delivery_failed, or delivered. The customer must wait for delivery and use the return workflow if eligible.
+An order cannot be cancelled once tracking resolves to awaiting_pickup, shipped, out_for_delivery, delivery_failed, or delivered. Packing or hand-wrapping alone does not block cancellation; booking an AWB/label does. After pickup or delivery, the customer must use the return workflow if eligible.
 .
 .NH 2
 Shipment cancellation is not order cancellation

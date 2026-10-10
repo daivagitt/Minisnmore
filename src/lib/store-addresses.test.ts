@@ -23,7 +23,7 @@ describe("store addresses", () => {
     vi.clearAllMocks();
   });
 
-  it("maps usage between UI and API", () => {
+  it("maps usages between UI and API", () => {
     expect(
       fromStoreAddressDto({
         id: 3,
@@ -33,10 +33,10 @@ describe("store addresses", () => {
         city: "Bengaluru",
         state: "Karnataka",
         pincode: "560001",
-        usage: "SHIPMENT",
+        usages: ["SHIPMENT", "INVOICE"],
         isDefault: true,
-      }).usage,
-    ).toBe("shipment");
+      }).usages,
+    ).toEqual(["shipment", "invoice"]);
     expect(
       fromStoreAddressDto({
         id: 4,
@@ -48,24 +48,26 @@ describe("store addresses", () => {
         pincode: "560001",
         usage: "NORMAL",
         is_default: true,
-      }).is_default,
-    ).toBe(true);
-    expect(toStoreAddressDto({
-      label: "HQ",
-      full_name: "Mini's n More",
-      phone: "9876543210",
-      line1: "12 Flower Lane",
-      line2: "",
-      city: "Bengaluru",
-      state: "Karnataka",
-      pincode: "560001",
-      country: "India",
-      usage: "invoice",
-      is_default: true,
-    }).usage).toBe("INVOICE");
+      }).usages,
+    ).toEqual(["normal"]);
+    expect(
+      toStoreAddressDto({
+        label: "HQ",
+        full_name: "Mini's n More",
+        phone: "9876543210",
+        line1: "12 Flower Lane",
+        line2: "",
+        city: "Bengaluru",
+        state: "Karnataka",
+        pincode: "560001",
+        country: "India",
+        usages: ["shipment", "normal", "invoice"],
+        is_default: true,
+      }).usages,
+    ).toEqual(["SHIPMENT", "NORMAL", "INVOICE"]);
   });
 
-  it("requires a complete address and type", () => {
+  it("requires a complete address and at least one usage", () => {
     expect(
       getStoreAddressValidationErrors({
         label: "",
@@ -77,7 +79,7 @@ describe("store addresses", () => {
         state: "",
         pincode: "",
         country: "India",
-        usage: "normal",
+        usages: [],
         is_default: false,
       }),
     ).not.toHaveLength(0);
@@ -93,13 +95,13 @@ describe("store addresses", () => {
         city: "Bengaluru",
         state: "Karnataka",
         pincode: "560001",
-        usage: "SHIPMENT",
+        usages: ["SHIPMENT"],
         isDefault: true,
       },
     ]);
     const rows = await listStoreAddresses();
     expect(mockedApi.get).toHaveBeenCalledWith("/api/v1/admin/store-addresses", { auth: true });
-    expect(rows[0]?.usage).toBe("shipment");
+    expect(rows[0]?.usages).toEqual(["shipment"]);
 
     mockedApi.post.mockResolvedValueOnce({
       id: 2,
@@ -109,7 +111,7 @@ describe("store addresses", () => {
       city: "Bengaluru",
       state: "Karnataka",
       pincode: "560001",
-      usage: "INVOICE",
+      usages: ["INVOICE"],
       isDefault: false,
     });
     await saveStoreAddress({
@@ -122,12 +124,12 @@ describe("store addresses", () => {
       state: "Karnataka",
       pincode: "560001",
       country: "India",
-      usage: "invoice",
+      usages: ["invoice"],
       is_default: false,
     });
     expect(mockedApi.post).toHaveBeenCalledWith(
       "/api/v1/admin/store-addresses",
-      expect.objectContaining({ usage: "INVOICE", fullName: "Stolt Global" }),
+      expect.objectContaining({ usages: ["INVOICE"], fullName: "Stolt Global" }),
       { auth: true },
     );
   });

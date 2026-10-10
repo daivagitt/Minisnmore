@@ -12,9 +12,14 @@ import org.mapstruct.*;
 @Mapper(componentModel = "spring", uses = CategoryMapper.class)
 public interface ProductMapper extends EntityMapper<ProductDTO, Product> {
     @Override
+    @Mapping(target = "zohoImageDocsJson", ignore = true)
+    Product toEntity(ProductDTO dto);
+
+    @Override
     @Named("partialUpdate")
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "category", ignore = true)
+    @Mapping(target = "zohoImageDocsJson", ignore = true)
     void partialUpdate(@MappingTarget Product entity, ProductDTO dto);
 
     @AfterMapping

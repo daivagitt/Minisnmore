@@ -569,4 +569,57 @@ class ZohoOrderStatusTest {
         assertThat(ZohoOrderStatus.isShipped("fulfilled")).isFalse();
         assertThat(ZohoOrderStatus.isShipped("invoiced")).isFalse();
     }
+
+    @Test
+    void applyDeliveryChallans_nullOrEmptyList_isNoOp() {
+        CustomerOrder order = paidOrder();
+        ZohoOrderStatus.applyDeliveryChallans(order, null);
+        ZohoOrderStatus.applyDeliveryChallans(order, List.of());
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+    }
+
+    @Test
+    void applySalesOrderTracking_shippedSignalWithoutShipmentDate_usesOrderDateFallback() {
+        CustomerOrder order = paidOrder();
+        ZohoOrderStatus.applySalesOrderTracking(
+            order,
+            Map.of("status", "shipped", "shipped_status", "shipped", "date", "2026-05-01")
+        );
+        assertThat(order.getShipmentDate()).isEqualTo("2026-05-01");
+    }
+
+    @Test
+    void applyDeliveryChallans_deliveredDoesNotOverrideCancelledOrder() {
+        CustomerOrder order = paidOrder().status(OrderStatus.CANCELLED);
+        ZohoOrderStatus.applyDeliveryChallans(order, List.of(Map.of("status", "delivered", "tracking_number", "DC-1")));
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(order.getTrackingNumber()).isEqualTo("DC-1");
+    }
+
+    @Test
+    void applySalesOrderTracking_localForwardShipment_blankStatus_skipsFieldUpdates() {
+        CustomerOrder order = paidOrder()
+            .trackingNumber("LOCAL")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES);
+        ZohoOrderStatus.applySalesOrderTracking(order, Map.of("status", "  ", "tracking_number", "ZOHO-AWB"));
+        assertThat(order.getZohoOrderStatus()).isNull();
+        assertThat(order.getTrackingNumber()).isEqualTo("LOCAL");
+    }
+
+    @Test
+    void applySalesOrderTracking_quantityPackedPromotesConfirmedToHandWrapped() {
+        CustomerOrder order = paidOrder();
+        ZohoOrderStatus.applySalesOrderTracking(
+            order,
+            Map.of(
+                "status",
+                "invoiced",
+                "shipped_status",
+                "pending",
+                "line_items",
+                List.of(Map.of("quantity_packed", 2, "quantity_shipped", 0))
+            )
+        );
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.HAND_WRAPPED);
+    }
 }

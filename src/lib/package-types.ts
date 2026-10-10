@@ -62,6 +62,9 @@ export function packageTypeDimensionHint(type: ZohoPackageType) {
   if (type === "envelope") {
     return "Standard envelope size is filled in. Adjust if the parcel is different.";
   }
+  if (type === "box") {
+    return "Choose a box type to fill length, width and height.";
+  }
   return "(Length X Width X Height)";
 }
 

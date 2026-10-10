@@ -303,26 +303,54 @@ class OrderCancellationExecutorTest {
     }
 
     @Test
-    void isCancelEligible_falseAfterDispatch_trueBeforePickup() {
+    void isCancelEligible_falseOnceShipmentBookedOrDispatched() {
         CustomerOrder confirmed = createOrder("ORD-OK");
         confirmed.setStatus(OrderStatus.CONFIRMED);
         assertThat(executor.isCancelEligible(confirmed)).isTrue();
+
+        CustomerOrder handWrapped = createOrder("ORD-WRAP");
+        handWrapped.setStatus(OrderStatus.HAND_WRAPPED);
+        assertThat(executor.isCancelEligible(handWrapped)).isTrue();
 
         CustomerOrder cancelled = createOrder("ORD-CANC");
         cancelled.setStatus(OrderStatus.CANCELLED);
         assertThat(executor.isCancelEligible(cancelled)).isFalse();
 
         CustomerOrder awaitingPickup = createOrder("ORD-AWB");
-        awaitingPickup.setStatus(OrderStatus.CONFIRMED);
+        awaitingPickup.setStatus(OrderStatus.HAND_WRAPPED);
         awaitingPickup.setShipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES);
         awaitingPickup.setTrackingNumber("XB-1");
-        assertThat(executor.isCancelEligible(awaitingPickup)).isTrue();
+        assertThat(executor.isCancelEligible(awaitingPickup)).isFalse();
 
         CustomerOrder shipped = createOrder("ORD-SHIP");
         shipped.setStatus(OrderStatus.CONFIRMED);
         shipped.setTrackingNumber("TRK-9");
         shipped.setShipmentDate("2026-09-28");
         assertThat(executor.isCancelEligible(shipped)).isFalse();
+    }
+
+    @Test
+    void assertCancelEligible_awaitingPickup_throwsConflict() {
+        CustomerOrder order = createOrder("ORD-AWB");
+        order.setStatus(OrderStatus.HAND_WRAPPED);
+        order.setShipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES);
+        order.setTrackingNumber("XB-1");
+
+        assertThatThrownBy(() -> executor.assertCancelEligible(order))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("already has a shipment booked");
+    }
+
+    @Test
+    void assertCancelEligible_carrierCancelledAwb_allowsCancellation() {
+        CustomerOrder order = createOrder("ORD-REBOOK");
+        order.setStatus(OrderStatus.HAND_WRAPPED);
+        order.setShipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES);
+        order.setTrackingNumber("XB-1");
+        order.setShipmentCarrierStatus("carrier_cancelled");
+
+        executor.assertCancelEligible(order);
+        assertThat(executor.isCancelEligible(order)).isTrue();
     }
 
     @Test

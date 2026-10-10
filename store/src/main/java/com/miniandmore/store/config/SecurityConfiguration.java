@@ -39,6 +39,12 @@ public class SecurityConfiguration {
                         AuthoritiesConstants.OPERATIONS,
                         AuthoritiesConstants.CUSTOMER_SUPPORT
                     )
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/package-boxes", "/api/v1/admin/package-boxes/**")
+                    .hasAnyAuthority(
+                        AuthoritiesConstants.ADMIN,
+                        AuthoritiesConstants.SUPER_ADMIN,
+                        AuthoritiesConstants.OPERATIONS
+                    )
                     .requestMatchers("/api/v1/admin/**").hasAnyAuthority(AuthoritiesConstants.ADMIN, AuthoritiesConstants.SUPER_ADMIN)
                     .requestMatchers("/api/v1/**").permitAll()
                     .anyRequest().authenticated()

@@ -297,7 +297,7 @@ class InternalAdminOrderReturnResourceTest {
         updated.setStatus(OrderReturnStatus.SHIPPED);
         updated.setOutboundAwb("OUT123");
         when(
-            orderReturnService.bookOutbound("RET-1", ReturnLogisticsMode.XPRESSBEES, null, null, null, null, null, null, null, null)
+            orderReturnService.bookOutbound("RET-1", ReturnLogisticsMode.XPRESSBEES, null, null, null, null, null, null, null, null, null)
         ).thenReturn(updated);
 
         mockMvc
@@ -318,7 +318,7 @@ class InternalAdminOrderReturnResourceTest {
         updated.setPackedAt(Instant.now());
         updated.setPackageWeightGrams(500);
         when(
-            orderReturnService.completeOutboundPackage("RET-1", 500, 12, 10, 8, "1", "Surface", "box")
+            orderReturnService.completeOutboundPackage("RET-1", 500, 12, 10, 8, "1", "Surface", "box", null)
         ).thenReturn(updated);
 
         mockMvc

@@ -1,0 +1,1310 @@
+{
+    "root_group": {
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {
+                "status is 2xx": {
+                    "id": "625da780c1868b693c9052f10511e6a0",
+                    "passes": 4810,
+                    "fails": 0,
+                    "name": "status is 2xx",
+                    "path": "::status is 2xx"
+                },
+                "response < 3000ms": {
+                    "path": "::response < 3000ms",
+                    "id": "03efe1ba2383967e71876c1115020dec",
+                    "passes": 4810,
+                    "fails": 0,
+                    "name": "response < 3000ms"
+                }
+            },
+        "name": "",
+        "path": ""
+    },
+    "metrics": {
+        "http_reqs{endpoint:GET /api/v1/admin/ledgerly/integration-status}": {
+            "count": 110,
+            "rate": 2.416576531304048,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/categories}": {
+            "passes": 0,
+            "fails": 109,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/order-returns}": {
+            "max": 747.157425,
+            "p(90)": 368.79498930000005,
+            "p(95)": 414.73735684999997,
+            "avg": 222.37918955454546,
+            "min": 108.530702,
+            "med": 177.618447,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 4810,
+            "thresholds": {
+                "rate<0.05": false
+            },
+            "value": 0
+        },
+        "http_reqs{endpoint:GET /api/v1/banners}": {
+            "count": 107,
+            "rate": 2.3506698986321193,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "vus": {
+            "max": 10,
+            "value": 10,
+            "min": 10
+        },
+        "http_req_failed{endpoint:GET /api/v1/account/profile}": {
+            "passes": 0,
+            "fails": 104,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/home-sections}": {
+            "rate": 2.416576531304048,
+            "count": 110,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/products}": {
+            "avg": 28.687156523364493,
+            "min": 12.364026,
+            "med": 23.731744,
+            "max": 180.265852,
+            "p(90)": 42.5877506,
+            "p(95)": 54.08442889999996,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/store-addresses}": {
+            "count": 107,
+            "rate": 2.3506698986321193,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/ledgerly/integration-status}": {
+            "passes": 0,
+            "fails": 110,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/order-returns/summary}": {
+            "passes": 0,
+            "fails": 110,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_tls_handshaking": {
+            "avg": 0.04687089022869023,
+            "min": 0,
+            "med": 0,
+            "max": 28.18708,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "http_req_receiving": {
+            "avg": 1.2792152137214121,
+            "min": 0.01265,
+            "med": 0.110147,
+            "max": 97.841635,
+            "p(90)": 3.0906951000000062,
+            "p(95)": 7.538168500000003
+        },
+        "http_reqs{endpoint:GET /api/v1/payments}": {
+            "count": 104,
+            "rate": 2.2847632659601906,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/payments}": {
+            "passes": 0,
+            "fails": 104,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/dashboard}": {
+            "passes": 0,
+            "fails": 110,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/products}": {
+            "passes": 0,
+            "fails": 107,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/ledgerly/test}": {
+            "count": 110,
+            "rate": 2.416576531304048,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/categories}": {
+            "passes": 0,
+            "fails": 107,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_reqs{endpoint:GET /api/v1/order-returns}": {
+            "count": 107,
+            "rate": 2.3506698986321193,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/account/wishlist}": {
+            "passes": 0,
+            "fails": 105,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/home-sections}": {
+            "passes": 0,
+            "fails": 110,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/cancellation-requests}": {
+            "passes": 0,
+            "fails": 108,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/cancellation-requests}": {
+            "count": 108,
+            "rate": 2.3726387761894285,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/blog-posts}": {
+            "passes": 0,
+            "fails": 107,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_duration{endpoint:GET /api/v1/about-page}": {
+            "p(90)": 22.255920800000002,
+            "p(95)": 28.863970549999976,
+            "avg": 17.80544333653846,
+            "min": 7.425671,
+            "med": 13.188589,
+            "max": 157.606666,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/coupons/active}": {
+            "avg": 21.09601514018692,
+            "min": 8.754024,
+            "med": 16.235435,
+            "max": 228.68175,
+            "p(90)": 27.803299,
+            "p(95)": 46.143503699999854,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/categories}": {
+            "count": 107,
+            "rate": 2.3506698986321193,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/ledgerly/test}": {
+            "avg": 54.345129445454575,
+            "min": 24.791284,
+            "med": 37.622285000000005,
+            "max": 268.271645,
+            "p(90)": 100.05058150000013,
+            "p(95)": 180.70730214999995,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_sending": {
+            "avg": 0.167470453222453,
+            "min": 0.028631,
+            "med": 0.08970600000000001,
+            "max": 25.239921,
+            "p(90)": 0.20138000000000014,
+            "p(95)": 0.42013750000000055
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/ledgerly/settings}": {
+            "count": 110,
+            "rate": 2.416576531304048,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/orders/cod-pending}": {
+            "passes": 0,
+            "fails": 110,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/ledgerly/test}": {
+            "passes": 0,
+            "fails": 110,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_reqs{endpoint:GET /api/v1/order-returns/config}": {
+            "count": 106,
+            "rate": 2.3287010210748096,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/package-boxes}": {
+            "count": 107,
+            "rate": 2.3506698986321193,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/policies}": {
+            "passes": 0,
+            "fails": 107,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "iterations": {
+            "count": 4810,
+            "rate": 105.67030105065882
+        },
+        "data_received": {
+            "count": 92124634,
+            "rate": 2023874.804357954
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/orders}": {
+            "med": 79.6317805,
+            "max": 202.969742,
+            "p(90)": 130.11352600000004,
+            "p(95)": 167.99390195,
+            "avg": 89.03214182727271,
+            "min": 42.641603,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/home-sections}": {
+            "max": 188.094694,
+            "p(90)": 36.280313600000014,
+            "p(95)": 51.68613504999995,
+            "avg": 21.372381481818184,
+            "min": 7.207758,
+            "med": 13.925441,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/banners}": {
+            "count": 106,
+            "rate": 2.3287010210748096,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/gift-page}": {
+            "passes": 0,
+            "fails": 107,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_waiting": {
+            "p(95)": 153.26934740000044,
+            "avg": 40.85347235862777,
+            "min": 5.864904,
+            "med": 15.7626075,
+            "max": 1024.287665,
+            "p(90)": 76.89156810000006
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/banners}": {
+            "passes": 0,
+            "fails": 106,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_failed{endpoint:GET /api/v1/site-settings}": {
+            "passes": 0,
+            "fails": 104,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_duration{endpoint:GET /api/v1/blog-posts}": {
+            "p(90)": 23.307393,
+            "p(95)": 40.440973499999856,
+            "avg": 16.16997824299065,
+            "min": 6.955926,
+            "med": 11.682318,
+            "max": 144.597946,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/site-settings}": {
+            "max": 96.572677,
+            "p(90)": 31.84473820000001,
+            "p(95)": 44.656830699999986,
+            "avg": 18.503438570093458,
+            "min": 8.376201,
+            "med": 13.503409,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/package-boxes}": {
+            "passes": 0,
+            "fails": 107,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/contact-messages}": {
+            "max": 69.491238,
+            "p(90)": 26.023111400000005,
+            "p(95)": 42.70014249999999,
+            "avg": 16.892827181818188,
+            "min": 8.241139,
+            "med": 12.953990000000001,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "vus_max": {
+            "value": 10,
+            "min": 10,
+            "max": 10
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/site-settings}": {
+            "passes": 0,
+            "fails": 107,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/store-addresses}": {
+            "passes": 0,
+            "fails": 107,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/orders}": {
+            "passes": 0,
+            "fails": 110,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_reqs{endpoint:GET /api/v1/blog-posts/{slug}}": {
+            "count": 107,
+            "rate": 2.3506698986321193,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/home-sections}": {
+            "fails": 107,
+            "passes": 0,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/orders/cod-pending}": {
+            "min": 284.028904,
+            "med": 497.4423575,
+            "max": 1053.590931,
+            "p(90)": 750.3737959,
+            "p(95)": 840.4381666500001,
+            "avg": 513.9419098363637,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/page-visibility}": {
+            "passes": 0,
+            "fails": 104,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_reqs{endpoint:GET /api/v1/page-visibility}": {
+            "count": 104,
+            "rate": 2.2847632659601906,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/order-returns}": {
+            "p(90)": 45.05336320000001,
+            "p(95)": 69.27373779999985,
+            "avg": 37.370843654205615,
+            "min": 18.682451,
+            "med": 29.867536,
+            "max": 272.348,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/order-returns}": {
+            "passes": 0,
+            "fails": 107,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/site-settings}": {
+            "count": 107,
+            "rate": 2.3506698986321193,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/products}": {
+            "count": 107,
+            "rate": 2.3506698986321193,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/dashboard}": {
+            "rate": 2.416576531304048,
+            "count": 110,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "checks": {
+            "passes": 9620,
+            "fails": 0,
+            "value": 1
+        },
+        "http_req_failed{endpoint:GET /api/v1/account/notifications}": {
+            "passes": 0,
+            "fails": 103,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_duration{endpoint:GET /api/v1/payments}": {
+            "min": 10.854189,
+            "med": 20.1162195,
+            "max": 226.837009,
+            "p(90)": 50.62496710000002,
+            "p(95)": 68.00611785,
+            "avg": 28.242525355769224,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_duration{expected_response:true}": {
+            "p(90)": 78.85228320000002,
+            "p(95)": 163.90006010000002,
+            "avg": 42.300158025571776,
+            "min": 6.048015,
+            "med": 16.3216465,
+            "max": 1053.590931
+        },
+        "http_req_duration{endpoint:GET /api/v1/banners}": {
+            "min": 6.048015,
+            "med": 11.082853,
+            "max": 95.256086,
+            "p(90)": 24.0751174,
+            "p(95)": 32.09706799999998,
+            "avg": 14.443022887850466,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/ledgerly/integration-status}": {
+            "p(90)": 30.946545800000013,
+            "p(95)": 68.24718869999998,
+            "avg": 21.668791200000005,
+            "min": 8.193568,
+            "med": 14.524134,
+            "max": 128.37826,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/store-addresses}": {
+            "avg": 17.302387046728978,
+            "min": 7.36037,
+            "med": 13.887211,
+            "max": 95.407356,
+            "p(90)": 26.630102400000013,
+            "p(95)": 34.902177399999935,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/orders/cod-pending}": {
+            "count": 110,
+            "rate": 2.416576531304048,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/order-returns/summary}": {
+            "avg": 25.515149009090894,
+            "min": 8.839676,
+            "med": 20.913679000000002,
+            "max": 84.64515,
+            "p(90)": 46.54740980000001,
+            "p(95)": 49.4233975,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/home-sections}": {
+            "count": 107,
+            "rate": 2.3506698986321193,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/banners}": {
+            "passes": 0,
+            "fails": 107,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_failed{endpoint:GET /api/v1/coupons/active}": {
+            "passes": 0,
+            "fails": 107,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/zoho-settings}": {
+            "med": 13.97072,
+            "max": 91.715608,
+            "p(90)": 26.452952,
+            "p(95)": 32.202995099999946,
+            "avg": 17.215353299065416,
+            "min": 7.170578,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/coupons/active}": {
+            "count": 107,
+            "rate": 2.3506698986321193,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/gift-page}": {
+            "rate": 2.3506698986321193,
+            "count": 107,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/blog-posts}": {
+            "passes": 0,
+            "fails": 107,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_failed{endpoint:GET /api/v1/products/{slug}}": {
+            "passes": 0,
+            "fails": 104,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_reqs{endpoint:GET /api/v1/blog-posts}": {
+            "count": 107,
+            "rate": 2.3506698986321193,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/policies}": {
+            "avg": 19.298974560747663,
+            "min": 8.662805,
+            "med": 15.890773,
+            "max": 146.731611,
+            "p(90)": 29.059255200000003,
+            "p(95)": 33.49334369999997,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/zoho-settings}": {
+            "fails": 107,
+            "passes": 0,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/ledgerly/settings}": {
+            "avg": 24.069509072727282,
+            "min": 8.35235,
+            "med": 13.978069,
+            "max": 198.479474,
+            "p(90)": 30.8623641,
+            "p(95)": 96.51425779999994,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/products}": {
+            "count": 104,
+            "rate": 2.2847632659601906,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_connecting": {
+            "avg": 0.0017028588357588359,
+            "min": 0,
+            "med": 0,
+            "max": 3.964204,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "http_req_failed{endpoint:GET /api/v1/products}": {
+            "fails": 104,
+            "passes": 0,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/categories}": {
+            "avg": 18.314195834862385,
+            "min": 7.237758,
+            "med": 13.01026,
+            "max": 96.792713,
+            "p(90)": 31.507025600000013,
+            "p(95)": 44.14392719999997,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_duration": {
+            "avg": 42.300158025571776,
+            "min": 6.048015,
+            "med": 16.3216465,
+            "max": 1053.590931,
+            "p(90)": 78.85228320000002,
+            "p(95)": 163.90006010000002,
+            "thresholds": {
+                "p(95)<3000": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/ledgerly/settings}": {
+            "passes": 0,
+            "fails": 110,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/order-returns}": {
+            "count": 110,
+            "rate": 2.416576531304048,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/account/addresses}": {
+            "fails": 104,
+            "passes": 0,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/orders/ordered-logins}": {
+            "count": 108,
+            "rate": 2.3726387761894285,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/categories}": {
+            "med": 11.288033,
+            "max": 61.749357,
+            "p(90)": 28.569112000000008,
+            "p(95)": 34.63495869999997,
+            "avg": 15.004790775700936,
+            "min": 7.170948,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/order-returns}": {
+            "passes": 0,
+            "fails": 110,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_duration{endpoint:GET /api/v1/account/profile}": {
+            "avg": 22.711687461538467,
+            "min": 7.237808,
+            "med": 13.6356395,
+            "max": 261.016899,
+            "p(90)": 30.733623400000003,
+            "p(95)": 79.53191209999993,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/blog-posts/{slug}}": {
+            "max": 114.693486,
+            "p(90)": 24.772790800000013,
+            "p(95)": 35.5424857,
+            "avg": 15.184043654205608,
+            "min": 7.344659,
+            "med": 11.04716,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/policies}": {
+            "count": 107,
+            "rate": 2.3506698986321193,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/products}": {
+            "p(95)": 105.00614294999988,
+            "avg": 47.23673484615384,
+            "min": 20.889634,
+            "med": 35.215441999999996,
+            "max": 294.880181,
+            "p(90)": 57.68192560000001,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/orders}": {
+            "avg": 105.05315738461545,
+            "min": 38.337323,
+            "med": 84.9112055,
+            "max": 588.641551,
+            "p(90)": 135.8014887,
+            "p(95)": 302.15631175,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/orders}": {
+            "count": 104,
+            "rate": 2.2847632659601906,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/banners}": {
+            "p(95)": 69.017082,
+            "avg": 22.507353584905665,
+            "min": 6.658402,
+            "med": 12.717458,
+            "max": 213.007673,
+            "p(90)": 55.86221,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/orders/ordered-logins}": {
+            "passes": 0,
+            "fails": 108,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/coupons}": {
+            "count": 110,
+            "rate": 2.416576531304048,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/orders/ordered-logins}": {
+            "avg": 21.90181775925927,
+            "min": 9.433691,
+            "med": 17.9417555,
+            "max": 71.235875,
+            "p(90)": 35.1745559,
+            "p(95)": 46.94130519999999,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "data_sent": {
+            "count": 587030,
+            "rate": 12896.39019246741
+        },
+        "http_req_failed{endpoint:GET /api/v1/orders}": {
+            "passes": 0,
+            "fails": 104,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/blog-posts}": {
+            "min": 7.239089,
+            "med": 13.417438,
+            "max": 128.797217,
+            "p(90)": 34.94249700000004,
+            "p(95)": 65.10927489999997,
+            "avg": 21.083083850467293,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/account/cart}": {
+            "count": 103,
+            "rate": 2.262794388402881,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/blog-posts}": {
+            "count": 107,
+            "rate": 2.3506698986321193,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/order-returns/config}": {
+            "p(90)": 31.220208999999997,
+            "p(95)": 36.65488225,
+            "avg": 20.172252622641505,
+            "min": 8.532262,
+            "med": 13.4762905,
+            "max": 203.560609,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/subscribe-page}": {
+            "avg": 17.253183249999996,
+            "min": 7.234967,
+            "med": 12.2385855,
+            "max": 177.58161,
+            "p(90)": 22.2130312,
+            "p(95)": 32.416155699999976,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/site-settings}": {
+            "count": 104,
+            "rate": 2.2847632659601906,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/order-returns/summary}": {
+            "count": 110,
+            "rate": 2.416576531304048,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/cancellation-requests}": {
+            "med": 21.6562215,
+            "max": 190.846854,
+            "p(90)": 53.621764399999996,
+            "p(95)": 91.49144274999976,
+            "avg": 32.30637593518518,
+            "min": 14.172341,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/order-returns/config}": {
+            "fails": 106,
+            "passes": 0,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_reqs{endpoint:GET /api/v1/about-page}": {
+            "count": 104,
+            "rate": 2.2847632659601906,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/account/profile}": {
+            "count": 104,
+            "rate": 2.2847632659601906,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/about-page}": {
+            "passes": 0,
+            "fails": 104,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/coupons}": {
+            "fails": 110,
+            "passes": 0,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_duration{endpoint:GET /api/v1/site-settings}": {
+            "p(95)": 35.44255169999997,
+            "avg": 16.170976115384622,
+            "min": 6.642031,
+            "med": 11.984624,
+            "max": 159.154534,
+            "p(90)": 23.949484400000003,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/dashboard}": {
+            "avg": 29.682921109090916,
+            "min": 9.749745,
+            "med": 24.6829575,
+            "max": 116.476883,
+            "p(90)": 47.59579440000002,
+            "p(95)": 65.96287575,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_blocked": {
+            "med": 0.000669,
+            "max": 61.513088,
+            "p(90)": 0.00101,
+            "p(95)": 0.00111,
+            "avg": 0.12116254012474112,
+            "min": 0.00016
+        },
+        "http_req_duration{endpoint:GET /api/v1/account/addresses}": {
+            "p(90)": 32.82399440000001,
+            "p(95)": 57.33725279999996,
+            "avg": 22.228118432692305,
+            "min": 9.08703,
+            "med": 15.473199000000001,
+            "max": 177.468249,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "iteration_duration": {
+            "min": 57.005505,
+            "med": 67.5267945,
+            "max": 1109.073016,
+            "p(90)": 131.4038154000001,
+            "p(95)": 215.34449165000007,
+            "avg": 93.69333306923092
+        },
+        "http_req_duration{endpoint:GET /api/v1/account/wishlist}": {
+            "p(90)": 39.393266000000054,
+            "p(95)": 68.75234419999998,
+            "avg": 21.711383485714293,
+            "min": 7.870616,
+            "med": 13.924521,
+            "max": 183.533594,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/products/{slug}}": {
+            "max": 132.9005,
+            "p(90)": 22.733813000000005,
+            "p(95)": 34.461684549999994,
+            "avg": 16.280338278846155,
+            "min": 6.922956,
+            "med": 11.308092,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/account/notifications}": {
+            "count": 103,
+            "rate": 2.262794388402881,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/account/addresses}": {
+            "rate": 2.2847632659601906,
+            "count": 104,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/account/cart}": {
+            "p(90)": 35.80424839999999,
+            "p(95)": 86.36292049999996,
+            "avg": 23.135499048543682,
+            "min": 7.749824,
+            "med": 14.228646,
+            "max": 179.458211,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/page-visibility}": {
+            "max": 114.352881,
+            "p(90)": 19.420372500000003,
+            "p(95)": 31.953937699999997,
+            "avg": 15.43952136538462,
+            "min": 6.402338,
+            "med": 11.189847499999999,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/home-sections}": {
+            "med": 11.451793,
+            "max": 164.822174,
+            "p(90)": 23.3045746,
+            "p(95)": 28.442474499999964,
+            "avg": 15.649313196261682,
+            "min": 7.412842,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/products/{slug}}": {
+            "rate": 2.2847632659601906,
+            "count": 104,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/coupons}": {
+            "avg": 17.528143672727275,
+            "min": 7.30741,
+            "med": 13.157738,
+            "max": 79.418911,
+            "p(90)": 33.0504464,
+            "p(95)": 42.83038625,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_reqs": {
+            "count": 4810,
+            "rate": 105.67030105065882
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/orders}": {
+            "rate": 2.416576531304048,
+            "count": 110,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/gift-page}": {
+            "avg": 17.533776429906542,
+            "min": 7.837425,
+            "med": 13.312087,
+            "max": 166.961198,
+            "p(90)": 21.927212600000008,
+            "p(95)": 32.486790999999904,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/categories}": {
+            "count": 109,
+            "rate": 2.3946076537467382,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/contact-messages}": {
+            "passes": 0,
+            "fails": 110,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_duration{endpoint:GET /api/v1/account/notifications}": {
+            "avg": 70.18734521359224,
+            "min": 27.554038,
+            "med": 51.108724,
+            "max": 355.025699,
+            "p(90)": 132.38965359999995,
+            "p(95)": 158.91707549999998,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/account/cart}": {
+            "passes": 0,
+            "fails": 103,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_failed{endpoint:GET /api/v1/blog-posts/{slug}}": {
+            "passes": 0,
+            "fails": 107,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/package-boxes}": {
+            "avg": 17.6371698411215,
+            "min": 8.752855,
+            "med": 15.61871,
+            "max": 46.713483,
+            "p(90)": 27.1724386,
+            "p(95)": 30.694326999999994,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/page-visibility}": {
+            "rate": 2.3506698986321193,
+            "count": 107,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/contact-messages}": {
+            "rate": 2.416576531304048,
+            "count": 110,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/subscribe-page}": {
+            "passes": 0,
+            "fails": 104,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_reqs{endpoint:GET /api/v1/account/wishlist}": {
+            "rate": 2.3067321435175003,
+            "count": 105,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_failed{endpoint:GET /api/v1/admin/page-visibility}": {
+            "passes": 0,
+            "fails": 107,
+            "thresholds": {
+                "rate>=0": false
+            },
+            "value": 0
+        },
+        "http_reqs{endpoint:GET /api/v1/admin/zoho-settings}": {
+            "count": 107,
+            "rate": 2.3506698986321193,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_duration{endpoint:GET /api/v1/admin/page-visibility}": {
+            "min": 7.433051,
+            "med": 13.734558,
+            "max": 58.345152,
+            "p(90)": 28.771354000000002,
+            "p(95)": 38.338078899999985,
+            "avg": 17.29818275700934,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_reqs{endpoint:GET /api/v1/subscribe-page}": {
+            "count": 104,
+            "rate": 2.2847632659601906,
+            "thresholds": {
+                "count>=0": false
+            }
+        }
+    }
+}

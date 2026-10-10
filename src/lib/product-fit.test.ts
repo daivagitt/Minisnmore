@@ -372,6 +372,9 @@ describe("product fit from MnM length/chest", () => {
   it("validates quantity and virtual fit uploads", () => {
     expect(validateQuantity(1)).toEqual({ ok: true, value: 1 });
     expect(clampQuantity(99)).toBe(10);
+    expect(clampQuantity(5, 2)).toBe(2);
+    expect(clampQuantity(1, 2)).toBe(1);
+    expect(clampQuantity(3, 0)).toBe(0);
     expect(validateVirtualFitFile(null).ok).toBe(false);
     expect(validateVirtualFitFile(new File(["x"], "pic.txt", { type: "text/plain" })).ok).toBe(false);
     expect(validateVirtualFitFile(new File(["x"], "pic.jpg", { type: "image/jpeg" }))).toEqual({

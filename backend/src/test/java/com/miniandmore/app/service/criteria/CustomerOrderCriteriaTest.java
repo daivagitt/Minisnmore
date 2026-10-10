@@ -2,11 +2,15 @@ package com.miniandmore.app.service.criteria;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.miniandmore.app.domain.enumeration.OrderStatus;
 import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.stream.Stream;
 import org.assertj.core.api.Condition;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 class CustomerOrderCriteriaTest {
 
@@ -72,6 +76,53 @@ class CustomerOrderCriteriaTest {
         var customerOrderCriteria = new CustomerOrderCriteria();
 
         assertThat(customerOrderCriteria).hasToString("CustomerOrderCriteria{}");
+    }
+
+    @Test
+    void equals_sameInstanceNullAndWrongType() {
+        var customerOrderCriteria = new CustomerOrderCriteria();
+        assertThat(customerOrderCriteria.equals(customerOrderCriteria)).isTrue();
+        assertThat(customerOrderCriteria.equals(null)).isFalse();
+        assertThat(customerOrderCriteria.equals("CustomerOrderCriteria")).isFalse();
+    }
+
+    @ParameterizedTest
+    @MethodSource("unequalCriteriaPairs")
+    void equals_falseWhenAnyFilterDiffers(CustomerOrderCriteria left, CustomerOrderCriteria right) {
+        assertThat(left).isNotEqualTo(right);
+    }
+
+    private static Stream<org.junit.jupiter.params.provider.Arguments> unequalCriteriaPairs() {
+        return Stream.of(
+            org.junit.jupiter.params.provider.Arguments.of(withOrderNumber("A"), withOrderNumber("B")),
+            org.junit.jupiter.params.provider.Arguments.of(withUserLogin("u1"), withUserLogin("u2")),
+            org.junit.jupiter.params.provider.Arguments.of(withStatus(OrderStatus.CONFIRMED), withStatus(OrderStatus.CANCELLED)),
+            org.junit.jupiter.params.provider.Arguments.of(withDistinct(true), withDistinct(false))
+        );
+    }
+
+    private static CustomerOrderCriteria withOrderNumber(String orderNumber) {
+        var c = new CustomerOrderCriteria();
+        c.orderNumber().setEquals(orderNumber);
+        return c;
+    }
+
+    private static CustomerOrderCriteria withUserLogin(String login) {
+        var c = new CustomerOrderCriteria();
+        c.userLogin().setEquals(login);
+        return c;
+    }
+
+    private static CustomerOrderCriteria withStatus(OrderStatus status) {
+        var c = new CustomerOrderCriteria();
+        c.status().setEquals(status);
+        return c;
+    }
+
+    private static CustomerOrderCriteria withDistinct(Boolean distinct) {
+        var c = new CustomerOrderCriteria();
+        c.setDistinct(distinct);
+        return c;
     }
 
     private static void setAllFilters(CustomerOrderCriteria customerOrderCriteria) {

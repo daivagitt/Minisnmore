@@ -17,6 +17,8 @@ import {
   parseSpreadsheetImageUrls,
   formatLedgerlySyncFailures,
   formatLedgerlySyncSummary,
+  formatZohoSyncFailureToast,
+  formatZohoSyncFailures,
   getAdminSiteSettings,
   getSiteSettings,
   getAboutPage,
@@ -35,6 +37,7 @@ import {
   listCategories,
   listProducts,
   saveBanner,
+  getBannerValidationErrors,
   saveBlogPost,
   savePolicy,
   saveCategory,
@@ -254,9 +257,21 @@ describe("backend data mappers", () => {
         title: "Hero",
         subtitle: undefined,
         imageUrl: "/hero.jpg",
+        eyebrow: "Featured",
+        trustFabricLabel: "GOTS cotton",
+        trustDyesLabel: "Plant dyes",
         active: undefined,
       }),
-    ).toMatchObject({ id: "2", subtitle: null, image_url: "/hero.jpg", active: true });
+    ).toMatchObject({
+      id: "2",
+      subtitle: null,
+      image_url: "/hero.jpg",
+      eyebrow: "Featured",
+      trust_fabric_label: "GOTS cotton",
+      trust_shipping_label: null,
+      trust_dyes_label: "Plant dyes",
+      active: true,
+    });
 
     expect(
       fromHomeSectionDto({
@@ -461,12 +476,24 @@ describe("backend data API calls", () => {
       image_url: "/b.jpg",
       link_url: "",
       cta_label: "",
+      eyebrow: "Featured",
+      trust_fabric_label: "GOTS cotton",
+      trust_shipping_label: "",
+      trust_dyes_label: "Plant dyes",
       sort_order: 0,
       active: true,
     });
     expect(mockedApi.post).toHaveBeenLastCalledWith(
       "/api/v1/admin/banners",
-      expect.objectContaining({ subtitle: null, linkUrl: null, ctaLabel: null }),
+      expect.objectContaining({
+        subtitle: null,
+        linkUrl: null,
+        ctaLabel: null,
+        eyebrow: "Featured",
+        trustFabricLabel: "GOTS cotton",
+        trustShippingLabel: null,
+        trustDyesLabel: "Plant dyes",
+      }),
       { auth: true },
     );
 
@@ -542,6 +569,37 @@ describe("backend data API calls", () => {
         skipped: [{ sku: "X", message: "No linked store product" }],
       }),
     ).toEqual(["Skipped — X: No linked store product"]);
+  });
+
+  it("formats Zoho sync failures with SKU-only backend entries", () => {
+    expect(
+      formatZohoSyncFailures({
+        success: 0,
+        failed: 1,
+        failures: [{ productName: "NEG-SKU", message: "Negative Zoho stock (-2); store stock was not updated" }],
+      }),
+    ).toEqual(["NEG-SKU: Negative Zoho stock (-2); store stock was not updated"]);
+    expect(
+      formatZohoSyncFailures({
+        success: 0,
+        failed: 1,
+        failures: [{ productId: 42, message: "Sync failed" }],
+      }),
+    ).toEqual(["Product 42: Sync failed"]);
+  });
+
+  it("formats Zoho sync failure toast with summary and overflow hint", () => {
+    const summary = {
+      success: 1,
+      failed: 2,
+      failures: [
+        { productName: "SKU-A", message: "Negative Zoho stock (-1); store stock was not updated" },
+        { productName: "SKU-B", message: "Negative Zoho stock (-3); store stock was not updated" },
+      ],
+    };
+    expect(formatZohoSyncFailureToast(summary, "Variant group pull")).toBe(
+      "Variant group pull: 1 succeeded, 2 failed — SKU-A: Negative Zoho stock (-1); store stock was not updated (+1 more)",
+    );
   });
 
   it("calls Ledgerly status and settings admin endpoints", async () => {
@@ -804,6 +862,10 @@ describe("backend data API calls", () => {
         image_url: "#$%",
         link_url: null,
         cta_label: null,
+        eyebrow: null,
+        trust_fabric_label: null,
+        trust_shipping_label: null,
+        trust_dyes_label: null,
         sort_order: 0,
         active: true,
       }),
@@ -882,6 +944,30 @@ describe("backend data API calls", () => {
     expect(mockedApi.put).not.toHaveBeenCalled();
   });
 
+  it("validates optional banner eyebrow length", () => {
+    const base = {
+      title: "Banner",
+      subtitle: null,
+      image_url: "/b.jpg",
+      link_url: null,
+      cta_label: null,
+      eyebrow: null,
+      trust_fabric_label: null,
+      trust_shipping_label: null,
+      trust_dyes_label: null,
+      sort_order: 0,
+      active: true,
+    };
+    expect(getBannerValidationErrors(base)).toEqual([]);
+    expect(getBannerValidationErrors({ ...base, eyebrow: "★" })).toEqual([]);
+    expect(
+      getBannerValidationErrors({ ...base, eyebrow: "A".repeat(81) }),
+    ).toContain("Eyebrow label must be 80 characters or fewer.");
+    expect(
+      getBannerValidationErrors({ ...base, trust_fabric_label: "A".repeat(81) }),
+    ).toContain("Organic / fabric line must be 80 characters or fewer.");
+  });
+
   it("rejects external banner link URLs before calling the API", () => {
     expect(() =>
       saveBanner({
@@ -890,6 +976,10 @@ describe("backend data API calls", () => {
         image_url: "/b.jpg",
         link_url: "https://google.com",
         cta_label: "Shop",
+        eyebrow: "Featured",
+        trust_fabric_label: null,
+        trust_shipping_label: null,
+        trust_dyes_label: null,
         sort_order: 0,
         active: true,
       }),

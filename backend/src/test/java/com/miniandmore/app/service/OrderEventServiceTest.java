@@ -298,6 +298,17 @@ class OrderEventServiceTest {
     }
 
     @Test
+    void recordRefundInitiatedWithoutMail_recordsEventAndDoesNotEmail() {
+        CustomerOrder order = baseOrder().paymentStatus(PaymentStatus.REFUND_INITIATED);
+        stubInsertSucceeds();
+
+        service.recordRefundInitiatedWithoutMail(order);
+
+        assertThat(capturedEventTypes()).containsExactly(OrderEventService.TYPE_REFUND_INITIATED);
+        verify(orderMailService, never()).sendRefundInitiated(any(), any(), any(), any());
+    }
+
+    @Test
     void syncLifecycleEvents_shipped_includesTrackingInBody() {
         CustomerOrder order = baseOrder()
             .paymentStatus(PaymentStatus.PAID)

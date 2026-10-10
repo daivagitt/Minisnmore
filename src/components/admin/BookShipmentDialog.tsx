@@ -34,23 +34,16 @@ import {
 import {
   packageDimensionFieldsFromOrder,
   selectZohoPackageType,
-  ZOHO_PACKAGE_TYPES,
   type ZohoPackageType,
 } from "@/lib/package-types";
+import { reopenZohoPackageType, resolvedPackageTypeId } from "@/lib/package-boxes";
+import { usePackageBoxes } from "@/hooks/usePackageBoxes";
+import { PackageTypeSelect } from "@/components/admin/PackageTypeSelect";
 import { openPrintableShippingLabel } from "@/lib/print-shipping-label";
 import { showApiError } from "@/lib/ui-errors";
 
 type WizardStep = "address" | "shipment" | "label";
 type CarrierMode = "xpressbees" | "manual";
-
-const DELIVERY_STATUSES = [
-  { value: "", label: "Select status" },
-  { value: "booked", label: "Booked" },
-  { value: "in_transit", label: "In Transit" },
-  { value: "out_for_delivery", label: "Out For Delivery" },
-  { value: "delivered", label: "Delivered" },
-  { value: "rto", label: "RTO" },
-];
 
 const CONTROL_CLS =
   "h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40";
@@ -168,7 +161,8 @@ export function BookShipmentDialog({
   const [carrier, setCarrier] = useState<CarrierMode>("xpressbees");
   const [shipDate, setShipDate] = useState(todayInputValue);
   const [parcelType, setParcelType] = useState<ZohoPackageType>("custom");
-  const [deliveryStatus, setDeliveryStatus] = useState("");
+  const [packageTypeId, setPackageTypeId] = useState("");
+  const { boxes, loaded: boxesLoaded, error: boxesLoadError } = usePackageBoxes(open);
   const [weight, setWeight] = useState("");
   const [weightUnit, setWeightUnit] = useState<WeightUnit>("kg");
   const [length, setLength] = useState("");
@@ -217,7 +211,7 @@ export function BookShipmentDialog({
     );
     setShipDate(todayInputValue());
     setParcelType(selectZohoPackageType(order.package_type || "custom", "cm").type);
-    setDeliveryStatus("");
+    setPackageTypeId(order.package_box_id == null ? "" : String(order.package_box_id));
     fillFromPackage(order);
     setAutoPickup(false);
     setCodEnabled(isCod);
@@ -231,6 +225,18 @@ export function BookShipmentDialog({
     setBusy(null);
     setBooked(null);
   }, [open, order?.order_number]);
+
+  useEffect(() => {
+    if (!open || !order || !boxesLoaded || boxesLoadError) return;
+    const matched = resolvedPackageTypeId(boxes, order);
+    setPackageTypeId(matched);
+    setParcelType(reopenZohoPackageType(order.package_type, matched));
+  }, [open, order, boxesLoaded, boxes, boxesLoadError]);
+
+  useEffect(() => {
+    if (!boxesLoadError) return;
+    showApiError(boxesLoadError, "Could not load package box types");
+  }, [boxesLoadError]);
 
   const parsedDims = () => {
     const parsedWeight = parsePackageWeightGrams(weight, weightUnit);
@@ -347,6 +353,7 @@ export function BookShipmentDialog({
         override_fulfillment_hold: requiresOverride || undefined,
         override_reason: requiresOverride ? overrideReason.trim() : undefined,
         package_type: parcelType,
+        package_box_id: packageTypeId ? Number(packageTypeId) : null,
       });
       const bookedOrder = (result as { order?: AdminOrderRow }).order ?? {
         ...order,
@@ -454,46 +461,35 @@ export function BookShipmentDialog({
                 </span>
               </label>
             </div>
-            <label className="block max-w-sm text-sm">
-              <span className="mb-1.5 block font-medium">
-                Parcel Type <span className="text-destructive">*</span>
-              </span>
-              <select
-                aria-label="Parcel type"
-                value={parcelType}
-                onChange={(event) => {
-                  const { type, preset } = selectZohoPackageType(event.target.value, lengthUnit);
-                  setParcelType(type);
+            <PackageTypeSelect
+              className="max-w-sm"
+              label="Parcel Type"
+              ariaLabel="Parcel type"
+              zohoType={parcelType}
+              packageTypeId={packageTypeId}
+              boxes={boxes}
+              loaded={boxesLoaded}
+              lengthUnit={lengthUnit}
+              weightUnit={weightUnit}
+              onChange={(next) => {
+                setParcelType(next.zohoType);
+                setPackageTypeId(next.packageTypeId);
+                if (next.dims) {
+                  setLength(next.dims.length);
+                  setWidth(next.dims.width);
+                  setHeight(next.dims.height);
+                } else {
+                  const preset = selectZohoPackageType(next.zohoType, lengthUnit).preset;
                   if (preset) {
                     setLength(preset.length);
                     setWidth(preset.width);
                     setHeight(preset.height);
-                    setRates(null);
                   }
-                }}
-                className={CONTROL_CLS}
-              >
-                {ZOHO_PACKAGE_TYPES.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block max-w-sm text-sm">
-              <span className="mb-1.5 block font-medium">MiniMS Delivery Status</span>
-              <select
-                value={deliveryStatus}
-                onChange={(event) => setDeliveryStatus(event.target.value)}
-                className={CONTROL_CLS}
-              >
-                {DELIVERY_STATUSES.map((status) => (
-                  <option key={status.value || "empty"} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                }
+                if (next.weight) setWeight(next.weight);
+                setRates(null);
+              }}
+            />
 
             <div className="rounded-xl border border-border bg-muted/20 p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

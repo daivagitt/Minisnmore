@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20261008140000-1" author="miniandmore">
+        <addColumn tableName="package_box">
+            <column name="weight_grams" type="integer"/>
+        </addColumn>
+        <addColumn tableName="customer_order">
+            <column name="package_box_id" type="bigint"/>
+        </addColumn>
+        <addColumn tableName="order_return">
+            <column name="package_box_id" type="bigint"/>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

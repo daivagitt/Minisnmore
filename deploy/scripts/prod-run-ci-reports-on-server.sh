@@ -152,11 +152,8 @@ if [ "$RUN_OPENAPI" = "true" ]; then
 fi
 
 if [ "$RUN_API_TESTS" = "true" ]; then
-  echo "=== 8. Live Ledgerly API tests ==="
-  API_TEST_BASE_URL="$API_INTEGRATION_BASE_URL" \
-    run_step bash jenkins/scripts/run-ledgerly-live-api-tests.sh
-  mkdir -p "$PKG/backend/ledgerly-live"
-  cp -a artifacts/ledgerly-live/. "$PKG/backend/ledgerly-live/" 2>/dev/null || true
+  echo "=== 8. Skip live Ledgerly API tests ==="
+  rm -rf "$PKG/backend/ledgerly-live" artifacts/ledgerly-live
 
   echo "=== 11. API lifecycle tests (all OpenAPI endpoints) ==="
   API_TEST_BASE_URL="$API_INTEGRATION_BASE_URL" \

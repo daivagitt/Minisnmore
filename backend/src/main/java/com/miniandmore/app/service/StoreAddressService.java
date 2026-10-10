@@ -10,10 +10,12 @@ import com.miniandmore.app.repository.StoreAddressRepository;
 import com.miniandmore.app.service.dto.StoreAddressDTO;
 import com.miniandmore.app.service.mapper.StoreAddressMapper;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -65,41 +67,84 @@ public class StoreAddressService {
         StoreAddress existing = storeAddressRepository
             .findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Address not found"));
-        StoreAddressUsage usage = existing.getUsage();
+        Set<StoreAddressUsage> usages = copyUsages(existing.getUsages());
         boolean wasDefault = Boolean.TRUE.equals(existing.getIsDefault());
         storeAddressRepository.delete(existing);
         if (wasDefault) {
-            applyRemainingDefault(usage);
+            for (StoreAddressUsage usage : usages) {
+                applyRemainingDefault(usage);
+            }
         }
     }
 
     private StoreAddressDTO persist(StoreAddressDTO dto, StoreAddress previous) {
         normalize(dto);
-        if (Boolean.TRUE.equals(dto.getIsDefault()) && dto.getUsage() != null) {
-            clearOtherDefaults(dto.getUsage(), dto.getId());
+        Set<StoreAddressUsage> previousUsages = previous == null ? Set.of() : copyUsages(previous.getUsages());
+        boolean previouslyDefault = previous != null && Boolean.TRUE.equals(previous.getIsDefault());
+        Set<StoreAddressUsage> orphanedPeerUsages = EnumSet.noneOf(StoreAddressUsage.class);
+        if (Boolean.TRUE.equals(dto.getIsDefault())) {
+            // One default address per usage type — clear peers and flush before writing the new default.
+            orphanedPeerUsages.addAll(clearOtherDefaults(dto.getUsages(), dto.getId()));
         }
-        StoreAddress saved = storeAddressRepository.save(storeAddressMapper.toEntity(dto));
+        StoreAddress entity;
+        if (previous != null) {
+            // partialUpdate mutates the managed usages collection in place — do not replace the Set reference.
+            storeAddressMapper.partialUpdate(previous, dto);
+            entity = previous;
+        } else {
+            entity = storeAddressMapper.toEntity(dto);
+        }
+        StoreAddress saved = storeAddressRepository.save(entity);
         if (Boolean.TRUE.equals(saved.getIsDefault())) {
             applyDefaultToSiteSettings(saved);
         }
-        if (previous != null && previous.getUsage() != null) {
-            boolean usageChanged = previous.getUsage() != saved.getUsage();
-            boolean lostDefault = Boolean.TRUE.equals(previous.getIsDefault()) && !Boolean.TRUE.equals(saved.getIsDefault());
-            if (usageChanged || lostDefault) {
-                applyRemainingDefault(previous.getUsage());
+        Set<StoreAddressUsage> savedUsages = copyUsages(saved.getUsages());
+        for (StoreAddressUsage usage : previousUsages) {
+            boolean removed = !savedUsages.contains(usage);
+            boolean lostDefault = previouslyDefault && (!Boolean.TRUE.equals(saved.getIsDefault()) || removed);
+            if (removed || lostDefault) {
+                applyRemainingDefault(usage);
+            }
+        }
+        for (StoreAddressUsage usage : orphanedPeerUsages) {
+            if (!savedUsages.contains(usage) || !Boolean.TRUE.equals(saved.getIsDefault())) {
+                applyRemainingDefault(usage);
             }
         }
         return storeAddressMapper.toDto(saved);
     }
 
-    private void clearOtherDefaults(StoreAddressUsage usage, Long keepId) {
-        for (StoreAddress existing : storeAddressRepository.findAllByUsageAndIsDefaultTrue(usage)) {
-            if (keepId != null && keepId.equals(existing.getId())) {
-                continue;
+    /**
+     * Clears default on any other address that includes one of {@code claimedUsages}.
+     * Returns usages those peers still cover that are not in {@code claimedUsages}, so site
+     * settings for those types can be refreshed after the new default is saved.
+     */
+    private Set<StoreAddressUsage> clearOtherDefaults(Set<StoreAddressUsage> claimedUsages, Long keepId) {
+        Set<StoreAddressUsage> orphaned = EnumSet.noneOf(StoreAddressUsage.class);
+        boolean cleared = false;
+        Set<Long> seen = new java.util.HashSet<>();
+        for (StoreAddressUsage usage : claimedUsages) {
+            for (StoreAddress existing : storeAddressRepository.findAllByUsagesContainingAndIsDefaultTrue(usage)) {
+                if (keepId != null && keepId.equals(existing.getId())) {
+                    continue;
+                }
+                if (!seen.add(existing.getId())) {
+                    continue;
+                }
+                for (StoreAddressUsage peerUsage : copyUsages(existing.getUsages())) {
+                    if (!claimedUsages.contains(peerUsage)) {
+                        orphaned.add(peerUsage);
+                    }
+                }
+                existing.setIsDefault(false);
+                storeAddressRepository.save(existing);
+                cleared = true;
             }
-            existing.setIsDefault(false);
-            storeAddressRepository.save(existing);
         }
+        if (cleared) {
+            storeAddressRepository.flush();
+        }
+        return orphaned;
     }
 
     private void applyDefaultToSiteSettings(StoreAddress address) {
@@ -107,11 +152,14 @@ public class StoreAddressService {
             .findFirstByOrderByIdAsc()
             .ifPresent(setting -> {
                 String formatted = formatMultiline(address);
-                if (address.getUsage() == StoreAddressUsage.INVOICE) {
+                Set<StoreAddressUsage> usages = copyUsages(address.getUsages());
+                if (usages.contains(StoreAddressUsage.INVOICE)) {
                     setting.setInvoiceSoldByAddress(formatted);
-                } else if (address.getUsage() == StoreAddressUsage.SHIPMENT) {
+                }
+                if (usages.contains(StoreAddressUsage.SHIPMENT)) {
                     setting.setInvoiceDispatchFromAddress(formatted);
-                } else if (address.getUsage() == StoreAddressUsage.NORMAL) {
+                }
+                if (usages.contains(StoreAddressUsage.NORMAL)) {
                     setting.setInvoiceRegisteredOfficeAddress(formatted);
                 }
                 siteSettingRepository.save(setting);
@@ -120,7 +168,7 @@ public class StoreAddressService {
 
     private void applyRemainingDefault(StoreAddressUsage usage) {
         storeAddressRepository
-            .findFirstByUsageAndIsDefaultTrue(usage)
+            .findFirstByUsagesContainingAndIsDefaultTrueOrderByIdDesc(usage)
             .ifPresentOrElse(this::applyDefaultToSiteSettings, () -> clearSiteSettingForUsage(usage));
     }
 
@@ -140,9 +188,14 @@ public class StoreAddressService {
     }
 
     static void normalize(StoreAddressDTO dto) {
-        if (dto.getUsage() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose whether this is a shipment, normal, or invoice address");
+        Set<StoreAddressUsage> usages = copyUsages(dto.getUsages());
+        if (usages.isEmpty()) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Choose at least one: shipment, normal address, or invoice"
+            );
         }
+        dto.setUsages(usages);
         dto.setLabel(trimToNull(dto.getLabel()));
         dto.setFullName(required(dto.getFullName(), "Name"));
         dto.setPhone(normalizePhone(dto.getPhone()));
@@ -272,6 +325,13 @@ public class StoreAddressService {
         if (StringUtils.isNotBlank(value)) {
             lines.add(value.trim());
         }
+    }
+
+    private static Set<StoreAddressUsage> copyUsages(Set<StoreAddressUsage> usages) {
+        if (usages == null || usages.isEmpty()) {
+            return EnumSet.noneOf(StoreAddressUsage.class);
+        }
+        return EnumSet.copyOf(usages);
     }
 
     private static String required(String value, String label) {

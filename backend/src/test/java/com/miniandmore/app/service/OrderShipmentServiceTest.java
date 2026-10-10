@@ -254,7 +254,15 @@ class OrderShipmentServiceTest {
         when(customerOrderRepository.findOneByOrderNumber("MNM-1")).thenReturn(Optional.of(order));
         when(xpressBeesClient.isForwardShipmentConfigured()).thenReturn(true);
         when(xpressBeesClient.createForwardShipment(any())).thenReturn(
-            new XpressBeesClient.ForwardShipmentResult("XB-1", "https://track/XB-1", "https://label/XB-1", "REQ-1", "ok")
+            new XpressBeesClient.ForwardShipmentResult(
+                "XB-1",
+                "https://track/XB-1",
+                "https://label/XB-1",
+                "REQ-1",
+                "ok",
+                "2",
+                "Xpressbees 1 K.G"
+            )
         );
         when(xpressBeesClient.buildTrackingUrl("XB-1")).thenReturn("https://track/XB-1");
         when(orderItemRepository.findAllByOrderId(10L)).thenReturn(
@@ -279,6 +287,8 @@ class OrderShipmentServiceTest {
         assertThat(result.getShipmentLogisticsMode()).isEqualTo(ReturnLogisticsMode.XPRESSBEES);
         assertThat(result.getShipmentCarrierStatus()).isEqualTo("booked");
         assertThat(result.getShipmentDate()).isNull();
+        assertThat(result.getPackageCourierId()).isEqualTo("2");
+        assertThat(result.getPackageCourierName()).isEqualTo("Xpressbees 1 K.G");
 
         ArgumentCaptor<XpressBeesClient.ForwardShipmentRequest> captor = ArgumentCaptor.forClass(
             XpressBeesClient.ForwardShipmentRequest.class

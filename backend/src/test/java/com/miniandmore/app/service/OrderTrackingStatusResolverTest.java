@@ -102,6 +102,24 @@ class OrderTrackingStatusResolverTest {
 
         assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("carrier_cancelled");
         assertThat(OrderTrackingStatusResolver.isDispatched("carrier_cancelled")).isFalse();
+        assertThat(OrderTrackingStatusResolver.blocksCustomerCancellation(order)).isFalse();
+    }
+
+    @Test
+    void blocksCustomerCancellation_trueForAwaitingPickupAndShipped() {
+        CustomerOrder awaiting = paidOrder()
+            .trackingNumber("XB-1")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("booked");
+        assertThat(OrderTrackingStatusResolver.blocksCustomerCancellation(awaiting)).isTrue();
+
+        CustomerOrder manualBooked = paidOrder()
+            .trackingNumber("MAN-1")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.MANUAL);
+        assertThat(OrderTrackingStatusResolver.blocksCustomerCancellation(manualBooked)).isTrue();
+
+        CustomerOrder packed = paidOrder().status(OrderStatus.HAND_WRAPPED);
+        assertThat(OrderTrackingStatusResolver.blocksCustomerCancellation(packed)).isFalse();
     }
 
     @Test

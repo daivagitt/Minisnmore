@@ -7,6 +7,10 @@ import { toast } from "sonner";
 import { Plus, Trash2, Save } from "lucide-react";
 import { ADMIN_NAME_MAX_LEN, deleteBanner, getBannerValidationErrors, listBanners, saveBanner, type BannerRow } from "@/lib/backend-data";
 import { invalidateBanners } from "@/hooks/useBanners";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { BANNER_LABEL_MAX, BANNER_TRUST_LABEL_MAX, DEFAULT_HERO_DYES_LABEL } from "@/lib/banner-trust";
+import { DEFAULT_BANNER_EYEBROW_FIRST } from "@/lib/banner-eyebrow";
+import { homeStorefrontTrustCopy } from "@/lib/home-storefront-copy";
 import { showApiError, showValidationErrors } from "@/lib/ui-errors";
 
 export const Route = createFileRoute("/admin/banners")({ component: BannersPage });
@@ -19,6 +23,10 @@ const empty: Banner = {
   image_url: "",
   link_url: "",
   cta_label: "Shop",
+  eyebrow: null,
+  trust_fabric_label: null,
+  trust_shipping_label: null,
+  trust_dyes_label: null,
   sort_order: null,
   active: true,
 };
@@ -73,7 +81,7 @@ function BannersPage() {
     <AdminPage
       eyebrow="Content"
       title="Homepage banners"
-      description="Homepage hero carousel. Use wide images (about 1920 × 900 px) — see the size guide on each banner. Active banners appear in sort order."
+      description="Homepage hero carousel. Use wide images (about 1920 × 900 px) — see the size guide on each banner. Each slide has its own title, button, and three trust lines under the card. Active banners appear in sort order."
       action={
         <button
           onClick={() => setRows((r) => [{ ...empty }, ...r])}
@@ -118,6 +126,10 @@ function BannerCard({
   onSave: (v: Banner) => void;
   onDelete: () => void;
 }) {
+  const settings = useSiteSettings();
+  const storefrontTrust = homeStorefrontTrustCopy(settings.free_shipping_min_inr);
+  const fabricPlaceholder = storefrontTrust.fabricLabel;
+  const shippingPlaceholder = storefrontTrust.heroShippingLabel;
   return (
     <div className="glass-strong rounded-3xl p-5 grid md:grid-cols-[160px_1fr] gap-4">
       <div className="space-y-1.5">
@@ -131,6 +143,18 @@ function BannerCard({
         <p className="text-[10px] text-muted-foreground text-center">Preview (~2 : 1)</p>
       </div>
       <div className="grid sm:grid-cols-2 gap-3">
+        <Field
+          label="Eyebrow label"
+          hint='Small uppercase line above the title — e.g. "Featured", "Just in". Leave blank to use Featured on the first slide and Just in on the rest.'
+        >
+          <input
+            className={inputCls()}
+            maxLength={BANNER_LABEL_MAX}
+            value={value.eyebrow ?? ""}
+            onChange={(e) => onChange({ ...value, eyebrow: e.target.value })}
+            placeholder={DEFAULT_BANNER_EYEBROW_FIRST}
+          />
+        </Field>
         <Field label="Title">
           <input
             className={inputCls()}
@@ -140,14 +164,16 @@ function BannerCard({
             placeholder="Main heading shown on carousel slide"
           />
         </Field>
-        <Field label="Subtitle">
-          <input
-            className={inputCls()}
-            value={value.subtitle ?? ""}
-            onChange={(e) => onChange({ ...value, subtitle: e.target.value })}
-            placeholder="Small supporting text shown under title"
-          />
-        </Field>
+        <div className="sm:col-span-2">
+          <Field label="Subtitle">
+            <input
+              className={inputCls()}
+              value={value.subtitle ?? ""}
+              onChange={(e) => onChange({ ...value, subtitle: e.target.value })}
+              placeholder="Small supporting text shown under title"
+            />
+          </Field>
+        </div>
         <div className="sm:col-span-2">
           <ImageUploadField
             label="Image for carousel"
@@ -174,6 +200,48 @@ function BannerCard({
             placeholder='Example: "Shop now"'
           />
         </Field>
+        <div className="sm:col-span-2 grid sm:grid-cols-1 gap-3 rounded-2xl ring-1 ring-border/60 bg-white/30 p-3">
+          <div className="text-xs uppercase tracking-wider text-muted-foreground">
+            Trust lines under this slide
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-snug -mt-1">
+            Shown at the bottom of this carousel card. Leave blank to keep the storefront default
+            for this slide only.
+          </p>
+          <Field label="Organic / fabric line" hint={`Default is “${fabricPlaceholder}”.`}>
+            <input
+              className={inputCls()}
+              maxLength={BANNER_TRUST_LABEL_MAX}
+              value={value.trust_fabric_label ?? ""}
+              onChange={(e) => onChange({ ...value, trust_fabric_label: e.target.value })}
+              placeholder={fabricPlaceholder}
+            />
+          </Field>
+          <Field
+            label="Shipping line"
+            hint={`Leave blank to follow Site settings (currently “${shippingPlaceholder}”).`}
+          >
+            <input
+              className={inputCls()}
+              maxLength={BANNER_TRUST_LABEL_MAX}
+              value={value.trust_shipping_label ?? ""}
+              onChange={(e) => onChange({ ...value, trust_shipping_label: e.target.value })}
+              placeholder={shippingPlaceholder}
+            />
+          </Field>
+          <Field
+            label="Dyes line"
+            hint={`Default is “${DEFAULT_HERO_DYES_LABEL}”. Hidden on very small screens.`}
+          >
+            <input
+              className={inputCls()}
+              maxLength={BANNER_TRUST_LABEL_MAX}
+              value={value.trust_dyes_label ?? ""}
+              onChange={(e) => onChange({ ...value, trust_dyes_label: e.target.value })}
+              placeholder={DEFAULT_HERO_DYES_LABEL}
+            />
+          </Field>
+        </div>
         <NumberField
           label="Carousel order"
           value={value.sort_order}

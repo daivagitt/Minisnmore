@@ -82,7 +82,7 @@ public class OrderCancellationExecutor {
         if (order == null || order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FULFILLED) {
             return false;
         }
-        return !OrderTrackingStatusResolver.isDispatched(OrderTrackingStatusResolver.resolve(order));
+        return !OrderTrackingStatusResolver.blocksCustomerCancellation(order);
     }
 
     public void assertCancelEligible(CustomerOrder order) {
@@ -92,9 +92,17 @@ public class OrderCancellationExecutor {
         if (order.getStatus() == OrderStatus.FULFILLED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This order has already been dispatched and can no longer be cancelled");
         }
-        if (OrderTrackingStatusResolver.isDispatched(OrderTrackingStatusResolver.resolve(order))) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "This order has already been dispatched and can no longer be cancelled");
+        if (!OrderTrackingStatusResolver.blocksCustomerCancellation(order)) {
+            return;
         }
+        String tracking = OrderTrackingStatusResolver.resolve(order);
+        if (XpressBeesShipmentStatus.AWAITING_PICKUP_MILESTONE.equals(tracking)) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "This order already has a shipment booked and can no longer be cancelled"
+            );
+        }
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "This order has already been dispatched and can no longer be cancelled");
     }
 
     public String retryFailedOnlineRefund(CustomerOrder order) {

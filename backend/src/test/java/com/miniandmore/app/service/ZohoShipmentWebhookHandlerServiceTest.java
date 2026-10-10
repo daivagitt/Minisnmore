@@ -586,6 +586,34 @@ class ZohoShipmentWebhookHandlerServiceTest {
         assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("hand_wrapped");
     }
 
+    @Test
+    void handle_missingShipmentFields_returnsBadRequest() {
+        String body = "{\"eventId\":\"evt-missing\"}";
+        assertThatThrownBy(() -> handler.handle(body, null, SECRET))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Provide zohoSalesOrderId or salesorder_number");
+    }
+
+    @Test
+    void handle_missingEventId_returnsBadRequest() {
+        String body = "{\"salesorder_id\":\"so-no-event\",\"package\":{\"tracking_number\":\"TRK-1\"}}";
+        assertThatThrownBy(() -> handler.handle(body, null, SECRET))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Missing eventId");
+    }
+
+    @Test
+    void handle_duplicateEventWithDataIntegrity_returnsDuplicateResult() {
+        String body =
+            "{\"eventId\":\"dup-evt\",\"salesorder_id\":\"so-dup\",\"package\":{\"status\":\"shipped\",\"tracking_number\":\"TRK-DUP\",\"package_id\":\"pkg-dup\",\"shipment_id\":\"ship-dup\"}}";
+        CustomerOrder order = order("MNM-DUP", "so-dup", OrderStatus.CONFIRMED);
+        when(customerOrderRepository.findOneByZohoSalesOrderId("so-dup")).thenReturn(Optional.of(order));
+        when(webhookEventRepository.existsByEventId("dup-evt")).thenReturn(false);
+        when(webhookEventRepository.saveAndFlush(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("dup"));
+        Map<String, Object> result = handler.handle(body, null, SECRET);
+        assertThat(result.get("duplicate")).isEqualTo(true);
+    }
+
     private void verifySavedEvent(String eventId, String zohoSalesOrderId, String packageId, String shipmentId, String status) {
         ArgumentCaptor<ZohoShipmentWebhookEvent> captor = ArgumentCaptor.forClass(ZohoShipmentWebhookEvent.class);
         verify(webhookEventRepository).saveAndFlush(captor.capture());

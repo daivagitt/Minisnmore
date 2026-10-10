@@ -384,6 +384,7 @@ class InternalAdminOrderResourceTest {
                 null,
                 null,
                 null,
+                null,
                 null
             )
         ).thenReturn(booked);
@@ -442,7 +443,7 @@ class InternalAdminOrderResourceTest {
             .packageHeightCm(8)
             .packageChargeableWeightGrams(500);
         when(
-            orderPackageService.completePackage("MNM-COD1", 500, 12, 10, 8, "1", "Surface Xpressbees 0.5 K.G", null)
+            orderPackageService.completePackage("MNM-COD1", 500, 12, 10, 8, "1", "Surface Xpressbees 0.5 K.G", null, null)
         ).thenReturn(wrapped);
 
         mockMvc
@@ -476,7 +477,7 @@ class InternalAdminOrderResourceTest {
             .packageHeightCm(2)
             .packageType(PackageType.ENVELOPE);
         when(
-            orderPackageService.completePackage("MNM-COD1", 250, 32, 24, 2, null, null, "envelope")
+            orderPackageService.completePackage("MNM-COD1", 250, 32, 24, 2, null, null, "envelope", null)
         ).thenReturn(wrapped);
 
         mockMvc

@@ -490,7 +490,7 @@ function OrderDetail() {
                 Need to cancel this order?
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                Submit a cancellation request while this order has not shipped yet. Our team will review it before processing any refund.
+                Submit a cancellation request before a shipment is booked. Our team will review it before processing any refund.
               </p>
             </div>
             <button

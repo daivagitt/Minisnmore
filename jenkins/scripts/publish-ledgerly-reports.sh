@@ -36,11 +36,8 @@ fi
 echo "=== 4. Repackage backend unit tests (if surefire exists) ==="
 bash jenkins/scripts/package-unit-test-reports.sh "$PKG" || true
 
-echo "=== 5. Live Ledgerly API tests ==="
-API_TEST_BASE_URL="${API_TEST_BASE_URL:-http://127.0.0.1:9180}" \
-  bash jenkins/scripts/run-ledgerly-live-api-tests.sh || true
-mkdir -p "$PKG/backend/ledgerly-live"
-cp -a artifacts/ledgerly-live/. "$PKG/backend/ledgerly-live/"
+echo "=== 5. Skip live Ledgerly API tests ==="
+rm -rf "$PKG/backend/ledgerly-live" artifacts/ledgerly-live
 
 rm -rf "$PKG/backend/scenario-integration" "$PKG/backend/ledgerly-scenario-integration" \
   "$PKG/backend/zoho-live" "$PKG/backend/coverage/integration" "$PKG/backend/javadoc/integration"

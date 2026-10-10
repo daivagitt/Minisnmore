@@ -1155,7 +1155,23 @@ def copy_logo() -> None:
         (OUT_DIR / "daiva-logo.svg").write_bytes(src.read_bytes())
 
 
+def render_from_json() -> int:
+    if not OUT_JSON.is_file():
+        print(f"Missing {OUT_JSON}", file=sys.stderr)
+        return 1
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    copy_logo()
+    report = json.loads(OUT_JSON.read_text(encoding="utf-8"))
+    OUT_HTML.write_text(build_html(report), encoding="utf-8")
+    OUT_JUNIT.write_text(build_junit(report), encoding="utf-8")
+    print(f"Rendered manual UI report from {OUT_JSON}")
+    return 0
+
+
 def main() -> int:
+    if "--from-json" in sys.argv:
+        return render_from_json()
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     copy_logo()
     started = datetime.now(timezone.utc).isoformat()

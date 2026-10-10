@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +40,13 @@ public class ZohoCreditNoteService {
     private final OrderItemRepository orderItemRepository;
     private final ZohoBooksAccountResolver accountResolver;
     private final ZohoCreditNoteOrderSupport orderSupport;
+    /**
+     * Kept for Spring wiring. Do not persist from {@code createCreditNote} (NOT_SUPPORTED):
+     * a nested REQUIRES_NEW update deadlocks allocate/convert, which hold FOR UPDATE on
+     * the same row. Callers save the credit-note id on the entity instead; Zoho reuses
+     * by return-number reference if that save is lost.
+     */
+    @SuppressWarnings("unused")
     private final ZohoReturnCreditNotePersistence returnCreditNotePersistence;
 
     public ZohoCreditNoteService(
@@ -140,6 +148,213 @@ public class ZohoCreditNoteService {
         boolean linkToSourceInvoice
     ) {
         return createCreditNoteInternal(orderId, returnNumber, returnedQtyByOrderItemId, false, linkToSourceInvoice);
+    }
+
+    /**
+     * Applies remaining credit-note balance to an existing invoice. Used when convert-to-refund
+     * follows a cheaper-replacement Razorpay settle that already created an unlinked note.
+     */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void applyCreditNoteToInvoice(String creditNoteId, String invoiceId) {
+        String noteId = StringUtils.trimToNull(creditNoteId);
+        String targetInvoiceId = StringUtils.trimToNull(invoiceId);
+        if (noteId == null || targetInvoiceId == null) {
+            return;
+        }
+        BigDecimal available = openCreditNoteBalance(noteId);
+        if (available.signum() <= 0) {
+            return;
+        }
+        applyCreditNoteAmount(noteId, targetInvoiceId, available);
+    }
+
+    /**
+     * Attaches an existing unlinked credit note to the order's source invoice. If that invoice has
+     * no outstanding (typical prepaid original), voids the unused note and creates a linked replacement.
+     */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public Optional<String> attachCreditNoteToSourceInvoice(
+        Long orderId,
+        String returnNumber,
+        String creditNoteId,
+        Map<Long, Integer> returnedQtyByOrderItemId
+    ) {
+        String noteId = StringUtils.trimToNull(creditNoteId);
+        if (noteId == null || orderId == null) {
+            return Optional.ofNullable(noteId);
+        }
+        Optional<CustomerOrder> orderOpt = customerOrderRepository.findById(orderId);
+        if (orderOpt.isEmpty()) {
+            return Optional.of(noteId);
+        }
+        CustomerOrder order = orderOpt.orElseThrow();
+        String invoiceId = StringUtils.trimToNull(order.getZohoInvoiceId());
+        BigDecimal available = openCreditNoteBalance(noteId);
+        if (available.signum() <= 0) {
+            return Optional.of(noteId);
+        }
+        BigDecimal outstanding = invoiceOutstanding(invoiceId);
+        if (outstanding.signum() > 0 && invoiceId != null) {
+            try {
+                applyCreditNoteAmount(noteId, invoiceId, available.min(outstanding));
+                return Optional.of(noteId);
+            } catch (RuntimeException e) {
+                LOG.warn(
+                    "Zoho apply credit note {} to invoice {} failed; replacing with a linked note: {}",
+                    noteId,
+                    invoiceId,
+                    e.getMessage()
+                );
+            }
+        }
+        return replaceWithLinkedCreditNote(noteId, orderId, returnNumber, returnedQtyByOrderItemId);
+    }
+
+    /**
+     * Refunds leftover credit-note balance after a cheaper replacement invoice has consumed what it
+     * can. Razorpay (or a manual difference refund) already paid that leftover in cash.
+     */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void refundOpenCreditNoteBalance(String creditNoteId, String referenceNumber) {
+        String noteId = StringUtils.trimToNull(creditNoteId);
+        if (noteId == null) {
+            return;
+        }
+        BigDecimal available = openCreditNoteBalance(noteId);
+        if (available.signum() <= 0) {
+            return;
+        }
+        String accountId = resolveRefundFromAccountId();
+        if (accountId == null) {
+            LOG.warn("Skipping leftover Zoho credit-note refund for {}: no cash/bank account in the org", noteId);
+            return;
+        }
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("date", LocalDate.now(INDIA).toString());
+        payload.put("refund_mode", "others");
+        payload.put("amount", available);
+        payload.put("from_account_id", accountId);
+        payload.put(
+            "reference_number",
+            StringUtils.left(StringUtils.defaultIfBlank(StringUtils.trimToNull(referenceNumber), noteId), 50)
+        );
+        booksClient.refundCreditNote(noteId, payload);
+        LOG.info("Refunded leftover Zoho credit note {} ({})", noteId, available);
+    }
+
+    private void applyCreditNoteAmount(String noteId, String invoiceId, BigDecimal amount) {
+        BigDecimal applied = moneyOrZero(amount);
+        if (applied.signum() <= 0) {
+            return;
+        }
+        Map<String, Object> invoiceApplication = new LinkedHashMap<>();
+        invoiceApplication.put("invoice_id", invoiceId);
+        invoiceApplication.put("amount_applied", applied);
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("invoices", List.of(invoiceApplication));
+        booksClient.applyCreditNoteToInvoices(noteId, payload);
+        LOG.info("Applied Zoho credit note {} ({}) to invoice {}", noteId, applied, invoiceId);
+    }
+
+    private Optional<String> replaceWithLinkedCreditNote(
+        String noteId,
+        Long orderId,
+        String returnNumber,
+        Map<Long, Integer> returnedQtyByOrderItemId
+    ) {
+        try {
+            booksClient.voidCreditNote(noteId);
+        } catch (RuntimeException e) {
+            LOG.warn("Could not void unlinked Zoho credit note {}: {}", noteId, e.getMessage());
+            return Optional.of(noteId);
+        }
+        Optional<String> created = findExistingCreditNoteIdByReference(returnNumber);
+        if (created.isPresent()) {
+            return created;
+        }
+        try {
+            created = createCreditNote(orderId, returnNumber, returnedQtyByOrderItemId, true);
+            if (created.isPresent()) {
+                return created;
+            }
+        } catch (RuntimeException e) {
+            LOG.warn("Could not recreate linked Zoho credit note for {}: {}", returnNumber, e.getMessage());
+        }
+        LOG.warn(
+            "Zoho credit note {} was voided for {} but no linked replacement was created; clear local id and retry",
+            noteId,
+            returnNumber
+        );
+        return Optional.empty();
+    }
+
+    private BigDecimal invoiceOutstanding(String invoiceId) {
+        Map<String, Object> invoice = loadInvoice(invoiceId);
+        if (invoice.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        if (invoice.get("balance") != null) {
+            return moneyOrZero(toBigDecimal(invoice.get("balance")));
+        }
+        return BigDecimal.ZERO;
+    }
+
+    private String resolveRefundFromAccountId() {
+        try {
+            for (Map<String, Object> account : booksClient.listBankAccounts()) {
+                String id = StringUtils.trimToNull(stringValue(account.get("account_id")));
+                if (id != null) {
+                    return id;
+                }
+            }
+        } catch (RuntimeException e) {
+            LOG.warn("Could not list Zoho bank accounts for credit-note refund: {}", e.getMessage());
+        }
+        try {
+            String fallback = null;
+            for (Map<String, Object> account : booksClient.listAssetAccounts()) {
+                String id = StringUtils.trimToNull(stringValue(account.get("account_id")));
+                if (id == null) {
+                    continue;
+                }
+                if (fallback == null) {
+                    fallback = id;
+                }
+                String name = StringUtils.lowerCase(
+                    StringUtils.defaultString(stringValue(account.get("account_name")), stringValue(account.get("name")))
+                );
+                if (name.contains("bank") || name.contains("cash") || name.contains("undeposited") || name.contains("petty")) {
+                    return id;
+                }
+            }
+            return fallback;
+        } catch (RuntimeException e) {
+            LOG.warn("Could not list Zoho asset accounts for credit-note refund: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private BigDecimal openCreditNoteBalance(String creditNoteId) {
+        try {
+            Map<String, Object> response = booksClient.getCreditNote(creditNoteId);
+            Object nested = response == null ? null : response.get("creditnote");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> creditNote = nested instanceof Map<?, ?> note ? (Map<String, Object>) note : response;
+            if (creditNote == null || creditNote.isEmpty()) {
+                return BigDecimal.ZERO;
+            }
+            String status = StringUtils.lowerCase(StringUtils.trimToEmpty(stringValue(creditNote.get("status"))));
+            if (Set.of("void", "voided").contains(status)) {
+                return BigDecimal.ZERO;
+            }
+            if (creditNote.get("balance") != null) {
+                return moneyOrZero(toBigDecimal(creditNote.get("balance")));
+            }
+            return moneyOrZero(toBigDecimal(creditNote.get("total")));
+        } catch (RuntimeException e) {
+            LOG.warn("Could not read Zoho credit note {}: {}", creditNoteId, e.getMessage());
+            return BigDecimal.ZERO;
+        }
     }
 
     private Optional<String> createCreditNoteInternal(

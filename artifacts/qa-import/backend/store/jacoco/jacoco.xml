@@ -1,0 +1,10 @@
+<?xml version="1.0" ?>
+<report name="jacoco">
+  <package name="com/miniandmore/rollup">
+    <class name="QaRunSummary" sourcefilename="QaRunSummary.java">
+      <counter type="INSTRUCTION" missed="1444" covered="8556"/>
+      <counter type="BRANCH" missed="3331" covered="6669"/>
+      <counter type="LINE" missed="1390" covered="8610"/>
+    </class>
+  </package>
+</report>

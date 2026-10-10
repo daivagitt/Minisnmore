@@ -1,12 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { BookShipmentDialog } from "@/components/admin/BookShipmentDialog";
 import { CreatePackageDialog } from "@/components/admin/CreatePackageDialog";
 import { ReturnsSummaryCards } from "@/components/admin/ReturnsSummaryCards";
 import { ReturnImageGallery } from "@/components/ReturnImageGallery";
 import { AdminCaseSearchFields } from "@/components/admin/AdminCaseSearchFields";
-import { ArrowRight, Loader2, Printer } from "lucide-react";
+import {
+  AdminCaseListTable,
+  AdminCaseTd,
+  AdminCaseTh,
+  adminCaseRowClass,
+} from "@/components/admin/AdminCaseListTable";
+import { ArrowRight, ChevronDown, Loader2, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
@@ -58,18 +64,9 @@ import { formatReturnVariant } from "@/lib/return-variant";
 import { SHOW_M2_POST_ORDER_UI } from "@/lib/feature-flags";
 import { isPackageReady } from "@/lib/fulfillment-docs";
 import { bookExchangeFulfillmentShipment, exchangeToFulfillmentOrder } from "@/lib/exchange-fulfillment";
+import { formatCaseAge } from "@/lib/admin-case-format";
 
 export const Route = createFileRoute("/admin/returns")({ component: AdminReturnsPage });
-
-function formatCaseAge(row: { case_age_hours?: number; sla_due_at?: string | null; sla_overdue?: boolean }) {
-  const age = row.case_age_hours ?? 0;
-  const ageLabel = age < 24 ? `${age}h old` : `${Math.floor(age / 24)}d old`;
-  if (!row.sla_due_at) {
-    return ageLabel;
-  }
-  const due = new Date(row.sla_due_at).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" });
-  return row.sla_overdue ? `${ageLabel} · overdue (due ${due})` : `${ageLabel} · due ${due}`;
-}
 
 type StageId = "all" | "request" | "pickup" | "inspection" | "exchange" | "closed";
 type RequestTypeFilter = "" | "return" | "exchange";
@@ -320,6 +317,171 @@ function hasReverseShipment(r: AdminOrderReturnRow): boolean {
 
 const EXCHANGE_OUTBOUND_PACK_STATUSES = new Set(["item_allocated", "repacking", "ready_to_ship"]);
 
+function ReturnCaseDetails({ r }: { r: AdminOrderReturnRow }) {
+  const items = r.items ?? [];
+  const headerVariant = items.length === 1 ? formatReturnVariant(items[0]) : formatReturnVariant(r);
+  const replacement = [r.replacement_size, r.replacement_color].filter(Boolean).join(" · ");
+  const priceDiff = r.price_difference == null ? null : Number(r.price_difference);
+  return (
+    <div className="space-y-3">
+      {Number(r.order_shipping) > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          Delivery {formatInr(r.order_shipping)} is not refunded
+          {Number(r.order_cod_fee) > 0 ? ` · COD fee ${formatInr(r.order_cod_fee)} is not refunded` : ""}
+        </p>
+      ) : Number(r.order_cod_fee) > 0 ? (
+        <p className="text-xs text-muted-foreground">COD fee {formatInr(r.order_cod_fee)} is not refunded</p>
+      ) : null}
+      {items.length > 0 || r.product_name ? (
+        <div className="space-y-2.5 rounded-xl border border-primary/15 bg-primary/5 p-3">
+          {items.length > 0
+            ? items.map((line, index) => (
+                <div key={line.id} className={index > 0 ? "border-t border-primary/10 pt-2.5" : undefined}>
+                  <ProductHighlight
+                    name={line.product_name}
+                    imageUrl={line.product_image}
+                    variant={formatReturnVariant(line)}
+                    replacement={items.length === 1 ? replacement : undefined}
+                    qty={line.requested_qty}
+                    acceptedQty={line.accepted_qty}
+                    refundAmount={line.refund_amount}
+                    disposition={line.disposition}
+                  />
+                </div>
+              ))
+            : r.product_name ? (
+                <ProductHighlight
+                  name={r.product_name}
+                  imageUrl={r.product_image}
+                  variant={headerVariant}
+                  replacement={replacement}
+                />
+              ) : null}
+        </div>
+      ) : null}
+      {r.request_type === "exchange" && priceDiff != null ? (
+        <HighlightBlock
+          label="Price difference"
+          className={priceDifferenceClass(priceDiff)}
+          labelClassName="opacity-80"
+        >
+          <p className="font-semibold">
+            {formatInr(Math.abs(priceDiff))}
+            {priceDiff > 0 ? " to collect" : priceDiff < 0 ? " to refund" : ""}
+            {r.settlement_status ? (
+              <span className="ml-1.5 text-xs font-medium opacity-80">
+                · {r.settlement_status.replace(/_/g, " ")}
+              </span>
+            ) : null}
+          </p>
+        </HighlightBlock>
+      ) : null}
+      {r.reason ? (
+        <HighlightBlock
+          label="Customer reason"
+          className="border-primary/20 bg-primary/8 text-foreground"
+          labelClassName="text-primary"
+        >
+          {r.reason}
+        </HighlightBlock>
+      ) : null}
+      <HighlightBlock
+        label="Customer photos"
+        className="border-border/70 bg-muted/30 text-foreground"
+        labelClassName="text-muted-foreground"
+      >
+        {r.image_urls && r.image_urls.length > 0 ? (
+          <ReturnImageGallery
+            urls={r.image_urls}
+            thumbClassName="h-20 w-20"
+            alt={r.request_type === "exchange" ? "Customer exchange photo" : "Customer return photo"}
+          />
+        ) : (
+          <p className="text-xs text-muted-foreground">No photos attached</p>
+        )}
+      </HighlightBlock>
+      {r.admin_notes ? (
+        <HighlightBlock
+          label="Admin notes"
+          className="border-border/70 bg-muted/40 text-foreground"
+          labelClassName="text-muted-foreground"
+        >
+          <p className="whitespace-pre-wrap text-xs">{r.admin_notes}</p>
+        </HighlightBlock>
+      ) : null}
+      {r.rejection_reason ? (
+        <HighlightBlock
+          label="Rejection reason"
+          className="border-amber-200/80 bg-amber-50/90 text-amber-950"
+          labelClassName="text-amber-800"
+        >
+          {r.rejection_reason}
+        </HighlightBlock>
+      ) : null}
+      {r.pickup_failure_reason ? (
+        <HighlightBlock
+          label="Pickup failed"
+          className="border-amber-200/80 bg-amber-50/90 text-amber-950"
+          labelClassName="text-amber-800"
+        >
+          {r.pickup_failure_reason}
+        </HighlightBlock>
+      ) : null}
+      {r.reverse_awb || r.tracking_url ? (
+        <p className="text-xs text-muted-foreground">
+          Pickup AWB: {r.reverse_awb ?? "—"}
+          {r.pickup_window ? ` · ${r.pickup_window}` : ""}
+          {r.tracking_url ? (
+            <>
+              {" · "}
+              <a href={r.tracking_url} target="_blank" rel="noreferrer" className="underline">
+                Track pickup
+              </a>
+            </>
+          ) : null}
+        </p>
+      ) : null}
+      {r.outbound_awb || r.outbound_tracking_url || r.outbound_label_url ? (
+        <p className="text-xs text-muted-foreground">
+          Outbound AWB: {r.outbound_awb ?? "—"}
+          {r.outbound_tracking_url ? (
+            <>
+              {" · "}
+              <a href={r.outbound_tracking_url} target="_blank" rel="noreferrer" className="underline">
+                Track
+              </a>
+            </>
+          ) : null}
+        </p>
+      ) : r.request_type === "exchange" && EXCHANGE_OUTBOUND_PACK_STATUSES.has(r.status) ? (
+        <p className="text-xs text-muted-foreground">
+          {isPackageReady(r)
+            ? `Packed ${r.package_weight_grams || r.default_package_weight_grams || "—"} g${
+                r.package_length_cm && r.package_breadth_cm && r.package_height_cm
+                  ? ` · ${r.package_length_cm}×${r.package_breadth_cm}×${r.package_height_cm} cm`
+                  : ""
+              }${r.package_courier_name ? ` · ${r.package_courier_name}` : ""}. Book a shipment to generate the AWB and label.`
+            : "Create a package first. Booking a shipment is blocked until the package exists."}
+        </p>
+      ) : null}
+      {r.razorpay_refund_id ? (
+        <p className="text-xs text-muted-foreground">Razorpay refund: {r.razorpay_refund_id}</p>
+      ) : null}
+      {r.settlement_reference && r.settlement_status === "refunded" ? (
+        <p className="text-xs text-muted-foreground">
+          Exchange settlement refund{r.settlement_method ? ` (${r.settlement_method})` : ""}: {r.settlement_reference}
+        </p>
+      ) : null}
+      {r.manual_refund_reference ? (
+        <p className="text-xs text-muted-foreground">
+          COD refund: {r.manual_refund_method?.replace(/_/g, " ")} · {r.manual_refund_reference}
+          {r.manual_refund_recorded_by ? ` · by ${r.manual_refund_recorded_by}` : ""}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 /** One primary next-step action (plus an optional secondary one) per current status. */
 function nextActions(
   r: AdminOrderReturnRow,
@@ -539,6 +701,10 @@ function nextActions(
 
 export function AdminReturnsPage({ mode = "admin" }: { mode?: "admin" | "operations" | "support" } = {}) {
   if (!SHOW_M2_POST_ORDER_UI) return null;
+  return <AdminReturnsPageContent mode={mode} />;
+}
+
+function AdminReturnsPageContent({ mode = "admin" }: { mode?: "admin" | "operations" | "support" } = {}) {
   const canFulfill = mode !== "support";
   const eyebrow = mode === "support" ? "Customer Support" : mode === "operations" ? "Operations" : "Fulfilment";
 
@@ -577,6 +743,7 @@ export function AdminReturnsPage({ mode = "admin" }: { mode?: "admin" | "operati
   const [orderQueryInput, setOrderQueryInput] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [expandedOverride, setExpandedOverride] = useState<string | null | undefined>(undefined);
   const hasRowsRef = useRef(false);
   const loadGenRef = useRef(0);
   const searchActive = adminCaseSearchActive(orderQueryInput, dateFrom, dateTo);
@@ -642,6 +809,12 @@ export function AdminReturnsPage({ mode = "admin" }: { mode?: "admin" | "operati
     pageSize: LIST_PAGE_SIZE,
     resetKey: `${requestType}|${stage}|${status}|${orderQueryInput}|${dateFrom}|${dateTo}`,
   });
+  const pageItemKey = paging.pageItems.map((row) => row.return_number).join("|");
+  useEffect(() => {
+    setExpandedOverride(undefined);
+  }, [pageItemKey]);
+  const autoExpandedNumber = paging.pageItems.length === 1 ? paging.pageItems[0].return_number : null;
+  const expandedNumber = expandedOverride === undefined ? autoExpandedNumber : expandedOverride;
 
   const selectStage = (next: StageId, nextStatus?: string, nextType?: RequestTypeFilter) => {
     setStage(next);
@@ -931,8 +1104,23 @@ export function AdminReturnsPage({ mode = "admin" }: { mode?: "admin" | "operati
         <p className="text-sm text-muted-foreground">No returns in this filter.</p>
       ) : (
         <>
-        <ul id="admin-returns-list" className="space-y-4">
-          {paging.pageItems.map((r) => {
+        <AdminCaseListTable id="admin-returns-list" caption="Returns and exchanges">
+          <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+            <tr>
+              <AdminCaseTh className="w-10">
+                <span className="sr-only">Details</span>
+              </AdminCaseTh>
+              <AdminCaseTh>Case</AdminCaseTh>
+              <AdminCaseTh>Order ID</AdminCaseTh>
+              <AdminCaseTh>Customer</AdminCaseTh>
+              <AdminCaseTh>Amount</AdminCaseTh>
+              <AdminCaseTh>Status</AdminCaseTh>
+              <AdminCaseTh>Requested</AdminCaseTh>
+              <AdminCaseTh>Actions</AdminCaseTh>
+            </tr>
+          </thead>
+          <tbody>
+            {paging.pageItems.map((r) => {
             const { primary, secondary, tertiary } = nextActions(
               r,
               (label, action) => void run(r.return_number, action, label),
@@ -982,19 +1170,41 @@ export function AdminReturnsPage({ mode = "admin" }: { mode?: "admin" | "operati
               },
               canFulfill,
             );
-            const items = r.items ?? [];
-            const headerVariant =
-              items.length === 1 ? formatReturnVariant(items[0]) : formatReturnVariant(r);
-            const replacement = [r.replacement_size, r.replacement_color].filter(Boolean).join(" · ");
-            const priceDiff = r.price_difference == null ? null : Number(r.price_difference);
+            const expanded = expandedNumber === r.return_number;
             return (
-              <li key={r.return_number} className="glass-strong rounded-2xl p-4 space-y-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0 space-y-1.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium">
-                        {r.request_type === "exchange" ? "Exchange" : "Return"} · {r.return_number}
+              <Fragment key={r.return_number}>
+                <tr className={adminCaseRowClass}>
+                  <AdminCaseTd className="w-10 pr-0">
+                    <button
+                      type="button"
+                      aria-expanded={expanded}
+                      aria-label={`Details for ${r.return_number}`}
+                      onClick={() => setExpandedOverride(expanded ? null : r.return_number)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                      <ChevronDown className={cn("h-4 w-4 transition-transform", expanded && "rotate-180")} />
+                    </button>
+                  </AdminCaseTd>
+                  <AdminCaseTd className="min-w-[10rem] font-medium">
+                    <p className="whitespace-nowrap">
+                      {r.request_type === "exchange" ? "Exchange" : "Return"} · {r.return_number}
+                    </p>
+                    {r.reason ? (
+                      <p className="mt-1 max-w-[14rem] truncate text-xs text-muted-foreground" title={r.reason}>
+                        {r.reason}
                       </p>
+                    ) : null}
+                    {r.image_urls && r.image_urls.length > 0 ? (
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {r.image_urls.length} customer photo{r.image_urls.length === 1 ? "" : "s"}
+                      </p>
+                    ) : null}
+                  </AdminCaseTd>
+                  <AdminCaseTd className="whitespace-nowrap font-medium">{r.order_number ?? "—"}</AdminCaseTd>
+                  <AdminCaseTd className="whitespace-nowrap">{r.customer_login || "—"}</AdminCaseTd>
+                  <AdminCaseTd className="whitespace-nowrap tabular-nums">{formatInr(r.order_total)}</AdminCaseTd>
+                  <AdminCaseTd>
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span
                         className={cn(
                           "inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
@@ -1009,235 +1219,82 @@ export function AdminReturnsPage({ mode = "admin" }: { mode?: "admin" | "operati
                         </span>
                       ) : null}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Order {r.order_number} · {r.customer_login} ·{" "}
-                      <span className="font-medium text-foreground">{formatInr(r.order_total)}</span>
-                    </p>
-                    {Number(r.order_shipping) > 0 ? (
-                      <p className="text-xs text-muted-foreground">
-                        Delivery {formatInr(r.order_shipping)} is not refunded
-                        {Number(r.order_cod_fee) > 0 ? ` · COD fee ${formatInr(r.order_cod_fee)} is not refunded` : ""}
-                      </p>
-                    ) : Number(r.order_cod_fee) > 0 ? (
-                      <p className="text-xs text-muted-foreground">COD fee {formatInr(r.order_cod_fee)} is not refunded</p>
-                    ) : null}
-                  </div>
-                  <div className="text-xs text-right">
-                    <p className={r.sla_overdue ? "text-amber-700 font-medium" : "text-muted-foreground"}>
+                    <p className={r.sla_overdue ? "mt-1 text-xs font-medium text-amber-700" : "mt-1 text-xs text-muted-foreground"}>
                       {formatCaseAge(r)}
                     </p>
-                    <p className="text-muted-foreground">
-                      {new Date(r.requested_at).toLocaleString("en-IN")}
-                    </p>
-                  </div>
-                </div>
-                {items.length > 0 || r.product_name ? (
-                  <div className="space-y-2.5 rounded-xl border border-primary/15 bg-primary/5 p-3">
-                    {items.length > 0
-                      ? items.map((line, index) => (
-                          <div
-                            key={line.id}
-                            className={index > 0 ? "border-t border-primary/10 pt-2.5" : undefined}
-                          >
-                            <ProductHighlight
-                              name={line.product_name}
-                              imageUrl={line.product_image}
-                              variant={formatReturnVariant(line)}
-                              replacement={items.length === 1 ? replacement : undefined}
-                              qty={line.requested_qty}
-                              acceptedQty={line.accepted_qty}
-                              refundAmount={line.refund_amount}
-                              disposition={line.disposition}
-                            />
-                          </div>
-                        ))
-                      : r.product_name ? (
-                          <ProductHighlight
-                            name={r.product_name}
-                            imageUrl={r.product_image}
-                            variant={headerVariant}
-                            replacement={replacement}
-                          />
-                        ) : null}
-                  </div>
-                ) : null}
-                {r.request_type === "exchange" && priceDiff != null ? (
-                  <HighlightBlock
-                    label="Price difference"
-                    className={priceDifferenceClass(priceDiff)}
-                    labelClassName="opacity-80"
-                  >
-                    <p className="font-semibold">
-                      {formatInr(Math.abs(priceDiff))}
-                      {priceDiff > 0 ? " to collect" : priceDiff < 0 ? " to refund" : ""}
-                      {r.settlement_status ? (
-                        <span className="ml-1.5 text-xs font-medium opacity-80">
-                          · {r.settlement_status.replace(/_/g, " ")}
-                        </span>
+                  </AdminCaseTd>
+                  <AdminCaseTd className="whitespace-nowrap text-xs text-muted-foreground">
+                    {new Date(r.requested_at).toLocaleString("en-IN")}
+                  </AdminCaseTd>
+                  <AdminCaseTd className="min-w-[12rem]">
+                    <div className="flex flex-wrap gap-2">
+                      {primary ? (
+                        <button
+                          type="button"
+                          disabled={busy === r.return_number}
+                          className="text-xs rounded-full bg-primary text-primary-foreground px-3 py-1.5"
+                          onClick={primary.onClick}
+                        >
+                          {primary.label}
+                        </button>
                       ) : null}
-                    </p>
-                  </HighlightBlock>
+                      {secondary ? (
+                        <button
+                          type="button"
+                          disabled={busy === r.return_number}
+                          className="text-xs rounded-full border border-border px-3 py-1.5"
+                          onClick={secondary.onClick}
+                        >
+                          {secondary.label}
+                        </button>
+                      ) : null}
+                      {tertiary ? (
+                        <button
+                          type="button"
+                          disabled={busy === r.return_number}
+                          className="text-xs rounded-full border border-border px-3 py-1.5"
+                          onClick={tertiary.onClick}
+                        >
+                          {tertiary.label}
+                        </button>
+                      ) : null}
+                      {r.outbound_label_url ? (
+                        <>
+                          <a
+                            href={r.outbound_label_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border px-3 py-1.5"
+                          >
+                            Open label
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const labelUrl = r.outbound_label_url;
+                              if (labelUrl) void openPrintableShippingLabel(labelUrl);
+                            }}
+                            className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border px-3 py-1.5"
+                          >
+                            <Printer className="h-3.5 w-3.5" /> Print label
+                          </button>
+                        </>
+                      ) : null}
+                    </div>
+                  </AdminCaseTd>
+                </tr>
+                {expanded ? (
+                  <tr className="border-t border-border/40 bg-muted/15">
+                    <AdminCaseTd colSpan={8} className="px-3 pb-4 pt-0">
+                      <ReturnCaseDetails r={r} />
+                    </AdminCaseTd>
+                  </tr>
                 ) : null}
-                {r.reason ? (
-                  <HighlightBlock
-                    label="Customer reason"
-                    className="border-primary/20 bg-primary/8 text-foreground"
-                    labelClassName="text-primary"
-                  >
-                    {r.reason}
-                  </HighlightBlock>
-                ) : null}
-                <HighlightBlock
-                  label="Customer photos"
-                  className="border-border/70 bg-muted/30 text-foreground"
-                  labelClassName="text-muted-foreground"
-                >
-                  {r.image_urls && r.image_urls.length > 0 ? (
-                    <ReturnImageGallery
-                      urls={r.image_urls}
-                      thumbClassName="h-20 w-20"
-                      alt={r.request_type === "exchange" ? "Customer exchange photo" : "Customer return photo"}
-                    />
-                  ) : (
-                    <p className="text-xs text-muted-foreground">No photos attached</p>
-                  )}
-                </HighlightBlock>
-                {r.admin_notes ? (
-                  <HighlightBlock
-                    label="Admin notes"
-                    className="border-border/70 bg-muted/40 text-foreground"
-                    labelClassName="text-muted-foreground"
-                  >
-                    <p className="whitespace-pre-wrap text-xs">{r.admin_notes}</p>
-                  </HighlightBlock>
-                ) : null}
-                {r.rejection_reason ? (
-                  <HighlightBlock
-                    label="Rejection reason"
-                    className="border-amber-200/80 bg-amber-50/90 text-amber-950"
-                    labelClassName="text-amber-800"
-                  >
-                    {r.rejection_reason}
-                  </HighlightBlock>
-                ) : null}
-                {r.pickup_failure_reason ? (
-                  <HighlightBlock
-                    label="Pickup failed"
-                    className="border-amber-200/80 bg-amber-50/90 text-amber-950"
-                    labelClassName="text-amber-800"
-                  >
-                    {r.pickup_failure_reason}
-                  </HighlightBlock>
-                ) : null}
-                {r.reverse_awb || r.tracking_url ? (
-                  <p className="text-xs text-muted-foreground">
-                    Pickup AWB: {r.reverse_awb ?? "—"}
-                    {r.pickup_window ? ` · ${r.pickup_window}` : ""}
-                    {r.tracking_url ? (
-                      <>
-                        {" · "}
-                        <a href={r.tracking_url} target="_blank" rel="noreferrer" className="underline">
-                          Track pickup
-                        </a>
-                      </>
-                    ) : null}
-                  </p>
-                ) : null}
-                {r.outbound_awb || r.outbound_tracking_url || r.outbound_label_url ? (
-                  <p className="text-xs text-muted-foreground">
-                    Outbound AWB: {r.outbound_awb ?? "—"}
-                    {r.outbound_tracking_url ? (
-                      <>
-                        {" · "}
-                        <a href={r.outbound_tracking_url} target="_blank" rel="noreferrer" className="underline">
-                          Track
-                        </a>
-                      </>
-                    ) : null}
-                  </p>
-                ) : r.request_type === "exchange" && EXCHANGE_OUTBOUND_PACK_STATUSES.has(r.status) ? (
-                  <p className="text-xs text-muted-foreground">
-                    {isPackageReady(r)
-                      ? `Packed ${r.package_weight_grams || r.default_package_weight_grams || "—"} g${
-                          r.package_length_cm && r.package_breadth_cm && r.package_height_cm
-                            ? ` · ${r.package_length_cm}×${r.package_breadth_cm}×${r.package_height_cm} cm`
-                            : ""
-                        }${r.package_courier_name ? ` · ${r.package_courier_name}` : ""}. Book a shipment to generate the AWB and label.`
-                      : "Create a package first. Booking a shipment is blocked until the package exists."}
-                  </p>
-                ) : null}
-                {r.razorpay_refund_id ? (
-                  <p className="text-xs text-muted-foreground">Razorpay refund: {r.razorpay_refund_id}</p>
-                ) : null}
-                {r.settlement_reference && r.settlement_status === "refunded" ? (
-                  <p className="text-xs text-muted-foreground">
-                    Exchange settlement refund{r.settlement_method ? ` (${r.settlement_method})` : ""}: {r.settlement_reference}
-                  </p>
-                ) : null}
-                {r.manual_refund_reference ? (
-                  <p className="text-xs text-muted-foreground">
-                    COD refund: {r.manual_refund_method?.replace(/_/g, " ")} · {r.manual_refund_reference}
-                    {r.manual_refund_recorded_by ? ` · by ${r.manual_refund_recorded_by}` : ""}
-                  </p>
-                ) : null}
-                <div className="flex flex-wrap gap-2">
-                  {primary ? (
-                    <button
-                      type="button"
-                      disabled={busy === r.return_number}
-                      className="text-xs rounded-full bg-primary text-primary-foreground px-3 py-1.5"
-                      onClick={primary.onClick}
-                    >
-                      {primary.label}
-                    </button>
-                  ) : null}
-                  {secondary ? (
-                    <button
-                      type="button"
-                      disabled={busy === r.return_number}
-                      className="text-xs rounded-full border border-border px-3 py-1.5"
-                      onClick={secondary.onClick}
-                    >
-                      {secondary.label}
-                    </button>
-                  ) : null}
-                  {tertiary ? (
-                    <button
-                      type="button"
-                      disabled={busy === r.return_number}
-                      className="text-xs rounded-full border border-border px-3 py-1.5"
-                      onClick={tertiary.onClick}
-                    >
-                      {tertiary.label}
-                    </button>
-                  ) : null}
-                  {r.outbound_label_url ? (
-                    <>
-                      <a
-                        href={r.outbound_label_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border px-3 py-1.5"
-                      >
-                        Open label
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const labelUrl = r.outbound_label_url;
-                          if (labelUrl) void openPrintableShippingLabel(labelUrl);
-                        }}
-                        className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border px-3 py-1.5"
-                      >
-                        <Printer className="h-3.5 w-3.5" /> Print label
-                      </button>
-                    </>
-                  ) : null}
-                </div>
-              </li>
+              </Fragment>
             );
           })}
-        </ul>
+          </tbody>
+        </AdminCaseListTable>
         <ListPagination
           page={paging.page}
           totalPages={paging.totalPages}

@@ -23,6 +23,9 @@ public interface OrderReturnRepository extends JpaRepository<OrderReturn, Long> 
     @EntityGraph(attributePaths = { "order", "orderItem" })
     Optional<OrderReturn> findOneByReturnNumber(String returnNumber);
 
+    @EntityGraph(attributePaths = { "order", "orderItem" })
+    Optional<OrderReturn> findFirstByZohoReplacementInvoiceIdOrderByIdDesc(String zohoReplacementInvoiceId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = { "order", "orderItem" })
     @Query("select r from OrderReturn r where r.returnNumber = :returnNumber")

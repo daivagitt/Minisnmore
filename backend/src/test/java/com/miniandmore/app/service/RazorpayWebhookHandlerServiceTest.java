@@ -501,4 +501,91 @@ class RazorpayWebhookHandlerServiceTest {
     private static String sign(String body) {
         return WebhookHmacSupport.hmacSha256Hex(SECRET, body);
     }
+
+    @Test
+    void handle_missingEventType_badRequest() {
+        String body = "{\"id\":\"evt-no-type\",\"payload\":{\"refund\":{\"entity\":{\"id\":\"rfnd_x\",\"payment_id\":\"pay_x\",\"amount\":100}}}}";
+
+        assertThatThrownBy(() -> handler.handle(body, sign(body)))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void handle_invalidJsonPayload_badRequest() {
+        assertThatThrownBy(() -> handler.handle("{not-json", sign("{not-json")))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Invalid Razorpay webhook payload");
+    }
+
+    @Test
+    void handle_refundProcessed_reopensFailedReturnAndSettlesPendingExchange() {
+        CustomerOrder order = paidOrder();
+        order.setPaymentStatus(PaymentStatus.REFUND_INITIATED);
+        OrderReturn orderReturn = new OrderReturn();
+        orderReturn.setOrder(order);
+        orderReturn.setStatus(OrderReturnStatus.FAILED);
+        orderReturn.setSettlementStatus(ExchangeSettlementStatus.PENDING);
+        orderReturn.setSettlementReference("rfnd_settle_pending");
+        when(orderReturnRepository.findFirstByRazorpayRefundIdOrderByIdDesc("rfnd_settle_pending")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.findFirstBySettlementReferenceOrderByIdDesc("rfnd_settle_pending")).thenReturn(Optional.of(orderReturn));
+        String body = processedBody("rfnd_settle_pending", "pay_sp", "order_sp", "MNM-1");
+
+        handler.handle(body, sign(body));
+
+        assertThat(orderReturn.getStatus()).isEqualTo(OrderReturnStatus.REFUNDED);
+        assertThat(orderReturn.getSettlementStatus()).isEqualTo(ExchangeSettlementStatus.REFUNDED);
+        assertThat(orderReturn.getSettledAt()).isNotNull();
+    }
+
+    @Test
+    void handle_refundFailed_marksCancellationAdminNotes() {
+        CustomerOrder order = paidOrder();
+        order.setPaymentStatus(PaymentStatus.REFUND_INITIATED);
+        OrderCancellationRequest request = new OrderCancellationRequest();
+        request.setOrder(order);
+        request.setAdminNotes("existing");
+        when(cancellationRequestRepository.findFirstByRazorpayRefundIdOrderByIdDesc("rfnd_fail_can")).thenReturn(Optional.of(request));
+        when(customerOrderRepository.findFirstByRazorpayPaymentId("pay_fail_can")).thenReturn(Optional.of(order));
+        String body =
+            "{\"id\":\"evt_fail_can\",\"event\":\"refund.failed\",\"payload\":{\"refund\":{\"entity\":{\"id\":\"rfnd_fail_can\",\"payment_id\":\"pay_fail_can\",\"amount\":129900,\"status\":\"failed\",\"error_description\":\"bank timeout\"}}}}";
+
+        handler.handle(body, sign(body));
+
+        assertThat(request.getAdminNotes()).contains("bank timeout").contains("rfnd_fail_can");
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUND_FAILED);
+    }
+
+    @Test
+    void handle_refundFailed_onFullyRefundedReturn_keepsOrderRefunded() {
+        CustomerOrder order = paidOrder();
+        order.setPaymentStatus(PaymentStatus.PARTIALLY_REFUNDED);
+        order.setTotal(new BigDecimal("1299.00"));
+        OrderReturn refunded = new OrderReturn();
+        refunded.setStatus(OrderReturnStatus.REFUNDED);
+        refunded.setRefundAmount(new BigDecimal("1299.00"));
+        when(customerOrderRepository.findFirstByRazorpayPaymentId("pay_full_ref")).thenReturn(Optional.of(order));
+        when(orderReturnRepository.findFirstByRazorpayRefundIdOrderByIdDesc("rfnd_full_ref")).thenReturn(Optional.of(refunded));
+        when(orderReturnRepository.findAllByOrder_IdOrderByRequestedAtAsc(11L)).thenReturn(java.util.List.of(refunded));
+        String body =
+            "{\"id\":\"evt_full_ref\",\"event\":\"refund.failed\",\"payload\":{\"refund\":{\"entity\":{\"id\":\"rfnd_full_ref\",\"payment_id\":\"pay_full_ref\",\"amount\":129900,\"status\":\"failed\"}}}}";
+
+        handler.handle(body, sign(body));
+
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUND_FAILED);
+    }
+
+    @Test
+    void handle_refundProcessed_paymentStatusPending_doesNotUpdateOrder() {
+        CustomerOrder order = paidOrder();
+        order.setPaymentStatus(PaymentStatus.PENDING);
+        when(customerOrderRepository.findFirstByRazorpayPaymentId("pay_pending")).thenReturn(Optional.of(order));
+        String body = processedBody("rfnd_pending", "pay_pending", "order_pending", null);
+
+        Map<String, Object> result = handler.handle(body, sign(body));
+
+        assertThat(result.get("updated")).isEqualTo(false);
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.PENDING);
+    }
 }

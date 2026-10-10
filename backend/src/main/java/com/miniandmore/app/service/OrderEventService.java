@@ -74,6 +74,24 @@ public class OrderEventService {
     }
 
     /**
+     * Records {@code refund_initiated} without mailing the full order total. Exchange Razorpay
+     * settlement already emails the price-difference amount and refund id.
+     */
+    public void recordRefundInitiatedWithoutMail(CustomerOrder order) {
+        if (order == null || order.getId() == null) {
+            return;
+        }
+        recordIfAbsent(
+            order,
+            TYPE_REFUND_INITIATED,
+            titleFor(TYPE_REFUND_INITIATED),
+            bodyFor(order, TYPE_REFUND_INITIATED),
+            Instant.now(),
+            false
+        );
+    }
+
+    /**
      * Idempotent: records any lifecycle events that match the order's current state but are not yet stored.
      */
     public void syncLifecycleEvents(CustomerOrder order) {

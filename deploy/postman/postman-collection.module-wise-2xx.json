@@ -38,7 +38,7 @@
     },
     {
       "key": "baseUrl",
-      "value": "https://minisnmore.com"
+      "value": "http://127.0.0.1:9184"
     },
     {
       "key": "email",
@@ -47,6 +47,10 @@
     {
       "key": "id",
       "value": "1"
+    },
+    {
+      "key": "itemGroupId",
+      "value": "{{id}}"
     },
     {
       "key": "key",
@@ -78,6 +82,10 @@
     },
     {
       "key": "productId",
+      "value": "{{id}}"
+    },
+    {
+      "key": "requestNumber",
       "value": "{{id}}"
     },
     {
@@ -834,7 +842,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"full_name\": \"Sample Name\",\n  \"phone\": \"9876543210\"\n}",
+              "raw": "{\n  \"full_name\": \"Sample Name\",\n  \"phone\": \"9876543210\",\n  \"subscribed\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -888,7 +896,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"full_name\": \"Sample Name\",\n  \"email\": \"{{email}}\"\n}",
+              "raw": "{\n  \"full_name\": \"Sample Name\",\n  \"email\": \"{{email}}\",\n  \"subscribed\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -980,7 +988,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"code\": \"TESTCODE\",\n  \"subtotal\": 99.99\n}",
+              "raw": "{\n  \"code\": \"TESTCODE\",\n  \"subtotal\": 99.99,\n  \"items\": [\n    {\n      \"qty\": 1,\n      \"price\": 99.99,\n      \"product_id\": \"{{id}}\",\n      \"sku\": \"sample-sku\",\n      \"category_id\": 1\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1385,6 +1393,141 @@
           ]
         },
         {
+          "name": "getCancelRequest",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderNumber}}/cancel-request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                "{{orderNumber}}",
+                "cancel-request"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "submitCancelRequest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderNumber}}/cancel-request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                "{{orderNumber}}",
+                "cancel-request"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"sample-reason\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "withdrawCancelRequest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderNumber}}/cancel-request/withdraw",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                "{{orderNumber}}",
+                "cancel-request",
+                "withdraw"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "payments",
           "request": {
             "method": "GET",
@@ -1404,6 +1547,264 @@
                 "api",
                 "v1",
                 "payments"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Internal Admin Cancellation Request",
+      "item": [
+        {
+          "name": "list_2",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/cancellation-requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "cancellation-requests"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "sample-status",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "approve_1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/cancellation-requests/{{requestNumber}}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "cancellation-requests",
+                "{{requestNumber}}",
+                "approve"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"admin_notes\": \"sample-admin_notes\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "recordCodRefund_1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/cancellation-requests/{{requestNumber}}/record-cod-refund",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "cancellation-requests",
+                "{{requestNumber}}",
+                "record-cod-refund"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refund_method\": \"sample-refund_method\",\n  \"refund_reference\": \"sample-refund_reference\",\n  \"admin_notes\": \"sample-admin_notes\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "reject_1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/cancellation-requests/{{requestNumber}}/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "cancellation-requests",
+                "{{requestNumber}}",
+                "reject"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rejection_reason\": \"sample-rejection_reason\",\n  \"admin_notes\": \"sample-admin_notes\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "retryRefund",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/cancellation-requests/{{requestNumber}}/retry-refund",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "cancellation-requests",
+                "{{requestNumber}}",
+                "retry-refund"
               ]
             },
             "description": ""
@@ -1568,6 +1969,12 @@
                   "value": "sample-ledgerlySyncStatus",
                   "description": "",
                   "disabled": true
+                },
+                {
+                  "key": "trackingStatus",
+                  "value": "sample-trackingStatus",
+                  "description": "",
+                  "disabled": true
                 }
               ]
             },
@@ -1628,6 +2035,46 @@
           ]
         },
         {
+          "name": "orderedLogins",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/orders/ordered-logins",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "orders",
+                "ordered-logins"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "getOrder",
           "request": {
             "method": "GET",
@@ -1652,6 +2099,226 @@
               ]
             },
             "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "bookShipment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/orders/{{orderNumber}}/book-shipment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "orders",
+                "{{orderNumber}}",
+                "book-shipment"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"sample-mode\",\n  \"carrier_name\": \"Sample Name\",\n  \"awb\": \"sample-awb\",\n  \"tracking_url\": \"https://example.com/resource\",\n  \"label_url\": \"https://example.com/resource\",\n  \"override_fulfillment_hold\": true,\n  \"override_reason\": \"sample-override_reason\",\n  \"courier_id\": \"{{id}}\",\n  \"courier_name\": \"Sample Name\",\n  \"package_type\": \"sample-package_type\",\n  \"package_box_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "cancelOrder_1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/orders/{{orderNumber}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "orders",
+                "{{orderNumber}}",
+                "cancel"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"sample-reason\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "cancelShipment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/orders/{{orderNumber}}/cancel-shipment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "orders",
+                "{{orderNumber}}",
+                "cancel-shipment"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"sample-mode\",\n  \"reason\": \"sample-reason\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "completePackage",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/orders/{{orderNumber}}/complete-package",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "orders",
+                "{{orderNumber}}",
+                "complete-package"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weight_grams\": 1,\n  \"length_cm\": 1,\n  \"breadth_cm\": 1,\n  \"height_cm\": 1,\n  \"courier_id\": \"{{id}}\",\n  \"courier_name\": \"Sample Name\",\n  \"package_type\": \"sample-package_type\",\n  \"package_box_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
           },
           "event": [
             {
@@ -1707,6 +2374,61 @@
               }
             }
           ]
+        },
+        {
+          "name": "packageRates",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/orders/{{orderNumber}}/package-rates",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "orders",
+                "{{orderNumber}}",
+                "package-rates"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weight_grams\": 1,\n  \"length_cm\": 1,\n  \"breadth_cm\": 1,\n  \"height_cm\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -1714,7 +2436,7 @@
       "name": "Internal Admin Order Return",
       "item": [
         {
-          "name": "list",
+          "name": "list_1",
           "request": {
             "method": "GET",
             "header": [
@@ -1742,6 +2464,46 @@
                   "description": "",
                   "disabled": true
                 }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/order-returns/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "order-returns",
+                "summary"
               ]
             },
             "description": ""
@@ -1793,7 +2555,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"admin_notes\": \"sample-admin_notes\"\n}",
+              "raw": "{\n  \"disposition\": \"sample-disposition\",\n  \"admin_notes\": \"sample-admin_notes\",\n  \"items\": [\n    {\n      \"return_item_id\": 1,\n      \"accepted_quantity\": 1,\n      \"disposition\": \"sample-disposition\"\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1926,6 +2688,171 @@
           ]
         },
         {
+          "name": "bookOutbound",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/order-returns/{{returnNumber}}/book-outbound",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "order-returns",
+                "{{returnNumber}}",
+                "book-outbound"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"sample-mode\",\n  \"carrier_name\": \"Sample Name\",\n  \"outbound_awb\": \"sample-outbound_awb\",\n  \"tracking_url\": \"https://example.com/resource\",\n  \"label_url\": \"https://example.com/resource\",\n  \"courier_id\": \"{{id}}\",\n  \"courier_name\": \"Sample Name\",\n  \"package_type\": \"sample-package_type\",\n  \"package_box_id\": 1,\n  \"admin_notes\": \"sample-admin_notes\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "bookPickup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/order-returns/{{returnNumber}}/book-pickup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "order-returns",
+                "{{returnNumber}}",
+                "book-pickup"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"sample-mode\",\n  \"carrier_name\": \"Sample Name\",\n  \"reverse_awb\": \"sample-reverse_awb\",\n  \"tracking_url\": \"https://example.com/resource\",\n  \"pickup_window\": \"sample-pickup_window\",\n  \"admin_notes\": \"sample-admin_notes\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "closePickupFailed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/order-returns/{{returnNumber}}/close-pickup-failed",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "order-returns",
+                "{{returnNumber}}",
+                "close-pickup-failed"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"admin_notes\": \"sample-admin_notes\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "complete",
           "request": {
             "method": "POST",
@@ -1959,6 +2886,61 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"admin_notes\": \"sample-admin_notes\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "completePackage_1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/order-returns/{{returnNumber}}/complete-package",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "order-returns",
+                "{{returnNumber}}",
+                "complete-package"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weight_grams\": 1,\n  \"length_cm\": 1,\n  \"breadth_cm\": 1,\n  \"height_cm\": 1,\n  \"courier_id\": \"{{id}}\",\n  \"courier_name\": \"Sample Name\",\n  \"package_type\": \"sample-package_type\",\n  \"package_box_id\": 1\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2201,6 +3183,61 @@
           ]
         },
         {
+          "name": "packageRates_1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/order-returns/{{returnNumber}}/package-rates",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "order-returns",
+                "{{returnNumber}}",
+                "package-rates"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weight_grams\": 1,\n  \"length_cm\": 1,\n  \"breadth_cm\": 1,\n  \"height_cm\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "pickedUp",
           "request": {
             "method": "POST",
@@ -2234,6 +3271,61 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"admin_notes\": \"sample-admin_notes\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "pickupFailed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/order-returns/{{returnNumber}}/pickup-failed",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "order-returns",
+                "{{returnNumber}}",
+                "pickup-failed"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"failure_reason\": \"sample-failure_reason\",\n  \"admin_notes\": \"sample-admin_notes\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2344,6 +3436,61 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"admin_notes\": \"sample-admin_notes\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "recordCodRefund",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/order-returns/{{returnNumber}}/record-cod-refund",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "order-returns",
+                "{{returnNumber}}",
+                "record-cod-refund"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refund_method\": \"sample-refund_method\",\n  \"refund_reference\": \"sample-refund_reference\",\n  \"admin_notes\": \"sample-admin_notes\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2531,6 +3678,116 @@
           ]
         },
         {
+          "name": "reschedulePickup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/order-returns/{{returnNumber}}/reschedule-pickup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "order-returns",
+                "{{returnNumber}}",
+                "reschedule-pickup"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"admin_notes\": \"sample-admin_notes\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "settlePriceDifference",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/order-returns/{{returnNumber}}/settle-price-difference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "order-returns",
+                "{{returnNumber}}",
+                "settle-price-difference"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"sample-status\",\n  \"amount\": 99.99,\n  \"method\": \"sample-method\",\n  \"reference\": \"sample-reference\",\n  \"admin_notes\": \"sample-admin_notes\",\n  \"force_manual\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "shipped",
           "request": {
             "method": "POST",
@@ -2564,6 +3821,197 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"admin_notes\": \"sample-admin_notes\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Internal Admin Package Box",
+      "item": [
+        {
+          "name": "list",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/package-boxes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "package-boxes"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/package-boxes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "package-boxes"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1,\n  \"name\": \"Sample Name\",\n  \"lengthCm\": 1,\n  \"breadthCm\": 1,\n  \"heightCm\": 1,\n  \"weightGrams\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "delete",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/package-boxes/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "package-boxes",
+                "{{id}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "update",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/package-boxes/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "package-boxes",
+                "{{id}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1,\n  \"name\": \"Sample Name\",\n  \"lengthCm\": 1,\n  \"breadthCm\": 1,\n  \"heightCm\": 1,\n  \"weightGrams\": 1\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2660,7 +4108,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": 1,\n  \"title\": \"Sample Title\",\n  \"subtitle\": \"Sample Title\",\n  \"imageUrl\": \"https://example.com/resource\",\n  \"linkUrl\": \"https://example.com/resource\",\n  \"ctaLabel\": \"sample-ctaLabel\",\n  \"sortOrder\": 1,\n  \"active\": true\n}",
+              "raw": "{\n  \"id\": 1,\n  \"title\": \"Sample Title\",\n  \"subtitle\": \"Sample Title\",\n  \"imageUrl\": \"https://example.com/resource\",\n  \"linkUrl\": \"https://example.com/resource\",\n  \"ctaLabel\": \"sample-ctaLabel\",\n  \"eyebrow\": \"sample-eyebrow\",\n  \"sortOrder\": 1,\n  \"active\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2754,7 +4202,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": 1,\n  \"title\": \"Sample Title\",\n  \"subtitle\": \"Sample Title\",\n  \"imageUrl\": \"https://example.com/resource\",\n  \"linkUrl\": \"https://example.com/resource\",\n  \"ctaLabel\": \"sample-ctaLabel\",\n  \"sortOrder\": 1,\n  \"active\": true\n}",
+              "raw": "{\n  \"id\": 1,\n  \"title\": \"Sample Title\",\n  \"subtitle\": \"Sample Title\",\n  \"imageUrl\": \"https://example.com/resource\",\n  \"linkUrl\": \"https://example.com/resource\",\n  \"ctaLabel\": \"sample-ctaLabel\",\n  \"eyebrow\": \"sample-eyebrow\",\n  \"sortOrder\": 1,\n  \"active\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3149,6 +4597,85 @@
           ]
         },
         {
+          "name": "contactMessages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/contact-messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "contact-messages"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "deleteContactMessage",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/contact-messages/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "contact-messages",
+                "{{id}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "coupons",
           "request": {
             "method": "GET",
@@ -3218,7 +4745,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": 1,\n  \"code\": \"TESTCODE\",\n  \"discountType\": \"PERCENT\",\n  \"discountValue\": 99.99,\n  \"minOrder\": 99.99,\n  \"maxDiscount\": 99.99,\n  \"expiresAt\": \"2026-05-23T00:00:00Z\",\n  \"active\": true\n}",
+              "raw": "{\n  \"id\": 1,\n  \"code\": \"TESTCODE\",\n  \"discountType\": \"PERCENT\",\n  \"discountValue\": 99.99,\n  \"minOrder\": 99.99,\n  \"maxDiscount\": 99.99,\n  \"bogoBuyQty\": 1,\n  \"bogoGetQty\": 1,\n  \"eligibilityScope\": \"ALL\",\n  \"eligibilityCategoryId\": 1,\n  \"expiresAt\": \"2026-05-23T00:00:00Z\",\n  \"active\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3312,7 +4839,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": 1,\n  \"code\": \"TESTCODE\",\n  \"discountType\": \"PERCENT\",\n  \"discountValue\": 99.99,\n  \"minOrder\": 99.99,\n  \"maxDiscount\": 99.99,\n  \"expiresAt\": \"2026-05-23T00:00:00Z\",\n  \"active\": true\n}",
+              "raw": "{\n  \"id\": 1,\n  \"code\": \"TESTCODE\",\n  \"discountType\": \"PERCENT\",\n  \"discountValue\": 99.99,\n  \"minOrder\": 99.99,\n  \"maxDiscount\": 99.99,\n  \"bogoBuyQty\": 1,\n  \"bogoGetQty\": 1,\n  \"eligibilityScope\": \"ALL\",\n  \"eligibilityCategoryId\": 1,\n  \"expiresAt\": \"2026-05-23T00:00:00Z\",\n  \"active\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3815,7 +5342,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": 1,\n  \"slug\": \"sample-slug\",\n  \"name\": \"Sample Name\",\n  \"sku\": \"sample-sku\",\n  \"fabricType\": \"sample-fabricType\",\n  \"description\": \"sample-description\",\n  \"story\": \"sample-story\",\n  \"price\": 99.99,\n  \"compareAtPrice\": 99.99,\n  \"currency\": \"INR\",\n  \"ageMinMonths\": 1,\n  \"ageMaxMonths\": 1,\n  \"sizesJson\": \"sample-sizesJson\",\n  \"colorsJson\": \"sample-colorsJson\",\n  \"colorImagesJson\": \"sample-colorImagesJson\",\n  \"itemStructure\": \"sample-itemStructure\",\n  \"variantsJson\": \"sample-variantsJson\",\n  \"imagesJson\": \"sample-imagesJson\",\n  \"badge\": \"sample-badge\",\n  \"stock\": 1,\n  \"sortOrder\": 1,\n  \"featured\": true,\n  \"trending\": true,\n  \"newArrival\": true,\n  \"bestSeller\": true,\n  \"active\": true,\n  \"units\": \"sample-units\",\n  \"zohoItemId\": \"{{id}}\",\n  \"zohoSyncStatus\": \"PENDING\",\n  \"zohoLastSyncedAt\": \"2026-05-23T00:00:00Z\",\n  \"zohoSyncError\": \"sample-zohoSyncError\",\n  \"ledgerlyItemId\": \"{{id}}\",\n  \"ledgerlySyncStatus\": \"PENDING\",\n  \"ledgerlyLastSyncedAt\": \"2026-05-23T00:00:00Z\",\n  \"ledgerlySyncError\": \"sample-ledgerlySyncError\",\n  \"category\": {\n    \"id\": 1,\n    \"slug\": \"sample-slug\",\n    \"name\": \"Sample Name\",\n    \"description\": \"sample-description\",\n    \"imageUrl\": \"https://example.com/resource\",\n    \"sortOrder\": 1,\n    \"active\": true\n  }\n}",
+              "raw": "{\n  \"id\": 1,\n  \"slug\": \"sample-slug\",\n  \"name\": \"Sample Name\",\n  \"sku\": \"sample-sku\",\n  \"fabricType\": \"sample-fabricType\",\n  \"description\": \"sample-description\",\n  \"story\": \"sample-story\",\n  \"price\": 99.99,\n  \"compareAtPrice\": 99.99,\n  \"currency\": \"INR\",\n  \"ageMinMonths\": 1,\n  \"ageMaxMonths\": 1,\n  \"sizesJson\": \"sample-sizesJson\",\n  \"sizeChartJson\": \"sample-sizeChartJson\",\n  \"sizeNotesJson\": \"sample-sizeNotesJson\",\n  \"colorsJson\": \"sample-colorsJson\",\n  \"colorImagesJson\": \"sample-colorImagesJson\",\n  \"itemStructure\": \"sample-itemStructure\",\n  \"variantsJson\": \"sample-variantsJson\",\n  \"imagesJson\": \"sample-imagesJson\",\n  \"badge\": \"sample-badge\",\n  \"detailsKicker\": \"sample-detailsKicker\",\n  \"stock\": 1,\n  \"sortOrder\": 1,\n  \"featured\": true,\n  \"trending\": true,\n  \"newArrival\": true,\n  \"bestSeller\": true,\n  \"active\": true,\n  \"units\": \"sample-units\",\n  \"zohoItemId\": \"{{id}}\",\n  \"zohoSyncStatus\": \"PENDING\",\n  \"zohoLastSyncedAt\": \"2026-05-23T00:00:00Z\",\n  \"zohoSyncError\": \"sample-zohoSyncError\",\n  \"ledgerlyItemId\": \"{{id}}\",\n  \"ledgerlySyncStatus\": \"PENDING\",\n  \"ledgerlyLastSyncedAt\": \"2026-05-23T00:00:00Z\",\n  \"ledgerlySyncError\": \"sample-ledgerlySyncError\",\n  \"category\": {\n    \"id\": 1,\n    \"slug\": \"sample-slug\",\n    \"name\": \"Sample Name\",\n    \"description\": \"sample-description\",\n    \"imageUrl\": \"https://example.com/resource\",\n    \"sortOrder\": 1,\n    \"active\": true\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3909,7 +5436,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": 1,\n  \"slug\": \"sample-slug\",\n  \"name\": \"Sample Name\",\n  \"sku\": \"sample-sku\",\n  \"fabricType\": \"sample-fabricType\",\n  \"description\": \"sample-description\",\n  \"story\": \"sample-story\",\n  \"price\": 99.99,\n  \"compareAtPrice\": 99.99,\n  \"currency\": \"INR\",\n  \"ageMinMonths\": 1,\n  \"ageMaxMonths\": 1,\n  \"sizesJson\": \"sample-sizesJson\",\n  \"colorsJson\": \"sample-colorsJson\",\n  \"colorImagesJson\": \"sample-colorImagesJson\",\n  \"itemStructure\": \"sample-itemStructure\",\n  \"variantsJson\": \"sample-variantsJson\",\n  \"imagesJson\": \"sample-imagesJson\",\n  \"badge\": \"sample-badge\",\n  \"stock\": 1,\n  \"sortOrder\": 1,\n  \"featured\": true,\n  \"trending\": true,\n  \"newArrival\": true,\n  \"bestSeller\": true,\n  \"active\": true,\n  \"units\": \"sample-units\",\n  \"zohoItemId\": \"{{id}}\",\n  \"zohoSyncStatus\": \"PENDING\",\n  \"zohoLastSyncedAt\": \"2026-05-23T00:00:00Z\",\n  \"zohoSyncError\": \"sample-zohoSyncError\",\n  \"ledgerlyItemId\": \"{{id}}\",\n  \"ledgerlySyncStatus\": \"PENDING\",\n  \"ledgerlyLastSyncedAt\": \"2026-05-23T00:00:00Z\",\n  \"ledgerlySyncError\": \"sample-ledgerlySyncError\",\n  \"category\": {\n    \"id\": 1,\n    \"slug\": \"sample-slug\",\n    \"name\": \"Sample Name\",\n    \"description\": \"sample-description\",\n    \"imageUrl\": \"https://example.com/resource\",\n    \"sortOrder\": 1,\n    \"active\": true\n  }\n}",
+              "raw": "{\n  \"id\": 1,\n  \"slug\": \"sample-slug\",\n  \"name\": \"Sample Name\",\n  \"sku\": \"sample-sku\",\n  \"fabricType\": \"sample-fabricType\",\n  \"description\": \"sample-description\",\n  \"story\": \"sample-story\",\n  \"price\": 99.99,\n  \"compareAtPrice\": 99.99,\n  \"currency\": \"INR\",\n  \"ageMinMonths\": 1,\n  \"ageMaxMonths\": 1,\n  \"sizesJson\": \"sample-sizesJson\",\n  \"sizeChartJson\": \"sample-sizeChartJson\",\n  \"sizeNotesJson\": \"sample-sizeNotesJson\",\n  \"colorsJson\": \"sample-colorsJson\",\n  \"colorImagesJson\": \"sample-colorImagesJson\",\n  \"itemStructure\": \"sample-itemStructure\",\n  \"variantsJson\": \"sample-variantsJson\",\n  \"imagesJson\": \"sample-imagesJson\",\n  \"badge\": \"sample-badge\",\n  \"detailsKicker\": \"sample-detailsKicker\",\n  \"stock\": 1,\n  \"sortOrder\": 1,\n  \"featured\": true,\n  \"trending\": true,\n  \"newArrival\": true,\n  \"bestSeller\": true,\n  \"active\": true,\n  \"units\": \"sample-units\",\n  \"zohoItemId\": \"{{id}}\",\n  \"zohoSyncStatus\": \"PENDING\",\n  \"zohoLastSyncedAt\": \"2026-05-23T00:00:00Z\",\n  \"zohoSyncError\": \"sample-zohoSyncError\",\n  \"ledgerlyItemId\": \"{{id}}\",\n  \"ledgerlySyncStatus\": \"PENDING\",\n  \"ledgerlyLastSyncedAt\": \"2026-05-23T00:00:00Z\",\n  \"ledgerlySyncError\": \"sample-ledgerlySyncError\",\n  \"category\": {\n    \"id\": 1,\n    \"slug\": \"sample-slug\",\n    \"name\": \"Sample Name\",\n    \"description\": \"sample-description\",\n    \"imageUrl\": \"https://example.com/resource\",\n    \"sortOrder\": 1,\n    \"active\": true\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4042,7 +5569,193 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": 1,\n  \"brandName\": \"Sample Name\",\n  \"careLabel\": \"sample-careLabel\",\n  \"contactEmail\": \"{{email}}\",\n  \"contactPhone\": \"9876543210\",\n  \"ecatalogueLabel\": \"sample-ecatalogueLabel\",\n  \"ecatalogueUrl\": \"https://example.com/resource\",\n  \"facebookUrl\": \"https://example.com/resource\",\n  \"footerCopyright\": \"sample-footerCopyright\",\n  \"footerTagline\": \"sample-footerTagline\",\n  \"instagramUrl\": \"https://example.com/resource\",\n  \"legalEntityName\": \"Sample Name\",\n  \"logoHorizontalUrl\": \"https://example.com/resource\",\n  \"logoUrl\": \"https://example.com/resource\",\n  \"invoiceLogoUrl\": \"https://example.com/resource\",\n  \"invoiceWebsite\": \"sample-invoiceWebsite\",\n  \"invoiceGstin\": \"sample-invoiceGstin\",\n  \"invoiceSoldByAddress\": \"sample-invoiceSoldByAddress\",\n  \"invoiceDispatchFromAddress\": \"sample-invoiceDispatchFromAddress\",\n  \"invoiceRegisteredOfficeAddress\": \"sample-invoiceRegisteredOfficeAddress\",\n  \"invoiceCin\": \"sample-invoiceCin\",\n  \"invoiceQrUrl\": \"https://example.com/resource\",\n  \"invoiceFooterNote\": \"sample-invoiceFooterNote\",\n  \"invoiceSellerState\": \"sample-invoiceSellerState\",\n  \"twitterUrl\": \"https://example.com/resource\",\n  \"whatsappNumber\": \"sample-whatsappNumber\",\n  \"youtubeUrl\": \"https://example.com/resource\",\n  \"gstRate\": 99.99,\n  \"pricesIncludeGst\": true,\n  \"shippingStandardInr\": 1,\n  \"shippingExpressInr\": 1,\n  \"freeShippingMinInr\": 1,\n  \"codFeeInr\": 1,\n  \"storeDiscountPercent\": 99.99,\n  \"subscribeHeroTitle\": \"Sample Title\",\n  \"subscribeHeroSubtitle\": \"Sample Title\",\n  \"subscribeTestimonial\": \"sample-subscribeTestimonial\",\n  \"subscribeBadgesJson\": \"sample-subscribeBadgesJson\",\n  \"subscribePlansJson\": \"sample-subscribePlansJson\",\n  \"subscribeFeaturesJson\": \"sample-subscribeFeaturesJson\"\n}",
+              "raw": "{\n  \"id\": 1,\n  \"brandName\": \"Sample Name\",\n  \"careLabel\": \"sample-careLabel\",\n  \"contactEmail\": \"{{email}}\",\n  \"contactPhone\": \"9876543210\",\n  \"ecatalogueLabel\": \"sample-ecatalogueLabel\",\n  \"ecatalogueUrl\": \"https://example.com/resource\",\n  \"facebookUrl\": \"https://example.com/resource\",\n  \"footerCopyright\": \"sample-footerCopyright\",\n  \"footerTagline\": \"sample-footerTagline\",\n  \"instagramUrl\": \"https://example.com/resource\",\n  \"legalEntityName\": \"Sample Name\",\n  \"logoHorizontalUrl\": \"https://example.com/resource\",\n  \"logoUrl\": \"https://example.com/resource\",\n  \"invoiceLogoUrl\": \"https://example.com/resource\",\n  \"invoiceWebsite\": \"sample-invoiceWebsite\",\n  \"invoiceGstin\": \"sample-invoiceGstin\",\n  \"invoiceSoldByAddress\": \"sample-invoiceSoldByAddress\",\n  \"invoiceDispatchFromAddress\": \"sample-invoiceDispatchFromAddress\",\n  \"invoiceRegisteredOfficeAddress\": \"sample-invoiceRegisteredOfficeAddress\",\n  \"invoiceCin\": \"sample-invoiceCin\",\n  \"invoiceQrUrl\": \"https://example.com/resource\",\n  \"invoiceFooterNote\": \"sample-invoiceFooterNote\",\n  \"invoiceSellerState\": \"sample-invoiceSellerState\",\n  \"twitterUrl\": \"https://example.com/resource\",\n  \"whatsappNumber\": \"sample-whatsappNumber\",\n  \"youtubeUrl\": \"https://example.com/resource\",\n  \"gstRate\": 99.99,\n  \"pricesIncludeGst\": true,\n  \"shippingStandardInr\": 1,\n  \"shippingExpressInr\": 1,\n  \"freeShippingMinInr\": 1,\n  \"codFeeInr\": 1,\n  \"deliveryEtaBufferDays\": 1,\n  \"returnWindowDays\": 1,\n  \"refundMinBusinessDays\": 1,\n  \"refundMaxBusinessDays\": 1,\n  \"storeDiscountPercent\": 99.99,\n  \"subscribeHeroTitle\": \"Sample Title\",\n  \"subscribeHeroSubtitle\": \"Sample Title\",\n  \"subscribeTestimonial\": \"sample-subscribeTestimonial\",\n  \"subscribeBadgesJson\": \"sample-subscribeBadgesJson\",\n  \"subscribePlansJson\": \"sample-subscribePlansJson\",\n  \"subscribeFeaturesJson\": \"sample-subscribeFeaturesJson\",\n  \"aboutPageJson\": \"sample-aboutPageJson\",\n  \"giftPageJson\": \"sample-giftPageJson\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "storeAddresses",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/store-addresses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "store-addresses"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "createStoreAddress",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/store-addresses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "store-addresses"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1,\n  \"label\": \"sample-label\",\n  \"fullName\": \"Sample Name\",\n  \"phone\": \"9876543210\",\n  \"line1\": \"sample-line1\",\n  \"line2\": \"sample-line2\",\n  \"city\": \"sample-city\",\n  \"state\": \"sample-state\",\n  \"pincode\": \"500001\",\n  \"country\": \"sample-country\",\n  \"usages\": [\n    \"SHIPMENT\"\n  ],\n  \"isDefault\": true,\n  \"usage\": \"SHIPMENT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "deleteStoreAddress",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/store-addresses/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "store-addresses",
+                "{{id}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "updateStoreAddress",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/store-addresses/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "store-addresses",
+                "{{id}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1,\n  \"label\": \"sample-label\",\n  \"fullName\": \"Sample Name\",\n  \"phone\": \"9876543210\",\n  \"line1\": \"sample-line1\",\n  \"line2\": \"sample-line2\",\n  \"city\": \"sample-city\",\n  \"state\": \"sample-state\",\n  \"pincode\": \"500001\",\n  \"country\": \"sample-country\",\n  \"usages\": [\n    \"SHIPMENT\"\n  ],\n  \"isDefault\": true,\n  \"usage\": \"SHIPMENT\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4107,6 +5820,64 @@
                 }
               }
             }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Internal Media Preview",
+      "item": [
+        {
+          "name": "preview",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/media/preview?u=sample-u",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "media",
+                "preview"
+              ],
+              "query": [
+                {
+                  "key": "u",
+                  "value": "sample-u",
+                  "description": "",
+                  "disabled": false
+                },
+                {
+                  "key": "w",
+                  "value": "1",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
           },
           "event": [
             {
@@ -4195,7 +5966,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"order_number\": \"sample-order_number\",\n  \"reason\": \"sample-reason\"\n}",
+              "raw": "{\n  \"order_number\": \"sample-order_number\",\n  \"reason\": \"sample-reason\",\n  \"items\": [\n    {\n      \"order_item_id\": 1,\n      \"quantity\": 1\n    }\n  ],\n  \"image_urls\": [\n    \"https://example.com/resource\"\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4327,7 +6098,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"order_number\": \"sample-order_number\",\n  \"order_item_id\": 1,\n  \"reason\": \"sample-reason\",\n  \"replacement_size\": \"sample-replacement_size\",\n  \"replacement_color\": \"sample-replacement_color\"\n}",
+              "raw": "{\n  \"order_number\": \"sample-order_number\",\n  \"order_item_id\": 1,\n  \"reason\": \"sample-reason\",\n  \"replacement_size\": \"sample-replacement_size\",\n  \"replacement_color\": \"sample-replacement_color\",\n  \"image_urls\": [\n    \"https://example.com/resource\"\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4404,6 +6175,59 @@
           ]
         },
         {
+          "name": "uploadImage",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/order-returns/uploads",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "order-returns",
+                "uploads"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{'file': 'sample-file'}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "cancel",
           "request": {
             "method": "POST",
@@ -4428,6 +6252,64 @@
               ]
             },
             "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Internal Razorpay Webhook",
+      "item": [
+        {
+          "name": "receive_3",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/razorpay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "razorpay"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "sample-value",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
           },
           "event": [
             {
@@ -4522,6 +6404,60 @@
           ]
         },
         {
+          "name": "uploadCataloguePdf",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/uploads/catalogue-pdf",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "uploads",
+                "catalogue-pdf"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{'file': 'sample-file'}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "deleteObjects",
           "request": {
             "method": "POST",
@@ -4554,6 +6490,60 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"keys\": [\n    \"sample-keys\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ensureDerivatives",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/uploads/derivatives",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "uploads",
+                "derivatives"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"publicUrl\": \"https://example.com/resource\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4694,6 +6684,44 @@
     {
       "name": "Internal Storefront",
       "item": [
+        {
+          "name": "aboutPage",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/about-page",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "about-page"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
         {
           "name": "banners_1",
           "request": {
@@ -4844,6 +6872,96 @@
             "auth": {
               "type": "noauth"
             }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "createContactMessage",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contact-messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contact-messages"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1,\n  \"name\": \"Sample Name\",\n  \"email\": \"{{email}}\",\n  \"phone\": \"9876543210\",\n  \"address\": \"sample-address\",\n  \"comment\": \"sample-comment\",\n  \"createdDate\": \"2026-05-23T00:00:00Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "giftPage",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/gift-page",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gift-page"
+              ]
+            },
+            "description": ""
           },
           "event": [
             {
@@ -5166,6 +7284,124 @@
               ]
             },
             "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Internal Xpress Bees Return Webhook",
+      "item": [
+        {
+          "name": "receiveReturnWebhook_1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/xpressbees/returns",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "xpressbees",
+                "returns"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "sample-value",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Internal Xpress Bees Shipment Webhook",
+      "item": [
+        {
+          "name": "receive_1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/xpressbees/shipments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "xpressbees",
+                "shipments"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "sample-value",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
           },
           "event": [
             {
@@ -6189,6 +8425,47 @@
                 "admin",
                 "zoho",
                 "pull-inventory"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 2xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "pullItemGroup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/zoho/pull-item-groups/{{itemGroupId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "zoho",
+                "pull-item-groups",
+                "{{itemGroupId}}"
               ]
             },
             "description": ""

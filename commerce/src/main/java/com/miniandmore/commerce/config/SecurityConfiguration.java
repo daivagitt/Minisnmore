@@ -79,7 +79,11 @@ public class SecurityConfiguration {
                         AuthoritiesConstants.CUSTOMER_SUPPORT
                     )
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/orders/*/cancel")
-                    .hasAnyAuthority(AuthoritiesConstants.SUPER_ADMIN, AuthoritiesConstants.ADMIN)
+                    .hasAnyAuthority(
+                        AuthoritiesConstants.SUPER_ADMIN,
+                        AuthoritiesConstants.ADMIN,
+                        AuthoritiesConstants.OPERATIONS
+                    )
                     .requestMatchers("/api/v1/admin/orders", "/api/v1/admin/orders/**")
                     .hasAnyAuthority(
                         AuthoritiesConstants.SUPER_ADMIN,

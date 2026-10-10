@@ -383,15 +383,15 @@ describe("order-status labels", () => {
     expect(isCodOrder({ payment_method: "online" })).toBe(false);
   });
 
-  it("prefers contact_care_to_cancel from the API when present", () => {
+  it("honors contact_care_to_cancel from the API only when explicitly true", () => {
     expect(shouldContactCareToCancel({ contact_care_to_cancel: true, status: "confirmed" })).toBe(true);
     expect(shouldContactCareToCancel({ contact_care_to_cancel: false, status: "hand_wrapped" })).toBe(false);
   });
 
-  it("asks packed orders to contact customer care instead of requesting cancellation", () => {
+  it("does not treat packed or hand-wrapped orders as contact-care by default", () => {
     expect(shouldContactCareToCancel({ status: "confirmed", can_cancel: true })).toBe(false);
-    expect(shouldContactCareToCancel({ status: "hand_wrapped", can_cancel: false })).toBe(true);
-    expect(shouldContactCareToCancel({ status: "confirmed", packed_at: "2026-09-30T00:00:00Z", can_cancel: false })).toBe(true);
+    expect(shouldContactCareToCancel({ status: "hand_wrapped", can_cancel: false })).toBe(false);
+    expect(shouldContactCareToCancel({ status: "confirmed", packed_at: "2026-09-30T00:00:00Z", can_cancel: false })).toBe(false);
     expect(shouldContactCareToCancel({ status: "hand_wrapped", pending_cancellation: true })).toBe(false);
     expect(shouldContactCareToCancel({ status: "fulfilled", tracking_status: "hand_wrapped" })).toBe(false);
     expect(shouldContactCareToCancel({ status: "cancelled", packed_at: "2026-09-30T00:00:00Z" })).toBe(false);

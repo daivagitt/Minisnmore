@@ -16,6 +16,7 @@ import {
 import { z } from "zod";
 import {
   completeZohoOAuth,
+  formatZohoSyncFailureToast,
   formatZohoSyncFailures,
   formatZohoSyncSummary,
   getZohoConnectUrl,
@@ -341,11 +342,11 @@ function ZohoSyncPanel({
       setLastResult({ label, summary });
       toast.dismiss(toastId);
       if (summary.failed > 0) {
-        toast.warning(formatZohoSyncSummary(summary, label));
+        toast.warning(formatZohoSyncFailureToast(summary, label));
       } else if (summary.success > 0) {
         toast.success(formatZohoSyncSummary(summary, label));
       } else if ((summary.notices?.length ?? 0) > 0) {
-        toast.info(formatZohoSyncSummary(summary, label));
+        toast.info(formatZohoSyncFailureToast(summary, label));
       } else {
         toast.info(`${label} completed — nothing to process`);
       }

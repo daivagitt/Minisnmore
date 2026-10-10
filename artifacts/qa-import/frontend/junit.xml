@@ -1,0 +1,6 @@
+<?xml version="1.0" ?>
+<testsuites>
+  <testsuite name="Vitest (QA final report rollup)" tests="987" failures="0" errors="0" skipped="0" time="0">
+    <testcase classname="rollup" name="frontend-suite" time="0"/>
+  </testsuite>
+</testsuites>

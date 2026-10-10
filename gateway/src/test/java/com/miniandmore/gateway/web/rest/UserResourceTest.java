@@ -5,6 +5,8 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.mockUser;
 import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.springSecurity;
 
+import com.miniandmore.gateway.domain.Authority;
+import com.miniandmore.gateway.domain.Authority;
 import com.miniandmore.gateway.domain.User;
 import com.miniandmore.gateway.repository.UserRepository;
 import com.miniandmore.gateway.security.AuthoritiesConstants;
@@ -103,20 +105,6 @@ class UserResourceTest {
         when(userService.getAllManagedUsers(any(Pageable.class))).thenReturn(Flux.just(new AdminUserDTO()));
 
         webTestClient.get().uri("/api/admin/users?page=0&size=20").exchange().expectStatus().isOk();
-    }
-
-    @Test
-    void getAllUsers_forSupport_listsCustomersOnly() {
-        when(userService.countCustomerUsers()).thenReturn(Mono.just(1L));
-        when(userService.getAllCustomerUsers(any(Pageable.class))).thenReturn(Flux.just(new AdminUserDTO()));
-
-        webTestClient
-            .mutateWith(mockUser("care").authorities(AuthoritiesConstants.CUSTOMER_SUPPORT))
-            .get()
-            .uri("/api/admin/users?page=0&size=20")
-            .exchange()
-            .expectStatus()
-            .isOk();
     }
 
     @Test
@@ -241,5 +229,41 @@ class UserResourceTest {
             .exchange()
             .expectStatus()
             .isOk();
+    }
+
+    @Test
+    void resendInvite_pendingUser_returnsNoContent() {
+        User user = new User();
+        user.setLogin("pending");
+        user.setActivated(false);
+        user.setActivationKey("key-123");
+        user.setAuthorities(Set.of(staffAuthority(AuthoritiesConstants.SALES)));
+        when(userService.getUserWithAuthoritiesByLogin("pending")).thenReturn(Mono.just(user));
+
+        webTestClient.post().uri("/api/admin/users/pending/resend-invite").exchange().expectStatus().isNoContent();
+    }
+
+    @Test
+    void resendInvite_unknownUser_returnsNotFound() {
+        when(userService.getUserWithAuthoritiesByLogin("missing")).thenReturn(Mono.empty());
+
+        webTestClient.post().uri("/api/admin/users/missing/resend-invite").exchange().expectStatus().isNotFound();
+    }
+
+    @Test
+    void resendInvite_alreadyActivated_returnsBadRequest() {
+        User user = new User();
+        user.setLogin("active");
+        user.setActivated(true);
+        user.setAuthorities(Set.of(staffAuthority(AuthoritiesConstants.SALES)));
+        when(userService.getUserWithAuthoritiesByLogin("active")).thenReturn(Mono.just(user));
+
+        webTestClient.post().uri("/api/admin/users/active/resend-invite").exchange().expectStatus().isBadRequest();
+    }
+
+    private static Authority staffAuthority(String role) {
+        Authority authority = new Authority();
+        authority.setName(role);
+        return authority;
     }
 }

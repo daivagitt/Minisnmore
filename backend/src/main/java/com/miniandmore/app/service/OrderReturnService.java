@@ -458,11 +458,14 @@ public class OrderReturnService {
 
     public OrderReturn approve(String returnNumber, String adminNotes) {
         assertFeatureEnabled();
-        OrderReturn orderReturn = loadReturn(returnNumber);
+        OrderReturn orderReturn = loadReturnForUpdate(returnNumber);
         if (orderReturn.getStatus() != OrderReturnStatus.REQUESTED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return is not awaiting approval");
         }
         if (orderReturn.getRequestType() == OrderRequestType.EXCHANGE) {
+            if (orderReturn.getReplacementReservedAt() != null) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Replacement stock is already reserved");
+            }
             reserveExchangeReplacement(orderReturn);
         }
         orderReturn.setStatus(OrderReturnStatus.APPROVED);
@@ -769,8 +772,8 @@ public class OrderReturnService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Disposition is required when accepting a return");
         }
         // Exchange accept only records disposition. Requested-item restock happens once later
-        // (allocation or convert-to-refund). Credit notes wait for allocation or convert-to-refund,
-        // not QC accept or price-difference settle.
+        // (allocation or convert-to-refund). Credit notes are created once: cheaper replacement
+        // after Razorpay refund initiated; otherwise at allocation or convert-to-refund.
         orderReturn.setDisposition(disposition);
         if (orderReturn.getRequestType() != OrderRequestType.EXCHANGE) {
             applyReturnLineInspection(orderReturn, disposition, lineDecisions);
@@ -892,12 +895,20 @@ public class OrderReturnService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Settlement method and transaction reference are required");
         }
         if (razorpayRefund) {
-            return exchangeRazorpaySettlementService.recordRazorpayRefund(
+            exchangeRazorpaySettlementService.recordRazorpayRefund(
                 returnNumber,
                 recordedAmount,
                 settledBy,
                 adminNotes
             );
+            OrderReturn settled = orderReturnRepository
+                .findOneByReturnNumberForUpdate(returnNumber)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Return not found"));
+            // Refund initiated is enough — do not wait for refund.processed.
+            // Persist the id via this save, not persistIfAbsent: that REQUIRES_NEW
+            // update deadlocks if a later allocate/convert holds FOR UPDATE.
+            issueExchangeCreditNote(settled, false);
+            return orderReturnRepository.save(settled);
         }
         orderReturn = orderReturnRepository
             .findOneByReturnNumberForUpdate(returnNumber)
@@ -920,6 +931,9 @@ public class OrderReturnService {
         orderReturn.setSettledAt(Instant.now());
         orderReturn.setSettledBy(StringUtils.left(StringUtils.defaultIfBlank(settledBy, "system"), 50));
         orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), adminNotes));
+        if (settlementStatus == ExchangeSettlementStatus.REFUNDED) {
+            issueExchangeCreditNote(orderReturn, false);
+        }
         return orderReturnRepository.save(orderReturn);
     }
 
@@ -929,8 +943,11 @@ public class OrderReturnService {
 
     public OrderReturn allocateReplacementItem(String returnNumber, String adminNotes) {
         assertFeatureEnabled();
-        OrderReturn orderReturn = loadReturn(returnNumber);
+        OrderReturn orderReturn = loadReturnForUpdate(returnNumber);
         assertIsExchange(orderReturn);
+        if (orderReturn.getStatus() == OrderReturnStatus.ITEM_ALLOCATED) {
+            return orderReturn;
+        }
         if (orderReturn.getStatus() != OrderReturnStatus.ACCEPTED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Exchange must be accepted before allocating the replacement");
         }
@@ -940,7 +957,7 @@ public class OrderReturnService {
             Product product = resolveProductForUpdate(item.getProductId()).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.BAD_REQUEST, "Original product could not be resolved")
             );
-            int qty = Optional.ofNullable(item.getQty()).orElse(1);
+            int qty = Math.max(1, Optional.ofNullable(item.getQty()).orElse(1));
             if (
                 !variantSupport.decrementVariantStock(
                     product,
@@ -967,16 +984,19 @@ public class OrderReturnService {
         restoreExchangeOriginalIfRestockable(orderReturn);
         issueExchangeCreditNote(orderReturn, false);
         issueReplacementInvoice(orderReturn);
+        refundCheaperExchangeCreditLeftover(orderReturn);
         syncExchangeProductStockToZoho(orderReturn);
         orderReturn.setStatus(OrderReturnStatus.ITEM_ALLOCATED);
         return orderReturnRepository.save(orderReturn);
     }
 
     /**
-     * Credit note for the item coming back. Unlinked at allocation so a continuing
-     * exchange can apply it to the replacement invoice. Linked at convert-to-refund
-     * so the original invoice is credited. Not created at price-difference settle
-     * (Razorpay or collect) — convert-to-refund is still a first-class next step.
+     * Credit note for the item coming back. After a cheaper-replacement Razorpay
+     * refund, created as soon as payment status is refund initiated — do not wait
+     * for refund.processed. Unlinked so a continuing exchange can apply it to the
+     * replacement invoice. Linked at convert-to-refund so the original invoice is
+     * credited. Collect does not create one; same-price and higher-price notes are
+     * created at allocation.
      */
     private void issueExchangeCreditNote(OrderReturn orderReturn, boolean linkToSourceInvoice) {
         CustomerOrder order = orderReturn.getOrder();
@@ -1006,29 +1026,93 @@ public class OrderReturnService {
                 }
             }
         }
-        if (applicationProperties.getZoho().isSyncReturns() && StringUtils.isBlank(orderReturn.getZohoCreditNoteId())) {
-            try {
-                Optional<String> zohoCreditNoteId = zohoBooksIntegrationClient.createCreditNote(
-                    order.getId(),
-                    orderReturn.getReturnNumber(),
-                    returnedQuantitiesForZoho(orderReturn),
-                    linkToSourceInvoice
-                );
-                if (zohoCreditNoteId.isPresent()) {
-                    orderReturn.setZohoCreditNoteId(zohoCreditNoteId.orElseThrow());
-                } else if (shouldStubDemoCreditNote(order, null)) {
-                    orderReturn.setZohoCreditNoteId("cn_zoho_demo_" + order.getOrderNumber());
+        if (applicationProperties.getZoho().isSyncReturns()) {
+            if (StringUtils.isBlank(orderReturn.getZohoCreditNoteId())) {
+                try {
+                    Optional<String> zohoCreditNoteId = zohoBooksIntegrationClient.createCreditNote(
+                        order.getId(),
+                        orderReturn.getReturnNumber(),
+                        returnedQuantitiesForZoho(orderReturn),
+                        linkToSourceInvoice
+                    );
+                    if (zohoCreditNoteId.isPresent()) {
+                        orderReturn.setZohoCreditNoteId(zohoCreditNoteId.orElseThrow());
+                    } else if (shouldStubDemoCreditNote(order, null)) {
+                        orderReturn.setZohoCreditNoteId("cn_zoho_demo_" + order.getOrderNumber());
+                    }
+                } catch (RuntimeException e) {
+                    if (shouldStubDemoCreditNote(order, e)) {
+                        orderReturn.setZohoCreditNoteId("cn_zoho_demo_" + order.getOrderNumber());
+                    } else {
+                        LOG.warn("Zoho exchange credit note failed for {}: {}", orderReturn.getReturnNumber(), e.getMessage());
+                        orderReturn.setAdminNotes(
+                            mergeNotes(orderReturn.getAdminNotes(), "Zoho credit note failed: " + StringUtils.left(e.getMessage(), 200))
+                        );
+                    }
                 }
-            } catch (RuntimeException e) {
-                if (shouldStubDemoCreditNote(order, e)) {
-                    orderReturn.setZohoCreditNoteId("cn_zoho_demo_" + order.getOrderNumber());
-                } else {
-                    LOG.warn("Zoho exchange credit note failed for {}: {}", orderReturn.getReturnNumber(), e.getMessage());
+            }
+            if (
+                linkToSourceInvoice &&
+                StringUtils.isNotBlank(orderReturn.getZohoCreditNoteId()) &&
+                !StringUtils.startsWith(orderReturn.getZohoCreditNoteId(), "cn_zoho_demo_")
+            ) {
+                try {
+                    Optional<String> attachedId = zohoBooksIntegrationClient.attachCreditNoteToSourceInvoice(
+                        order.getId(),
+                        orderReturn.getReturnNumber(),
+                        orderReturn.getZohoCreditNoteId(),
+                        returnedQuantitiesForZoho(orderReturn)
+                    );
+                    if (attachedId.isPresent()) {
+                        orderReturn.setZohoCreditNoteId(attachedId.orElseThrow());
+                    } else if (StringUtils.isNotBlank(orderReturn.getZohoCreditNoteId())) {
+                        orderReturn.setZohoCreditNoteId(null);
+                        orderReturn.setAdminNotes(
+                            mergeNotes(
+                                orderReturn.getAdminNotes(),
+                                "Zoho credit note was voided without a linked replacement; retry convert or create manually"
+                            )
+                        );
+                    }
+                } catch (RuntimeException e) {
+                    LOG.warn(
+                        "Zoho attach credit note to original invoice failed for {}: {}",
+                        orderReturn.getReturnNumber(),
+                        e.getMessage()
+                    );
                     orderReturn.setAdminNotes(
-                        mergeNotes(orderReturn.getAdminNotes(), "Zoho credit note failed: " + StringUtils.left(e.getMessage(), 200))
+                        mergeNotes(orderReturn.getAdminNotes(), "Zoho credit note apply failed: " + StringUtils.left(e.getMessage(), 200))
                     );
                 }
             }
+        }
+    }
+
+    private void refundCheaperExchangeCreditLeftover(OrderReturn orderReturn) {
+        if (
+            !applicationProperties.getZoho().isSyncReturns() ||
+            money(orderReturn.getPriceDifference()).signum() >= 0 ||
+            orderReturn.getSettlementStatus() != ExchangeSettlementStatus.REFUNDED ||
+            StringUtils.isBlank(orderReturn.getZohoCreditNoteId()) ||
+            StringUtils.startsWith(orderReturn.getZohoCreditNoteId(), "cn_zoho_demo_") ||
+            StringUtils.isBlank(orderReturn.getZohoReplacementInvoiceId())
+        ) {
+            return;
+        }
+        try {
+            zohoBooksIntegrationClient.refundOpenCreditNoteBalance(
+                orderReturn.getZohoCreditNoteId(),
+                StringUtils.firstNonBlank(orderReturn.getSettlementReference(), orderReturn.getReturnNumber())
+            );
+        } catch (RuntimeException e) {
+            LOG.warn(
+                "Zoho leftover credit-note refund failed for {}: {}",
+                orderReturn.getReturnNumber(),
+                e.getMessage()
+            );
+            orderReturn.setAdminNotes(
+                mergeNotes(orderReturn.getAdminNotes(), "Zoho leftover credit refund failed: " + StringUtils.left(e.getMessage(), 200))
+            );
         }
     }
 
@@ -1126,8 +1210,11 @@ public class OrderReturnService {
 
     public OrderReturn convertExchangeToRefund(String returnNumber, String adminNotes) {
         assertFeatureEnabled();
-        OrderReturn orderReturn = loadReturn(returnNumber);
+        OrderReturn orderReturn = loadReturnForUpdate(returnNumber);
         assertIsExchange(orderReturn);
+        if (orderReturn.getStatus() == OrderReturnStatus.REFUNDED) {
+            return orderReturn;
+        }
         if (orderReturn.getStatus() != OrderReturnStatus.ACCEPTED && orderReturn.getStatus() != OrderReturnStatus.FAILED) {
             throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
@@ -1230,6 +1317,30 @@ public class OrderReturnService {
         String courierName,
         String packageType
     ) {
+        return completeOutboundPackage(
+            returnNumber,
+            weightGrams,
+            lengthCm,
+            breadthCm,
+            heightCm,
+            courierId,
+            courierName,
+            packageType,
+            null
+        );
+    }
+
+    public OrderReturn completeOutboundPackage(
+        String returnNumber,
+        Integer weightGrams,
+        int lengthCm,
+        int breadthCm,
+        int heightCm,
+        String courierId,
+        String courierName,
+        String packageType,
+        Long packageBoxId
+    ) {
         assertFeatureEnabled();
         OrderReturn orderReturn = loadReturn(returnNumber);
         assertOutboundPackageEligible(orderReturn);
@@ -1265,6 +1376,7 @@ public class OrderReturnService {
         orderReturn.setPackageCourierId(StringUtils.left(selected.id(), 40));
         orderReturn.setPackageCourierName(StringUtils.left(selected.name(), 120));
         orderReturn.setPackageType(resolvedType);
+        orderReturn.setPackageBoxId(packageBoxId);
         orderReturn.setPackedAt(Instant.now());
         if (OUTBOUND_PACKAGE_ADVANCE_STATUSES.contains(orderReturn.getStatus())) {
             orderReturn.setStatus(OrderReturnStatus.READY_TO_SHIP);
@@ -1309,6 +1421,34 @@ public class OrderReturnService {
         String courierName,
         String packageType
     ) {
+        return bookOutbound(
+            returnNumber,
+            mode,
+            carrierName,
+            outboundAwb,
+            trackingUrl,
+            labelUrl,
+            adminNotes,
+            courierId,
+            courierName,
+            packageType,
+            null
+        );
+    }
+
+    public OrderReturn bookOutbound(
+        String returnNumber,
+        ReturnLogisticsMode mode,
+        String carrierName,
+        String outboundAwb,
+        String trackingUrl,
+        String labelUrl,
+        String adminNotes,
+        String courierId,
+        String courierName,
+        String packageType,
+        Long packageBoxId
+    ) {
         assertFeatureEnabled();
         OrderReturn orderReturn = loadReturn(returnNumber);
         assertIsExchange(orderReturn);
@@ -1333,6 +1473,7 @@ public class OrderReturnService {
                     )
             );
             orderReturn.setPackageType(resolvedType);
+            orderReturn.setPackageBoxId(packageBoxId);
         }
         applyOutboundCourierSelection(orderReturn, courierId, courierName);
         if (mode == ReturnLogisticsMode.XPRESSBEES) {
@@ -1367,6 +1508,12 @@ public class OrderReturnService {
             );
             orderReturn.setOutboundLogisticsMode(ReturnLogisticsMode.XPRESSBEES);
             orderReturn.setOutboundCarrierName("XpressBees");
+            if (StringUtils.isNotBlank(result.courierId())) {
+                orderReturn.setPackageCourierId(StringUtils.left(result.courierId(), 40));
+            }
+            if (StringUtils.isNotBlank(result.courierName())) {
+                orderReturn.setPackageCourierName(StringUtils.left(result.courierName(), 120));
+            }
             orderReturn.setOutboundAwb(StringUtils.left(result.awb(), 80));
             String tracking = StringUtils.defaultIfBlank(xpressBeesClient.buildTrackingUrl(result.awb()), result.trackingUrl());
             orderReturn.setOutboundTrackingUrl(StringUtils.left(StringUtils.trimToNull(tracking), 500));
@@ -2285,6 +2432,12 @@ public class OrderReturnService {
     private OrderReturn loadReturn(String returnNumber) {
         return orderReturnRepository
             .findOneByReturnNumber(returnNumber)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Return request not found"));
+    }
+
+    private OrderReturn loadReturnForUpdate(String returnNumber) {
+        return orderReturnRepository
+            .findOneByReturnNumberForUpdate(returnNumber)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Return request not found"));
     }
 

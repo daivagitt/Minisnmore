@@ -52,7 +52,7 @@ final class ReturnXpressBeesShipmentFactory {
         ApplicationProperties.XpressBees xpressBees = applicationProperties.getXpressbees();
         XpressBeesClient.ReversePickupAddress pickupFrom = customerAddress(shipping);
         XpressBeesClient.ReversePickupAddress deliverTo = StoreAddressService.warehousePickup(
-            storeAddressRepository.findFirstByUsageAndIsDefaultTrue(StoreAddressUsage.SHIPMENT),
+            storeAddressRepository.findFirstByUsagesContainingAndIsDefaultTrueOrderByIdDesc(StoreAddressUsage.SHIPMENT),
             xpressBees,
             pickupFrom.phone()
         );
@@ -75,7 +75,7 @@ final class ReturnXpressBeesShipmentFactory {
         JsonNode shipping = parseShippingAddress(order.getShippingAddressJson());
         ApplicationProperties.XpressBees xpressBees = applicationProperties.getXpressbees();
         XpressBeesClient.ReversePickupAddress shipFrom = StoreAddressService.warehousePickup(
-            storeAddressRepository.findFirstByUsageAndIsDefaultTrue(StoreAddressUsage.SHIPMENT),
+            storeAddressRepository.findFirstByUsagesContainingAndIsDefaultTrueOrderByIdDesc(StoreAddressUsage.SHIPMENT),
             xpressBees,
             firstAddressField(shipping, "phone", "mobile")
         );
@@ -120,7 +120,7 @@ final class ReturnXpressBeesShipmentFactory {
 
     Map<String, Object> dispatchAddressPayload() {
         return StoreAddressService.dispatchAddressPayload(
-            storeAddressRepository.findFirstByUsageAndIsDefaultTrue(StoreAddressUsage.SHIPMENT),
+            storeAddressRepository.findFirstByUsagesContainingAndIsDefaultTrueOrderByIdDesc(StoreAddressUsage.SHIPMENT),
             applicationProperties.getXpressbees()
         );
     }

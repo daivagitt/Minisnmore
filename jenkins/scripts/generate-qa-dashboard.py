@@ -128,6 +128,13 @@ def read_smoke(root: Path) -> dict[str, int]:
     }
 
 
+def read_qa_run_summary(root: Path) -> dict:
+    path = root / "artifacts/qa-run-summary.json"
+    if not path.is_file():
+        return {}
+    return json.loads(path.read_text())
+
+
 def read_load_levels(root: Path) -> list[dict[str, int | str]]:
     rows: list[dict[str, int | str]] = []
     for summary_path in sorted(root.glob("artifacts/postman/load-*users/summary.json")):
@@ -171,7 +178,16 @@ def apply_metrics(html: str, root: Path) -> str:
         f'<p class="muted">Hosted UAT reports refreshed on {now_ist.strftime("%Y-%m-%d")}.</p>',
     )
 
+    qa = read_qa_run_summary(root)
     fe = read_frontend_coverage(root)
+    if not fe and qa.get("frontendCoverage"):
+        fc = qa["frontendCoverage"]
+        fe = {
+            "statements": float(fc.get("statements") or 0),
+            "branches": float(fc.get("branches") or 0),
+            "functions": float(fc.get("functions") or 0),
+            "lines": float(fc.get("lines") or 0),
+        }
     if fe:
         html = replace_once(html, r"97\.9% statements, 93\.81% branches, 99\.6% functions, 99\.62% lines\.", f"{pct(fe['statements'])} statements, {pct(fe['branches'])} branches, {pct(fe['functions'])} functions, {pct(fe['lines'])} lines.")
         html = replace_once(html, r"<span class=\"value\">97\.9%</span>", f'<span class="value">{pct(fe["statements"])}</span>', )
@@ -181,6 +197,11 @@ def apply_metrics(html: str, root: Path) -> str:
         html = replace_once(html, r"97\.9% statements / 99\.62% lines", f"{pct(fe['statements'])} statements / {pct(fe['lines'])} lines")
 
     be = read_backend_jacoco(root)
+    if not be and qa.get("backendCoverage"):
+        bc = qa["backendCoverage"]
+        instr = float(bc.get("instruction") or 0)
+        branch = float(bc.get("branch") or 0)
+        be = {"instruction": instr, "branch": branch}
     if be:
         instr = float(be.get("instruction") or 0)
         branch = float(be.get("branch") or 0)
@@ -215,6 +236,15 @@ def apply_metrics(html: str, root: Path) -> str:
         )
 
     tests = count_surefire_tests(root)
+    if not tests.get("tests") and qa.get("backendUnitTests"):
+        bu = qa["backendUnitTests"]
+        tests = {
+            "tests": int(bu.get("total") or 0),
+            "failures": int(bu.get("failed") or 0),
+            "errors": int(bu.get("errors") or 0),
+            "skipped": int(bu.get("skipped") or 0),
+        }
+        tests["passed"] = tests["tests"] - tests["failures"] - tests["errors"] - tests["skipped"]
     if tests.get("tests"):
         html = replace_once(html, r"2,024 tests executed, 0 failures, 0 errors, 1 skipped, Maven BUILD SUCCESS\.", f"{tests['tests']:,} tests executed, {tests['failures']} failures, {tests['errors']} errors, {tests['skipped']} skipped, Maven BUILD SUCCESS.")
         html = replace_once(html, r"<span class=\"value\">2,024</span>", f'<span class="value">{tests["tests"]:,}</span>')

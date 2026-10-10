@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-export API_TEST_BASE_URL="${API_TEST_BASE_URL:-https://minisnmore.com}"
+export API_TEST_BASE_URL="${API_TEST_BASE_URL:-https://uat.minisnmore.com}"
 export API_LIFECYCLE_REPORT="${API_LIFECYCLE_REPORT:-artifacts/api-tests/lifecycle-report.json}"
 export API_LIFECYCLE_ALLOW_FAILURES="${API_LIFECYCLE_ALLOW_FAILURES:-false}"
 

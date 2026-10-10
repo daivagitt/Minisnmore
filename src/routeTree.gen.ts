@@ -65,6 +65,7 @@ import { Route as AdminRbacRouteImport } from './routes/admin.rbac'
 import { Route as AdminProductsRouteImport } from './routes/admin.products'
 import { Route as AdminPoliciesRouteImport } from './routes/admin.policies'
 import { Route as AdminPagesRouteImport } from './routes/admin.pages'
+import { Route as AdminPackageTypesRouteImport } from './routes/admin.package-types'
 import { Route as AdminOrdersRouteImport } from './routes/admin.orders'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminInvoicesRouteImport } from './routes/admin.invoices'
@@ -383,6 +384,11 @@ const AdminPagesRoute = AdminPagesRouteImport.update({
   path: '/pages',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminPackageTypesRoute = AdminPackageTypesRouteImport.update({
+  id: '/package-types',
+  path: '/package-types',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminOrdersRoute = AdminOrdersRouteImport.update({
   id: '/orders',
   path: '/orders',
@@ -608,6 +614,7 @@ export interface FileRoutesByFullPath {
   '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/orders': typeof AdminOrdersRoute
+  '/admin/package-types': typeof AdminPackageTypesRoute
   '/admin/pages': typeof AdminPagesRoute
   '/admin/policies': typeof AdminPoliciesRoute
   '/admin/products': typeof AdminProductsRoute
@@ -695,6 +702,7 @@ export interface FileRoutesByTo {
   '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/orders': typeof AdminOrdersRoute
+  '/admin/package-types': typeof AdminPackageTypesRoute
   '/admin/pages': typeof AdminPagesRoute
   '/admin/policies': typeof AdminPoliciesRoute
   '/admin/products': typeof AdminProductsRoute
@@ -787,6 +795,7 @@ export interface FileRoutesById {
   '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/orders': typeof AdminOrdersRoute
+  '/admin/package-types': typeof AdminPackageTypesRoute
   '/admin/pages': typeof AdminPagesRoute
   '/admin/policies': typeof AdminPoliciesRoute
   '/admin/products': typeof AdminProductsRoute
@@ -880,6 +889,7 @@ export interface FileRouteTypes {
     | '/admin/invoices'
     | '/admin/login'
     | '/admin/orders'
+    | '/admin/package-types'
     | '/admin/pages'
     | '/admin/policies'
     | '/admin/products'
@@ -967,6 +977,7 @@ export interface FileRouteTypes {
     | '/admin/invoices'
     | '/admin/login'
     | '/admin/orders'
+    | '/admin/package-types'
     | '/admin/pages'
     | '/admin/policies'
     | '/admin/products'
@@ -1058,6 +1069,7 @@ export interface FileRouteTypes {
     | '/admin/invoices'
     | '/admin/login'
     | '/admin/orders'
+    | '/admin/package-types'
     | '/admin/pages'
     | '/admin/policies'
     | '/admin/products'
@@ -1523,6 +1535,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPagesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/package-types': {
+      id: '/admin/package-types'
+      path: '/package-types'
+      fullPath: '/admin/package-types'
+      preLoaderRoute: typeof AdminPackageTypesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/orders': {
       id: '/admin/orders'
       path: '/orders'
@@ -1822,6 +1841,7 @@ interface AdminRouteChildren {
   AdminInvoicesRoute: typeof AdminInvoicesRoute
   AdminLoginRoute: typeof AdminLoginRoute
   AdminOrdersRoute: typeof AdminOrdersRoute
+  AdminPackageTypesRoute: typeof AdminPackageTypesRoute
   AdminPagesRoute: typeof AdminPagesRoute
   AdminPoliciesRoute: typeof AdminPoliciesRoute
   AdminProductsRoute: typeof AdminProductsRoute
@@ -1852,6 +1872,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminInvoicesRoute: AdminInvoicesRoute,
   AdminLoginRoute: AdminLoginRoute,
   AdminOrdersRoute: AdminOrdersRoute,
+  AdminPackageTypesRoute: AdminPackageTypesRoute,
   AdminPagesRoute: AdminPagesRoute,
   AdminPoliciesRoute: AdminPoliciesRoute,
   AdminProductsRoute: AdminProductsRoute,

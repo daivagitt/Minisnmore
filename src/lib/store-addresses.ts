@@ -27,7 +27,7 @@ export type StoreAddressRow = {
   state: string;
   pincode: string;
   country: string;
-  usage: StoreAddressUsage;
+  usages: StoreAddressUsage[];
   is_default: boolean;
 };
 
@@ -42,9 +42,16 @@ type StoreAddressDto = {
   state: string;
   pincode: string;
   country?: string | null;
-  usage: "SHIPMENT" | "NORMAL" | "INVOICE";
+  usages?: Array<"SHIPMENT" | "NORMAL" | "INVOICE"> | null;
+  usage?: "SHIPMENT" | "NORMAL" | "INVOICE" | null;
   isDefault?: boolean | null;
   is_default?: boolean | null;
+};
+
+const API_USAGE: Record<StoreAddressUsage, "SHIPMENT" | "NORMAL" | "INVOICE"> = {
+  shipment: "SHIPMENT",
+  normal: "NORMAL",
+  invoice: "INVOICE",
 };
 
 export const emptyStoreAddress = (): StoreAddressRow => ({
@@ -57,7 +64,7 @@ export const emptyStoreAddress = (): StoreAddressRow => ({
   state: "",
   pincode: "",
   country: "India",
-  usage: "normal",
+  usages: [],
   is_default: false,
 });
 
@@ -65,8 +72,19 @@ export function isStoreAddressUsage(value: string): value is StoreAddressUsage {
   return (STORE_ADDRESS_USAGES as readonly string[]).includes(value);
 }
 
+function normalizeUsages(dto: StoreAddressDto): StoreAddressUsage[] {
+  const raw = Array.isArray(dto.usages) && dto.usages.length ? dto.usages : dto.usage ? [dto.usage] : [];
+  const seen = new Set<StoreAddressUsage>();
+  for (const item of raw) {
+    const usage = String(item ?? "").toLowerCase();
+    if (isStoreAddressUsage(usage)) {
+      seen.add(usage);
+    }
+  }
+  return STORE_ADDRESS_USAGES.filter((usage) => seen.has(usage));
+}
+
 export function fromStoreAddressDto(dto: StoreAddressDto): StoreAddressRow {
-  const usage = String(dto.usage ?? "NORMAL").toLowerCase();
   return {
     id: dto.id == null ? undefined : String(dto.id),
     label: dto.label ?? "",
@@ -78,13 +96,12 @@ export function fromStoreAddressDto(dto: StoreAddressDto): StoreAddressRow {
     state: dto.state ?? "",
     pincode: dto.pincode ?? "",
     country: dto.country?.trim() || "India",
-    usage: isStoreAddressUsage(usage) ? usage : "normal",
+    usages: normalizeUsages(dto),
     is_default: !!(dto.isDefault ?? dto.is_default),
   };
 }
 
 export function toStoreAddressDto(row: StoreAddressRow): StoreAddressDto {
-  const usage = row.usage === "shipment" ? "SHIPMENT" : row.usage === "invoice" ? "INVOICE" : "NORMAL";
   return {
     id: row.id ? Number(row.id) : undefined,
     label: row.label.trim() || null,
@@ -96,15 +113,15 @@ export function toStoreAddressDto(row: StoreAddressRow): StoreAddressDto {
     state: row.state.trim(),
     pincode: normalizePincode(row.pincode),
     country: row.country.trim() || "India",
-    usage,
+    usages: row.usages.map((usage) => API_USAGE[usage]),
     isDefault: !!row.is_default,
   };
 }
 
 export function getStoreAddressValidationErrors(row: StoreAddressRow): string[] {
   const errors: string[] = [];
-  if (!isStoreAddressUsage(row.usage)) {
-    errors.push("Choose whether this is shown as shipment, normal address, or invoice.");
+  if (!row.usages.length) {
+    errors.push("Choose at least one: shipment, normal address, or invoice.");
   }
   const fieldErrors = validateAddressForm({
     label: row.label || "Address",
@@ -139,7 +156,7 @@ export const saveStoreAddress = async (row: StoreAddressRow) => {
       pincode: row.pincode,
     }),
     label: row.label.trim(),
-    usage: row.usage,
+    usages: row.usages,
     is_default: row.is_default,
   };
   const errors = getStoreAddressValidationErrors(normalized);

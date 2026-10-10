@@ -115,4 +115,11 @@
     <include file="config/liquibase/changelog/20261002190000_add_order_return_outbound_package_fields.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20261002210000_add_order_return_carrier_status.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20261007120000_added_entity_StoreAddress.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20261007140000_add_product_zoho_image_docs_json.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20261008120000_added_entity_PackageBox.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20261008140000_add_package_type_weight_and_order_link.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20261009120000_store_address_multi_usage.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20261009140000_store_address_default_per_usage_trigger.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20261009150000_add_banner_eyebrow.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20261009160000_add_banner_trust_labels.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>

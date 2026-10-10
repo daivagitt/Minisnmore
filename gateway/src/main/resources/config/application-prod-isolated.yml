@@ -66,7 +66,7 @@ spring:
             - id: miniandmore-commerce-api
               uri: http://127.0.0.1:9182
               predicates:
-                - Path=/api/v1/orders/**,/api/v1/account/**,/api/v1/payments,/api/v1/coupons/**,/api/v1/order-returns/**,/api/v1/admin/order-returns/**
+                - Path=/api/v1/orders/**,/api/v1/account/**,/api/v1/payments,/api/v1/coupons/**,/api/v1/order-returns/**,/api/v1/admin/order-returns/**,/api/v1/admin/orders,/api/v1/admin/orders/**,/api/v1/admin/cancellation-requests,/api/v1/admin/cancellation-requests/**
             - id: miniandmore-store-api
               uri: http://127.0.0.1:9181
               predicates:

@@ -1,32 +1,16 @@
 import { useEffect, useState } from "react";
 import { listBanners } from "@/lib/backend-data";
 import { broadcastStorefrontInvalidation } from "@/lib/storefront-cache-broadcast";
+import { mapBannerRowsToHomeBanners, type HomeBanner } from "@/lib/home-banners";
 
-export type HomeBanner = {
-  id: string;
-  title: string;
-  subtitle: string | null;
-  image_url: string | null;
-  link_url: string | null;
-  cta_label: string | null;
-};
+export type { HomeBanner };
 
 let cache: HomeBanner[] | null = null;
 let inflight: Promise<HomeBanner[]> | null = null;
 const subs = new Set<(b: HomeBanner[]) => void>();
 
 function mapRows(rows: Awaited<ReturnType<typeof listBanners>>): HomeBanner[] {
-  return rows
-    .filter((b) => b.active)
-    .slice(0, 6)
-    .map((b) => ({
-      id: b.id,
-      title: b.title,
-      subtitle: b.subtitle,
-      image_url: b.image_url,
-      link_url: b.link_url,
-      cta_label: b.cta_label,
-    }));
+  return mapBannerRowsToHomeBanners(rows);
 }
 
 async function load(): Promise<HomeBanner[]> {

@@ -16,6 +16,10 @@ if [ -f coverage/frontend/junit.xml ]; then
     --output "$package_dir/frontend/unit-tests/index.html" \
     --title "Frontend unit tests" \
     --coverage-href "../coverage-summary/index.html"
+  mkdir -p "$package_dir/frontend/unit-tests/scenarios"
+  python3 jenkins/scripts/generate-frontend-unit-scenario-report.py \
+    --input coverage/frontend/junit.xml \
+    --output-dir "$package_dir/frontend/unit-tests/scenarios"
 fi
 
 JAVA_MODULES=(

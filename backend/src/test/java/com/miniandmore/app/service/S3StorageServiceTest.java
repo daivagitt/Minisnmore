@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -656,5 +657,130 @@ class S3StorageServiceTest {
         assertThatThrownBy(() -> s3StorageService.uploadCataloguePdf("catalogue.pdf", new java.io.ByteArrayInputStream(big), 10_000_000L))
             .isInstanceOf(ResponseStatusException.class)
             .hasMessageContaining("too large");
+    }
+
+    @Test
+    void uploadInvoicePdf_nullFilename_defaultsSafeName() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+        byte[] pdfBytes = "%PDF-1.4".getBytes();
+
+        String url = s3StorageService.uploadInvoicePdf(null, pdfBytes);
+
+        assertThat(url).contains("invoice.pdf");
+        verify(mockClient).putObject(any(PutObjectRequest.class), any(RequestBody.class));
+    }
+
+    @Test
+    void ensureImageDerivativesFromPublicUrl_existingObject_generatesDerivatives() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+        byte[] png = createMinimalPng();
+        when(mockClient.getObjectAsBytes(any(software.amazon.awssdk.services.s3.model.GetObjectRequest.class)))
+            .thenReturn(
+                software.amazon.awssdk.core.ResponseBytes.fromByteArray(
+                    software.amazon.awssdk.services.s3.model.GetObjectResponse.builder().build(),
+                    png
+                )
+            );
+
+        s3StorageService.ensureImageDerivativesFromPublicUrl("https://cdn.example.com/my-bucket/products/photo.png");
+
+        verify(mockClient, times(2)).putObject(any(PutObjectRequest.class), any(RequestBody.class));
+    }
+
+    @Test
+    void publicBaseUrl_returnsConfiguredCdnBase() {
+        assertThat(s3StorageService.publicBaseUrl()).isEqualTo("https://cdn.example.com/my-bucket");
+    }
+
+    @Test
+    void getObjectBytes_blankKey_returnsEmptyWithoutCallingS3() {
+        assertThat(s3StorageService.getObjectBytes("  ")).isEmpty();
+    }
+
+    @Test
+    void ensureImageDerivatives_blankKeyOrEmptyBytes_isNoOp() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+        s3StorageService.ensureImageDerivatives(" ", new byte[] { 1 });
+        s3StorageService.ensureImageDerivatives("products/x.jpg", new byte[0]);
+        verify(mockClient, never()).putObject(any(PutObjectRequest.class), any(RequestBody.class));
+    }
+
+    @Test
+    void getObjectBytes_oversizedImage_throwsBadRequest() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+        byte[] huge = new byte[(int) com.miniandmore.app.service.ImagePreviewSupport.MAX_SOURCE_BYTES + 1];
+        when(mockClient.getObjectAsBytes(any(software.amazon.awssdk.services.s3.model.GetObjectRequest.class)))
+            .thenReturn(
+                software.amazon.awssdk.core.ResponseBytes.fromByteArray(
+                    software.amazon.awssdk.services.s3.model.GetObjectResponse.builder().build(),
+                    huge
+                )
+            );
+
+        assertThatThrownBy(() -> s3StorageService.getObjectBytes("products/huge.jpg"))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("too large");
+    }
+
+    @Test
+    void ensureImageDerivativesFromPublicUrl_missingObject_throwsNotFound() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+        when(mockClient.getObjectAsBytes(any(software.amazon.awssdk.services.s3.model.GetObjectRequest.class)))
+            .thenThrow(software.amazon.awssdk.services.s3.model.NoSuchKeyException.builder().message("missing").build());
+
+        assertThatThrownBy(() ->
+            s3StorageService.ensureImageDerivativesFromPublicUrl("https://cdn.example.com/my-bucket/products/missing.png")
+        )
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(ex -> ((ResponseStatusException) ex).getStatusCode().value())
+            .isEqualTo(404);
+    }
+
+    @Test
+    void getObjectBytes_s3Failure_wrapsBadGateway() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+        when(mockClient.getObjectAsBytes(any(software.amazon.awssdk.services.s3.model.GetObjectRequest.class)))
+            .thenThrow(
+                software.amazon.awssdk.services.s3.model.S3Exception.builder().statusCode(503).message("upstream").build()
+            );
+
+        assertThatThrownBy(() -> s3StorageService.getObjectBytes("products/down.jpg"))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Could not read stored image");
+    }
+
+    @Test
+    void putPublicImage_uploadFailure_wrapsStorageException() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+        doThrow(new RuntimeException("network")).when(mockClient).putObject(any(PutObjectRequest.class), any(RequestBody.class));
+
+        assertThatThrownBy(() -> s3StorageService.putPublicImage("products/x.jpg", new byte[] { 1, 2, 3 }))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Upload to storage failed");
+    }
+
+    @Test
+    void uploadCataloguePdf_nullByteArray_usesEmptyStreamPath() {
+        assertThatThrownBy(() -> s3StorageService.uploadCataloguePdf("catalogue.pdf", (byte[]) null))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Catalogue PDF is empty");
+    }
+
+    private static byte[] createMinimalPng() {
+        java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(4, 4, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        try {
+            javax.imageio.ImageIO.write(image, "png", out);
+        } catch (java.io.IOException e) {
+            throw new RuntimeException(e);
+        }
+        return out.toByteArray();
     }
 }

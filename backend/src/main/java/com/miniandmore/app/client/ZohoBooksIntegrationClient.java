@@ -65,6 +65,23 @@ public class ZohoBooksIntegrationClient {
         return syncService.createCreditNote(orderId, returnNumber, returnedQtyByOrderItemId, linkToSourceInvoice);
     }
 
+    public void applyCreditNoteToInvoice(String creditNoteId, String invoiceId) {
+        syncService.applyCreditNoteToInvoice(creditNoteId, invoiceId);
+    }
+
+    public Optional<String> attachCreditNoteToSourceInvoice(
+        Long orderId,
+        String returnNumber,
+        String creditNoteId,
+        Map<Long, Integer> returnedQtyByOrderItemId
+    ) {
+        return syncService.attachCreditNoteToSourceInvoice(orderId, returnNumber, creditNoteId, returnedQtyByOrderItemId);
+    }
+
+    public void refundOpenCreditNoteBalance(String creditNoteId, String referenceNumber) {
+        syncService.refundOpenCreditNoteBalance(creditNoteId, referenceNumber);
+    }
+
     /** Overload kept for parity with {@code LedgerlyIntegrationClient}; amount is currently unused by Zoho credit notes. */
     public Optional<String> createCreditNote(Long orderId, String returnNumber, BigDecimal amount) {
         return syncService.createCreditNote(orderId, returnNumber);

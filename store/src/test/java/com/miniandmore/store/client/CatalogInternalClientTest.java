@@ -89,4 +89,38 @@ class CatalogInternalClientTest {
             server.verify();
         }
     }
+
+    @Test
+    void get_forwardsAuthorizationHeader() {
+        try (MockedStatic<SecurityUtils> security = mockStatic(SecurityUtils.class)) {
+            security.when(SecurityUtils::currentBearerToken).thenReturn("Bearer token-abc");
+            server
+                .expect(requestTo("http://catalog.test/internal/v1/admin/products"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer token-abc"))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+
+            ResponseEntity<String> response = client.get("/internal/v1/admin/products");
+
+            assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+            assertThat(response.getBody()).isEqualTo("[]");
+            server.verify();
+        }
+    }
+
+    @Test
+    void post_forwardsAuthorizationHeader() {
+        try (MockedStatic<SecurityUtils> security = mockStatic(SecurityUtils.class)) {
+            security.when(SecurityUtils::currentBearerToken).thenReturn("Bearer token-abc");
+            server
+                .expect(requestTo("http://catalog.test/internal/v1/admin/ledgerly/pull-inventory"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer token-abc"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+            ResponseEntity<String> response = client.post("/internal/v1/admin/ledgerly/pull-inventory", Map.of());
+            assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+            server.verify();
+        }
+    }
 }

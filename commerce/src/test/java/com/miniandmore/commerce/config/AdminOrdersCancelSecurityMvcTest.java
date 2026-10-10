@@ -50,7 +50,10 @@ class AdminOrdersCancelSecurityMvcTest {
     private CatalogInternalClient catalog;
 
     @Test
-    void cancelOrder_operationsRoleIsForbidden() throws Exception {
+    void cancelOrder_operationsRoleIsAllowed() throws Exception {
+        when(catalog.post(eq("/internal/v1/admin/orders/MNM-1/cancel"), any()))
+            .thenReturn(ResponseEntity.ok("{\"order\":{\"order_number\":\"MNM-1\"}}"));
+
         mockMvc
             .perform(
                 post("/api/v1/admin/orders/MNM-1/cancel")
@@ -58,7 +61,7 @@ class AdminOrdersCancelSecurityMvcTest {
                     .contentType("application/json")
                     .content("{\"reason\":\"Item is out of stock now\"}")
             )
-            .andExpect(status().isForbidden());
+            .andExpect(status().isOk());
     }
 
     @Test

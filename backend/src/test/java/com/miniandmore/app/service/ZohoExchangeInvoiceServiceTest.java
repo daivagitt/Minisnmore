@@ -111,4 +111,14 @@ class ZohoExchangeInvoiceServiceTest {
 
         assertThat(invoiceId).contains("inv-recovered");
     }
+
+    @Test
+    void returnNumberFromInvoiceReference_stripsExinvPrefix() {
+        assertThat(ZohoExchangeInvoiceService.returnNumberFromInvoiceReference("EXINV-RET-MNM-10AF633829D6-1749F0"))
+            .isEqualTo("RET-MNM-10AF633829D6-1749F0");
+        assertThat(ZohoExchangeInvoiceService.returnNumberFromInvoiceReference("exinv-RET-1")).isEqualTo("RET-1");
+        assertThat(ZohoExchangeInvoiceService.returnNumberFromInvoiceReference("MNM-10AF633829D6")).isNull();
+        assertThat(ZohoExchangeInvoiceService.returnNumberFromInvoiceReference("EXINV-")).isNull();
+        assertThat(ZohoExchangeInvoiceService.returnNumberFromInvoiceReference(null)).isNull();
+    }
 }

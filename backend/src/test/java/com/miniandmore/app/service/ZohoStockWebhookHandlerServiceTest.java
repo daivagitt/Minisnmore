@@ -3,6 +3,7 @@ package com.miniandmore.app.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -115,5 +116,81 @@ class ZohoStockWebhookHandlerServiceTest {
         assertThatThrownBy(() -> handler.handle(body, WebhookTestSupport.hmacSha256Hex(SECRET, body)))
             .isInstanceOf(ResponseStatusException.class)
             .hasMessageContaining("Missing or invalid stock");
+    }
+
+    @Test
+    void handle_negativeStock_throwsBadRequest() {
+        String body = "{\"eventId\":\"evt-neg\",\"sku\":\"SKU-NEG\",\"stock\":-2}";
+
+        assertThatThrownBy(() -> handler.handle(body, WebhookTestSupport.hmacSha256Hex(SECRET, body)))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Negative Zoho stock (-2)");
+
+        verify(stockReconcileService, never()).reconcileStockFromWebhook(any(), any(), anyInt());
+        verify(webhookEventRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void handle_snakeCaseEventId_isAccepted() {
+        String body = "{\"event_id\":\"evt-snake\",\"sku\":\"SKU-SNAKE\",\"stock\":4}";
+        when(webhookEventRepository.existsByEventId("evt-snake")).thenReturn(false);
+        when(stockReconcileService.reconcileStockFromWebhook("SKU-SNAKE", null, 4)).thenReturn(Map.of("ok", true));
+
+        Map<String, Object> result = handler.handle(body, WebhookTestSupport.hmacSha256Hex(SECRET, body));
+
+        assertThat(result).containsEntry("ok", true);
+    }
+
+    @Test
+    void handle_missingEventId_throwsBadRequest() {
+        String body = "{\"sku\":\"SKU-7\",\"stock\":1}";
+
+        assertThatThrownBy(() -> handler.handle(body, WebhookTestSupport.hmacSha256Hex(SECRET, body)))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Missing eventId");
+    }
+
+    @Test
+    void handle_missingSkuAndProductId_throwsBadRequest() {
+        String body = "{\"eventId\":\"evt-8\",\"stock\":2}";
+
+        assertThatThrownBy(() -> handler.handle(body, WebhookTestSupport.hmacSha256Hex(SECRET, body)))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Provide sku or productId");
+    }
+
+    @Test
+    void handle_invalidProductId_throwsBadRequest() {
+        String body = "{\"eventId\":\"evt-9\",\"productId\":\"not-a-number\",\"stock\":2}";
+
+        assertThatThrownBy(() -> handler.handle(body, WebhookTestSupport.hmacSha256Hex(SECRET, body)))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Invalid productId");
+    }
+
+    @Test
+    void handle_raceOnInsert_returnsDuplicateResult() {
+        String body = "{\"eventId\":\"evt-race\",\"sku\":\"SKU-RACE\",\"stock\":1}";
+        when(webhookEventRepository.existsByEventId("evt-race")).thenReturn(false);
+        org.mockito.Mockito
+            .doThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate"))
+            .when(webhookEventRepository)
+            .saveAndFlush(any());
+
+        Map<String, Object> result = handler.handle(body, WebhookTestSupport.hmacSha256Hex(SECRET, body));
+
+        assertThat(result).containsEntry("duplicate", true);
+        verify(stockReconcileService, never()).reconcileStockFromWebhook(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.nullable(Long.class), org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    @Test
+    void handle_reconcileByProductId_passesNumericId() {
+        String body = "{\"eventId\":\"evt-pid\",\"product_id\":42,\"stock\":9}";
+        when(webhookEventRepository.existsByEventId("evt-pid")).thenReturn(false);
+        when(stockReconcileService.reconcileStockFromWebhook(null, 42L, 9)).thenReturn(Map.of("ok", true));
+
+        handler.handle(body, WebhookTestSupport.hmacSha256Hex(SECRET, body));
+
+        verify(stockReconcileService).reconcileStockFromWebhook(null, 42L, 9);
     }
 }

@@ -34,9 +34,10 @@ import {
   sizesForDisplay,
 } from "@/lib/product-variants";
 import { StockAvailability, stockAvailabilityState } from "@/components/StockAvailability";
+import { maxPurchasableQty } from "@/lib/purchasable-qty";
 import { VariantColorButtons, VariantSizeButtons, variantColorsForDisplay } from "@/components/VariantPickers";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
-import { commerceFromSiteSettings } from "@/lib/commerce";
+import { commerceFromSiteSettings, freeShippingStorefrontLabels } from "@/lib/commerce";
 import { sizeNoteForSelection } from "@/lib/product-size-notes";
 import { SizeFeatureNote } from "@/components/SizeFeatureNote";
 import { productDetailsKicker } from "@/lib/product-details-kicker";
@@ -73,7 +74,7 @@ function ProductPage() {
   const settings = useSiteSettings();
   const { byKey, isEnabled, titleFor, subtitleFor } = useHomeSections();
   const commerce = commerceFromSiteSettings(settings);
-  const freeShippingMinLabel = commerce.freeShippingMinInr.toLocaleString("en-IN");
+  const freeShippingLabels = freeShippingStorefrontLabels(commerce.freeShippingMinInr);
   const defaults = product ? defaultSellableSelection(product) : { size: null as string | null, color: null as string | null };
   const [size, setSize] = useState<string | null>(() => defaults.size);
   const [color, setColor] = useState<string | null>(() => defaults.color);
@@ -123,6 +124,16 @@ function ProductPage() {
     () => (product ? stockAvailabilityState(product, selectedVariant, { size, color }) : null),
     [product, selectedVariant, size, color],
   );
+  const maxQty = useMemo(
+    () =>
+      product
+        ? maxPurchasableQty(product, { size, color, sku: selectedVariant?.sku })
+        : 1,
+    [product, size, color, selectedVariant],
+  );
+  useEffect(() => {
+    setQty((q) => clampQuantity(q, maxQty));
+  }, [maxQty]);
   const stockIsSoldOut = stockState?.kind === "out_of_stock";
   const soldOutMessage = !stockIsSoldOut
     ? null
@@ -240,7 +251,7 @@ function ProductPage() {
     addToCart(product, {
       size: size ?? product.sizes[0],
       color: color ?? product.colors[0]?.name,
-      qty,
+      qty: clampQuantity(qty, maxQty),
       variantSku: selectedVariant?.sku,
     });
   };
@@ -277,8 +288,8 @@ function ProductPage() {
     { i: Banknote, t: "COD" },
     {
       i: Truck,
-      t: `Free ₹${freeShippingMinLabel}+`,
-      title: `Free shipping order above ${freeShippingMinLabel}`,
+      t: freeShippingLabels.pdpShort,
+      title: freeShippingLabels.pdpTitle,
     },
     ...(SHOW_M2_POST_ORDER_UI
       ? [
@@ -394,14 +405,27 @@ function ProductPage() {
           <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-3 sm:items-start">
             <div>
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Quantity</div>
-              <div className="glass rounded-full inline-flex items-center">
-                <button type="button" onClick={() => setQty((q) => clampQuantity(q - 1))}
-                  className="h-10 w-10 grid place-items-center" aria-label="Decrease quantity">
+              <div
+                className={`glass rounded-full inline-flex items-center ${!canAdd || maxQty < 1 ? "opacity-50 pointer-events-none" : ""}`}
+                aria-disabled={!canAdd || maxQty < 1}
+              >
+                <button
+                  type="button"
+                  onClick={() => setQty((q) => clampQuantity(q - 1, maxQty))}
+                  disabled={!canAdd || maxQty < 1 || qty <= 1}
+                  className="h-10 w-10 grid place-items-center disabled:opacity-30"
+                  aria-label="Decrease quantity"
+                >
                   <Minus className="h-4 w-4" />
                 </button>
-                <span className="w-8 text-center text-sm font-medium tabular-nums">{qty}</span>
-                <button type="button" onClick={() => setQty((q) => clampQuantity(q + 1))}
-                  className="h-10 w-10 grid place-items-center" aria-label="Increase quantity">
+                <span className="w-8 text-center text-sm font-medium tabular-nums">{canAdd && maxQty >= 1 ? qty : 0}</span>
+                <button
+                  type="button"
+                  onClick={() => setQty((q) => clampQuantity(q + 1, maxQty))}
+                  disabled={!canAdd || maxQty < 1 || qty >= maxQty}
+                  className="h-10 w-10 grid place-items-center disabled:opacity-30"
+                  aria-label="Increase quantity"
+                >
                   <Plus className="h-4 w-4" />
                 </button>
               </div>

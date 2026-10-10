@@ -116,7 +116,7 @@ function AdminAddressesPage() {
     <AdminPage
       eyebrow="Company"
       title="Addresses"
-      description="Add company-wide addresses and choose whether each one is shown as a shipment address, a normal address, or an invoice address. Mark one default per type."
+      description="Add a company address once, then check which roles it fills (shipment, normal, invoice). Mark it as default for those selected roles."
       action={
         <button
           type="button"
@@ -138,20 +138,36 @@ function AdminAddressesPage() {
           ) : null}
           {rows.map((row) => (
             <article key={row.clientKey} className="glass-strong rounded-3xl p-5 space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <Field label="Show as" required>
-                  <select
-                    className={inputCls()}
-                    value={row.usage}
-                    onChange={(event) => update(row.clientKey, { usage: event.target.value as StoreAddressUsage })}
-                  >
-                    {STORE_ADDRESS_USAGES.map((usage) => (
-                      <option key={usage} value={usage}>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">
+                  Show as <span className="text-destructive">*</span>
+                </p>
+                <div className="flex flex-wrap gap-4">
+                  {STORE_ADDRESS_USAGES.map((usage) => {
+                    const checked = row.usages.includes(usage);
+                    return (
+                      <label key={usage} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(event) => {
+                            const next = event.target.checked
+                              ? [...row.usages, usage]
+                              : row.usages.filter((item) => item !== usage);
+                            const usages = STORE_ADDRESS_USAGES.filter((item) => next.includes(item));
+                            update(row.clientKey, {
+                              usages,
+                              ...(usages.length === 0 ? { is_default: false } : {}),
+                            });
+                          }}
+                        />
                         {STORE_ADDRESS_USAGE_LABELS[usage]}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <Field label="Label">
                   <input
                     className={inputCls()}
@@ -220,7 +236,7 @@ function AdminAddressesPage() {
                   checked={row.is_default}
                   onChange={(event) => update(row.clientKey, { is_default: event.target.checked })}
                 />
-                Default {STORE_ADDRESS_USAGE_LABELS[row.usage].toLowerCase()}
+                Default for selected types
               </label>
               <div className="flex flex-wrap gap-2">
                 <button

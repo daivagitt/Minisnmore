@@ -1,20 +1,20 @@
 {
-  "startedAt": "2026-10-07T07:03:07.010349+00:00",
-  "finishedAt": "2026-10-07T07:03:08.335648+00:00",
+  "startedAt": "2026-10-07T11:28:23.537253+00:00",
+  "finishedAt": "2026-10-07T11:28:24.834636+00:00",
   "sourceRoot": "/var/www/uat1/mini_ms_test/src",
-  "screenCount": 80,
+  "screenCount": 90,
   "summary": {
-    "total": 992,
-    "passed": 992,
+    "total": 1122,
+    "passed": 1122,
     "failed": 0,
     "positive": {
-      "total": 696,
-      "passed": 696,
+      "total": 786,
+      "passed": 786,
       "failed": 0
     },
     "negative": {
-      "total": 296,
-      "passed": 296,
+      "total": 336,
+      "passed": 336,
       "failed": 0
     },
     "screens": {
@@ -1314,10 +1314,82 @@
         "passed": 13,
         "failed": 0
       },
+      "Operations::/operations/cancellations": {
+        "module": "Operations",
+        "screen": "Cancellations",
+        "path": "/operations/cancellations",
+        "positive": {
+          "total": 9,
+          "passed": 9,
+          "failed": 0
+        },
+        "negative": {
+          "total": 4,
+          "passed": 4,
+          "failed": 0
+        },
+        "total": 13,
+        "passed": 13,
+        "failed": 0
+      },
+      "Operations::/operations/contact-messages": {
+        "module": "Operations",
+        "screen": "Contact messages",
+        "path": "/operations/contact-messages",
+        "positive": {
+          "total": 9,
+          "passed": 9,
+          "failed": 0
+        },
+        "negative": {
+          "total": 4,
+          "passed": 4,
+          "failed": 0
+        },
+        "total": 13,
+        "passed": 13,
+        "failed": 0
+      },
+      "Operations::/operations/customers": {
+        "module": "Operations",
+        "screen": "Customers",
+        "path": "/operations/customers",
+        "positive": {
+          "total": 9,
+          "passed": 9,
+          "failed": 0
+        },
+        "negative": {
+          "total": 4,
+          "passed": 4,
+          "failed": 0
+        },
+        "total": 13,
+        "passed": 13,
+        "failed": 0
+      },
       "Operations::/operations/dashboard": {
         "module": "Operations",
         "screen": "Operations Dashboard",
         "path": "/operations/dashboard",
+        "positive": {
+          "total": 9,
+          "passed": 9,
+          "failed": 0
+        },
+        "negative": {
+          "total": 4,
+          "passed": 4,
+          "failed": 0
+        },
+        "total": 13,
+        "passed": 13,
+        "failed": 0
+      },
+      "Operations::/operations/invoices": {
+        "module": "Operations",
+        "screen": "Invoices",
+        "path": "/operations/invoices",
         "positive": {
           "total": 9,
           "passed": 9,
@@ -1366,6 +1438,42 @@
         },
         "total": 14,
         "passed": 14,
+        "failed": 0
+      },
+      "Operations::/operations/products": {
+        "module": "Operations",
+        "screen": "Products",
+        "path": "/operations/products",
+        "positive": {
+          "total": 9,
+          "passed": 9,
+          "failed": 0
+        },
+        "negative": {
+          "total": 4,
+          "passed": 4,
+          "failed": 0
+        },
+        "total": 13,
+        "passed": 13,
+        "failed": 0
+      },
+      "Operations::/operations/returns": {
+        "module": "Operations",
+        "screen": "Returns",
+        "path": "/operations/returns",
+        "positive": {
+          "total": 9,
+          "passed": 9,
+          "failed": 0
+        },
+        "negative": {
+          "total": 4,
+          "passed": 4,
+          "failed": 0
+        },
+        "total": 13,
+        "passed": 13,
         "failed": 0
       },
       "Sales::/sales": {
@@ -1422,6 +1530,60 @@
         "passed": 13,
         "failed": 0
       },
+      "Customer Support::/customersupport/cancellations": {
+        "module": "Customer Support",
+        "screen": "Cancellations",
+        "path": "/customersupport/cancellations",
+        "positive": {
+          "total": 9,
+          "passed": 9,
+          "failed": 0
+        },
+        "negative": {
+          "total": 4,
+          "passed": 4,
+          "failed": 0
+        },
+        "total": 13,
+        "passed": 13,
+        "failed": 0
+      },
+      "Customer Support::/customersupport/contact-messages": {
+        "module": "Customer Support",
+        "screen": "Contact messages",
+        "path": "/customersupport/contact-messages",
+        "positive": {
+          "total": 9,
+          "passed": 9,
+          "failed": 0
+        },
+        "negative": {
+          "total": 4,
+          "passed": 4,
+          "failed": 0
+        },
+        "total": 13,
+        "passed": 13,
+        "failed": 0
+      },
+      "Customer Support::/customersupport/customers": {
+        "module": "Customer Support",
+        "screen": "Customers",
+        "path": "/customersupport/customers",
+        "positive": {
+          "total": 9,
+          "passed": 9,
+          "failed": 0
+        },
+        "negative": {
+          "total": 4,
+          "passed": 4,
+          "failed": 0
+        },
+        "total": 13,
+        "passed": 13,
+        "failed": 0
+      },
       "Customer Support::/customersupport/orders": {
         "module": "Customer Support",
         "screen": "Customersupport Orders",
@@ -1456,6 +1618,24 @@
         },
         "total": 14,
         "passed": 14,
+        "failed": 0
+      },
+      "Customer Support::/customersupport/returns": {
+        "module": "Customer Support",
+        "screen": "Returns",
+        "path": "/customersupport/returns",
+        "positive": {
+          "total": 9,
+          "passed": 9,
+          "failed": 0
+        },
+        "negative": {
+          "total": 4,
+          "passed": 4,
+          "failed": 0
+        },
+        "total": 13,
+        "passed": 13,
         "failed": 0
       }
     }
@@ -17472,7 +17652,9 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/feature-flags.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/ui-errors.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
@@ -17501,7 +17683,9 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/feature-flags.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/ui-errors.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
@@ -17531,7 +17715,9 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/feature-flags.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/ui-errors.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
@@ -17560,7 +17746,9 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/feature-flags.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/ui-errors.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
@@ -17589,7 +17777,9 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/feature-flags.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/ui-errors.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
@@ -17618,7 +17808,9 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/feature-flags.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/ui-errors.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
@@ -17647,7 +17839,9 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/feature-flags.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/ui-errors.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
@@ -17676,7 +17870,9 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/feature-flags.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/ui-errors.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
@@ -17705,7 +17901,9 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/feature-flags.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/ui-errors.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
@@ -17734,7 +17932,9 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/feature-flags.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/ui-errors.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
@@ -17763,7 +17963,9 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/feature-flags.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/ui-errors.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
@@ -17792,7 +17994,9 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/feature-flags.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/ui-errors.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
@@ -17821,7 +18025,9 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/feature-flags.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/ui-errors.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
@@ -18283,6 +18489,7 @@
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
         "src/lib/contact-messages.ts",
+        "src/lib/export-table.ts",
         "src/lib/ui-errors.ts"
       ]
     },
@@ -18309,6 +18516,7 @@
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
         "src/lib/contact-messages.ts",
+        "src/lib/export-table.ts",
         "src/lib/ui-errors.ts"
       ]
     },
@@ -18336,6 +18544,7 @@
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
         "src/lib/contact-messages.ts",
+        "src/lib/export-table.ts",
         "src/lib/ui-errors.ts"
       ]
     },
@@ -18362,6 +18571,7 @@
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
         "src/lib/contact-messages.ts",
+        "src/lib/export-table.ts",
         "src/lib/ui-errors.ts"
       ]
     },
@@ -18388,6 +18598,7 @@
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
         "src/lib/contact-messages.ts",
+        "src/lib/export-table.ts",
         "src/lib/ui-errors.ts"
       ]
     },
@@ -18414,6 +18625,7 @@
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
         "src/lib/contact-messages.ts",
+        "src/lib/export-table.ts",
         "src/lib/ui-errors.ts"
       ]
     },
@@ -18440,6 +18652,7 @@
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
         "src/lib/contact-messages.ts",
+        "src/lib/export-table.ts",
         "src/lib/ui-errors.ts"
       ]
     },
@@ -18466,6 +18679,7 @@
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
         "src/lib/contact-messages.ts",
+        "src/lib/export-table.ts",
         "src/lib/ui-errors.ts"
       ]
     },
@@ -18492,6 +18706,7 @@
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
         "src/lib/contact-messages.ts",
+        "src/lib/export-table.ts",
         "src/lib/ui-errors.ts"
       ]
     },
@@ -18518,6 +18733,7 @@
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
         "src/lib/contact-messages.ts",
+        "src/lib/export-table.ts",
         "src/lib/ui-errors.ts"
       ]
     },
@@ -18544,6 +18760,7 @@
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
         "src/lib/contact-messages.ts",
+        "src/lib/export-table.ts",
         "src/lib/ui-errors.ts"
       ]
     },
@@ -18570,6 +18787,7 @@
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
         "src/lib/contact-messages.ts",
+        "src/lib/export-table.ts",
         "src/lib/ui-errors.ts"
       ]
     },
@@ -18596,6 +18814,7 @@
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
         "src/lib/contact-messages.ts",
+        "src/lib/export-table.ts",
         "src/lib/ui-errors.ts"
       ]
     },
@@ -19001,6 +19220,7 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/lib/export-table.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
         "src/lib/api.ts",
@@ -19033,6 +19253,7 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/lib/export-table.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
         "src/lib/api.ts",
@@ -19066,6 +19287,7 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/lib/export-table.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
         "src/lib/api.ts",
@@ -19098,6 +19320,7 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/lib/export-table.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
         "src/lib/api.ts",
@@ -19130,6 +19353,7 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/lib/export-table.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
         "src/lib/api.ts",
@@ -19162,6 +19386,7 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/lib/export-table.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
         "src/lib/api.ts",
@@ -19194,6 +19419,7 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/lib/export-table.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
         "src/lib/api.ts",
@@ -19226,6 +19452,7 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/lib/export-table.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
         "src/lib/api.ts",
@@ -19258,6 +19485,7 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/lib/export-table.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
         "src/lib/api.ts",
@@ -19290,6 +19518,7 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/lib/export-table.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
         "src/lib/api.ts",
@@ -19322,6 +19551,7 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/lib/export-table.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
         "src/lib/api.ts",
@@ -19354,6 +19584,7 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/lib/export-table.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
         "src/lib/api.ts",
@@ -19386,6 +19617,7 @@
         "src/routes/admin.tsx",
         "src/lib/admin-nav.ts",
         "src/components/admin/AdminPage.tsx",
+        "src/lib/export-table.ts",
         "src/components/ListPagination.tsx",
         "src/hooks/useListPagination.ts",
         "src/lib/api.ts",
@@ -24037,11 +24269,11 @@
         "src/components/admin/CreatePackageDialog.tsx",
         "src/components/admin/ReturnsSummaryCards.tsx",
         "src/components/ReturnImageGallery.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/utils.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/print-shipping-label.ts",
-        "src/lib/ui-errors.ts",
-        "src/components/ListPagination.tsx",
-        "src/hooks/useListPagination.ts"
+        "src/lib/ui-errors.ts"
       ]
     },
     {
@@ -24070,11 +24302,11 @@
         "src/components/admin/CreatePackageDialog.tsx",
         "src/components/admin/ReturnsSummaryCards.tsx",
         "src/components/ReturnImageGallery.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/utils.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/print-shipping-label.ts",
-        "src/lib/ui-errors.ts",
-        "src/components/ListPagination.tsx",
-        "src/hooks/useListPagination.ts"
+        "src/lib/ui-errors.ts"
       ]
     },
     {
@@ -24104,11 +24336,11 @@
         "src/components/admin/CreatePackageDialog.tsx",
         "src/components/admin/ReturnsSummaryCards.tsx",
         "src/components/ReturnImageGallery.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/utils.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/print-shipping-label.ts",
-        "src/lib/ui-errors.ts",
-        "src/components/ListPagination.tsx",
-        "src/hooks/useListPagination.ts"
+        "src/lib/ui-errors.ts"
       ]
     },
     {
@@ -24137,11 +24369,11 @@
         "src/components/admin/CreatePackageDialog.tsx",
         "src/components/admin/ReturnsSummaryCards.tsx",
         "src/components/ReturnImageGallery.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/utils.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/print-shipping-label.ts",
-        "src/lib/ui-errors.ts",
-        "src/components/ListPagination.tsx",
-        "src/hooks/useListPagination.ts"
+        "src/lib/ui-errors.ts"
       ]
     },
     {
@@ -24170,11 +24402,11 @@
         "src/components/admin/CreatePackageDialog.tsx",
         "src/components/admin/ReturnsSummaryCards.tsx",
         "src/components/ReturnImageGallery.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/utils.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/print-shipping-label.ts",
-        "src/lib/ui-errors.ts",
-        "src/components/ListPagination.tsx",
-        "src/hooks/useListPagination.ts"
+        "src/lib/ui-errors.ts"
       ]
     },
     {
@@ -24203,11 +24435,11 @@
         "src/components/admin/CreatePackageDialog.tsx",
         "src/components/admin/ReturnsSummaryCards.tsx",
         "src/components/ReturnImageGallery.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/utils.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/print-shipping-label.ts",
-        "src/lib/ui-errors.ts",
-        "src/components/ListPagination.tsx",
-        "src/hooks/useListPagination.ts"
+        "src/lib/ui-errors.ts"
       ]
     },
     {
@@ -24236,11 +24468,11 @@
         "src/components/admin/CreatePackageDialog.tsx",
         "src/components/admin/ReturnsSummaryCards.tsx",
         "src/components/ReturnImageGallery.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/utils.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/print-shipping-label.ts",
-        "src/lib/ui-errors.ts",
-        "src/components/ListPagination.tsx",
-        "src/hooks/useListPagination.ts"
+        "src/lib/ui-errors.ts"
       ]
     },
     {
@@ -24269,11 +24501,11 @@
         "src/components/admin/CreatePackageDialog.tsx",
         "src/components/admin/ReturnsSummaryCards.tsx",
         "src/components/ReturnImageGallery.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/utils.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/print-shipping-label.ts",
-        "src/lib/ui-errors.ts",
-        "src/components/ListPagination.tsx",
-        "src/hooks/useListPagination.ts"
+        "src/lib/ui-errors.ts"
       ]
     },
     {
@@ -24302,11 +24534,11 @@
         "src/components/admin/CreatePackageDialog.tsx",
         "src/components/admin/ReturnsSummaryCards.tsx",
         "src/components/ReturnImageGallery.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/utils.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/print-shipping-label.ts",
-        "src/lib/ui-errors.ts",
-        "src/components/ListPagination.tsx",
-        "src/hooks/useListPagination.ts"
+        "src/lib/ui-errors.ts"
       ]
     },
     {
@@ -24335,11 +24567,11 @@
         "src/components/admin/CreatePackageDialog.tsx",
         "src/components/admin/ReturnsSummaryCards.tsx",
         "src/components/ReturnImageGallery.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/utils.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/print-shipping-label.ts",
-        "src/lib/ui-errors.ts",
-        "src/components/ListPagination.tsx",
-        "src/hooks/useListPagination.ts"
+        "src/lib/ui-errors.ts"
       ]
     },
     {
@@ -24368,11 +24600,11 @@
         "src/components/admin/CreatePackageDialog.tsx",
         "src/components/admin/ReturnsSummaryCards.tsx",
         "src/components/ReturnImageGallery.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/utils.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/print-shipping-label.ts",
-        "src/lib/ui-errors.ts",
-        "src/components/ListPagination.tsx",
-        "src/hooks/useListPagination.ts"
+        "src/lib/ui-errors.ts"
       ]
     },
     {
@@ -24401,11 +24633,11 @@
         "src/components/admin/CreatePackageDialog.tsx",
         "src/components/admin/ReturnsSummaryCards.tsx",
         "src/components/ReturnImageGallery.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/utils.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/print-shipping-label.ts",
-        "src/lib/ui-errors.ts",
-        "src/components/ListPagination.tsx",
-        "src/hooks/useListPagination.ts"
+        "src/lib/ui-errors.ts"
       ]
     },
     {
@@ -24434,11 +24666,11 @@
         "src/components/admin/CreatePackageDialog.tsx",
         "src/components/admin/ReturnsSummaryCards.tsx",
         "src/components/ReturnImageGallery.tsx",
+        "src/components/admin/AdminCaseSearchFields.tsx",
         "src/lib/utils.ts",
+        "src/lib/admin-case-search.ts",
         "src/lib/print-shipping-label.ts",
-        "src/lib/ui-errors.ts",
-        "src/components/ListPagination.tsx",
-        "src/hooks/useListPagination.ts"
+        "src/lib/ui-errors.ts"
       ]
     },
     {
@@ -26194,6 +26426,948 @@
       ]
     },
     {
+      "id": "MT-OPS-operations-cancellations-001",
+      "screen": "Cancellations",
+      "path": "/operations/cancellations",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P1",
+      "scenario": "Smoke — Cancellations screen loads",
+      "steps": [
+        "Log in as the role that owns this screen (or stay a guest on public pages).",
+        "Open Cancellations from the sidebar, module hub, or URL.",
+        "Confirm the URL matches `/operations/cancellations`."
+      ],
+      "expected": "Page shell renders without an error toast; primary heading or empty-state message is visible.",
+      "status": "pass",
+      "actual": "Route module exports createFileRoute with a component.",
+      "files": [
+        "src/routes/operations.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-cancellations-002",
+      "screen": "Cancellations",
+      "path": "/operations/cancellations",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Navigation — return to hub after visiting Cancellations",
+      "steps": [
+        "From Cancellations, use browser back or the app Home/sidebar.",
+        "Re-open Cancellations."
+      ],
+      "expected": "Navigation is stable; no blank screen or infinite spinner.",
+      "status": "pass",
+      "actual": "Link or navigate() is present in the screen or parent layout.",
+      "files": [
+        "src/routes/operations.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-cancellations-003",
+      "screen": "Cancellations",
+      "path": "/operations/cancellations",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P2",
+      "scenario": "Mobile layout — Cancellations usable on phone width",
+      "steps": [
+        "Set viewport to mobile (≤430px) or use a device.",
+        "Open Cancellations.",
+        "Scroll primary content."
+      ],
+      "expected": "Controls remain reachable; no horizontal overflow blocking actions.",
+      "status": "pass",
+      "actual": "Responsive Tailwind breakpoints or compact padding are present.",
+      "files": [
+        "src/routes/operations.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-cancellations-004",
+      "screen": "Cancellations",
+      "path": "/operations/cancellations",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P2",
+      "scenario": "Heading — Cancellations identifies itself",
+      "steps": [
+        "Open Cancellations.",
+        "Look at the document title or on-page heading."
+      ],
+      "expected": "Primary heading or HTML title is visible so the tester knows which screen they are on.",
+      "status": "pass",
+      "actual": "head() title, h1, or display heading is defined.",
+      "files": [
+        "src/routes/operations.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-cancellations-005",
+      "screen": "Cancellations",
+      "path": "/operations/cancellations",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Route registry — Cancellations is wired into the app router",
+      "steps": [
+        "Deploy/build the app.",
+        "Request `/operations/cancellations` directly."
+      ],
+      "expected": "TanStack route tree includes this path so the screen is reachable.",
+      "status": "pass",
+      "actual": "Path is present in src/routeTree.gen.ts.",
+      "files": [
+        "src/routes/operations.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-cancellations-006",
+      "screen": "Cancellations",
+      "path": "/operations/cancellations",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Primary actions — Cancellations controls are reachable",
+      "steps": [
+        "Open Cancellations.",
+        "Tab or tap through primary buttons, links, or the main form."
+      ],
+      "expected": "At least one primary action (button, link, or form) is present.",
+      "status": "pass",
+      "actual": "Button, Link, or form control found.",
+      "files": [
+        "src/routes/operations.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-cancellations-007",
+      "screen": "Cancellations",
+      "path": "/operations/cancellations",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P3",
+      "scenario": "Overflow — Cancellations does not trap actions off-canvas",
+      "steps": [
+        "Open on a 375px-wide viewport.",
+        "Try to reach every primary control."
+      ],
+      "expected": "Layout uses width constraints or overflow-x handling so actions stay on screen.",
+      "status": "pass",
+      "actual": "Width/overflow constraints present.",
+      "files": [
+        "src/routes/operations.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-cancellations-008",
+      "screen": "Cancellations",
+      "path": "/operations/cancellations",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Empty / loading — Cancellations handles no data",
+      "steps": [
+        "Open Cancellations with an empty catalog, empty cart, or while data is still loading.",
+        "Wait for the first paint."
+      ],
+      "expected": "A loading indicator or empty-state message is shown instead of a blank page.",
+      "status": "pass",
+      "actual": "Empty-state or loading UI is present.",
+      "files": [
+        "src/routes/operations.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-cancellations-009",
+      "screen": "Cancellations",
+      "path": "/operations/cancellations",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P1",
+      "scenario": "Authorized session — entitled user can stay on Cancellations",
+      "steps": [
+        "Sign in as the role that owns this module.",
+        "Open Cancellations."
+      ],
+      "expected": "Authenticated entitled users are not bounced to login.",
+      "status": "pass",
+      "actual": "Screen or parent layout uses useAuth / StaffShell.",
+      "files": [
+        "src/routes/operations.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-cancellations-010",
+      "screen": "Cancellations",
+      "path": "/operations/cancellations",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — guest cannot open Cancellations",
+      "steps": [
+        "Sign out (or use a private window).",
+        "Paste `/operations/cancellations` into the address bar."
+      ],
+      "expected": "Unauthenticated visitors are redirected to customer or staff login; no protected data is shown.",
+      "status": "pass",
+      "actual": "Layout redirects guests to /login or /admin/login.",
+      "files": [
+        "src/routes/operations.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-cancellations-011",
+      "screen": "Cancellations",
+      "path": "/operations/cancellations",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — wrong staff role cannot use Cancellations",
+      "steps": [
+        "Sign in as a staff user whose role does not own this module (e.g. Sales on Operations).",
+        "Open `/operations/cancellations`."
+      ],
+      "expected": "User is sent to their own home path; admin/staff chrome for this module is not rendered.",
+      "status": "pass",
+      "actual": "Role guard (isAdmin / allowedRole / staffHomePath) is present.",
+      "files": [
+        "src/routes/operations.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-cancellations-012",
+      "screen": "Cancellations",
+      "path": "/operations/cancellations",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Negative",
+      "priority": "P2",
+      "scenario": "Negative — Cancellations surfaces API failures",
+      "steps": [
+        "Simulate a failed API response (network offline or 5xx from the gateway).",
+        "Reload Cancellations or retry the primary action."
+      ],
+      "expected": "User sees a toast or inline error; the screen does not fail silently or spin forever.",
+      "status": "pass",
+      "actual": "catch / toast.error / showApiError / loading guard is present.",
+      "files": [
+        "src/routes/operations.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-cancellations-013",
+      "screen": "Cancellations",
+      "path": "/operations/cancellations",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P2",
+      "scenario": "Negative — Cancellations does not render unsanitized HTML from the route",
+      "steps": [
+        "If the screen echoes user- or CMS-supplied text, paste a script tag into a text field.",
+        "Save and reopen the screen."
+      ],
+      "expected": "The route module itself does not call dangerouslySetInnerHTML on user input.",
+      "status": "pass",
+      "actual": "Route file does not use dangerouslySetInnerHTML on non-JSON payloads.",
+      "files": [
+        "src/routes/operations.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-contact-messages-001",
+      "screen": "Contact messages",
+      "path": "/operations/contact-messages",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P1",
+      "scenario": "Smoke — Contact messages screen loads",
+      "steps": [
+        "Log in as the role that owns this screen (or stay a guest on public pages).",
+        "Open Contact messages from the sidebar, module hub, or URL.",
+        "Confirm the URL matches `/operations/contact-messages`."
+      ],
+      "expected": "Page shell renders without an error toast; primary heading or empty-state message is visible.",
+      "status": "pass",
+      "actual": "Route module exports createFileRoute with a component.",
+      "files": [
+        "src/routes/operations.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-contact-messages-002",
+      "screen": "Contact messages",
+      "path": "/operations/contact-messages",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Navigation — return to hub after visiting Contact messages",
+      "steps": [
+        "From Contact messages, use browser back or the app Home/sidebar.",
+        "Re-open Contact messages."
+      ],
+      "expected": "Navigation is stable; no blank screen or infinite spinner.",
+      "status": "pass",
+      "actual": "Link or navigate() is present in the screen or parent layout.",
+      "files": [
+        "src/routes/operations.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-contact-messages-003",
+      "screen": "Contact messages",
+      "path": "/operations/contact-messages",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P2",
+      "scenario": "Mobile layout — Contact messages usable on phone width",
+      "steps": [
+        "Set viewport to mobile (≤430px) or use a device.",
+        "Open Contact messages.",
+        "Scroll primary content."
+      ],
+      "expected": "Controls remain reachable; no horizontal overflow blocking actions.",
+      "status": "pass",
+      "actual": "Responsive Tailwind breakpoints or compact padding are present.",
+      "files": [
+        "src/routes/operations.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-contact-messages-004",
+      "screen": "Contact messages",
+      "path": "/operations/contact-messages",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P2",
+      "scenario": "Heading — Contact messages identifies itself",
+      "steps": [
+        "Open Contact messages.",
+        "Look at the document title or on-page heading."
+      ],
+      "expected": "Primary heading or HTML title is visible so the tester knows which screen they are on.",
+      "status": "pass",
+      "actual": "head() title, h1, or display heading is defined.",
+      "files": [
+        "src/routes/operations.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-contact-messages-005",
+      "screen": "Contact messages",
+      "path": "/operations/contact-messages",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Route registry — Contact messages is wired into the app router",
+      "steps": [
+        "Deploy/build the app.",
+        "Request `/operations/contact-messages` directly."
+      ],
+      "expected": "TanStack route tree includes this path so the screen is reachable.",
+      "status": "pass",
+      "actual": "Path is present in src/routeTree.gen.ts.",
+      "files": [
+        "src/routes/operations.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-contact-messages-006",
+      "screen": "Contact messages",
+      "path": "/operations/contact-messages",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Primary actions — Contact messages controls are reachable",
+      "steps": [
+        "Open Contact messages.",
+        "Tab or tap through primary buttons, links, or the main form."
+      ],
+      "expected": "At least one primary action (button, link, or form) is present.",
+      "status": "pass",
+      "actual": "Button, Link, or form control found.",
+      "files": [
+        "src/routes/operations.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-contact-messages-007",
+      "screen": "Contact messages",
+      "path": "/operations/contact-messages",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P3",
+      "scenario": "Overflow — Contact messages does not trap actions off-canvas",
+      "steps": [
+        "Open on a 375px-wide viewport.",
+        "Try to reach every primary control."
+      ],
+      "expected": "Layout uses width constraints or overflow-x handling so actions stay on screen.",
+      "status": "pass",
+      "actual": "Width/overflow constraints present.",
+      "files": [
+        "src/routes/operations.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-contact-messages-008",
+      "screen": "Contact messages",
+      "path": "/operations/contact-messages",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Empty / loading — Contact messages handles no data",
+      "steps": [
+        "Open Contact messages with an empty catalog, empty cart, or while data is still loading.",
+        "Wait for the first paint."
+      ],
+      "expected": "A loading indicator or empty-state message is shown instead of a blank page.",
+      "status": "pass",
+      "actual": "Empty-state or loading UI is present.",
+      "files": [
+        "src/routes/operations.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-contact-messages-009",
+      "screen": "Contact messages",
+      "path": "/operations/contact-messages",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P1",
+      "scenario": "Authorized session — entitled user can stay on Contact messages",
+      "steps": [
+        "Sign in as the role that owns this module.",
+        "Open Contact messages."
+      ],
+      "expected": "Authenticated entitled users are not bounced to login.",
+      "status": "pass",
+      "actual": "Screen or parent layout uses useAuth / StaffShell.",
+      "files": [
+        "src/routes/operations.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-contact-messages-010",
+      "screen": "Contact messages",
+      "path": "/operations/contact-messages",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — guest cannot open Contact messages",
+      "steps": [
+        "Sign out (or use a private window).",
+        "Paste `/operations/contact-messages` into the address bar."
+      ],
+      "expected": "Unauthenticated visitors are redirected to customer or staff login; no protected data is shown.",
+      "status": "pass",
+      "actual": "Layout redirects guests to /login or /admin/login.",
+      "files": [
+        "src/routes/operations.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-contact-messages-011",
+      "screen": "Contact messages",
+      "path": "/operations/contact-messages",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — wrong staff role cannot use Contact messages",
+      "steps": [
+        "Sign in as a staff user whose role does not own this module (e.g. Sales on Operations).",
+        "Open `/operations/contact-messages`."
+      ],
+      "expected": "User is sent to their own home path; admin/staff chrome for this module is not rendered.",
+      "status": "pass",
+      "actual": "Role guard (isAdmin / allowedRole / staffHomePath) is present.",
+      "files": [
+        "src/routes/operations.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-contact-messages-012",
+      "screen": "Contact messages",
+      "path": "/operations/contact-messages",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Negative",
+      "priority": "P2",
+      "scenario": "Negative — Contact messages surfaces API failures",
+      "steps": [
+        "Simulate a failed API response (network offline or 5xx from the gateway).",
+        "Reload Contact messages or retry the primary action."
+      ],
+      "expected": "User sees a toast or inline error; the screen does not fail silently or spin forever.",
+      "status": "pass",
+      "actual": "catch / toast.error / showApiError / loading guard is present.",
+      "files": [
+        "src/routes/operations.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-contact-messages-013",
+      "screen": "Contact messages",
+      "path": "/operations/contact-messages",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P2",
+      "scenario": "Negative — Contact messages does not render unsanitized HTML from the route",
+      "steps": [
+        "If the screen echoes user- or CMS-supplied text, paste a script tag into a text field.",
+        "Save and reopen the screen."
+      ],
+      "expected": "The route module itself does not call dangerouslySetInnerHTML on user input.",
+      "status": "pass",
+      "actual": "Route file does not use dangerouslySetInnerHTML on non-JSON payloads.",
+      "files": [
+        "src/routes/operations.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-customers-001",
+      "screen": "Customers",
+      "path": "/operations/customers",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P1",
+      "scenario": "Smoke — Customers screen loads",
+      "steps": [
+        "Log in as the role that owns this screen (or stay a guest on public pages).",
+        "Open Customers from the sidebar, module hub, or URL.",
+        "Confirm the URL matches `/operations/customers`."
+      ],
+      "expected": "Page shell renders without an error toast; primary heading or empty-state message is visible.",
+      "status": "pass",
+      "actual": "Route module exports createFileRoute with a component.",
+      "files": [
+        "src/routes/operations.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-customers-002",
+      "screen": "Customers",
+      "path": "/operations/customers",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Navigation — return to hub after visiting Customers",
+      "steps": [
+        "From Customers, use browser back or the app Home/sidebar.",
+        "Re-open Customers."
+      ],
+      "expected": "Navigation is stable; no blank screen or infinite spinner.",
+      "status": "pass",
+      "actual": "Link or navigate() is present in the screen or parent layout.",
+      "files": [
+        "src/routes/operations.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-customers-003",
+      "screen": "Customers",
+      "path": "/operations/customers",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P2",
+      "scenario": "Mobile layout — Customers usable on phone width",
+      "steps": [
+        "Set viewport to mobile (≤430px) or use a device.",
+        "Open Customers.",
+        "Scroll primary content."
+      ],
+      "expected": "Controls remain reachable; no horizontal overflow blocking actions.",
+      "status": "pass",
+      "actual": "Responsive Tailwind breakpoints or compact padding are present.",
+      "files": [
+        "src/routes/operations.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-customers-004",
+      "screen": "Customers",
+      "path": "/operations/customers",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P2",
+      "scenario": "Heading — Customers identifies itself",
+      "steps": [
+        "Open Customers.",
+        "Look at the document title or on-page heading."
+      ],
+      "expected": "Primary heading or HTML title is visible so the tester knows which screen they are on.",
+      "status": "pass",
+      "actual": "head() title, h1, or display heading is defined.",
+      "files": [
+        "src/routes/operations.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-customers-005",
+      "screen": "Customers",
+      "path": "/operations/customers",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Route registry — Customers is wired into the app router",
+      "steps": [
+        "Deploy/build the app.",
+        "Request `/operations/customers` directly."
+      ],
+      "expected": "TanStack route tree includes this path so the screen is reachable.",
+      "status": "pass",
+      "actual": "Path is present in src/routeTree.gen.ts.",
+      "files": [
+        "src/routes/operations.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-customers-006",
+      "screen": "Customers",
+      "path": "/operations/customers",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Primary actions — Customers controls are reachable",
+      "steps": [
+        "Open Customers.",
+        "Tab or tap through primary buttons, links, or the main form."
+      ],
+      "expected": "At least one primary action (button, link, or form) is present.",
+      "status": "pass",
+      "actual": "Button, Link, or form control found.",
+      "files": [
+        "src/routes/operations.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-customers-007",
+      "screen": "Customers",
+      "path": "/operations/customers",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P3",
+      "scenario": "Overflow — Customers does not trap actions off-canvas",
+      "steps": [
+        "Open on a 375px-wide viewport.",
+        "Try to reach every primary control."
+      ],
+      "expected": "Layout uses width constraints or overflow-x handling so actions stay on screen.",
+      "status": "pass",
+      "actual": "Width/overflow constraints present.",
+      "files": [
+        "src/routes/operations.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-customers-008",
+      "screen": "Customers",
+      "path": "/operations/customers",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Empty / loading — Customers handles no data",
+      "steps": [
+        "Open Customers with an empty catalog, empty cart, or while data is still loading.",
+        "Wait for the first paint."
+      ],
+      "expected": "A loading indicator or empty-state message is shown instead of a blank page.",
+      "status": "pass",
+      "actual": "Empty-state or loading UI is present.",
+      "files": [
+        "src/routes/operations.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-customers-009",
+      "screen": "Customers",
+      "path": "/operations/customers",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P1",
+      "scenario": "Authorized session — entitled user can stay on Customers",
+      "steps": [
+        "Sign in as the role that owns this module.",
+        "Open Customers."
+      ],
+      "expected": "Authenticated entitled users are not bounced to login.",
+      "status": "pass",
+      "actual": "Screen or parent layout uses useAuth / StaffShell.",
+      "files": [
+        "src/routes/operations.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-customers-010",
+      "screen": "Customers",
+      "path": "/operations/customers",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — guest cannot open Customers",
+      "steps": [
+        "Sign out (or use a private window).",
+        "Paste `/operations/customers` into the address bar."
+      ],
+      "expected": "Unauthenticated visitors are redirected to customer or staff login; no protected data is shown.",
+      "status": "pass",
+      "actual": "Layout redirects guests to /login or /admin/login.",
+      "files": [
+        "src/routes/operations.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-customers-011",
+      "screen": "Customers",
+      "path": "/operations/customers",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — wrong staff role cannot use Customers",
+      "steps": [
+        "Sign in as a staff user whose role does not own this module (e.g. Sales on Operations).",
+        "Open `/operations/customers`."
+      ],
+      "expected": "User is sent to their own home path; admin/staff chrome for this module is not rendered.",
+      "status": "pass",
+      "actual": "Role guard (isAdmin / allowedRole / staffHomePath) is present.",
+      "files": [
+        "src/routes/operations.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-customers-012",
+      "screen": "Customers",
+      "path": "/operations/customers",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Negative",
+      "priority": "P2",
+      "scenario": "Negative — Customers surfaces API failures",
+      "steps": [
+        "Simulate a failed API response (network offline or 5xx from the gateway).",
+        "Reload Customers or retry the primary action."
+      ],
+      "expected": "User sees a toast or inline error; the screen does not fail silently or spin forever.",
+      "status": "pass",
+      "actual": "catch / toast.error / showApiError / loading guard is present.",
+      "files": [
+        "src/routes/operations.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-customers-013",
+      "screen": "Customers",
+      "path": "/operations/customers",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P2",
+      "scenario": "Negative — Customers does not render unsanitized HTML from the route",
+      "steps": [
+        "If the screen echoes user- or CMS-supplied text, paste a script tag into a text field.",
+        "Save and reopen the screen."
+      ],
+      "expected": "The route module itself does not call dangerouslySetInnerHTML on user input.",
+      "status": "pass",
+      "actual": "Route file does not use dangerouslySetInnerHTML on non-JSON payloads.",
+      "files": [
+        "src/routes/operations.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
       "id": "MT-OPS-operations-dashboard-001",
       "screen": "Operations Dashboard",
       "path": "/operations/dashboard",
@@ -26557,6 +27731,320 @@
         "src/lib/money.ts",
         "src/lib/order-status.ts",
         "src/lib/ui-errors.ts"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-invoices-001",
+      "screen": "Invoices",
+      "path": "/operations/invoices",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P1",
+      "scenario": "Smoke — Invoices screen loads",
+      "steps": [
+        "Log in as the role that owns this screen (or stay a guest on public pages).",
+        "Open Invoices from the sidebar, module hub, or URL.",
+        "Confirm the URL matches `/operations/invoices`."
+      ],
+      "expected": "Page shell renders without an error toast; primary heading or empty-state message is visible.",
+      "status": "pass",
+      "actual": "Route module exports createFileRoute with a component.",
+      "files": [
+        "src/routes/operations.invoices.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-invoices-002",
+      "screen": "Invoices",
+      "path": "/operations/invoices",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Navigation — return to hub after visiting Invoices",
+      "steps": [
+        "From Invoices, use browser back or the app Home/sidebar.",
+        "Re-open Invoices."
+      ],
+      "expected": "Navigation is stable; no blank screen or infinite spinner.",
+      "status": "pass",
+      "actual": "Link or navigate() is present in the screen or parent layout.",
+      "files": [
+        "src/routes/operations.invoices.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-invoices-003",
+      "screen": "Invoices",
+      "path": "/operations/invoices",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P2",
+      "scenario": "Mobile layout — Invoices usable on phone width",
+      "steps": [
+        "Set viewport to mobile (≤430px) or use a device.",
+        "Open Invoices.",
+        "Scroll primary content."
+      ],
+      "expected": "Controls remain reachable; no horizontal overflow blocking actions.",
+      "status": "pass",
+      "actual": "Responsive Tailwind breakpoints or compact padding are present.",
+      "files": [
+        "src/routes/operations.invoices.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-invoices-004",
+      "screen": "Invoices",
+      "path": "/operations/invoices",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P2",
+      "scenario": "Heading — Invoices identifies itself",
+      "steps": [
+        "Open Invoices.",
+        "Look at the document title or on-page heading."
+      ],
+      "expected": "Primary heading or HTML title is visible so the tester knows which screen they are on.",
+      "status": "pass",
+      "actual": "head() title, h1, or display heading is defined.",
+      "files": [
+        "src/routes/operations.invoices.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-invoices-005",
+      "screen": "Invoices",
+      "path": "/operations/invoices",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Route registry — Invoices is wired into the app router",
+      "steps": [
+        "Deploy/build the app.",
+        "Request `/operations/invoices` directly."
+      ],
+      "expected": "TanStack route tree includes this path so the screen is reachable.",
+      "status": "pass",
+      "actual": "Path is present in src/routeTree.gen.ts.",
+      "files": [
+        "src/routes/operations.invoices.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-invoices-006",
+      "screen": "Invoices",
+      "path": "/operations/invoices",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Primary actions — Invoices controls are reachable",
+      "steps": [
+        "Open Invoices.",
+        "Tab or tap through primary buttons, links, or the main form."
+      ],
+      "expected": "At least one primary action (button, link, or form) is present.",
+      "status": "pass",
+      "actual": "Button, Link, or form control found.",
+      "files": [
+        "src/routes/operations.invoices.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-invoices-007",
+      "screen": "Invoices",
+      "path": "/operations/invoices",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P3",
+      "scenario": "Overflow — Invoices does not trap actions off-canvas",
+      "steps": [
+        "Open on a 375px-wide viewport.",
+        "Try to reach every primary control."
+      ],
+      "expected": "Layout uses width constraints or overflow-x handling so actions stay on screen.",
+      "status": "pass",
+      "actual": "Width/overflow constraints present.",
+      "files": [
+        "src/routes/operations.invoices.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-invoices-008",
+      "screen": "Invoices",
+      "path": "/operations/invoices",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Empty / loading — Invoices handles no data",
+      "steps": [
+        "Open Invoices with an empty catalog, empty cart, or while data is still loading.",
+        "Wait for the first paint."
+      ],
+      "expected": "A loading indicator or empty-state message is shown instead of a blank page.",
+      "status": "pass",
+      "actual": "Empty-state or loading UI is present.",
+      "files": [
+        "src/routes/operations.invoices.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-invoices-009",
+      "screen": "Invoices",
+      "path": "/operations/invoices",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P1",
+      "scenario": "Authorized session — entitled user can stay on Invoices",
+      "steps": [
+        "Sign in as the role that owns this module.",
+        "Open Invoices."
+      ],
+      "expected": "Authenticated entitled users are not bounced to login.",
+      "status": "pass",
+      "actual": "Screen or parent layout uses useAuth / StaffShell.",
+      "files": [
+        "src/routes/operations.invoices.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-invoices-010",
+      "screen": "Invoices",
+      "path": "/operations/invoices",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — guest cannot open Invoices",
+      "steps": [
+        "Sign out (or use a private window).",
+        "Paste `/operations/invoices` into the address bar."
+      ],
+      "expected": "Unauthenticated visitors are redirected to customer or staff login; no protected data is shown.",
+      "status": "pass",
+      "actual": "Layout redirects guests to /login or /admin/login.",
+      "files": [
+        "src/routes/operations.invoices.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-invoices-011",
+      "screen": "Invoices",
+      "path": "/operations/invoices",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — wrong staff role cannot use Invoices",
+      "steps": [
+        "Sign in as a staff user whose role does not own this module (e.g. Sales on Operations).",
+        "Open `/operations/invoices`."
+      ],
+      "expected": "User is sent to their own home path; admin/staff chrome for this module is not rendered.",
+      "status": "pass",
+      "actual": "Role guard (isAdmin / allowedRole / staffHomePath) is present.",
+      "files": [
+        "src/routes/operations.invoices.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-invoices-012",
+      "screen": "Invoices",
+      "path": "/operations/invoices",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Negative",
+      "priority": "P2",
+      "scenario": "Negative — Invoices surfaces API failures",
+      "steps": [
+        "Simulate a failed API response (network offline or 5xx from the gateway).",
+        "Reload Invoices or retry the primary action."
+      ],
+      "expected": "User sees a toast or inline error; the screen does not fail silently or spin forever.",
+      "status": "pass",
+      "actual": "catch / toast.error / showApiError / loading guard is present.",
+      "files": [
+        "src/routes/operations.invoices.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-invoices-013",
+      "screen": "Invoices",
+      "path": "/operations/invoices",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P2",
+      "scenario": "Negative — Invoices does not render unsanitized HTML from the route",
+      "steps": [
+        "If the screen echoes user- or CMS-supplied text, paste a script tag into a text field.",
+        "Save and reopen the screen."
+      ],
+      "expected": "The route module itself does not call dangerouslySetInnerHTML on user input.",
+      "status": "pass",
+      "actual": "Route file does not use dangerouslySetInnerHTML on non-JSON payloads.",
+      "files": [
+        "src/routes/operations.invoices.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
       ]
     },
     {
@@ -27273,6 +28761,634 @@
         "src/components/staff/StaffShell.tsx",
         "src/components/InvoiceViewer.tsx",
         "src/lib/invoice-breakdown.ts"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-products-001",
+      "screen": "Products",
+      "path": "/operations/products",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P1",
+      "scenario": "Smoke — Products screen loads",
+      "steps": [
+        "Log in as the role that owns this screen (or stay a guest on public pages).",
+        "Open Products from the sidebar, module hub, or URL.",
+        "Confirm the URL matches `/operations/products`."
+      ],
+      "expected": "Page shell renders without an error toast; primary heading or empty-state message is visible.",
+      "status": "pass",
+      "actual": "Route module exports createFileRoute with a component.",
+      "files": [
+        "src/routes/operations.products.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/sales.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-products-002",
+      "screen": "Products",
+      "path": "/operations/products",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Navigation — return to hub after visiting Products",
+      "steps": [
+        "From Products, use browser back or the app Home/sidebar.",
+        "Re-open Products."
+      ],
+      "expected": "Navigation is stable; no blank screen or infinite spinner.",
+      "status": "pass",
+      "actual": "Link or navigate() is present in the screen or parent layout.",
+      "files": [
+        "src/routes/operations.products.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/sales.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-products-003",
+      "screen": "Products",
+      "path": "/operations/products",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P2",
+      "scenario": "Mobile layout — Products usable on phone width",
+      "steps": [
+        "Set viewport to mobile (≤430px) or use a device.",
+        "Open Products.",
+        "Scroll primary content."
+      ],
+      "expected": "Controls remain reachable; no horizontal overflow blocking actions.",
+      "status": "pass",
+      "actual": "Responsive Tailwind breakpoints or compact padding are present.",
+      "files": [
+        "src/routes/operations.products.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/sales.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-products-004",
+      "screen": "Products",
+      "path": "/operations/products",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P2",
+      "scenario": "Heading — Products identifies itself",
+      "steps": [
+        "Open Products.",
+        "Look at the document title or on-page heading."
+      ],
+      "expected": "Primary heading or HTML title is visible so the tester knows which screen they are on.",
+      "status": "pass",
+      "actual": "head() title, h1, or display heading is defined.",
+      "files": [
+        "src/routes/operations.products.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/sales.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-products-005",
+      "screen": "Products",
+      "path": "/operations/products",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Route registry — Products is wired into the app router",
+      "steps": [
+        "Deploy/build the app.",
+        "Request `/operations/products` directly."
+      ],
+      "expected": "TanStack route tree includes this path so the screen is reachable.",
+      "status": "pass",
+      "actual": "Path is present in src/routeTree.gen.ts.",
+      "files": [
+        "src/routes/operations.products.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/sales.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-products-006",
+      "screen": "Products",
+      "path": "/operations/products",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Primary actions — Products controls are reachable",
+      "steps": [
+        "Open Products.",
+        "Tab or tap through primary buttons, links, or the main form."
+      ],
+      "expected": "At least one primary action (button, link, or form) is present.",
+      "status": "pass",
+      "actual": "Button, Link, or form control found.",
+      "files": [
+        "src/routes/operations.products.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/sales.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-products-007",
+      "screen": "Products",
+      "path": "/operations/products",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P3",
+      "scenario": "Overflow — Products does not trap actions off-canvas",
+      "steps": [
+        "Open on a 375px-wide viewport.",
+        "Try to reach every primary control."
+      ],
+      "expected": "Layout uses width constraints or overflow-x handling so actions stay on screen.",
+      "status": "pass",
+      "actual": "Width/overflow constraints present.",
+      "files": [
+        "src/routes/operations.products.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/sales.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-products-008",
+      "screen": "Products",
+      "path": "/operations/products",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Empty / loading — Products handles no data",
+      "steps": [
+        "Open Products with an empty catalog, empty cart, or while data is still loading.",
+        "Wait for the first paint."
+      ],
+      "expected": "A loading indicator or empty-state message is shown instead of a blank page.",
+      "status": "pass",
+      "actual": "Empty-state or loading UI is present.",
+      "files": [
+        "src/routes/operations.products.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/sales.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-products-009",
+      "screen": "Products",
+      "path": "/operations/products",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P1",
+      "scenario": "Authorized session — entitled user can stay on Products",
+      "steps": [
+        "Sign in as the role that owns this module.",
+        "Open Products."
+      ],
+      "expected": "Authenticated entitled users are not bounced to login.",
+      "status": "pass",
+      "actual": "Screen or parent layout uses useAuth / StaffShell.",
+      "files": [
+        "src/routes/operations.products.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/sales.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-products-010",
+      "screen": "Products",
+      "path": "/operations/products",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — guest cannot open Products",
+      "steps": [
+        "Sign out (or use a private window).",
+        "Paste `/operations/products` into the address bar."
+      ],
+      "expected": "Unauthenticated visitors are redirected to customer or staff login; no protected data is shown.",
+      "status": "pass",
+      "actual": "Layout redirects guests to /login or /admin/login.",
+      "files": [
+        "src/routes/operations.products.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/sales.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-products-011",
+      "screen": "Products",
+      "path": "/operations/products",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — wrong staff role cannot use Products",
+      "steps": [
+        "Sign in as a staff user whose role does not own this module (e.g. Sales on Operations).",
+        "Open `/operations/products`."
+      ],
+      "expected": "User is sent to their own home path; admin/staff chrome for this module is not rendered.",
+      "status": "pass",
+      "actual": "Role guard (isAdmin / allowedRole / staffHomePath) is present.",
+      "files": [
+        "src/routes/operations.products.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/sales.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-products-012",
+      "screen": "Products",
+      "path": "/operations/products",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Negative",
+      "priority": "P2",
+      "scenario": "Negative — Products surfaces API failures",
+      "steps": [
+        "Simulate a failed API response (network offline or 5xx from the gateway).",
+        "Reload Products or retry the primary action."
+      ],
+      "expected": "User sees a toast or inline error; the screen does not fail silently or spin forever.",
+      "status": "pass",
+      "actual": "catch / toast.error / showApiError / loading guard is present.",
+      "files": [
+        "src/routes/operations.products.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/sales.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-products-013",
+      "screen": "Products",
+      "path": "/operations/products",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P2",
+      "scenario": "Negative — Products does not render unsanitized HTML from the route",
+      "steps": [
+        "If the screen echoes user- or CMS-supplied text, paste a script tag into a text field.",
+        "Save and reopen the screen."
+      ],
+      "expected": "The route module itself does not call dangerouslySetInnerHTML on user input.",
+      "status": "pass",
+      "actual": "Route file does not use dangerouslySetInnerHTML on non-JSON payloads.",
+      "files": [
+        "src/routes/operations.products.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/sales.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-returns-001",
+      "screen": "Returns",
+      "path": "/operations/returns",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P1",
+      "scenario": "Smoke — Returns screen loads",
+      "steps": [
+        "Log in as the role that owns this screen (or stay a guest on public pages).",
+        "Open Returns from the sidebar, module hub, or URL.",
+        "Confirm the URL matches `/operations/returns`."
+      ],
+      "expected": "Page shell renders without an error toast; primary heading or empty-state message is visible.",
+      "status": "pass",
+      "actual": "Route module exports createFileRoute with a component.",
+      "files": [
+        "src/routes/operations.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-returns-002",
+      "screen": "Returns",
+      "path": "/operations/returns",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Navigation — return to hub after visiting Returns",
+      "steps": [
+        "From Returns, use browser back or the app Home/sidebar.",
+        "Re-open Returns."
+      ],
+      "expected": "Navigation is stable; no blank screen or infinite spinner.",
+      "status": "pass",
+      "actual": "Link or navigate() is present in the screen or parent layout.",
+      "files": [
+        "src/routes/operations.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-returns-003",
+      "screen": "Returns",
+      "path": "/operations/returns",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P2",
+      "scenario": "Mobile layout — Returns usable on phone width",
+      "steps": [
+        "Set viewport to mobile (≤430px) or use a device.",
+        "Open Returns.",
+        "Scroll primary content."
+      ],
+      "expected": "Controls remain reachable; no horizontal overflow blocking actions.",
+      "status": "pass",
+      "actual": "Responsive Tailwind breakpoints or compact padding are present.",
+      "files": [
+        "src/routes/operations.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-returns-004",
+      "screen": "Returns",
+      "path": "/operations/returns",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P2",
+      "scenario": "Heading — Returns identifies itself",
+      "steps": [
+        "Open Returns.",
+        "Look at the document title or on-page heading."
+      ],
+      "expected": "Primary heading or HTML title is visible so the tester knows which screen they are on.",
+      "status": "pass",
+      "actual": "head() title, h1, or display heading is defined.",
+      "files": [
+        "src/routes/operations.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-returns-005",
+      "screen": "Returns",
+      "path": "/operations/returns",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Route registry — Returns is wired into the app router",
+      "steps": [
+        "Deploy/build the app.",
+        "Request `/operations/returns` directly."
+      ],
+      "expected": "TanStack route tree includes this path so the screen is reachable.",
+      "status": "pass",
+      "actual": "Path is present in src/routeTree.gen.ts.",
+      "files": [
+        "src/routes/operations.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-returns-006",
+      "screen": "Returns",
+      "path": "/operations/returns",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Primary actions — Returns controls are reachable",
+      "steps": [
+        "Open Returns.",
+        "Tab or tap through primary buttons, links, or the main form."
+      ],
+      "expected": "At least one primary action (button, link, or form) is present.",
+      "status": "pass",
+      "actual": "Button, Link, or form control found.",
+      "files": [
+        "src/routes/operations.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-returns-007",
+      "screen": "Returns",
+      "path": "/operations/returns",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P3",
+      "scenario": "Overflow — Returns does not trap actions off-canvas",
+      "steps": [
+        "Open on a 375px-wide viewport.",
+        "Try to reach every primary control."
+      ],
+      "expected": "Layout uses width constraints or overflow-x handling so actions stay on screen.",
+      "status": "pass",
+      "actual": "Width/overflow constraints present.",
+      "files": [
+        "src/routes/operations.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-returns-008",
+      "screen": "Returns",
+      "path": "/operations/returns",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Empty / loading — Returns handles no data",
+      "steps": [
+        "Open Returns with an empty catalog, empty cart, or while data is still loading.",
+        "Wait for the first paint."
+      ],
+      "expected": "A loading indicator or empty-state message is shown instead of a blank page.",
+      "status": "pass",
+      "actual": "Empty-state or loading UI is present.",
+      "files": [
+        "src/routes/operations.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-returns-009",
+      "screen": "Returns",
+      "path": "/operations/returns",
+      "module": "Operations",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P1",
+      "scenario": "Authorized session — entitled user can stay on Returns",
+      "steps": [
+        "Sign in as the role that owns this module.",
+        "Open Returns."
+      ],
+      "expected": "Authenticated entitled users are not bounced to login.",
+      "status": "pass",
+      "actual": "Screen or parent layout uses useAuth / StaffShell.",
+      "files": [
+        "src/routes/operations.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-returns-010",
+      "screen": "Returns",
+      "path": "/operations/returns",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — guest cannot open Returns",
+      "steps": [
+        "Sign out (or use a private window).",
+        "Paste `/operations/returns` into the address bar."
+      ],
+      "expected": "Unauthenticated visitors are redirected to customer or staff login; no protected data is shown.",
+      "status": "pass",
+      "actual": "Layout redirects guests to /login or /admin/login.",
+      "files": [
+        "src/routes/operations.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-returns-011",
+      "screen": "Returns",
+      "path": "/operations/returns",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — wrong staff role cannot use Returns",
+      "steps": [
+        "Sign in as a staff user whose role does not own this module (e.g. Sales on Operations).",
+        "Open `/operations/returns`."
+      ],
+      "expected": "User is sent to their own home path; admin/staff chrome for this module is not rendered.",
+      "status": "pass",
+      "actual": "Role guard (isAdmin / allowedRole / staffHomePath) is present.",
+      "files": [
+        "src/routes/operations.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-returns-012",
+      "screen": "Returns",
+      "path": "/operations/returns",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Negative",
+      "priority": "P2",
+      "scenario": "Negative — Returns surfaces API failures",
+      "steps": [
+        "Simulate a failed API response (network offline or 5xx from the gateway).",
+        "Reload Returns or retry the primary action."
+      ],
+      "expected": "User sees a toast or inline error; the screen does not fail silently or spin forever.",
+      "status": "pass",
+      "actual": "catch / toast.error / showApiError / loading guard is present.",
+      "files": [
+        "src/routes/operations.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-OPS-operations-returns-013",
+      "screen": "Returns",
+      "path": "/operations/returns",
+      "module": "Operations",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P2",
+      "scenario": "Negative — Returns does not render unsanitized HTML from the route",
+      "steps": [
+        "If the screen echoes user- or CMS-supplied text, paste a script tag into a text field.",
+        "Save and reopen the screen."
+      ],
+      "expected": "The route module itself does not call dangerouslySetInnerHTML on user input.",
+      "status": "pass",
+      "actual": "Route file does not use dangerouslySetInnerHTML on non-JSON payloads.",
+      "files": [
+        "src/routes/operations.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/operations.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
       ]
     },
     {
@@ -28257,6 +30373,948 @@
       ]
     },
     {
+      "id": "MT-CS-customersupport-cancellations-001",
+      "screen": "Cancellations",
+      "path": "/customersupport/cancellations",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P1",
+      "scenario": "Smoke — Cancellations screen loads",
+      "steps": [
+        "Log in as the role that owns this screen (or stay a guest on public pages).",
+        "Open Cancellations from the sidebar, module hub, or URL.",
+        "Confirm the URL matches `/customersupport/cancellations`."
+      ],
+      "expected": "Page shell renders without an error toast; primary heading or empty-state message is visible.",
+      "status": "pass",
+      "actual": "Route module exports createFileRoute with a component.",
+      "files": [
+        "src/routes/customersupport.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-cancellations-002",
+      "screen": "Cancellations",
+      "path": "/customersupport/cancellations",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Navigation — return to hub after visiting Cancellations",
+      "steps": [
+        "From Cancellations, use browser back or the app Home/sidebar.",
+        "Re-open Cancellations."
+      ],
+      "expected": "Navigation is stable; no blank screen or infinite spinner.",
+      "status": "pass",
+      "actual": "Link or navigate() is present in the screen or parent layout.",
+      "files": [
+        "src/routes/customersupport.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-cancellations-003",
+      "screen": "Cancellations",
+      "path": "/customersupport/cancellations",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P2",
+      "scenario": "Mobile layout — Cancellations usable on phone width",
+      "steps": [
+        "Set viewport to mobile (≤430px) or use a device.",
+        "Open Cancellations.",
+        "Scroll primary content."
+      ],
+      "expected": "Controls remain reachable; no horizontal overflow blocking actions.",
+      "status": "pass",
+      "actual": "Responsive Tailwind breakpoints or compact padding are present.",
+      "files": [
+        "src/routes/customersupport.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-cancellations-004",
+      "screen": "Cancellations",
+      "path": "/customersupport/cancellations",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P2",
+      "scenario": "Heading — Cancellations identifies itself",
+      "steps": [
+        "Open Cancellations.",
+        "Look at the document title or on-page heading."
+      ],
+      "expected": "Primary heading or HTML title is visible so the tester knows which screen they are on.",
+      "status": "pass",
+      "actual": "head() title, h1, or display heading is defined.",
+      "files": [
+        "src/routes/customersupport.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-cancellations-005",
+      "screen": "Cancellations",
+      "path": "/customersupport/cancellations",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Route registry — Cancellations is wired into the app router",
+      "steps": [
+        "Deploy/build the app.",
+        "Request `/customersupport/cancellations` directly."
+      ],
+      "expected": "TanStack route tree includes this path so the screen is reachable.",
+      "status": "pass",
+      "actual": "Path is present in src/routeTree.gen.ts.",
+      "files": [
+        "src/routes/customersupport.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-cancellations-006",
+      "screen": "Cancellations",
+      "path": "/customersupport/cancellations",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Primary actions — Cancellations controls are reachable",
+      "steps": [
+        "Open Cancellations.",
+        "Tab or tap through primary buttons, links, or the main form."
+      ],
+      "expected": "At least one primary action (button, link, or form) is present.",
+      "status": "pass",
+      "actual": "Button, Link, or form control found.",
+      "files": [
+        "src/routes/customersupport.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-cancellations-007",
+      "screen": "Cancellations",
+      "path": "/customersupport/cancellations",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P3",
+      "scenario": "Overflow — Cancellations does not trap actions off-canvas",
+      "steps": [
+        "Open on a 375px-wide viewport.",
+        "Try to reach every primary control."
+      ],
+      "expected": "Layout uses width constraints or overflow-x handling so actions stay on screen.",
+      "status": "pass",
+      "actual": "Width/overflow constraints present.",
+      "files": [
+        "src/routes/customersupport.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-cancellations-008",
+      "screen": "Cancellations",
+      "path": "/customersupport/cancellations",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Empty / loading — Cancellations handles no data",
+      "steps": [
+        "Open Cancellations with an empty catalog, empty cart, or while data is still loading.",
+        "Wait for the first paint."
+      ],
+      "expected": "A loading indicator or empty-state message is shown instead of a blank page.",
+      "status": "pass",
+      "actual": "Empty-state or loading UI is present.",
+      "files": [
+        "src/routes/customersupport.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-cancellations-009",
+      "screen": "Cancellations",
+      "path": "/customersupport/cancellations",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P1",
+      "scenario": "Authorized session — entitled user can stay on Cancellations",
+      "steps": [
+        "Sign in as the role that owns this module.",
+        "Open Cancellations."
+      ],
+      "expected": "Authenticated entitled users are not bounced to login.",
+      "status": "pass",
+      "actual": "Screen or parent layout uses useAuth / StaffShell.",
+      "files": [
+        "src/routes/customersupport.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-cancellations-010",
+      "screen": "Cancellations",
+      "path": "/customersupport/cancellations",
+      "module": "Customer Support",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — guest cannot open Cancellations",
+      "steps": [
+        "Sign out (or use a private window).",
+        "Paste `/customersupport/cancellations` into the address bar."
+      ],
+      "expected": "Unauthenticated visitors are redirected to customer or staff login; no protected data is shown.",
+      "status": "pass",
+      "actual": "Layout redirects guests to /login or /admin/login.",
+      "files": [
+        "src/routes/customersupport.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-cancellations-011",
+      "screen": "Cancellations",
+      "path": "/customersupport/cancellations",
+      "module": "Customer Support",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — wrong staff role cannot use Cancellations",
+      "steps": [
+        "Sign in as a staff user whose role does not own this module (e.g. Sales on Operations).",
+        "Open `/customersupport/cancellations`."
+      ],
+      "expected": "User is sent to their own home path; admin/staff chrome for this module is not rendered.",
+      "status": "pass",
+      "actual": "Role guard (isAdmin / allowedRole / staffHomePath) is present.",
+      "files": [
+        "src/routes/customersupport.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-cancellations-012",
+      "screen": "Cancellations",
+      "path": "/customersupport/cancellations",
+      "module": "Customer Support",
+      "kind": "negative",
+      "type": "Negative",
+      "priority": "P2",
+      "scenario": "Negative — Cancellations surfaces API failures",
+      "steps": [
+        "Simulate a failed API response (network offline or 5xx from the gateway).",
+        "Reload Cancellations or retry the primary action."
+      ],
+      "expected": "User sees a toast or inline error; the screen does not fail silently or spin forever.",
+      "status": "pass",
+      "actual": "catch / toast.error / showApiError / loading guard is present.",
+      "files": [
+        "src/routes/customersupport.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-cancellations-013",
+      "screen": "Cancellations",
+      "path": "/customersupport/cancellations",
+      "module": "Customer Support",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P2",
+      "scenario": "Negative — Cancellations does not render unsanitized HTML from the route",
+      "steps": [
+        "If the screen echoes user- or CMS-supplied text, paste a script tag into a text field.",
+        "Save and reopen the screen."
+      ],
+      "expected": "The route module itself does not call dangerouslySetInnerHTML on user input.",
+      "status": "pass",
+      "actual": "Route file does not use dangerouslySetInnerHTML on non-JSON payloads.",
+      "files": [
+        "src/routes/customersupport.cancellations.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-contact-messages-001",
+      "screen": "Contact messages",
+      "path": "/customersupport/contact-messages",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P1",
+      "scenario": "Smoke — Contact messages screen loads",
+      "steps": [
+        "Log in as the role that owns this screen (or stay a guest on public pages).",
+        "Open Contact messages from the sidebar, module hub, or URL.",
+        "Confirm the URL matches `/customersupport/contact-messages`."
+      ],
+      "expected": "Page shell renders without an error toast; primary heading or empty-state message is visible.",
+      "status": "pass",
+      "actual": "Route module exports createFileRoute with a component.",
+      "files": [
+        "src/routes/customersupport.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-contact-messages-002",
+      "screen": "Contact messages",
+      "path": "/customersupport/contact-messages",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Navigation — return to hub after visiting Contact messages",
+      "steps": [
+        "From Contact messages, use browser back or the app Home/sidebar.",
+        "Re-open Contact messages."
+      ],
+      "expected": "Navigation is stable; no blank screen or infinite spinner.",
+      "status": "pass",
+      "actual": "Link or navigate() is present in the screen or parent layout.",
+      "files": [
+        "src/routes/customersupport.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-contact-messages-003",
+      "screen": "Contact messages",
+      "path": "/customersupport/contact-messages",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P2",
+      "scenario": "Mobile layout — Contact messages usable on phone width",
+      "steps": [
+        "Set viewport to mobile (≤430px) or use a device.",
+        "Open Contact messages.",
+        "Scroll primary content."
+      ],
+      "expected": "Controls remain reachable; no horizontal overflow blocking actions.",
+      "status": "pass",
+      "actual": "Responsive Tailwind breakpoints or compact padding are present.",
+      "files": [
+        "src/routes/customersupport.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-contact-messages-004",
+      "screen": "Contact messages",
+      "path": "/customersupport/contact-messages",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P2",
+      "scenario": "Heading — Contact messages identifies itself",
+      "steps": [
+        "Open Contact messages.",
+        "Look at the document title or on-page heading."
+      ],
+      "expected": "Primary heading or HTML title is visible so the tester knows which screen they are on.",
+      "status": "pass",
+      "actual": "head() title, h1, or display heading is defined.",
+      "files": [
+        "src/routes/customersupport.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-contact-messages-005",
+      "screen": "Contact messages",
+      "path": "/customersupport/contact-messages",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Route registry — Contact messages is wired into the app router",
+      "steps": [
+        "Deploy/build the app.",
+        "Request `/customersupport/contact-messages` directly."
+      ],
+      "expected": "TanStack route tree includes this path so the screen is reachable.",
+      "status": "pass",
+      "actual": "Path is present in src/routeTree.gen.ts.",
+      "files": [
+        "src/routes/customersupport.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-contact-messages-006",
+      "screen": "Contact messages",
+      "path": "/customersupport/contact-messages",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Primary actions — Contact messages controls are reachable",
+      "steps": [
+        "Open Contact messages.",
+        "Tab or tap through primary buttons, links, or the main form."
+      ],
+      "expected": "At least one primary action (button, link, or form) is present.",
+      "status": "pass",
+      "actual": "Button, Link, or form control found.",
+      "files": [
+        "src/routes/customersupport.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-contact-messages-007",
+      "screen": "Contact messages",
+      "path": "/customersupport/contact-messages",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P3",
+      "scenario": "Overflow — Contact messages does not trap actions off-canvas",
+      "steps": [
+        "Open on a 375px-wide viewport.",
+        "Try to reach every primary control."
+      ],
+      "expected": "Layout uses width constraints or overflow-x handling so actions stay on screen.",
+      "status": "pass",
+      "actual": "Width/overflow constraints present.",
+      "files": [
+        "src/routes/customersupport.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-contact-messages-008",
+      "screen": "Contact messages",
+      "path": "/customersupport/contact-messages",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Empty / loading — Contact messages handles no data",
+      "steps": [
+        "Open Contact messages with an empty catalog, empty cart, or while data is still loading.",
+        "Wait for the first paint."
+      ],
+      "expected": "A loading indicator or empty-state message is shown instead of a blank page.",
+      "status": "pass",
+      "actual": "Empty-state or loading UI is present.",
+      "files": [
+        "src/routes/customersupport.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-contact-messages-009",
+      "screen": "Contact messages",
+      "path": "/customersupport/contact-messages",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P1",
+      "scenario": "Authorized session — entitled user can stay on Contact messages",
+      "steps": [
+        "Sign in as the role that owns this module.",
+        "Open Contact messages."
+      ],
+      "expected": "Authenticated entitled users are not bounced to login.",
+      "status": "pass",
+      "actual": "Screen or parent layout uses useAuth / StaffShell.",
+      "files": [
+        "src/routes/customersupport.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-contact-messages-010",
+      "screen": "Contact messages",
+      "path": "/customersupport/contact-messages",
+      "module": "Customer Support",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — guest cannot open Contact messages",
+      "steps": [
+        "Sign out (or use a private window).",
+        "Paste `/customersupport/contact-messages` into the address bar."
+      ],
+      "expected": "Unauthenticated visitors are redirected to customer or staff login; no protected data is shown.",
+      "status": "pass",
+      "actual": "Layout redirects guests to /login or /admin/login.",
+      "files": [
+        "src/routes/customersupport.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-contact-messages-011",
+      "screen": "Contact messages",
+      "path": "/customersupport/contact-messages",
+      "module": "Customer Support",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — wrong staff role cannot use Contact messages",
+      "steps": [
+        "Sign in as a staff user whose role does not own this module (e.g. Sales on Operations).",
+        "Open `/customersupport/contact-messages`."
+      ],
+      "expected": "User is sent to their own home path; admin/staff chrome for this module is not rendered.",
+      "status": "pass",
+      "actual": "Role guard (isAdmin / allowedRole / staffHomePath) is present.",
+      "files": [
+        "src/routes/customersupport.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-contact-messages-012",
+      "screen": "Contact messages",
+      "path": "/customersupport/contact-messages",
+      "module": "Customer Support",
+      "kind": "negative",
+      "type": "Negative",
+      "priority": "P2",
+      "scenario": "Negative — Contact messages surfaces API failures",
+      "steps": [
+        "Simulate a failed API response (network offline or 5xx from the gateway).",
+        "Reload Contact messages or retry the primary action."
+      ],
+      "expected": "User sees a toast or inline error; the screen does not fail silently or spin forever.",
+      "status": "pass",
+      "actual": "catch / toast.error / showApiError / loading guard is present.",
+      "files": [
+        "src/routes/customersupport.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-contact-messages-013",
+      "screen": "Contact messages",
+      "path": "/customersupport/contact-messages",
+      "module": "Customer Support",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P2",
+      "scenario": "Negative — Contact messages does not render unsanitized HTML from the route",
+      "steps": [
+        "If the screen echoes user- or CMS-supplied text, paste a script tag into a text field.",
+        "Save and reopen the screen."
+      ],
+      "expected": "The route module itself does not call dangerouslySetInnerHTML on user input.",
+      "status": "pass",
+      "actual": "Route file does not use dangerouslySetInnerHTML on non-JSON payloads.",
+      "files": [
+        "src/routes/customersupport.contact-messages.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-customers-001",
+      "screen": "Customers",
+      "path": "/customersupport/customers",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P1",
+      "scenario": "Smoke — Customers screen loads",
+      "steps": [
+        "Log in as the role that owns this screen (or stay a guest on public pages).",
+        "Open Customers from the sidebar, module hub, or URL.",
+        "Confirm the URL matches `/customersupport/customers`."
+      ],
+      "expected": "Page shell renders without an error toast; primary heading or empty-state message is visible.",
+      "status": "pass",
+      "actual": "Route module exports createFileRoute with a component.",
+      "files": [
+        "src/routes/customersupport.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-customers-002",
+      "screen": "Customers",
+      "path": "/customersupport/customers",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Navigation — return to hub after visiting Customers",
+      "steps": [
+        "From Customers, use browser back or the app Home/sidebar.",
+        "Re-open Customers."
+      ],
+      "expected": "Navigation is stable; no blank screen or infinite spinner.",
+      "status": "pass",
+      "actual": "Link or navigate() is present in the screen or parent layout.",
+      "files": [
+        "src/routes/customersupport.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-customers-003",
+      "screen": "Customers",
+      "path": "/customersupport/customers",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P2",
+      "scenario": "Mobile layout — Customers usable on phone width",
+      "steps": [
+        "Set viewport to mobile (≤430px) or use a device.",
+        "Open Customers.",
+        "Scroll primary content."
+      ],
+      "expected": "Controls remain reachable; no horizontal overflow blocking actions.",
+      "status": "pass",
+      "actual": "Responsive Tailwind breakpoints or compact padding are present.",
+      "files": [
+        "src/routes/customersupport.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-customers-004",
+      "screen": "Customers",
+      "path": "/customersupport/customers",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P2",
+      "scenario": "Heading — Customers identifies itself",
+      "steps": [
+        "Open Customers.",
+        "Look at the document title or on-page heading."
+      ],
+      "expected": "Primary heading or HTML title is visible so the tester knows which screen they are on.",
+      "status": "pass",
+      "actual": "head() title, h1, or display heading is defined.",
+      "files": [
+        "src/routes/customersupport.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-customers-005",
+      "screen": "Customers",
+      "path": "/customersupport/customers",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Route registry — Customers is wired into the app router",
+      "steps": [
+        "Deploy/build the app.",
+        "Request `/customersupport/customers` directly."
+      ],
+      "expected": "TanStack route tree includes this path so the screen is reachable.",
+      "status": "pass",
+      "actual": "Path is present in src/routeTree.gen.ts.",
+      "files": [
+        "src/routes/customersupport.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-customers-006",
+      "screen": "Customers",
+      "path": "/customersupport/customers",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Primary actions — Customers controls are reachable",
+      "steps": [
+        "Open Customers.",
+        "Tab or tap through primary buttons, links, or the main form."
+      ],
+      "expected": "At least one primary action (button, link, or form) is present.",
+      "status": "pass",
+      "actual": "Button, Link, or form control found.",
+      "files": [
+        "src/routes/customersupport.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-customers-007",
+      "screen": "Customers",
+      "path": "/customersupport/customers",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P3",
+      "scenario": "Overflow — Customers does not trap actions off-canvas",
+      "steps": [
+        "Open on a 375px-wide viewport.",
+        "Try to reach every primary control."
+      ],
+      "expected": "Layout uses width constraints or overflow-x handling so actions stay on screen.",
+      "status": "pass",
+      "actual": "Width/overflow constraints present.",
+      "files": [
+        "src/routes/customersupport.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-customers-008",
+      "screen": "Customers",
+      "path": "/customersupport/customers",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Empty / loading — Customers handles no data",
+      "steps": [
+        "Open Customers with an empty catalog, empty cart, or while data is still loading.",
+        "Wait for the first paint."
+      ],
+      "expected": "A loading indicator or empty-state message is shown instead of a blank page.",
+      "status": "pass",
+      "actual": "Empty-state or loading UI is present.",
+      "files": [
+        "src/routes/customersupport.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-customers-009",
+      "screen": "Customers",
+      "path": "/customersupport/customers",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P1",
+      "scenario": "Authorized session — entitled user can stay on Customers",
+      "steps": [
+        "Sign in as the role that owns this module.",
+        "Open Customers."
+      ],
+      "expected": "Authenticated entitled users are not bounced to login.",
+      "status": "pass",
+      "actual": "Screen or parent layout uses useAuth / StaffShell.",
+      "files": [
+        "src/routes/customersupport.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-customers-010",
+      "screen": "Customers",
+      "path": "/customersupport/customers",
+      "module": "Customer Support",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — guest cannot open Customers",
+      "steps": [
+        "Sign out (or use a private window).",
+        "Paste `/customersupport/customers` into the address bar."
+      ],
+      "expected": "Unauthenticated visitors are redirected to customer or staff login; no protected data is shown.",
+      "status": "pass",
+      "actual": "Layout redirects guests to /login or /admin/login.",
+      "files": [
+        "src/routes/customersupport.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-customers-011",
+      "screen": "Customers",
+      "path": "/customersupport/customers",
+      "module": "Customer Support",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — wrong staff role cannot use Customers",
+      "steps": [
+        "Sign in as a staff user whose role does not own this module (e.g. Sales on Operations).",
+        "Open `/customersupport/customers`."
+      ],
+      "expected": "User is sent to their own home path; admin/staff chrome for this module is not rendered.",
+      "status": "pass",
+      "actual": "Role guard (isAdmin / allowedRole / staffHomePath) is present.",
+      "files": [
+        "src/routes/customersupport.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-customers-012",
+      "screen": "Customers",
+      "path": "/customersupport/customers",
+      "module": "Customer Support",
+      "kind": "negative",
+      "type": "Negative",
+      "priority": "P2",
+      "scenario": "Negative — Customers surfaces API failures",
+      "steps": [
+        "Simulate a failed API response (network offline or 5xx from the gateway).",
+        "Reload Customers or retry the primary action."
+      ],
+      "expected": "User sees a toast or inline error; the screen does not fail silently or spin forever.",
+      "status": "pass",
+      "actual": "catch / toast.error / showApiError / loading guard is present.",
+      "files": [
+        "src/routes/customersupport.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-customers-013",
+      "screen": "Customers",
+      "path": "/customersupport/customers",
+      "module": "Customer Support",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P2",
+      "scenario": "Negative — Customers does not render unsanitized HTML from the route",
+      "steps": [
+        "If the screen echoes user- or CMS-supplied text, paste a script tag into a text field.",
+        "Save and reopen the screen."
+      ],
+      "expected": "The route module itself does not call dangerouslySetInnerHTML on user input.",
+      "status": "pass",
+      "actual": "Route file does not use dangerouslySetInnerHTML on non-JSON payloads.",
+      "files": [
+        "src/routes/customersupport.customers.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
       "id": "MT-CS-customersupport-orders-001",
       "screen": "Customersupport Orders",
       "path": "/customersupport/orders",
@@ -28970,6 +32028,320 @@
         "src/components/staff/StaffShell.tsx",
         "src/components/InvoiceViewer.tsx",
         "src/lib/invoice-breakdown.ts"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-returns-001",
+      "screen": "Returns",
+      "path": "/customersupport/returns",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P1",
+      "scenario": "Smoke — Returns screen loads",
+      "steps": [
+        "Log in as the role that owns this screen (or stay a guest on public pages).",
+        "Open Returns from the sidebar, module hub, or URL.",
+        "Confirm the URL matches `/customersupport/returns`."
+      ],
+      "expected": "Page shell renders without an error toast; primary heading or empty-state message is visible.",
+      "status": "pass",
+      "actual": "Route module exports createFileRoute with a component.",
+      "files": [
+        "src/routes/customersupport.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-returns-002",
+      "screen": "Returns",
+      "path": "/customersupport/returns",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Navigation — return to hub after visiting Returns",
+      "steps": [
+        "From Returns, use browser back or the app Home/sidebar.",
+        "Re-open Returns."
+      ],
+      "expected": "Navigation is stable; no blank screen or infinite spinner.",
+      "status": "pass",
+      "actual": "Link or navigate() is present in the screen or parent layout.",
+      "files": [
+        "src/routes/customersupport.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-returns-003",
+      "screen": "Returns",
+      "path": "/customersupport/returns",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P2",
+      "scenario": "Mobile layout — Returns usable on phone width",
+      "steps": [
+        "Set viewport to mobile (≤430px) or use a device.",
+        "Open Returns.",
+        "Scroll primary content."
+      ],
+      "expected": "Controls remain reachable; no horizontal overflow blocking actions.",
+      "status": "pass",
+      "actual": "Responsive Tailwind breakpoints or compact padding are present.",
+      "files": [
+        "src/routes/customersupport.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-returns-004",
+      "screen": "Returns",
+      "path": "/customersupport/returns",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Smoke",
+      "priority": "P2",
+      "scenario": "Heading — Returns identifies itself",
+      "steps": [
+        "Open Returns.",
+        "Look at the document title or on-page heading."
+      ],
+      "expected": "Primary heading or HTML title is visible so the tester knows which screen they are on.",
+      "status": "pass",
+      "actual": "head() title, h1, or display heading is defined.",
+      "files": [
+        "src/routes/customersupport.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-returns-005",
+      "screen": "Returns",
+      "path": "/customersupport/returns",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Route registry — Returns is wired into the app router",
+      "steps": [
+        "Deploy/build the app.",
+        "Request `/customersupport/returns` directly."
+      ],
+      "expected": "TanStack route tree includes this path so the screen is reachable.",
+      "status": "pass",
+      "actual": "Path is present in src/routeTree.gen.ts.",
+      "files": [
+        "src/routes/customersupport.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-returns-006",
+      "screen": "Returns",
+      "path": "/customersupport/returns",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Primary actions — Returns controls are reachable",
+      "steps": [
+        "Open Returns.",
+        "Tab or tap through primary buttons, links, or the main form."
+      ],
+      "expected": "At least one primary action (button, link, or form) is present.",
+      "status": "pass",
+      "actual": "Button, Link, or form control found.",
+      "files": [
+        "src/routes/customersupport.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-returns-007",
+      "screen": "Returns",
+      "path": "/customersupport/returns",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Responsive",
+      "priority": "P3",
+      "scenario": "Overflow — Returns does not trap actions off-canvas",
+      "steps": [
+        "Open on a 375px-wide viewport.",
+        "Try to reach every primary control."
+      ],
+      "expected": "Layout uses width constraints or overflow-x handling so actions stay on screen.",
+      "status": "pass",
+      "actual": "Width/overflow constraints present.",
+      "files": [
+        "src/routes/customersupport.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-returns-008",
+      "screen": "Returns",
+      "path": "/customersupport/returns",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P2",
+      "scenario": "Empty / loading — Returns handles no data",
+      "steps": [
+        "Open Returns with an empty catalog, empty cart, or while data is still loading.",
+        "Wait for the first paint."
+      ],
+      "expected": "A loading indicator or empty-state message is shown instead of a blank page.",
+      "status": "pass",
+      "actual": "Empty-state or loading UI is present.",
+      "files": [
+        "src/routes/customersupport.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-returns-009",
+      "screen": "Returns",
+      "path": "/customersupport/returns",
+      "module": "Customer Support",
+      "kind": "positive",
+      "type": "Regression",
+      "priority": "P1",
+      "scenario": "Authorized session — entitled user can stay on Returns",
+      "steps": [
+        "Sign in as the role that owns this module.",
+        "Open Returns."
+      ],
+      "expected": "Authenticated entitled users are not bounced to login.",
+      "status": "pass",
+      "actual": "Screen or parent layout uses useAuth / StaffShell.",
+      "files": [
+        "src/routes/customersupport.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-returns-010",
+      "screen": "Returns",
+      "path": "/customersupport/returns",
+      "module": "Customer Support",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — guest cannot open Returns",
+      "steps": [
+        "Sign out (or use a private window).",
+        "Paste `/customersupport/returns` into the address bar."
+      ],
+      "expected": "Unauthenticated visitors are redirected to customer or staff login; no protected data is shown.",
+      "status": "pass",
+      "actual": "Layout redirects guests to /login or /admin/login.",
+      "files": [
+        "src/routes/customersupport.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-returns-011",
+      "screen": "Returns",
+      "path": "/customersupport/returns",
+      "module": "Customer Support",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P1",
+      "scenario": "Negative — wrong staff role cannot use Returns",
+      "steps": [
+        "Sign in as a staff user whose role does not own this module (e.g. Sales on Operations).",
+        "Open `/customersupport/returns`."
+      ],
+      "expected": "User is sent to their own home path; admin/staff chrome for this module is not rendered.",
+      "status": "pass",
+      "actual": "Role guard (isAdmin / allowedRole / staffHomePath) is present.",
+      "files": [
+        "src/routes/customersupport.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-returns-012",
+      "screen": "Returns",
+      "path": "/customersupport/returns",
+      "module": "Customer Support",
+      "kind": "negative",
+      "type": "Negative",
+      "priority": "P2",
+      "scenario": "Negative — Returns surfaces API failures",
+      "steps": [
+        "Simulate a failed API response (network offline or 5xx from the gateway).",
+        "Reload Returns or retry the primary action."
+      ],
+      "expected": "User sees a toast or inline error; the screen does not fail silently or spin forever.",
+      "status": "pass",
+      "actual": "catch / toast.error / showApiError / loading guard is present.",
+      "files": [
+        "src/routes/customersupport.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
+      ]
+    },
+    {
+      "id": "MT-CS-customersupport-returns-013",
+      "screen": "Returns",
+      "path": "/customersupport/returns",
+      "module": "Customer Support",
+      "kind": "negative",
+      "type": "Security",
+      "priority": "P2",
+      "scenario": "Negative — Returns does not render unsanitized HTML from the route",
+      "steps": [
+        "If the screen echoes user- or CMS-supplied text, paste a script tag into a text field.",
+        "Save and reopen the screen."
+      ],
+      "expected": "The route module itself does not call dangerouslySetInnerHTML on user input.",
+      "status": "pass",
+      "actual": "Route file does not use dangerouslySetInnerHTML on non-JSON payloads.",
+      "files": [
+        "src/routes/customersupport.returns.tsx",
+        "src/routes/__root.tsx",
+        "src/routes/customersupport.tsx",
+        "src/components/staff/StaffShell.tsx",
+        "src/routes/admin.tsx"
       ]
     }
   ]

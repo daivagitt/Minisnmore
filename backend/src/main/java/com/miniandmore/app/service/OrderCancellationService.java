@@ -62,9 +62,6 @@ public class OrderCancellationService {
             .findOneByOrderNumberAndUserLogin(orderNumber, userLogin)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
         cancellationExecutor.assertCancelEligible(order);
-        if (isAfterHandWrap(order)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Please contact Customer Care");
-        }
         if (cancellationRequestRepository.existsByOrderIdAndStatus(order.getId(), CancellationRequestStatus.REQUESTED)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "A cancellation request is already pending for this order");
         }
@@ -122,13 +119,9 @@ public class OrderCancellationService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cancellation request is not awaiting approval");
         }
         CustomerOrder order = request.getOrder();
-        cancellationExecutor.assertCancelEligible(order);
-        if (isAfterHandWrap(order)) {
-            throw new ResponseStatusException(
-                HttpStatus.CONFLICT,
-                "This order is already packed. Reject the cancellation request and ask the customer to contact Customer Care."
-            );
-        }
+        assertNotTerminatedForCancellation(order);
+        String voidReason = resolveShipmentVoidReason(request.getReason(), adminNotes);
+        order = voidBookedShipmentBeforeCancellation(order, voidReason, "cancellation-approval", null);
         String refundId = cancellationExecutor.performCancellation(order, request.getReason());
         OrderCancellationRequest saved = completeApprovedCancellation(
             request,
@@ -242,10 +235,10 @@ public class OrderCancellationService {
     }
 
     public boolean canCustomerRequestCancel(CustomerOrder order) {
-        return canCancel(order) && !isAfterHandWrap(order);
+        return canCancel(order);
     }
 
-    /** Customer account UI: may show "Request cancellation" (not pending, eligible, not yet packed). */
+    /** Customer account UI: may show "Request cancellation" (not pending, eligible until shipment is booked). */
     public boolean canCustomerShowCancelAction(CustomerOrder order) {
         if (order == null || order.getId() == null) {
             return false;
@@ -256,35 +249,9 @@ public class OrderCancellationService {
         return canCustomerRequestCancel(order);
     }
 
+    /** Packed/hand-wrapped orders are self-serve until shipment booking; contact-care is unused. */
     public boolean shouldContactCareToCancel(CustomerOrder order) {
-        if (order == null || order.getId() == null) {
-            return false;
-        }
-        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FULFILLED) {
-            return false;
-        }
-        if (hasPendingRequest(order.getId())) {
-            return false;
-        }
-        if (canCustomerRequestCancel(order)) {
-            return false;
-        }
-        return isAfterHandWrap(order);
-    }
-
-    public static boolean isAfterHandWrap(CustomerOrder order) {
-        if (order == null) {
-            return false;
-        }
-        return order.getStatus() == OrderStatus.HAND_WRAPPED || order.getPackedAt() != null;
-    }
-
-    public CustomerOrder loadCancellable(String orderNumber) {
-        CustomerOrder order = customerOrderRepository
-            .findOneByOrderNumberForUpdate(orderNumber)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
-        cancellationExecutor.assertCancelEligible(order);
-        return order;
+        return false;
     }
 
     /**
@@ -293,37 +260,48 @@ public class OrderCancellationService {
      */
     public CustomerOrder cancelOrderFromAdmin(String orderNumber, String reason, String cancelledBy, String shipmentMode) {
         String normalizedReason = normalizeAdminReason(reason);
-        CustomerOrder order = loadCancellable(orderNumber);
-        boolean hadBookedLabel = StringUtils.isNotBlank(order.getTrackingNumber());
-        if (hadBookedLabel) {
-            if (orderShipmentService == null) {
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Shipment cancellation is not configured");
-            }
-            ReturnLogisticsMode logisticsMode = resolveShipmentCancelMode(order, shipmentMode);
-            try {
-                orderShipmentService.cancelShipment(
-                    orderNumber,
-                    logisticsMode,
-                    normalizedReason,
-                    StringUtils.defaultIfBlank(cancelledBy, "system")
-                );
-            } catch (ResponseStatusException ex) {
-                if (ex.getStatusCode().isSameCodeAs(HttpStatus.BAD_GATEWAY)) {
-                    throw new ResponseStatusException(
-                        HttpStatus.CONFLICT,
-                        "Could not void the AWB with the carrier: "
-                            + StringUtils.defaultIfBlank(ex.getReason(), ex.getMessage())
-                            + ". The order was not cancelled; void the label manually or retry after the carrier confirms."
-                    );
-                }
-                throw ex;
-            }
-            order = customerOrderRepository
-                .findOneByOrderNumberForUpdate(orderNumber)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
-            cancellationExecutor.assertCancelEligible(order);
-        }
+        CustomerOrder order = loadOrderForAdminCancellation(orderNumber);
+        order = voidBookedShipmentBeforeCancellation(order, normalizedReason, cancelledBy, shipmentMode);
         return finalizeAdminCancellation(order, normalizedReason, cancelledBy);
+    }
+
+    private CustomerOrder voidBookedShipmentBeforeCancellation(
+        CustomerOrder order,
+        String reason,
+        String cancelledBy,
+        String shipmentMode
+    ) {
+        if (StringUtils.isBlank(order.getTrackingNumber())) {
+            cancellationExecutor.assertCancelEligible(order);
+            return order;
+        }
+        if (orderShipmentService == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Shipment cancellation is not configured");
+        }
+        ReturnLogisticsMode logisticsMode = resolveShipmentCancelMode(order, shipmentMode);
+        try {
+            orderShipmentService.cancelShipment(
+                order.getOrderNumber(),
+                logisticsMode,
+                reason,
+                StringUtils.defaultIfBlank(cancelledBy, "system")
+            );
+        } catch (ResponseStatusException ex) {
+            if (ex.getStatusCode().isSameCodeAs(HttpStatus.BAD_GATEWAY)) {
+                throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Could not void the AWB with the carrier: "
+                        + StringUtils.defaultIfBlank(ex.getReason(), ex.getMessage())
+                        + ". The order was not cancelled; void the label manually or retry after the carrier confirms."
+                );
+            }
+            throw ex;
+        }
+        CustomerOrder refreshed = customerOrderRepository
+            .findOneByOrderNumberForUpdate(order.getOrderNumber())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+        cancellationExecutor.assertCancelEligible(refreshed);
+        return refreshed;
     }
 
     private CustomerOrder finalizeAdminCancellation(CustomerOrder order, String normalizedReason, String cancelledBy) {
@@ -407,7 +385,14 @@ public class OrderCancellationService {
         }
     }
 
+    /**
+     * Carrier-voided AWBs ({@code carrier_cancelled}) always clear locally via MANUAL —
+     * never re-issue an ExpressBees cancel, even if the client requested xpressbees mode.
+     */
     private static ReturnLogisticsMode resolveShipmentCancelMode(CustomerOrder order, String shipmentMode) {
+        if (OrderShipmentService.isCarrierCancelledShipment(order)) {
+            return ReturnLogisticsMode.MANUAL;
+        }
         if (StringUtils.isNotBlank(shipmentMode)) {
             try {
                 return ReturnLogisticsMode.valueOf(shipmentMode.trim().toUpperCase());
@@ -517,6 +502,36 @@ public class OrderCancellationService {
         return customerOrderRepository
             .findOneByOrderNumberAndUserLogin(orderNumber, userLogin)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+    }
+
+    private CustomerOrder loadOrderForAdminCancellation(String orderNumber) {
+        CustomerOrder order = customerOrderRepository
+            .findOneByOrderNumberForUpdate(orderNumber)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+        assertNotTerminatedForCancellation(order);
+        return order;
+    }
+
+    private static void assertNotTerminatedForCancellation(CustomerOrder order) {
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This order is already cancelled");
+        }
+        if (order.getStatus() == OrderStatus.FULFILLED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This order has already been dispatched and can no longer be cancelled");
+        }
+    }
+
+    /** Shipment void requires at least five characters; customer cancel reasons may be shorter. */
+    private static String resolveShipmentVoidReason(String primary, String secondary) {
+        String normalized = StringUtils.normalizeSpace(StringUtils.trimToEmpty(primary));
+        if (normalized.length() >= ADMIN_CANCEL_REASON_MIN_LENGTH) {
+            return StringUtils.left(normalized, 2000);
+        }
+        String combined = StringUtils.normalizeSpace(normalized + " " + StringUtils.trimToEmpty(secondary));
+        if (combined.length() >= ADMIN_CANCEL_REASON_MIN_LENGTH) {
+            return StringUtils.left(combined, 2000);
+        }
+        return "Order cancellation approved";
     }
 
     private static String normalizeReason(String reason) {

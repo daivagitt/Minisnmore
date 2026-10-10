@@ -2,7 +2,7 @@
   "baseUrl": "https://uat.minisnmore.com",
   "adminAuthenticated": true,
   "customerAuthenticated": true,
-  "endpointCount": 42,
+  "endpointCount": 45,
   "endpoints": [
     {
       "method": "GET",
@@ -132,6 +132,13 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/admin/order-returns/summary",
+      "openapiPath": "/api/v1/admin/order-returns/summary",
+      "module": "internal-admin-order-return-resource",
+      "auth": "admin"
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/admin/orders",
       "openapiPath": "/api/v1/admin/orders",
       "module": "internal-admin-order-resource",
@@ -149,6 +156,13 @@
       "path": "/api/v1/admin/orders/ordered-logins",
       "openapiPath": "/api/v1/admin/orders/ordered-logins",
       "module": "internal-admin-order-resource",
+      "auth": "admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/package-boxes",
+      "openapiPath": "/api/v1/admin/package-boxes",
+      "module": "internal-admin-package-box-resource",
       "auth": "admin"
     },
     {
@@ -176,6 +190,13 @@
       "method": "GET",
       "path": "/api/v1/admin/site-settings",
       "openapiPath": "/api/v1/admin/site-settings",
+      "module": "internal-admin-store-resource",
+      "auth": "admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/store-addresses",
+      "openapiPath": "/api/v1/admin/store-addresses",
       "module": "internal-admin-store-resource",
       "auth": "admin"
     },
@@ -279,7 +300,7 @@
     },
     {
       "method": "GET",
-      "path": "/api/v1/products/api-test-seed-1789020484",
+      "path": "/api/v1/products/api-test-seed-1789016908",
       "openapiPath": "/api/v1/products/{slug}",
       "module": "internal-storefront-resource",
       "auth": "none"

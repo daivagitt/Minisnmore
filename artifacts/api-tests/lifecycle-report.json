@@ -1,22 +1,22 @@
 {
   "summary": {
     "strategy": "OpenAPI-driven: payloads from spec/schemas, skip user-interaction endpoints",
-    "openapiSource": "https://uat.minisnmore.com/v3/api-docs",
+    "openapiSource": "https://uat.minisnmore.com/v3/api-docs/catalog",
     "baseUrl": "https://uat.minisnmore.com",
     "noMailMode": true,
-    "skippedNoMail": 63,
-    "skippedUserInteraction": 3,
-    "totalOpenApiOps": 151,
-    "requestsRun": 155,
-    "openapiOpsMarked": 181,
+    "skippedNoMail": 74,
+    "skippedUserInteraction": 4,
+    "totalOpenApiOps": 166,
+    "requestsRun": 170,
+    "openapiOpsMarked": 196,
     "adminLogin": 200,
     "customerLogin": 200,
-    "pass2xx": 74,
+    "pass2xx": 77,
     "fail": 12,
-    "skipped": 69,
-    "passRatePct": 86.0,
+    "skipped": 81,
+    "passRatePct": 86.5,
     "credentials": {
-      "admin": "admin@uat.minisnmore.com",
+      "admin": "admin",
       "customer": "irfanpatan9948@gmail.com"
     }
   },
@@ -104,12 +104,12 @@
     "internal-admin-cancellation-request": {
       "pass": 1,
       "fail": 0,
-      "skip": 3
+      "skip": 4
     },
     "internal-admin-store": {
-      "pass": 3,
+      "pass": 4,
       "fail": 0,
-      "skip": 3
+      "skip": 6
     },
     "internal-admin-import": {
       "pass": 0,
@@ -122,19 +122,24 @@
       "skip": 8
     },
     "internal-admin-order-return": {
-      "pass": 1,
+      "pass": 2,
       "fail": 0,
-      "skip": 22
+      "skip": 24
     },
     "internal-admin-order": {
       "pass": 3,
       "fail": 0,
-      "skip": 5
+      "skip": 6
     },
     "internal-admin-order-resource": {
       "pass": 0,
       "fail": 1,
       "skip": 0
+    },
+    "internal-admin-package-box": {
+      "pass": 1,
+      "fail": 0,
+      "skip": 3
     },
     "internal-admin-store-resource": {
       "pass": 0,
@@ -159,7 +164,7 @@
     "internal-order-return": {
       "pass": 2,
       "fail": 0,
-      "skip": 3
+      "skip": 4
     },
     "internal-order-return-resource": {
       "pass": 0,
@@ -170,6 +175,11 @@
       "pass": 0,
       "fail": 2,
       "skip": 0
+    },
+    "internal-razorpay-webhook": {
+      "pass": 0,
+      "fail": 0,
+      "skip": 1
     },
     "internal-xpress-bees-return-webhook": {
       "pass": 0,
@@ -236,7 +246,7 @@
       "code": 200,
       "2xx": true,
       "note": "seed product",
-      "responseTimeMs": 35
+      "responseTimeMs": 128
     },
     {
       "module": "storefront",
@@ -246,7 +256,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 28
+      "responseTimeMs": 105
     },
     {
       "module": "storefront",
@@ -256,7 +266,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 30
+      "responseTimeMs": 216
     },
     {
       "module": "storefront",
@@ -266,7 +276,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 34
+      "responseTimeMs": 103
     },
     {
       "module": "storefront",
@@ -276,7 +286,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 46
+      "responseTimeMs": 95
     },
     {
       "module": "storefront",
@@ -286,7 +296,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 5034
+      "responseTimeMs": 61
     },
     {
       "module": "storefront",
@@ -296,7 +306,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 57
+      "responseTimeMs": 102
     },
     {
       "module": "storefront",
@@ -306,7 +316,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 29
+      "responseTimeMs": 33
     },
     {
       "module": "storefront",
@@ -316,17 +326,17 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 134
+      "responseTimeMs": 240
     },
     {
       "module": "storefront",
       "method": "GET",
-      "path": "/api/v1/products/api-test-seed-1789020484",
+      "path": "/api/v1/products/api-test-seed-1789016908",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 27
+      "responseTimeMs": 32
     },
     {
       "module": "admin-banners",
@@ -336,7 +346,7 @@
       "code": 200,
       "2xx": true,
       "note": "create",
-      "responseTimeMs": 58
+      "responseTimeMs": 105
     },
     {
       "module": "admin-banners",
@@ -346,27 +356,27 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 31
+      "responseTimeMs": 38
     },
     {
       "module": "admin-banners",
       "method": "PUT",
-      "path": "/api/v1/admin/banners/1588652",
+      "path": "/api/v1/admin/banners/4073851",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 37
+      "responseTimeMs": 116
     },
     {
       "module": "admin-banners",
       "method": "DELETE",
-      "path": "/api/v1/admin/banners/1588652",
+      "path": "/api/v1/admin/banners/4073851",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 124
+      "responseTimeMs": 126
     },
     {
       "module": "admin-categories",
@@ -376,7 +386,7 @@
       "code": 200,
       "2xx": true,
       "note": "create",
-      "responseTimeMs": 31
+      "responseTimeMs": 70
     },
     {
       "module": "admin-categories",
@@ -386,27 +396,27 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 88
+      "responseTimeMs": 59
     },
     {
       "module": "admin-categories",
       "method": "PUT",
-      "path": "/api/v1/admin/categories/1588702",
+      "path": "/api/v1/admin/categories/4073901",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 53
+      "responseTimeMs": 71
     },
     {
       "module": "admin-categories",
       "method": "DELETE",
-      "path": "/api/v1/admin/categories/1588702",
+      "path": "/api/v1/admin/categories/4073901",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 36
+      "responseTimeMs": 71
     },
     {
       "module": "admin-coupons",
@@ -436,7 +446,7 @@
       "code": 200,
       "2xx": true,
       "note": "create",
-      "responseTimeMs": 33
+      "responseTimeMs": 40
     },
     {
       "module": "admin-policies",
@@ -446,27 +456,27 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 34
+      "responseTimeMs": 60
     },
     {
       "module": "admin-policies",
       "method": "PUT",
-      "path": "/api/v1/admin/policies/1588752",
+      "path": "/api/v1/admin/policies/4073951",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 31
+      "responseTimeMs": 71
     },
     {
       "module": "admin-policies",
       "method": "DELETE",
-      "path": "/api/v1/admin/policies/1588752",
+      "path": "/api/v1/admin/policies/4073951",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 31
+      "responseTimeMs": 54
     },
     {
       "module": "admin-blog-posts",
@@ -476,7 +486,7 @@
       "code": 200,
       "2xx": true,
       "note": "create",
-      "responseTimeMs": 29
+      "responseTimeMs": 42
     },
     {
       "module": "admin-blog-posts",
@@ -486,27 +496,27 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 50
+      "responseTimeMs": 65
     },
     {
       "module": "admin-blog-posts",
       "method": "PUT",
-      "path": "/api/v1/admin/blog-posts/1588802",
+      "path": "/api/v1/admin/blog-posts/4074001",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 37
+      "responseTimeMs": 178
     },
     {
       "module": "admin-blog-posts",
       "method": "DELETE",
-      "path": "/api/v1/admin/blog-posts/1588802",
+      "path": "/api/v1/admin/blog-posts/4074001",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 58
+      "responseTimeMs": 38
     },
     {
       "module": "admin-home-sections",
@@ -516,7 +526,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 29
+      "responseTimeMs": 58
     },
     {
       "module": "admin-home-sections",
@@ -526,7 +536,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 35
+      "responseTimeMs": 162
     },
     {
       "module": "admin-page-visibility",
@@ -536,7 +546,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 33
+      "responseTimeMs": 55
     },
     {
       "module": "admin-page-visibility",
@@ -546,7 +556,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 32
+      "responseTimeMs": 57
     },
     {
       "module": "admin",
@@ -556,7 +566,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 57
+      "responseTimeMs": 74
     },
     {
       "module": "admin",
@@ -566,7 +576,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 43
+      "responseTimeMs": 54
     },
     {
       "module": "admin",
@@ -576,7 +586,7 @@
       "code": 204,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 16
+      "responseTimeMs": 38
     },
     {
       "module": "admin",
@@ -586,7 +596,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 18
+      "responseTimeMs": 66
     },
     {
       "module": "admin",
@@ -596,7 +606,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 17
+      "responseTimeMs": 51
     },
     {
       "module": "admin",
@@ -606,7 +616,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 54
+      "responseTimeMs": 58
     },
     {
       "module": "admin",
@@ -626,7 +636,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 34
+      "responseTimeMs": 64
     },
     {
       "module": "customer",
@@ -636,7 +646,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 82
+      "responseTimeMs": 47
     },
     {
       "module": "customer",
@@ -646,7 +656,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 68
+      "responseTimeMs": 210
     },
     {
       "module": "customer",
@@ -656,7 +666,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 5037
+      "responseTimeMs": 79
     },
     {
       "module": "customer",
@@ -666,7 +676,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 35
+      "responseTimeMs": 153
     },
     {
       "module": "customer",
@@ -696,7 +706,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 30
+      "responseTimeMs": 56
     },
     {
       "module": "internal-account",
@@ -706,7 +716,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 39
+      "responseTimeMs": 64
     },
     {
       "module": "internal-account",
@@ -716,7 +726,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 65
+      "responseTimeMs": 86
     },
     {
       "module": "internal-account",
@@ -726,7 +736,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 34
+      "responseTimeMs": 75
     },
     {
       "module": "internal-account-resource",
@@ -766,7 +776,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 33
+      "responseTimeMs": 54
     },
     {
       "module": "internal-account",
@@ -776,7 +786,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 39
+      "responseTimeMs": 58
     },
     {
       "module": "internal-account-order",
@@ -786,7 +796,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 56
+      "responseTimeMs": 160
     },
     {
       "module": "internal-account-order",
@@ -796,7 +806,7 @@
       "code": 400,
       "2xx": false,
       "note": "{\"detail\":\"Email does not match signed-in account\",\"instance\":\"/internal/v1/account/profile/bootstrap\",\"status\":400,\"title\":\"Bad Request\"}",
-      "responseTimeMs": 39
+      "responseTimeMs": 54
     },
     {
       "module": "internal-account",
@@ -806,7 +816,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 39
+      "responseTimeMs": 47
     },
     {
       "module": "internal-account",
@@ -826,7 +836,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 56
+      "responseTimeMs": 63
     },
     {
       "module": "internal-account-resource",
@@ -846,7 +856,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 40
+      "responseTimeMs": 68
     },
     {
       "module": "internal-admin-cancellation-request",
@@ -856,7 +866,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 91
+      "responseTimeMs": 93
     },
     {
       "module": "internal-admin-cancellation-request",
@@ -889,6 +899,16 @@
       "responseTimeMs": null
     },
     {
+      "module": "internal-admin-cancellation-request",
+      "method": "POST",
+      "path": "/api/v1/admin/cancellation-requests/{requestNumber}/retry-refund",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
       "module": "internal-admin-store",
       "method": "GET",
       "path": "/api/v1/admin/contact-messages",
@@ -896,7 +916,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 36
+      "responseTimeMs": 99
     },
     {
       "module": "internal-admin-store",
@@ -916,7 +936,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 29
+      "responseTimeMs": 87
     },
     {
       "module": "internal-admin-store",
@@ -956,7 +976,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 30
+      "responseTimeMs": 67
     },
     {
       "module": "ledgerly-admin",
@@ -966,7 +986,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 67
+      "responseTimeMs": 460
     },
     {
       "module": "ledgerly-admin",
@@ -1016,7 +1036,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 32
+      "responseTimeMs": 30
     },
     {
       "module": "ledgerly-admin",
@@ -1066,7 +1086,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 53
+      "responseTimeMs": 85
     },
     {
       "module": "internal-admin-order-return",
@@ -1076,7 +1096,17 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 176
+      "responseTimeMs": 5563
+    },
+    {
+      "module": "internal-admin-order-return",
+      "method": "GET",
+      "path": "/api/v1/admin/order-returns/summary",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 63
     },
     {
       "module": "internal-admin-order-return",
@@ -1151,6 +1181,16 @@
     {
       "module": "internal-admin-order-return",
       "method": "POST",
+      "path": "/api/v1/admin/order-returns/{returnNumber}/complete-package",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-order-return",
+      "method": "POST",
       "path": "/api/v1/admin/order-returns/{returnNumber}/convert-to-refund",
       "status": "FAIL",
       "code": 0,
@@ -1182,6 +1222,16 @@
       "module": "internal-admin-order-return",
       "method": "POST",
       "path": "/api/v1/admin/order-returns/{returnNumber}/mark-received",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-order-return",
+      "method": "POST",
+      "path": "/api/v1/admin/order-returns/{returnNumber}/package-rates",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
@@ -1306,7 +1356,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 142
+      "responseTimeMs": 228
     },
     {
       "module": "internal-admin-order",
@@ -1316,7 +1366,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 501
+      "responseTimeMs": 1033
     },
     {
       "module": "internal-admin-order",
@@ -1326,7 +1376,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 35
+      "responseTimeMs": 82
     },
     {
       "module": "internal-admin-order-resource",
@@ -1342,6 +1392,16 @@
       "module": "internal-admin-order",
       "method": "POST",
       "path": "/api/v1/admin/orders/{orderNumber}/book-shipment",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-order",
+      "method": "POST",
+      "path": "/api/v1/admin/orders/{orderNumber}/cancel",
       "status": "FAIL",
       "code": 0,
       "2xx": false,
@@ -1389,6 +1449,46 @@
       "responseTimeMs": null
     },
     {
+      "module": "internal-admin-package-box",
+      "method": "GET",
+      "path": "/api/v1/admin/package-boxes",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 41
+    },
+    {
+      "module": "internal-admin-package-box",
+      "method": "POST",
+      "path": "/api/v1/admin/package-boxes",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-package-box",
+      "method": "DELETE",
+      "path": "/api/v1/admin/package-boxes/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-package-box",
+      "method": "PUT",
+      "path": "/api/v1/admin/package-boxes/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
       "module": "internal-admin-store",
       "method": "GET",
       "path": "/api/v1/admin/products",
@@ -1396,7 +1496,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 107
+      "responseTimeMs": 39
     },
     {
       "module": "internal-admin-store-resource",
@@ -1406,6 +1506,46 @@
       "code": 0,
       "2xx": false,
       "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-store",
+      "method": "GET",
+      "path": "/api/v1/admin/store-addresses",
+      "status": "PASS",
+      "code": 200,
+      "2xx": true,
+      "note": "",
+      "responseTimeMs": 70
+    },
+    {
+      "module": "internal-admin-store",
+      "method": "POST",
+      "path": "/api/v1/admin/store-addresses",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-store",
+      "method": "DELETE",
+      "path": "/api/v1/admin/store-addresses/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-admin-store",
+      "method": "PUT",
+      "path": "/api/v1/admin/store-addresses/{id}",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
       "responseTimeMs": null
     },
     {
@@ -1456,7 +1596,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 3426
+      "responseTimeMs": 3449
     },
     {
       "module": "internal-storage-upload",
@@ -1486,7 +1626,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 36
+      "responseTimeMs": 134
     },
     {
       "module": "internal-storefront",
@@ -1496,7 +1636,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 31
+      "responseTimeMs": 113
     },
     {
       "module": "internal-ledgerly-webhook",
@@ -1516,7 +1656,7 @@
       "code": 400,
       "2xx": false,
       "note": "{\"detail\":\"Required parameter 'u' is not present.\",\"instance\":\"/internal/v1/media/preview\",\"status\":400,\"title\":\"Bad Request\"}",
-      "responseTimeMs": 31
+      "responseTimeMs": 56
     },
     {
       "module": "internal-order-return",
@@ -1526,7 +1666,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 70
+      "responseTimeMs": 184
     },
     {
       "module": "internal-order-return",
@@ -1546,7 +1686,7 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 36
+      "responseTimeMs": 80
     },
     {
       "module": "internal-order-return-resource",
@@ -1576,6 +1716,16 @@
       "code": 0,
       "2xx": false,
       "note": "no path param",
+      "responseTimeMs": null
+    },
+    {
+      "module": "internal-order-return",
+      "method": "POST",
+      "path": "/api/v1/order-returns/uploads",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: user interaction (multipart file upload)",
       "responseTimeMs": null
     },
     {
@@ -1666,17 +1816,17 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 64
+      "responseTimeMs": 148
     },
     {
       "module": "internal-storefront",
       "method": "GET",
-      "path": "/api/v1/products/api-test-seed-1790574247",
+      "path": "/api/v1/products/api-test-seed-1791551378",
       "status": "PASS",
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 51
+      "responseTimeMs": 148
     },
     {
       "module": "internal-storefront",
@@ -1686,7 +1836,17 @@
       "code": 200,
       "2xx": true,
       "note": "",
-      "responseTimeMs": 22
+      "responseTimeMs": 91
+    },
+    {
+      "module": "internal-razorpay-webhook",
+      "method": "POST",
+      "path": "/api/v1/webhooks/razorpay",
+      "status": "FAIL",
+      "code": 0,
+      "2xx": false,
+      "note": "skipped: no-mail mode (endpoint can send email via Care@minisnmore.com)",
+      "responseTimeMs": null
     },
     {
       "module": "internal-xpress-bees-return-webhook",

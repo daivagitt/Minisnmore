@@ -4,6 +4,7 @@ import {
   isZohoPackageType,
   normalizeZohoPackageType,
   packageDimensionFieldsFromOrder,
+  packageTypeDimensionHint,
   ZOHO_ENVELOPE_DIMENSIONS_CM,
   ZOHO_PACKAGE_TYPES,
 } from "./package-types";
@@ -50,6 +51,10 @@ describe("Zoho package types", () => {
       width: "8",
       height: "4",
     });
+  });
+
+  it("tells operators to pick a box type for Box parcels", () => {
+    expect(packageTypeDimensionHint("box")).toMatch(/box type/i);
   });
 
   it("fills a standard envelope size and leaves box/custom for the operator", () => {

@@ -250,6 +250,54 @@ class LedgerlyAdminResourceTest {
     }
 
     @Test
+    void testConnection_forbidden_returnsUnauthorizedShape() throws Exception {
+        when(settingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
+        when(ledgerlyClient.testConnection()).thenThrow(
+            new RestClientResponseException("403", HttpStatus.FORBIDDEN.value(), "Forbidden", null, null, null)
+        );
+
+        mockMvc
+            .perform(get("/api/v1/admin/ledgerly/test"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.error").value("unauthorized"));
+    }
+
+    @Test
+    void testConnection_statusOkWithoutExplicitFlags_marksConnected() throws Exception {
+        LedgerlySetting setting = ledgerlySetting();
+        setting.setId(2L);
+        when(settingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.of(setting));
+        when(ledgerlyClient.testConnection()).thenReturn(Map.of("status", "ok"));
+        when(settingRepository.save(any(LedgerlySetting.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc
+            .perform(get("/api/v1/admin/ledgerly/test"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.connected").value(true))
+            .andExpect(jsonPath("$.ok").value(true));
+
+        verify(settingRepository).save(any(LedgerlySetting.class));
+    }
+
+    @Test
+    void saveSettings_camelCaseFieldsAndPullProductsFlag() throws Exception {
+        LedgerlySetting setting = new LedgerlySetting();
+        when(settingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.of(setting));
+        when(settingRepository.save(any(LedgerlySetting.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc
+            .perform(
+                put("/api/v1/admin/ledgerly/settings")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"apiBaseUrl\":\"https://ledgerly.test/v2\",\"apiToken\":\"tok\",\"orgId\":\"7\",\"pullProductsAutoCreateCategory\":true}"
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ok").value(true));
+    }
+
+    @Test
     void testConnection_http500_returnsStructuredError() throws Exception {
         when(settingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.empty());
         when(ledgerlyClient.testConnection()).thenThrow(

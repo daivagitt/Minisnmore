@@ -106,6 +106,26 @@ class ProductServiceTest {
     }
 
     @Test
+    void update_preservesZohoImageDocsJsonFromExistingProduct() {
+        ProductDTO input = new ProductDTO();
+        input.setId(ID);
+        Product entity = new Product().id(ID);
+        Product existing = new Product().id(ID).zohoImageDocsJson("{\"doc:1\":\"https://cdn.example.com/a.jpg\"}");
+        Product saved = new Product().id(ID);
+        ProductDTO expected = new ProductDTO();
+        expected.setId(ID);
+
+        when(productRepository.findById(ID)).thenReturn(Optional.of(existing));
+        when(productMapper.toEntity(input)).thenReturn(entity);
+        when(productRepository.save(entity)).thenReturn(saved);
+        when(productMapper.toDto(saved)).thenReturn(expected);
+
+        productService.update(input);
+
+        assertThat(entity.getZohoImageDocsJson()).isEqualTo("{\"doc:1\":\"https://cdn.example.com/a.jpg\"}");
+    }
+
+    @Test
     void partialUpdate_found() {
         ProductDTO input = new ProductDTO();
         input.setId(ID);

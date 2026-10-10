@@ -658,7 +658,7 @@ class InternalAdminStoreResourceTest {
         StoreAddressDTO dto = new StoreAddressDTO();
         dto.setId(31L);
         dto.setFullName("Warehouse");
-        dto.setUsage(com.miniandmore.app.domain.enumeration.StoreAddressUsage.SHIPMENT);
+        dto.setUsages(java.util.EnumSet.of(com.miniandmore.app.domain.enumeration.StoreAddressUsage.SHIPMENT));
         when(storeAddressService.findAllNewestFirst()).thenReturn(List.of(dto));
 
         mockMvc
@@ -679,7 +679,7 @@ class InternalAdminStoreResourceTest {
                 post("/internal/v1/admin/store-addresses")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
-                        "{\"fullName\":\"Invoice office\",\"phone\":\"9876543210\",\"line1\":\"12 Flower Lane\",\"city\":\"Bengaluru\",\"state\":\"Karnataka\",\"pincode\":\"560001\",\"usage\":\"INVOICE\"}"
+                        "{\"fullName\":\"Invoice office\",\"phone\":\"9876543210\",\"line1\":\"12 Flower Lane\",\"city\":\"Bengaluru\",\"state\":\"Karnataka\",\"pincode\":\"560001\",\"usages\":[\"INVOICE\"]}"
                     )
             )
             .andExpect(status().isOk())

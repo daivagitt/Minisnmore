@@ -142,16 +142,14 @@ public class XpressBeesClient {
         }
         validateForwardShipmentRequest(request);
         try {
-            String body = config.usesLegacyAuth()
-                ? buildLegacyForwardManifestBody(request)
-                : buildTokenForwardManifestBody(
-                    request,
-                    resolveForwardCourierId(
-                        request.deliverTo().pincode(),
-                        courierSelectionWeightGrams(request),
-                        request.courierId()
-                    )
-                );
+            CourierOption bookedCourier = null;
+            String body;
+            if (config.usesLegacyAuth()) {
+                body = buildLegacyForwardManifestBody(request);
+            } else {
+                bookedCourier = resolveForwardCourier(request);
+                body = buildTokenForwardManifestBody(request, bookedCourier.id());
+            }
             String token = config.usesLegacyAuth() ? null : accessToken();
             if (!config.usesLegacyAuth() && token == null) {
                 throw new XpressBeesApiException("ExpressBees login failed");
@@ -160,7 +158,10 @@ public class XpressBeesClient {
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new XpressBeesApiException(providerFailureMessage("forward shipment", response));
             }
-            return parseForwardShipmentResponse(response.body(), request);
+            ForwardShipmentResult result = parseForwardShipmentResponse(response.body(), request);
+            return bookedCourier == null
+                ? result
+                : result.withCourier(bookedCourier.id(), bookedCourier.name());
         } catch (XpressBeesApiException ex) {
             throw ex;
         } catch (InterruptedException ex) {
@@ -802,7 +803,7 @@ public class XpressBeesClient {
     }
 
     public List<CourierOption> listForwardCourierOptions(String destinationPincode, int weightGrams) {
-        return listForwardCourierOptions(destinationPincode, weightGrams, 0, 0, 0, null, null);
+        return listForwardCourierOptions(destinationPincode, weightGrams, 0, 0, 0, null, null, null);
     }
 
     /**
@@ -818,38 +819,39 @@ public class XpressBeesClient {
         String paymentType,
         BigDecimal orderAmount
     ) {
-        if (!isConfigured() || destinationPincode == null || !destinationPincode.matches("^[1-9]\\d{5}$")) {
-            return List.of();
-        }
+        return listForwardCourierOptions(
+            destinationPincode,
+            weightGrams,
+            lengthCm,
+            breadthCm,
+            heightCm,
+            paymentType,
+            orderAmount,
+            null
+        );
+    }
+
+    public List<CourierOption> listForwardCourierOptions(
+        String destinationPincode,
+        int weightGrams,
+        int lengthCm,
+        int breadthCm,
+        int heightCm,
+        String paymentType,
+        BigDecimal orderAmount,
+        String originPincode
+    ) {
         try {
-            String token = accessToken();
-            if (token == null) {
-                LOG.warn("XpressBees courier rates skipped for pincode {}: login failed", destinationPincode);
-                return List.of();
-            }
-            int chargeableWeightGrams = courierSelectionWeightGrams(weightGrams, lengthCm, breadthCm, heightCm);
-            String body = objectMapper.writeValueAsString(
-                buildCourierRatePayload(
-                    destinationPincode,
-                    chargeableWeightGrams,
-                    lengthCm,
-                    breadthCm,
-                    heightCm,
-                    paymentType,
-                    orderAmount
-                )
+            return fetchForwardCourierOptions(
+                destinationPincode,
+                weightGrams,
+                lengthCm,
+                breadthCm,
+                heightCm,
+                paymentType,
+                orderAmount,
+                originPincode
             );
-            HttpResponse<String> response = postJson(serviceabilityPincodeUrl(destinationPincode), body, token);
-            if (response.statusCode() != 200) {
-                LOG.warn(
-                    "XpressBees courier rates HTTP {} for pincode {}: {}",
-                    response.statusCode(),
-                    destinationPincode,
-                    abbreviate(response.body(), 200)
-                );
-                return List.of();
-            }
-            return parseForwardCourierOptions(response.body(), chargeableWeightGrams);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             return List.of();
@@ -893,58 +895,108 @@ public class XpressBeesClient {
         }
     }
 
-    private String resolveForwardCourierId(String destinationPincode, int weightGrams, String preferredCourierId)
-        throws XpressBeesApiException {
-        if (StringUtils.isNotBlank(preferredCourierId)) {
-            return preferredCourierId.trim();
-        }
+    /**
+     * Booking must quote the same POST serviceability call as rate preview. Blindly sending a saved
+     * courier_id, or a GET-only courier list, is what XpressBees rejects as "Drop Location Not
+     * Servicable" for otherwise valid pins such as 506001.
+     */
+    private CourierOption resolveForwardCourier(ForwardShipmentRequest request) throws XpressBeesApiException {
+        String destinationPincode = request == null || request.deliverTo() == null ? null : request.deliverTo().pincode();
         if (destinationPincode == null || !destinationPincode.matches("^[1-9]\\d{5}$")) {
             throw courierResolutionFailure(destinationPincode, "invalid pincode");
         }
+        String origin = request.shipFrom() == null ? null : request.shipFrom().pincode();
+        List<CourierOption> options;
         try {
-            String token = accessToken();
-            if (token == null) {
-                throw courierResolutionFailure(destinationPincode, "login failed");
-            }
-            String url =
-                config.getBaseUrl().replaceAll("/$", "") +
-                "/api/courier/serviceability/pincode/" +
-                destinationPincode;
-            HttpResponse<String> response = getJson(url, token);
-            if (response.statusCode() != 200) {
-                throw courierResolutionFailure(destinationPincode, "serviceability HTTP " + response.statusCode());
-            }
-            JsonNode data = objectMapper.readTree(response.body()).path("data");
-            if (!data.isArray() || data.isEmpty()) {
-                throw courierResolutionFailure(destinationPincode, "no serviceable couriers");
-            }
-            String preferred = preferredForwardCourierName(weightGrams);
-            String firstForward = null;
-            for (JsonNode option : data) {
-                String id = text(option, "id");
-                String name = text(option, "name");
-                if (id.isBlank() || name.toLowerCase(Locale.ROOT).contains("reverse")) {
-                    continue;
-                }
-                if (firstForward == null) {
-                    firstForward = id;
-                }
-                if (name.equalsIgnoreCase(preferred)) {
-                    return id;
-                }
-            }
-            if (firstForward != null) {
-                return firstForward;
-            }
-            throw courierResolutionFailure(destinationPincode, "no forward courier match");
+            options = fetchForwardCourierOptions(
+                destinationPincode,
+                packageWeightGrams(request),
+                firstPositive(request.packageLengthCm(), 0),
+                firstPositive(request.packageBreadthCm(), 0),
+                firstPositive(request.packageHeightCm(), 0),
+                request.paymentType(),
+                request.orderAmount(),
+                origin
+            );
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             throw courierResolutionFailure(destinationPincode, "interrupted");
         } catch (XpressBeesApiException ex) {
-            throw ex;
+            throw courierResolutionFailure(destinationPincode, ex.getMessage());
         } catch (Exception ex) {
             throw courierResolutionFailure(destinationPincode, ex.getMessage());
         }
+        if (options.isEmpty()) {
+            throw courierResolutionFailure(destinationPincode, "no serviceable couriers");
+        }
+        return pickForwardCourier(options, request.courierId(), origin, destinationPincode);
+    }
+
+    private List<CourierOption> fetchForwardCourierOptions(
+        String destinationPincode,
+        int weightGrams,
+        int lengthCm,
+        int breadthCm,
+        int heightCm,
+        String paymentType,
+        BigDecimal orderAmount,
+        String originPincode
+    ) throws Exception {
+        if (!isConfigured() || destinationPincode == null || !destinationPincode.matches("^[1-9]\\d{5}$")) {
+            return List.of();
+        }
+        String token = accessToken();
+        if (token == null) {
+            throw new XpressBeesApiException("login failed");
+        }
+        int chargeableWeightGrams = courierSelectionWeightGrams(weightGrams, lengthCm, breadthCm, heightCm);
+        String body = objectMapper.writeValueAsString(
+            buildCourierRatePayload(
+                destinationPincode,
+                chargeableWeightGrams,
+                lengthCm,
+                breadthCm,
+                heightCm,
+                paymentType,
+                orderAmount,
+                originPincode
+            )
+        );
+        HttpResponse<String> response = postJson(serviceabilityPincodeUrl(destinationPincode), body, token);
+        if (response.statusCode() != 200) {
+            throw new XpressBeesApiException(
+                "serviceability HTTP " + response.statusCode() + ": " + abbreviate(response.body(), 200)
+            );
+        }
+        return parseForwardCourierOptions(response.body(), chargeableWeightGrams);
+    }
+
+    private CourierOption pickForwardCourier(
+        List<CourierOption> options,
+        String preferredCourierId,
+        String originPincode,
+        String destinationPincode
+    ) {
+        String selectedId = StringUtils.trimToNull(preferredCourierId);
+        if (selectedId != null) {
+            for (CourierOption option : options) {
+                if (selectedId.equals(option.id())) {
+                    return option;
+                }
+            }
+            LOG.warn(
+                "ExpressBees courier {} is not serviceable for origin {} destination {}; using another forward courier",
+                selectedId,
+                resolvedOriginPincode(originPincode),
+                destinationPincode
+            );
+        }
+        for (CourierOption option : options) {
+            if (option.preferred()) {
+                return option;
+            }
+        }
+        return options.get(0);
     }
 
     private String resolveReverseCourierId(String customerPincode) throws XpressBeesApiException {
@@ -1039,6 +1091,13 @@ public class XpressBeesClient {
         return actual;
     }
 
+    private String resolvedOriginPincode(String originPincode) {
+        if (originPincode != null && originPincode.matches("^[1-9]\\d{5}$")) {
+            return originPincode;
+        }
+        return config.getOriginPincode();
+    }
+
     private static int firstPositive(Integer value, int fallback) {
         return value != null && value > 0 ? value : fallback;
     }
@@ -1070,8 +1129,30 @@ public class XpressBeesClient {
         String paymentType,
         BigDecimal orderAmount
     ) {
+        return buildCourierRatePayload(
+            destinationPincode,
+            weightGrams,
+            lengthCm,
+            breadthCm,
+            heightCm,
+            paymentType,
+            orderAmount,
+            config.getOriginPincode()
+        );
+    }
+
+    Map<String, Object> buildCourierRatePayload(
+        String destinationPincode,
+        int weightGrams,
+        int lengthCm,
+        int breadthCm,
+        int heightCm,
+        String paymentType,
+        BigDecimal orderAmount,
+        String originPincode
+    ) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("origin", config.getOriginPincode());
+        payload.put("origin", resolvedOriginPincode(originPincode));
         payload.put("destination", destinationPincode);
         String pay = StringUtils.defaultIfBlank(paymentType, StringUtils.defaultIfBlank(config.getPaymentType(), "prepaid"))
             .trim()
@@ -1451,10 +1532,20 @@ public class XpressBeesClient {
         String trackingUrl,
         String labelUrl,
         String providerRequestId,
-        String message
+        String message,
+        String courierId,
+        String courierName
     ) {
         public ForwardShipmentResult {
             awb = awb == null ? null : awb.trim();
+        }
+
+        public ForwardShipmentResult(String awb, String trackingUrl, String labelUrl, String providerRequestId, String message) {
+            this(awb, trackingUrl, labelUrl, providerRequestId, message, null, null);
+        }
+
+        ForwardShipmentResult withCourier(String bookedCourierId, String bookedCourierName) {
+            return new ForwardShipmentResult(awb, trackingUrl, labelUrl, providerRequestId, message, bookedCourierId, bookedCourierName);
         }
     }
 

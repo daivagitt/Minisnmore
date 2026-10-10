@@ -41,6 +41,9 @@ describe("admin-nav", () => {
 
     const addresses = filterAdminNavItems(ADMIN_NAV_ITEMS, "warehouse invoice");
     expect(addresses.map((item) => item.to)).toEqual(["/admin/addresses"]);
+
+    const packageTypes = filterAdminNavItems(ADMIN_NAV_ITEMS, "box type");
+    expect(packageTypes.map((item) => item.to)).toEqual(["/admin/package-types"]);
   });
 
   it("requires every token to match", () => {

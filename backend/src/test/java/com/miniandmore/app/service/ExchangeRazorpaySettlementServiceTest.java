@@ -43,6 +43,9 @@ class ExchangeRazorpaySettlementServiceTest {
     @Mock
     private OrderMailService orderMailService;
 
+    @Mock
+    private OrderEventService orderEventService;
+
     @InjectMocks
     private ExchangeRazorpaySettlementService exchangeRazorpaySettlementService;
 
@@ -69,11 +72,40 @@ class ExchangeRazorpaySettlementServiceTest {
         assertThat(result.getSettlementStatus()).isEqualTo(ExchangeSettlementStatus.REFUNDED);
         assertThat(result.getSettlementReference()).isEqualTo("rfnd_diff_1");
         assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUND_INITIATED);
+        verify(orderEventService).recordRefundInitiatedWithoutMail(order);
+        verify(orderEventService, never()).syncLifecycleEvents(order);
         verify(razorpayRefundService).refundPayment(
             eq(order),
             eq(new BigDecimal("300.00")),
             eq(RazorpayRefundService.PURPOSE_EXCHANGE_SETTLEMENT)
         );
+    }
+
+    @Test
+    void recordRazorpayRefund_partiallyRefunded_setsRefundInitiated() {
+        OrderReturn orderReturn = pendingCheaperExchange();
+        CustomerOrder order = orderReturn.getOrder();
+        order.setPaymentStatus(PaymentStatus.PARTIALLY_REFUNDED);
+
+        when(orderReturnRepository.findOneByReturnNumberForUpdate("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(razorpayRefundService.findExistingRefundForOrder(order, new BigDecimal("300.00"), RazorpayRefundService.PURPOSE_EXCHANGE_SETTLEMENT))
+            .thenReturn(Optional.empty());
+        when(razorpayRefundService.refundPayment(order, new BigDecimal("300.00"), RazorpayRefundService.PURPOSE_EXCHANGE_SETTLEMENT))
+            .thenReturn("rfnd_diff_1");
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = exchangeRazorpaySettlementService.recordRazorpayRefund(
+            "RET-1",
+            new BigDecimal("300.00"),
+            "admin",
+            null
+        );
+
+        assertThat(result.getSettlementStatus()).isEqualTo(ExchangeSettlementStatus.REFUNDED);
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUND_INITIATED);
+        verify(orderEventService).recordRefundInitiatedWithoutMail(order);
+        verify(orderEventService, never()).syncLifecycleEvents(order);
     }
 
     @Test

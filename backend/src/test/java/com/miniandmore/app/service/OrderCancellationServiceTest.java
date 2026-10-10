@@ -141,30 +141,39 @@ class OrderCancellationServiceTest {
     }
 
     @Test
-    void submitRequest_afterHandWrap_throwsConflict() {
+    void submitRequest_afterHandWrap_success() {
         CustomerOrder order = createOrder("ORD-001", "testuser");
         order.setStatus(OrderStatus.HAND_WRAPPED);
         when(customerOrderRepository.findOneByOrderNumberAndUserLogin("ORD-001", "testuser"))
             .thenReturn(Optional.of(order));
+        when(cancellationRequestRepository.existsByOrderIdAndStatus(101L, CancellationRequestStatus.REQUESTED))
+            .thenReturn(false);
+        when(cancellationRequestRepository.save(any(OrderCancellationRequest.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
 
-        assertThatThrownBy(() -> service.submitRequest("testuser", "ORD-001", "Valid reason"))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.CONFLICT))
-            .hasMessageContaining("Please contact Customer Care");
-        verify(cancellationRequestRepository, never()).save(any());
+        OrderCancellationRequest request = service.submitRequest("testuser", "ORD-001", "Valid reason here");
+
+        assertThat(request.getStatus()).isEqualTo(CancellationRequestStatus.REQUESTED);
+        assertThat(request.getOrder()).isEqualTo(order);
+        verify(cancellationExecutor).assertCancelEligible(order);
     }
 
     @Test
-    void submitRequest_afterPackedAt_throwsConflict() {
+    void submitRequest_afterPackedAt_success() {
         CustomerOrder order = createOrder("ORD-001", "testuser");
         order.setPackedAt(Instant.parse("2026-09-30T00:00:00Z"));
         when(customerOrderRepository.findOneByOrderNumberAndUserLogin("ORD-001", "testuser"))
             .thenReturn(Optional.of(order));
+        when(cancellationRequestRepository.existsByOrderIdAndStatus(101L, CancellationRequestStatus.REQUESTED))
+            .thenReturn(false);
+        when(cancellationRequestRepository.save(any(OrderCancellationRequest.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
 
-        assertThatThrownBy(() -> service.submitRequest("testuser", "ORD-001", "Valid reason"))
-            .isInstanceOf(ResponseStatusException.class)
-            .hasMessageContaining("Please contact Customer Care");
-        verify(cancellationRequestRepository, never()).save(any());
+        OrderCancellationRequest request = service.submitRequest("testuser", "ORD-001", "Valid reason here");
+
+        assertThat(request.getStatus()).isEqualTo(CancellationRequestStatus.REQUESTED);
+        assertThat(request.getOrder()).isEqualTo(order);
+        verify(cancellationExecutor).assertCancelEligible(order);
     }
 
     @Test
@@ -353,7 +362,7 @@ class OrderCancellationServiceTest {
     }
 
     @Test
-    void approve_afterHandWrap_throwsConflict() {
+    void approve_afterHandWrap_success() {
         CustomerOrder order = createOrder("ORD-001", "testuser");
         order.setStatus(OrderStatus.HAND_WRAPPED);
         OrderCancellationRequest req = new OrderCancellationRequest();
@@ -364,12 +373,81 @@ class OrderCancellationServiceTest {
 
         when(cancellationRequestRepository.findOneByRequestNumber("CAN-ORD001-111111"))
             .thenReturn(Optional.of(req));
+        when(cancellationExecutor.performCancellation(order, "Changed my mind")).thenReturn("rfnd_packed");
+        when(cancellationRequestRepository.save(any(OrderCancellationRequest.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
 
-        assertThatThrownBy(() -> service.approve("CAN-ORD001-111111", "Approved"))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.CONFLICT))
-            .hasMessageContaining("already packed");
-        verify(cancellationExecutor, never()).performCancellation(any(), any());
+        OrderCancellationRequest approved = service.approve("CAN-ORD001-111111", "Approved");
+
+        assertThat(approved.getStatus()).isEqualTo(CancellationRequestStatus.APPROVED);
+        assertThat(approved.getRazorpayRefundId()).isEqualTo("rfnd_packed");
+        verify(cancellationExecutor).assertCancelEligible(order);
+        verify(cancellationExecutor).performCancellation(order, "Changed my mind");
+    }
+
+    @Test
+    void approve_withBookedLabel_voidsAwbBeforeCancellingOrder() {
+        CustomerOrder order = createOrder("ORD-001", "testuser");
+        order.setStatus(OrderStatus.HAND_WRAPPED);
+        order.setTrackingNumber("XB-1");
+        order.setShipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES);
+        CustomerOrder afterVoid = createOrder("ORD-001", "testuser");
+        afterVoid.setStatus(OrderStatus.HAND_WRAPPED);
+        OrderCancellationRequest req = new OrderCancellationRequest();
+        req.setRequestNumber("CAN-ORD001-111111");
+        req.setStatus(CancellationRequestStatus.REQUESTED);
+        req.setReason("Changed my mind");
+        req.setOrder(order);
+
+        when(cancellationRequestRepository.findOneByRequestNumber("CAN-ORD001-111111"))
+            .thenReturn(Optional.of(req));
+        when(customerOrderRepository.findOneByOrderNumberForUpdate("ORD-001")).thenReturn(Optional.of(afterVoid));
+        when(cancellationExecutor.performCancellation(afterVoid, "Changed my mind")).thenReturn("rfnd_packed");
+        when(cancellationRequestRepository.save(any(OrderCancellationRequest.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        service.approve("CAN-ORD001-111111", "Approved");
+
+        InOrder inOrder = inOrder(orderShipmentService, cancellationExecutor);
+        inOrder
+            .verify(orderShipmentService)
+            .cancelShipment(
+                eq("ORD-001"),
+                eq(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES),
+                eq("Changed my mind"),
+                eq("cancellation-approval")
+            );
+        inOrder.verify(cancellationExecutor).assertCancelEligible(afterVoid);
+        inOrder.verify(cancellationExecutor).performCancellation(afterVoid, "Changed my mind");
+    }
+
+    @Test
+    void approve_shortCustomerReason_combinesAdminNotesForShipmentVoid() {
+        CustomerOrder order = createOrder("ORD-001", "testuser");
+        order.setTrackingNumber("XB-1");
+        order.setShipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES);
+        CustomerOrder afterVoid = createOrder("ORD-001", "testuser");
+        OrderCancellationRequest req = new OrderCancellationRequest();
+        req.setRequestNumber("CAN-ORD001-111111");
+        req.setStatus(CancellationRequestStatus.REQUESTED);
+        req.setReason("Yes");
+        req.setOrder(order);
+
+        when(cancellationRequestRepository.findOneByRequestNumber("CAN-ORD001-111111"))
+            .thenReturn(Optional.of(req));
+        when(customerOrderRepository.findOneByOrderNumberForUpdate("ORD-001")).thenReturn(Optional.of(afterVoid));
+        when(cancellationExecutor.performCancellation(afterVoid, "Yes")).thenReturn(null);
+        when(cancellationRequestRepository.save(any(OrderCancellationRequest.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        service.approve("CAN-ORD001-111111", "Approved by ops");
+
+        verify(orderShipmentService).cancelShipment(
+            eq("ORD-001"),
+            eq(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES),
+            eq("Yes Approved by ops"),
+            eq("cancellation-approval")
+        );
     }
 
     @Test
@@ -800,6 +878,7 @@ class OrderCancellationServiceTest {
                 eq("Unable to fulfil"),
                 eq("ops.admin")
             );
+        inOrder.verify(cancellationExecutor).assertCancelEligible(afterVoid);
         inOrder.verify(cancellationExecutor).performCancellation(eq(afterVoid), eq("Unable to fulfil"));
     }
 
@@ -823,6 +902,33 @@ class OrderCancellationServiceTest {
     }
 
     @Test
+    void cancelOrderFromAdmin_carrierAlreadyCancelled_clearsLocallyWithoutXpressBeesMode() {
+        CustomerOrder order = createOrder("ORD-001", "testuser");
+        order.setTrackingNumber("XB-1");
+        order.setShipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES);
+        order.setShipmentCarrierStatus("carrier_cancelled");
+        CustomerOrder afterVoid = createOrder("ORD-001", "testuser");
+        when(customerOrderRepository.findOneByOrderNumberForUpdate("ORD-001")).thenReturn(Optional.of(order), Optional.of(afterVoid));
+        when(customerOrderRepository.findById(101L)).thenReturn(Optional.of(afterVoid));
+        when(cancellationExecutor.performCancellation(eq(afterVoid), eq("Courier voided AWB"))).thenReturn("rfnd_1");
+        when(cancellationRequestRepository.findFirstByOrderIdAndStatusOrderByRequestedAtDesc(101L, CancellationRequestStatus.REQUESTED))
+            .thenReturn(Optional.empty());
+        when(cancellationRequestRepository.save(any(OrderCancellationRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Mode resolution must force MANUAL for carrier_cancelled even when client asks for xpressbees.
+        service.cancelOrderFromAdmin("ORD-001", "Courier voided AWB", "ops.admin", "xpressbees");
+
+        verify(orderShipmentService)
+            .cancelShipment(
+                eq("ORD-001"),
+                eq(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.MANUAL),
+                eq("Courier voided AWB"),
+                eq("ops.admin")
+            );
+        verify(cancellationExecutor).performCancellation(eq(afterVoid), eq("Courier voided AWB"));
+    }
+
+    @Test
     void canCancel_delegatesToExecutor() {
         CustomerOrder order = createOrder("ORD-001", "testuser");
         when(cancellationExecutor.isCancelEligible(order)).thenReturn(true);
@@ -832,30 +938,25 @@ class OrderCancellationServiceTest {
     }
 
     @Test
-    void canCustomerRequestCancel_falseAfterHandWrap() {
+    void canCustomerRequestCancel_trueAfterHandWrapWhenEligible() {
         CustomerOrder packed = createOrder("ORD-001", "testuser");
         packed.setStatus(OrderStatus.HAND_WRAPPED);
         when(cancellationExecutor.isCancelEligible(packed)).thenReturn(true);
 
-        assertThat(service.canCustomerRequestCancel(packed)).isFalse();
-        assertThat(OrderCancellationService.isAfterHandWrap(packed)).isTrue();
+        assertThat(service.canCustomerRequestCancel(packed)).isTrue();
     }
 
     @Test
-    void shouldContactCareToCancel_trueWhenPackedAndNotEligible() {
+    void shouldContactCareToCancel_falseWhenPacked() {
         CustomerOrder packed = createOrder("ORD-001", "testuser");
         packed.setStatus(OrderStatus.HAND_WRAPPED);
-        when(cancellationExecutor.isCancelEligible(packed)).thenReturn(true);
-        when(cancellationRequestRepository.existsByOrderIdAndStatus(101L, CancellationRequestStatus.REQUESTED)).thenReturn(false);
 
-        assertThat(service.shouldContactCareToCancel(packed)).isTrue();
+        assertThat(service.shouldContactCareToCancel(packed)).isFalse();
     }
 
     @Test
-    void shouldContactCareToCancel_falseWhenCustomerCanStillCancel() {
+    void shouldContactCareToCancel_alwaysFalse() {
         CustomerOrder order = createOrder("ORD-001", "testuser");
-        when(cancellationExecutor.isCancelEligible(order)).thenReturn(true);
-        when(cancellationRequestRepository.existsByOrderIdAndStatus(101L, CancellationRequestStatus.REQUESTED)).thenReturn(false);
 
         assertThat(service.shouldContactCareToCancel(order)).isFalse();
     }

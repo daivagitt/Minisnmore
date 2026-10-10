@@ -569,7 +569,7 @@ class XpressBeesClientTest {
                     return loginResponse;
                 }
                 if (uri.contains("/api/courier/serviceability/pincode/")) {
-                    assertThat(request.method()).isEqualTo("GET");
+                    assertThat(request.method()).isEqualTo("POST");
                     return serviceabilityResponse;
                 }
                 if (uri.equals("https://xpressbees.test/api/shipments2")) {
@@ -585,7 +585,120 @@ class XpressBeesClientTest {
 
         assertThat(result.awb()).isEqualTo("XB-COD-1");
         assertThat(result.labelUrl()).isEqualTo("https://label/1");
+        assertThat(result.courierId()).isEqualTo("1");
+        assertThat(result.courierName()).isEqualTo("Surface Xpressbees 0.5 K.G");
         verify(shippingHttp, times(3)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void resolveForwardCourierId_postsServiceabilityAndFallsBackWhenPreferredCourierUnserviceable() throws Exception {
+        HttpResponse<String> loginResponse = mock(HttpResponse.class);
+        when(loginResponse.statusCode()).thenReturn(200);
+        when(loginResponse.body()).thenReturn("{\"status\":true,\"data\":\"plain-login-token\"}");
+
+        HttpResponse<String> serviceabilityResponse = mock(HttpResponse.class);
+        when(serviceabilityResponse.statusCode()).thenReturn(200);
+        when(serviceabilityResponse.body())
+            .thenReturn(
+                """
+                {"status":true,"data":[{"id":"8","name":"Express Reverse"},{"id":"2","name":"Xpressbees 1 K.G","eddDays":4}]}
+                """
+            );
+
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenAnswer(invocation -> {
+                HttpRequest request = invocation.getArgument(0);
+                String uri = request.uri().toString();
+                if (uri.endsWith("/api/users/login")) {
+                    return loginResponse;
+                }
+                if (uri.equals("https://xpressbees.test/api/courier/serviceability/pincode/506001")) {
+                    assertThat(request.method()).isEqualTo("POST");
+                    String posted = httpRequestBody(request);
+                    assertThat(posted).contains("\"origin\":\"560074\"");
+                    assertThat(posted).contains("\"destination\":\"506001\"");
+                    assertThat(posted).contains("\"payment_type\":\"cod\"");
+                    assertThat(posted).contains("\"weight\":600");
+                    return serviceabilityResponse;
+                }
+                throw new AssertionError("Unexpected HTTP request: " + request.method() + " " + uri);
+            });
+
+        XpressBeesClient.ForwardShipmentRequest request = new XpressBeesClient.ForwardShipmentRequest(
+            "MNM-WL-1",
+            "MNM-WL-1",
+            new XpressBeesClient.ReversePickupAddress("WH", "9876500000", null, "WH Line", null, "Bengaluru", "Karnataka", "560074"),
+            new XpressBeesClient.ReversePickupAddress("Ravi", "9876543210", null, "Line 1", null, "Warangal", "Telangana", "506001"),
+            List.of(new XpressBeesClient.ReversePickupLine("Tee", "SKU", 1, new java.math.BigDecimal("499"), 500)),
+            null,
+            "cod",
+            new java.math.BigDecimal("499"),
+            new java.math.BigDecimal("499"),
+            20,
+            15,
+            10,
+            500,
+            "1"
+        );
+
+        XpressBeesClient.CourierOption courier = ReflectionTestUtils.invokeMethod(client, "resolveForwardCourier", request);
+
+        assertThat(courier.id()).isEqualTo("2");
+        assertThat(courier.name()).isEqualTo("Xpressbees 1 K.G");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void resolveForwardCourierId_keepsPreferredCourierWhenStillServiceable() throws Exception {
+        HttpResponse<String> loginResponse = mock(HttpResponse.class);
+        when(loginResponse.statusCode()).thenReturn(200);
+        when(loginResponse.body()).thenReturn("{\"status\":true,\"data\":\"plain-login-token\"}");
+
+        HttpResponse<String> serviceabilityResponse = mock(HttpResponse.class);
+        when(serviceabilityResponse.statusCode()).thenReturn(200);
+        when(serviceabilityResponse.body())
+            .thenReturn(
+                """
+                {"status":true,"data":[{"id":"1","name":"Surface Xpressbees 0.5 K.G","eddDays":5},{"id":"2","name":"Xpressbees 1 K.G","eddDays":4}]}
+                """
+            );
+
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenAnswer(invocation -> {
+                HttpRequest request = invocation.getArgument(0);
+                String uri = request.uri().toString();
+                if (uri.endsWith("/api/users/login")) {
+                    return loginResponse;
+                }
+                if (uri.contains("/api/courier/serviceability/pincode/506001")) {
+                    assertThat(request.method()).isEqualTo("POST");
+                    return serviceabilityResponse;
+                }
+                throw new AssertionError("Unexpected HTTP request: " + request.method() + " " + uri);
+            });
+
+        XpressBeesClient.ForwardShipmentRequest request = new XpressBeesClient.ForwardShipmentRequest(
+            "MNM-WL-2",
+            "MNM-WL-2",
+            new XpressBeesClient.ReversePickupAddress("WH", "9876500000", null, "WH Line", null, "Bengaluru", "Karnataka", "560074"),
+            new XpressBeesClient.ReversePickupAddress("Ravi", "9876543210", null, "Line 1", null, "Warangal", "Telangana", "506001"),
+            List.of(new XpressBeesClient.ReversePickupLine("Tee", "SKU", 1, new java.math.BigDecimal("499"), 500)),
+            null,
+            "prepaid",
+            new java.math.BigDecimal("499"),
+            java.math.BigDecimal.ZERO,
+            10,
+            10,
+            10,
+            500,
+            "1"
+        );
+
+        XpressBeesClient.CourierOption courier = ReflectionTestUtils.invokeMethod(client, "resolveForwardCourier", request);
+
+        assertThat(courier.id()).isEqualTo("1");
+        assertThat(courier.name()).isEqualTo("Surface Xpressbees 0.5 K.G");
     }
 
     @Test
@@ -743,6 +856,20 @@ class XpressBeesClientTest {
         assertThat(missingCodAmount.get("payment_type")).isEqualTo("cod");
         assertThat(missingCodAmount.get("weight")).isEqualTo(1);
         assertThat(missingCodAmount).doesNotContainKey("order_amount");
+
+        java.util.Map<String, Object> warehouseOrigin = client.buildCourierRatePayload(
+            "506001",
+            500,
+            20,
+            15,
+            10,
+            "cod",
+            new java.math.BigDecimal("499"),
+            "560076"
+        );
+        assertThat(warehouseOrigin.get("origin")).isEqualTo("560076");
+        assertThat(warehouseOrigin.get("destination")).isEqualTo("506001");
+        assertThat(warehouseOrigin.get("payment_type")).isEqualTo("cod");
     }
 
     @Test
@@ -777,6 +904,11 @@ class XpressBeesClientTest {
                 }
                 if (uri.equals("https://xpressbees.test/api/courier/serviceability/pincode/400067")) {
                     assertThat(request.method()).isEqualTo("POST");
+                    String posted = httpRequestBody(request);
+                    assertThat(posted).contains("\"origin\":\"560074\"");
+                    assertThat(posted).contains("\"destination\":\"400067\"");
+                    assertThat(posted).contains("\"payment_type\":\"prepaid\"");
+                    assertThat(posted).contains("\"weight\":600");
                     return ratesResponse;
                 }
                 throw new AssertionError("Unexpected HTTP request: " + request.method() + " " + uri);
@@ -1009,6 +1141,39 @@ class XpressBeesClientTest {
         ApplicationProperties empty = new ApplicationProperties();
         XpressBeesClient disabled = new XpressBeesClient(empty, new ObjectMapper());
         assertThat(disabled.isReversePickupConfigured()).isFalse();
+    }
+
+    private static String httpRequestBody(HttpRequest request) {
+        return request
+            .bodyPublisher()
+            .map(publisher -> {
+                java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+                publisher.subscribe(
+                    new java.util.concurrent.Flow.Subscriber<>() {
+                        @Override
+                        public void onSubscribe(java.util.concurrent.Flow.Subscription subscription) {
+                            subscription.request(Long.MAX_VALUE);
+                        }
+
+                        @Override
+                        public void onNext(java.nio.ByteBuffer item) {
+                            byte[] chunk = new byte[item.remaining()];
+                            item.get(chunk);
+                            output.write(chunk, 0, chunk.length);
+                        }
+
+                        @Override
+                        public void onError(Throwable throwable) {
+                            throw new IllegalStateException(throwable);
+                        }
+
+                        @Override
+                        public void onComplete() {}
+                    }
+                );
+                return output.toString(StandardCharsets.UTF_8);
+            })
+            .orElse("");
     }
 
     private static String jwtWithExpiry(Instant expiresAt) {

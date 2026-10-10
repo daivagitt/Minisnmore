@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20261009120000-1" author="miniandmore">
+        <createTable tableName="store_address_usage">
+            <column name="store_address_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="usage" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addPrimaryKey
+            tableName="store_address_usage"
+            columnNames="store_address_id, usage"
+            constraintName="pk_store_address_usage"/>
+        <addForeignKeyConstraint
+            baseTableName="store_address_usage"
+            baseColumnNames="store_address_id"
+            referencedTableName="store_address"
+            referencedColumnNames="id"
+            constraintName="fk_store_address_usage__store_address"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="20261009120000-2" author="miniandmore">
+        <sql>
+            INSERT INTO store_address_usage (store_address_id, usage)
+            SELECT id, usage FROM store_address WHERE usage IS NOT NULL;
+        </sql>
+    </changeSet>
+
+    <changeSet id="20261009120000-3" author="miniandmore" dbms="postgresql">
+        <sql>DROP INDEX IF EXISTS idx_store_address_default_usage;</sql>
+    </changeSet>
+
+    <changeSet id="20261009120000-4" author="miniandmore">
+        <dropIndex tableName="store_address" indexName="idx_store_address_usage"/>
+        <dropColumn tableName="store_address" columnName="usage"/>
+    </changeSet>
+
+</databaseChangeLog>

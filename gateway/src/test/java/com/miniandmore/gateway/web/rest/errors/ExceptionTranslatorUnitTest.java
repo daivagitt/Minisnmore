@@ -15,8 +15,12 @@ import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.dao.ConcurrencyFailureException;
+import java.net.URI;
+import org.springframework.web.server.ServerWebExchange;
 import tech.jhipster.config.JHipsterConstants;
 import tech.jhipster.web.rest.errors.ProblemDetailWithCause;
+import tech.jhipster.web.util.HeaderUtil;
 
 class ExceptionTranslatorUnitTest {
 
@@ -124,5 +128,90 @@ class ExceptionTranslatorUnitTest {
             new com.miniandmore.gateway.security.UserNotActivatedException("User test was not activated")
         );
         assertThat(problem.getDetail()).isEqualTo("User account is not activated");
+    }
+
+    @Test
+    void handleAnyException_criticalError_rethrowsWithoutWrapping() {
+        ExceptionTranslator translator = new ExceptionTranslator(new MockEnvironment());
+        OutOfMemoryError error = new OutOfMemoryError("heap exhausted");
+
+        reactor.test.StepVerifier.create(translator.handleAnyException(error, exchange))
+            .expectErrorMatches(thrown -> thrown == error)
+            .verify();
+    }
+
+    @Test
+    void wrapAndCustomizeProblem_concurrencyFailureUsesMappedMessageKey() {
+        ExceptionTranslator translator = new ExceptionTranslator(new MockEnvironment());
+        ProblemDetailWithCause problem = translator.wrapAndCustomizeProblem(new ConcurrencyFailureException("conflict"), exchange);
+        assertThat(problem.getProperties()).containsEntry("message", ErrorConstants.ERR_CONCURRENCY_FAILURE);
+    }
+
+    @Test
+    void getPathValue_nullExchange_returnsAboutBlank() {
+        ExceptionTranslator translator = new ExceptionTranslator(new MockEnvironment());
+        URI path = ReflectionTestUtils.invokeMethod(translator, "getPathValue", (ServerWebExchange) null);
+        assertThat(path).hasToString("about:blank");
+    }
+
+    @Test
+    void updateContentType_nullHeaders_setsProblemJson() {
+        ExceptionTranslator translator = new ExceptionTranslator(new MockEnvironment());
+        HttpHeaders headers = ReflectionTestUtils.invokeMethod(translator, "updateContentType", (HttpHeaders) null);
+        assertThat(headers.getContentType()).isEqualTo(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON);
+    }
+
+    @Test
+    void wrapAndCustomizeProblem_accessDeniedIsForbidden() {
+        ExceptionTranslator translator = new ExceptionTranslator(new MockEnvironment());
+        ProblemDetailWithCause problem = translator.wrapAndCustomizeProblem(new org.springframework.security.access.AccessDeniedException("nope"), exchange);
+        assertThat(problem.getStatus()).isEqualTo(403);
+    }
+
+    @Test
+    void wrapAndCustomizeProblem_webExchangeBindException_includesFieldErrors() throws Exception {
+        ExceptionTranslator translator = new ExceptionTranslator(new MockEnvironment());
+        org.springframework.validation.BeanPropertyBindingResult bindingResult =
+            new org.springframework.validation.BeanPropertyBindingResult(
+                new ExceptionTranslatorTestController.TestDTO(),
+                "testDTO"
+            );
+        bindingResult.rejectValue("test", "NotNull", "must not be blank");
+        org.springframework.core.MethodParameter parameter = new org.springframework.core.MethodParameter(
+            ExceptionTranslatorTestController.class.getDeclaredMethod(
+                "methodArgument",
+                ExceptionTranslatorTestController.TestDTO.class
+            ),
+            0
+        );
+        org.springframework.web.bind.support.WebExchangeBindException bindException =
+            new org.springframework.web.bind.support.WebExchangeBindException(parameter, bindingResult);
+
+        ProblemDetailWithCause problem = translator.wrapAndCustomizeProblem(bindException, exchange);
+
+        assertThat(problem.getProperties()).containsEntry("message", ErrorConstants.ERR_VALIDATION);
+        assertThat(problem.getProperties().get("fieldErrors")).asList().isNotEmpty();
+    }
+
+    @Test
+    void wrapAndCustomizeProblem_badRequestAlertBuildsFailureAlertHeaders() {
+        ExceptionTranslator translator = new ExceptionTranslator(new MockEnvironment());
+        ReflectionTestUtils.setField(translator, "applicationName", "gateway");
+        BadRequestAlertException ex = new BadRequestAlertException("Invalid payload", "orderReturn", "invalidStatus");
+
+        HttpHeaders headers = ReflectionTestUtils.invokeMethod(translator, "buildHeaders", ex);
+        HttpHeaders expected =
+            HeaderUtil.createFailureAlert("gateway", true, "orderReturn", "invalidStatus", "Invalid payload");
+
+        assertThat(headers).isNotNull();
+        assertThat(headers.toSingleValueMap()).isEqualTo(expected.toSingleValueMap());
+    }
+
+    @Test
+    void getCustomizedTitle_badRequestAlertUsesBodyTitle() {
+        ExceptionTranslator translator = new ExceptionTranslator(new MockEnvironment());
+        BadRequestAlertException ex = new BadRequestAlertException("Bad", "entity", "errorKey");
+        String title = ReflectionTestUtils.invokeMethod(translator, "getCustomizedTitle", ex);
+        assertThat(title).isNotBlank();
     }
 }

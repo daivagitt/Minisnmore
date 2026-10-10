@@ -1,0 +1,12 @@
+{
+  "concurrentUsers": 10,
+  "workers": 10,
+  "requests": {
+    "total": 240,
+    "failed": 0
+  },
+  "assertions": {
+    "total": 240,
+    "failed": 0
+  }
+}

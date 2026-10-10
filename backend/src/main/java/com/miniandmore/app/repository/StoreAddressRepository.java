@@ -11,7 +11,7 @@ import org.springframework.stereotype.Repository;
 public interface StoreAddressRepository extends JpaRepository<StoreAddress, Long> {
     List<StoreAddress> findAllByOrderByIdDesc();
 
-    List<StoreAddress> findAllByUsageAndIsDefaultTrue(StoreAddressUsage usage);
+    List<StoreAddress> findAllByUsagesContainingAndIsDefaultTrue(StoreAddressUsage usage);
 
-    Optional<StoreAddress> findFirstByUsageAndIsDefaultTrue(StoreAddressUsage usage);
+    Optional<StoreAddress> findFirstByUsagesContainingAndIsDefaultTrueOrderByIdDesc(StoreAddressUsage usage);
 }

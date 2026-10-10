@@ -12,6 +12,7 @@ const settleOrderReturnPriceDifference = vi.hoisted(() => vi.fn());
 
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (config: unknown) => config,
+  Link: ({ children, to }: { children: unknown; to: string }) => <a href={to}>{children as never}</a>,
 }));
 
 vi.mock("@/lib/orders.functions", () => ({
@@ -86,6 +87,30 @@ describe("admin returns", () => {
       xpressbeesReverseReady: 0,
       stages: { request: 1, pickup: 0, inspection: 0, exchange: 0, closed: 0 },
     });
+  });
+
+  it("renders returns and exchanges as a searchable list table", async () => {
+    listAdminOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "RET-1",
+          order_number: "MNM-1",
+          request_type: "return",
+          status: "requested",
+          reason: "Need a different size",
+          requested_at: "2026-09-20T00:00:00Z",
+          customer_login: "asha",
+          order_total: 999,
+        },
+      ],
+    });
+
+    renderAdminReturns();
+    await waitFor(() => expect(screen.getByRole("table", { name: "Returns and exchanges" })).toBeInTheDocument());
+    expect(screen.getByRole("columnheader", { name: "Order ID" })).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: /search by order id/i })).toBeInTheDocument();
+    expect(screen.getByLabelText("From date")).toBeInTheDocument();
+    expect(screen.getByLabelText("To date")).toBeInTheDocument();
   });
 
   it("shows print label when an outbound shipping label is available", async () => {
@@ -288,7 +313,7 @@ describe("admin returns", () => {
     expect(screen.getByText(/refund ₹3/)).toBeInTheDocument();
     expect(screen.getByText("Price difference")).toBeInTheDocument();
     expect(screen.getByText(/not required/i)).toBeInTheDocument();
-    expect(screen.getByText("hey this is not fit")).toBeInTheDocument();
+    expect(screen.getAllByText("hey this is not fit").length).toBeGreaterThan(0);
     expect(screen.getByText("pickup scheduled")).toBeInTheDocument();
   });
 
@@ -771,12 +796,12 @@ describe("admin returns", () => {
 
     renderAdminReturns();
     await waitFor(() => expect(screen.getByRole("button", { name: "Go to page 2" })).toBeInTheDocument());
-    expect(screen.getByText(/Order MNM-100/)).toBeInTheDocument();
-    expect(screen.queryByText(/Order MNM-111/)).toBeNull();
+    expect(screen.getByRole("cell", { name: "MNM-100" })).toBeInTheDocument();
+    expect(screen.queryByRole("cell", { name: "MNM-111" })).toBeNull();
 
     await userEvent.type(screen.getByRole("searchbox", { name: /search by order id/i }), "MNM-111");
-    await waitFor(() => expect(screen.getByText(/Order MNM-111/)).toBeInTheDocument());
-    expect(screen.queryByText(/Order MNM-100/)).toBeNull();
+    await waitFor(() => expect(screen.getByRole("cell", { name: "MNM-111" })).toBeInTheDocument());
+    expect(screen.queryByRole("cell", { name: "MNM-100" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Go to page 2" })).toBeNull();
   });
 
@@ -809,13 +834,13 @@ describe("admin returns", () => {
     });
 
     renderAdminReturns();
-    await waitFor(() => expect(screen.getByText(/Order MNM-TODAY/)).toBeInTheDocument());
-    expect(screen.getByText(/Order MNM-OLD/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("cell", { name: "MNM-TODAY" })).toBeInTheDocument());
+    expect(screen.getByRole("cell", { name: "MNM-OLD" })).toBeInTheDocument();
 
     const from = screen.getByLabelText("From date");
     await userEvent.type(from, "2026-10-07");
-    await waitFor(() => expect(screen.getByText(/Order MNM-TODAY/)).toBeInTheDocument());
-    expect(screen.queryByText(/Order MNM-OLD/)).toBeNull();
+    await waitFor(() => expect(screen.getByRole("cell", { name: "MNM-TODAY" })).toBeInTheDocument());
+    expect(screen.queryByRole("cell", { name: "MNM-OLD" })).toBeNull();
   });
 
   it("finds a return in another status without switching the Requested chip", async () => {
@@ -843,12 +868,12 @@ describe("admin returns", () => {
     );
 
     renderAdminReturns();
-    await waitFor(() => expect(screen.getByText(/Order MNM-REQ/)).toBeInTheDocument());
-    expect(screen.queryByText(/Order MNM-OK/)).toBeNull();
+    await waitFor(() => expect(screen.getByRole("cell", { name: "MNM-REQ" })).toBeInTheDocument());
+    expect(screen.queryByRole("cell", { name: "MNM-OK" })).toBeNull();
     expect(screen.getByRole("button", { name: "Requested" })).toHaveAttribute("aria-pressed", "true");
 
     await userEvent.type(screen.getByRole("searchbox", { name: /search by order id/i }), "MNM-OK");
-    await waitFor(() => expect(screen.getByText(/Order MNM-OK/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("cell", { name: "MNM-OK" })).toBeInTheDocument());
     expect(listAdminOrderReturns).toHaveBeenCalledWith(undefined);
     expect(screen.getByRole("button", { name: "Requested" })).toHaveAttribute("aria-pressed", "true");
   });
@@ -871,11 +896,11 @@ describe("admin returns", () => {
     );
 
     renderAdminReturns();
-    await waitFor(() => expect(screen.getByText(/Order MNM-REQ/)).toBeInTheDocument());
-    expect(screen.queryByText(/Order MNM-OK/)).toBeNull();
+    await waitFor(() => expect(screen.getByRole("cell", { name: "MNM-REQ" })).toBeInTheDocument());
+    expect(screen.queryByRole("cell", { name: "MNM-OK" })).toBeNull();
 
     await userEvent.type(screen.getByLabelText("From date"), "2026-10-07");
-    await waitFor(() => expect(screen.getByText(/Order MNM-OK/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("cell", { name: "MNM-OK" })).toBeInTheDocument());
     expect(listAdminOrderReturns).toHaveBeenCalledWith(undefined);
   });
 });

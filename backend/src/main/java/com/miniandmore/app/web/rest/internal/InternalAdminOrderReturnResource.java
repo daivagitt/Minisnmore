@@ -284,7 +284,8 @@ public class InternalAdminOrderReturnResource {
                     body.height_cm(),
                     body.courier_id(),
                     body.courier_name(),
-                    body.package_type()
+                    body.package_type(),
+                    body.package_box_id()
                 )
             )
         );
@@ -309,7 +310,8 @@ public class InternalAdminOrderReturnResource {
                     body.admin_notes(),
                     body.courier_id(),
                     body.courier_name(),
-                    body.package_type()
+                    body.package_type(),
+                    body.package_box_id()
                 )
             )
         );
@@ -455,6 +457,7 @@ public class InternalAdminOrderReturnResource {
             "package_type",
             orderReturn.getPackageType() == null ? "custom" : orderReturn.getPackageType().toApi()
         );
+        data.put("package_box_id", orderReturn.getPackageBoxId());
         data.put("packed_at", orderReturn.getPackedAt() == null ? "" : orderReturn.getPackedAt().toString());
         data.put("package_slip_number", orderReturnService.documentNumber("PKG-", orderReturn));
         data.put("shipment_order_number", orderReturnService.documentNumber("SHP-", orderReturn));
@@ -543,6 +546,7 @@ public class InternalAdminOrderReturnResource {
         @Size(max = 40) String courier_id,
         @Size(max = 120) String courier_name,
         @Size(max = 20) String package_type,
+        Long package_box_id,
         @Size(max = 2000) String admin_notes
     ) {}
 
@@ -560,7 +564,8 @@ public class InternalAdminOrderReturnResource {
         @NotNull @Min(1) Integer height_cm,
         @Size(max = 40) String courier_id,
         @Size(max = 120) String courier_name,
-        @Size(max = 20) String package_type
+        @Size(max = 20) String package_type,
+        Long package_box_id
     ) {}
 
     public record PickupFailedRequest(

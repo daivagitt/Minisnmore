@@ -3,6 +3,8 @@ package com.miniandmore.app.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,8 +17,10 @@ import com.miniandmore.app.repository.SiteSettingRepository;
 import com.miniandmore.app.repository.StoreAddressRepository;
 import com.miniandmore.app.service.dto.StoreAddressDTO;
 import com.miniandmore.app.service.mapper.StoreAddressMapper;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,16 +56,18 @@ class StoreAddressServiceTest {
         incoming.setPhone("+91 98765 43210");
         incoming.setLine1("  12 Flower Lane  ");
         incoming.setPincode("560001");
-        incoming.setUsage(StoreAddressUsage.INVOICE);
+        incoming.setUsages(EnumSet.of(StoreAddressUsage.INVOICE));
         incoming.setIsDefault(true);
 
-        StoreAddress previousDefault = new StoreAddress().id(2L).usage(StoreAddressUsage.INVOICE).isDefault(true);
+        StoreAddress previousDefault = new StoreAddress().id(2L).usages(EnumSet.of(StoreAddressUsage.INVOICE)).isDefault(true);
         StoreAddress entity = new StoreAddress();
-        StoreAddress saved = sample().id(1L).usage(StoreAddressUsage.INVOICE).isDefault(true);
+        StoreAddress saved = sample().id(1L).usages(EnumSet.of(StoreAddressUsage.INVOICE)).isDefault(true);
         StoreAddressDTO out = dto();
         out.setId(1L);
 
-        when(storeAddressRepository.findAllByUsageAndIsDefaultTrue(StoreAddressUsage.INVOICE)).thenReturn(List.of(previousDefault));
+        when(storeAddressRepository.findAllByUsagesContainingAndIsDefaultTrue(StoreAddressUsage.INVOICE)).thenReturn(
+            List.of(previousDefault)
+        );
         when(storeAddressMapper.toEntity(any(StoreAddressDTO.class))).thenReturn(entity);
         when(storeAddressRepository.save(any(StoreAddress.class))).thenAnswer(invocation -> {
             StoreAddress argument = invocation.getArgument(0);
@@ -82,8 +88,116 @@ class StoreAddressServiceTest {
         assertThat(mapped.getPhone()).isEqualTo("9876543210");
         assertThat(mapped.getLine1()).isEqualTo("12 Flower Lane");
         assertThat(previousDefault.getIsDefault()).isFalse();
+        verify(storeAddressRepository).flush();
         assertThat(setting.getInvoiceSoldByAddress()).contains("Mini Warehouse");
         verify(siteSettingRepository).save(setting);
+    }
+
+    @Test
+    void update_switchingDefault_clearsPreviousDefaultBeforeSave() {
+        StoreAddressDTO incoming = dto();
+        incoming.setId(1L);
+        incoming.setUsages(EnumSet.of(StoreAddressUsage.SHIPMENT));
+        incoming.setIsDefault(true);
+
+        StoreAddress existing = sample().id(1L).usages(EnumSet.of(StoreAddressUsage.SHIPMENT)).isDefault(false);
+        StoreAddress previousDefault = sample()
+            .id(2L)
+            .fullName("Old warehouse")
+            .usages(EnumSet.of(StoreAddressUsage.SHIPMENT))
+            .isDefault(true);
+        StoreAddressDTO out = dto();
+        out.setId(1L);
+        out.setIsDefault(true);
+
+        when(storeAddressRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(storeAddressRepository.findAllByUsagesContainingAndIsDefaultTrue(StoreAddressUsage.SHIPMENT)).thenReturn(
+            List.of(previousDefault)
+        );
+        stubPartialUpdate();
+        when(storeAddressRepository.save(any(StoreAddress.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(storeAddressMapper.toDto(any(StoreAddress.class))).thenReturn(out);
+        SiteSetting setting = new SiteSetting().id(1L);
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.of(setting));
+
+        service.update(incoming);
+
+        assertThat(previousDefault.getIsDefault()).isFalse();
+        assertThat(existing.getIsDefault()).isTrue();
+        verify(storeAddressMapper).partialUpdate(existing, incoming);
+        verify(storeAddressRepository).flush();
+        verify(storeAddressRepository, never()).findFirstByUsagesContainingAndIsDefaultTrueOrderByIdDesc(any());
+        assertThat(setting.getInvoiceDispatchFromAddress()).contains("Mini Warehouse");
+    }
+
+    @Test
+    void update_newDefault_demotesMultiUsagePeer_andRefreshesOrphanedUsageSiteSetting() {
+        StoreAddressDTO incoming = dto();
+        incoming.setId(1L);
+        incoming.setUsages(EnumSet.of(StoreAddressUsage.SHIPMENT, StoreAddressUsage.INVOICE));
+        incoming.setIsDefault(true);
+
+        StoreAddress existing = sample().id(1L).usages(EnumSet.of(StoreAddressUsage.SHIPMENT)).isDefault(false);
+        StoreAddress peer = sample()
+            .id(2L)
+            .fullName("Peer office")
+            .usages(EnumSet.of(StoreAddressUsage.SHIPMENT, StoreAddressUsage.NORMAL))
+            .isDefault(true);
+        StoreAddress remainingNormal = sample()
+            .id(3L)
+            .fullName("Registered office")
+            .usages(EnumSet.of(StoreAddressUsage.NORMAL))
+            .isDefault(true);
+        StoreAddressDTO out = dto();
+        out.setId(1L);
+        out.setUsages(incoming.getUsages());
+
+        when(storeAddressRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(storeAddressRepository.findAllByUsagesContainingAndIsDefaultTrue(StoreAddressUsage.SHIPMENT)).thenReturn(
+            List.of(peer)
+        );
+        when(storeAddressRepository.findAllByUsagesContainingAndIsDefaultTrue(StoreAddressUsage.INVOICE)).thenReturn(
+            List.of(peer)
+        );
+        stubPartialUpdate();
+        when(storeAddressRepository.save(any(StoreAddress.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(storeAddressMapper.toDto(any(StoreAddress.class))).thenReturn(out);
+        when(storeAddressRepository.findFirstByUsagesContainingAndIsDefaultTrueOrderByIdDesc(StoreAddressUsage.NORMAL))
+            .thenReturn(Optional.of(remainingNormal));
+        SiteSetting setting = new SiteSetting().id(1L);
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.of(setting));
+
+        service.update(incoming);
+
+        assertThat(peer.getIsDefault()).isFalse();
+        verify(storeAddressRepository).flush();
+        verify(storeAddressRepository).findFirstByUsagesContainingAndIsDefaultTrueOrderByIdDesc(StoreAddressUsage.NORMAL);
+        assertThat(setting.getInvoiceRegisteredOfficeAddress()).contains("Registered office");
+    }
+
+    @Test
+    void save_multiUsageDefault_writesAllMatchingSiteSettings() {
+        StoreAddressDTO incoming = dto();
+        incoming.setUsages(EnumSet.of(StoreAddressUsage.SHIPMENT, StoreAddressUsage.NORMAL, StoreAddressUsage.INVOICE));
+        incoming.setIsDefault(true);
+
+        StoreAddress entity = sample().usages(incoming.getUsages()).isDefault(true);
+        StoreAddressDTO out = dto();
+        out.setId(1L);
+        out.setUsages(incoming.getUsages());
+
+        when(storeAddressRepository.findAllByUsagesContainingAndIsDefaultTrue(any())).thenReturn(List.of());
+        when(storeAddressMapper.toEntity(any(StoreAddressDTO.class))).thenReturn(entity);
+        when(storeAddressRepository.save(entity)).thenReturn(entity);
+        when(storeAddressMapper.toDto(entity)).thenReturn(out);
+        SiteSetting setting = new SiteSetting().id(1L);
+        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.of(setting));
+
+        service.save(incoming);
+
+        assertThat(setting.getInvoiceDispatchFromAddress()).contains("Mini Warehouse");
+        assertThat(setting.getInvoiceRegisteredOfficeAddress()).contains("Mini Warehouse");
+        assertThat(setting.getInvoiceSoldByAddress()).contains("Mini Warehouse");
     }
 
     @Test
@@ -97,10 +211,12 @@ class StoreAddressServiceTest {
 
     @Test
     void delete_default_appliesRemainingDefaultToSiteSettings() {
-        StoreAddress deleted = sample().id(1L).usage(StoreAddressUsage.INVOICE).isDefault(true);
-        StoreAddress remaining = sample().id(2L).fullName("Other office").usage(StoreAddressUsage.INVOICE).isDefault(true);
+        StoreAddress deleted = sample().id(1L).usages(EnumSet.of(StoreAddressUsage.INVOICE)).isDefault(true);
+        StoreAddress remaining = sample().id(2L).fullName("Other office").usages(EnumSet.of(StoreAddressUsage.INVOICE)).isDefault(true);
         when(storeAddressRepository.findById(1L)).thenReturn(Optional.of(deleted));
-        when(storeAddressRepository.findFirstByUsageAndIsDefaultTrue(StoreAddressUsage.INVOICE)).thenReturn(Optional.of(remaining));
+        when(storeAddressRepository.findFirstByUsagesContainingAndIsDefaultTrueOrderByIdDesc(StoreAddressUsage.INVOICE)).thenReturn(
+            Optional.of(remaining)
+        );
         SiteSetting setting = new SiteSetting().id(1L);
         when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.of(setting));
 
@@ -113,9 +229,11 @@ class StoreAddressServiceTest {
 
     @Test
     void delete_lastDefault_clearsMatchingInvoiceSiteSetting() {
-        StoreAddress deleted = sample().id(1L).usage(StoreAddressUsage.SHIPMENT).isDefault(true);
+        StoreAddress deleted = sample().id(1L).usages(EnumSet.of(StoreAddressUsage.SHIPMENT)).isDefault(true);
         when(storeAddressRepository.findById(1L)).thenReturn(Optional.of(deleted));
-        when(storeAddressRepository.findFirstByUsageAndIsDefaultTrue(StoreAddressUsage.SHIPMENT)).thenReturn(Optional.empty());
+        when(storeAddressRepository.findFirstByUsagesContainingAndIsDefaultTrueOrderByIdDesc(StoreAddressUsage.SHIPMENT)).thenReturn(
+            Optional.empty()
+        );
         SiteSetting setting = new SiteSetting().id(1L).invoiceDispatchFromAddress("Mini Warehouse\n12 Flower Lane");
         when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(Optional.of(setting));
 
@@ -126,24 +244,54 @@ class StoreAddressServiceTest {
     }
 
     @Test
+    void update_changingUsages_usesPartialUpdateWithoutReplacingCollectionReference() {
+        StoreAddressDTO incoming = dto();
+        incoming.setId(1L);
+        incoming.setUsages(EnumSet.of(StoreAddressUsage.SHIPMENT, StoreAddressUsage.INVOICE));
+
+        StoreAddress existing = sample().id(1L).usages(EnumSet.of(StoreAddressUsage.SHIPMENT)).isDefault(false);
+        StoreAddressDTO out = dto();
+        out.setId(1L);
+        out.setUsages(incoming.getUsages());
+
+        when(storeAddressRepository.findById(1L)).thenReturn(Optional.of(existing));
+        stubPartialUpdate();
+        when(storeAddressRepository.save(existing)).thenReturn(existing);
+        when(storeAddressMapper.toDto(existing)).thenReturn(out);
+
+        service.update(incoming);
+
+        verify(storeAddressMapper).partialUpdate(existing, incoming);
+        verify(storeAddressMapper, never()).toEntity(any(StoreAddressDTO.class));
+        verify(storeAddressMapper, never()).toEntity(anyList());
+        assertThat(existing.getUsages()).containsExactlyInAnyOrder(
+            StoreAddressUsage.SHIPMENT,
+            StoreAddressUsage.INVOICE
+        );
+    }
+
+    @Test
     void update_changingUsage_refreshesPreviousUsageSiteSetting() {
         StoreAddressDTO incoming = dto();
         incoming.setId(1L);
-        incoming.setUsage(StoreAddressUsage.SHIPMENT);
+        incoming.setUsages(EnumSet.of(StoreAddressUsage.SHIPMENT));
         incoming.setIsDefault(true);
-        StoreAddress previous = sample().id(1L).usage(StoreAddressUsage.INVOICE).isDefault(true);
-        StoreAddress remainingInvoice = sample().id(3L).fullName("Registered office").usage(StoreAddressUsage.INVOICE).isDefault(true);
-        StoreAddress saved = sample().id(1L).usage(StoreAddressUsage.SHIPMENT).isDefault(true);
+        StoreAddress previous = sample().id(1L).usages(EnumSet.of(StoreAddressUsage.INVOICE)).isDefault(true);
+        StoreAddress remainingInvoice = sample()
+            .id(3L)
+            .fullName("Registered office")
+            .usages(EnumSet.of(StoreAddressUsage.INVOICE))
+            .isDefault(true);
         StoreAddressDTO out = dto();
         out.setId(1L);
-        out.setUsage(StoreAddressUsage.SHIPMENT);
+        out.setUsages(EnumSet.of(StoreAddressUsage.SHIPMENT));
 
         when(storeAddressRepository.findById(1L)).thenReturn(Optional.of(previous));
-        when(storeAddressRepository.findAllByUsageAndIsDefaultTrue(StoreAddressUsage.SHIPMENT)).thenReturn(List.of());
-        when(storeAddressMapper.toEntity(any(StoreAddressDTO.class))).thenReturn(saved);
-        when(storeAddressRepository.save(any(StoreAddress.class))).thenReturn(saved);
-        when(storeAddressMapper.toDto(saved)).thenReturn(out);
-        when(storeAddressRepository.findFirstByUsageAndIsDefaultTrue(StoreAddressUsage.INVOICE)).thenReturn(
+        when(storeAddressRepository.findAllByUsagesContainingAndIsDefaultTrue(StoreAddressUsage.SHIPMENT)).thenReturn(List.of());
+        stubPartialUpdate();
+        when(storeAddressRepository.save(any(StoreAddress.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(storeAddressMapper.toDto(any(StoreAddress.class))).thenReturn(out);
+        when(storeAddressRepository.findFirstByUsagesContainingAndIsDefaultTrueOrderByIdDesc(StoreAddressUsage.INVOICE)).thenReturn(
             Optional.of(remainingInvoice)
         );
         SiteSetting setting = new SiteSetting().id(1L);
@@ -151,6 +299,7 @@ class StoreAddressServiceTest {
 
         service.update(incoming);
 
+        verify(storeAddressMapper).partialUpdate(previous, incoming);
         assertThat(setting.getInvoiceDispatchFromAddress()).contains("Mini Warehouse");
         assertThat(setting.getInvoiceSoldByAddress()).contains("Registered office");
     }
@@ -191,6 +340,49 @@ class StoreAddressServiceTest {
         assertThat(pickup.phone()).isEqualTo("9999999999");
     }
 
+    private void stubPartialUpdate() {
+        doAnswer(invocation -> {
+            StoreAddress entity = invocation.getArgument(0);
+            StoreAddressDTO source = invocation.getArgument(1);
+            if (source.getFullName() != null) {
+                entity.setFullName(source.getFullName());
+            }
+            if (source.getPhone() != null) {
+                entity.setPhone(source.getPhone());
+            }
+            if (source.getLine1() != null) {
+                entity.setLine1(source.getLine1());
+            }
+            if (source.getLine2() != null) {
+                entity.setLine2(source.getLine2());
+            }
+            if (source.getCity() != null) {
+                entity.setCity(source.getCity());
+            }
+            if (source.getState() != null) {
+                entity.setState(source.getState());
+            }
+            if (source.getPincode() != null) {
+                entity.setPincode(source.getPincode());
+            }
+            if (source.getCountry() != null) {
+                entity.setCountry(source.getCountry());
+            }
+            if (source.getUsages() != null) {
+                entity.setUsages(source.getUsages());
+            }
+            if (source.getIsDefault() != null) {
+                entity.setIsDefault(source.getIsDefault());
+            }
+            if (source.getLabel() != null) {
+                entity.setLabel(source.getLabel());
+            }
+            return null;
+        })
+            .when(storeAddressMapper)
+            .partialUpdate(any(StoreAddress.class), any(StoreAddressDTO.class));
+    }
+
     private static StoreAddress sample() {
         return new StoreAddress()
             .fullName("Mini Warehouse")
@@ -200,7 +392,7 @@ class StoreAddressServiceTest {
             .state("Karnataka")
             .pincode("560001")
             .country("India")
-            .usage(StoreAddressUsage.SHIPMENT)
+            .usages(Set.of(StoreAddressUsage.SHIPMENT))
             .isDefault(true);
     }
 
@@ -213,7 +405,7 @@ class StoreAddressServiceTest {
         dto.setState("Karnataka");
         dto.setPincode("560001");
         dto.setCountry("India");
-        dto.setUsage(StoreAddressUsage.SHIPMENT);
+        dto.setUsages(EnumSet.of(StoreAddressUsage.SHIPMENT));
         dto.setIsDefault(false);
         return dto;
     }

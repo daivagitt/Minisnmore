@@ -9,14 +9,17 @@ import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PackageType;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
+import com.miniandmore.app.domain.enumeration.StoreAddressUsage;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.OrderItemRepository;
+import com.miniandmore.app.repository.StoreAddressRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,6 +37,7 @@ public class OrderPackageService {
     private final OrderEventService orderEventService;
     private final OrderCancellationService orderCancellationService;
     private final ObjectMapper objectMapper;
+    private final StoreAddressRepository storeAddressRepository;
 
     public OrderPackageService(
         CustomerOrderRepository customerOrderRepository,
@@ -42,7 +46,8 @@ public class OrderPackageService {
         ApplicationProperties applicationProperties,
         OrderEventService orderEventService,
         OrderCancellationService orderCancellationService,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        StoreAddressRepository storeAddressRepository
     ) {
         this.customerOrderRepository = customerOrderRepository;
         this.orderItemRepository = orderItemRepository;
@@ -51,6 +56,7 @@ public class OrderPackageService {
         this.orderEventService = orderEventService;
         this.orderCancellationService = orderCancellationService;
         this.objectMapper = objectMapper;
+        this.storeAddressRepository = storeAddressRepository;
     }
 
     public static int volumetricWeightGrams(int lengthCm, int breadthCm, int heightCm, int divisor) {
@@ -140,7 +146,7 @@ public class OrderPackageService {
         String courierId,
         String courierName
     ) {
-        return completePackage(orderNumber, weightGrams, lengthCm, breadthCm, heightCm, courierId, courierName, null);
+        return completePackage(orderNumber, weightGrams, lengthCm, breadthCm, heightCm, courierId, courierName, null, null);
     }
 
     public CustomerOrder completePackage(
@@ -152,6 +158,20 @@ public class OrderPackageService {
         String courierId,
         String courierName,
         String packageType
+    ) {
+        return completePackage(orderNumber, weightGrams, lengthCm, breadthCm, heightCm, courierId, courierName, packageType, null);
+    }
+
+    public CustomerOrder completePackage(
+        String orderNumber,
+        Integer weightGrams,
+        int lengthCm,
+        int breadthCm,
+        int heightCm,
+        String courierId,
+        String courierName,
+        String packageType,
+        Long packageBoxId
     ) {
         CustomerOrder order = requireOrder(orderNumber);
         requirePackageEligible(order);
@@ -177,6 +197,7 @@ public class OrderPackageService {
         order.setPackageCourierId(selected.id());
         order.setPackageCourierName(selected.name());
         order.setPackageType(resolvedType);
+        order.setPackageBoxId(packageBoxId);
         order.setPackedAt(Instant.now());
         if (order.getStatus() == OrderStatus.CONFIRMED) {
             order.setStatus(OrderStatus.HAND_WRAPPED);
@@ -209,7 +230,8 @@ public class OrderPackageService {
             breadthCm,
             heightCm,
             cod ? "cod" : "prepaid",
-            orderAmount
+            orderAmount,
+            warehouseOriginPincode()
         );
         String preferredId = null;
         List<Map<String, Object>> couriers = new ArrayList<>();
@@ -278,6 +300,15 @@ public class OrderPackageService {
             }
         }
         return null;
+    }
+
+    private String warehouseOriginPincode() {
+        var stored = storeAddressRepository.findFirstByUsagesContainingAndIsDefaultTrueOrderByIdDesc(StoreAddressUsage.SHIPMENT);
+        return StoreAddressService.warehousePickup(
+            stored == null ? Optional.empty() : stored,
+            applicationProperties.getXpressbees(),
+            null
+        ).pincode();
     }
 
     private JsonNode parseShippingAddress(String shippingAddressJson) {

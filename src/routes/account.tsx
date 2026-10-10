@@ -156,7 +156,7 @@ function AccountLayout() {
         <figure className="relative overflow-hidden rounded-[2rem] min-h-[360px] shadow-soft">
           <img
             src={newbornBaby}
-            alt="Softly wrapped newborn in organic babywear"
+            alt="Smiling baby in organic cotton onesie"
             className="absolute inset-0 h-full w-full object-cover"
             loading="lazy"
             decoding="async"

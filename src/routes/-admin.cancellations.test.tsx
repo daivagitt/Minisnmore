@@ -37,6 +37,31 @@ describe("admin cancellations", () => {
     Element.prototype.scrollIntoView = vi.fn();
   });
 
+  it("renders a searchable list table instead of cards", async () => {
+    listAdminCancellationRequests.mockResolvedValue({
+      requests: [
+        {
+          id: 1,
+          order_id: 501,
+          request_number: "CAN-1",
+          order_number: "MNM-1",
+          status: "requested",
+          reason: "Changed my mind",
+          requested_at: new Date(2026, 9, 7, 12, 0, 0).toISOString(),
+          customer_login: "asha",
+          order_total: 999,
+        },
+      ],
+    });
+
+    renderCancellations();
+    await waitFor(() => expect(screen.getByRole("table", { name: "Cancellation requests" })).toBeInTheDocument());
+    expect(screen.getByRole("columnheader", { name: "Order ID" })).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: /search by order id/i })).toBeInTheDocument();
+    expect(screen.getByLabelText("From date")).toBeInTheDocument();
+    expect(screen.getByLabelText("To date")).toBeInTheDocument();
+  });
+
   it("finds a cancellation by order id without paging through results", async () => {
     const requestedAt = new Date(2026, 9, 7, 12, 0, 0).toISOString();
     listAdminCancellationRequests.mockResolvedValue({
@@ -60,7 +85,7 @@ describe("admin cancellations", () => {
 
     await userEvent.type(screen.getByRole("searchbox", { name: /search by order id/i }), "MNM-211");
     await waitFor(() => expect(screen.getByText("CAN-12")).toBeInTheDocument());
-    expect(screen.getByText(/Order MNM-211/)).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "MNM-211" })).toBeInTheDocument();
     expect(screen.queryByText("CAN-1")).toBeNull();
   });
 

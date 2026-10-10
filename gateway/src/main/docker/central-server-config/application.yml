@@ -22,7 +22,7 @@ spring:
             - id: miniandmore-commerce-api
               uri: lb://miniandmore-commerce
               predicates:
-                - Path=/api/v1/orders/**,/api/v1/account/**,/api/v1/payments,/api/v1/coupons/**,/api/v1/order-returns/**,/api/v1/admin/order-returns/**,/api/v1/admin/orders,/api/v1/admin/orders/**
+                - Path=/api/v1/orders/**,/api/v1/account/**,/api/v1/payments,/api/v1/coupons/**,/api/v1/order-returns/**,/api/v1/admin/order-returns/**,/api/v1/admin/orders,/api/v1/admin/orders/**,/api/v1/admin/cancellation-requests,/api/v1/admin/cancellation-requests/**
             - id: miniandmore-store-api
               uri: lb://miniandmore-store
               predicates:

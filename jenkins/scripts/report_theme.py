@@ -32,7 +32,9 @@ def brand_logo_markup(*, nested: bool = False) -> str:
 
 
 def esc(value: object) -> str:
-    return html.escape(str(value or ""))
+    if value is None:
+        return ""
+    return html.escape(str(value))
 
 
 def release_id() -> str:

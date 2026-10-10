@@ -735,7 +735,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{baseUrl}}/api/v1/products/api-test-seed-1789020484"
+            "url": "{{baseUrl}}/api/v1/products/basic-shorts-set"
           }
         },
         {

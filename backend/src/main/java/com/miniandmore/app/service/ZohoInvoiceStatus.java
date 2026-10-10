@@ -59,6 +59,10 @@ public final class ZohoInvoiceStatus {
         return "sent".equals(normalized) || "paid".equals(normalized);
     }
 
+    public static boolean isPaid(String status) {
+        return "paid".equals(normalize(status));
+    }
+
     /**
      * Invoice statuses (sent/paid/draft) must not clobber sales-order fulfillment statuses
      * already stored in {@code zoho_order_status} (shipped/in_transit/fulfilled).

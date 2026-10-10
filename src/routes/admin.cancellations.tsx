@@ -2,6 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { AdminCaseSearchFields } from "@/components/admin/AdminCaseSearchFields";
+import {
+  AdminCaseListHead,
+  AdminCaseListTable,
+  AdminCaseTd,
+  adminCaseRowClass,
+} from "@/components/admin/AdminCaseListTable";
 import { SHOW_M2_POST_ORDER_UI } from "@/lib/feature-flags";
 import {
   adminCaseListFetchStatus,
@@ -30,23 +36,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { formatCaseAge } from "@/lib/admin-case-format";
 
 export const Route = createFileRoute("/admin/cancellations")({ component: AdminCancellationsPage });
 
 const STATUS_FILTERS = ["", "requested", "approved", "rejected", "withdrawn"] as const;
 
-function formatCaseAge(row: AdminCancellationRequestRow) {
-  const age = row.case_age_hours ?? 0;
-  const ageLabel = age < 24 ? `${age}h old` : `${Math.floor(age / 24)}d old`;
-  if (!row.sla_due_at) {
-    return ageLabel;
-  }
-  const due = new Date(row.sla_due_at).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" });
-  return row.sla_overdue ? `${ageLabel} · overdue (due ${due})` : `${ageLabel} · due ${due}`;
-}
-
 export function AdminCancellationsPage({ mode = "admin" }: { mode?: "admin" | "operations" | "support" } = {}) {
   if (!SHOW_M2_POST_ORDER_UI) return null;
+  return <AdminCancellationsPageContent mode={mode} />;
+}
+
+function AdminCancellationsPageContent({ mode = "admin" }: { mode?: "admin" | "operations" | "support" } = {}) {
   const canFulfill = mode !== "support";
   const eyebrow = mode === "support" ? "Customer Support" : mode === "operations" ? "Operations" : "Fulfilment";
 
@@ -207,111 +208,109 @@ export function AdminCancellationsPage({ mode = "admin" }: { mode?: "admin" | "o
       ) : filteredRows.length === 0 ? (
         <p className="text-sm text-muted-foreground">No cancellation requests in this filter.</p>
       ) : (
-        <ul id="admin-cancellations-list" className="space-y-4">
-          {paging.pageItems.map((r) => (
-            <li key={r.request_number} className="glass-strong rounded-2xl p-4 space-y-3">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <p className="font-medium">{r.request_number}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Order {r.order_number} · {r.customer_login} · ₹
-                    {Number(r.order_total ?? 0).toLocaleString("en-IN")}
-                  </p>
-                  <p className="text-xs mt-1">
-                    Status: <span className="uppercase tracking-wide">{r.status}</span>
-                    {r.cod_refund_pending ? (
-                      <span className="ml-2 text-amber-700">· COD refund pending</span>
-                    ) : null}
-                    {r.payment_status === "refund_failed" ? (
-                      <span className="ml-2 text-destructive">· Refund failed</span>
-                    ) : null}
-                  </p>
-                </div>
-                <div className="text-xs text-right">
-                  <p className={r.sla_overdue ? "text-amber-700 font-medium" : "text-muted-foreground"}>
+        <AdminCaseListTable id="admin-cancellations-list" caption="Cancellation requests">
+          <AdminCaseListHead
+            columns={["Request", "Order ID", "Customer", "Amount", "Status", "Requested", "Reason", "Actions"]}
+          />
+          <tbody>
+            {paging.pageItems.map((r) => (
+              <tr key={r.request_number} className={adminCaseRowClass}>
+                <AdminCaseTd className="font-medium whitespace-nowrap">{r.request_number}</AdminCaseTd>
+                <AdminCaseTd className="whitespace-nowrap font-medium">{r.order_number ?? "—"}</AdminCaseTd>
+                <AdminCaseTd className="whitespace-nowrap">{r.customer_login || "—"}</AdminCaseTd>
+                <AdminCaseTd className="whitespace-nowrap tabular-nums">
+                  ₹{Number(r.order_total ?? 0).toLocaleString("en-IN")}
+                </AdminCaseTd>
+                <AdminCaseTd>
+                  <p className="uppercase tracking-wide text-xs font-semibold">{r.status}</p>
+                  <p className={r.sla_overdue ? "text-xs text-amber-700 font-medium" : "text-xs text-muted-foreground"}>
                     {formatCaseAge(r)}
                   </p>
-                  <p className="text-muted-foreground">
-                    {new Date(r.requested_at).toLocaleString("en-IN")}
-                  </p>
-                </div>
-              </div>
-              <p className="text-sm">{r.reason}</p>
-              {r.manual_refund_reference ? (
-                <p className="text-xs text-muted-foreground">
-                  COD refund: {r.manual_refund_method?.replace(/_/g, " ")} · {r.manual_refund_reference}
-                  {r.manual_refund_recorded_by ? ` · by ${r.manual_refund_recorded_by}` : ""}
-                </p>
-              ) : null}
-              {r.rejection_reason ? (
-                <p className="text-xs text-amber-700">{r.rejection_reason}</p>
-              ) : null}
-              {canFulfill && r.status === "approved" && r.payment_status === "refund_failed" ? (
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={busy === r.request_number}
-                    className="text-xs rounded-full bg-primary text-primary-foreground px-3 py-1.5"
-                    onClick={() =>
-                      void run(
-                        r.request_number,
-                        () => retryCancellationRefund(r.request_number),
-                        "Refund retry initiated",
-                      )
-                    }
-                  >
-                    Retry refund
-                  </button>
-                </div>
-              ) : null}
-              {canFulfill && r.cod_refund_pending ? (
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={busy === r.request_number}
-                    className="text-xs rounded-full bg-primary text-primary-foreground px-3 py-1.5"
-                    onClick={() => {
-                      setCodRefundTarget(r.request_number);
-                      setCodRefundMethod("upi");
-                      setCodRefundReference("");
-                    }}
-                  >
-                    Record COD refund
-                  </button>
-                </div>
-              ) : null}
-              {r.status === "requested" ? (
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={busy === r.request_number}
-                    className="text-xs rounded-full bg-primary text-primary-foreground px-3 py-1.5"
-                    onClick={() =>
-                      void run(
-                        r.request_number,
-                        () => approveCancellationRequest(r.request_number),
-                        "Cancellation approved",
-                      )
-                    }
-                  >
-                    Approve & cancel order
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy === r.request_number}
-                    className="text-xs rounded-full border border-border px-3 py-1.5"
-                    onClick={() => {
-                      setRejectTarget(r.request_number);
-                      setRejectReason("");
-                    }}
-                  >
-                    Reject
-                  </button>
-                </div>
-              ) : null}
-            </li>
-          ))}
-        </ul>
+                  {r.cod_refund_pending ? <p className="text-xs text-amber-700">COD refund pending</p> : null}
+                  {r.payment_status === "refund_failed" ? (
+                    <p className="text-xs text-destructive">Refund failed</p>
+                  ) : null}
+                </AdminCaseTd>
+                <AdminCaseTd className="whitespace-nowrap text-xs text-muted-foreground">
+                  {new Date(r.requested_at).toLocaleString("en-IN")}
+                </AdminCaseTd>
+                <AdminCaseTd className="max-w-[16rem]">
+                  <p className="line-clamp-2" title={r.reason}>{r.reason}</p>
+                  {r.manual_refund_reference ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      COD refund: {r.manual_refund_method?.replace(/_/g, " ")} · {r.manual_refund_reference}
+                      {r.manual_refund_recorded_by ? ` · by ${r.manual_refund_recorded_by}` : ""}
+                    </p>
+                  ) : null}
+                  {r.rejection_reason ? <p className="mt-1 text-xs text-amber-700">{r.rejection_reason}</p> : null}
+                </AdminCaseTd>
+                <AdminCaseTd className="min-w-[11rem]">
+                  <div className="flex flex-wrap gap-2">
+                    {canFulfill && r.status === "approved" && r.payment_status === "refund_failed" ? (
+                      <button
+                        type="button"
+                        disabled={busy === r.request_number}
+                        className="text-xs rounded-full bg-primary text-primary-foreground px-3 py-1.5"
+                        onClick={() =>
+                          void run(
+                            r.request_number,
+                            () => retryCancellationRefund(r.request_number),
+                            "Refund retry initiated",
+                          )
+                        }
+                      >
+                        Retry refund
+                      </button>
+                    ) : null}
+                    {canFulfill && r.cod_refund_pending ? (
+                      <button
+                        type="button"
+                        disabled={busy === r.request_number}
+                        className="text-xs rounded-full bg-primary text-primary-foreground px-3 py-1.5"
+                        onClick={() => {
+                          setCodRefundTarget(r.request_number);
+                          setCodRefundMethod("upi");
+                          setCodRefundReference("");
+                        }}
+                      >
+                        Record COD refund
+                      </button>
+                    ) : null}
+                    {r.status === "requested" ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled={busy === r.request_number}
+                          className="text-xs rounded-full bg-primary text-primary-foreground px-3 py-1.5"
+                          onClick={() =>
+                            void run(
+                              r.request_number,
+                              () => approveCancellationRequest(r.request_number),
+                              "Cancellation approved",
+                            )
+                          }
+                        >
+                          Approve & cancel order
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy === r.request_number}
+                          className="text-xs rounded-full border border-border px-3 py-1.5"
+                          onClick={() => {
+                            setRejectTarget(r.request_number);
+                            setRejectReason("");
+                          }}
+                        >
+                          Reject
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                </AdminCaseTd>
+              </tr>
+            ))}
+          </tbody>
+        </AdminCaseListTable>
       )}
       {!loading && filteredRows.length > 0 && (
         <ListPagination

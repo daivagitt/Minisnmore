@@ -1,13 +1,16 @@
 package com.miniandmore.app.service.dto;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
 import com.miniandmore.app.domain.enumeration.StoreAddressUsage;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.io.Serializable;
+import java.util.LinkedHashSet;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * A DTO for the {@link com.miniandmore.app.domain.StoreAddress} entity.
@@ -49,8 +52,8 @@ public class StoreAddressDTO implements Serializable {
     @Size(max = 80)
     private String country;
 
-    @NotNull
-    private StoreAddressUsage usage;
+    @JsonFormat(with = JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
+    private Set<StoreAddressUsage> usages = new LinkedHashSet<>();
 
     @JsonProperty("isDefault")
     @JsonAlias("is_default")
@@ -136,12 +139,44 @@ public class StoreAddressDTO implements Serializable {
         this.country = country;
     }
 
-    public StoreAddressUsage getUsage() {
-        return usage;
+    public Set<StoreAddressUsage> getUsages() {
+        return usages;
     }
 
+    public void setUsages(Set<StoreAddressUsage> usages) {
+        if (usages == null) {
+            return;
+        }
+        if (usages.isEmpty()) {
+            // Ignore empty arrays so a later legacy "usage" setter is not wiped (Jackson property order).
+            return;
+        }
+        this.usages = new LinkedHashSet<>(usages);
+    }
+
+    /**
+     * Legacy singular {@code usage} field from older clients — folded into {@link #usages}.
+     */
+    @JsonSetter("usage")
     public void setUsage(StoreAddressUsage usage) {
-        this.usage = usage;
+        if (usage == null) {
+            return;
+        }
+        if (this.usages == null) {
+            this.usages = new LinkedHashSet<>();
+        }
+        this.usages.add(usage);
+    }
+
+    /**
+     * Legacy singular field for API clients that still read {@code usage} (first selected role).
+     */
+    @JsonProperty("usage")
+    public StoreAddressUsage getUsage() {
+        if (usages == null || usages.isEmpty()) {
+            return null;
+        }
+        return usages.iterator().next();
     }
 
     public Boolean getIsDefault() {
@@ -174,6 +209,6 @@ public class StoreAddressDTO implements Serializable {
 
     @Override
     public String toString() {
-        return "StoreAddressDTO{" + "id=" + getId() + ", usage='" + getUsage() + "'" + "}";
+        return "StoreAddressDTO{" + "id=" + getId() + ", usages='" + getUsages() + "'" + "}";
     }
 }

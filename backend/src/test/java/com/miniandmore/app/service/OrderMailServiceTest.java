@@ -283,20 +283,6 @@ class OrderMailServiceTest {
     }
 
     @Test
-    void sendForwardCarrierCancelledAdminNotice_sendsToSiteContactEmail() {
-        CustomerOrder order = orderWithAddress();
-        order.setTrackingNumber("XB-9");
-        SiteSetting settings = new SiteSetting();
-        settings.setContactEmail("ops@minisnmore.com");
-        when(siteSettingRepository.findFirstByOrderByIdAsc()).thenReturn(java.util.Optional.of(settings));
-        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
-
-        service.sendForwardCarrierCancelledAdminNotice(order);
-
-        verify(javaMailSender).send(mimeMessage);
-    }
-
-    @Test
     void cancellationEmails_processTheirTemplates() {
         CustomerOrder order = orderWithAddress();
         when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
@@ -316,6 +302,115 @@ class OrderMailServiceTest {
 
         service.sendCancellationRejected(order, req);
         verify(templateEngine).process(eq("mail/cancellationRejectedEmail"), any(Context.class));
+    }
+
+    @Test
+    void sendRefundFailed_processesTemplate() {
+        CustomerOrder order = orderWithAddress().paymentMethod("online");
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(anyString(), any(Context.class))).thenReturn("content");
+        when(messageSource.getMessage(anyString(), any(), any())).thenReturn("title");
+        when(orderItemRepository.findAllByOrderId(9L)).thenReturn(List.of());
+
+        service.sendRefundFailed(order, BigDecimal.valueOf(1299), "rfnd_fail_1", "online");
+
+        verify(templateEngine).process(eq("mail/refundFailedEmail"), any(Context.class));
+    }
+
+    @Test
+    void sendOrderCancelled_onlineRefunded_includesRefundExtras() {
+        CustomerOrder order = orderWithAddress()
+            .paymentMethod("online")
+            .paymentStatus(PaymentStatus.REFUNDED)
+            .total(BigDecimal.valueOf(1299));
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(anyString(), any(Context.class))).thenReturn("content");
+        when(messageSource.getMessage(anyString(), any(), any())).thenReturn("title");
+        when(orderItemRepository.findAllByOrderId(9L)).thenReturn(List.of());
+
+        service.sendOrderCancelled(order);
+
+        ArgumentCaptor<Context> contextCaptor = ArgumentCaptor.forClass(Context.class);
+        verify(templateEngine).process(eq("mail/orderCancelledEmail"), contextCaptor.capture());
+        assertThat(contextCaptor.getValue().getVariable("hasRefund")).isEqualTo(true);
+        assertThat(contextCaptor.getValue().getVariable("refundAmount")).isEqualTo("₹1299");
+    }
+
+    @Test
+    void sendCancellationAccepted_onlineWithoutExplicitRefund_usesOrderTotal() {
+        CustomerOrder order = orderWithAddress().paymentMethod("online").total(BigDecimal.valueOf(899));
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(anyString(), any(Context.class))).thenReturn("content");
+        when(messageSource.getMessage(anyString(), any(), any())).thenReturn("title");
+        when(orderItemRepository.findAllByOrderId(9L)).thenReturn(List.of());
+
+        OrderCancellationRequest req = new OrderCancellationRequest();
+        req.setRequestNumber("CAN-2");
+        req.setReason("Changed mind");
+
+        service.sendCancellationAccepted(order, req);
+
+        ArgumentCaptor<Context> contextCaptor = ArgumentCaptor.forClass(Context.class);
+        verify(templateEngine).process(eq("mail/cancellationAcceptedEmail"), contextCaptor.capture());
+        assertThat(contextCaptor.getValue().getVariable("hasRefund")).isEqualTo(true);
+        assertThat(contextCaptor.getValue().getVariable("refundAmount")).isEqualTo("₹899");
+    }
+
+    @Test
+    void sendReturnUpdate_qcRejection_usesQcFailedTemplate() {
+        CustomerOrder order = orderWithAddress();
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(anyString(), any(Context.class))).thenReturn("content");
+        when(messageSource.getMessage(anyString(), any(), any())).thenReturn("title");
+        when(orderItemRepository.findAllByOrderId(9L)).thenReturn(List.of());
+
+        OrderReturn orderReturn = new OrderReturn();
+        orderReturn.setReturnNumber("RET-QC");
+        orderReturn.setStatus(OrderReturnStatus.REJECTED);
+        orderReturn.setRejectionReason("QC failed — item shows signs of use");
+
+        service.sendReturnUpdate(order, orderReturn);
+
+        verify(templateEngine).process(eq("mail/returnQcFailedEmail"), any(Context.class));
+        verify(templateEngine, never()).process(eq("mail/returnRejectedEmail"), any(Context.class));
+    }
+
+    @Test
+    void sendReturnUpdate_returnShipped_usesStatusSpecificTemplate() {
+        CustomerOrder order = orderWithAddress();
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(anyString(), any(Context.class))).thenReturn("content");
+        when(messageSource.getMessage(anyString(), any(), any())).thenReturn("title");
+        when(orderItemRepository.findAllByOrderId(9L)).thenReturn(List.of());
+
+        OrderReturn orderReturn = new OrderReturn();
+        orderReturn.setReturnNumber("RET-SHIP");
+        orderReturn.setStatus(OrderReturnStatus.SHIPPED);
+
+        service.sendReturnUpdate(order, orderReturn);
+
+        verify(templateEngine).process(eq("mail/orderReturnEmail"), any(Context.class));
+    }
+
+    @Test
+    void sendReturnUpdate_manualRefundCompleted_sendsCompletedTemplate() {
+        CustomerOrder order = orderWithAddress().paymentMethod("online");
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(anyString(), any(Context.class))).thenReturn("content");
+        when(messageSource.getMessage(anyString(), any(), any())).thenReturn("title");
+        when(orderItemRepository.findAllByOrderId(9L)).thenReturn(List.of());
+
+        OrderReturn orderReturn = new OrderReturn();
+        orderReturn.setReturnNumber("RET-MAN");
+        orderReturn.setStatus(OrderReturnStatus.REFUNDED);
+        orderReturn.setRefundAmount(BigDecimal.valueOf(499));
+        orderReturn.setManualRefundReference("UTR-MAN-1");
+        orderReturn.setManualRefundRecordedAt(java.time.Instant.now());
+
+        service.sendReturnUpdate(order, orderReturn);
+
+        verify(templateEngine).process(eq("mail/refundCompletedEmail"), any(Context.class));
+        verify(templateEngine, never()).process(eq("mail/refundInitiatedEmail"), any(Context.class));
     }
 
     @Test

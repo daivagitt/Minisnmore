@@ -11,6 +11,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.AbstractList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -438,7 +439,15 @@ public class ZohoBooksClient {
     }
 
     public Map<String, Object> createInvoiceFromSalesOrder(String salesOrderId) {
-        return post("/invoices/fromsalesorder?" + orgIdParam() + "&salesorder_id=" + salesOrderId, Map.of());
+        return createInvoiceFromSalesOrder(salesOrderId, null);
+    }
+
+    public Map<String, Object> createInvoiceFromSalesOrder(String salesOrderId, String referenceNumber) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        if (StringUtils.isNotBlank(referenceNumber)) {
+            payload.put("reference_number", referenceNumber.trim());
+        }
+        return post("/invoices/fromsalesorder?" + orgIdParam() + "&salesorder_id=" + salesOrderId, payload);
     }
 
     public Map<String, Object> markInvoiceAsSent(String invoiceId) {
@@ -462,6 +471,20 @@ public class ZohoBooksClient {
 
     public Map<String, Object> markCreditNoteAsOpen(String creditNoteId) {
         return post("/creditnotes/" + creditNoteId + "/status/open?" + orgIdParam(), Map.of());
+    }
+
+    public Map<String, Object> voidCreditNote(String creditNoteId) {
+        return post("/creditnotes/" + creditNoteId + "/status/void?" + orgIdParam(), Map.of());
+    }
+
+    public Map<String, Object> refundCreditNote(String creditNoteId, Map<String, Object> payload) {
+        return post("/creditnotes/" + creditNoteId + "/refunds?" + orgIdParam(), payload);
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> listBankAccounts() {
+        Map<String, Object> response = get("/bankaccounts?" + orgIdParam());
+        return (List<Map<String, Object>>) response.getOrDefault("bankaccounts", List.of());
     }
 
     public Map<String, Object> getInvoice(String invoiceId) {

@@ -65,6 +65,21 @@ public final class OrderTrackingStatusResolver {
     }
 
     /**
+     * Customer cancellation is blocked once a forward shipment is booked (awaiting pickup) or has left the warehouse.
+     * Carrier-cancelled AWBs remain open so the order can be rebooked or cancelled.
+     */
+    public static boolean blocksCustomerCancellation(CustomerOrder order) {
+        if (order == null) {
+            return false;
+        }
+        String tracking = resolve(order);
+        if (XpressBeesShipmentStatus.CARRIER_CANCELLED.equals(tracking)) {
+            return false;
+        }
+        return "awaiting_pickup".equals(tracking) || isDispatched(tracking);
+    }
+
+    /**
      * ExpressBees AWB generation only prints a label. Customer "shipped" waits for a pickup scan.
      */
     static boolean isExpressBeesAwaitingPickup(CustomerOrder order) {

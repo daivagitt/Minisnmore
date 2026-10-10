@@ -78,3 +78,37 @@ export function commerceFromSiteSettings(s: CommerceSiteFields): CommerceConfig 
     codFeeInr: s.cod_fee_inr,
   };
 }
+
+/** INR amount formatted for storefront copy (matches PDP trust badges). */
+export function formatFreeShippingMinInr(amountInr: number): string {
+  const n = Number(amountInr);
+  if (!Number.isFinite(n) || n < 0) return formatFreeShippingMinInr(DEFAULT_COMMERCE.freeShippingMinInr);
+  return n.toLocaleString("en-IN");
+}
+
+export type FreeShippingStorefrontLabels = {
+  marquee: string;
+  hero: string;
+  pdpShort: string;
+  pdpTitle: string;
+  cartBadge: string;
+};
+
+export function freeShippingStorefrontLabels(freeShippingMinInr: number): FreeShippingStorefrontLabels {
+  const amt = formatFreeShippingMinInr(freeShippingMinInr);
+  return {
+    marquee: `Free shipping over ₹${amt}`,
+    hero: `Free shipping ₹${amt}+`,
+    pdpShort: `Free ₹${amt}+`,
+    pdpTitle: `Free shipping order above ${amt}`,
+    cartBadge: `Free Delivery Above ₹${amt}`,
+  };
+}
+
+export function freeShippingHeroBadgeLabel(amountInr: number): string {
+  return freeShippingStorefrontLabels(amountInr).hero;
+}
+
+export function freeShippingOfferMarqueeLabel(amountInr: number): string {
+  return freeShippingStorefrontLabels(amountInr).marquee;
+}

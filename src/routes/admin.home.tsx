@@ -91,7 +91,7 @@ const LABELS: Record<string, string> = {
 
 /** Admin tooltips — what each homepage block does (from Kasasowjanya storefront). */
 const SECTION_HINTS: Record<string, string> = {
-  hero: "Top carousel. Slide images and CTAs are managed under Admin → Homepage banners.",
+  hero: "Top carousel. Slide images, CTAs and the three trust lines under each slide are managed under Admin → Homepage banners.",
   by_age: "Age category cards shown in a grid. Add cards below or leave empty for built-in defaults.",
   best_sellers: "Shows five products on the homepage. Pick up to five below or leave empty for auto bestsellers.",
   trending: "Shows five trending products. Pick up to five or leave empty for automatic picks.",

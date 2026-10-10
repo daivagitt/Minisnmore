@@ -47,6 +47,7 @@ export function exchangeToFulfillmentOrder(row: AdminOrderReturnRow): AdminOrder
     package_courier_id: row.package_courier_id || "",
     package_courier_name: row.package_courier_name || "",
     package_type: row.package_type || "custom",
+    package_box_id: row.package_box_id ?? null,
     packed_at: row.packed_at || "",
     package_slip_number: row.package_slip_number || undefined,
     shipment_order_number: row.shipment_order_number || undefined,
@@ -79,6 +80,7 @@ export async function bookExchangeFulfillmentShipment(
     courier_id?: string;
     courier_name?: string;
     package_type?: "custom" | "box" | "envelope";
+    package_box_id?: number | null;
     override_fulfillment_hold?: boolean;
     override_reason?: string;
   },
@@ -92,6 +94,7 @@ export async function bookExchangeFulfillmentShipment(
     courier_id: payload.courier_id,
     courier_name: payload.courier_name,
     package_type: payload.package_type,
+    package_box_id: payload.package_box_id,
   })) as AdminOrderReturnRow;
   return {
     order: {

@@ -767,7 +767,7 @@ class InternalAccountOrderResourcePrivateLogicTest {
     }
 
     @Test
-    void orderSummary_packedOrder_hidesCustomerCancelAndAsksForCare() {
+    void orderSummary_packedOrder_allowsCustomerCancelUntilDispatched() {
         CustomerOrder order = new CustomerOrder()
             .id(12L)
             .orderNumber("MNM-12")
@@ -779,14 +779,14 @@ class InternalAccountOrderResourcePrivateLogicTest {
             .placedAt(Instant.parse("2026-08-10T10:00:00Z"));
         OrderItem item = new OrderItem().id(1L).productId("1").productName("Dress").qty(1).price(BigDecimal.TEN);
         when(orderItemRepository.findAllByOrderId(12L)).thenReturn(List.of(item));
-        when(orderCancellationService.canCustomerShowCancelAction(order)).thenReturn(false);
-        when(orderCancellationService.shouldContactCareToCancel(order)).thenReturn(true);
+        when(orderCancellationService.canCustomerShowCancelAction(order)).thenReturn(true);
+        when(orderCancellationService.shouldContactCareToCancel(order)).thenReturn(false);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> summary = (Map<String, Object>) ReflectionTestUtils.invokeMethod(resource, "orderSummary", order);
 
-        assertThat(summary.get("can_cancel")).isEqualTo(false);
-        assertThat(summary.get("contact_care_to_cancel")).isEqualTo(true);
+        assertThat(summary.get("can_cancel")).isEqualTo(true);
+        assertThat(summary.get("contact_care_to_cancel")).isEqualTo(false);
         assertThat(summary.get("packed_at")).isEqualTo("2026-09-30T00:00:00Z");
     }
 }

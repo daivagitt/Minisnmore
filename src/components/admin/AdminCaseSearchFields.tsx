@@ -1,4 +1,5 @@
 import { Search } from "lucide-react";
+import { adminCaseSearchActive } from "@/lib/admin-case-search";
 
 export function AdminCaseSearchFields({
   orderQuery,
@@ -7,6 +8,9 @@ export function AdminCaseSearchFields({
   to,
   onFromChange,
   onToChange,
+  placeholder = "Search by order ID",
+  searchAriaLabel = "Search by order ID",
+  hint = "Searching all cases — status filters pause until you clear.",
 }: {
   orderQuery: string;
   onOrderQueryChange: (value: string) => void;
@@ -14,7 +18,12 @@ export function AdminCaseSearchFields({
   to: string;
   onFromChange: (value: string) => void;
   onToChange: (value: string) => void;
+  placeholder?: string;
+  searchAriaLabel?: string;
+  /** Pass `null` to hide the active-search hint (e.g. orders keep status filters). */
+  hint?: string | null;
 }) {
+  const searchActive = adminCaseSearchActive(orderQuery, from, to);
   return (
     <div className="grid gap-3 sm:grid-cols-[minmax(12rem,1.5fr)_repeat(2,minmax(10rem,1fr))]">
       <label className="block min-w-0">
@@ -30,8 +39,8 @@ export function AdminCaseSearchFields({
             type="search"
             value={orderQuery}
             onChange={(event) => onOrderQueryChange(event.target.value)}
-            placeholder="Search by order ID"
-            aria-label="Search by order ID"
+            placeholder={placeholder}
+            aria-label={searchAriaLabel}
             autoComplete="off"
             className="h-10 w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-sm"
           />
@@ -61,11 +70,9 @@ export function AdminCaseSearchFields({
           className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
         />
       </label>
-      {Boolean(orderQuery.trim() || from.trim() || to.trim()) && (
-        <p className="text-xs text-muted-foreground sm:col-span-3">
-          Searching all cases — status filters pause until you clear.
-        </p>
-      )}
+      {searchActive && hint ? (
+        <p className="text-xs text-muted-foreground sm:col-span-3">{hint}</p>
+      ) : null}
     </div>
   );
 }

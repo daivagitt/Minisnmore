@@ -358,23 +358,6 @@ class UserServiceTest {
     }
 
     @Test
-    void getAllCustomerUsers_mapsToDto() {
-        when(userRepository.findAllCustomerUsers(20, 0)).thenReturn(Flux.just(user));
-
-        StepVerifier.create(userService.getAllCustomerUsers(PageRequest.of(0, 20)))
-            .assertNext(dto -> assertThat(dto.getLogin()).isEqualTo("user"))
-            .verifyComplete();
-        verify(userAuthoritiesLoader).attachAuthorities(anyList());
-    }
-
-    @Test
-    void countCustomerUsers_delegatesToRepository() {
-        when(userRepository.countCustomerUsers()).thenReturn(Mono.just(4L));
-
-        StepVerifier.create(userService.countCustomerUsers()).expectNext(4L).verifyComplete();
-    }
-
-    @Test
     void getAllPublicUsers_mapsToDto() {
         when(userRepository.findAllActivatedUsers(20, 0)).thenReturn(Flux.just(user));
 
@@ -507,6 +490,97 @@ class UserServiceTest {
         when(userRepository.findOneByEmailIgnoreCase("user@localhost")).thenReturn(Mono.just(user));
 
         StepVerifier.create(userService.registerUser(dto, "password")).expectError(EmailAlreadyUsedException.class).verify();
+    }
+
+    @Test
+    void createStaffUser_assignsCanonicalSalesRole() {
+        AdminUserDTO dto = adminDto("sales1", "sales1@localhost");
+        dto.setAuthorities(Set.of(AuthoritiesConstants.SALES));
+
+        StepVerifier.create(userService.createStaffUser(dto, Set.of(AuthoritiesConstants.SUPER_ADMIN)).contextWrite(securityContext()))
+            .assertNext(saved -> {
+                assertThat(saved.isActivated()).isFalse();
+                assertThat(saved.getAuthorities()).extracting(Authority::getName).contains(AuthoritiesConstants.SALES);
+            })
+            .verifyComplete();
+    }
+
+    @Test
+    void updateStaffUser_blocksRemovingLastSuperAdmin() {
+        User superAdmin = sampleUser();
+        superAdmin.setLogin("super");
+        Authority sa = new Authority();
+        sa.setName(AuthoritiesConstants.SUPER_ADMIN);
+        superAdmin.setAuthorities(Set.of(sa));
+        when(userRepository.findById(1L)).thenReturn(Mono.just(superAdmin));
+        when(userAuthoritiesLoader.withAuthorities(superAdmin)).thenReturn(Mono.just(superAdmin));
+        when(userRepository.countUsersWithAuthority(AuthoritiesConstants.SUPER_ADMIN)).thenReturn(Mono.just(1L));
+
+        AdminUserDTO dto = new AdminUserDTO(superAdmin);
+        dto.setAuthorities(Set.of(AuthoritiesConstants.ADMIN));
+
+        StepVerifier.create(userService.updateStaffUser(dto, Set.of(AuthoritiesConstants.SUPER_ADMIN)))
+            .expectErrorMatches(ex -> ex instanceof org.springframework.web.server.ResponseStatusException)
+            .verify();
+    }
+
+    @Test
+    void updateStaffUser_blocksDeactivatingLastSuperAdmin() {
+        User superAdmin = sampleUser();
+        superAdmin.setLogin("super");
+        Authority sa = new Authority();
+        sa.setName(AuthoritiesConstants.SUPER_ADMIN);
+        superAdmin.setAuthorities(Set.of(sa));
+        when(userRepository.findById(1L)).thenReturn(Mono.just(superAdmin));
+        when(userAuthoritiesLoader.withAuthorities(superAdmin)).thenReturn(Mono.just(superAdmin));
+        when(userRepository.countUsersWithAuthority(AuthoritiesConstants.SUPER_ADMIN)).thenReturn(Mono.just(1L));
+
+        AdminUserDTO dto = new AdminUserDTO(superAdmin);
+        dto.setActivated(false);
+
+        StepVerifier.create(userService.updateStaffUser(dto, Set.of(AuthoritiesConstants.SUPER_ADMIN)))
+            .expectErrorMatches(ex ->
+                ex instanceof org.springframework.web.server.ResponseStatusException &&
+                ((org.springframework.web.server.ResponseStatusException) ex).getReason().contains("last Super Admin")
+            )
+            .verify();
+    }
+
+    @Test
+    void registerUser_deletesInactiveUserWithSameEmail() {
+        AdminUserDTO dto = adminDto("newuser", "new@localhost");
+        when(userRepository.findOneByLogin("newuser")).thenReturn(Mono.empty());
+        User inactiveByEmail = sampleUser();
+        inactiveByEmail.setActivated(false);
+        when(userRepository.findOneByEmailIgnoreCase("new@localhost")).thenReturn(Mono.just(inactiveByEmail));
+        when(userRepository.deleteUserAuthorities(inactiveByEmail.getId())).thenReturn(Mono.empty());
+        when(userRepository.delete(inactiveByEmail)).thenReturn(Mono.empty());
+        Authority authority = new Authority();
+        authority.setName(AuthoritiesConstants.USER);
+        when(authorityRepository.findById(AuthoritiesConstants.USER)).thenReturn(Mono.just(authority));
+
+        StepVerifier.create(userService.registerUser(dto, "password").contextWrite(securityContext()))
+            .expectNextCount(1)
+            .verifyComplete();
+
+        verify(userRepository).delete(inactiveByEmail);
+    }
+
+    @Test
+    void deleteStaffUser_removesManagedStaffAccount() {
+        User staff = sampleUser();
+        staff.setLogin("sales-user");
+        Authority sales = new Authority();
+        sales.setName(AuthoritiesConstants.SALES);
+        staff.setAuthorities(Set.of(sales));
+        when(userRepository.findOneByLogin("sales-user")).thenReturn(Mono.just(staff));
+        when(userAuthoritiesLoader.withAuthorities(staff)).thenReturn(Mono.just(staff));
+        when(userRepository.delete(staff)).thenReturn(Mono.empty());
+
+        StepVerifier.create(userService.deleteStaffUser("sales-user", Set.of(AuthoritiesConstants.SUPER_ADMIN)))
+            .verifyComplete();
+
+        verify(userRepository).delete(staff);
     }
 
     private static AdminUserDTO adminDto(String login, String email) {

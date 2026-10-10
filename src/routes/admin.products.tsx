@@ -12,7 +12,7 @@ import { AgeRangeField } from "@/components/admin/AgeRangeField";
 import { CommaListField } from "@/components/admin/CommaListField";
 import { NumberField } from "@/components/admin/NumberField";
 import { VariantsMatrixEditor, validateVariantRows } from "@/components/admin/VariantsMatrixEditor";
-import { suggestParentSku, summarizeZohoVariantLinkage, isVariantsItemStructure, normalizeAdminProductPricing, type VariantEditorRow } from "@/lib/admin-variants";
+import { suggestParentSku, summarizeZohoVariantLinkage, isVariantsItemStructure, normalizeAdminProductPricing, digitsOnlyZohoId, zohoItemGroupId, type VariantEditorRow } from "@/lib/admin-variants";
 import { parseAgeRangeField } from "@/lib/comma-list-field";
 import { ImageSpecHint } from "@/components/admin/ImageSpecHint";
 import { ADMIN_IMAGE_SPECS } from "@/lib/admin-image-specs";
@@ -60,13 +60,14 @@ import {
   normalizeProductImageUrl,
   pullZohoProduct,
   pullZohoProductByIdentity,
+  pullZohoProductGroup,
   pullZohoProductVariant,
   saveCategory,
   saveProduct,
   slugifyProductSlug,
   syncZohoProduct,
   uploadAdminImage,
-  formatZohoSyncFailures,
+  formatZohoSyncFailureToast,
   formatZohoSyncSummary,
   type ProductRow,
 } from "@/lib/backend-data";
@@ -180,8 +181,11 @@ function ProductsPage() {
   const [zohoPulling, setZohoPulling] = useState<Set<number>>(() => new Set());
   const [zohoVariantPulling, setZohoVariantPulling] = useState<Set<string>>(() => new Set());
   const [zohoIdentityPulling, setZohoIdentityPulling] = useState(false);
+  const [zohoGroupPulling, setZohoGroupPulling] = useState<string | null>(null);
   const [zohoPullSku, setZohoPullSku] = useState("");
   const [zohoPullItemId, setZohoPullItemId] = useState("");
+  const [zohoPullGroupId, setZohoPullGroupId] = useState("");
+  const zohoPullBusy = zohoIdentityPulling || zohoGroupPulling !== null;
   const [clearingVariantPhotos, setClearingVariantPhotos] = useState<Set<number>>(() => new Set());
   const [imageUploading, setImageUploading] = useState<number | null>(null);
   const [skuWiseImporting, setSkuWiseImporting] = useState(false);
@@ -319,6 +323,10 @@ function ProductsPage() {
   };
 
   const pullFromZoho = async (i: number, p: Product) => {
+    if (zohoPullBusy) {
+      toast.error("Wait for the current Zoho pull to finish.");
+      return;
+    }
     if (!p.id) {
       toast.error("Save the product first, then pull from Zoho.");
       return;
@@ -330,9 +338,8 @@ function ProductsPage() {
     setZohoPulling((prev) => new Set(prev).add(i));
     try {
       const summary = await pullZohoProduct(Number(p.id));
-      const details = formatZohoSyncFailures(summary);
       if (summary.failed > 0) {
-        toast.error(details[0] ?? formatZohoSyncSummary(summary, "Product pull"));
+        toast.error(formatZohoSyncFailureToast(summary, "Product pull"));
       } else {
         toast.success(formatZohoSyncSummary(summary, "Product pull"));
       }
@@ -356,12 +363,15 @@ function ProductsPage() {
       toast.error("Enter a Zoho item id or SKU to pull.");
       return;
     }
+    if (zohoGroupPulling !== null || zohoPulling.size > 0 || zohoVariantPulling.size > 0) {
+      toast.error("Wait for the current Zoho pull to finish.");
+      return;
+    }
     setZohoIdentityPulling(true);
     try {
       const summary = await pullZohoProductByIdentity({ sku, zohoItemId });
-      const details = formatZohoSyncFailures(summary);
       if (summary.failed > 0) {
-        toast.error(details[0] ?? formatZohoSyncSummary(summary, "Product pull"));
+        toast.error(formatZohoSyncFailureToast(summary, "Product pull"));
       } else {
         toast.success(formatZohoSyncSummary(summary, "Product pull"));
         setZohoPullSku("");
@@ -374,6 +384,39 @@ function ProductsPage() {
       showApiError(error, "Zoho product pull failed");
     } finally {
       setZohoIdentityPulling(false);
+    }
+  };
+
+  const pullByZohoGroup = async (groupId?: string, productIndex?: number) => {
+    const itemGroupId = digitsOnlyZohoId(groupId ?? zohoPullGroupId);
+    if (!itemGroupId) {
+      toast.error(groupId ? "This product is not linked to a Zoho item group." : "Enter a Zoho item group ID to pull.");
+      return;
+    }
+    if (zohoIdentityPulling || zohoPulling.size > 0 || zohoVariantPulling.size > 0) {
+      toast.error("Wait for the current Zoho pull to finish.");
+      return;
+    }
+    setZohoGroupPulling(itemGroupId);
+    try {
+      const summary = await pullZohoProductGroup(itemGroupId);
+      if (summary.failed > 0) {
+        toast.error(formatZohoSyncFailureToast(summary, "Variant group pull"));
+      } else {
+        toast.success(formatZohoSyncSummary(summary, "Variant group pull"));
+        if (!groupId) setZohoPullGroupId("");
+      }
+      invalidateProducts();
+      await load();
+      if (productIndex != null) {
+        setEditing(productIndex);
+      } else {
+        paging.setPage(1);
+      }
+    } catch (error) {
+      showApiError(error, "Zoho variant group pull failed");
+    } finally {
+      setZohoGroupPulling(null);
     }
   };
 
@@ -398,6 +441,10 @@ function ProductsPage() {
       toast.error("Variant Zoho item id or SKU is required before pulling from Zoho.");
       return;
     }
+    if (zohoPullBusy) {
+      toast.error("Wait for the current Zoho pull to finish.");
+      return;
+    }
     const key = variantPullKey(product, row, rowIndex);
     setZohoVariantPulling((prev) => new Set(prev).add(key));
     try {
@@ -405,9 +452,8 @@ function ProductsPage() {
         sku: row.sku,
         zohoItemId: row.zohoItemId,
       });
-      const details = formatZohoSyncFailures(summary);
       if (summary.failed > 0) {
-        toast.error(details[0] ?? formatZohoSyncSummary(summary, "Variant pull"));
+        toast.error(formatZohoSyncFailureToast(summary, "Variant pull"));
       } else {
         toast.success(formatZohoSyncSummary(summary, "Variant pull"));
       }
@@ -619,7 +665,7 @@ function ProductsPage() {
         </div>
       }
     >
-      <div className="glass-strong rounded-3xl p-4 mb-4">
+      <div className="glass-strong rounded-3xl p-4 mb-4 space-y-3">
         <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
           <input
             className={inputCls()}
@@ -633,19 +679,19 @@ function ProductsPage() {
               value={zohoPullItemId}
               onChange={(e) => setZohoPullItemId(e.target.value)}
               placeholder="Zoho item ID"
-              disabled={zohoIdentityPulling}
+              disabled={zohoPullBusy}
             />
             <input
               className={inputCls()}
               value={zohoPullSku}
               onChange={(e) => setZohoPullSku(e.target.value)}
               placeholder="Zoho SKU"
-              disabled={zohoIdentityPulling}
+              disabled={zohoPullBusy}
             />
             <button
               type="button"
               onClick={() => void pullByZohoIdentity()}
-              disabled={zohoIdentityPulling || (!zohoPullItemId.trim() && !zohoPullSku.trim())}
+              disabled={zohoPullBusy || (!zohoPullItemId.trim() && !zohoPullSku.trim())}
               className="rounded-full bg-primary text-primary-foreground px-4 py-2.5 text-sm flex items-center justify-center gap-2 disabled:opacity-60"
               title="Pull one Zoho item by item ID or SKU, creating a local product or variant parent if needed"
             >
@@ -653,6 +699,26 @@ function ProductsPage() {
               Pull Zoho item
             </button>
           </div>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] lg:ml-auto lg:min-w-[620px]">
+          <input
+            className={inputCls()}
+            inputMode="numeric"
+            value={zohoPullGroupId}
+            onChange={(e) => setZohoPullGroupId(digitsOnlyZohoId(e.target.value))}
+            placeholder="Zoho item group ID"
+            disabled={zohoPullBusy}
+          />
+          <button
+            type="button"
+            onClick={() => void pullByZohoGroup()}
+            disabled={zohoPullBusy || !zohoPullGroupId.trim()}
+            className="rounded-full bg-primary text-primary-foreground px-4 py-2.5 text-sm flex items-center justify-center gap-2 disabled:opacity-60"
+            title="Pull all child variants and the parent category from a Zoho item group"
+          >
+            {zohoGroupPulling === digitsOnlyZohoId(zohoPullGroupId) ? <Loader2 className="h-4 w-4 animate-spin" /> : <CloudDownload className="h-4 w-4" />}
+            Pull group
+          </button>
         </div>
       </div>
 
@@ -981,6 +1047,8 @@ function ProductsPage() {
                           value={p.variants_json}
                           freezeColors
                           pullingRowKeys={pullingVariantRowKeysForProduct(p)}
+                          pullDisabled={zohoPullBusy}
+                          onPullFromZoho={(row, rowIndex) => void pullVariantFromZoho(i, p, row, rowIndex)}
                           onChange={(next) =>
                             update(i, {
                               ...next,
@@ -1240,7 +1308,7 @@ function ProductsPage() {
                       {p.id && (
                         <button
                           type="button"
-                          disabled={zohoPulling.has(i)}
+                          disabled={zohoPulling.has(i) || zohoPullBusy}
                           onClick={() => void pullFromZoho(i, p)}
                           className="rounded-full glass px-4 py-2 text-sm flex items-center gap-2 disabled:opacity-50"
                           title="Pull this product's latest fields, stock, variants, and image from Zoho Books"
@@ -1253,6 +1321,22 @@ function ProductsPage() {
                           {zohoPulling.has(i) ? "Pulling…" : "Pull from Zoho"}
                         </button>
                       )}
+                      {p.id && zohoItemGroupId(p) ? (
+                        <button
+                          type="button"
+                          disabled={zohoPullBusy || zohoPulling.has(i) || pullingVariantRowKeysForProduct(p).size > 0}
+                          onClick={() => void pullByZohoGroup(zohoItemGroupId(p) ?? undefined, i)}
+                          className="rounded-full glass px-4 py-2 text-sm flex items-center gap-2 disabled:opacity-50"
+                          title="Pull every child variant in this Zoho item group, including SKUs not yet on this product"
+                        >
+                          {zohoGroupPulling === zohoItemGroupId(p) ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <CloudDownload className="h-4 w-4" />
+                          )}
+                          {zohoGroupPulling === zohoItemGroupId(p) ? "Pulling group…" : "Pull group"}
+                        </button>
+                      ) : null}
                       {p.id && isVariantsItemStructure(p.item_structure) && (
                         <button
                           type="button"

@@ -49,8 +49,18 @@ public class ZohoExchangeInvoiceService {
         this.orderSupport = orderSupport;
     }
 
+    public static final String REPLACEMENT_INVOICE_REFERENCE_PREFIX = "EXINV-";
+
     public static String replacementInvoiceReference(String returnNumber) {
-        return "EXINV-" + StringUtils.defaultString(returnNumber);
+        return REPLACEMENT_INVOICE_REFERENCE_PREFIX + StringUtils.defaultString(returnNumber);
+    }
+
+    public static String returnNumberFromInvoiceReference(String reference) {
+        String trimmed = StringUtils.trimToNull(reference);
+        if (trimmed == null || !StringUtils.startsWithIgnoreCase(trimmed, REPLACEMENT_INVOICE_REFERENCE_PREFIX)) {
+            return null;
+        }
+        return StringUtils.trimToNull(trimmed.substring(REPLACEMENT_INVOICE_REFERENCE_PREFIX.length()));
     }
 
     public Optional<String> createReplacementInvoice(

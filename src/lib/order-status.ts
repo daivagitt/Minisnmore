@@ -65,22 +65,8 @@ export function isCodCancelledUncollected(order?: OrderStatusFields | null): boo
   return normalizedStatus(order.payment_status) === "failed";
 }
 
-export function isOrderHandWrapped(order?: OrderStatusFields | null) {
-  if (!order) return false;
-  const status = order.status?.trim().toLowerCase();
-  const tracking = order.tracking_status?.trim().toLowerCase();
-  if (status === "hand_wrapped" || tracking === "hand_wrapped") return true;
-  return Boolean(order.packed_at);
-}
-
 export function shouldContactCareToCancel(order?: OrderStatusFields | null) {
-  if (!order) return false;
-  if (order.contact_care_to_cancel === true) return true;
-  if (order.contact_care_to_cancel === false) return false;
-  const status = order.status?.trim().toLowerCase();
-  if (status === "cancelled" || status === "canceled" || status === "fulfilled") return false;
-  if (order.pending_cancellation || order.can_cancel) return false;
-  return isOrderHandWrapped(order);
+  return order?.contact_care_to_cancel === true;
 }
 
 /** Online checkout started but Razorpay (or similar) payment not completed yet. */

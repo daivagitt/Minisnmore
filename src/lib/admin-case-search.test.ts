@@ -38,4 +38,15 @@ describe("admin case search", () => {
     expect(adminCaseListFetchStatus(false, "")).toBeUndefined();
     expect(adminCaseListFetchStatus(true, "requested")).toBeUndefined();
   });
+
+  it("maps local from/to dates to exclusive-end ISO bounds for order APIs", async () => {
+    const { adminOrderApiDateRange } = await import("./admin-case-search");
+    expect(adminOrderApiDateRange("", "")).toEqual({});
+    const sameDay = adminOrderApiDateRange("2026-10-07", "2026-10-07");
+    expect(sameDay.from).toBe(new Date(2026, 9, 7).toISOString());
+    expect(sameDay.to).toBe(new Date(2026, 9, 8).toISOString());
+    const openEnd = adminOrderApiDateRange("2026-10-07", "");
+    expect(openEnd.from).toBe(new Date(2026, 9, 7).toISOString());
+    expect(openEnd.to).toBeUndefined();
+  });
 });

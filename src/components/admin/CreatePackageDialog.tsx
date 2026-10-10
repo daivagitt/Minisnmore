@@ -27,9 +27,11 @@ import {
   packageDimensionFieldsFromOrder,
   packageTypeDimensionHint,
   selectZohoPackageType,
-  ZOHO_PACKAGE_TYPES,
   type ZohoPackageType,
 } from "@/lib/package-types";
+import { reopenZohoPackageType, resolvedPackageTypeId } from "@/lib/package-boxes";
+import { usePackageBoxes } from "@/hooks/usePackageBoxes";
+import { PackageTypeSelect } from "@/components/admin/PackageTypeSelect";
 import { showApiError } from "@/lib/ui-errors";
 
 function todayInputValue() {
@@ -50,7 +52,7 @@ export function CreatePackageDialog({
   onOpenChange,
   onSaved,
   completePackage = completeAdminOrderPackage,
-  description = "All order line items are included in this package. Choose a Zoho parcel type, then save weight and dimensions. Package date is display only.",
+  description = "All order line items are included in this package. Choose a package type, then save gross weight and dimensions. Package date is display only.",
 }: {
   order: AdminOrderRow | null;
   open: boolean;
@@ -61,6 +63,8 @@ export function CreatePackageDialog({
 }) {
   const [packageDate, setPackageDate] = useState(todayInputValue);
   const [packageType, setPackageType] = useState<ZohoPackageType>("custom");
+  const [packageTypeId, setPackageTypeId] = useState("");
+  const { boxes, loaded: boxesLoaded, error: boxesLoadError } = usePackageBoxes(open);
   const [grossWeight, setGrossWeight] = useState("");
   const [weightUnit, setWeightUnit] = useState<WeightUnit>("kg");
   const [length, setLength] = useState("");
@@ -80,6 +84,7 @@ export function CreatePackageDialog({
     setPackageDate(todayInputValue());
     const type = selectZohoPackageType(order.package_type || "custom", "cm").type;
     setPackageType(type);
+    setPackageTypeId(order.package_box_id == null ? "" : String(order.package_box_id));
     setGrossWeight(parsed.ok ? convertWeightInput(String(grams), "g", "kg") : "");
     setWeightUnit("kg");
     setLengthUnit("cm");
@@ -88,6 +93,18 @@ export function CreatePackageDialog({
     setWidth(dims.width);
     setHeight(dims.height);
   }, [open, order]);
+
+  useEffect(() => {
+    if (!open || !order || !boxesLoaded || boxesLoadError) return;
+    const matched = resolvedPackageTypeId(boxes, order);
+    setPackageTypeId(matched);
+    setPackageType(reopenZohoPackageType(order.package_type, matched));
+  }, [open, order, boxesLoaded, boxes, boxesLoadError]);
+
+  useEffect(() => {
+    if (!boxesLoadError) return;
+    showApiError(boxesLoadError, "Could not load package box types");
+  }, [boxesLoadError]);
 
   const packedAlready = Boolean(order?.packed_at);
 
@@ -117,6 +134,7 @@ export function CreatePackageDialog({
         breadth_cm: parsedDims.widthCm.cm,
         height_cm: parsedDims.heightCm.cm,
         package_type: packageType,
+        package_box_id: packageTypeId ? Number(packageTypeId) : null,
       });
       toast.success(`${slipNumber} saved. You can now book a shipment.`);
       await onSaved();
@@ -161,35 +179,38 @@ export function CreatePackageDialog({
                 className="h-10 w-full rounded-xl border border-border bg-muted px-3 text-sm"
               />
             </label>
-            <label className="block text-sm">
-              <span className="mb-1.5 block font-medium">
-                Package Type <span className="text-destructive">*</span>
-              </span>
-              <select
-                aria-label="Package type"
-                value={packageType}
-                onChange={(event) => {
-                  const { type, preset } = selectZohoPackageType(event.target.value, lengthUnit);
-                  setPackageType(type);
+            <PackageTypeSelect
+              zohoType={packageType}
+              packageTypeId={packageTypeId}
+              boxes={boxes}
+              loaded={boxesLoaded}
+              lengthUnit={lengthUnit}
+              weightUnit={weightUnit}
+              onChange={(next) => {
+                setPackageType(next.zohoType);
+                setPackageTypeId(next.packageTypeId);
+                if (next.dims) {
+                  setLength(next.dims.length);
+                  setWidth(next.dims.width);
+                  setHeight(next.dims.height);
+                } else {
+                  const preset = selectZohoPackageType(next.zohoType, lengthUnit).preset;
                   if (preset) {
                     setLength(preset.length);
                     setWidth(preset.width);
                     setHeight(preset.height);
                   }
-                }}
-                className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-              >
-                {ZOHO_PACKAGE_TYPES.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                }
+                if (next.weight) setGrossWeight(next.weight);
+              }}
+            />
             <label className="block text-sm">
-              <span className="mb-1.5 block font-medium">Gross Weight</span>
+              <span className="mb-1.5 block font-medium">
+                Gross Weight <span className="text-destructive">*</span>
+              </span>
               <span className="flex">
                 <input
+                  aria-label="Gross weight"
                   type="number"
                   min={0}
                   step="any"

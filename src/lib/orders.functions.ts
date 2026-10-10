@@ -456,6 +456,7 @@ export type AdminOrderReturnRow = OrderReturnRow & {
   package_courier_id?: string | null;
   package_courier_name?: string | null;
   package_type?: "custom" | "box" | "envelope" | string | null;
+  package_box_id?: string | number | null;
 };
 
 export type AdminOrderReturnsStageCounts = {
@@ -654,6 +655,7 @@ export async function bookOrderReturnOutbound(
     courier_id?: string;
     courier_name?: string;
     package_type?: "custom" | "box" | "envelope";
+    package_box_id?: number | null;
     admin_notes?: string;
   },
 ) {
@@ -690,6 +692,7 @@ export async function completeOrderReturnPackage(
     courier_id?: string;
     courier_name?: string;
     package_type?: "custom" | "box" | "envelope";
+    package_box_id?: number | null;
   },
 ) {
   return api.post(
@@ -890,6 +893,7 @@ export type AdminOrderRow = AdminCodOrderRow & {
   package_courier_id?: string;
   package_courier_name?: string;
   package_type?: "custom" | "box" | "envelope" | string;
+  package_box_id?: string | number | null;
   packed_at?: string;
   package_slip_number?: string;
   shipment_order_number?: string;
@@ -1012,6 +1016,7 @@ export async function bookAdminOrderShipment(
     courier_id?: string;
     courier_name?: string;
     package_type?: "custom" | "box" | "envelope";
+    package_box_id?: number | null;
   },
 ) {
   return api.post(
@@ -1067,6 +1072,7 @@ export async function completeAdminOrderPackage(
     courier_id?: string;
     courier_name?: string;
     package_type?: "custom" | "box" | "envelope";
+    package_box_id?: number | null;
   },
 ) {
   return api.post(

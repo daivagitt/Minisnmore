@@ -83,6 +83,7 @@ describe("order return tracking", () => {
     vi.clearAllMocks();
     tracking.order.status = "fulfilled";
     tracking.order.can_cancel = false;
+    tracking.order.contact_care_to_cancel = false;
     tracking.order.pending_cancellation = false;
     tracking.order.packed_at = undefined;
     tracking.order.cancellation_request = undefined;
@@ -131,16 +132,16 @@ describe("order return tracking", () => {
     expect(trigger).toBeInTheDocument();
   });
 
-  it("tells packed orders to contact customer care instead of requesting cancellation", async () => {
+  it("lets packed orders request cancellation until dispatched", async () => {
     tracking.order.status = "hand_wrapped";
-    tracking.order.can_cancel = false;
+    tracking.order.can_cancel = true;
+    tracking.order.contact_care_to_cancel = false;
     tracking.order.packed_at = "2026-09-30T00:00:00Z";
     listMyOrderReturns.mockResolvedValue({ returns: [] });
     render(<OrderDetail />);
 
-    expect(await screen.findByText("Please contact Customer Care")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Request cancellation/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Contact Customer Care" })).toHaveAttribute("href", "/contact-us");
+    expect(await screen.findByRole("button", { name: /Request cancellation/i })).toBeInTheDocument();
+    expect(screen.queryByText("Please contact Customer Care")).not.toBeInTheDocument();
   });
 
   it("shows the admin return decline reason", async () => {

@@ -1514,8 +1514,14 @@ public class ZohoSyncService implements ZohoCreditNoteOrderSupport {
             product.setPrice(rate);
         }
         Object stockOnHand = zohoItem.get("stock_on_hand");
+        String stockFailure = null;
         if (stockOnHand != null && !isBlankNumber(stockOnHand) && !variantSupport.isVariants(product)) {
-            product.setStock(nonNegativeStock(stockOnHand));
+            int parsedStock = toInteger(stockOnHand);
+            if (parsedStock < 0) {
+                stockFailure = ZohoInboundStock.negativeStockMessage(parsedStock);
+            } else {
+                product.setStock(parsedStock);
+            }
         }
         applyPulledDescription(product, stringValue(zohoItem.get("description")));
         Optional<String> fieldNotice = Optional.ofNullable(
@@ -1532,8 +1538,9 @@ public class ZohoSyncService implements ZohoCreditNoteOrderSupport {
             }
         }
         product.setActive(true);
-        savePulledProductResult(product, sku, imageFailure, builder);
-        if (created) {
+        String pullFailure = combinePullFailures(stockFailure, imageFailure);
+        savePulledProductResult(product, sku, pullFailure, builder);
+        if (created && pullFailure == null) {
             builder.notice(sku, "Created from Zoho pull");
         }
         return true;
@@ -1595,9 +1602,17 @@ public class ZohoSyncService implements ZohoCreditNoteOrderSupport {
         Map<String, Object> zohoItem = item;
         BigDecimal rate = blankToBigDecimal(zohoItem.get("rate"));
         BigDecimal mrp = blankToBigDecimal(zohoItem.get("label_rate"));
-        Integer stock = zohoItem.get("stock_on_hand") != null && !isBlankNumber(zohoItem.get("stock_on_hand"))
-            ? nonNegativeStock(zohoItem.get("stock_on_hand"))
-            : null;
+        Integer stock = null;
+        if (zohoItem.get("stock_on_hand") != null && !isBlankNumber(zohoItem.get("stock_on_hand"))) {
+            int parsedStock = toInteger(zohoItem.get("stock_on_hand"));
+            if (parsedStock < 0) {
+                // Refuse the whole variant/group row merge so admin pulls surface a clear failure
+                // instead of partially updating the matrix while leaving stock unchanged.
+                savePulledProductResult(product, variantSku, ZohoInboundStock.negativeStockMessage(parsedStock), builder);
+                return true;
+            }
+            stock = parsedStock;
+        }
         String size = ZohoBooksItemAttributes.size(zohoItem);
         String color = ZohoBooksItemAttributes.color(zohoItem);
         if (
@@ -1660,6 +1675,16 @@ public class ZohoSyncService implements ZohoCreditNoteOrderSupport {
         product.setActive(true);
         savePulledProductResult(product, variantSku, imageFailure, builder);
         return true;
+    }
+
+    private static String combinePullFailures(String first, String second) {
+        if (first == null) {
+            return second;
+        }
+        if (second == null) {
+            return first;
+        }
+        return first + "; " + second;
     }
 
     private void savePulledProductResult(Product product, String sku, String failure, ZohoSyncSummary.Builder builder) {
@@ -2372,7 +2397,14 @@ public class ZohoSyncService implements ZohoCreditNoteOrderSupport {
                             );
                             continue;
                         }
-                        int stock = nonNegativeStock(stockValue);
+                        int stock = toInteger(stockValue);
+                        if (stock < 0) {
+                            builder.failure(
+                                StringUtils.firstNonBlank(sku, itemId, "missing-item"),
+                                ZohoInboundStock.negativeStockMessage(stock)
+                            );
+                            continue;
+                        }
                         Optional<Product> product = StringUtils.isNotBlank(itemId)
                             ? productRepository.findOneByZohoItemId(itemId)
                             : Optional.empty();
@@ -2655,7 +2687,7 @@ public class ZohoSyncService implements ZohoCreditNoteOrderSupport {
     private Map<String, Object> resolveOrCreateInvoiceFromSalesOrder(String salesOrderId, String orderNumber) {
         markSalesOrderOpenBestEffort(salesOrderId, orderNumber);
         try {
-            return booksClient.createInvoiceFromSalesOrder(salesOrderId);
+            return booksClient.createInvoiceFromSalesOrder(salesOrderId, orderNumber);
         } catch (RestClientResponseException e) {
             if (!isSalesOrderAlreadyInvoiced(e)) {
                 throw e;
@@ -3514,6 +3546,31 @@ public class ZohoSyncService implements ZohoCreditNoteOrderSupport {
         return creditNoteService.createCreditNote(orderId, returnNumber, returnedQtyByOrderItemId, linkToSourceInvoice);
     }
 
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void applyCreditNoteToInvoice(String creditNoteId, String invoiceId) {
+        creditNoteService.applyCreditNoteToInvoice(creditNoteId, invoiceId);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public Optional<String> attachCreditNoteToSourceInvoice(
+        Long orderId,
+        String returnNumber,
+        String creditNoteId,
+        Map<Long, Integer> returnedQtyByOrderItemId
+    ) {
+        return creditNoteService.attachCreditNoteToSourceInvoice(
+            orderId,
+            returnNumber,
+            creditNoteId,
+            returnedQtyByOrderItemId
+        );
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void refundOpenCreditNoteBalance(String creditNoteId, String referenceNumber) {
+        creditNoteService.refundOpenCreditNoteBalance(creditNoteId, referenceNumber);
+    }
+
     private static final java.util.regex.Pattern NON_SLUG = java.util.regex.Pattern.compile("[^a-z0-9]+");
 
     private String uniqueSlug(String sku, String name) {
@@ -3595,10 +3652,6 @@ public class ZohoSyncService implements ZohoCreditNoteOrderSupport {
             return 0;
         }
         return new BigDecimal(text).intValue();
-    }
-
-    private int nonNegativeStock(Object value) {
-        return Math.max(0, toInteger(value));
     }
 
     private static boolean isZohoAuthFailure(RuntimeException e) {

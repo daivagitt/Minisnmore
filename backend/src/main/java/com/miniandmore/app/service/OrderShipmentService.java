@@ -171,6 +171,7 @@ public class OrderShipmentService {
             overrideReason,
             courierId,
             courierName,
+            null,
             null
         );
     }
@@ -188,11 +189,44 @@ public class OrderShipmentService {
         String courierName,
         String packageType
     ) {
+        return bookShipment(
+            orderNumber,
+            mode,
+            carrierName,
+            awb,
+            trackingUrl,
+            labelUrl,
+            overrideFulfillmentHold,
+            overrideReason,
+            courierId,
+            courierName,
+            packageType,
+            null
+        );
+    }
+
+    public CustomerOrder bookShipment(
+        String orderNumber,
+        ReturnLogisticsMode mode,
+        String carrierName,
+        String awb,
+        String trackingUrl,
+        String labelUrl,
+        boolean overrideFulfillmentHold,
+        String overrideReason,
+        String courierId,
+        String courierName,
+        String packageType,
+        Long packageBoxId
+    ) {
         CustomerOrder order = customerOrderRepository
             .findOneByOrderNumber(orderNumber)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
         assertCanBook(order, overrideFulfillmentHold, overrideReason);
         PackageType.parse(packageType).ifPresent(order::setPackageType);
+        if (packageType != null) {
+            order.setPackageBoxId(packageBoxId);
+        }
         if (mode == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Logistics mode is required");
         }
@@ -230,6 +264,12 @@ public class OrderShipmentService {
                 buildForwardShipmentRequest(order, preAssignedAwb)
             );
             String tracking = StringUtils.defaultIfBlank(xpressBeesClient.buildTrackingUrl(result.awb()), result.trackingUrl());
+            if (StringUtils.isNotBlank(result.courierId())) {
+                order.setPackageCourierId(StringUtils.left(result.courierId(), 40));
+            }
+            if (StringUtils.isNotBlank(result.courierName())) {
+                order.setPackageCourierName(StringUtils.left(result.courierName(), 120));
+            }
             applyShipment(
                 order,
                 ReturnLogisticsMode.XPRESSBEES,
@@ -520,7 +560,7 @@ public class OrderShipmentService {
         JsonNode shipping = parseShippingAddress(order.getShippingAddressJson());
         ApplicationProperties.XpressBees xpressBees = applicationProperties.getXpressbees();
         XpressBeesClient.ReversePickupAddress shipFrom = StoreAddressService.warehousePickup(
-            storeAddressRepository.findFirstByUsageAndIsDefaultTrue(StoreAddressUsage.SHIPMENT),
+            storeAddressRepository.findFirstByUsagesContainingAndIsDefaultTrueOrderByIdDesc(StoreAddressUsage.SHIPMENT),
             xpressBees,
             firstAddressField(shipping, "phone", "mobile")
         );

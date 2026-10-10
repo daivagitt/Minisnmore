@@ -128,6 +128,12 @@ class OrderReturnServiceTest {
         lenient().when(applicationProperties.getZoho()).thenReturn(new ApplicationProperties.Zoho());
         lenient().when(applicationProperties.getLedgerly()).thenReturn(new ApplicationProperties.Ledgerly());
         lenient().when(applicationProperties.getXpressbees()).thenReturn(new ApplicationProperties.XpressBees());
+        lenient()
+            .when(orderReturnRepository.findOneByReturnNumberForUpdate(any()))
+            .thenAnswer(inv -> orderReturnRepository.findOneByReturnNumber(inv.getArgument(0)));
+        lenient()
+            .when(zohoBooksIntegrationClient.attachCreditNoteToSourceInvoice(any(), any(), any(), anyMap()))
+            .thenAnswer(inv -> Optional.ofNullable(inv.getArgument(2)));
         lenient().when(objectMapper.createObjectNode()).thenReturn(new ObjectMapper().createObjectNode());
         lenient()
             .when(objectMapper.readTree(any(String.class)))
@@ -1290,6 +1296,27 @@ class OrderReturnServiceTest {
     }
 
     @Test
+    void allocateReplacementItem_alreadyAllocated_skipsStockAndCreditNote() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ITEM_ALLOCATED, "TEE-M-BLUE", "M", "Blue");
+        orderReturn.setReplacementReservedAt(Instant.now());
+        orderReturn.setOriginalRestockedAt(Instant.now());
+        orderReturn.setZohoCreditNoteId("cn-existing");
+        orderReturn.setSettlementStatus(ExchangeSettlementStatus.REFUNDED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.findOneByReturnNumberForUpdate("RET-1")).thenReturn(Optional.of(orderReturn));
+
+        OrderReturn result = orderReturnService.allocateReplacementItem("RET-1", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.ITEM_ALLOCATED);
+        assertThat(result.getZohoCreditNoteId()).isEqualTo("cn-existing");
+        verify(productRepository, never()).findOneForInventoryUpdate(any());
+        verify(productRepository, never()).save(any());
+        verify(zohoBooksIntegrationClient, never()).createCreditNote(any(), any(), anyMap());
+        verify(zohoBooksIntegrationClient, never()).createCreditNote(any(), any(), anyMap(), eq(false));
+        verify(orderReturnRepository, never()).save(any());
+    }
+
+    @Test
     void allocateReplacementItem_reservedRestockable_restocksRequestedItemOnceWithoutTouchingReplacement() {
         OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ACCEPTED, "TEE-M-BLUE", "M", "Blue");
         orderReturn.setDisposition(ReturnDisposition.RESTOCKABLE);
@@ -1439,6 +1466,7 @@ class OrderReturnServiceTest {
         orderReturn.setReplacementItemAmount(new BigDecimal("12.00"));
         orderReturn.setReplacementReservedAt(Instant.now());
         orderReturn.setSettlementStatus(ExchangeSettlementStatus.REFUNDED);
+        orderReturn.setPriceDifference(new BigDecimal("-3.00"));
         orderReturn.setZohoCreditNoteId("cn-rzp");
         when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
         when(orderReturnRepository.findAllByOrder_IdOrderByRequestedAtAsc(10L)).thenReturn(List.of(orderReturn));
@@ -1460,7 +1488,42 @@ class OrderReturnServiceTest {
         OrderReturn result = orderReturnService.allocateReplacementItem("RET-1", null);
 
         assertThat(result.getZohoCreditNoteId()).isEqualTo("cn-rzp");
+        assertThat(result.getZohoReplacementInvoiceId()).isEqualTo("inv-repl");
         verify(zohoBooksIntegrationClient, never()).createCreditNote(any(), any(), anyMap(), eq(false));
+        verify(zohoBooksIntegrationClient).refundOpenCreditNoteBalance("cn-rzp", "RET-1");
+    }
+
+    @Test
+    void allocateReplacementItem_replacementInvoiceFails_skipsLeftoverCreditRefund() {
+        ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
+        zoho.setSyncReturns(true);
+        when(applicationProperties.getZoho()).thenReturn(zoho);
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ACCEPTED, "TEE-M-BLUE", "M", "Blue");
+        orderReturn.setReplacementItemAmount(new BigDecimal("12.00"));
+        orderReturn.setReplacementReservedAt(Instant.now());
+        orderReturn.setSettlementStatus(ExchangeSettlementStatus.REFUNDED);
+        orderReturn.setPriceDifference(new BigDecimal("-3.00"));
+        orderReturn.setZohoCreditNoteId("cn-rzp");
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.findAllByOrder_IdOrderByRequestedAtAsc(10L)).thenReturn(List.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(
+            zohoBooksIntegrationClient.createExchangeReplacementInvoice(
+                eq(10L),
+                eq("RET-1"),
+                eq(5L),
+                eq("TEE-M-BLUE"),
+                eq("M"),
+                eq("Blue"),
+                eq(new BigDecimal("12.00")),
+                eq(1),
+                anyList()
+            )
+        ).thenReturn(Optional.empty());
+
+        orderReturnService.allocateReplacementItem("RET-1", null);
+
+        verify(zohoBooksIntegrationClient, never()).refundOpenCreditNoteBalance(any(), any());
     }
 
     @Test
@@ -1477,6 +1540,29 @@ class OrderReturnServiceTest {
         assertThat(result.getRefundAmount()).isEqualByComparingTo("500.00");
         assertThat(orderReturn.getOrder().getPaymentStatus()).isEqualTo(PaymentStatus.REFUND_INITIATED);
         verify(customerOrderRepository).save(orderReturn.getOrder());
+    }
+
+    @Test
+    void convertExchangeToRefund_alreadyRefunded_skipsStockAndCreditNote() {
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.REFUNDED, "TEE-M-BLUE", "M", "Blue");
+        orderReturn.setReplacementReservedAt(Instant.now());
+        orderReturn.setReplacementReservationReleasedAt(Instant.now());
+        orderReturn.setOriginalRestockedAt(Instant.now());
+        orderReturn.setZohoCreditNoteId("cn-existing");
+        orderReturn.setRefundAmount(new BigDecimal("500.00"));
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.findOneByReturnNumberForUpdate("RET-1")).thenReturn(Optional.of(orderReturn));
+
+        OrderReturn result = orderReturnService.convertExchangeToRefund("RET-1", null);
+
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.REFUNDED);
+        assertThat(result.getZohoCreditNoteId()).isEqualTo("cn-existing");
+        verify(razorpayRefundService, never()).refundPayment(any(), any(), any());
+        verify(zohoBooksIntegrationClient, never()).createCreditNote(any(), any(), anyMap(), eq(true));
+        verify(zohoBooksIntegrationClient, never()).applyCreditNoteToInvoice(any(), any());
+        verify(zohoBooksIntegrationClient, never()).attachCreditNoteToSourceInvoice(any(), any(), any(), anyMap());
+        verify(productRepository, never()).findOneForInventoryUpdate(any());
+        verify(orderReturnRepository, never()).save(any());
     }
 
     @Test
@@ -2694,6 +2780,7 @@ class OrderReturnServiceTest {
                 null
             )
         ).thenReturn(orderReturn);
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
         OrderReturn result = orderReturnService.settlePriceDifference(
             "RET-1",
@@ -2713,16 +2800,17 @@ class OrderReturnServiceTest {
             null
         );
         verify(zohoBooksIntegrationClient, never()).createCreditNote(any(), any(), anyMap(), eq(false));
-        verify(orderReturnRepository, never()).save(any());
+        verify(orderReturnRepository).save(orderReturn);
     }
 
     @Test
-    void settlePriceDifference_razorpay_doesNotCreateCreditNote() {
+    void settlePriceDifference_razorpay_createsCreditNoteAfterRefundInitiated() {
         ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
         zoho.setSyncReturns(true);
-        lenient().when(applicationProperties.getZoho()).thenReturn(zoho);
+        when(applicationProperties.getZoho()).thenReturn(zoho);
         OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ACCEPTED, "TEE-M-BLUE", "M", "Blue");
         orderReturn.getOrder().paymentMethod("online").razorpayPaymentId("pay_live_1").total(new BigDecimal("1200.00"));
+        orderReturn.getOrder().setPaymentStatus(PaymentStatus.REFUND_INITIATED);
         orderReturn.setPriceDifference(new BigDecimal("-300.00"));
         orderReturn.setOriginalItemAmount(new BigDecimal("800.00"));
         orderReturn.setSettlementStatus(ExchangeSettlementStatus.PENDING);
@@ -2735,6 +2823,9 @@ class OrderReturnServiceTest {
                 null
             )
         ).thenReturn(orderReturn);
+        when(zohoBooksIntegrationClient.createCreditNote(eq(10L), eq("RET-1"), eq(Map.of(5L, 1)), eq(false)))
+            .thenReturn(Optional.of("cn-rzp"));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
         OrderReturn result = orderReturnService.settlePriceDifference(
             "RET-1",
@@ -2746,9 +2837,10 @@ class OrderReturnServiceTest {
             null
         );
 
-        assertThat(result.getZohoCreditNoteId()).isNull();
-        verify(zohoBooksIntegrationClient, never()).createCreditNote(any(), any(), anyMap(), eq(false));
-        verify(orderReturnRepository, never()).save(any());
+        assertThat(result.getZohoCreditNoteId()).isEqualTo("cn-rzp");
+        assertThat(orderReturn.getOrder().getPaymentStatus()).isEqualTo(PaymentStatus.REFUND_INITIATED);
+        verify(zohoBooksIntegrationClient).createCreditNote(eq(10L), eq("RET-1"), eq(Map.of(5L, 1)), eq(false));
+        verify(orderReturnRepository).save(orderReturn);
     }
 
     @Test
@@ -2874,6 +2966,35 @@ class OrderReturnServiceTest {
     }
 
     @Test
+    void settlePriceDifference_manualCheaper_createsUnlinkedCreditNote() {
+        ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
+        zoho.setSyncReturns(true);
+        when(applicationProperties.getZoho()).thenReturn(zoho);
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ACCEPTED, "TEE-M-BLUE", "M", "Blue");
+        orderReturn.getOrder().paymentMethod("cod");
+        orderReturn.setPriceDifference(new BigDecimal("-150.00"));
+        orderReturn.setSettlementStatus(ExchangeSettlementStatus.PENDING);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.findOneByReturnNumberForUpdate("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(zohoBooksIntegrationClient.createCreditNote(eq(10L), eq("RET-1"), anyMap(), eq(false))).thenReturn(Optional.of("cn-cod"));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+
+        OrderReturn result = orderReturnService.settlePriceDifference(
+            "RET-1",
+            ExchangeSettlementStatus.REFUNDED,
+            new BigDecimal("150.00"),
+            "UPI",
+            "UTR-COD-1",
+            "admin",
+            null
+        );
+
+        assertThat(result.getZohoCreditNoteId()).isEqualTo("cn-cod");
+        verify(zohoBooksIntegrationClient).createCreditNote(eq(10L), eq("RET-1"), anyMap(), eq(false));
+        verify(exchangeRazorpaySettlementService, never()).recordRazorpayRefund(any(), any(), any(), any());
+    }
+
+    @Test
     void settlePriceDifference_forceManualWithoutReference_throwsBadRequest() {
         OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ACCEPTED, "TEE-M-BLUE", "M", "Blue");
         orderReturn.getOrder().paymentMethod("online").razorpayPaymentId("pay_live_1");
@@ -2913,6 +3034,7 @@ class OrderReturnServiceTest {
                 null
             )
         ).thenReturn(orderReturn);
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
 
         orderReturnService.settlePriceDifference(
             "RET-1",
@@ -2930,7 +3052,7 @@ class OrderReturnServiceTest {
             "admin",
             null
         );
-        verify(orderReturnRepository, never()).save(any());
+        verify(orderReturnRepository).save(orderReturn);
     }
 
     @Test
@@ -2976,6 +3098,61 @@ class OrderReturnServiceTest {
         assertThat(result.getZohoCreditNoteId()).isEqualTo("cn-linked");
         verify(zohoBooksIntegrationClient).createCreditNote(eq(10L), eq("RET-1"), anyMap(), eq(true));
         verify(zohoBooksIntegrationClient, never()).createCreditNote(any(), any(), anyMap(), eq(false));
+        verify(zohoBooksIntegrationClient).attachCreditNoteToSourceInvoice(eq(10L), eq("RET-1"), eq("cn-linked"), anyMap());
+    }
+
+    @Test
+    void convertExchangeToRefund_afterCheaperSettleWithExistingNote_attachesToOriginalInvoice() {
+        ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
+        zoho.setSyncReturns(true);
+        when(applicationProperties.getZoho()).thenReturn(zoho);
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ACCEPTED, "TEE-M-BLUE", "M", "Blue");
+        orderReturn.setOriginalItemAmount(new BigDecimal("500.00"));
+        orderReturn.setSettlementStatus(ExchangeSettlementStatus.REFUNDED);
+        orderReturn.setSettlementAmount(new BigDecimal("120.00"));
+        orderReturn.setZohoCreditNoteId("cn-rzp");
+        orderReturn.getOrder().setZohoInvoiceId("inv-orig");
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(razorpayRefundService.refundPayment(any(), eq(new BigDecimal("380.00")), eq(RazorpayRefundService.PURPOSE_RETURN_REFUND)))
+            .thenReturn("rfnd_rest");
+        when(zohoBooksIntegrationClient.attachCreditNoteToSourceInvoice(eq(10L), eq("RET-1"), eq("cn-rzp"), anyMap()))
+            .thenReturn(Optional.of("cn-linked"));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderReturn result = orderReturnService.convertExchangeToRefund("RET-1", null);
+
+        assertThat(result.getZohoCreditNoteId()).isEqualTo("cn-linked");
+        verify(zohoBooksIntegrationClient).attachCreditNoteToSourceInvoice(eq(10L), eq("RET-1"), eq("cn-rzp"), anyMap());
+        verify(zohoBooksIntegrationClient, never()).createCreditNote(any(), any(), anyMap(), eq(true));
+        verify(zohoBooksIntegrationClient, never()).createCreditNote(any(), any(), anyMap(), eq(false));
+        verify(zohoBooksIntegrationClient, never()).applyCreditNoteToInvoice(any(), any());
+    }
+
+    @Test
+    void convertExchangeToRefund_reusedUnlinkedNote_attachesToOriginalInvoice() {
+        ApplicationProperties.Zoho zoho = new ApplicationProperties.Zoho();
+        zoho.setSyncReturns(true);
+        when(applicationProperties.getZoho()).thenReturn(zoho);
+        OrderReturn orderReturn = exchangeReturnWithStatus(OrderReturnStatus.ACCEPTED, "TEE-M-BLUE", "M", "Blue");
+        orderReturn.setOriginalItemAmount(new BigDecimal("500.00"));
+        orderReturn.setSettlementStatus(ExchangeSettlementStatus.REFUNDED);
+        orderReturn.setSettlementAmount(new BigDecimal("120.00"));
+        orderReturn.getOrder().setZohoInvoiceId("inv-orig");
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(razorpayRefundService.refundPayment(any(), eq(new BigDecimal("380.00")), eq(RazorpayRefundService.PURPOSE_RETURN_REFUND)))
+            .thenReturn("rfnd_rest");
+        when(zohoBooksIntegrationClient.createCreditNote(eq(10L), eq("RET-1"), anyMap(), eq(true))).thenReturn(Optional.of("cn-reused"));
+        when(zohoBooksIntegrationClient.attachCreditNoteToSourceInvoice(eq(10L), eq("RET-1"), eq("cn-reused"), anyMap()))
+            .thenReturn(Optional.of("cn-linked"));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderReturn result = orderReturnService.convertExchangeToRefund("RET-1", null);
+
+        assertThat(result.getZohoCreditNoteId()).isEqualTo("cn-linked");
+        verify(zohoBooksIntegrationClient).createCreditNote(eq(10L), eq("RET-1"), anyMap(), eq(true));
+        verify(zohoBooksIntegrationClient).attachCreditNoteToSourceInvoice(eq(10L), eq("RET-1"), eq("cn-reused"), anyMap());
     }
 
     @Test

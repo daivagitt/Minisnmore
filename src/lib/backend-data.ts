@@ -46,6 +46,7 @@ import {
   detailsKickerValidationErrors,
   normalizeDetailsKicker,
 } from "@/lib/product-details-kicker";
+import { getBannerEyebrowValidationErrors, getBannerTrustValidationErrors } from "@/lib/banner-trust";
 
 type Id = string | number;
 type JsonRecord = Record<string, unknown>;
@@ -288,6 +289,8 @@ export function getBannerValidationErrors(row: BannerRow): string[] {
   const hasCta = !!(row.cta_label ?? "").trim();
   if (hasLink && !hasCta) errors.push("CTA label is required when Link URL is set.");
   if (hasCta && !hasLink) errors.push("Link URL is required when CTA label is set.");
+  errors.push(...getBannerEyebrowValidationErrors(row.eyebrow));
+  errors.push(...getBannerTrustValidationErrors(row));
   const sortError = requireNumberField(row.sort_order, "Sort order", { allowZero: true });
   if (sortError) errors.push(sortError);
   return errors;
@@ -882,6 +885,11 @@ export type BannerRow = {
   image_url: string | null;
   link_url: string | null;
   cta_label: string | null;
+  /** Small overline above the title (e.g. "Featured"). */
+  eyebrow: string | null;
+  trust_fabric_label: string | null;
+  trust_shipping_label: string | null;
+  trust_dyes_label: string | null;
   sort_order: number | null;
   active: boolean;
 };
@@ -893,6 +901,10 @@ type BannerDto = {
   imageUrl?: string | null;
   linkUrl?: string | null;
   ctaLabel?: string | null;
+  eyebrow?: string | null;
+  trustFabricLabel?: string | null;
+  trustShippingLabel?: string | null;
+  trustDyesLabel?: string | null;
   sortOrder?: number;
   active?: boolean;
 };
@@ -904,6 +916,10 @@ export const fromBannerDto = (dto: BannerDto): BannerRow => ({
   image_url: dto.imageUrl ?? null,
   link_url: dto.linkUrl ?? null,
   cta_label: dto.ctaLabel ?? null,
+  eyebrow: dto.eyebrow ?? null,
+  trust_fabric_label: dto.trustFabricLabel ?? null,
+  trust_shipping_label: dto.trustShippingLabel ?? null,
+  trust_dyes_label: dto.trustDyesLabel ?? null,
   sort_order: dto.sortOrder != null ? Number(dto.sortOrder) : null,
   active: dto.active ?? true,
 });
@@ -915,6 +931,10 @@ const toBannerDto = (row: BannerRow): BannerDto => ({
   imageUrl: nullable(row.image_url) as string | null,
   linkUrl: nullable(row.link_url) as string | null,
   ctaLabel: nullable(row.cta_label) as string | null,
+  eyebrow: nullable(row.eyebrow) as string | null,
+  trustFabricLabel: nullable(row.trust_fabric_label) as string | null,
+  trustShippingLabel: nullable(row.trust_shipping_label) as string | null,
+  trustDyesLabel: nullable(row.trust_dyes_label) as string | null,
   sortOrder: Number(row.sort_order) || 0,
   active: !!row.active,
 });
@@ -932,6 +952,10 @@ export const saveBanner = (row: BannerRow) => {
     image_url: row.image_url?.trim() ?? "",
     link_url: row.link_url?.trim() || null,
     cta_label: row.cta_label?.trim() || null,
+    eyebrow: row.eyebrow?.trim() || null,
+    trust_fabric_label: row.trust_fabric_label?.trim() || null,
+    trust_shipping_label: row.trust_shipping_label?.trim() || null,
+    trust_dyes_label: row.trust_dyes_label?.trim() || null,
   };
   assertValidBanner(normalized);
   return normalized.id
@@ -1770,9 +1794,9 @@ export const testZohoConnection = () =>
   api.get<ZohoConnectionStatus>("/api/v1/admin/zoho/test", { auth: true });
 
 export type ZohoSyncFailure = {
-  productId: number;
-  productName: string;
-  message: string;
+  productId?: number;
+  productName?: string;
+  message?: string;
 };
 
 export type ZohoSyncSummary = {
@@ -1883,9 +1907,26 @@ export function formatZohoSyncSummary(summary: ZohoSyncSummary, label: string) {
 }
 
 export function formatZohoSyncFailures(summary: ZohoSyncSummary): string[] {
-  const failures = (summary.failures ?? []).map((f) => `${f.productName}: ${f.message}`);
-  const notices = (summary.notices ?? []).map((f) => `Note — ${f.productName}: ${f.message}`);
+  const label = (f: ZohoSyncFailure) =>
+    f.productName?.trim() || (f.productId != null ? `Product ${f.productId}` : "Item");
+  const failures = (summary.failures ?? []).map((f) => `${label(f)}: ${f.message ?? "Failed"}`);
+  const notices = (summary.notices ?? []).map((f) => `Note — ${label(f)}: ${f.message ?? ""}`);
   return [...failures, ...notices];
+}
+
+/** Toast line for failed Zoho sync runs: summary counts plus first failure (and +N more when needed). */
+export function formatZohoSyncFailureToast(summary: ZohoSyncSummary, label: string): string {
+  const summaryLine = formatZohoSyncSummary(summary, label);
+  const details = formatZohoSyncFailures(summary);
+  if (summary.failed > 0) {
+    const first = details[0];
+    const more = details.length > 1 ? ` (+${details.length - 1} more)` : "";
+    return first ? `${summaryLine} — ${first}${more}` : summaryLine;
+  }
+  if ((summary.notices?.length ?? 0) > 0 && details[0]) {
+    return details[0];
+  }
+  return summaryLine;
 }
 
 export const getZohoSettings = async (): Promise<ZohoSettingsRow | null> => {

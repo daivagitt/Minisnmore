@@ -569,6 +569,45 @@ class LedgerlyProductMergeServiceTest {
     }
 
     @Test
+    void mergeLedgerlyItem_withoutStructureOrVariantsJson_returnsEarly() {
+        Product product = new Product()
+            .sku("PLAIN")
+            .itemStructure(ProductVariantSupport.STRUCTURE_SIMPLE)
+            .variantsJson("[{\"sku\":\"PLAIN\",\"rate\":10,\"stock\":1,\"active\":true}]");
+        mergeService.mergeLedgerlyItem(product, Map.of("price", 10, "stock", 2), name -> Optional.empty(), null);
+        assertThat(product.getItemStructure()).isEqualTo(ProductVariantSupport.STRUCTURE_SIMPLE);
+        assertThat(product.getVariantsJson()).contains("PLAIN");
+    }
+
+    @Test
+    void mergeLedgerlyItem_itemStructureAlias_appliesMatrix() {
+        Product product = new Product().sku("SKU-ALIAS").price(BigDecimal.ZERO).stock(0);
+        Map<String, Object> item = Map.of(
+            "item_structure",
+            ProductVariantSupport.STRUCTURE_VARIANTS,
+            "variants_json",
+            "[{\"sku\":\"SKU-ALIAS-S\",\"size\":\"S\",\"color\":\"Red\",\"rate\":500,\"stock\":2,\"active\":true}]"
+        );
+        mergeService.mergeLedgerlyItem(product, item, name -> Optional.empty(), null);
+        assertThat(product.getItemStructure()).isEqualTo(ProductVariantSupport.STRUCTURE_VARIANTS);
+        assertThat(product.getVariantsJson()).contains("SKU-ALIAS-S");
+    }
+
+    @Test
+    void buildPushPayload_generatesSkuWhenMissing_andSkipsBlankCategory() {
+        Product product = new Product().id(99L).name("No SKU").price(BigDecimal.ZERO).stock(3).units("kg").active(false);
+        when(itemImageSync.firstImageUrl(any())).thenReturn(null);
+
+        Map<String, Object> payload = mergeService.buildPushPayload(product, "   ");
+
+        assertThat(payload.get("sku")).isEqualTo("P-99");
+        assertThat(payload.get("unit")).isEqualTo("kg");
+        assertThat(payload.get("active")).isEqualTo(false);
+        assertThat(payload).doesNotContainKey("category");
+        assertThat((BigDecimal) payload.get("price")).isEqualByComparingTo("0");
+    }
+
+    @Test
     void mergeLedgerlyItem_infersVariantsStructureFromJson() {
         Product product = new Product().sku("SKU-VAR").price(BigDecimal.ZERO).stock(0);
         Map<String, Object> item = Map.of(

@@ -129,17 +129,23 @@ public class ZohoStockWebhookHandlerService {
         if (raw == null) {
             return null;
         }
+        int stock;
         if (raw instanceof Number number) {
-            return Math.max(0, number.intValue());
+            stock = number.intValue();
+        } else {
+            String text = StringUtils.trimToNull(raw.toString());
+            if (text == null) {
+                return null;
+            }
+            try {
+                stock = Integer.parseInt(text);
+            } catch (NumberFormatException e) {
+                return null;
+            }
         }
-        String text = StringUtils.trimToNull(raw.toString());
-        if (text == null) {
-            return null;
+        if (stock < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ZohoInboundStock.negativeStockMessage(stock));
         }
-        try {
-            return Math.max(0, Integer.parseInt(text));
-        } catch (NumberFormatException e) {
-            return null;
-        }
+        return stock;
     }
 }

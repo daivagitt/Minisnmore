@@ -28,17 +28,20 @@ public class ExchangeRazorpaySettlementService {
     private final CustomerOrderRepository customerOrderRepository;
     private final RazorpayRefundService razorpayRefundService;
     private final OrderMailService orderMailService;
+    private final OrderEventService orderEventService;
 
     public ExchangeRazorpaySettlementService(
         OrderReturnRepository orderReturnRepository,
         CustomerOrderRepository customerOrderRepository,
         RazorpayRefundService razorpayRefundService,
-        OrderMailService orderMailService
+        OrderMailService orderMailService,
+        OrderEventService orderEventService
     ) {
         this.orderReturnRepository = orderReturnRepository;
         this.customerOrderRepository = customerOrderRepository;
         this.razorpayRefundService = razorpayRefundService;
         this.orderMailService = orderMailService;
+        this.orderEventService = orderEventService;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -93,12 +96,19 @@ public class ExchangeRazorpaySettlementService {
                     razorpayRefundService.refundPayment(order, razorpayAmount, RazorpayRefundService.PURPOSE_EXCHANGE_SETTLEMENT)
                 );
         }
-        if (
-            order != null &&
-            (order.getPaymentStatus() == PaymentStatus.PAID || order.getPaymentStatus() == PaymentStatus.REFUND_FAILED)
-        ) {
-            order.setPaymentStatus(PaymentStatus.REFUND_INITIATED);
-            customerOrderRepository.save(order);
+        if (order != null) {
+            PaymentStatus current = order.getPaymentStatus();
+            if (
+                current == PaymentStatus.PAID ||
+                current == PaymentStatus.REFUND_FAILED ||
+                current == PaymentStatus.PARTIALLY_REFUNDED
+            ) {
+                order.setPaymentStatus(PaymentStatus.REFUND_INITIATED);
+                customerOrderRepository.save(order);
+            }
+            if (order.getPaymentStatus() == PaymentStatus.REFUND_INITIATED) {
+                orderEventService.recordRefundInitiatedWithoutMail(order);
+            }
         }
         orderReturn.setSettlementStatus(ExchangeSettlementStatus.REFUNDED);
         orderReturn.setSettlementAmount(recordedAmount);

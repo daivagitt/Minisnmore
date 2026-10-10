@@ -58,4 +58,23 @@ class ZohoBooksIntegrationClientTest {
         when(syncService.createCreditNote(1L, "RET-1", java.util.Map.of(11L, 1))).thenReturn(Optional.of("cn_qty"));
         assertThat(client.createCreditNote(1L, "RET-1", java.util.Map.of(11L, 1))).contains("cn_qty");
     }
+
+    @Test
+    void applyCreditNoteToInvoice_delegates() {
+        client.applyCreditNoteToInvoice("cn-1", "inv-1");
+        verify(syncService).applyCreditNoteToInvoice("cn-1", "inv-1");
+    }
+
+    @Test
+    void attachCreditNoteToSourceInvoice_delegates() {
+        when(syncService.attachCreditNoteToSourceInvoice(1L, "RET-1", "cn-1", java.util.Map.of(11L, 1)))
+            .thenReturn(Optional.of("cn-linked"));
+        assertThat(client.attachCreditNoteToSourceInvoice(1L, "RET-1", "cn-1", java.util.Map.of(11L, 1))).contains("cn-linked");
+    }
+
+    @Test
+    void refundOpenCreditNoteBalance_delegates() {
+        client.refundOpenCreditNoteBalance("cn-1", "rfnd_1");
+        verify(syncService).refundOpenCreditNoteBalance("cn-1", "rfnd_1");
+    }
 }

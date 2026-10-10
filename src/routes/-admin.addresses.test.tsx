@@ -41,18 +41,19 @@ describe("admin addresses page", () => {
     saveStoreAddress.mockResolvedValue({});
   });
 
-  it("lets admin add an invoice address", async () => {
+  it("lets admin check multiple usage types on one address", async () => {
     const user = userEvent.setup();
     renderAddresses();
 
     await waitFor(() => expect(screen.getByRole("button", { name: /new address/i })).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: /new address/i }));
 
-    expect(screen.getByRole("option", { name: /shipment/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /normal address/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /invoice/i })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /shipment/i })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /normal address/i })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /invoice/i })).toBeInTheDocument();
 
-    await user.selectOptions(screen.getByRole("combobox"), "invoice");
-    expect(screen.getByText(/default invoice/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: /^shipment$/i }));
+    await user.click(screen.getByRole("checkbox", { name: /^invoice$/i }));
+    expect(screen.getByRole("checkbox", { name: /default for selected types/i })).toBeInTheDocument();
   });
 });

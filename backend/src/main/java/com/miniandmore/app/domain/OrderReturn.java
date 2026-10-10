@@ -203,6 +203,9 @@ public class OrderReturn implements Serializable {
     @Column(name = "package_type", length = 20)
     private PackageType packageType;
 
+    @Column(name = "package_box_id")
+    private Long packageBoxId;
+
     @Column(name = "packed_at")
     private Instant packedAt;
 
@@ -620,6 +623,14 @@ public class OrderReturn implements Serializable {
 
     public void setPackageType(PackageType packageType) {
         this.packageType = packageType;
+    }
+
+    public Long getPackageBoxId() {
+        return packageBoxId;
+    }
+
+    public void setPackageBoxId(Long packageBoxId) {
+        this.packageBoxId = packageBoxId;
     }
 
     public Instant getPackedAt() {

@@ -780,6 +780,9 @@ public class ProductVariantSupport {
         if (product == null || StringUtils.isBlank(variantSku)) {
             return false;
         }
+        if (stock != null && ZohoInboundStock.isNegative(stock)) {
+            throw new IllegalArgumentException(ZohoInboundStock.negativeStockMessage(stock));
+        }
         List<VariantRow> rows = new ArrayList<>(parseProduct(product));
         // Zoho item_id is stable when an admin renames a SKU. Prefer it so a rename updates the
         // existing row instead of appending a duplicate and later stale-deactivating the old row.

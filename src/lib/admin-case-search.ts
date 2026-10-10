@@ -34,3 +34,22 @@ export function adminCaseListFetchStatus(searchActive: boolean, status: string):
   if (searchActive) return undefined;
   return status || undefined;
 }
+
+/** Convert local From/To date inputs to exclusive-end ISO bounds for admin order list APIs. */
+export function adminOrderApiDateRange(
+  from: string,
+  to: string,
+): { from?: string; to?: string } {
+  const range = customJoinedDateRange(from, to);
+  if (!range) return {};
+  return {
+    from:
+      Number.isFinite(range.fromMs) && range.fromMs !== Number.NEGATIVE_INFINITY
+        ? new Date(range.fromMs).toISOString()
+        : undefined,
+    to:
+      Number.isFinite(range.toMs) && range.toMs !== Number.POSITIVE_INFINITY
+        ? new Date(range.toMs).toISOString()
+        : undefined,
+  };
+}

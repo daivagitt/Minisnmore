@@ -161,8 +161,10 @@ export function validateChestCm(
   return { ok: true, value };
 }
 
-export function clampQuantity(qty: number): number {
-  return Math.max(FIT_LIMITS.qtyMin, Math.min(FIT_LIMITS.qtyMax, Math.trunc(qty)));
+export function clampQuantity(qty: number, max: number = FIT_LIMITS.qtyMax): number {
+  const cappedMax = Math.min(FIT_LIMITS.qtyMax, Math.max(0, Math.trunc(max)));
+  if (cappedMax < FIT_LIMITS.qtyMin) return cappedMax;
+  return Math.max(FIT_LIMITS.qtyMin, Math.min(cappedMax, Math.trunc(qty)));
 }
 
 export function validateQuantity(qty: number): FieldValidation {

@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Commits a Zoho credit-note id onto the return in its own transaction so a successful Zoho
  * create is not lost if the outer allocate/refund transaction rolls back.
+ * Do not call while the caller holds {@code SELECT FOR UPDATE} on the same row
+ * ({@code persistIfAbsent} uses a second connection and will deadlock).
  */
 @Service
 public class ZohoReturnCreditNotePersistence {
