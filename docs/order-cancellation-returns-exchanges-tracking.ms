@@ -350,11 +350,11 @@ In the current implementation, reverse-pickup AWB and reverse tracking URL are s
 .NH 1
 Implementation observations
 .IP "1." 4
-The return-window calculation currently gives shipment_date first priority as its delivery anchor. If shipment_date represents dispatch rather than delivery, the three-day return period can begin too early. A dedicated shipment_delivered_at timestamp or explicit delivered event should take priority for strict "three days from delivery" behavior.
+The return window starts from shipment_delivered_at only. Dispatch shipment_date and Zoho/Ledgerly tracking-pull timestamps are not used as the delivery anchor.
 .IP "2." 4
 The original order's tracking remains delivered throughout a return or exchange. Customer interfaces should always display the separate return/exchange status alongside it to avoid confusion.
 .IP "3." 4
-For better customer visibility, the return response could expose reverse_awb and tracking_url, just as it already exposes outbound_awb and outbound_tracking_url for replacement shipments.
+Customer account, return APIs, and pickup emails expose reverse_awb and a pickup tracking URL (stored URL, or ExpressBees tracking page built from the AWB).
 .
 .NH 1
 Quick operational reference

@@ -9,6 +9,7 @@ import {
   hasReturnShipmentDetails,
   isClosedReturn,
   isExchangeRequest,
+  resolvePickupTrackingUrl,
   resolveReturnStage,
   returnStageDetail,
   returnStageLabel,
@@ -57,6 +58,7 @@ export function ReturnTrackingCard({ item, actions, showHeader = true, omitClose
   const subtitle = formatReturnProductSubtitle(item);
   const productThumbs = resolveReturnProductLines(item);
   const refunded = (item.status ?? "").toLowerCase() === "refunded";
+  const pickupTrackingUrl = resolvePickupTrackingUrl(item);
 
   return (
     <div className="space-y-4">
@@ -149,7 +151,7 @@ export function ReturnTrackingCard({ item, actions, showHeader = true, omitClose
 
       {hasReturnShipmentDetails(item) && (
         <div className="glass rounded-2xl p-4 text-sm space-y-2">
-          {(item.carrier_name || item.reverse_awb || item.tracking_url || item.pickup_window) && (
+          {(item.carrier_name || item.reverse_awb || pickupTrackingUrl || item.pickup_window) && (
             <div className="space-y-1">
               <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
                 Pickup
@@ -178,9 +180,9 @@ export function ReturnTrackingCard({ item, actions, showHeader = true, omitClose
                   <span className="text-muted-foreground">Pickup window:</span> {item.pickup_window}
                 </div>
               ) : null}
-              {item.tracking_url ? (
+              {pickupTrackingUrl ? (
                 <div>
-                  <a href={item.tracking_url} target="_blank" rel="noreferrer" className="underline">
+                  <a href={pickupTrackingUrl} target="_blank" rel="noreferrer" className="underline">
                     Track pickup
                   </a>
                 </div>

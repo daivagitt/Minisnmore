@@ -100,17 +100,20 @@ export type OrderTrackingFields = {
 };
 
 export function resolveTrackingStage(order: OrderTrackingFields) {
-  const tracking = order.tracking_status?.toLowerCase();
-  if (tracking && tracking in STATUS_INDEX) {
-    return STATUS_INDEX[tracking];
+  if (order.tracking_status) {
+    const trackingKey = normalizedTrackingKey({ tracking_status: order.tracking_status });
+    if (trackingKey in STATUS_INDEX) {
+      return STATUS_INDEX[trackingKey];
+    }
   }
-  return STATUS_INDEX[String(order.status ?? "").toLowerCase()] ?? 0;
+  return STATUS_INDEX[normalizedTrackingKey({ status: order.status })] ?? 0;
 }
 
 function normalizedTrackingKey(order: OrderTrackingFields): string {
   const tracking = (order.tracking_status ?? order.status ?? "pending").toLowerCase();
   if (tracking === "fulfilled") return "delivered";
   if (tracking === "wrapped") return "hand_wrapped";
+  if (tracking === "readyforpickup" || tracking === "ready_for_pickup") return "awaiting_pickup";
   return tracking;
 }
 
@@ -170,6 +173,13 @@ export function trackingStageDetail(
 }
 
 const TERMINAL_TRACKING_STATUSES = new Set(["delivered", "fulfilled", "cancelled", "canceled"]);
+
+/** True once the parcel has left the warehouse (matches backend OrderTrackingStatusResolver.isDispatched). */
+export function isDispatchedTrackingStatus(order: OrderTrackingFields | null | undefined): boolean {
+  if (!order) return false;
+  const key = normalizedTrackingKey(order);
+  return key === "shipped" || key === "out_for_delivery" || key === "delivery_failed" || key === "delivered";
+}
 
 export function isTerminalTrackingState(order: OrderTrackingFields | null | undefined): boolean {
   if (!order) return false;

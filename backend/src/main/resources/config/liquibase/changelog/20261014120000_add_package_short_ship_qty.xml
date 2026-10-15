@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20261014120000-1" author="miniandmore">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="order_item" columnName="packed_qty"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="order_item">
+            <column name="packed_qty" type="integer"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20261014120000-2" author="miniandmore">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="customer_order" columnName="package_short_refund_amount"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="customer_order">
+            <column name="package_short_refund_amount" type="decimal(21,2)"/>
+            <column name="package_short_razorpay_refund_id" type="varchar(80)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20261014120000-3" author="miniandmore">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="order_return" columnName="outbound_packed_qty"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="order_return">
+            <column name="outbound_packed_qty" type="integer"/>
+            <column name="package_short_refund_amount" type="decimal(21,2)"/>
+            <column name="package_short_razorpay_refund_id" type="varchar(80)"/>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>

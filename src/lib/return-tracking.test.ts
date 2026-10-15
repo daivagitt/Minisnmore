@@ -6,6 +6,7 @@ import {
   hasReturnShipmentDetails,
   isClosedReturn,
   isOpenReturnForOrderUi,
+  resolvePickupTrackingUrl,
   resolveReturnStage,
   returnStageDetail,
   returnStageLabel,
@@ -136,6 +137,18 @@ describe("return-tracking helpers", () => {
     expect(hasReturnShipmentDetails({ status: "approved" })).toBe(false);
     expect(hasReturnShipmentDetails({ reverse_awb: "REV-1", tracking_url: "https://track/rev" })).toBe(true);
     expect(hasReturnShipmentDetails({ outbound_awb: "OUT-1", outbound_tracking_url: "https://track/out" })).toBe(true);
+  });
+
+  it("builds a pickup tracking URL from reverse AWB when none is stored", () => {
+    expect(resolvePickupTrackingUrl({ tracking_url: "https://track/rev" })).toBe("https://track/rev");
+    expect(resolvePickupTrackingUrl({ reverse_awb: "XB123", carrier_name: "XpressBees" })).toBe(
+      "https://shipmentv2.xpressbees.com/orders/tracking/XB123",
+    );
+    expect(resolvePickupTrackingUrl({ reverse_awb: "XB 1", carrier_name: "XpressBees" })).toBe(
+      "https://shipmentv2.xpressbees.com/orders/tracking/XB%201",
+    );
+    expect(resolvePickupTrackingUrl({ reverse_awb: "DLV-1", carrier_name: "Delhivery" })).toBeNull();
+    expect(resolvePickupTrackingUrl({})).toBeNull();
   });
 
   it("treats refunded exchanges as closed while keeping return refund timelines", () => {

@@ -58,6 +58,9 @@ class OrderPackageServiceTest {
     @Mock
     private StoreAddressRepository storeAddressRepository;
 
+    @Mock
+    private PackageShortShipService packageShortShipService;
+
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
 

@@ -407,41 +407,69 @@ public class ZohoCreditNoteService {
             throw new IllegalStateException("Zoho credit note has no returned line items for " + returnNumber);
         }
         if (!linkToSourceInvoice) {
-            lineItems.forEach(line -> line.remove("invoice_item_id"));
+            lineItems.forEach(line -> {
+                line.remove("invoice_item_id");
+                line.remove("invoice_id");
+            });
         }
         Map<String, Object> payload = buildCreditNotePayload(
             customerId,
             returnNumber,
             linkToSourceInvoice ? invoiceId : null,
             invoice,
+            order,
             lineItems
         );
         if (includeInvoiceCharges) {
             copyInvoiceChargesToCreditNote(invoice, order, payload);
             payload.put("notes", PREPAID_CANCELLATION_CREDIT_NOTE_NOTES);
         }
-        Map<String, Object> response;
-        try {
-            response = booksClient.createCreditNote(payload);
-        } catch (RestClientResponseException e) {
-            if (!isInvalidCreditNoteValue(e) || StringUtils.isBlank(invoiceId)) {
+        return createCreditNoteWithSelfHealing(returnNumber, payload, invoice, order, includeInvoiceCharges);
+    }
+
+    /**
+     * Same shape as sales-order self-heal on this org: keep as much of the document as Zoho
+     * accepts, and only strip the field that the previous attempt rejected.
+     */
+    private Optional<String> createCreditNoteWithSelfHealing(
+        String returnNumber,
+        Map<String, Object> payload,
+        Map<String, Object> invoice,
+        CustomerOrder order,
+        boolean failOnOpenFailure
+    ) {
+        List<Map<String, Object>> attempts = creditNoteCreateAttempts(payload, invoice, order);
+        RuntimeException lastError = null;
+        for (int index = 0; index < attempts.size(); index++) {
+            try {
+                return finalizeCreatedCreditNote(booksClient.createCreditNote(attempts.get(index)), failOnOpenFailure);
+            } catch (RestClientResponseException e) {
+                Optional<String> existing = findExistingCreditNoteIdByReference(returnNumber);
+                if (existing.isPresent()) {
+                    LOG.info(
+                        "Zoho credit note create failed for {}; reusing existing credit note {}",
+                        returnNumber,
+                        existing.orElseThrow()
+                    );
+                    return existing;
+                }
+                lastError = e;
+                if (index + 1 >= attempts.size() || !isRetryableCreditNoteCreate(e, attempts.get(index))) {
+                    break;
+                }
+                LOG.warn(
+                    "Zoho rejected credit note for {} ({}); retrying with a narrower invoice association",
+                    returnNumber,
+                    e.getMessage()
+                );
+            } catch (RuntimeException e) {
                 return recoverExistingCreditNoteOrThrow(returnNumber, e);
             }
-            LOG.warn(
-                "Zoho rejected invoice-linked credit note for {} ({}); retrying without invoice linkage",
-                returnNumber,
-                e.getMessage()
-            );
-            try {
-                response = booksClient.createCreditNote(copyPayloadWithoutInvoiceLinkage(payload));
-            } catch (RuntimeException retryEx) {
-                return recoverExistingCreditNoteOrThrow(returnNumber, retryEx);
-            }
-        } catch (RuntimeException e) {
-            return recoverExistingCreditNoteOrThrow(returnNumber, e);
         }
-        Optional<String> created = finalizeCreatedCreditNote(response, includeInvoiceCharges);
-        return created;
+        if (lastError != null) {
+            return recoverExistingCreditNoteOrThrow(returnNumber, lastError);
+        }
+        return Optional.empty();
     }
 
     private Optional<String> recoverExistingCreditNoteOrThrow(String returnNumber, RuntimeException error) {
@@ -504,6 +532,7 @@ public class ZohoCreditNoteService {
         String returnNumber,
         String invoiceId,
         Map<String, Object> invoice,
+        CustomerOrder order,
         List<Map<String, Object>> lineItems
     ) {
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -517,6 +546,7 @@ public class ZohoCreditNoteService {
         if (StringUtils.isNotBlank(invoiceId)) {
             payload.put("invoice_id", invoiceId);
         }
+        applyGstInvoiceAssociation(payload, invoice, order, StringUtils.isNotBlank(invoiceId));
         payload.put("line_items", lineItems);
         // Zoho copies invoice shipping unless the payload states a charge. Default 0 so
         // returns/exchanges do not credit delivery; cancellation overwrites when shipping > 0.
@@ -643,10 +673,62 @@ public class ZohoCreditNoteService {
         return invoiceLine == null ? Map.of() : invoiceLine;
     }
 
+    private List<Map<String, Object>> creditNoteCreateAttempts(
+        Map<String, Object> payload,
+        Map<String, Object> invoice,
+        CustomerOrder order
+    ) {
+        List<Map<String, Object>> attempts = new ArrayList<>();
+        addDistinctCreditNoteAttempt(attempts, payload);
+        addDistinctCreditNoteAttempt(attempts, copyWithoutInvoiceItemIds(payload));
+        addDistinctCreditNoteAttempt(attempts, copyPayloadWithoutInvoiceLineLinkage(payload, invoice, order));
+        Map<String, Object> numberOnly = copyPayloadWithoutInvoiceLineLinkage(payload, invoice, order);
+        removeGstInvoiceTypeFields(numberOnly);
+        if (StringUtils.isNotBlank(stringValue(numberOnly.get("invoice_number")))) {
+            addDistinctCreditNoteAttempt(attempts, numberOnly);
+        }
+        return attempts;
+    }
+
+    private static void addDistinctCreditNoteAttempt(List<Map<String, Object>> attempts, Map<String, Object> payload) {
+        String signature = creditNoteAttemptSignature(payload);
+        for (Map<String, Object> existing : attempts) {
+            if (signature.equals(creditNoteAttemptSignature(existing))) {
+                return;
+            }
+        }
+        attempts.add(payload);
+    }
+
+    private static String creditNoteAttemptSignature(Map<String, Object> payload) {
+        return (payload.containsKey("invoice_id") ? "id" : "-")
+            + "|"
+            + (payload.containsKey("invoice_number") ? "num" : "-")
+            + "|"
+            + (payload.containsKey("invoice_type") || payload.containsKey("reference_invoice_type") ? "type" : "-")
+            + "|"
+            + (creditNoteLinesHaveInvoiceItemId(payload) ? "line" : "-");
+    }
+
+    private static boolean creditNoteLinesHaveInvoiceItemId(Map<String, Object> payload) {
+        Object rawLines = payload.get("line_items");
+        if (!(rawLines instanceof List<?> lines)) {
+            return false;
+        }
+        for (Object lineObj : lines) {
+            if (lineObj instanceof Map<?, ?> line && line.get("invoice_item_id") != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Keep the invoice id (uat3 linked create) but drop line-item ids that Zoho code 6 often rejects.
+     */
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> copyPayloadWithoutInvoiceLinkage(Map<String, Object> payload) {
+    private static Map<String, Object> copyWithoutInvoiceItemIds(Map<String, Object> payload) {
         Map<String, Object> copy = new LinkedHashMap<>(payload);
-        copy.remove("invoice_id");
         Object rawLines = payload.get("line_items");
         if (!(rawLines instanceof List<?> lines)) {
             return copy;
@@ -656,11 +738,96 @@ public class ZohoCreditNoteService {
             if (lineObj instanceof Map<?, ?> line) {
                 Map<String, Object> copiedLine = new LinkedHashMap<>((Map<String, Object>) line);
                 copiedLine.remove("invoice_item_id");
+                copiedLine.remove("invoice_id");
                 copiedLines.add(copiedLine);
             }
         }
         copy.put("line_items", copiedLines);
         return copy;
+    }
+
+    /**
+     * GST India still requires the original invoice number or an invoice type when the credit note
+     * is not applied against the paid invoice.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> copyPayloadWithoutInvoiceLineLinkage(
+        Map<String, Object> payload,
+        Map<String, Object> invoice,
+        CustomerOrder order
+    ) {
+        Map<String, Object> copy = copyWithoutInvoiceItemIds(payload);
+        copy.remove("invoice_id");
+        applyGstInvoiceAssociation(copy, invoice, order, false);
+        return copy;
+    }
+
+    private void applyGstInvoiceAssociation(
+        Map<String, Object> payload,
+        Map<String, Object> invoice,
+        CustomerOrder order,
+        boolean linkedToInvoice
+    ) {
+        String invoiceNumber = firstNonBlank(
+            stringValue(payload.get("invoice_number")),
+            stringValue(invoice.get("invoice_number"))
+        );
+        if (invoiceNumber != null) {
+            payload.put("invoice_number", invoiceNumber);
+        }
+        if (!linkedToInvoice || invoiceNumber == null) {
+            putGstInvoiceTypeFields(payload, gstCreditNoteInvoiceType(invoice, order));
+        }
+    }
+
+    private static void putGstInvoiceTypeFields(Map<String, Object> payload, String invoiceType) {
+        if (StringUtils.isBlank(invoiceType)) {
+            return;
+        }
+        payload.put("invoice_type", invoiceType);
+        // India GST orgs often expect this alias on create/import (Books UI: "Reference invoice type").
+        payload.put("reference_invoice_type", invoiceType);
+    }
+
+    private static void removeGstInvoiceTypeFields(Map<String, Object> payload) {
+        payload.remove("invoice_type");
+        payload.remove("reference_invoice_type");
+    }
+
+    private String gstCreditNoteInvoiceType(Map<String, Object> invoice, CustomerOrder order) {
+        String declared = firstNonBlank(
+            stringValue(invoice.get("reference_invoice_type")),
+            stringValue(invoice.get("invoice_type"))
+        );
+        if (declared != null && !Set.of("invoice", "sales_invoice").contains(StringUtils.lowerCase(declared))) {
+            return normalizeGstReferenceInvoiceType(declared);
+        }
+        String gst = StringUtils.lowerCase(StringUtils.trimToEmpty(stringValue(invoice.get("gst_treatment"))));
+        BigDecimal total = moneyOrZero(toBigDecimal(invoice.get("total")));
+        if (total.signum() <= 0 && order != null) {
+            total = moneyOrZero(order.getTotal());
+        }
+        boolean b2cLarge = total.compareTo(new BigDecimal("100000.00")) > 0;
+        return switch (gst) {
+            case "business_gst" -> "registered";
+            case "deemed_export" -> "deemed_export";
+            case "overseas" -> "overseas";
+            case "sez", "sez_developer_lut", "sez_with_lut", "business_sez" -> "sez";
+            default -> b2cLarge ? "b2c_large" : "b2c_others";
+        };
+    }
+
+    private static String normalizeGstReferenceInvoiceType(String declared) {
+        String normalized = StringUtils.lowerCase(StringUtils.trimToEmpty(declared)).replace(' ', '_');
+        return switch (normalized) {
+            case "registered", "b2b" -> "registered";
+            case "b2c_large", "b2cl" -> "b2c_large";
+            case "b2c_others", "b2cs" -> "b2c_others";
+            case "deemed_export" -> "deemed_export";
+            case "overseas" -> "overseas";
+            case "sez" -> "sez";
+            default -> declared.trim();
+        };
     }
 
     private void copyIfPresent(Map<String, Object> source, Map<String, Object> target, String key) {
@@ -670,18 +837,46 @@ public class ZohoCreditNoteService {
         }
     }
 
+    private boolean isRetryableCreditNoteCreate(RestClientResponseException exception, Map<String, Object> payload) {
+        if (isMissingGstInvoiceAssociation(exception) || isInvalidInvoiceTypeElement(exception)) {
+            return true;
+        }
+        // Zoho code 6 is generic; only walk down the ladder while invoice line linkage may be the cause.
+        return isInvalidCreditNoteValue(exception) && creditNoteLinesHaveInvoiceItemId(payload);
+    }
+
     private boolean isInvalidCreditNoteValue(RestClientResponseException exception) {
-        if (exception.getStatusCode().value() != 400) {
+        return zohoErrorCode(exception) == 6;
+    }
+
+    private boolean isMissingGstInvoiceAssociation(RestClientResponseException exception) {
+        if (zohoErrorCode(exception) == 12069) {
+            return true;
+        }
+        String body = StringUtils.lowerCase(StringUtils.defaultString(exception.getResponseBodyAsString()));
+        return exception.getStatusCode().value() == 400 && body.contains("associated invoice number or invoice type");
+    }
+
+    private boolean isInvalidInvoiceTypeElement(RestClientResponseException exception) {
+        if (exception.getStatusCode().value() != 400 || zohoErrorCode(exception) != 8) {
             return false;
+        }
+        String body = StringUtils.lowerCase(StringUtils.defaultString(exception.getResponseBodyAsString()));
+        return body.contains("invoice_type") || body.contains("reference_invoice_type");
+    }
+
+    private int zohoErrorCode(RestClientResponseException exception) {
+        if (exception.getStatusCode().value() != 400) {
+            return Integer.MIN_VALUE;
         }
         String body = StringUtils.trimToEmpty(exception.getResponseBodyAsString());
         if (body.isEmpty()) {
-            return false;
+            return Integer.MIN_VALUE;
         }
         try {
-            return objectMapper.readTree(body).path("code").asInt(Integer.MIN_VALUE) == 6;
+            return objectMapper.readTree(body).path("code").asInt(Integer.MIN_VALUE);
         } catch (Exception ignored) {
-            return false;
+            return Integer.MIN_VALUE;
         }
     }
 

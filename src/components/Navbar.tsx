@@ -162,7 +162,7 @@ export function Navbar() {
               return (
                 <div
                   key={n.to}
-                  className="relative"
+                  className="static"
                   onMouseEnter={() => setShopHover(true)}
                   onMouseLeave={() => setShopHover(false)}
                 >

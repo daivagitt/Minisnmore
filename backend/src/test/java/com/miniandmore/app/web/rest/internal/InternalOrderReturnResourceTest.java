@@ -16,6 +16,7 @@ import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.service.OrderReturnService;
+import com.miniandmore.app.service.ReturnPickupTracking;
 import com.miniandmore.app.service.S3StorageService;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -50,6 +51,7 @@ class InternalOrderReturnResourceTest {
     void authenticate() {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("customer1", "n/a"));
         when(orderReturnService.returnLineBreakdown(any())).thenReturn(List.of());
+        when(orderReturnService.pickupTrackingUrl(any())).thenAnswer(inv -> ReturnPickupTracking.url(inv.getArgument(0)));
     }
 
     @Test
@@ -76,6 +78,20 @@ class InternalOrderReturnResourceTest {
             .andExpect(jsonPath("$.data[0].outbound_tracking_url").value("https://track.example/OUT-456"))
             .andExpect(jsonPath("$.data[0].outbound_carrier_name").value("XpressBees"))
             .andExpect(jsonPath("$.data[0].outbound_label_url").doesNotExist());
+    }
+
+    @Test
+    void listMine_fillsPickupTrackingUrlFromReverseAwb() throws Exception {
+        OrderReturn orderReturn = sampleReturn();
+        orderReturn.setCarrierName("XpressBees");
+        orderReturn.setReverseAwb("XB777");
+        when(orderReturnService.listForUser("customer1")).thenReturn(List.of(orderReturn));
+
+        mockMvc
+            .perform(get("/internal/v1/order-returns").with(user("customer1")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].reverse_awb").value("XB777"))
+            .andExpect(jsonPath("$.data[0].tracking_url").value("https://shipmentv2.xpressbees.com/orders/tracking/XB777"));
     }
 
     @Test

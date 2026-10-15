@@ -15,6 +15,7 @@ import { showApiError } from "@/lib/ui-errors";
 import { formatOrderDate } from "@/lib/dates";
 import { toast } from "sonner";
 import { ListPagination } from "@/components/ListPagination";
+import { CopyButton } from "@/components/CopyButton";
 import { ReturnConditionNotice } from "@/components/ReturnConditionNotice";
 import { ReturnImageGallery } from "@/components/ReturnImageGallery";
 import { ReturnImageUpload } from "@/components/ReturnImageUpload";
@@ -30,7 +31,7 @@ import {
   refundListLineMessage,
 } from "@/lib/refund-policy";
 import { resolveReturnProductLines } from "@/lib/return-product-lines";
-import { closedReturnMessage, returnStatusLabel } from "@/lib/return-tracking";
+import { closedReturnMessage, resolvePickupTrackingUrl, returnStatusLabel } from "@/lib/return-tracking";
 
 export const Route = createFileRoute("/account/returns")({
   head: () => ({ meta: [{ title: "Returns & exchanges · Mini's n More" }] }),
@@ -215,6 +216,7 @@ function ReturnsPage() {
         <div id="account-returns-list" className="space-y-3">
           {returnsPaging.pageItems.map((r) => {
             const productLines = resolveReturnProductLines(r);
+            const pickupUrl = resolvePickupTrackingUrl(r);
             return (
             <div key={r.return_number} className="glass rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="min-w-0">
@@ -268,19 +270,26 @@ function ReturnsPage() {
                 <ReturnImageGallery urls={r.image_urls} className="mt-2 flex flex-wrap gap-2" />
                   </div>
                 </div>
-                {r.reverse_awb || r.tracking_url ? (
-                  r.tracking_url ? (
-                    <a
-                      href={r.tracking_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs text-primary underline mt-1 inline-block"
-                    >
-                      Track pickup{r.reverse_awb ? ` (AWB ${r.reverse_awb})` : ""}
-                    </a>
-                  ) : (
-                    <p className="text-xs text-muted-foreground mt-1">Pickup AWB {r.reverse_awb}</p>
-                  )
+                {r.reverse_awb || pickupUrl ? (
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    {r.reverse_awb ? (
+                      <>
+                        <p className="text-xs text-muted-foreground">Pickup AWB {r.reverse_awb}</p>
+                        <CopyButton
+                          value={r.reverse_awb}
+                          label="Copy pickup AWB"
+                          successMessage="Pickup AWB copied"
+                          variant="text"
+                          className="text-[11px]"
+                        />
+                      </>
+                    ) : null}
+                    {pickupUrl ? (
+                      <a href={pickupUrl} target="_blank" rel="noreferrer" className="text-xs text-primary underline">
+                        Track pickup
+                      </a>
+                    ) : null}
+                  </div>
                 ) : null}
                 {r.outbound_tracking_url ? (
                   <a

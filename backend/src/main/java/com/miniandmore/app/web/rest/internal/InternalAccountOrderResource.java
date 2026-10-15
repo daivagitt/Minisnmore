@@ -1571,6 +1571,7 @@ public class InternalAccountOrderResource {
         data.put("color", item.getColor());
         data.put("sku", item.getVariantSku());
         data.put("qty", item.getQty());
+        data.put("packed_qty", item.getPackedQty());
         data.put("price", item.getPrice());
         data.put("mrp", invoiceItemMrp(item, product));
         data.put("hsn", StringUtils.defaultString(item.getHsn(), product == null ? "" : product.getHsn()));

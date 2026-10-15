@@ -55,6 +55,9 @@ class OrderPackageServiceRankedBranchMatrixTest {
     @Mock
     private StoreAddressRepository storeAddresses;
 
+    @Mock
+    private PackageShortShipService shortShip;
+
     private OrderPackageService service;
 
     @BeforeEach
@@ -71,7 +74,8 @@ class OrderPackageServiceRankedBranchMatrixTest {
             events,
             cancellations,
             new ObjectMapper(),
-            storeAddresses
+            storeAddresses,
+            shortShip
         );
     }
 

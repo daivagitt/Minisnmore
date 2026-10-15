@@ -1939,13 +1939,14 @@ class ZohoSyncServiceTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void createCreditNote_code6_retriesWithoutInvoiceLinkage() {
+    void createCreditNote_code6_retriesWithInvoiceNumberAndType() {
         Product product = new Product().id(10L).sku("SKU-10").zohoItemId("zoho-item-10");
         OrderItem item = new OrderItem().id(1L).productId("10").productName("Tee").qty(1).price(BigDecimal.valueOf(1.60));
         CustomerOrder order = new CustomerOrder()
             .id(202L)
             .orderNumber("MNM-RET-3")
             .userLogin("buyer@example.com")
+            .total(BigDecimal.valueOf(259))
             .zohoInvoiceId("inv-bad");
         when(customerOrderRepository.findById(202L)).thenReturn(Optional.of(order));
         when(orderItemRepository.findAllByOrderId(202L)).thenReturn(List.of(item));
@@ -1956,6 +1957,10 @@ class ZohoSyncServiceTest {
                 Map.of(
                     "customer_id",
                     "cust-invoice",
+                    "invoice_number",
+                    "INV-000174",
+                    "gst_treatment",
+                    "consumer",
                     "line_items",
                     List.of(Map.of("item_id", "zoho-item-10", "line_item_id", "inv-line-1", "rate", 1.60))
                 )
@@ -1981,10 +1986,18 @@ class ZohoSyncServiceTest {
         verify(booksClient, times(2)).createCreditNote(payloadCaptor.capture());
         Map<String, Object> first = payloadCaptor.getAllValues().get(0);
         Map<String, Object> retry = payloadCaptor.getAllValues().get(1);
-        assertThat(first).containsEntry("invoice_id", "inv-bad");
+        assertThat(first)
+            .containsEntry("invoice_id", "inv-bad")
+            .containsEntry("invoice_number", "INV-000174")
+            .doesNotContainKey("invoice_type");
         assertThat(((List<Map<String, Object>>) first.get("line_items")).get(0)).containsEntry("invoice_item_id", "inv-line-1");
-        assertThat(retry).doesNotContainKey("invoice_id");
-        assertThat(((List<Map<String, Object>>) retry.get("line_items")).get(0)).doesNotContainKey("invoice_item_id");
+        assertThat(retry)
+            .containsEntry("invoice_id", "inv-bad")
+            .containsEntry("invoice_number", "INV-000174")
+            .doesNotContainKey("invoice_type");
+        assertThat(((List<Map<String, Object>>) retry.get("line_items")).get(0))
+            .doesNotContainKey("invoice_item_id")
+            .doesNotContainKey("invoice_id");
     }
 
     @Test
@@ -6097,6 +6110,8 @@ class ZohoSyncServiceTest {
                 Map.of(
                     "customer_id",
                     "cust-prepaid",
+                    "invoice_number",
+                    "INV-PREPAID-1",
                     "date",
                     "2026-10-01",
                     "shipping_charge",
@@ -6119,6 +6134,7 @@ class ZohoSyncServiceTest {
         assertThat(payload)
             .containsEntry("customer_id", "cust-prepaid")
             .containsEntry("invoice_id", "inv-prepaid")
+            .containsEntry("invoice_number", "INV-PREPAID-1")
             .containsEntry("reference_number", "CNCL-MNM-CANCEL-PREPAID")
             .containsEntry("shipping_charge", 80)
             .containsEntry("discount", 50)
@@ -6321,6 +6337,10 @@ class ZohoSyncServiceTest {
                     Map.of(
                         "customer_id",
                         "cust-prepaid",
+                        "invoice_number",
+                        "INV-PREPAID-1",
+                        "gst_treatment",
+                        "consumer",
                         "date",
                         "2026-10-01",
                         "line_items",

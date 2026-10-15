@@ -349,6 +349,29 @@ class InternalAdminOrderResourceTest {
 
     @Test
     @WithMockUser(authorities = "ROLE_ADMIN")
+    void markCodCollected_rejectsCancelledOrder() throws Exception {
+        CustomerOrder cancelled = codOrder().status(OrderStatus.CANCELLED);
+        when(customerOrderRepository.findOneByOrderNumber("MNM-COD1")).thenReturn(Optional.of(cancelled));
+
+        mockMvc.perform(post("/internal/v1/admin/orders/MNM-COD1/mark-cod-collected")).andExpect(status().isConflict());
+
+        verify(customerOrderRepository, never()).save(any(CustomerOrder.class));
+        verify(zohoSyncService, never()).syncOrder(any());
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
+    void markCodCollected_rejectsNonPendingCodOrder() throws Exception {
+        CustomerOrder failed = codOrder().status(OrderStatus.CONFIRMED).paymentStatus(PaymentStatus.FAILED);
+        when(customerOrderRepository.findOneByOrderNumber("MNM-COD1")).thenReturn(Optional.of(failed));
+
+        mockMvc.perform(post("/internal/v1/admin/orders/MNM-COD1/mark-cod-collected")).andExpect(status().isConflict());
+
+        verify(customerOrderRepository, never()).save(any(CustomerOrder.class));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ROLE_ADMIN")
     void getOrder_returnsInvoicePayloadForExistingOrder() throws Exception {
         CustomerOrder order = codOrder().status(OrderStatus.FULFILLED).paymentStatus(PaymentStatus.PAID);
         when(customerOrderRepository.findOneByOrderNumber("MNM-COD1")).thenReturn(Optional.of(order));
@@ -443,7 +466,7 @@ class InternalAdminOrderResourceTest {
             .packageHeightCm(8)
             .packageChargeableWeightGrams(500);
         when(
-            orderPackageService.completePackage("MNM-COD1", 500, 12, 10, 8, "1", "Surface Xpressbees 0.5 K.G", null, null)
+            orderPackageService.completePackage("MNM-COD1", 500, 12, 10, 8, "1", "Surface Xpressbees 0.5 K.G", null, null, null)
         ).thenReturn(wrapped);
 
         mockMvc
@@ -477,7 +500,7 @@ class InternalAdminOrderResourceTest {
             .packageHeightCm(2)
             .packageType(PackageType.ENVELOPE);
         when(
-            orderPackageService.completePackage("MNM-COD1", 250, 32, 24, 2, null, null, "envelope", null)
+            orderPackageService.completePackage("MNM-COD1", 250, 32, 24, 2, null, null, "envelope", null, null)
         ).thenReturn(wrapped);
 
         mockMvc

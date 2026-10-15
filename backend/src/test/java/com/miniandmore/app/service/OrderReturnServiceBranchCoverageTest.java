@@ -121,6 +121,9 @@ class OrderReturnServiceBranchCoverageTest {
     @Mock
     private StoreAddressRepository storeAddressRepository;
 
+    @Mock
+    private PackageShortShipService packageShortShipService;
+
     @InjectMocks
     private OrderReturnService orderReturnService;
 

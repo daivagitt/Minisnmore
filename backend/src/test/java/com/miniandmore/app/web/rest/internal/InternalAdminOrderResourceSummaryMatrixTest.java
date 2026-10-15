@@ -99,6 +99,30 @@ class InternalAdminOrderResourceSummaryMatrixTest {
         assertThat(dto.get("zoho_sync_status")).isEqualTo("synced");
         assertThat(dto.get("ledgerly_sync_status")).isEqualTo("failed");
         assertThat((Boolean) dto.get("zoho_sync_eligible")).isTrue();
+        assertThat((Boolean) dto.get("can_mark_cod_collected")).isFalse();
+    }
+
+    @Test
+    void summary_canMarkCodCollectedOnlyForOpenPendingCod() {
+        CustomerOrder pendingCod = new CustomerOrder()
+            .id(5L)
+            .orderNumber("MNM-5")
+            .status(OrderStatus.CONFIRMED)
+            .paymentStatus(PaymentStatus.PENDING)
+            .paymentMethod("cod");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> openDto = (Map<String, Object>) ReflectionTestUtils.invokeMethod(resource, "summary", pendingCod);
+        assertThat((Boolean) openDto.get("can_mark_cod_collected")).isTrue();
+
+        CustomerOrder cancelledCod = new CustomerOrder()
+            .id(6L)
+            .orderNumber("MNM-6")
+            .status(OrderStatus.CANCELLED)
+            .paymentStatus(PaymentStatus.PENDING)
+            .paymentMethod("cod");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> cancelledDto = (Map<String, Object>) ReflectionTestUtils.invokeMethod(resource, "summary", cancelledCod);
+        assertThat((Boolean) cancelledDto.get("can_mark_cod_collected")).isFalse();
     }
 
     @Test

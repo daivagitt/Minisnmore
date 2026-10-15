@@ -148,7 +148,7 @@ public class InternalOrderReturnResource {
         }
         data.put("carrier_name", orderReturn.getCarrierName());
         data.put("reverse_awb", orderReturn.getReverseAwb());
-        data.put("tracking_url", orderReturn.getTrackingUrl());
+        data.put("tracking_url", orderReturnService.pickupTrackingUrl(orderReturn));
         data.put("pickup_window", orderReturn.getPickupWindow());
         data.put("pickup_failure_reason", orderReturn.getPickupFailureReason());
         data.put("reverse_carrier_status", orderReturn.getReverseCarrierStatus());

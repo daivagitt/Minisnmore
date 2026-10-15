@@ -45,6 +45,7 @@ public class RazorpayWebhookHandlerService {
     private final OrderReturnRepository orderReturnRepository;
     private final OrderCancellationRequestRepository cancellationRequestRepository;
     private final OrderEventService orderEventService;
+    private final PackageShortShipService packageShortShipService;
     private final String webhookSecret;
     private final TransactionTemplate eventInsertTransaction;
 
@@ -56,6 +57,7 @@ public class RazorpayWebhookHandlerService {
         OrderReturnRepository orderReturnRepository,
         OrderCancellationRequestRepository cancellationRequestRepository,
         OrderEventService orderEventService,
+        PackageShortShipService packageShortShipService,
         @Value("${razorpay.webhook-secret:}") String webhookSecret,
         PlatformTransactionManager transactionManager
     ) {
@@ -66,6 +68,7 @@ public class RazorpayWebhookHandlerService {
             orderReturnRepository,
             cancellationRequestRepository,
             orderEventService,
+            packageShortShipService,
             webhookSecret
         );
         this.eventInsertTransaction.setTransactionManager(transactionManager);
@@ -79,6 +82,7 @@ public class RazorpayWebhookHandlerService {
         OrderReturnRepository orderReturnRepository,
         OrderCancellationRequestRepository cancellationRequestRepository,
         OrderEventService orderEventService,
+        PackageShortShipService packageShortShipService,
         String webhookSecret
     ) {
         this.objectMapper = objectMapper;
@@ -87,6 +91,7 @@ public class RazorpayWebhookHandlerService {
         this.orderReturnRepository = orderReturnRepository;
         this.cancellationRequestRepository = cancellationRequestRepository;
         this.orderEventService = orderEventService;
+        this.packageShortShipService = packageShortShipService;
         this.webhookSecret = webhookSecret;
         this.eventInsertTransaction = new TransactionTemplate();
     }
@@ -194,12 +199,33 @@ public class RazorpayWebhookHandlerService {
         ) {
             return caseUpdated;
         }
-        PaymentStatus next = nextPaymentStatus(order, refundEntity);
+        PaymentStatus next = nextPaymentStatus(order, refundEntity, refundId);
         if (next == current) {
+            if (caseUpdated) {
+                maybeNotifyPackageShortRefundProcessed(order, refundEntity, refundId);
+            }
             return caseUpdated;
         }
         order.setPaymentStatus(next);
+        maybeNotifyPackageShortRefundProcessed(order, refundEntity, refundId);
         return true;
+    }
+
+    private void maybeNotifyPackageShortRefundProcessed(CustomerOrder order, JsonNode refundEntity, String refundId) {
+        if (order == null || StringUtils.isBlank(refundId)) {
+            return;
+        }
+        BigDecimal amount = refundAmount(refundEntity);
+        if (refundId.equals(order.getPackageShortRazorpayRefundId())) {
+            packageShortShipService.notifyPackageShortRefundProcessed(order, amount, refundId);
+            return;
+        }
+        orderReturnRepository.findFirstByPackageShortRazorpayRefundIdOrderByIdDesc(refundId).ifPresent(orderReturn -> {
+            CustomerOrder linked = orderReturn.getOrder();
+            if (linked != null) {
+                packageShortShipService.notifyPackageShortRefundProcessed(linked, amount, refundId);
+            }
+        });
     }
 
     private boolean applyProcessedRefundToCases(String refundId) {
@@ -229,11 +255,11 @@ public class RazorpayWebhookHandlerService {
         return updated;
     }
 
-    private PaymentStatus nextPaymentStatus(CustomerOrder order, JsonNode refundEntity) {
+    private PaymentStatus nextPaymentStatus(CustomerOrder order, JsonNode refundEntity, String refundId) {
         if (order.getStatus() == OrderStatus.CANCELLED) {
             return PaymentStatus.REFUNDED;
         }
-        BigDecimal settled = settledRefundAmount(order, refundEntity);
+        BigDecimal settled = settledRefundAmount(order, refundEntity, refundId);
         if (settled.signum() <= 0) {
             return order.getPaymentStatus();
         }
@@ -244,20 +270,20 @@ public class RazorpayWebhookHandlerService {
         return PaymentStatus.REFUNDED;
     }
 
-    private BigDecimal settledRefundAmount(CustomerOrder order, JsonNode refundEntity) {
+    private BigDecimal settledRefundAmount(CustomerOrder order, JsonNode refundEntity, String refundId) {
         BigDecimal thisRefund = refundAmount(refundEntity);
         if (order.getId() == null) {
             return thisRefund;
         }
-        BigDecimal fromReturns = orderReturnRepository
-            .findAllByOrder_IdOrderByRequestedAtAsc(order.getId())
-            .stream()
-            .map(ExchangeSettlementAmounts::cashAlreadyRefunded)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-        if (fromReturns.signum() <= 0) {
+        var returns = orderReturnRepository.findAllByOrder_IdOrderByRequestedAtAsc(order.getId());
+        BigDecimal booked = ExchangeSettlementAmounts.prepaidRefundsAlreadyIssued(order, returns);
+        if (ExchangeSettlementAmounts.isRefundBookedOnOrder(order, returns, refundId)) {
+            return booked.max(thisRefund);
+        }
+        if (booked.signum() <= 0) {
             return thisRefund;
         }
-        return fromReturns.max(thisRefund);
+        return booked.add(thisRefund);
     }
 
     private Optional<CustomerOrder> resolveOrder(String refundId, String paymentId, String razorpayOrderId, String orderNumber) {
@@ -275,6 +301,18 @@ public class RazorpayWebhookHandlerService {
             );
             if (byCancelRefund.isPresent() && byCancelRefund.orElseThrow().getOrder() != null) {
                 return Optional.of(byCancelRefund.orElseThrow().getOrder());
+            }
+            Optional<OrderReturn> byPackageShortReturn = orderReturnRepository.findFirstByPackageShortRazorpayRefundIdOrderByIdDesc(
+                refundId
+            );
+            if (byPackageShortReturn.isPresent() && byPackageShortReturn.orElseThrow().getOrder() != null) {
+                return Optional.of(byPackageShortReturn.orElseThrow().getOrder());
+            }
+            Optional<CustomerOrder> byPackageShortOrder = customerOrderRepository.findFirstByPackageShortRazorpayRefundIdOrderByIdDesc(
+                refundId
+            );
+            if (byPackageShortOrder.isPresent()) {
+                return byPackageShortOrder;
             }
         }
         if (StringUtils.isNotBlank(paymentId)) {
@@ -331,7 +369,38 @@ public class RazorpayWebhookHandlerService {
         if (byCancelRefund.isPresent()) {
             updated = markCancellationRefundFailed(byCancelRefund.orElseThrow(), refundId, reason) || updated;
         }
+        Optional<OrderReturn> byPackageShortReturn = orderReturnRepository.findFirstByPackageShortRazorpayRefundIdOrderByIdDesc(
+            refundId
+        );
+        if (byPackageShortReturn.isPresent()) {
+            updated =
+                markPackageShortRefundFailedOnReturn(byPackageShortReturn.orElseThrow(), refundId, reason) || updated;
+        }
+        if (order != null && refundId.equals(order.getPackageShortRazorpayRefundId())) {
+            updated = markPackageShortRefundFailedOnOrder(order, refundId, reason) || updated;
+        }
         return updated;
+    }
+
+    private boolean markPackageShortRefundFailedOnOrder(CustomerOrder order, String refundId, String reason) {
+        if (order == null || !refundId.equals(order.getPackageShortRazorpayRefundId())) {
+            return false;
+        }
+        order.setPackageShortRefundAmount(null);
+        order.setPackageShortRazorpayRefundId(null);
+        order.setNotes(mergeNotes(order.getNotes(), reason + " (" + refundId + ")"));
+        return true;
+    }
+
+    private boolean markPackageShortRefundFailedOnReturn(OrderReturn orderReturn, String refundId, String reason) {
+        if (!refundId.equals(orderReturn.getPackageShortRazorpayRefundId())) {
+            return false;
+        }
+        orderReturn.setPackageShortRefundAmount(null);
+        orderReturn.setPackageShortRazorpayRefundId(null);
+        orderReturn.setAdminNotes(mergeNotes(orderReturn.getAdminNotes(), reason + " (" + refundId + ")"));
+        orderReturnRepository.save(orderReturn);
+        return true;
     }
 
     private boolean markReturnRefundFailed(OrderReturn orderReturn, String refundId, String reason) {
@@ -366,11 +435,8 @@ public class RazorpayWebhookHandlerService {
         if (order.getId() == null) {
             return PaymentStatus.REFUND_FAILED;
         }
-        BigDecimal remaining = orderReturnRepository
-            .findAllByOrder_IdOrderByRequestedAtAsc(order.getId())
-            .stream()
-            .map(ExchangeSettlementAmounts::cashAlreadyRefunded)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        var returns = orderReturnRepository.findAllByOrder_IdOrderByRequestedAtAsc(order.getId());
+        BigDecimal remaining = ExchangeSettlementAmounts.prepaidRefundsAlreadyIssued(order, returns);
         BigDecimal orderTotal = money(order.getTotal());
         if (orderTotal.signum() > 0 && remaining.compareTo(orderTotal) >= 0) {
             return PaymentStatus.REFUNDED;

@@ -1431,7 +1431,7 @@ function AdminReturnsPageContent({ mode = "admin" }: { mode?: "admin" | "operati
           await loadSummary();
         }}
         completePackage={completeOrderReturnPackage}
-        description="The replacement item is included in this package. Choose a Zoho parcel type, then save weight and dimensions. Package date is display only."
+        description="Reduce packed quantity if a replacement unit is damaged. Unshipped units are refunded automatically. Package date is display only."
       />
 
       <BookShipmentDialog

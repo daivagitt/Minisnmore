@@ -6,6 +6,7 @@ import {
   formatAdminPaymentStatusLabel,
   formatAccountOrderPaymentLabel,
   isCodOrder,
+  canMarkCodCollected,
   isCancelledOrder,
   isOnlineRefundAwaitingBank,
   isCodCancelledUncollected,
@@ -381,6 +382,11 @@ describe("order-status labels", () => {
   it("detects COD orders", () => {
     expect(isCodOrder({ payment_method: "cod" })).toBe(true);
     expect(isCodOrder({ payment_method: "online" })).toBe(false);
+  });
+
+  it("allows COD collection only on open pending orders", () => {
+    expect(canMarkCodCollected({ payment_method: "cod", payment_status: "pending", status: "confirmed" })).toBe(true);
+    expect(canMarkCodCollected({ payment_method: "cod", payment_status: "pending", status: "cancelled" })).toBe(false);
   });
 
   it("honors contact_care_to_cancel from the API only when explicitly true", () => {

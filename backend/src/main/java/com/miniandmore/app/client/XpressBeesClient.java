@@ -8,6 +8,7 @@ import com.miniandmore.app.config.ApplicationProperties;
 import com.miniandmore.app.service.OrderPackageService;
 import java.math.BigDecimal;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -36,6 +37,7 @@ public class XpressBeesClient {
     // Reverse pickup is kept at 20 to stay unique versus the original forward order number.
     static final int FORWARD_PROVIDER_ORDER_NUMBER_MAX_LEN = 30;
     static final int REVERSE_PROVIDER_ORDER_NUMBER_MAX_LEN = 20;
+    public static final String DEFAULT_TRACKING_URL_TEMPLATE = "https://shipmentv2.xpressbees.com/orders/tracking/{awb}";
     private static final String[] COURIER_RATE_FIELDS = {
         "rate",
         "total_charges",
@@ -372,8 +374,12 @@ public class XpressBeesClient {
         if (StringUtils.isBlank(awb)) {
             return null;
         }
-        String template = StringUtils.defaultIfBlank(config.getTrackingUrlTemplate(), "https://shipmentv2.xpressbees.com/orders/tracking/{awb}");
-        return template.replace("{awb}", awb.trim());
+        String template = StringUtils.defaultIfBlank(config.getTrackingUrlTemplate(), DEFAULT_TRACKING_URL_TEMPLATE);
+        return template.replace("{awb}", encodeAwb(awb.trim()));
+    }
+
+    public static String encodeAwb(String awb) {
+        return URLEncoder.encode(awb, StandardCharsets.UTF_8).replace("+", "%20");
     }
 
     public Optional<ForwardTrackingResult> fetchForwardTracking(String awb) {

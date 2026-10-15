@@ -21,6 +21,9 @@ public interface OrderReturnRepository extends JpaRepository<OrderReturn, Long> 
     Optional<OrderReturn> findFirstByRazorpayRefundIdOrderByIdDesc(String razorpayRefundId);
 
     @EntityGraph(attributePaths = { "order", "orderItem" })
+    Optional<OrderReturn> findFirstByPackageShortRazorpayRefundIdOrderByIdDesc(String packageShortRazorpayRefundId);
+
+    @EntityGraph(attributePaths = { "order", "orderItem" })
     Optional<OrderReturn> findOneByReturnNumber(String returnNumber);
 
     @EntityGraph(attributePaths = { "order", "orderItem" })

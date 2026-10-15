@@ -412,7 +412,7 @@ public class OrderMailService {
         extra.put("pickupWindow", StringUtils.defaultString(orderReturn.getPickupWindow(), "Within 2-3 business days"));
         extra.put("reverseAwb", StringUtils.defaultString(orderReturn.getReverseAwb()));
         extra.put("carrierName", StringUtils.defaultString(orderReturn.getCarrierName()));
-        extra.put(TRACKING_URL, StringUtils.trimToNull(orderReturn.getTrackingUrl()));
+        extra.put(TRACKING_URL, ReturnPickupTracking.url(orderReturn));
         extra.put("requestedOn", formatOrderDate(orderReturn.getRequestedAt()));
         extra.put("requestedOnFormatted", formatOrderDate(orderReturn.getRequestedAt()));
         extra.put("reviewedOn", formatOrderDate(orderReturn.getResolvedAt()));

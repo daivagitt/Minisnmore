@@ -47,6 +47,9 @@ class RazorpayWebhookHandlerServiceRankedBranchMatrixTest {
     @Mock
     private OrderEventService events;
 
+    @Mock
+    private PackageShortShipService packageShortShipService;
+
     private RazorpayWebhookHandlerService service;
 
     @BeforeEach
@@ -58,6 +61,7 @@ class RazorpayWebhookHandlerServiceRankedBranchMatrixTest {
             returns,
             cancellations,
             events,
+            packageShortShipService,
             "secret"
         );
     }

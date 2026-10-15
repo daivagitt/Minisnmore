@@ -21,6 +21,7 @@ flowchart LR
   PG[("Postgres miniandmore :5432")]
   R2["Cloudflare R2"]
   Zoho["Zoho Books"]
+  XB["XpressBees"]
   Rzp["Razorpay"]
   Mail["SMTP Gmail or Zoho"]
 
@@ -36,6 +37,7 @@ flowchart LR
   GW --> PG
   CC --> R2
   CC --> Zoho
+  CC --> XB
   CC --> Rzp
   GW --> Mail
 ```
@@ -63,7 +65,8 @@ Gateway Spring profile on the live JAR: `prod,uat-isolated` (profile **name** is
 | `/api/v1/orders`, `/api/v1/payments`, `/api/v1/coupons`, `/api/v1/order-returns` | `:9180` → commerce `:9182` → catalog `:9184` | |
 | `/oauth2/`, `/login/oauth2/` | `:9180` | Google/Apple/Facebook |
 | `/api/v1/zoho/invoice-webhook` | **direct `:9184`** | Catalog (not via gateway) |
-| `/internal/v1/zoho/shipment-webhook` (and item, order-status) | `:9180` | Then catalog |
+| `/api/v1/zoho/shipment-webhook` (and stock, item, order-status) | `:9180` | Gateway route → catalog `:9184` |
+| `/api/v1/webhooks/xpressbees/shipments` and `/returns` | `:9180` | Gateway route → catalog `:9184` |
 
 Shared JWT secret: `JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET` in `/etc/mini-and-more/prod.env`. Every Java service must use the same value.
 

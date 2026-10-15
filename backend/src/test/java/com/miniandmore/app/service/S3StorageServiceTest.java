@@ -19,8 +19,11 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
+import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
+import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.DeletedObject;
 import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectsResponse;
@@ -384,6 +387,29 @@ class S3StorageServiceTest {
     }
 
     @Test
+    void listCatalogueObjects_usesDedicatedFolderAndPdfFilter() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+        Instant modified = Instant.parse("2024-01-01T00:00:00Z");
+        when(mockClient.listObjectsV2(any(ListObjectsV2Request.class)))
+            .thenAnswer(invocation -> {
+                ListObjectsV2Request request = invocation.getArgument(0);
+                assertThat(request.prefix()).isEqualTo("catalogues/");
+                return ListObjectsV2Response.builder()
+                    .contents(
+                        S3Object.builder().key("catalogues/100-active.pdf").lastModified(modified).size(100L).build(),
+                        S3Object.builder().key("catalogues/readme.txt").lastModified(modified).size(20L).build()
+                    )
+                    .isTruncated(false)
+                    .build();
+            });
+
+        assertThat(s3StorageService.listCatalogueObjects(50))
+            .extracting(S3StorageService.StoredObject::key)
+            .containsExactly("catalogues/100-active.pdf");
+    }
+
+    @Test
     void listObjects_accessDenied_throwsBadGateway() {
         S3Client mockClient = mock(S3Client.class);
         ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
@@ -497,6 +523,19 @@ class S3StorageServiceTest {
     }
 
     @Test
+    void uploadObject_r2Opaque403_pointsAtApiToken() {
+        S3Client mockClient = mock(S3Client.class);
+        ReflectionTestUtils.setField(s3StorageService, "s3Client", mockClient);
+        doThrow(new RuntimeException("Access Denied (Service: S3, Status Code: 403, Request ID: null)"))
+            .when(mockClient)
+            .putObject(any(PutObjectRequest.class), any(RequestBody.class));
+
+        assertThatThrownBy(() -> s3StorageService.uploadObject("products", "photo.jpg", new byte[] { 1 }, "image/jpeg"))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Manage API Tokens");
+    }
+
+    @Test
     void presignUpload_unknownExtensionContentType_resolvesFromFilename() {
         var result = s3StorageService.presignUpload("products", "photo.png", null);
         assertThat(result.publicUrl()).endsWith(".png");
@@ -511,11 +550,39 @@ class S3StorageServiceTest {
     }
 
     @Test
-    void buildClient_initializesLazyS3Client() {
+    void buildClient_initializesLazyS3ClientWithR2ChecksumPolicy() {
         S3StorageService service = new S3StorageService(applicationProperties);
         S3Client client = (S3Client) ReflectionTestUtils.invokeMethod(service, "client");
         assertThat(client).isNotNull();
         assertThat((S3Client) ReflectionTestUtils.invokeMethod(service, "client")).isSameAs(client);
+        assertThat(client.serviceClientConfiguration().requestChecksumCalculation()).isEqualTo(
+            RequestChecksumCalculation.WHEN_REQUIRED
+        );
+        assertThat(client.serviceClientConfiguration().responseChecksumValidation()).isEqualTo(
+            ResponseChecksumValidation.WHEN_REQUIRED
+        );
+    }
+
+    @Test
+    void r2ServiceConfiguration_enablesPathStyleAndDisablesChunkedEncoding() {
+        S3Configuration config = (S3Configuration) ReflectionTestUtils.invokeMethod(s3StorageService, "r2ServiceConfiguration");
+        assertThat(config.pathStyleAccessEnabled()).isTrue();
+        assertThat(config.chunkedEncodingEnabled()).isFalse();
+    }
+
+    @Test
+    void buildPresigner_initializesLazyPresigner() {
+        software.amazon.awssdk.services.s3.presigner.S3Presigner presigner =
+            (software.amazon.awssdk.services.s3.presigner.S3Presigner) ReflectionTestUtils.invokeMethod(
+                s3StorageService,
+                "presigner"
+            );
+        assertThat(presigner).isNotNull();
+        assertThat((software.amazon.awssdk.services.s3.presigner.S3Presigner) ReflectionTestUtils.invokeMethod(
+                s3StorageService,
+                "presigner"
+            )).isSameAs(presigner);
+        presigner.close();
     }
 
     @Test

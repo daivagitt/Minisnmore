@@ -42,3 +42,4 @@ config/liquibase/changelog/20261009120000_store_address_multi_usage.xml
 config/liquibase/changelog/20261009140000_store_address_default_per_usage_trigger.xml
 config/liquibase/changelog/20261009150000_add_banner_eyebrow.xml
 config/liquibase/changelog/20261009160000_add_banner_trust_labels.xml
+config/liquibase/changelog/20261014120000_add_package_short_ship_qty.xml

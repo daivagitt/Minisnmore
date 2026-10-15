@@ -111,16 +111,42 @@ describe("order return tracking", () => {
 
     const trigger = await screen.findByRole("button", { name: /Return RET-1/i });
     expect(trigger).toBeInTheDocument();
+    expect(screen.getByText("Pickup AWB REV-123")).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Return timeline" })).not.toBeInTheDocument();
 
     fireEvent.click(trigger);
 
     await waitFor(() => expect(screen.getByRole("list", { name: "Return timeline" })).toBeInTheDocument());
     expect(screen.getAllByText("Pickup scheduled").length).toBeGreaterThan(0);
-    expect(screen.getByText("REV-123")).toBeInTheDocument();
+    expect(screen.getAllByText(/REV-123/).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Track pickup" })).toHaveAttribute(
       "href",
       "https://track.example/REV-123",
+    );
+  });
+
+  it("shows reverse pickup AWB and a tracking link when only the AWB is stored", async () => {
+    listMyOrderReturns.mockResolvedValue({
+      returns: [
+        {
+          return_number: "RET-2",
+          order_number: "MNM-1",
+          request_type: "return",
+          status: "pickup_scheduled",
+          requested_at: "2026-09-20T00:00:00Z",
+          reverse_awb: "XB9876543210",
+          carrier_name: "XpressBees",
+        },
+      ],
+    });
+
+    render(<OrderDetail />);
+
+    expect(await screen.findByText("Pickup AWB XB9876543210")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Return RET-2/i }));
+    expect(await screen.findByRole("link", { name: "Track pickup" })).toHaveAttribute(
+      "href",
+      "https://shipmentv2.xpressbees.com/orders/tracking/XB9876543210",
     );
   });
 

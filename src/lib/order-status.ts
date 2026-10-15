@@ -65,6 +65,12 @@ export function isCodCancelledUncollected(order?: OrderStatusFields | null): boo
   return normalizedStatus(order.payment_status) === "failed";
 }
 
+/** First-leg COD cash collection is only allowed while the outbound order is still open. */
+export function canMarkCodCollected(order?: OrderStatusFields | null): boolean {
+  if (!order || !isCodOrder(order) || isCancelledOrder(order)) return false;
+  return normalizedStatus(order.payment_status) === "pending";
+}
+
 export function shouldContactCareToCancel(order?: OrderStatusFields | null) {
   return order?.contact_care_to_cancel === true;
 }

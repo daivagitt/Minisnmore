@@ -17,6 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
+import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -337,8 +339,18 @@ public class S3StorageService {
      */
     public List<StoredObject> listObjects(String folder, String suffix, int maxKeys) {
         validateConfig();
-        int limit = maxKeys <= 0 ? 1000 : Math.min(maxKeys, 5000);
         var safeFolder = validateFolder(folder);
+        return listObjectsInFolder(safeFolder, suffix, maxKeys);
+    }
+
+    /** List catalogue PDFs without exposing the catalogue folder to the generic image-upload API. */
+    public List<StoredObject> listCatalogueObjects(int maxKeys) {
+        validateConfig();
+        return listObjectsInFolder("catalogues", ".pdf", maxKeys);
+    }
+
+    private List<StoredObject> listObjectsInFolder(String safeFolder, String suffix, int maxKeys) {
+        int limit = maxKeys <= 0 ? 1000 : Math.min(maxKeys, 5000);
         var prefix = normalizeKeyPrefix(properties.getKeyPrefix());
         var fullPrefix = prefix.isEmpty() ? safeFolder + "/" : prefix + "/" + safeFolder + "/";
         var suffixNorm = suffix == null || suffix.isBlank() ? "" : suffix.trim().toLowerCase(Locale.ROOT);
@@ -503,17 +515,20 @@ public class S3StorageService {
             .region(storageRegion())
             .credentialsProvider(credentialsProvider())
             .serviceConfiguration(r2ServiceConfiguration())
+            // AWS SDK 2.30+ signs PutObject with CRC32 checksums by default. R2 rejects those
+            // headers as Access Denied (403, Request ID null) — typical for larger Zoho photos.
+            .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
+            .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED)
             .build();
     }
 
+    /** Presigned browser PUTs do not use {@link S3Client} checksum middleware; sync client only. */
     private S3Presigner buildPresigner() {
         return S3Presigner.builder()
             .endpointOverride(storageEndpointUri())
             .region(storageRegion())
             .credentialsProvider(credentialsProvider())
-            .serviceConfiguration(
-                S3Configuration.builder().pathStyleAccessEnabled(true).chunkedEncodingEnabled(false).build()
-            )
+            .serviceConfiguration(r2ServiceConfiguration())
             .build();
     }
 
@@ -664,9 +679,10 @@ public class S3StorageService {
         if (message.contains("AccessDenied") || message.contains("Access Denied") || message.contains("403")) {
             return new ResponseStatusException(
                 HttpStatus.BAD_GATEWAY,
-                "R2 storage denied upload (check S3_ACCESS_KEY / S3_SECRET_KEY have Object Read & Write on bucket "
+                "R2 storage denied upload for bucket "
                     + properties.getBucket()
-                    + ")",
+                    + " — verify S3_ACCESS_KEY / S3_SECRET_KEY still have Object Read & Write"
+                    + " (Cloudflare R2 → Manage API Tokens), then restart catalog",
                 ex
             );
         }

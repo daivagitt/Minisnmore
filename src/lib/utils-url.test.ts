@@ -43,6 +43,11 @@ describe("public file download", () => {
       "soft-bloom.pdf",
     );
     expect(downloadFilenameFromUrl("/e-catalogue.pdf")).toBe("e-catalogue.pdf");
+    expect(
+      downloadFilenameFromUrl(
+        "https://cdn.example.com/catalogues/1791979056416-d89c8f50-f4d0-4b4d-8716-3816b62e4d92-Product-Catalogue.pdf",
+      ),
+    ).toBe("Product-Catalogue.pdf");
     expect(downloadFilenameFromUrl("")).toBe("download");
   });
 
@@ -76,6 +81,7 @@ describe("public file download", () => {
 
     expect(fetch).toHaveBeenCalledWith("https://cdn.example.com/catalogues/soft-bloom.pdf");
     expect(createElement).toHaveBeenCalledWith("a");
+    expect(createElement.mock.results[0]?.value.download).toBe("soft-bloom.pdf");
     expect(click).toHaveBeenCalled();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:mock");
 

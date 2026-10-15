@@ -120,6 +120,9 @@ class OrderReturnServiceTest {
     @Mock
     private StoreAddressRepository storeAddressRepository;
 
+    @Mock
+    private PackageShortShipService packageShortShipService;
+
     @InjectMocks
     private OrderReturnService orderReturnService;
 
@@ -1878,7 +1881,21 @@ class OrderReturnServiceTest {
 
         Instant anchor = orderReturnService.resolveDeliveryAnchor(order);
 
-        assertThat(anchor).isEqualTo(Instant.parse("2026-02-01T00:00:00Z"));
+        assertThat(anchor).isNull();
+    }
+
+    @Test
+    void resolveDeliveryAnchor_zohoDeliveredAndDispatchDate_areNotTheWindowStart() {
+        CustomerOrder order = eligibleOrder()
+            .shipmentDate("2026-09-20")
+            .shipmentDeliveredAt(null)
+            .status(OrderStatus.FULFILLED)
+            .zohoOrderStatus("delivered")
+            .zohoTrackingLastPulledAt(Instant.parse("2026-09-20T08:00:00Z"));
+
+        Instant anchor = orderReturnService.resolveDeliveryAnchor(order);
+
+        assertThat(anchor).isNull();
     }
 
     @Test
@@ -2236,6 +2253,30 @@ class OrderReturnServiceTest {
         )
             .isInstanceOf(ResponseStatusException.class)
             .hasMessageContaining("Reverse AWB");
+    }
+
+    @Test
+    void bookPickup_manualWithoutTrackingUrl_fillsCustomerPickupUrl() {
+        OrderReturn orderReturn = returnWithStatus(OrderReturnStatus.APPROVED);
+        when(orderReturnRepository.findOneByReturnNumber("RET-1")).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(xpressBeesClient.buildTrackingUrl("XB555111")).thenReturn(
+            "https://shipmentv2.xpressbees.com/orders/tracking/XB555111"
+        );
+
+        OrderReturn result = orderReturnService.bookPickup(
+            "RET-1",
+            ReturnLogisticsMode.MANUAL,
+            "XpressBees",
+            "XB555111",
+            null,
+            "Tomorrow 10am–2pm",
+            null
+        );
+
+        assertThat(result.getReverseAwb()).isEqualTo("XB555111");
+        assertThat(result.getTrackingUrl()).isEqualTo("https://shipmentv2.xpressbees.com/orders/tracking/XB555111");
+        assertThat(result.getStatus()).isEqualTo(OrderReturnStatus.PICKUP_SCHEDULED);
     }
 
     @Test

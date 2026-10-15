@@ -30,6 +30,8 @@ public final class XpressBeesShipmentStatus {
         "pickup_scheduled",
         "pending_pickup",
         "out_for_pickup",
+        "ready_for_pickup",
+        "readyforpickup",
         "scheduled",
         AWAITING_PICKUP_MILESTONE
     );
@@ -70,6 +72,11 @@ public final class XpressBeesShipmentStatus {
     public static boolean isAwaitingPickup(String status) {
         String normalized = normalize(status);
         return normalized.isBlank() || AWAITING_PICKUP.contains(normalized);
+    }
+
+    /** Canonical pre-pickup carrier statuses, including ExpressBees aliases like readyforpickup. */
+    public static Set<String> awaitingPickupStatuses() {
+        return AWAITING_PICKUP;
     }
 
     public static boolean isCancelled(String status) {

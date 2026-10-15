@@ -59,6 +59,10 @@ public class OrderItem implements Serializable {
     @Column(name = "qty", nullable = false)
     private Integer qty;
 
+    @Min(value = 0)
+    @Column(name = "packed_qty")
+    private Integer packedQty;
+
     @NotNull
     @DecimalMin(value = "0")
     @Column(name = "price", precision = 21, scale = 2, nullable = false)
@@ -206,6 +210,19 @@ public class OrderItem implements Serializable {
         this.qty = qty;
     }
 
+    public Integer getPackedQty() {
+        return this.packedQty;
+    }
+
+    public OrderItem packedQty(Integer packedQty) {
+        this.setPackedQty(packedQty);
+        return this;
+    }
+
+    public void setPackedQty(Integer packedQty) {
+        this.packedQty = packedQty;
+    }
+
     public BigDecimal getPrice() {
         return this.price;
     }
@@ -316,6 +333,7 @@ public class OrderItem implements Serializable {
             ", color='" + getColor() + "'" +
             ", variantSku='" + getVariantSku() + "'" +
             ", qty=" + getQty() +
+            ", packedQty=" + getPackedQty() +
             ", price=" + getPrice() +
             ", mrp=" + getMrp() +
             ", hsn='" + getHsn() + "'" +

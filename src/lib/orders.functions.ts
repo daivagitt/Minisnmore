@@ -457,6 +457,8 @@ export type AdminOrderReturnRow = OrderReturnRow & {
   package_courier_name?: string | null;
   package_type?: "custom" | "box" | "envelope" | string | null;
   package_box_id?: string | number | null;
+  outbound_packed_qty?: number | null;
+  package_short_refund_amount?: number | null;
 };
 
 export type AdminOrderReturnsStageCounts = {
@@ -693,6 +695,7 @@ export async function completeOrderReturnPackage(
     courier_name?: string;
     package_type?: "custom" | "box" | "envelope";
     package_box_id?: number | null;
+    items?: Array<{ order_item_id?: number; packed_qty: number }>;
   },
 ) {
   return api.post(
@@ -861,6 +864,7 @@ export type AdminOrderItem = {
   color?: string;
   sku?: string;
   qty?: number;
+  packed_qty?: number;
   price?: number;
   mrp?: number;
 };
@@ -884,6 +888,7 @@ export type AdminOrderRow = AdminCodOrderRow & {
   can_book_expressbees_shipment_with_override?: boolean;
   can_rebook_carrier_cancelled_shipment?: boolean;
   can_complete_package?: boolean;
+  can_mark_cod_collected?: boolean;
   default_package_weight_grams?: number | null;
   package_weight_grams?: number | null;
   package_length_cm?: number | null;
@@ -1073,6 +1078,7 @@ export async function completeAdminOrderPackage(
     courier_name?: string;
     package_type?: "custom" | "box" | "envelope";
     package_box_id?: number | null;
+    items?: Array<{ order_item_id?: number; packed_qty: number }>;
   },
 ) {
   return api.post(

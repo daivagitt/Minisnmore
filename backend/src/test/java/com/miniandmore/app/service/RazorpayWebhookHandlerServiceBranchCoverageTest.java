@@ -42,6 +42,9 @@ class RazorpayWebhookHandlerServiceBranchCoverageTest {
     @Mock
     private OrderEventService orderEventService;
 
+    @Mock
+    private PackageShortShipService packageShortShipService;
+
     private RazorpayWebhookHandlerService handler;
 
     @BeforeEach
@@ -53,6 +56,7 @@ class RazorpayWebhookHandlerServiceBranchCoverageTest {
             orderReturnRepository,
             cancellationRequestRepository,
             orderEventService,
+            packageShortShipService,
             "secret"
         );
     }

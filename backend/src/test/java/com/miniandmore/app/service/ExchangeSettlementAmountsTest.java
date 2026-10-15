@@ -23,6 +23,9 @@ class ExchangeSettlementAmountsTest {
             .isEqualByComparingTo("380.00");
         assertThat(ExchangeSettlementAmounts.remainingItemRefund(orderReturn, new BigDecimal("120.00")))
             .isEqualByComparingTo("0.00");
+        orderReturn.setPackageShortRefundAmount(new BigDecimal("50.00"));
+        assertThat(ExchangeSettlementAmounts.remainingItemRefund(orderReturn, new BigDecimal("500.00")))
+            .isEqualByComparingTo("330.00");
     }
 
     @Test
@@ -45,6 +48,45 @@ class ExchangeSettlementAmountsTest {
         fullySettledThenConverted.setSettlementStatus(ExchangeSettlementStatus.REFUNDED);
         fullySettledThenConverted.setSettlementAmount(new BigDecimal("120.00"));
         assertThat(ExchangeSettlementAmounts.cashAlreadyRefunded(fullySettledThenConverted)).isEqualByComparingTo("120.00");
+    }
+
+    @Test
+    void remainingPrepaidRefundable_subtractsForwardAndExchangePackageShort() {
+        CustomerOrder order = new CustomerOrder().id(1L).total(new BigDecimal("1000.00"));
+        order.setPackageShortRefundAmount(new BigDecimal("100.00"));
+        order.setPackageShortRazorpayRefundId("rfnd_fwd");
+
+        OrderReturn exchange = exchange();
+        exchange.setPackageShortRefundAmount(new BigDecimal("200.00"));
+        exchange.setPackageShortRazorpayRefundId("rfnd_ex");
+
+        assertThat(ExchangeSettlementAmounts.remainingPrepaidRefundable(order, java.util.List.of(exchange)))
+            .isEqualByComparingTo("700.00");
+    }
+
+    @Test
+    void prepaidRefundsAlreadyIssued_ignoresClearedPackageShortAfterWebhookFailure() {
+        CustomerOrder order = new CustomerOrder().id(1L).total(new BigDecimal("1000.00"));
+        order.setPaymentStatus(PaymentStatus.REFUND_INITIATED);
+
+        OrderReturn exchange = exchange();
+        exchange.setOrder(order);
+
+        assertThat(ExchangeSettlementAmounts.prepaidRefundsAlreadyIssued(order, java.util.List.of(exchange)))
+            .isEqualByComparingTo("0.00");
+        assertThat(ExchangeSettlementAmounts.remainingPrepaidRefundable(order, java.util.List.of(exchange)))
+            .isEqualByComparingTo("1000.00");
+    }
+
+    @Test
+    void prepaidRefundsAlreadyIssued_stillCountsSuccessfulPackageShortWhenOrderRefundFailed() {
+        CustomerOrder order = new CustomerOrder().id(1L).total(new BigDecimal("1000.00"));
+        order.setPaymentStatus(PaymentStatus.REFUND_FAILED);
+        order.setPackageShortRefundAmount(new BigDecimal("300.00"));
+        order.setPackageShortRazorpayRefundId("rfnd_ok");
+
+        assertThat(ExchangeSettlementAmounts.remainingPrepaidRefundable(order, java.util.List.of()))
+            .isEqualByComparingTo("700.00");
     }
 
     @Test

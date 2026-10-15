@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   TRACKING_STAGES,
+  isDispatchedTrackingStatus,
   isTerminalTrackingState,
   resolveTrackingStage,
   shouldShowOrderTrackingLink,
@@ -69,6 +70,10 @@ describe("order-tracking helpers", () => {
     expect(resolveTrackingStage({ status: "confirmed", tracking_status: "shipped" })).toBe(3);
     expect(resolveTrackingStage({ tracking_status: "awaiting_pickup" })).toBe(2);
     expect(trackingStatusLabel({ tracking_status: "awaiting_pickup" })).toBe("Waiting for pickup");
+    expect(trackingStatusLabel({ tracking_status: "readyforpickup" })).toBe("Waiting for pickup");
+    expect(resolveTrackingStage({ tracking_status: "ready_for_pickup" })).toBe(2);
+    expect(isDispatchedTrackingStatus({ tracking_status: "shipped" })).toBe(true);
+    expect(isDispatchedTrackingStatus({ tracking_status: "awaiting_pickup" })).toBe(false);
     expect(trackingStageLabel({ tracking_status: "confirmed" }, "awaiting_pickup")).toBe("Waiting for pickup");
     expect(trackingStageDetail({ tracking_status: "awaiting_pickup" }, "awaiting_pickup", "current")).toMatch(
       /courier collects/i,

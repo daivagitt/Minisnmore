@@ -8,6 +8,7 @@ import com.miniandmore.app.domain.enumeration.OrderReturnStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Collection;
 import org.apache.commons.lang3.StringUtils;
 
 /**
@@ -60,16 +61,80 @@ public final class ExchangeSettlementAmounts {
         );
     }
 
+    /**
+     * Forward package-short cash counted against the original Razorpay capture (excludes failed online attempts).
+     */
+    public static BigDecimal forwardPackageShortCash(CustomerOrder order) {
+        if (order == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal amount = money(order.getPackageShortRefundAmount());
+        if (amount.signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return amount;
+    }
+
+    public static BigDecimal packageShortCashOnReturn(OrderReturn orderReturn) {
+        if (orderReturn == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal amount = money(orderReturn.getPackageShortRefundAmount());
+        if (amount.signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return amount;
+    }
+
+    public static BigDecimal prepaidRefundsAlreadyIssued(CustomerOrder order, Collection<OrderReturn> returns) {
+        BigDecimal issued = forwardPackageShortCash(order);
+        if (returns == null) {
+            return issued;
+        }
+        for (OrderReturn orderReturn : returns) {
+            issued = issued.add(cashAlreadyRefunded(orderReturn));
+        }
+        return issued;
+    }
+
+    public static BigDecimal remainingPrepaidRefundable(CustomerOrder order, Collection<OrderReturn> returns) {
+        if (order == null) {
+            return BigDecimal.ZERO;
+        }
+        return money(order.getTotal()).subtract(prepaidRefundsAlreadyIssued(order, returns)).max(BigDecimal.ZERO);
+    }
+
+    public static boolean isRefundBookedOnOrder(CustomerOrder order, Collection<OrderReturn> returns, String refundId) {
+        if (StringUtils.isBlank(refundId)) {
+            return false;
+        }
+        if (order != null && refundId.equals(order.getPackageShortRazorpayRefundId())) {
+            return true;
+        }
+        if (returns == null) {
+            return false;
+        }
+        for (OrderReturn orderReturn : returns) {
+            if (
+                refundId.equals(orderReturn.getPackageShortRazorpayRefundId()) ||
+                refundId.equals(orderReturn.getRazorpayRefundId()) ||
+                refundId.equals(orderReturn.getSettlementReference())
+            ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static BigDecimal remainingItemRefund(OrderReturn orderReturn, BigDecimal originalItemAmount) {
         BigDecimal itemAmount = money(originalItemAmount);
         ExchangeSettlementStatus status = orderReturn == null ? null : orderReturn.getSettlementStatus();
         if (status == ExchangeSettlementStatus.COLLECTED) {
-            return itemAmount.add(money(orderReturn.getSettlementAmount()));
+            itemAmount = itemAmount.add(money(orderReturn.getSettlementAmount()));
+        } else if (status == ExchangeSettlementStatus.REFUNDED) {
+            itemAmount = itemAmount.subtract(money(orderReturn.getSettlementAmount())).max(BigDecimal.ZERO);
         }
-        if (status == ExchangeSettlementStatus.REFUNDED) {
-            return itemAmount.subtract(money(orderReturn.getSettlementAmount())).max(BigDecimal.ZERO);
-        }
-        return itemAmount;
+        return itemAmount.subtract(money(orderReturn == null ? null : orderReturn.getPackageShortRefundAmount())).max(BigDecimal.ZERO);
     }
 
     public static BigDecimal cashAlreadyRefunded(OrderReturn orderReturn) {
@@ -83,6 +148,7 @@ public final class ExchangeSettlementAmounts {
         if (orderReturn.getSettlementStatus() == ExchangeSettlementStatus.REFUNDED) {
             line = line.add(money(orderReturn.getSettlementAmount()));
         }
+        line = line.add(packageShortCashOnReturn(orderReturn));
         return line;
     }
 }

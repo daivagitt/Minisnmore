@@ -599,11 +599,15 @@ public class OrderShipmentService {
         List<XpressBeesClient.ReversePickupLine> lines = new ArrayList<>();
         int defaultWeight = Math.max(1, applicationProperties.getXpressbees().getDefaultWeightGrams());
         for (OrderItem item : items) {
+            int qty = PackageShortShipService.packedQty(item);
+            if (qty < 1) {
+                continue;
+            }
             lines.add(
                 new XpressBeesClient.ReversePickupLine(
                     StringUtils.defaultIfBlank(item.getProductName(), "Order item"),
                     StringUtils.defaultIfBlank(item.getVariantSku(), StringUtils.defaultIfBlank(item.getProductSlug(), order.getOrderNumber())),
-                    Math.max(1, item.getQty() == null ? 1 : item.getQty()),
+                    qty,
                     item.getPrice(),
                     defaultWeight
                 )

@@ -31,6 +31,8 @@ GET /api/v1/categories → 200
 GET /shop → 307 or 200
 POST /api/v1/zoho/invoice-webhook → 200
 POST /internal/v1/zoho/shipment-webhook → 200
+POST /api/v1/webhooks/xpressbees/shipments → 200
+POST /api/v1/webhooks/xpressbees/returns → 200
 ```
 
 `401` on `/api/v1/order-returns` without a cookie is expected.
@@ -46,6 +48,9 @@ grep -iE 'jwt|oauth|ERROR' /root/.pm2/logs/mini-prod-ms-gateway-out.log | tail -
 
 # Payments
 grep -iE 'razorpay|ERROR' /root/.pm2/logs/mini-prod-ms-catalog-core-out.log | tail -50
+
+# XpressBees forward/reverse callbacks
+grep -iE 'xpressbees|expressbees|webhook|ERROR' /root/.pm2/logs/mini-prod-ms-catalog-core-out.log | tail -50
 ```
 
 Disk: if `/` fills up, PM2 logs are the usual cause. Rotate or truncate old `~/.pm2/logs/*` after copying an incident snippet. Do not delete `/var/log/nginx` without logrotate.
@@ -70,6 +75,8 @@ SELECT count(*) FROM customer_order;
 -- recent webhook processing
 SELECT * FROM zoho_shipment_webhook_event ORDER BY id DESC LIMIT 20;
 SELECT * FROM zoho_invoice_webhook_event ORDER BY id DESC LIMIT 20;
+SELECT * FROM xpressbees_shipment_webhook_event ORDER BY id DESC LIMIT 20;
+SELECT * FROM xpressbees_return_webhook_event ORDER BY id DESC LIMIT 20;
 
 -- stuck orders (adjust names if schema differs)
 SELECT id, order_number, status, created_date
@@ -104,6 +111,7 @@ Images are **not** in Postgres; they are in Cloudflare R2 (`S3_BUCKET` + prefix 
 | 502 on `/api` | gateway + store + catalog liveness; catalog logs |
 | Login works, shop empty | catalog DB `product` / `active`; R2 URLs |
 | Checkout pays but order missing | catalog `customer_order`; Razorpay dashboard; commerce logs |
-| Tracking never updates | Nginx POST to shipment webhook; `zoho_shipment_webhook_event`; Zoho workflow history |
+| Zoho tracking never updates | Nginx POST to shipment webhook; `zoho_shipment_webhook_event`; Zoho workflow history |
+| XpressBees tracking never updates | Nginx POST to the shipment/return callback; matching `xpressbees_*_webhook_event`; active AWB |
 | Invoice PDF missing | invoice webhook 200; catalog `:9184` was up |
 | Admin Zoho timeout | nginx 600s location; catalog still running the sync |

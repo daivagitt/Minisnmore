@@ -17,8 +17,9 @@ export const Route = createFileRoute("/admin/login")({
 });
 
 function AdminLogin() {
-  const { signIn, user, isAdmin, staffRole, loading, signOut } = useAuth();
+  const { signIn, requestPasswordReset, user, isAdmin, staffRole, loading, signOut } = useAuth();
   const nav = useNavigate();
+  const [mode, setMode] = useState<"signin" | "forgot">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordError, setPasswordError] = useState<string | undefined>();
@@ -27,6 +28,8 @@ function AdminLogin() {
   const [emailTouched, setEmailTouched] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [forgotBusy, setForgotBusy] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
 
   useEffect(() => {
     if (loading || !user) return;
@@ -52,6 +55,25 @@ function AdminLogin() {
     const { error } = await signIn(email, password);
     setBusy(false);
     if (error) return toast.error(error);
+  };
+
+  const onForgotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const nextEmailError = emailFieldError(email);
+    setEmailError(nextEmailError);
+    setEmailTouched(true);
+    if (nextEmailError) {
+      toast.error(nextEmailError, { id: "forgot-password-error" });
+      return;
+    }
+    setForgotBusy(true);
+    const { error } = await requestPasswordReset(email);
+    setForgotBusy(false);
+    if (error) {
+      toast.error(error, { id: "forgot-password-error" });
+      return;
+    }
+    setForgotSent(true);
   };
 
   return (
@@ -87,8 +109,16 @@ function AdminLogin() {
             </p>
             <div className="glass-strong rounded-[2rem] p-8 md:p-10 w-full">
               <div className="text-xs uppercase tracking-[0.28em] text-primary">Atelier</div>
-              <h1 className="font-display text-3xl md:text-4xl mt-2">Staff sign in</h1>
-              <p className="text-sm text-muted-foreground mt-2">Sign in with your Mini Admin invitation account.</p>
+              <h1 className="font-display text-3xl md:text-4xl mt-2">
+                {mode === "forgot" ? "Reset password" : "Staff sign in"}
+              </h1>
+              <p className="text-sm text-muted-foreground mt-2">
+                {mode === "forgot"
+                  ? forgotSent
+                    ? "Check your inbox for a link to reset your password."
+                    : "Enter your staff email and we'll send a reset link."
+                  : "Sign in with your Mini Admin invitation account."}
+              </p>
               {!loading && user && !staffRole && (
                 <div className="mt-4 rounded-2xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
                   <p>Signed in as {user.email ?? user.login}, but this account does not have staff access.</p>
@@ -101,66 +131,104 @@ function AdminLogin() {
                   </button>
                 </div>
               )}
-              <form onSubmit={onSubmit} noValidate className="mt-6 space-y-3">
-                <div>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      if (emailTouched) setEmailError(emailFieldError(e.target.value));
-                    }}
-                    onBlur={() => {
-                      setEmailTouched(true);
-                      setEmailError(emailFieldError(email));
-                    }}
-                    placeholder="you@store.in"
-                    aria-invalid={!!emailError && emailTouched}
-                    className={`w-full rounded-2xl glass px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/40 ${emailError && emailTouched ? "ring-2 ring-destructive/50" : ""}`}
-                  />
-                  {emailError && emailTouched ? (
-                    <p className="mt-1 text-xs text-destructive">{emailError}</p>
-                  ) : null}
-                </div>
-                <div>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => {
-                        setPassword(e.target.value);
-                        if (passwordTouched) setPasswordError(passwordFieldError(e.target.value));
-                      }}
-                      onBlur={() => {
-                        setPasswordTouched(true);
-                        setPasswordError(passwordFieldError(password));
-                      }}
-                      placeholder="Password (min 6)"
-                      aria-invalid={!!passwordError && passwordTouched}
-                      className={`w-full rounded-2xl glass px-4 py-3 pr-11 text-sm outline-none focus:ring-2 focus:ring-primary/40 ${passwordError && passwordTouched ? "ring-2 ring-destructive/50" : ""}`}
+              {mode === "forgot" ? (
+                forgotSent ? (
+                  <div className="mt-6 rounded-2xl border border-primary/30 bg-primary/10 text-primary px-4 py-3 text-sm">
+                    If an account exists for {email}, a reset link is on its way.
+                  </div>
+                ) : (
+                  <form onSubmit={onForgotSubmit} noValidate className="mt-6 space-y-3">
+                    <StaffEmailField
+                      email={email}
+                      emailError={emailError}
+                      emailTouched={emailTouched}
+                      onEmailChange={setEmail}
+                      onEmailError={setEmailError}
+                      onEmailTouched={setEmailTouched}
                     />
                     <button
-                      type="button"
-                      onClick={() => setShowPassword((v) => !v)}
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                      className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                      disabled={forgotBusy}
+                      type="submit"
+                      className="w-full rounded-full bg-primary text-primary-foreground py-3 font-medium hover:shadow-glow transition disabled:opacity-60"
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {forgotBusy ? "Sending…" : "Send reset link"}
+                    </button>
+                  </form>
+                )
+              ) : (
+                <form onSubmit={onSubmit} noValidate className="mt-6 space-y-3">
+                  <StaffEmailField
+                    email={email}
+                    emailError={emailError}
+                    emailTouched={emailTouched}
+                    onEmailChange={setEmail}
+                    onEmailError={setEmailError}
+                    onEmailTouched={setEmailTouched}
+                  />
+                  <div>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          if (passwordTouched) setPasswordError(passwordFieldError(e.target.value));
+                        }}
+                        onBlur={() => {
+                          setPasswordTouched(true);
+                          setPasswordError(passwordFieldError(password));
+                        }}
+                        placeholder="Password (min 6)"
+                        aria-invalid={!!passwordError && passwordTouched}
+                        className={`w-full rounded-2xl glass px-4 py-3 pr-11 text-sm outline-none focus:ring-2 focus:ring-primary/40 ${passwordError && passwordTouched ? "ring-2 ring-destructive/50" : ""}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((v) => !v)}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {passwordError && passwordTouched ? (
+                      <p className="mt-1 text-xs text-destructive">{passwordError}</p>
+                    ) : null}
+                  </div>
+                  <div className="text-right -mt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode("forgot");
+                        setForgotSent(false);
+                      }}
+                      className="text-xs story-link text-primary"
+                    >
+                      Forgot password?
                     </button>
                   </div>
-                  {passwordError && passwordTouched ? (
-                    <p className="mt-1 text-xs text-destructive">{passwordError}</p>
-                  ) : null}
-                </div>
-                <button
-                  disabled={busy}
-                  type="submit"
-                  className="w-full rounded-full bg-primary text-primary-foreground py-3 font-medium hover:shadow-glow transition disabled:opacity-60"
-                >
-                  {busy ? "Please wait…" : "Sign in"}
-                </button>
-              </form>
-              <div className="mt-6 text-center">
+                  <button
+                    disabled={busy}
+                    type="submit"
+                    className="w-full rounded-full bg-primary text-primary-foreground py-3 font-medium hover:shadow-glow transition disabled:opacity-60"
+                  >
+                    {busy ? "Please wait…" : "Sign in"}
+                  </button>
+                </form>
+              )}
+              <div className="mt-6 text-center space-y-2">
+                {mode === "forgot" ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("signin");
+                      setForgotSent(false);
+                    }}
+                    className="block w-full text-sm story-link text-primary"
+                  >
+                    Back to sign in
+                  </button>
+                ) : null}
                 <Link to="/" className="text-xs text-muted-foreground story-link">
                   ← Back to store
                 </Link>
@@ -169,6 +237,45 @@ function AdminLogin() {
           </div>
         </motion.div>
       </section>
+    </div>
+  );
+}
+
+function StaffEmailField({
+  email,
+  emailError,
+  emailTouched,
+  onEmailChange,
+  onEmailError,
+  onEmailTouched,
+}: {
+  email: string;
+  emailError: string | undefined;
+  emailTouched: boolean;
+  onEmailChange: (value: string) => void;
+  onEmailError: (value: string | undefined) => void;
+  onEmailTouched: (value: boolean) => void;
+}) {
+  return (
+    <div>
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => {
+          onEmailChange(e.target.value);
+          if (emailTouched) onEmailError(emailFieldError(e.target.value));
+        }}
+        onBlur={() => {
+          onEmailTouched(true);
+          onEmailError(emailFieldError(email));
+        }}
+        placeholder="you@store.in"
+        aria-invalid={!!emailError && emailTouched}
+        className={`w-full rounded-2xl glass px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/40 ${emailError && emailTouched ? "ring-2 ring-destructive/50" : ""}`}
+      />
+      {emailError && emailTouched ? (
+        <p className="mt-1 text-xs text-destructive">{emailError}</p>
+      ) : null}
     </div>
   );
 }

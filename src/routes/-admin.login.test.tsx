@@ -9,6 +9,7 @@ const authMock = vi.hoisted(() => ({
   signUp: vi.fn(),
   signInWithOAuth: vi.fn(),
   signOut: vi.fn(),
+  requestPasswordReset: vi.fn(),
   user: null as null | { id: number; email?: string; login?: string },
   isAdmin: false,
   staffRole: null as null | string,
@@ -138,6 +139,18 @@ describe("admin login route", () => {
     renderAdminLogin();
     expect(screen.queryByRole("button", { name: /sign up/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /google/i })).toBeNull();
+  });
+
+  it("sends a forgot-password reset link", async () => {
+    authMock.requestPasswordReset.mockResolvedValueOnce({ error: null });
+    renderAdminLogin();
+
+    await userEvent.click(screen.getByRole("button", { name: /forgot password/i }));
+    await userEvent.type(screen.getByPlaceholderText("you@store.in"), "ops@store.in");
+    await userEvent.click(screen.getByRole("button", { name: "Send reset link" }));
+
+    await waitFor(() => expect(authMock.requestPasswordReset).toHaveBeenCalledWith("ops@store.in"));
+    expect(screen.getByText(/reset link is on its way/i)).toBeInTheDocument();
   });
 
   it("validates email and password before submit and shows field errors", async () => {

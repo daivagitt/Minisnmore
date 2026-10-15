@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Seed homepage hero carousel from the storefront defaultHeroSlides in src/routes/index.tsx
+      so Admin → Banners can edit the same slides. Images live under public/hero-carousel/.
+      Only inserts when there are no active banners yet (does not overwrite admin edits).
+    -->
+    <changeSet id="20261010180000-1" author="minisandmore">
+        <sql dbms="postgresql">
+            INSERT INTO banner (
+                id, title, subtitle, image_url, link_url, cta_label, eyebrow,
+                trust_fabric_label, trust_shipping_label, trust_dyes_label,
+                sort_order, active
+            )
+            SELECT
+                nextval('sequence_generator'),
+                v.title,
+                v.subtitle,
+                v.image_url,
+                v.link_url,
+                v.cta_label,
+                v.eyebrow,
+                NULL,
+                NULL,
+                NULL,
+                v.sort_order,
+                true
+            FROM (VALUES
+                (
+                    'Minis today, memories forever.',
+                    'Organic clothing for your little one''s softest beginnings — feather-light cottons coloured with azo-free dyes, made to be loved and passed on.',
+                    '/hero-carousel/slide-premium.jpg',
+                    '/shop',
+                    'Shop the new edit',
+                    'Premium · Thoughtfully designed',
+                    10
+                ),
+                (
+                    'Softness made for first cuddles.',
+                    'Whisper-soft organic cotton in azo-free dyed hues — designed for the gentlest skin on earth.',
+                    '/hero-carousel/slide-organic.jpg',
+                    '/shop',
+                    'Shop infant edit',
+                    'Made for tiny ones',
+                    20
+                ),
+                (
+                    'All-day comfort for growing minis.',
+                    'Crafted with soft, breathable fabrics and child-friendly stitching — built around the way little ones move, play and rest.',
+                    '/hero-carousel/slide-comfort.webp',
+                    '/shop',
+                    'Shop the collection',
+                    'Comfort first design',
+                    30
+                ),
+                (
+                    'Crafted with care. Made to last.',
+                    'Premium children''s clothing built on certified organic cotton, azo-free dyes and child-safe finishing — thoughtfully designed for comfort, quality and the way little ones really live.',
+                    '/hero-carousel/slide-founders.jpg',
+                    '/about',
+                    'Read our story',
+                    'A note from the founders',
+                    40
+                )
+            ) AS v(title, subtitle, image_url, link_url, cta_label, eyebrow, sort_order)
+            WHERE NOT EXISTS (SELECT 1 FROM banner WHERE active = true);
+        </sql>
+    </changeSet>
+</databaseChangeLog>

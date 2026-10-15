@@ -10,8 +10,13 @@ class XpressBeesShipmentStatusTest {
     void bookedAndScheduledStayAwaitingPickup() {
         assertThat(XpressBeesShipmentStatus.isAwaitingPickup("booked")).isTrue();
         assertThat(XpressBeesShipmentStatus.isAwaitingPickup("pickup scheduled")).isTrue();
+        assertThat(XpressBeesShipmentStatus.isAwaitingPickup("ReadyForPickup")).isTrue();
+        assertThat(XpressBeesShipmentStatus.isAwaitingPickup("ready_for_pickup")).isTrue();
         assertThat(XpressBeesShipmentStatus.isAwaitingPickup(null)).isTrue();
         assertThat(XpressBeesShipmentStatus.isPickedUpOrInTransit("booked")).isFalse();
+        assertThat(XpressBeesShipmentStatus.isPickedUpOrInTransit("readyforpickup")).isFalse();
+        assertThat(XpressBeesShipmentStatus.milestone("ReadyForPickup")).isEqualTo("awaiting_pickup");
+        assertThat(XpressBeesShipmentStatus.awaitingPickupStatuses()).contains("readyforpickup", "awaiting_pickup");
     }
 
     @Test

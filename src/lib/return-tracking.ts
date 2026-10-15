@@ -451,3 +451,21 @@ export function hasReturnShipmentDetails(item: ReturnTrackingFields): boolean {
       item.outbound_carrier_name,
   );
 }
+
+const DEFAULT_PICKUP_TRACKING_URL = "https://shipmentv2.xpressbees.com/orders/tracking/{awb}";
+
+function isXpressBeesCarrier(item: ReturnTrackingFields): boolean {
+  const carrier = String(item.carrier_name ?? "")
+    .trim()
+    .toLowerCase();
+  return carrier.includes("xpressbees") || carrier.includes("expressbees");
+}
+
+/** Pickup tracking link: stored URL, or ExpressBees page when the carrier is ExpressBees. */
+export function resolvePickupTrackingUrl(item: ReturnTrackingFields): string | null {
+  const stored = item.tracking_url?.trim();
+  if (stored) return stored;
+  const awb = item.reverse_awb?.trim();
+  if (!awb || !isXpressBeesCarrier(item)) return null;
+  return DEFAULT_PICKUP_TRACKING_URL.replace("{awb}", encodeURIComponent(awb));
+}

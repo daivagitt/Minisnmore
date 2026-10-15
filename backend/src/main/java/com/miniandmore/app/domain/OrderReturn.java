@@ -209,6 +209,16 @@ public class OrderReturn implements Serializable {
     @Column(name = "packed_at")
     private Instant packedAt;
 
+    @Column(name = "outbound_packed_qty")
+    private Integer outboundPackedQty;
+
+    @Column(name = "package_short_refund_amount", precision = 21, scale = 2)
+    private BigDecimal packageShortRefundAmount;
+
+    @Size(max = 80)
+    @Column(name = "package_short_razorpay_refund_id", length = 80)
+    private String packageShortRazorpayRefundId;
+
     @Column(name = "original_item_amount", precision = 21, scale = 2)
     private BigDecimal originalItemAmount;
 
@@ -639,6 +649,30 @@ public class OrderReturn implements Serializable {
 
     public void setPackedAt(Instant packedAt) {
         this.packedAt = packedAt;
+    }
+
+    public Integer getOutboundPackedQty() {
+        return outboundPackedQty;
+    }
+
+    public void setOutboundPackedQty(Integer outboundPackedQty) {
+        this.outboundPackedQty = outboundPackedQty;
+    }
+
+    public BigDecimal getPackageShortRefundAmount() {
+        return packageShortRefundAmount;
+    }
+
+    public void setPackageShortRefundAmount(BigDecimal packageShortRefundAmount) {
+        this.packageShortRefundAmount = packageShortRefundAmount;
+    }
+
+    public String getPackageShortRazorpayRefundId() {
+        return packageShortRazorpayRefundId;
+    }
+
+    public void setPackageShortRazorpayRefundId(String packageShortRazorpayRefundId) {
+        this.packageShortRazorpayRefundId = packageShortRazorpayRefundId;
     }
 
     public BigDecimal getOriginalItemAmount() {

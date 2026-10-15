@@ -38,6 +38,7 @@ public class OrderPackageService {
     private final OrderCancellationService orderCancellationService;
     private final ObjectMapper objectMapper;
     private final StoreAddressRepository storeAddressRepository;
+    private final PackageShortShipService packageShortShipService;
 
     public OrderPackageService(
         CustomerOrderRepository customerOrderRepository,
@@ -47,7 +48,8 @@ public class OrderPackageService {
         OrderEventService orderEventService,
         OrderCancellationService orderCancellationService,
         ObjectMapper objectMapper,
-        StoreAddressRepository storeAddressRepository
+        StoreAddressRepository storeAddressRepository,
+        PackageShortShipService packageShortShipService
     ) {
         this.customerOrderRepository = customerOrderRepository;
         this.orderItemRepository = orderItemRepository;
@@ -57,6 +59,7 @@ public class OrderPackageService {
         this.orderCancellationService = orderCancellationService;
         this.objectMapper = objectMapper;
         this.storeAddressRepository = storeAddressRepository;
+        this.packageShortShipService = packageShortShipService;
     }
 
     public static int volumetricWeightGrams(int lengthCm, int breadthCm, int heightCm, int divisor) {
@@ -173,12 +176,45 @@ public class OrderPackageService {
         String packageType,
         Long packageBoxId
     ) {
+        return completePackage(
+            orderNumber,
+            weightGrams,
+            lengthCm,
+            breadthCm,
+            heightCm,
+            courierId,
+            courierName,
+            packageType,
+            packageBoxId,
+            null
+        );
+    }
+
+    public CustomerOrder completePackage(
+        String orderNumber,
+        Integer weightGrams,
+        int lengthCm,
+        int breadthCm,
+        int heightCm,
+        String courierId,
+        String courierName,
+        String packageType,
+        Long packageBoxId,
+        List<PackageShortShipService.PackedLine> packedLines
+    ) {
         CustomerOrder order = requireOrder(orderNumber);
         requirePackageEligible(order);
         requireDimensions(lengthCm, breadthCm, heightCm);
         requireDestinationPincode(order);
         PackageType resolvedType = resolvePackageType(packageType);
         int actualWeight = resolveActualWeight(order, weightGrams);
+        if (order.getId() != null) {
+            packageShortShipService.applyForwardShortShip(
+                order,
+                orderItemRepository.findAllByOrderId(order.getId()),
+                packedLines
+            );
+        }
         Map<String, Object> rates = previewRatesForDestination(
             destinationPincode(order),
             actualWeight,
@@ -286,7 +322,7 @@ public class OrderPackageService {
         }
         int total = 0;
         for (OrderItem item : orderItemRepository.findAllByOrderId(order.getId())) {
-            total += Math.max(1, item.getQty() == null ? 1 : item.getQty());
+            total += PackageShortShipService.packedQty(item);
         }
         return Math.max(1, total);
     }

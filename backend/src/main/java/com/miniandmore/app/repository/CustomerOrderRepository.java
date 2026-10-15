@@ -91,6 +91,8 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     Optional<CustomerOrder> findFirstByRazorpayPaymentId(String razorpayPaymentId);
 
+    Optional<CustomerOrder> findFirstByPackageShortRazorpayRefundIdOrderByIdDesc(String packageShortRazorpayRefundId);
+
     Optional<CustomerOrder> findFirstByRazorpayOrderId(String razorpayOrderId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

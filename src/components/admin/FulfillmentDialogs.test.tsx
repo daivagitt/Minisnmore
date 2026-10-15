@@ -103,7 +103,7 @@ describe("Zoho-style fulfillment dialogs", () => {
     expect(screen.getByText("Envelope")).toBeTruthy();
     expect(screen.getByText("Small carton (20×15×10 cm, 400 g)")).toBeTruthy();
     expect(screen.getByLabelText("Gross weight")).toHaveValue(0.5);
-    expect(screen.getByText("All order line items are included in this package. Choose a package type, then save gross weight and dimensions. Package date is display only.")).toBeTruthy();
+    expect(screen.getByText("Reduce packed quantity if a unit is damaged or cannot be shipped. Unshipped units are refunded automatically. Package date is display only.")).toBeTruthy();
     expect(screen.getByText("Body Suit — 6-12 M — Snail")).toBeTruthy();
     expect(screen.queryByText("Stock on Hand")).toBeNull();
     expect(screen.queryByText("Head Office")).toBeNull();
@@ -121,7 +121,31 @@ describe("Zoho-style fulfillment dialogs", () => {
         height_cm: 4,
         package_type: "custom",
         package_box_id: null,
+        items: [{ order_item_id: 1, packed_qty: 1 }],
       }),
+    );
+  });
+
+  it("lets ops pack fewer units than ordered so the leftover can be refunded", async () => {
+    const user = userEvent.setup();
+    render(
+      <CreatePackageDialog
+        order={order({
+          order_items: [{ id: 7, product_name: "Body Suit", size: "6-12 M", color: "Snail", sku: "MN-12", qty: 2 }],
+        })}
+        open
+        onOpenChange={() => {}}
+        onSaved={() => {}}
+      />,
+    );
+    const packed = screen.getByLabelText("Packed quantity for Body Suit — 6-12 M — Snail");
+    await user.clear(packed);
+    await user.type(packed, "1");
+    expect(screen.getByText("1 unit will be refunded")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(completeAdminOrderPackage).toHaveBeenCalledWith(
+      "MNM-18",
+      expect.objectContaining({ items: [{ order_item_id: 7, packed_qty: 1 }] }),
     );
   });
 

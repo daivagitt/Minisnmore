@@ -268,6 +268,13 @@ public class CustomerOrder implements Serializable {
     @Column(name = "packed_at")
     private Instant packedAt;
 
+    @Column(name = "package_short_refund_amount", precision = 21, scale = 2)
+    private BigDecimal packageShortRefundAmount;
+
+    @Size(max = 80)
+    @Column(name = "package_short_razorpay_refund_id", length = 80)
+    private String packageShortRazorpayRefundId;
+
     @Column(name = "ledgerly_tracking_last_pulled_at")
     private Instant ledgerlyTrackingLastPulledAt;
 
@@ -1040,6 +1047,32 @@ public class CustomerOrder implements Serializable {
 
     public void setPackedAt(Instant packedAt) {
         this.packedAt = packedAt;
+    }
+
+    public BigDecimal getPackageShortRefundAmount() {
+        return packageShortRefundAmount;
+    }
+
+    public CustomerOrder packageShortRefundAmount(BigDecimal packageShortRefundAmount) {
+        this.setPackageShortRefundAmount(packageShortRefundAmount);
+        return this;
+    }
+
+    public void setPackageShortRefundAmount(BigDecimal packageShortRefundAmount) {
+        this.packageShortRefundAmount = packageShortRefundAmount;
+    }
+
+    public String getPackageShortRazorpayRefundId() {
+        return packageShortRazorpayRefundId;
+    }
+
+    public CustomerOrder packageShortRazorpayRefundId(String packageShortRazorpayRefundId) {
+        this.setPackageShortRazorpayRefundId(packageShortRazorpayRefundId);
+        return this;
+    }
+
+    public void setPackageShortRazorpayRefundId(String packageShortRazorpayRefundId) {
+        this.packageShortRazorpayRefundId = packageShortRazorpayRefundId;
     }
 
     public Instant getLedgerlyTrackingLastPulledAt() {

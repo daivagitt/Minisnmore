@@ -114,6 +114,7 @@ public class OrderReturnService {
     private final SiteSettingRepository siteSettingRepository;
     private final OrderPackageService orderPackageService;
     private final ExchangeRazorpaySettlementService exchangeRazorpaySettlementService;
+    private final PackageShortShipService packageShortShipService;
     private final ReturnXpressBeesShipmentFactory shipmentFactory;
 
     private static final EnumSet<OrderReturnStatus> SUMMARY_CLOSED_STATUSES = EnumSet.of(
@@ -143,6 +144,7 @@ public class OrderReturnService {
         SiteSettingRepository siteSettingRepository,
         OrderPackageService orderPackageService,
         ExchangeRazorpaySettlementService exchangeRazorpaySettlementService,
+        PackageShortShipService packageShortShipService,
         StoreAddressRepository storeAddressRepository
     ) {
         this.orderReturnRepository = orderReturnRepository;
@@ -163,6 +165,7 @@ public class OrderReturnService {
         this.siteSettingRepository = siteSettingRepository;
         this.orderPackageService = orderPackageService;
         this.exchangeRazorpaySettlementService = exchangeRazorpaySettlementService;
+        this.packageShortShipService = packageShortShipService;
         this.shipmentFactory = new ReturnXpressBeesShipmentFactory(
             applicationProperties,
             objectMapper,
@@ -321,12 +324,12 @@ public class OrderReturnService {
             }
         }
 
-        BigDecimal subtotal = positiveOrFallback(order.getSubtotal(), orderItems
+        BigDecimal subtotal = OrderMerchandiseAmounts.positiveOrFallback(order.getSubtotal(), orderItems
             .stream()
             .map(item -> money(item.getPrice()).multiply(BigDecimal.valueOf(Optional.ofNullable(item.getQty()).orElse(0))))
             .reduce(BigDecimal.ZERO, BigDecimal::add));
         BigDecimal discount = money(order.getDiscount());
-        boolean hasPersistedLineAllocations = orderHasPersistedLineAllocations(orderItems);
+        boolean hasPersistedLineAllocations = OrderMerchandiseAmounts.orderHasPersistedLineAllocations(orderItems);
         BigDecimal totalRefund = BigDecimal.ZERO;
         for (Map.Entry<Long, Integer> selected : requestedByItem.entrySet()) {
             OrderItem item = orderItems
@@ -339,7 +342,7 @@ public class OrderReturnService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return quantity exceeds the ordered quantity");
             }
             BigDecimal gross = money(item.getPrice()).multiply(BigDecimal.valueOf(selected.getValue())).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal discountAllocation = allocatedDiscountFor(
+            BigDecimal discountAllocation = OrderMerchandiseAmounts.allocatedDiscountFor(
                 item,
                 selected.getValue(),
                 orderedQty,
@@ -572,8 +575,13 @@ public class OrderReturnService {
         }
         orderReturn.setLogisticsMode(mode);
         orderReturn.setCarrierName(StringUtils.left(StringUtils.trimToNull(carrierName), 80));
-        orderReturn.setReverseAwb(StringUtils.left(StringUtils.trimToNull(reverseAwb), 80));
-        orderReturn.setTrackingUrl(StringUtils.left(StringUtils.trimToNull(trackingUrl), 500));
+        String awb = StringUtils.left(StringUtils.trimToNull(reverseAwb), 80);
+        orderReturn.setReverseAwb(awb);
+        String pickupUrl = StringUtils.trimToNull(trackingUrl);
+        if (pickupUrl == null && ReturnPickupTracking.isXpressBees(mode, carrierName)) {
+            pickupUrl = xpressBeesClient.buildTrackingUrl(awb);
+        }
+        orderReturn.setTrackingUrl(StringUtils.left(pickupUrl, 500));
         orderReturn.setPickupWindow(StringUtils.left(StringUtils.trimToNull(pickupWindow), 200));
         orderReturn.setPickupFailureReason(null);
         orderReturn.setReverseCarrierStatus(XpressBeesReturnCarrierStatus.DATA_RECEIVED);
@@ -1278,11 +1286,7 @@ public class OrderReturnService {
 
     public int defaultPackageWeightGrams(OrderReturn orderReturn) {
         int perLine = Math.max(1, applicationProperties.getXpressbees().getDefaultWeightGrams());
-        OrderItem item = orderReturn == null ? null : orderReturn.getOrderItem();
-        int qty = 1;
-        if (item != null && item.getQty() != null) {
-            qty = Math.max(1, item.getQty());
-        }
+        int qty = Math.max(1, PackageShortShipService.exchangePackedQty(orderReturn));
         return perLine * qty;
     }
 
@@ -1341,6 +1345,32 @@ public class OrderReturnService {
         String packageType,
         Long packageBoxId
     ) {
+        return completeOutboundPackage(
+            returnNumber,
+            weightGrams,
+            lengthCm,
+            breadthCm,
+            heightCm,
+            courierId,
+            courierName,
+            packageType,
+            packageBoxId,
+            null
+        );
+    }
+
+    public OrderReturn completeOutboundPackage(
+        String returnNumber,
+        Integer weightGrams,
+        int lengthCm,
+        int breadthCm,
+        int heightCm,
+        String courierId,
+        String courierName,
+        String packageType,
+        Long packageBoxId,
+        List<PackageShortShipService.PackedLine> packedLines
+    ) {
         assertFeatureEnabled();
         OrderReturn orderReturn = loadReturn(returnNumber);
         assertOutboundPackageEligible(orderReturn);
@@ -1368,6 +1398,7 @@ public class OrderReturnService {
         if (xpressBeesClient.isForwardShipmentConfigured() && StringUtils.isBlank(selected.id())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No serviceable couriers for this package");
         }
+        packageShortShipService.applyExchangeShortShip(orderReturn, packedQtyFromLines(orderReturn, packedLines));
         orderReturn.setPackageWeightGrams(actualWeight);
         orderReturn.setPackageLengthCm(lengthCm);
         orderReturn.setPackageBreadthCm(breadthCm);
@@ -1382,6 +1413,22 @@ public class OrderReturnService {
             orderReturn.setStatus(OrderReturnStatus.READY_TO_SHIP);
         }
         return orderReturnRepository.save(orderReturn);
+    }
+
+    private static Integer packedQtyFromLines(OrderReturn orderReturn, List<PackageShortShipService.PackedLine> packedLines) {
+        if (packedLines == null || packedLines.isEmpty()) {
+            return null;
+        }
+        Long orderItemId = orderReturn.getOrderItem() == null ? null : orderReturn.getOrderItem().getId();
+        for (PackageShortShipService.PackedLine line : packedLines) {
+            if (line == null || line.packedQty() == null) {
+                continue;
+            }
+            if (orderItemId == null || line.orderItemId() == null || orderItemId.equals(line.orderItemId())) {
+                return line.packedQty();
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Packed quantity must reference the exchange line item");
     }
 
     public Map<String, Object> shippingAddressPayload(OrderReturn orderReturn) {
@@ -2094,16 +2141,23 @@ public class OrderReturnService {
         if (order == null) {
             return null;
         }
-        if (order.getShipmentDeliveredAt() != null) {
-            return order.getShipmentDeliveredAt();
+        // Dispatch (`shipment_date`) and tracking-pull timestamps are not delivery.
+        // The return window starts only when physical delivery was recorded.
+        return order.getShipmentDeliveredAt();
+    }
+
+    public String pickupTrackingUrl(OrderReturn orderReturn) {
+        if (orderReturn == null) {
+            return null;
         }
-        if (LedgerlyOrderStatus.isDelivered(order.getLedgerlyOrderStatus())) {
-            return order.getLedgerlyTrackingLastPulledAt();
+        String stored = StringUtils.trimToNull(orderReturn.getTrackingUrl());
+        if (stored != null) {
+            return stored;
         }
-        if (!OrderShipmentService.hasLocalForwardShipment(order) && ZohoOrderStatus.isDelivered(order.getZohoOrderStatus())) {
-            return order.getZohoTrackingLastPulledAt();
+        if (!ReturnPickupTracking.isXpressBees(orderReturn.getLogisticsMode(), orderReturn.getCarrierName())) {
+            return null;
         }
-        return null;
+        return xpressBeesClient.buildTrackingUrl(orderReturn.getReverseAwb());
     }
 
     private void queueReturnEmail(CustomerOrder order, OrderReturn orderReturn) {
@@ -2518,20 +2572,20 @@ public class OrderReturnService {
             return originalGross;
         }
         int orderedQty = Math.max(1, Optional.ofNullable(item.getQty()).orElse(1));
-        BigDecimal orderSubtotal = positiveOrFallback(order.getSubtotal(), originalGross);
+        BigDecimal orderSubtotal = OrderMerchandiseAmounts.positiveOrFallback(order.getSubtotal(), originalGross);
         List<OrderItem> siblings = order.getId() == null
             ? List.of(item)
             : orderItemRepository.findAllByOrderId(order.getId());
         if (siblings.isEmpty()) {
             siblings = List.of(item);
         }
-        BigDecimal allocatedDiscount = allocatedDiscountFor(
+        BigDecimal allocatedDiscount = OrderMerchandiseAmounts.allocatedDiscountFor(
             item,
             qty,
             orderedQty,
             orderSubtotal,
             money(order.getDiscount()),
-            orderHasPersistedLineAllocations(siblings)
+            OrderMerchandiseAmounts.orderHasPersistedLineAllocations(siblings)
         ).min(originalGross);
         return originalGross.subtract(allocatedDiscount).max(BigDecimal.ZERO);
     }
@@ -2550,36 +2604,6 @@ public class OrderReturnService {
      * New orders persist per-line {@code discountAllocation}; legacy orders keep zeros and fall back
      * to proportional share of the order discount.
      */
-    private static boolean orderHasPersistedLineAllocations(List<OrderItem> orderItems) {
-        return orderItems.stream().anyMatch(item -> money(item.getDiscountAllocation()).signum() > 0);
-    }
-
-    private static BigDecimal allocatedDiscountFor(
-        OrderItem item,
-        int requestedQty,
-        int orderedQty,
-        BigDecimal orderSubtotal,
-        BigDecimal orderDiscount,
-        boolean usePersistedLineAllocation
-    ) {
-        BigDecimal gross = money(item.getPrice()).multiply(BigDecimal.valueOf(requestedQty)).setScale(2, RoundingMode.HALF_UP);
-        if (usePersistedLineAllocation) {
-            return money(item.getDiscountAllocation())
-                .multiply(BigDecimal.valueOf(requestedQty))
-                .divide(BigDecimal.valueOf(Math.max(1, orderedQty)), 2, RoundingMode.HALF_UP)
-                .min(gross);
-        }
-        if (orderSubtotal.signum() == 0) {
-            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        }
-        return orderDiscount.multiply(gross).divide(orderSubtotal, 2, RoundingMode.HALF_UP).min(gross);
-    }
-
-    private static BigDecimal positiveOrFallback(BigDecimal preferred, BigDecimal fallback) {
-        BigDecimal value = money(preferred);
-        return value.signum() > 0 ? value : money(fallback);
-    }
-
     @Transactional(readOnly = true)
     public List<String> imageUrls(OrderReturn orderReturn) {
         return parseImageUrls(orderReturn == null ? null : orderReturn.getImageUrlsJson());

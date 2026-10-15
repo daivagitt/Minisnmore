@@ -123,6 +123,16 @@ class OrderTrackingStatusResolverTest {
     }
 
     @Test
+    void resolve_expressBeesReadyForPickupIsAwaitingPickup() {
+        CustomerOrder order = paidOrder()
+            .trackingNumber("XB-READY")
+            .shipmentLogisticsMode(com.miniandmore.app.domain.enumeration.ReturnLogisticsMode.XPRESSBEES)
+            .shipmentCarrierStatus("readyforpickup");
+
+        assertThat(OrderTrackingStatusResolver.resolve(order)).isEqualTo("awaiting_pickup");
+    }
+
+    @Test
     void resolve_expressBeesBookedAwbIsAwaitingPickup() {
         CustomerOrder order = paidOrder()
             .trackingNumber("XB-1")

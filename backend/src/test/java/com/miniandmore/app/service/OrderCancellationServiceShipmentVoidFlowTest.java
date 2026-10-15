@@ -71,6 +71,7 @@ class OrderCancellationServiceShipmentVoidFlowTest {
         when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
         cancellationExecutor = new OrderCancellationExecutor(
             dataAccess,
+            org.mockito.Mockito.mock(com.miniandmore.app.repository.OrderReturnRepository.class),
             razorpayRefundService,
             zohoSyncService,
             orderEventService,

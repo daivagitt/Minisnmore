@@ -2,21 +2,11 @@
 
 How to operate Mini's n More production without changing code.
 
-## Owners (fill names on handover)
+## Access boundary
 
-| Area | Primary | Backup |
-| --- | --- | --- |
-| VPS / Nginx / PM2 / Postgres | | |
-| GitHub `developersqobox-org/mini_and_more` | | |
-| Cloudflare (DNS + R2) | | |
-| Zoho Books org + webhooks | | |
-| Razorpay live keys | | |
-| Google / Apple / Facebook OAuth apps | | |
-| Gmail / Zoho SMTP | | |
-| Domain `minisnmore.com` registrar | | |
-| Let’s Encrypt renewal | | |
+Routine operation may require existing authorised access to the VPS, Nginx/PM2/Postgres, Zoho, Razorpay, OAuth provider consoles, DNS, and object storage. Account ownership transfer is outside this document’s scope.
 
-Transfer access as part of go-live: GitHub org, Cloudflare account, Zoho org, Razorpay dashboard, OAuth consoles, DNS, server SSH keys. Do not share the contents of `/etc/mini-and-more/prod.env` over chat; copy on the server or via a password manager.
+Do not share the contents of `/etc/mini-and-more/prod.env` over chat. Operators should retrieve secrets from the approved vault and keep access least-privileged.
 
 ## Daily checks
 

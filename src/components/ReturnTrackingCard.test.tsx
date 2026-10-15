@@ -40,6 +40,26 @@ describe("ReturnTrackingCard", () => {
     );
   });
 
+  it("synthesizes a pickup tracking link from reverse AWB", () => {
+    render(
+      <ReturnTrackingCard
+        item={{
+          return_number: "RET-awb",
+          request_type: "return",
+          status: "pickup_scheduled",
+          reverse_awb: "XB555",
+          carrier_name: "XpressBees",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("XB555")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Track pickup" })).toHaveAttribute(
+      "href",
+      "https://shipmentv2.xpressbees.com/orders/tracking/XB555",
+    );
+  });
+
   it("shows variant_sku in the product subtitle", () => {
     render(
       <ReturnTrackingCard

@@ -703,6 +703,11 @@ function OrderDetail() {
                             {returnStatusLabel(r)}
                           </span>
                         </span>
+                        {r.reverse_awb ? (
+                          <span className="text-xs font-normal normal-case tracking-normal text-muted-foreground">
+                            Pickup AWB {r.reverse_awb}
+                          </span>
+                        ) : null}
                         {isRejectedReturn(r) ? (
                           <span className="text-xs font-normal normal-case tracking-normal text-amber-800">
                             {closedReturnMessage(r)}

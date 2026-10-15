@@ -231,11 +231,17 @@ public class InternalAdminOrderResource {
             .customerOrderRepository()
             .findOneByOrderNumber(orderNumber)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
-        if (!"cod".equalsIgnoreCase(order.getPaymentMethod())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Not a Cash on Delivery order");
-        }
-        if (order.getPaymentStatus() == PaymentStatus.PAID) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Already marked as collected");
+        if (!canMarkCodCollected(order)) {
+            if (!"cod".equalsIgnoreCase(order.getPaymentMethod())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Not a Cash on Delivery order");
+            }
+            if (order.getStatus() == OrderStatus.CANCELLED) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot mark COD collected on a cancelled order");
+            }
+            if (order.getPaymentStatus() == PaymentStatus.PAID) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Already marked as collected");
+            }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "COD can only be marked collected while payment is pending");
         }
         order.setPaymentStatus(PaymentStatus.PAID);
         order.setZohoSyncStatus(ZohoSyncStatus.PENDING);
@@ -318,7 +324,8 @@ public class InternalAdminOrderResource {
             body.courier_id(),
             body.courier_name(),
             body.package_type(),
-            body.package_box_id()
+            body.package_box_id(),
+            AdminPackedItemLines.toPackedLines(body.items())
         );
         return ApiResponse.ok(Map.of("order", summary(saved)));
     }
@@ -410,6 +417,7 @@ public class InternalAdminOrderResource {
         data.put("can_book_expressbees_shipment_with_override", orderShipmentService.canBookExpressBeesWithOverride(order));
         data.put("can_rebook_carrier_cancelled_shipment", orderShipmentService.canRebookCarrierCancelled(order));
         data.put("can_complete_package", orderPackageService.canCompletePackage(order));
+        data.put("can_mark_cod_collected", canMarkCodCollected(order));
         data.put("default_package_weight_grams", orderPackageService.defaultPackageWeightGrams(order));
         data.put("package_weight_grams", order.getPackageWeightGrams());
         data.put("package_length_cm", order.getPackageLengthCm());
@@ -433,6 +441,15 @@ public class InternalAdminOrderResource {
             data.put("order_items", List.of());
         }
         return data;
+    }
+
+    static boolean canMarkCodCollected(CustomerOrder order) {
+        return (
+            order != null &&
+            "cod".equalsIgnoreCase(StringUtils.defaultString(order.getPaymentMethod())) &&
+            order.getPaymentStatus() == PaymentStatus.PENDING &&
+            order.getStatus() != OrderStatus.CANCELLED
+        );
     }
 
     private static boolean isZohoSyncEligible(CustomerOrder order) {
@@ -553,6 +570,7 @@ public class InternalAdminOrderResource {
         @Size(max = 40) String courier_id,
         @Size(max = 120) String courier_name,
         @Size(max = 20) String package_type,
-        Long package_box_id
+        Long package_box_id,
+        @Valid List<AdminPackedItemLines.PackedItemRequest> items
     ) {}
 }

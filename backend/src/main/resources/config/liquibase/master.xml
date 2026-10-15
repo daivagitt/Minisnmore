@@ -122,4 +122,5 @@
     <include file="config/liquibase/changelog/20261009140000_store_address_default_per_usage_trigger.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20261009150000_add_banner_eyebrow.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20261009160000_add_banner_trust_labels.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20261014120000_add_package_short_ship_qty.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>

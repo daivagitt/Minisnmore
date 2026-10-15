@@ -123,4 +123,91 @@ describe("OrdersWorkspace", () => {
       }),
     );
   });
+
+  it("hides Mark COD collected on cancelled first-leg COD orders", async () => {
+    listAdminOrders.mockResolvedValue({
+      orders: [
+        {
+          order_number: "MNM-314F044BF1DE",
+          full_name: "Partheeban",
+          phone: "9740199455",
+          city: "Bangalore",
+          total: 278,
+          cod_fee: 99,
+          payment_method: "cod",
+          payment_status: "pending",
+          status: "cancelled",
+          can_mark_cod_collected: false,
+          placed_at: "2026-10-12T11:26:10Z",
+        },
+      ],
+      page: 1,
+      pageSize: 10,
+      totalItems: 1,
+      totalPages: 1,
+      express_cancellation_count: 0,
+    });
+
+    render(<OrdersWorkspace mode="admin" invoiceHref={(n) => `/admin/orders/${n}/invoice`} />);
+    await waitFor(() => expect(screen.getByRole("cell", { name: "MNM-314F044BF1DE" })).toBeInTheDocument());
+
+    expect(screen.queryByRole("button", { name: "Mark COD collected" })).not.toBeInTheDocument();
+  });
+
+  it("shows AWB on shipped orders in the list", async () => {
+    listAdminOrders.mockResolvedValue({
+      orders: [
+        {
+          order_number: "MNM-SHIPPED",
+          full_name: "Asha",
+          phone: "9999999999",
+          city: "Bengaluru",
+          total: 999,
+          payment_method: "online",
+          payment_status: "paid",
+          status: "confirmed",
+          tracking_status: "shipped",
+          tracking_number: "XB-441122",
+          placed_at: "2026-10-07T12:00:00Z",
+        },
+      ],
+      page: 1,
+      pageSize: 10,
+      totalItems: 1,
+      totalPages: 1,
+      express_cancellation_count: 0,
+    });
+
+    render(<OrdersWorkspace mode="admin" invoiceHref={(n) => `/admin/orders/${n}/invoice`} />);
+    await waitFor(() => expect(screen.getByRole("cell", { name: "MNM-SHIPPED" })).toBeInTheDocument());
+    expect(screen.getByText("AWB XB-441122")).toBeInTheDocument();
+  });
+
+  it("keeps Mark COD collected enabled on open pending COD orders", async () => {
+    listAdminOrders.mockResolvedValue({
+      orders: [
+        {
+          order_number: "MNM-COD-OPEN",
+          full_name: "Asha",
+          phone: "9999999999",
+          city: "Bengaluru",
+          total: 999,
+          payment_method: "cod",
+          payment_status: "pending",
+          status: "confirmed",
+          placed_at: "2026-10-07T12:00:00Z",
+        },
+      ],
+      page: 1,
+      pageSize: 10,
+      totalItems: 1,
+      totalPages: 1,
+      express_cancellation_count: 0,
+    });
+
+    render(<OrdersWorkspace mode="admin" invoiceHref={(n) => `/admin/orders/${n}/invoice`} />);
+    await waitFor(() => expect(screen.getByRole("cell", { name: "MNM-COD-OPEN" })).toBeInTheDocument());
+
+    expect(screen.getByRole("button", { name: "Mark COD collected" })).toBeEnabled();
+  });
 });

@@ -42,6 +42,7 @@ describe("exchangeToFulfillmentOrder", () => {
       size: "6-12 M",
       color: "Snail",
       qty: 1,
+      packed_qty: 1,
     });
   });
 

@@ -25,6 +25,8 @@ export function exchangeToFulfillmentOrder(row: AdminOrderReturnRow): AdminOrder
     1,
     Number(row.items?.[0]?.accepted_qty ?? row.items?.[0]?.requested_qty ?? 1) || 1,
   );
+  const packedQty = Number(row.outbound_packed_qty);
+  const packed = Number.isFinite(packedQty) && packedQty >= 0 ? packedQty : qty;
   return {
     id: row.id,
     order_number: row.return_number,
@@ -64,6 +66,7 @@ export function exchangeToFulfillmentOrder(row: AdminOrderReturnRow): AdminOrder
         color: row.replacement_color || row.original_color || undefined,
         sku: row.sku || undefined,
         qty,
+        packed_qty: packed,
       },
     ],
   };

@@ -6,6 +6,7 @@ import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
 import com.miniandmore.app.domain.enumeration.ReturnLogisticsMode;
 import com.miniandmore.app.domain.enumeration.ZohoSyncStatus;
+import com.miniandmore.app.service.XpressBeesShipmentStatus;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
@@ -30,20 +31,6 @@ final class AdminOrderListSpec {
         "delivery_failed",
         "carrier_cancelled"
     );
-    private static final List<String> AWAITING_PICKUP_CARRIER = List.of(
-        "booked",
-        "pending",
-        "created",
-        "data_received",
-        "shipment_created",
-        "label_generated",
-        "manifest_generated",
-        "pickup_scheduled",
-        "pending_pickup",
-        "out_for_pickup",
-        "scheduled"
-    );
-
     private AdminOrderListSpec() {}
 
     static Specification<CustomerOrder> create(
@@ -211,7 +198,7 @@ final class AdminOrderListSpec {
         Expression<String> carrier = carrierStatus(root, cb);
         List<Predicate> awaitingCarrier = new ArrayList<>();
         awaitingCarrier.add(cb.equal(carrier, ""));
-        for (String status : AWAITING_PICKUP_CARRIER) {
+        for (String status : XpressBeesShipmentStatus.awaitingPickupStatuses()) {
             awaitingCarrier.add(cb.equal(carrier, status));
         }
         return cb.and(

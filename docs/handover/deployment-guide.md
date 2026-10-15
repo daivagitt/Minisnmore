@@ -100,4 +100,4 @@ Public API must keep proxying `/api/` to `127.0.0.1:9180` except invoice webhook
 3. `pm2 list` — all `mini-prod-*` **online**, no `errored`
 4. `pm2 save`
 
-See [post-deployment-support.md](./post-deployment-support.md) for the support window and rollback.
+If a health check fails, keep the prior JAR or `dist/` available and restore only the affected service. Re-run the same health checks before reopening the change window.

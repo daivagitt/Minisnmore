@@ -55,6 +55,9 @@ class RazorpayWebhookHandlerServiceTest {
     @Mock
     private OrderEventService orderEventService;
 
+    @Mock
+    private PackageShortShipService packageShortShipService;
+
     private RazorpayWebhookHandlerService handler;
 
     @BeforeEach
@@ -66,6 +69,7 @@ class RazorpayWebhookHandlerServiceTest {
             orderReturnRepository,
             cancellationRequestRepository,
             orderEventService,
+            packageShortShipService,
             SECRET
         );
         when(webhookEventRepository.save(any(RazorpayWebhookEvent.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -99,6 +103,7 @@ class RazorpayWebhookHandlerServiceTest {
             orderReturnRepository,
             cancellationRequestRepository,
             orderEventService,
+            packageShortShipService,
             ""
         );
         assertThatThrownBy(() -> handler.handle("{}", "sig"))
@@ -230,6 +235,41 @@ class RazorpayWebhookHandlerServiceTest {
 
         assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUNDED);
         assertThat(order.getOrderNumber()).isEqualTo("MNM-1");
+    }
+
+    @Test
+    void handle_cancelRefundAfterPackageShort_marksFullyRefunded() {
+        CustomerOrder order = paidOrder();
+        order.setTotal(new BigDecimal("1000.00"));
+        order.setPaymentStatus(PaymentStatus.REFUND_INITIATED);
+        order.setPackageShortRefundAmount(new BigDecimal("300.00"));
+        order.setPackageShortRazorpayRefundId("rfnd_pkg_short");
+        when(customerOrderRepository.findFirstByRazorpayPaymentId("pay_cancel_after")).thenReturn(Optional.of(order));
+        when(orderReturnRepository.findAllByOrder_IdOrderByRequestedAtAsc(11L)).thenReturn(java.util.List.of());
+        String body =
+            "{\"id\":\"evt_cancel_after\",\"event\":\"refund.processed\",\"payload\":{\"refund\":{\"entity\":{\"id\":\"rfnd_cancel\",\"payment_id\":\"pay_cancel_after\",\"amount\":70000,\"status\":\"processed\"}},\"payment\":{\"entity\":{\"id\":\"pay_cancel_after\",\"order_id\":\"order_cancel\"}}}}";
+
+        handler.handle(body, sign(body));
+
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUNDED);
+    }
+
+    @Test
+    void handle_packageShortRefundProcessed_marksPartiallyRefunded() {
+        CustomerOrder order = paidOrder();
+        order.setTotal(new BigDecimal("1000.00"));
+        order.setPaymentStatus(PaymentStatus.REFUND_INITIATED);
+        order.setPackageShortRefundAmount(new BigDecimal("300.00"));
+        order.setPackageShortRazorpayRefundId("rfnd_pkg_short");
+        when(customerOrderRepository.findFirstByPackageShortRazorpayRefundIdOrderByIdDesc("rfnd_pkg_short")).thenReturn(Optional.of(order));
+        when(orderReturnRepository.findAllByOrder_IdOrderByRequestedAtAsc(11L)).thenReturn(java.util.List.of());
+        String body =
+            "{\"id\":\"evt_pkg_short\",\"event\":\"refund.processed\",\"payload\":{\"refund\":{\"entity\":{\"id\":\"rfnd_pkg_short\",\"payment_id\":\"pay_pkg_short\",\"amount\":30000,\"status\":\"processed\"}},\"payment\":{\"entity\":{\"id\":\"pay_pkg_short\",\"order_id\":\"order_pkg\"}}}}";
+
+        handler.handle(body, sign(body));
+
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.PARTIALLY_REFUNDED);
+        verify(packageShortShipService).notifyPackageShortRefundProcessed(order, new BigDecimal("300.00"), "rfnd_pkg_short");
     }
 
     @Test
@@ -537,6 +577,52 @@ class RazorpayWebhookHandlerServiceTest {
         assertThat(orderReturn.getStatus()).isEqualTo(OrderReturnStatus.REFUNDED);
         assertThat(orderReturn.getSettlementStatus()).isEqualTo(ExchangeSettlementStatus.REFUNDED);
         assertThat(orderReturn.getSettledAt()).isNotNull();
+    }
+
+    @Test
+    void handle_refundFailed_clearsForwardPackageShortBookedAmount() {
+        CustomerOrder order = paidOrder();
+        order.setPaymentStatus(PaymentStatus.REFUND_INITIATED);
+        order.setPackageShortRefundAmount(new BigDecimal("300.00"));
+        order.setPackageShortRazorpayRefundId("rfnd_pkg_fail_fwd");
+        when(customerOrderRepository.findFirstByPackageShortRazorpayRefundIdOrderByIdDesc("rfnd_pkg_fail_fwd")).thenReturn(
+            Optional.of(order)
+        );
+        when(orderReturnRepository.findAllByOrder_IdOrderByRequestedAtAsc(11L)).thenReturn(java.util.List.of());
+        String body =
+            "{\"id\":\"evt_pkg_fail_fwd\",\"event\":\"refund.failed\",\"payload\":{\"refund\":{\"entity\":{\"id\":\"rfnd_pkg_fail_fwd\",\"payment_id\":\"pay_pkg_fail_fwd\",\"amount\":30000,\"status\":\"failed\",\"error_description\":\"bank declined\"}}}}";
+
+        handler.handle(body, sign(body));
+
+        assertThat(order.getPackageShortRefundAmount()).isNull();
+        assertThat(order.getPackageShortRazorpayRefundId()).isNull();
+        assertThat(order.getNotes()).contains("bank declined");
+        assertThat(ExchangeSettlementAmounts.remainingPrepaidRefundable(order, java.util.List.of()))
+            .isEqualByComparingTo("1299.00");
+    }
+
+    @Test
+    void handle_refundFailed_clearsExchangePackageShortBookedAmount() {
+        CustomerOrder order = paidOrder();
+        order.setPaymentStatus(PaymentStatus.REFUND_INITIATED);
+        OrderReturn orderReturn = new OrderReturn();
+        orderReturn.setOrder(order);
+        orderReturn.setPackageShortRefundAmount(new BigDecimal("200.00"));
+        orderReturn.setPackageShortRazorpayRefundId("rfnd_pkg_fail_ex");
+        when(orderReturnRepository.findFirstByPackageShortRazorpayRefundIdOrderByIdDesc("rfnd_pkg_fail_ex")).thenReturn(
+            Optional.of(orderReturn)
+        );
+        when(orderReturnRepository.findAllByOrder_IdOrderByRequestedAtAsc(11L)).thenReturn(java.util.List.of(orderReturn));
+        String body =
+            "{\"id\":\"evt_pkg_fail_ex\",\"event\":\"refund.failed\",\"payload\":{\"refund\":{\"entity\":{\"id\":\"rfnd_pkg_fail_ex\",\"payment_id\":\"pay_pkg_fail_ex\",\"amount\":20000,\"status\":\"failed\",\"error_description\":\"timeout\"}}}}";
+
+        handler.handle(body, sign(body));
+
+        assertThat(orderReturn.getPackageShortRefundAmount()).isNull();
+        assertThat(orderReturn.getPackageShortRazorpayRefundId()).isNull();
+        assertThat(orderReturn.getAdminNotes()).contains("timeout");
+        assertThat(ExchangeSettlementAmounts.remainingPrepaidRefundable(order, java.util.List.of(orderReturn)))
+            .isEqualByComparingTo("1299.00");
     }
 
     @Test

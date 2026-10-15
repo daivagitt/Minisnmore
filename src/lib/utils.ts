@@ -34,7 +34,15 @@ export function downloadFilenameFromUrl(url: string, fallback = "download"): str
   try {
     const pathname = new URL(url, "https://x.invalid").pathname;
     const base = pathname.split("/").pop() ?? "";
-    if (base) return decodeURIComponent(base);
+    if (base) {
+      const decoded = decodeURIComponent(base);
+      // Uploaded objects are made unique as <timestamp>-<uuid>-<original-name>.
+      // Keep that storage key in the URL, but restore the original name when saving.
+      return decoded.replace(
+        /^\d{10,17}-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}-(?=.)/i,
+        "",
+      );
+    }
   } catch {
     /* fall through */
   }

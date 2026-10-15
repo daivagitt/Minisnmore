@@ -285,7 +285,8 @@ public class InternalAdminOrderReturnResource {
                     body.courier_id(),
                     body.courier_name(),
                     body.package_type(),
-                    body.package_box_id()
+                    body.package_box_id(),
+                    AdminPackedItemLines.toPackedLines(body.items())
                 )
             )
         );
@@ -428,7 +429,7 @@ public class InternalAdminOrderReturnResource {
         data.put("logistics_mode", orderReturn.getLogisticsMode() != null ? orderReturn.getLogisticsMode().name().toLowerCase() : null);
         data.put("carrier_name", orderReturn.getCarrierName());
         data.put("reverse_awb", orderReturn.getReverseAwb());
-        data.put("tracking_url", orderReturn.getTrackingUrl());
+        data.put("tracking_url", orderReturnService.pickupTrackingUrl(orderReturn));
         data.put("pickup_window", orderReturn.getPickupWindow());
         data.put("provider_request_id", orderReturn.getProviderRequestId());
         data.put("pickup_failure_reason", orderReturn.getPickupFailureReason());
@@ -458,6 +459,8 @@ public class InternalAdminOrderReturnResource {
             orderReturn.getPackageType() == null ? "custom" : orderReturn.getPackageType().toApi()
         );
         data.put("package_box_id", orderReturn.getPackageBoxId());
+        data.put("outbound_packed_qty", orderReturn.getOutboundPackedQty());
+        data.put("package_short_refund_amount", orderReturn.getPackageShortRefundAmount());
         data.put("packed_at", orderReturn.getPackedAt() == null ? "" : orderReturn.getPackedAt().toString());
         data.put("package_slip_number", orderReturnService.documentNumber("PKG-", orderReturn));
         data.put("shipment_order_number", orderReturnService.documentNumber("SHP-", orderReturn));
@@ -565,7 +568,8 @@ public class InternalAdminOrderReturnResource {
         @Size(max = 40) String courier_id,
         @Size(max = 120) String courier_name,
         @Size(max = 20) String package_type,
-        Long package_box_id
+        Long package_box_id,
+        @Valid List<AdminPackedItemLines.PackedItemRequest> items
     ) {}
 
     public record PickupFailedRequest(

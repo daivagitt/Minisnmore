@@ -52,7 +52,7 @@ export function CreatePackageDialog({
   onOpenChange,
   onSaved,
   completePackage = completeAdminOrderPackage,
-  description = "All order line items are included in this package. Choose a package type, then save gross weight and dimensions. Package date is display only.",
+  description = "Reduce packed quantity if a unit is damaged or cannot be shipped. Unshipped units are refunded automatically. Package date is display only.",
 }: {
   order: AdminOrderRow | null;
   open: boolean;
@@ -72,10 +72,29 @@ export function CreatePackageDialog({
   const [height, setHeight] = useState("");
   const [lengthUnit, setLengthUnit] = useState<LengthUnit>("cm");
   const [saving, setSaving] = useState(false);
+  const [packedQtyByKey, setPackedQtyByKey] = useState<Record<string, number>>({});
 
   const items = order?.order_items ?? [];
   const slipNumber = order?.package_slip_number || documentNumber("PKG-", order?.id);
-  const totalItems = items.reduce((sum, item) => sum + Math.max(1, Number(item.qty) || 1), 0);
+
+  function itemKey(item: NonNullable<AdminOrderRow["order_items"]>[number], index: number) {
+    return String(item.id ?? index);
+  }
+
+  function orderedQty(item: NonNullable<AdminOrderRow["order_items"]>[number]) {
+    return Math.max(1, Number(item.qty) || 1);
+  }
+
+  function packedQty(item: NonNullable<AdminOrderRow["order_items"]>[number], index: number) {
+    const key = itemKey(item, index);
+    if (packedQtyByKey[key] != null) return packedQtyByKey[key];
+    const saved = Number(item.packed_qty);
+    if (Number.isFinite(saved) && saved >= 0) return saved;
+    return orderedQty(item);
+  }
+
+  const totalItems = items.reduce((sum, item, index) => sum + packedQty(item, index), 0);
+  const shortUnits = items.reduce((sum, item, index) => sum + Math.max(0, orderedQty(item) - packedQty(item, index)), 0);
 
   useEffect(() => {
     if (!open || !order) return;
@@ -92,6 +111,13 @@ export function CreatePackageDialog({
     setLength(dims.length);
     setWidth(dims.width);
     setHeight(dims.height);
+    const nextPacked: Record<string, number> = {};
+    (order.order_items ?? []).forEach((item, index) => {
+      const ordered = Math.max(1, Number(item.qty) || 1);
+      const saved = Number(item.packed_qty);
+      nextPacked[String(item.id ?? index)] = Number.isFinite(saved) && saved >= 0 ? saved : ordered;
+    });
+    setPackedQtyByKey(nextPacked);
   }, [open, order]);
 
   useEffect(() => {
@@ -126,6 +152,10 @@ export function CreatePackageDialog({
       toast.error("Enter length, width and height greater than 0");
       return;
     }
+    if (totalItems < 1) {
+      toast.error("Pack at least one unit, or cancel / convert to a refund if nothing can be shipped");
+      return;
+    }
     setSaving(true);
     try {
       await completePackage(order.order_number, {
@@ -135,6 +165,10 @@ export function CreatePackageDialog({
         height_cm: parsedDims.heightCm.cm,
         package_type: packageType,
         package_box_id: packageTypeId ? Number(packageTypeId) : null,
+        items: items.map((item, index) => ({
+          order_item_id: item.id,
+          packed_qty: packedQty(item, index),
+        })),
       });
       toast.success(`${slipNumber} saved. You can now book a shipment.`);
       await onSaved();
@@ -324,16 +358,41 @@ export function CreatePackageDialog({
                   </tr>
                 ) : (
                   items.map((item, index) => {
-                    const key = String(item.id ?? index);
-                    const ordered = Math.max(1, Number(item.qty) || 1);
+                    const key = itemKey(item, index);
+                    const ordered = orderedQty(item);
+                    const packed = packedQty(item, index);
                     return (
                       <tr key={key} className="border-b last:border-0">
                         <td className="px-4 py-3">
                           <p className="font-medium">{itemLabel(item)}</p>
                           {item.sku ? <p className="text-xs text-muted-foreground">SKU: {item.sku}</p> : null}
+                          {packed < ordered ? (
+                            <p className="text-xs text-amber-700">
+                              {ordered - packed} unit{ordered - packed === 1 ? "" : "s"} will be refunded
+                            </p>
+                          ) : null}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">{ordered}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">{ordered}</td>
+                        <td className="px-4 py-3 text-right">
+                          <input
+                            aria-label={`Packed quantity for ${itemLabel(item)}`}
+                            type="number"
+                            min={0}
+                            max={ordered}
+                            step={1}
+                            disabled={packedAlready}
+                            value={packed}
+                            onChange={(event) => {
+                              const next = Number(event.target.value);
+                              if (!Number.isFinite(next)) return;
+                              setPackedQtyByKey((current) => ({
+                                ...current,
+                                [key]: Math.min(ordered, Math.max(0, Math.trunc(next))),
+                              }));
+                            }}
+                            className="ml-auto h-9 w-20 rounded-lg border border-border bg-background px-2 text-right text-sm tabular-nums outline-none focus:ring-2 focus:ring-primary/40 disabled:bg-muted"
+                          />
+                        </td>
                       </tr>
                     );
                   })
@@ -361,7 +420,10 @@ export function CreatePackageDialog({
               Cancel
             </button>
           </div>
-          <p className="text-sm text-muted-foreground">Total Items : {totalItems}</p>
+          <p className="text-sm text-muted-foreground">
+            Total Items : {totalItems}
+            {shortUnits > 0 ? ` · ${shortUnits} to refund` : ""}
+          </p>
         </DialogFooter>
       </DialogContent>
     </Dialog>

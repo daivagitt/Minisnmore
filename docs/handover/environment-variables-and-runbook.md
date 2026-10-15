@@ -58,8 +58,21 @@ Live isolated stack **overrides** some example defaults:
 ### Other
 
 `LEDGERLY_*` — present in env; catalog can run Ledgerly beside Zoho.  
-`XPRESSBEES_*` — courier.  
 `FASTSMS_*` — OTP SMS.
+
+### XpressBees
+
+| Name | Purpose |
+| --- | --- |
+| `XPRESSBEES_BASE_URL` | Carrier API base URL |
+| `XPRESSBEES_EMAIL`, `XPRESSBEES_PASSWORD` | Token-login credentials |
+| `XPRESSBEES_XB_KEY` | Legacy/key-based API credential when the configured auth mode requires it |
+| `XPRESSBEES_WEBHOOK_SECRET` | HMAC/shared secret for shipment and return callbacks |
+| `XPRESSBEES_WAREHOUSE_*` | Pickup/contact address sent on shipment creation |
+| `XPRESSBEES_ORIGIN_PINCODE` | Origin used for serviceability and shipment requests |
+| `XPRESSBEES_PICKUP_VENDOR_CODE` | Provider pickup location identifier, when assigned |
+
+Changing courier credentials or webhook secret requires a catalog restart. Never put the real values in `deploy/env/prod.env.example`.
 
 ## Runbook — start of day / incident
 

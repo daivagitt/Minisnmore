@@ -37,9 +37,14 @@ function ResetPasswordPage() {
           <p className="text-sm text-muted-foreground mt-3">
             Open the full link from your email, or request a new one.
           </p>
-          <Link to="/login" className="mt-6 inline-flex rounded-full bg-primary text-primary-foreground px-6 py-3 text-sm font-medium hover:shadow-glow transition">
-            Back to sign in
-          </Link>
+          <div className="mt-6 flex flex-col items-center gap-3">
+            <Link to="/login" className="inline-flex rounded-full bg-primary text-primary-foreground px-6 py-3 text-sm font-medium hover:shadow-glow transition">
+              Back to sign in
+            </Link>
+            <Link to="/admin/login" className="text-xs text-muted-foreground story-link">
+              Staff sign in
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -136,8 +141,9 @@ function ResetPasswordPage() {
             </button>
           </form>
         )}
-        <div className="mt-6 text-center">
-          <Link to="/login" className="text-xs text-muted-foreground story-link">← Back to sign in</Link>
+        <div className="mt-6 text-center space-y-2">
+          <Link to="/login" className="block text-xs text-muted-foreground story-link">← Back to sign in</Link>
+          <Link to="/admin/login" className="block text-xs text-muted-foreground story-link">Staff sign in</Link>
         </div>
       </div>
     </div>

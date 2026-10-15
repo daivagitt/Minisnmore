@@ -11,8 +11,11 @@ import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.Product;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
+import com.miniandmore.app.domain.OrderReturn;
+import com.miniandmore.app.domain.enumeration.OrderRequestType;
 import com.miniandmore.app.repository.CustomerOrderRepository;
 import com.miniandmore.app.repository.OrderItemRepository;
+import com.miniandmore.app.repository.OrderReturnRepository;
 import com.miniandmore.app.repository.ProductRepository;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
 import java.math.BigDecimal;
@@ -34,6 +37,9 @@ class OrderCancellationExecutorTest {
 
     @Mock
     private CustomerOrderRepository customerOrderRepository;
+
+    @Mock
+    private OrderReturnRepository orderReturnRepository;
 
     @Mock
     private OrderItemRepository orderItemRepository;
@@ -88,8 +94,11 @@ class OrderCancellationExecutorTest {
             ledgerlyIntegrationClient
         );
 
+        lenient().when(orderReturnRepository.findAllByOrder_IdOrderByRequestedAtAsc(any())).thenReturn(List.of());
+
         executor = new OrderCancellationExecutor(
             dataAccess,
+            orderReturnRepository,
             razorpayRefundService,
             zohoSyncService,
             orderEventService,
@@ -400,5 +409,91 @@ class OrderCancellationExecutorTest {
 
         executor.performCancellation(order, "Reason");
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void performCancellation_afterPackageShortShip_refundsRemainderWhenRefundInitiated() {
+        CustomerOrder order = createOrder("ORD-SHORT");
+        order.setPaymentStatus(PaymentStatus.REFUND_INITIATED);
+        order.setPackageShortRefundAmount(new BigDecimal("300.00"));
+        order.setPackageShortRazorpayRefundId("rfnd_short");
+        order.setTotal(new BigDecimal("1000.00"));
+
+        when(razorpayRefundService.findExistingRefundForOrder(order, new BigDecimal("700.00"))).thenReturn(Optional.empty());
+        when(razorpayRefundService.refundPayment(order, new BigDecimal("700.00"))).thenReturn("rfnd_cancel");
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
+
+        String refundId = executor.performCancellation(order, "Cancel after short-ship");
+
+        assertThat(refundId).isEqualTo("rfnd_cancel");
+        verify(razorpayRefundService).refundPayment(order, new BigDecimal("700.00"));
+        verify(razorpayRefundService, never()).refundPayment(order, new BigDecimal("1000.00"));
+    }
+
+    @Test
+    void performCancellation_afterExchangePackageShortShip_refundsRemainder() {
+        CustomerOrder order = createOrder("ORD-EX-SHORT");
+        order.setPaymentStatus(PaymentStatus.REFUND_INITIATED);
+        order.setTotal(new BigDecimal("1000.00"));
+
+        OrderReturn exchange = new OrderReturn();
+        exchange.setRequestType(OrderRequestType.EXCHANGE);
+        exchange.setPackageShortRefundAmount(new BigDecimal("200.00"));
+        exchange.setPackageShortRazorpayRefundId("rfnd_ex_short");
+        exchange.setOrder(order);
+        when(orderReturnRepository.findAllByOrder_IdOrderByRequestedAtAsc(10L)).thenReturn(List.of(exchange));
+        when(razorpayRefundService.findExistingRefundForOrder(order, new BigDecimal("800.00"))).thenReturn(Optional.empty());
+        when(razorpayRefundService.refundPayment(order, new BigDecimal("800.00"))).thenReturn("rfnd_cancel");
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
+
+        String refundId = executor.performCancellation(order, "Cancel");
+
+        assertThat(refundId).isEqualTo("rfnd_cancel");
+        verify(razorpayRefundService).refundPayment(order, new BigDecimal("800.00"));
+    }
+
+    @Test
+    void performCancellation_afterClearedFailedPackageShortShip_refundsFullTotal() {
+        CustomerOrder order = createOrder("ORD-FAIL-SHORT");
+        order.setPaymentStatus(PaymentStatus.REFUND_INITIATED);
+        order.setPackageShortRefundAmount(null);
+        order.setPackageShortRazorpayRefundId(null);
+        order.setTotal(new BigDecimal("1000.00"));
+
+        when(razorpayRefundService.findExistingRefundForOrder(order, new BigDecimal("1000.00"))).thenReturn(Optional.empty());
+        when(razorpayRefundService.refundPayment(order, new BigDecimal("1000.00"))).thenReturn("rfnd_full");
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of());
+
+        executor.performCancellation(order, "Cancel after failed short refund");
+
+        verify(razorpayRefundService).refundPayment(order, new BigDecimal("1000.00"));
+    }
+
+    @Test
+    void performCancellation_afterPackageShortShip_restoresPackedQtyOnly() {
+        CustomerOrder order = createOrder("ORD-PACK");
+        order.setPaymentMethod("cod");
+        order.setPaymentStatus(PaymentStatus.PENDING);
+
+        OrderItem item = new OrderItem();
+        item.setProductId("101");
+        item.setQty(2);
+        item.setPackedQty(1);
+
+        Product product = new Product();
+        product.setId(101L);
+        product.setStock(10);
+
+        when(customerOrderRepository.save(any(CustomerOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderItemRepository.findAllByOrderId(10L)).thenReturn(List.of(item));
+        when(productRepository.findOneForInventoryUpdate(101L)).thenReturn(Optional.of(product));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        executor.performCancellation(order, "Cancel packed line");
+
+        assertThat(product.getStock()).isEqualTo(11);
     }
 }

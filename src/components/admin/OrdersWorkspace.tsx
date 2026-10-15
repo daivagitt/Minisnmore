@@ -33,8 +33,8 @@ import { LIST_PAGE_SIZE } from "@/lib/pagination";
 import { SHOW_M2_POST_ORDER_UI } from "@/lib/feature-flags";
 import { isInvoiceAvailable } from "@/lib/invoice-availability";
 import { isPackageReady } from "@/lib/fulfillment-docs";
-import { trackingStatusLabel } from "@/lib/order-tracking";
-import { formatAdminPaymentStatusLabel } from "@/lib/order-status";
+import { isDispatchedTrackingStatus, trackingStatusLabel } from "@/lib/order-tracking";
+import { canMarkCodCollected, formatAdminPaymentStatusLabel } from "@/lib/order-status";
 import { openPrintableShippingLabel } from "@/lib/print-shipping-label";
 import { cn } from "@/lib/utils";
 
@@ -562,10 +562,9 @@ export function OrdersWorkspace({
           </thead>
           <tbody>
             {rows.map((order) => {
-              const isPendingCod =
-                order.payment_method === "cod" && order.payment_status === "pending";
               const alreadySynced = normalizedStatus(order.zoho_sync_status) === "synced";
               const canSync = order.zoho_sync_eligible;
+              const collectCodEnabled = order.can_mark_cod_collected ?? canMarkCodCollected(order);
               const expanded = expandedNumber === order.order_number;
               return (
                 <Fragment key={order.order_number}>
@@ -601,6 +600,11 @@ export function OrdersWorkspace({
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium uppercase">
                         {trackingStatusLabel(order)}
                       </span>
+                      {order.tracking_number && isDispatchedTrackingStatus(order) ? (
+                        <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                          AWB {order.tracking_number}
+                        </p>
+                      ) : null}
                       {order.coupon_code?.trim() ? (
                         <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
                           Coupon {order.coupon_code.trim()}
@@ -620,7 +624,7 @@ export function OrdersWorkspace({
                     </AdminCaseTd>
                     <AdminCaseTd className="min-w-[12rem]">
                       <div className="flex flex-wrap gap-2">
-                        {isPendingCod && canFulfill ? (
+                        {canFulfill && collectCodEnabled ? (
                           <button
                             type="button"
                             disabled={busy !== null}

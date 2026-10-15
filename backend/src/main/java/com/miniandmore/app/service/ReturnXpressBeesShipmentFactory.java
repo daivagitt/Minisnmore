@@ -196,10 +196,7 @@ final class ReturnXpressBeesShipmentFactory {
             orderReturn.getReplacementVariantSku(),
             item != null ? StringUtils.defaultIfBlank(item.getVariantSku(), item.getProductSlug()) : orderReturn.getReturnNumber()
         );
-        int qty = 1;
-        if (item != null && item.getQty() != null) {
-            qty = Math.max(1, item.getQty());
-        }
+        int qty = Math.max(1, PackageShortShipService.exchangePackedQty(orderReturn));
         BigDecimal price = item != null ? item.getPrice() : orderReturn.getOrder().getTotal();
         int weight = orderReturn.getPackageWeightGrams() != null && orderReturn.getPackageWeightGrams() > 0
             ? orderReturn.getPackageWeightGrams()

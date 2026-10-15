@@ -3,9 +3,12 @@ package com.miniandmore.app.service;
 import com.miniandmore.app.domain.CustomerOrder;
 import com.miniandmore.app.domain.OrderItem;
 import com.miniandmore.app.domain.Product;
+import com.miniandmore.app.domain.OrderReturn;
 import com.miniandmore.app.domain.enumeration.OrderStatus;
 import com.miniandmore.app.domain.enumeration.PaymentStatus;
+import com.miniandmore.app.repository.OrderReturnRepository;
 import com.miniandmore.app.web.rest.v1.AccountOrderDataAccess;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,6 +32,7 @@ public class OrderCancellationExecutor {
     private static final Logger LOG = LoggerFactory.getLogger(OrderCancellationExecutor.class);
 
     private final AccountOrderDataAccess dataAccess;
+    private final OrderReturnRepository orderReturnRepository;
     private final RazorpayRefundService razorpayRefundService;
     private final ZohoSyncService zohoSyncService;
     private final OrderEventService orderEventService;
@@ -37,6 +41,7 @@ public class OrderCancellationExecutor {
 
     public OrderCancellationExecutor(
         AccountOrderDataAccess dataAccess,
+        OrderReturnRepository orderReturnRepository,
         RazorpayRefundService razorpayRefundService,
         ZohoSyncService zohoSyncService,
         OrderEventService orderEventService,
@@ -44,6 +49,7 @@ public class OrderCancellationExecutor {
         PlatformTransactionManager transactionManager
     ) {
         this.dataAccess = dataAccess;
+        this.orderReturnRepository = orderReturnRepository;
         this.razorpayRefundService = razorpayRefundService;
         this.zohoSyncService = zohoSyncService;
         this.orderEventService = orderEventService;
@@ -55,13 +61,16 @@ public class OrderCancellationExecutor {
         if (order.getStatus() == OrderStatus.CANCELLED) {
             return null;
         }
-        boolean onlinePayment =
-            "online".equalsIgnoreCase(order.getPaymentMethod()) && StringUtils.isNotBlank(order.getRazorpayPaymentId());
         String refundId = null;
-        if (order.getPaymentStatus() == PaymentStatus.PAID && onlinePayment) {
-            refundId = razorpayRefundService.refundPayment(order, order.getTotal());
-            order.setPaymentStatus(PaymentStatus.REFUND_INITIATED);
-            order = dataAccess.customerOrderRepository().save(order);
+        if (canRefundOnlineOnCancel(order)) {
+            final BigDecimal remainder = remainingOnlineRefundAmount(order, returnsForOrder(order));
+            if (remainder.signum() > 0) {
+                refundId = razorpayRefundService
+                    .findExistingRefundForOrder(order, remainder)
+                    .orElseGet(() -> razorpayRefundService.refundPayment(order, remainder));
+                order.setPaymentStatus(PaymentStatus.REFUND_INITIATED);
+                dataAccess.customerOrderRepository().save(order);
+            }
         }
         CustomerOrder orderForInventoryRestore = order;
         try {
@@ -114,9 +123,13 @@ public class OrderCancellationExecutor {
         if (!onlinePayment) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order has no Razorpay payment to refund");
         }
+        final BigDecimal remainder = remainingOnlineRefundAmount(order, returnsForOrder(order));
+        if (remainder.signum() <= 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "No refundable balance remains on this order");
+        }
         String refundId = razorpayRefundService
-            .findExistingRefundForOrder(order, order.getTotal())
-            .orElseGet(() -> razorpayRefundService.refundPayment(order, order.getTotal()));
+            .findExistingRefundForOrder(order, remainder)
+            .orElseGet(() -> razorpayRefundService.refundPayment(order, remainder));
         order.setPaymentStatus(PaymentStatus.REFUND_INITIATED);
         dataAccess.customerOrderRepository().save(order);
         return refundId;
@@ -151,7 +164,7 @@ public class OrderCancellationExecutor {
                 if (product == null) {
                     continue;
                 }
-                int qty = Optional.ofNullable(item.getQty()).orElse(0);
+                int qty = PackageShortShipService.packedQty(item);
                 if (qty <= 0) {
                     continue;
                 }
@@ -183,6 +196,35 @@ public class OrderCancellationExecutor {
         order.setInventoryReserved(false);
         order.setInventoryReleasedAt(Instant.now());
         dataAccess.customerOrderRepository().save(order);
+    }
+
+    static boolean canRefundOnlineOnCancel(CustomerOrder order) {
+        if (order == null) {
+            return false;
+        }
+        boolean onlinePayment =
+            "online".equalsIgnoreCase(order.getPaymentMethod()) && StringUtils.isNotBlank(order.getRazorpayPaymentId());
+        if (!onlinePayment) {
+            return false;
+        }
+        PaymentStatus status = order.getPaymentStatus();
+        return (
+            status == PaymentStatus.PAID ||
+            status == PaymentStatus.REFUND_INITIATED ||
+            status == PaymentStatus.PARTIALLY_REFUNDED ||
+            status == PaymentStatus.REFUND_FAILED
+        );
+    }
+
+    private List<OrderReturn> returnsForOrder(CustomerOrder order) {
+        if (order == null || order.getId() == null) {
+            return List.of();
+        }
+        return orderReturnRepository.findAllByOrder_IdOrderByRequestedAtAsc(order.getId());
+    }
+
+    static BigDecimal remainingOnlineRefundAmount(CustomerOrder order, List<OrderReturn> returns) {
+        return ExchangeSettlementAmounts.remainingPrepaidRefundable(order, returns);
     }
 
     private void syncCancellationToLedgerly(CustomerOrder order, String refundId) {

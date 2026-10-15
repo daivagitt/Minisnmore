@@ -28,6 +28,7 @@ public class RazorpayRefundService {
 
     public static final String PURPOSE_EXCHANGE_SETTLEMENT = "exchange_price_difference";
     public static final String PURPOSE_RETURN_REFUND = "return_refund";
+    public static final String PURPOSE_PACKAGE_SHORT_SHIP = "package_short_ship";
 
     private final ObjectMapper objectMapper;
     private final String razorpayKeyId;
