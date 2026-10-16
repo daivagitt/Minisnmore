@@ -16,12 +16,12 @@ REPO_ROOT="${REPO_ROOT:-/var/www/uat1/mini_ms_test}"
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 PM2_NAME="${PM2_NAME:-mini-prod-frontend}"
 
-if [ ! -f "$REPO_ROOT/package.json" ]; then
-  echo "ERROR: $REPO_ROOT/package.json missing" >&2
+if [ ! -f "$REPO_ROOT/frontend/package.json" ]; then
+  echo "ERROR: $REPO_ROOT/frontend/package.json missing" >&2
   exit 1
 fi
 
-cd "$REPO_ROOT"
+cd "$REPO_ROOT/frontend"
 if [ -f "$REPO_ROOT/deploy/scripts/ensure-frontend-source.sh" ]; then
   bash "$REPO_ROOT/deploy/scripts/ensure-frontend-source.sh"
 fi
@@ -36,7 +36,7 @@ if [ "${SKIP_BUILD:-0}" = "1" ] && [ -d dist/client ] && [ -f dist/client/RELEAS
   pm2 delete mini-uat-frontend >/dev/null 2>&1 || true
   fuser -k "${FRONTEND_PORT}/tcp" >/dev/null 2>&1 || true
   pm2 delete "$PM2_NAME" >/dev/null 2>&1 || true
-  pm2 start npm --name "$PM2_NAME" --cwd "$REPO_ROOT" --update-env -- run preview -- --host 127.0.0.1 --port "$FRONTEND_PORT" --strictPort
+  pm2 start npm --name "$PM2_NAME" --cwd "$REPO_ROOT/frontend" --update-env -- run preview -- --host 127.0.0.1 --port "$FRONTEND_PORT" --strictPort
   pm2 save
   echo "Production frontend PM2 '$PM2_NAME' on http://127.0.0.1:${FRONTEND_PORT} (pre-built dist)"
   exit 0
@@ -80,6 +80,6 @@ fi
 pm2 delete mini-uat-frontend >/dev/null 2>&1 || true
 fuser -k "${FRONTEND_PORT}/tcp" >/dev/null 2>&1 || true
 pm2 delete "$PM2_NAME" >/dev/null 2>&1 || true
-pm2 start npm --name "$PM2_NAME" --cwd "$REPO_ROOT" --update-env -- run preview -- --host 127.0.0.1 --port "$FRONTEND_PORT" --strictPort
+pm2 start npm --name "$PM2_NAME" --cwd "$REPO_ROOT/frontend" --update-env -- run preview -- --host 127.0.0.1 --port "$FRONTEND_PORT" --strictPort
 pm2 save
 echo "Production frontend PM2 '$PM2_NAME' on http://127.0.0.1:${FRONTEND_PORT}"

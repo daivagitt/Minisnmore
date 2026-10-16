@@ -6,20 +6,24 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+echo "==> Frontend type and lint checks"
+npm --prefix frontend run typecheck
+npm --prefix frontend run lint
+
 echo "==> Frontend (Vitest + 95% coverage on scoped lib/routes)"
-npm run test:coverage
+npm --prefix frontend run test:coverage
 
 echo "==> Gateway unit tests (Surefire; Failsafe *IT* skipped)"
-(cd gateway && ./mvnw -q test)
+(cd services/gateway && ./mvnw -q test)
 
 echo "==> Catalog core unit tests (Surefire; Failsafe *IT* skipped)"
 (cd backend && ./mvnw -q test)
 
 echo "==> Store unit tests"
-(cd store && ./mvnw -q test)
+(cd services/store && ./mvnw -q test)
 
 echo "==> Commerce unit tests"
-(cd commerce && ./mvnw -q test)
+(cd services/commerce && ./mvnw -q test)
 
 echo ""
 echo "All unit tests passed (95% coverage gate per module)."

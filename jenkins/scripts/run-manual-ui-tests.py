@@ -24,7 +24,7 @@ from typing import Callable, Iterable
 from xml.sax.saxutils import escape as xml_escape
 
 ROOT = Path(__file__).resolve().parents[2]
-SRC = ROOT / "src"
+SRC = ROOT / "frontend" / "src"
 ROUTES = SRC / "routes"
 ROUTE_TREE = SRC / "routeTree.gen.ts"
 OUT_DIR = Path(os.environ.get("MANUAL_UI_REPORT_DIR", ROOT / "artifacts/manual-ui-tests"))
@@ -449,7 +449,7 @@ def build_cases(catalog: Catalog, screen: Screen) -> None:
         expected="TanStack route tree includes this path so the screen is reachable.",
         check=lambda: (
             in_tree,
-            "Path is present in src/routeTree.gen.ts." if in_tree else "Path missing from src/routeTree.gen.ts.",
+            "Path is present in frontend/src/routeTree.gen.ts." if in_tree else "Path missing from frontend/src/routeTree.gen.ts.",
         ),
     )
 
@@ -998,7 +998,7 @@ def build_html(report: dict) -> str:
     body = f"""
       <section class="panel">
         <h2>Summary</h2>
-        <p>Evaluated against <code>src/routes</code> and first-party UI imports · {esc(report['finishedAt'])}</p>
+        <p>Evaluated against <code>frontend/src/routes</code> and first-party UI imports · {esc(report['finishedAt'])}</p>
         <p>Status: {status_pill(overall)} · Cases are scored from the codebase (not a live browser session).
            Each row is still a manual workflow a tester can follow on UAT.</p>
         <div class="stats">

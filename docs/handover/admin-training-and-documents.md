@@ -3,7 +3,7 @@
 **URL:** [https://minisnmore.com/admin](https://minisnmore.com/admin)  
 **Who can use it:** accounts with `ROLE_ADMIN` (issued by the gateway JWT).
 
-Sign in with the storefront account that has admin authority. After login, the left nav is the source of truth (`src/lib/admin-nav.ts`).
+Sign in with the storefront account that has admin authority. After login, the left nav is the source of truth (`frontend/src/lib/admin-nav.ts`).
 
 ## Screens
 
@@ -32,7 +32,7 @@ Zoho long-running admin calls (bulk sync, pull inventory) can take several minut
 
 On **Products**, the editor says: **“Fields marked with * are required.”**
 
-The red asterisk is rendered by `Field` in `src/components/admin/AdminPage.tsx` when `required` is set. Screen readers get a required hint; sighted users see `*`.
+The red asterisk is rendered by `Field` in `frontend/src/components/admin/AdminPage.tsx` when `required` is set. Screen readers get a required hint; sighted users see `*`.
 
 ### Required on the product form
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Smoke-test admin JWT on the isolated UAT gateway (:9180 by default).
-# Usage: GATEWAY_URL=http://127.0.0.1:9180 bash deploy/scripts/uat-isolated-admin-smoke.sh
+# Smoke-test admin JWT on the isolated production gateway (:9180 by default).
+# Usage: GATEWAY_URL=http://127.0.0.1:9180 bash deploy/scripts/prod-isolated-admin-smoke.sh
 set -euo pipefail
 
 GATEWAY_URL="${GATEWAY_URL:-http://127.0.0.1:9180}"

@@ -10,7 +10,7 @@ out_dir="$package_dir/engineering-qa"
 mkdir -p "$out_dir"
 
 python3 jenkins/scripts/generate-qa-dashboard.py \
-  --template "$ROOT/report.html" \
+  --template "$ROOT/jenkins/templates/engineering-qa.html" \
   --output "$out_dir/index.html"
 
 # Dashboard references daiva logo; reuse reports-site asset.

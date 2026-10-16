@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Local dev: infra + catalog core + store + commerce + integration + gateway.
+# Local dev: infra + catalog core + store + commerce + gateway.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -28,7 +28,7 @@ for i in $(seq 1 90); do
 done
 
 echo "Starting store (8081)..."
-(cd store && ./mvnw -q -DskipTests spring-boot:run -Dspring-boot.run.profiles=dev) &
+(cd services/store && ./mvnw -q -DskipTests spring-boot:run -Dspring-boot.run.profiles=dev) &
 STORE_PID=$!
 
 echo "Waiting for store..."
@@ -41,7 +41,7 @@ for i in $(seq 1 60); do
 done
 
 echo "Starting commerce (8082)..."
-(cd commerce && ./mvnw -q -DskipTests spring-boot:run -Dspring-boot.run.profiles=dev) &
+(cd services/commerce && ./mvnw -q -DskipTests spring-boot:run -Dspring-boot.run.profiles=dev) &
 COMMERCE_PID=$!
 
 for i in $(seq 1 60); do
@@ -52,20 +52,8 @@ for i in $(seq 1 60); do
   sleep 2
 done
 
-echo "Starting integration (8083)..."
-(cd integration && ./mvnw -q -DskipTests spring-boot:run -Dspring-boot.run.profiles=dev) &
-INTEGRATION_PID=$!
-
-for i in $(seq 1 60); do
-  if curl -fsS http://127.0.0.1:8083/management/health >/dev/null 2>&1; then
-    echo "Integration ready (${i} attempts)."
-    break
-  fi
-  sleep 2
-done
-
 echo "Starting gateway (8080)..."
-(cd gateway && ./mvnw -q -DskipTests spring-boot:run -Dspring-boot.run.profiles=dev) &
+(cd services/gateway && ./mvnw -q -DskipTests spring-boot:run -Dspring-boot.run.profiles=dev) &
 GATEWAY_PID=$!
 
 for i in $(seq 1 90); do
@@ -76,10 +64,10 @@ for i in $(seq 1 90); do
   sleep 2
 done
 
-echo "Core=$CORE_PID Store=$STORE_PID Commerce=$COMMERCE_PID Integration=$INTEGRATION_PID Gateway=$GATEWAY_PID"
-echo "Frontend: npm run dev  (proxies /api → :8080)"
+echo "Core=$CORE_PID Store=$STORE_PID Commerce=$COMMERCE_PID Gateway=$GATEWAY_PID"
+echo "Frontend: npm --prefix frontend run dev  (proxies /api → :8080)"
 if bash deploy/scripts/health-check-microservices.sh 2>/dev/null; then
   bash scripts/verify-frontend-api-contract.sh 2>/dev/null || true
 fi
-trap 'kill $CORE_PID $STORE_PID $COMMERCE_PID $INTEGRATION_PID $GATEWAY_PID 2>/dev/null || true' EXIT
+trap 'kill $CORE_PID $STORE_PID $COMMERCE_PID $GATEWAY_PID 2>/dev/null || true' EXIT
 wait

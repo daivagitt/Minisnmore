@@ -1,3 +1,5 @@
+> Historical deployment instructions: obsolete UAT, 808x, and Integration-dependent laptop launchers have been removed. Use the [current script index](../deploy/scripts/README.md) for supported commands.
+
 # Ledgerly UAT cutover — issues encountered
 
 Date: 2026-06-30  
@@ -105,7 +107,7 @@ pm2 restart mini-uat-ms-catalog-core --update-env
 Error: Unable to access jarfile .../commerce/target/miniandmore-commerce-0.0.1-SNAPSHOT.jar
 ```
 
-**Cause:** `commerce/target/` had test artifacts but no packaged JAR.
+**Cause:** `services/commerce/target/` had test artifacts but no packaged JAR.
 
 **Fix:** Built commerce module and restarted PM2.
 
@@ -144,7 +146,7 @@ Error: Unable to access jarfile .../commerce/target/miniandmore-commerce-0.0.1-S
 
 **Data was not lost:** PostgreSQL still had **8 active categories** and **24 active products**. Catalog core (`:9184`) served data correctly on `/internal/v1/categories` (HTTP 200).
 
-**Fix:** Restored `store/src/main/java/com/miniandmore/store/config/SecurityConfiguration.java`:
+**Fix:** Restored `services/store/src/main/java/com/miniandmore/store/config/SecurityConfiguration.java`:
 - `GET /api/v1/**` → `permitAll` (public storefront)
 - `/api/v1/admin/**` → `ROLE_ADMIN`
 - Rebuilt store JAR and restarted `mini-uat-ms-store`
@@ -256,10 +258,10 @@ error_description="... Invalid JWT serialization: Missing dot delimiter(s)"
 | Item | Location |
 |------|----------|
 | UAT secrets | `/etc/mini-and-more/uat.env` |
-| Gateway UAT routes | `gateway/src/main/resources/config/application-uat-isolated.yml` |
+| Gateway UAT routes | `services/gateway/src/main/resources/config/application-uat-isolated.yml` |
 | Deployed gateway JAR (patched) | `deploy/gateway-uat.jar` |
-| Store proxy fix | `store/src/main/java/com/miniandmore/store/client/CatalogCoreClient.java` |
-| Store security (public catalog) | `store/src/main/java/com/miniandmore/store/config/SecurityConfiguration.java` |
+| Store proxy fix | `services/store/src/main/java/com/miniandmore/store/client/CatalogCoreClient.java` |
+| Store security (public catalog) | `services/store/src/main/java/com/miniandmore/store/config/SecurityConfiguration.java` |
 | Ledgerly properties binding | `backend/src/main/java/com/miniandmore/app/config/ApplicationProperties.java` |
 | Nginx UAT | `/etc/nginx/sites-enabled/mini-frontend-uat` |
 | Test scenarios | `docs/ledgerly-integration-test-scenarios.md` |

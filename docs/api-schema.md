@@ -3,7 +3,9 @@
 REST API surface across all four services. See [system-architecture.md](./system-architecture.md) for the request-flow diagram and [backend-architecture.md](./backend-architecture.md) for service internals.
 
 ```text
-Browser → Nginx → Gateway (:8080) → [Store :8081 | Commerce :8082] → Backend "catalog core" (:8084, internal only)
+Browser → Nginx → Gateway (dev :8080 · prod :9180)
+  → [Store :8081|:9181 | Commerce :8082|:9182]
+  → Catalog core backend/ (:8084|:9184, loopback only)
 ```
 
 ## Versioning & path scheme
@@ -15,7 +17,7 @@ Browser → Nginx → Gateway (:8080) → [Store :8081 | Commerce :8082] → Bac
 | `/internal/v1/**` | backend | Business logic, meant to be reached only via store/commerce; **not proxied by any committed Nginx config or gateway route** — not internet-reachable through anything in this repo |
 | `/api/v1/admin/ledgerly/**`, `/api/v1/admin/zoho/**`, `/api/v1/admin/zoho-settings/**` | backend directly | Integration admin surfaces living under `/api/v1` on backend itself, routed straight through by store |
 
-There is no single current OpenAPI spec covering the full proxied surface unless **catalog-core** runs with the `api-docs` profile (`/v3/api-docs` on `:9184`, proxied by UAT nginx). springdoc scans `backend` controllers under `/internal/v1/**` and `/api/v1/**`, remapping internal paths to the public `/api/v1/**` contract. Store/commerce proxies are 1:1 with that surface. Gateway auth (`/api/authenticate`, `/api/account`, …) is documented separately when the gateway runs with `api-docs`. Regenerate snapshots with `deploy/scripts/export-openapi.sh`. `openapi-all.zip` at the repo root is Zoho Books' *own* API spec, not this app's. Treat this document plus [FRONTEND_API_CONTRACT.md](./FRONTEND_API_CONTRACT.md) as the semantic source of truth for payloads and behaviour.
+There is no single current OpenAPI spec covering the full proxied surface unless **catalog-core** runs with the `api-docs` profile (`/v3/api-docs` on `:9184`, proxied by UAT nginx). springdoc scans `backend` controllers under `/internal/v1/**` and `/api/v1/**`, remapping internal paths to the public `/api/v1/**` contract. Store/commerce proxies are 1:1 with that surface. Gateway auth (`/api/authenticate`, `/api/account`, …) is documented separately when the gateway runs with `api-docs`. Regenerate snapshots with `deploy/scripts/export-openapi.sh`. [zoho-books-openapi.zip](reference/zoho-books-openapi.zip) is Zoho Books' *own* API spec, not this app's. Treat this document plus [FRONTEND_API_CONTRACT.md](./FRONTEND_API_CONTRACT.md) as the semantic source of truth for payloads and behaviour.
 
 ## Auth scheme
 

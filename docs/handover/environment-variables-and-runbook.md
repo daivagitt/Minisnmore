@@ -87,7 +87,7 @@ Changing courier credentials or webhook secret requires a catalog restart. Never
 
 ## Runbook — planned bounce (one service)
 
-Catalog first if the JAR or schema changed, then store, commerce, gateway. Frontend last if `dist/` changed.
+Catalog first if the JAR or schema changed, then store, commerce, gateway. Frontend last if `frontend/dist/` changed.
 
 ```bash
 cd /var/www/uat1/mini_ms_test

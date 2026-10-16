@@ -66,7 +66,7 @@ One service per “module” (products, blog, Zoho, …) would add heavy operati
 | `backend/jdl/miniandmore-commerce.jdl` | CustomerProfile, CustomerOrder, OrderItem, OrderReturn (+ enums) |
 | `backend/jdl/miniandmore-integration.jdl` | ZohoSetting only |
 
-Generate each with `jhipster jdl <file>.jdl` in its own folder (`store/`, `commerce/`, `integration/`), application type **microservice**, then port v1 controllers from current `backend/`.
+Generate each with `jhipster jdl <file>.jdl` in its own folder (`services/store/`, `services/commerce/`, `integration/`), application type **microservice**, then port v1 controllers from current `backend/`.
 
 ## Phased rollout (recommended)
 
@@ -75,7 +75,7 @@ Generate each with `jhipster jdl <file>.jdl` in its own folder (`store/`, `comme
 | **0** (done in repo) | This doc + JDL splits + gateway route template | None |
 | **1** | New **integration** service; move `ZohoSyncResource`, `ZohoBooksSyncService`, schedulers; Feign to catalog DB or read-only APIs | Medium |
 | **2** | New **commerce** service; move orders/returns/profile; Feign store for stock + settings | High |
-| **3** | Slim **store** service; drop order/zoho code from `backend/`; rename to `store/` | High |
+| **3** | Slim **store** service; drop order/zoho code from `backend/`; rename to `services/store/` | High |
 | **4** | ~~Separate Postgres per service~~ **not planned** — keep one DB; integration owns Zoho code only | — |
 
 ## Phase 1 status (integration service) — done
@@ -84,11 +84,11 @@ Generate each with `jhipster jdl <file>.jdl` in its own folder (`store/`, `comme
 
 ## Phase 2 status (commerce edge service) — done
 
-`commerce/` (`:8082`) exposes orders, profile, coupons, payments, and order-returns (public paths unchanged). Catalog implements logic at `/internal/v1/**` (`InternalAccountOrderResource`, `InternalOrderReturnResource`, `InternalAdminOrderReturnResource`).
+`services/commerce/` (`:8082`) exposes orders, profile, coupons, payments, and order-returns (public paths unchanged). Catalog implements logic at `/internal/v1/**` (`InternalAccountOrderResource`, `InternalOrderReturnResource`, `InternalAdminOrderReturnResource`).
 
 ## Phase 3 status (store edge service) — done
 
-`store/` (`:8081`) proxies all remaining public `/api/v1/**` (storefront, admin CMS, uploads) to catalog core at **`/internal/v1/**`**. Catalog core (`backend/`) listens on **:8084** only.
+`services/store/` (`:8081`) proxies all remaining public `/api/v1/**` (storefront, admin CMS, uploads) to catalog core at **`/internal/v1/**`**. Catalog core (`backend/`) listens on **:8084** only.
 
 **Shared Postgres:** one schema (`miniandmore`), Liquibase on catalog core only. Zoho sync/schedulers run in **integration**; catalog calls integration for order sync, product sync, credit notes, and tracking pull.
 

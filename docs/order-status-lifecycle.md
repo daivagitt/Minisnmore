@@ -209,4 +209,4 @@ Order and return JSON uses **snake_case** keys (`order_number`, `payment_status`
 | Return status enum | `backend/.../enumeration/OrderReturnStatus.java` |
 | Tracking status resolver | `backend/.../service/OrderTrackingStatusResolver.java` |
 | Return rules & workflow | `backend/.../service/OrderReturnService.java` |
-| Storefront labels | `src/lib/order-status.ts` |
+| Storefront labels | `frontend/src/lib/order-status.ts` |

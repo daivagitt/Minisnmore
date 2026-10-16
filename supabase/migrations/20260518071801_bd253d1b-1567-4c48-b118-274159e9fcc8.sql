@@ -1,1 +1,0 @@
-ALTER TABLE public.zoho_settings ADD COLUMN IF NOT EXISTS client_secret TEXT;

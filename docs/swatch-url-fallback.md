@@ -38,7 +38,7 @@ You do **not** have to set `swatchUrl` on every print. The storefront still show
 
 ### Colour picker (PDP / Quick View)
 
-`swatchImageForColor()` in `src/lib/product-colors.ts` picks the first non-empty value:
+`swatchImageForColor()` in `frontend/src/lib/product-colors.ts` picks the first non-empty value:
 
 ```
 swatchUrl  →  imageUrl  →  imageUrls[0]  →  (no image → solid hex background)
@@ -249,14 +249,14 @@ Non-empty listing `images_json` is kept across re-import when already set.
 
 | Concern | Location |
 |---------|----------|
-| Picker thumbnail chain | `src/lib/product-colors.ts` → `swatchImageForColor()` |
-| Listing hero collection | `src/lib/product-colors.ts` → `collectStorefrontCardImages()` |
-| PDP gallery (no swatch) | `src/lib/product-gallery.ts` → `galleryForSelectedColor()` |
-| Print picker UI | `src/components/VariantPickers.tsx` |
+| Picker thumbnail chain | `frontend/src/lib/product-colors.ts` → `swatchImageForColor()` |
+| Listing hero collection | `frontend/src/lib/product-colors.ts` → `collectStorefrontCardImages()` |
+| PDP gallery (no swatch) | `frontend/src/lib/product-gallery.ts` → `galleryForSelectedColor()` |
+| Print picker UI | `frontend/src/components/VariantPickers.tsx` |
 | Excel → print names | `deploy/scripts/prod-sku-wise-print-import.py` → `build_print_name_map()` |
 | Excel → `swatchUrl` | `deploy/scripts/prod-restore-print-swatch-images.py` |
 | Backend listing backfill | `ProductColorImagesSupport.ensureProductImagesFromColorGalleries()` |
-| Tests | `src/lib/product-colors.merge.test.ts` |
+| Tests | `frontend/src/lib/product-colors.merge.test.ts` |
 
 ### Typical UAT order
 

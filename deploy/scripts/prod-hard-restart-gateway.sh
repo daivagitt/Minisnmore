@@ -52,9 +52,9 @@ if [ ! -f "$GATEWAY_JAR" ] && [ -f "${REPO_ROOT}/deploy/gateway-uat.jar" ]; then
   GATEWAY_JAR="${REPO_ROOT}/deploy/gateway-uat.jar"
 fi
 if [ ! -f "$GATEWAY_JAR" ]; then
-  _src=$(ls -1 "${REPO_ROOT}"/gateway/target/gateway-*.jar 2>/dev/null | grep -v '\.original$' | head -1)
+  _src=$(ls -1 "${REPO_ROOT}"/services/gateway/target/gateway-*.jar 2>/dev/null | grep -v '\.original$' | head -1)
   if [ -z "${_src:-}" ]; then
-    echo "ERROR: no gateway fat JAR under ${REPO_ROOT}/gateway/target or deploy/" >&2
+    echo "ERROR: no gateway fat JAR under ${REPO_ROOT}/services/gateway/target or deploy/" >&2
     exit 1
   fi
   mkdir -p "${REPO_ROOT}/deploy"
@@ -62,8 +62,8 @@ if [ ! -f "$GATEWAY_JAR" ]; then
 fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 bash "${SCRIPT_DIR}/verify-spring-boot-fat-jar.sh" "$GATEWAY_JAR" "gateway-prod.jar"
-mkdir -p "${REPO_ROOT}/gateway/target"
-ln -sf "../../deploy/gateway-prod.jar" "${REPO_ROOT}/gateway/target/gateway-0.0.1-SNAPSHOT.jar"
+mkdir -p "${REPO_ROOT}/services/gateway/target"
+ln -sf "../../../deploy/gateway-prod.jar" "${REPO_ROOT}/services/gateway/target/gateway-0.0.1-SNAPSHOT.jar"
 
 echo "=== Start gateway (prod,uat-isolated,api-docs) ==="
 unset SPRING_PROFILES_ACTIVE SPRING_PROFILES_INCLUDE

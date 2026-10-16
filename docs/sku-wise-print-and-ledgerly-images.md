@@ -685,9 +685,9 @@ S3_SECRET_KEY=…
 | Colour/gallery sync | `backend/.../ProductColorImagesSupport.java` |
 | Product save / variant normalize | `backend/.../ProductService.java` |
 | Ledgerly pull/push orchestration | `backend/.../LedgerlySyncService.java` |
-| Admin upload UI | `src/components/admin/ColorImagesEditor.tsx` |
-| Admin save + `colorImagesJson` build | `src/lib/backend-data.ts` (`saveProduct`) |
-| Storefront gallery per print | `src/lib/product-gallery.ts` |
+| Admin upload UI | `frontend/src/components/admin/ColorImagesEditor.tsx` |
+| Admin save + `colorImagesJson` build | `frontend/src/lib/backend-data.ts` (`saveProduct`) |
+| Storefront gallery per print | `frontend/src/lib/product-gallery.ts` |
 | Swatch restore from xlsx | `deploy/scripts/prod-restore-print-swatch-images.py` |
 | Print name image matching | `deploy/scripts/prod-sku-wise-print-import.py` (`build_print_name_map`) |
 | R2 upload API | `backend/.../InternalStorageUploadResource.java` |

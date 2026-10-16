@@ -8,16 +8,16 @@ cd "$ROOT"
 package_dir="${1:-artifacts/reports-site}"
 mkdir -p "$package_dir"
 
-if [ -d coverage/frontend ]; then
+if [ -d frontend/coverage ]; then
   mkdir -p "$package_dir/frontend/coverage"
-  cp -R coverage/frontend/. "$package_dir/frontend/coverage/"
+  cp -R frontend/coverage/. "$package_dir/frontend/coverage/"
 fi
 
-if [ -f coverage/frontend/coverage-summary.json ]; then
+if [ -f frontend/coverage/coverage-summary.json ]; then
   mkdir -p "$package_dir/frontend/coverage-summary"
   python3 jenkins/scripts/generate-coverage-report.py \
     --kind frontend \
-    --input coverage/frontend/coverage-summary.json \
+    --input frontend/coverage/coverage-summary.json \
     --detail-href ../coverage/index.html \
     --line-gate 95 \
     --branch-gate 88 \
@@ -52,10 +52,10 @@ module_args=()
 while IFS= read -r line; do
   [ -n "$line" ] && module_args+=( "$line" )
 done < <(
-  collect_jacoco_module gateway gateway Gateway
+  collect_jacoco_module services/gateway gateway Gateway
   collect_jacoco_module backend catalog "Catalog"
-  collect_jacoco_module store store Store
-  collect_jacoco_module commerce commerce Commerce
+  collect_jacoco_module services/store store Store
+  collect_jacoco_module services/commerce commerce Commerce
 )
 
 if [ "${#module_args[@]}" -gt 0 ]; then

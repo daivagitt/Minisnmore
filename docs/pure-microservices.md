@@ -6,10 +6,10 @@ This repository follows a **gateway + catalog** split. Treat these as hard bound
 
 | Service | Folder | Port (dev) | Owns |
 |---------|--------|------------|------|
-| **Gateway** | `gateway/` | 8080 | Users, JWT **issuance**, `/api/authenticate`, `/api/register`, `/api/account/*`, Spring Cloud Gateway |
+| **Gateway** | `services/gateway/` | 8080 | Users, JWT **issuance**, `/api/authenticate`, `/api/register`, `/api/account/*`, Spring Cloud Gateway |
 | **Catalog core** | `backend/` (`miniandmore`) | 8084 | DB, domain logic, Ledgerly sync/schedulers, **`/internal/v1/**` only** (not public) |
-| **Store** | `store/` (`miniandmore-store`) | 8081 | Public storefront + admin CMS + uploads; proxies to core (including Ledgerly admin API) |
-| **Commerce** | `commerce/` (`miniandmore-commerce`) | 8082 | Orders, profile, coupons, returns; proxies to core |
+| **Store** | `services/store/` (`miniandmore-store`) | 8081 | Public storefront + admin CMS + uploads; proxies to core (including Ledgerly admin API) |
+| **Commerce** | `services/commerce/` (`miniandmore-commerce`) | 8082 | Orders, profile, coupons, returns; proxies to core |
 
 Ledgerly accounting integration runs **inside catalog core** — there is no separate integration microservice on `:8083`.
 

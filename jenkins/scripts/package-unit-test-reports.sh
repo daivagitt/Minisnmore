@@ -8,25 +8,25 @@ cd "$ROOT"
 package_dir="${1:-artifacts/reports-site}"
 mkdir -p "$package_dir"
 
-if [ -f coverage/frontend/junit.xml ]; then
+if [ -f frontend/coverage/junit.xml ]; then
   mkdir -p "$package_dir/frontend/unit-tests"
   python3 jenkins/scripts/generate-unit-test-report.py \
     --kind frontend \
-    --input coverage/frontend/junit.xml \
+    --input frontend/coverage/junit.xml \
     --output "$package_dir/frontend/unit-tests/index.html" \
     --title "Frontend unit tests" \
     --coverage-href "../coverage-summary/index.html"
   mkdir -p "$package_dir/frontend/unit-tests/scenarios"
   python3 jenkins/scripts/generate-frontend-unit-scenario-report.py \
-    --input coverage/frontend/junit.xml \
+    --input frontend/coverage/junit.xml \
     --output-dir "$package_dir/frontend/unit-tests/scenarios"
 fi
 
 JAVA_MODULES=(
-  "gateway:Gateway"
+  "services/gateway:Gateway"
   "backend:Catalog"
-  "store:Store"
-  "commerce:Commerce"
+  "services/store:Store"
+  "services/commerce:Commerce"
 )
 
 module_flags=()

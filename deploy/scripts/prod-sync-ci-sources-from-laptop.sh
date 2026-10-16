@@ -21,7 +21,7 @@ trap cleanup EXIT
 
 echo "=== SSH (one password) ==="
 ssh -M -S "$SSH_SOCK" -o ControlPersist=20m -f -N "$REMOTE"
-ssh -S "$SSH_SOCK" "$REMOTE" "mkdir -p ${REMOTE_DIR}"
+ssh -S "$SSH_SOCK" "$REMOTE" "mkdir -p ${REMOTE_DIR}/frontend ${REMOTE_DIR}/backend ${REMOTE_DIR}/services/gateway ${REMOTE_DIR}/services/store ${REMOTE_DIR}/services/commerce ${REMOTE_DIR}/jenkins ${REMOTE_DIR}/deploy/scripts"
 
 rsync_uat() {
   rsync -az -e "ssh -S $SSH_SOCK" "$@"
@@ -30,17 +30,14 @@ rsync_uat() {
 echo "=== Syncing frontend + Java sources + jenkins scripts ==="
 rsync_uat \
   --exclude node_modules \
-  --exclude '**/target' \
-  --exclude .git \
   --exclude dist \
-  --exclude artifacts \
   --exclude coverage \
-  "$ROOT/package.json" "$ROOT/package-lock.json" "$ROOT/vite.config.ts" \
-  "$ROOT/vitest.config.ts" "$ROOT/tsconfig.json" "$ROOT/components.json" \
-  "$ROOT/src" \
-  "$REMOTE:${REMOTE_DIR}/"
+  --exclude .tanstack \
+  --exclude .scannerwork \
+  --exclude '.env*' \
+  "$ROOT/frontend/" "$REMOTE:${REMOTE_DIR}/frontend/"
 
-for mod in gateway backend store commerce integration; do
+for mod in services/gateway backend services/store services/commerce; do
   echo "  $mod/"
   rsync_uat \
     --exclude target \

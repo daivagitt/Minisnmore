@@ -4,13 +4,13 @@
 
 The frontend coverage gate focuses on the highest-risk custom integration surface:
 
-- `src/lib/api.ts`
-- `src/lib/coupons.functions.ts`
-- `src/lib/orders.functions.ts`
-- `src/hooks/useAuth.tsx`
-- `src/store/shop.tsx`
-- `src/routes/login.tsx`
-- `src/routes/admin.login.tsx`
+- `frontend/src/lib/api.ts`
+- `frontend/src/lib/coupons.functions.ts`
+- `frontend/src/lib/orders.functions.ts`
+- `frontend/src/hooks/useAuth.tsx`
+- `frontend/src/store/shop.tsx`
+- `frontend/src/routes/login.tsx`
+- `frontend/src/routes/admin.login.tsx`
 
 The current frontend gate is calibrated to keep quality checks strict but stable
 for CI:
@@ -29,7 +29,7 @@ frontend gate.
 Run:
 
 ```bash
-npm run test:coverage
+npm --prefix frontend run test:coverage
 ```
 
 ## Backend

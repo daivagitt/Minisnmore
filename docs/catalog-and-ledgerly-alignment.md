@@ -16,9 +16,9 @@
 
 | Service | Directory | Port (prod / UAT isolated) | Owns catalog DB? |
 |---------|-----------|----------------------------|------------------|
-| Gateway | `gateway/` | `8080` / `9180` | No |
-| Store (edge API) | `store/` | `8081` / `9181` | No |
-| Commerce | `commerce/` | `8082` / `9182` | No |
+| Gateway | `services/gateway/` | `8080` / `9180` | No |
+| Store (edge API) | `services/store/` | `8081` / `9181` | No |
+| Commerce | `services/commerce/` | `8082` / `9182` | No |
 | **Catalog core** | `backend/` | **`8084` / `9184`** | **Yes** |
 
 - **DB:** Postgres `miniandmore` (Liquibase runs **only** on catalog core).
@@ -38,8 +38,8 @@ Browser (Vite / React)
 
 | Piece | Path |
 |-------|------|
-| Store catch-all | `store/.../StoreCatalogProxyResource.java` |
-| Path rewrite | `store/.../CatalogCoreClient.java` — `/api/v1/X` → `/internal/v1/X` |
+| Store catch-all | `services/store/.../StoreCatalogProxyResource.java` |
+| Path rewrite | `services/store/.../CatalogCoreClient.java` — `/api/v1/X` → `/internal/v1/X` |
 | Exception | `/api/v1/admin/ledgerly/**` stays on catalog as `/api/v1/admin/ledgerly/**` |
 
 ---
@@ -63,7 +63,7 @@ Entity: `backend/.../domain/Product.java` → table `product`.
 
 **Category** (`category`): `slug`, `name`, `description`, `image_url`, `sort_order`, `active`, `ledgerly_category_id`.
 
-Frontend snake_case via `src/lib/backend-data.ts` (`compare_at_price`, `item_structure`, `variants_json`, …).
+Frontend snake_case via `frontend/src/lib/backend-data.ts` (`compare_at_price`, `item_structure`, `variants_json`, …).
 
 > **Schema note:** Mini **does** store `item_structure` as a DB column (Liquibase `20260714150000_…`). Treat non-empty `variants_json` + `item_structure=VARIANTS` as the variant mode; empty matrix → `SIMPLE`.
 
@@ -112,8 +112,8 @@ As of 2026-07-22 on `uat3`:
 | Migration | `backend/.../liquibase/changelog/20260714150000_add_product_variants_and_order_item_variant_sku.xml` |
 | Backend | `ProductVariantSupport.java` |
 | Merge / push | `LedgerlyProductMergeService.java` |
-| Admin UI | `src/components/admin/VariantsMatrixEditor.tsx` |
-| Storefront | `src/lib/product-variants.ts` |
+| Admin UI | `frontend/src/components/admin/VariantsMatrixEditor.tsx` |
+| Storefront | `frontend/src/lib/product-variants.ts` |
 
 ### Rules
 
@@ -352,7 +352,7 @@ See [`docs/product-images-and-ledgerly-sync.md`](./product-images-and-ledgerly-s
 | Duplicate SKU errors | Same SKU on two products or variant = parent | Enforce unique SKUs in admin |
 | Store price wrong after pull | Confused MRP vs selling | Apply pricing contract above |
 | Variant OOS wrong after Ledgerly stock change | Pull sent parent SKU stock only for VARIANTS item | Use per-variant SKU or `variantsJson` on inventory pull |
-| UAT admin still shows “UAT price” | Stale frontend `dist/` | Rebuild + restart `mini-prod-frontend` |
+| UAT admin still shows “UAT price” | Stale frontend `frontend/dist/` | Rebuild + restart `mini-prod-frontend` |
 
 ---
 
@@ -380,8 +380,8 @@ See [`docs/product-images-and-ledgerly-sync.md`](./product-images-and-ledgerly-s
 | Ledgerly sync | `backend/.../LedgerlySyncService.java` |
 | Checkout reserve | `backend/.../InternalAccountOrderResource.java` |
 | Product repository (eager) | `backend/.../ProductRepository.java` |
-| FE catalog | `src/lib/backend-data.ts`, `src/lib/product-variants.ts` |
-| Admin Ledgerly | `src/routes/admin.integrations.ledgerly.tsx` |
+| FE catalog | `frontend/src/lib/backend-data.ts`, `frontend/src/lib/product-variants.ts` |
+| Admin Ledgerly | `frontend/src/routes/admin.integrations.ledgerly.tsx` |
 
 ---
 

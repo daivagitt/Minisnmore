@@ -5,21 +5,21 @@ React 19 + [TanStack Start](https://tanstack.com/start) (file-based SSR router o
 ## Stack
 
 - **Framework**: `@tanstack/react-start` + `@tanstack/react-router` (file-based routing, SSR-capable via `shellComponent`)
-- **Build**: Vite, via `@lovable.dev/vite-tanstack-config` ([vite.config.ts](../vite.config.ts)) — bundles TanStack Start, React plugin, Tailwind v4, tsconfig-paths, Cloudflare adapter (build-only)
-- **Styling**: Tailwind CSS v4, [styles.css](../styles.css)
-- **UI primitives**: Radix UI + shadcn-style wrapper components in `src/components/ui/`
+- **Build**: Vite, via `@lovable.dev/vite-tanstack-config` ([vite.config.ts](../frontend/vite.config.ts)) — bundles TanStack Start, React plugin, Tailwind v4, tsconfig-paths, Cloudflare adapter (build-only)
+- **Styling**: Tailwind CSS v4, [styles.css](../frontend/src/styles.css)
+- **UI primitives**: Radix UI + shadcn-style wrapper components in `frontend/src/components/ui/`
 - **Forms**: `react-hook-form` + `@hookform/resolvers`
 - **Data fetching**: `@tanstack/react-query`
 - **Testing**: Vitest (`*.test.ts(x)` colocated with source)
 
-Path alias: `@/*` → `src/*` (`tsconfig.json`).
+Path alias: `@/*` → `frontend/src/*` (`frontend/tsconfig.json`).
 
 ## Directory layout
 
-The repo root has **symlinks** `routes → src/routes` and `components → src/components` for tooling convenience; the real source lives under `src/`. `hooks/`, `lib/`, `store/` at repo root are plain duplicates of `src/hooks`, `src/lib`, `src/store` respectively (kept in sync manually — treat `src/` as canonical). Note: the root-level `store/` directory name collides with the unrelated Java **store microservice** folder of the same name; the frontend cart/wishlist state lives at `src/store/shop.tsx`, not the Java service.
+The frontend source lives exclusively under `frontend/src/`. Historical root-level copies are preserved in `docs/archive/legacy-frontend/` and are excluded from linting and formatting. The `services/store/` directory is a Java microservice; frontend cart/wishlist state lives in `frontend/src/store/`. Deployment validates this layout with `deploy/scripts/ensure-frontend-source.sh`.
 
 ```
-src/
+frontend/src/
 ├── routes/          File-based TanStack Router routes (see below)
 ├── components/      React components (storefront, admin, ui/, auth/)
 ├── hooks/           Data-fetching + auth hooks
@@ -36,7 +36,7 @@ src/
 
 ## Routing
 
-File-based routes under `src/routes/`, flat-file dot-segment convention (e.g. `account.orders.$orderNumber.tsx` → `/account/orders/:orderNumber`). Route groups:
+File-based routes under `frontend/src/routes/`, flat-file dot-segment convention (e.g. `account.orders.$orderNumber.tsx` → `/account/orders/:orderNumber`). Route groups:
 
 | Group | Example routes | Purpose |
 |---|---|---|
@@ -47,7 +47,7 @@ File-based routes under `src/routes/`, flat-file dot-segment convention (e.g. `a
 | Admin | `admin`, `admin.products`, `admin.categories`, `admin.coupons`, `admin.banners`, `admin.blog`, `admin.home`, `admin.pages`, `admin.policies`, `admin.returns`, `admin.settings`, `admin.subscribe`, `admin.integrations.ledgerly`, `admin.login` | Admin CMS (guarded by `ROLE_ADMIN`) |
 | Static/legal | `about`, `privacy`, `terms`, `shipping`, `track` | Content pages |
 
-## Data layer (`src/lib/`)
+## Data layer (`frontend/src/lib/`)
 
 - **`api.ts`** — low-level fetch client: builds URLs against `VITE_API_BASE_URL` (empty in dev, proxied by Vite), attaches the JWT (`mnm_backend_jwt` in `localStorage`) when `auth: true`, throws `ApiError` with status/body on failure.
 - **`storefront.ts`**, **`commerce.ts`**, **`backend-data.ts`** — typed wrappers over `api.ts` per domain (catalog reads, orders/coupons/returns, and shared response shaping/normalization respectively). `backend-data.ts` is the largest file (~1.4k lines) and centralizes DTO → UI-model mapping (e.g. parsing `Product.variantsJson`/`colorImagesJson` from the backend's JSON-string columns).
@@ -58,17 +58,17 @@ File-based routes under `src/routes/`, flat-file dot-segment convention (e.g. `a
 
 Every non-trivial `lib/` module has a colocated `*.test.ts` — this is the most heavily unit-tested layer of the frontend.
 
-## Hooks (`src/hooks/`)
+## Hooks (`frontend/src/hooks/`)
 
 Thin React Query wrappers per resource: `useProducts`, `useCategories`, `useBanners`, `useBlogPosts`, `useHomeSections`, `usePageVisibility`, `usePolicy`, `useSiteSettings`, `useOrderTracking`, plus `useAuth.tsx` — the JWT session provider (login/logout/register, token persistence, current-user state) consumed via `AuthProvider` in `__root.tsx`.
 
 ## State management
 
 - **Server state**: React Query (caching, refetch, mutations) via the hooks above.
-- **Client state**: a single React Context in `src/store/shop.tsx` (`ShopProvider`) holding cart items and wishlist — no Redux/Zustand.
-- **Auth state**: `AuthProvider` (`src/hooks/useAuth.tsx`), backed by `localStorage` JWT + React Query cache invalidation on login/logout.
+- **Client state**: a single React Context in `frontend/src/store/shop.tsx` (`ShopProvider`) holding cart items and wishlist — no Redux/Zustand.
+- **Auth state**: `AuthProvider` (`frontend/src/hooks/useAuth.tsx`), backed by `localStorage` JWT + React Query cache invalidation on login/logout.
 
-## Components (`src/components/`)
+## Components (`frontend/src/components/`)
 
 - Storefront: `ProductCard`, `ProductGallery`, `QuickView`, `VariantPickers`, `CollectionView`, `CartDrawer`, `StockAvailability`, `OrderTrackingCard`, `Navbar`, `Footer`, decorative/motion chrome (`FloatingDecor`, `ScrollProgress`, `Watermark`).
 - `admin/` — CMS editors: `AdminPage` (shell), `BulkImport`, `ColorImagesEditor`, `VariantsMatrixEditor`, `HomeHeroBannersPanel`, `HomeBlogStripEditor`, `HomeByAgeCardsEditor`, `HomeReviewsEditor`, `HomeSectionProductsPicker`, `ImageUploadField`, `SubscribePayloadEditors`, plus shared field primitives (`NumberField`, `CommaListField`, `AgeRangeField`).
@@ -77,7 +77,7 @@ Thin React Query wrappers per resource: `useProducts`, `useCategories`, `useBann
 
 ## Dev proxy
 
-`vite.config.ts` proxies `/api`, `/oauth2`, `/login/oauth2`, `/services` to `http://127.0.0.1:8080` (the gateway) during `vite dev` — the frontend never talks to `store`/`commerce`/`backend` directly, even locally.
+`frontend/vite.config.ts` proxies `/api`, `/oauth2`, `/login/oauth2`, `/services` to `http://127.0.0.1:8080` (the gateway) during `vite dev` — the frontend never talks to `store`/`commerce`/`backend` directly, even locally.
 
 ## Related docs
 

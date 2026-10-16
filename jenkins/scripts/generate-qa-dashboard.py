@@ -14,8 +14,8 @@ from zoneinfo import ZoneInfo
 
 LINK_REPLACEMENTS: list[tuple[str, str]] = [
     ('src="assets/logo-horizontal.png"', 'src="../daiva-logo.svg"'),
-    ("href=\"coverage/frontend/index.html\"", 'href="../frontend/coverage/index.html"'),
-    ("href=\"coverage/frontend/coverage-summary.json\"", 'href="../frontend/coverage-summary/index.html"'),
+    ("href=\"frontend/coverage/index.html\"", 'href="../frontend/coverage/index.html"'),
+    ("href=\"frontend/coverage/coverage-summary.json\"", 'href="../frontend/coverage-summary/index.html"'),
     ("href=\"backend/target/site/jacoco/index.html\"", 'href="../backend/coverage/catalog/index.html"'),
     ("href=\"backend/target/reports/apidocs/index.html\"", 'href="../backend/javadoc/catalog/index.html"'),
     ("href=\"artifacts/javadocs/index.html\"", 'href="../backend/javadoc/index.html"'),
@@ -30,7 +30,7 @@ LINK_REPLACEMENTS: list[tuple[str, str]] = [
     ("href=\"http://localhost:8084/swagger-ui/index.html\"", 'href="../backend/swagger/index.html"'),
     ("href=\"http://localhost:8084/v3/api-docs/catalog\"", 'href="../backend/swagger/openapi.json"'),
     ("href=\"http://localhost:9001/dashboard?id=miniandmore\"", 'href="../sonar-summary/index.html"'),
-    ("<code>coverage/frontend/index.html</code>", "<code>frontend/coverage/index.html</code>"),
+    ("<code>frontend/coverage/index.html</code>", "<code>frontend/coverage/index.html</code>"),
     ("<code>backend/target/site/jacoco/index.html</code>", "<code>backend/coverage/catalog/index.html</code>"),
     ("<code>backend/target/reports/apidocs/index.html</code>", "<code>backend/javadoc/catalog/index.html</code>"),
     ("<code>artifacts/javadocs/index.html</code>", "<code>backend/javadoc/index.html</code>"),
@@ -45,7 +45,7 @@ def pct(value: float) -> str:
 
 
 def read_frontend_coverage(root: Path) -> dict[str, float]:
-    path = root / "coverage/frontend/coverage-summary.json"
+    path = root / "frontend/coverage/coverage-summary.json"
     if not path.is_file():
         return {}
     total = json.loads(path.read_text()).get("total") or {}

@@ -6,7 +6,7 @@ set -euo pipefail
 GATEWAY_PORT="${GATEWAY_PORT:-9180}"
 STORE_PORT="${STORE_PORT:-9181}"
 COMMERCE_PORT="${COMMERCE_PORT:-9182}"
-INTEGRATION_PORT="${INTEGRATION_PORT:-9183}"
+INTEGRATION_PORT="${INTEGRATION_PORT:-}"
 CATALOG_PORT="${CATALOG_PORT:-9184}"
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 FAIL=0
@@ -43,7 +43,7 @@ echo "=== Ports ==="
 check_port "$GATEWAY_PORT" "gateway"
 check_port "$STORE_PORT" "store"
 check_port "$COMMERCE_PORT" "commerce"
-check_port "$INTEGRATION_PORT" "integration"
+if [ -n "$INTEGRATION_PORT" ]; then check_port "$INTEGRATION_PORT" "integration"; fi
 check_port "$CATALOG_PORT" "catalog"
 check_port "$FRONTEND_PORT" "frontend"
 
@@ -52,7 +52,7 @@ echo "=== Liveness (localhost) ==="
 check_http "http://127.0.0.1:${CATALOG_PORT}/management/health/liveness" "catalog"
 check_http "http://127.0.0.1:${STORE_PORT}/management/health/liveness" "store"
 check_http "http://127.0.0.1:${COMMERCE_PORT}/management/health/liveness" "commerce"
-check_http "http://127.0.0.1:${INTEGRATION_PORT}/management/health/liveness" "integration"
+if [ -n "$INTEGRATION_PORT" ]; then check_http "http://127.0.0.1:${INTEGRATION_PORT}/management/health/liveness" "integration"; fi
 check_http "http://127.0.0.1:${GATEWAY_PORT}/management/health/liveness" "gateway"
 
 echo ""

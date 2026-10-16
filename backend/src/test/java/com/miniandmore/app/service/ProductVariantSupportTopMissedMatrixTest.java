@@ -1,6 +1,7 @@
 package com.miniandmore.app.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -214,8 +215,24 @@ class ProductVariantSupportTopMissedMatrixTest {
                 "Navy",
                 3
             ),
-            Arguments.of("[]", "NEW", "L", "Green", -4, " z-new ", true, "L", "Green", 0)
+            Arguments.of("[]", "NEW", "L", "Green", 0, " z-new ", true, "L", "Green", 0)
         );
+    }
+
+    @Test
+    void upsertRejectsNegativeStockWithoutChangingExistingVariants() {
+        Product product = variantProduct(
+            "[{\"sku\":\"OLD\",\"size\":\"S\",\"color\":\"Navy\",\"rate\":10,\"stock\":3}]"
+        );
+        String original = product.getVariantsJson();
+
+        assertThatThrownBy(() ->
+            support.upsertPulledVariantFromZoho(product, "NEW", "L", "Green", new BigDecimal("25"), null, -4, "z-new", true)
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Negative Zoho stock");
+        assertThat(product.getVariantsJson()).isEqualTo(original);
+        assertThat(support.findBySku(support.parseProduct(product), "NEW")).isEmpty();
     }
 
     private Product variantProduct(String json) {

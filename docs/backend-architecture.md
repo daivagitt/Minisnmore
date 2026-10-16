@@ -1,3 +1,5 @@
+> Historical deployment instructions: obsolete UAT, 808x, and Integration-dependent laptop launchers have been removed. Use the [current script index](../deploy/scripts/README.md) for supported commands.
+
 # Backend Architecture
 
 Four Spring Boot / JHipster services. `backend` (catalog core) owns all business logic and the primary database; `gateway` owns auth; `store` and `commerce` are stateless proxy/edge services with no database of their own. See [system-architecture.md](./system-architecture.md) for the request-flow diagram and [api-schema.md](./api-schema.md) for endpoints.
@@ -6,10 +8,10 @@ Four Spring Boot / JHipster services. `backend` (catalog core) owns all business
 
 | Service | Spring Boot | JHipster | Spring Cloud | Web stack | Notes |
 |---|---|---|---|---|---|
-| `gateway/` | 3.5.11 | 8.12.0 | 2025.0.0 | WebFlux (reactive) | Not yet upgraded — version skew vs. the other three |
+| `services/gateway/` | 3.5.11 | 8.12.0 | 2025.0.0 | WebFlux (reactive) | Not yet upgraded — version skew vs. the other three |
 | `backend/` | 4.0.3 | 9.0.0 | 2025.1.1 | MVC (servlet) | Catalog core, owns `miniandmore` DB |
-| `store/` | 4.0.3 | 9.0.0 | 2025.1.1 | MVC (servlet) | No datasource — pure proxy |
-| `commerce/` | 4.0.3 | 9.0.0 | 2025.1.1 | MVC (servlet) | No datasource — pure proxy |
+| `services/store/` | 4.0.3 | 9.0.0 | 2025.1.1 | MVC (servlet) | No datasource — pure proxy |
+| `services/commerce/` | 4.0.3 | 9.0.0 | 2025.1.1 | MVC (servlet) | No datasource — pure proxy |
 
 Java 21 across all services.
 
@@ -92,25 +94,33 @@ Backend's only outbound call is to the external Ledgerly API via `client/Ledgerl
 
 ## Deployment topology
 
+**Local dev** (Consul + `lb://` routes):
+
 ```text
-Nginx (443, public)
-  → Gateway   127.0.0.1:8080
+Nginx optional
+  → Gateway   127.0.0.1:8080  (Consul discovery)
       → Store     127.0.0.1:8081
       → Commerce  127.0.0.1:8082
-          → Backend 127.0.0.1:8084 (internal only)
-Consul  127.0.0.1:8500
-Postgres (catalog) 127.0.0.1:5432   Postgres (gateway) 127.0.0.1:5433
-Redis   127.0.0.1:6379
+          → Catalog core 127.0.0.1:8084 (internal only)
+Consul :8500 · Postgres catalog :5432 · Postgres gateway :5433 · Redis :6379
 ```
 
-- Local dev infra: `docker compose -f docker/microservices.yml up -d` — Consul (dev mode), 2× Postgres 18.3, Redis 8.6.1.
-- Production/UAT: each service built via `./mvnw -Pprod -DskipTests clean package`, run under **PM2** (`deploy/scripts/prod-microservices-pm2.sh` / `prod-microservices-pm2.sh`), health-checked via `/management/health/{liveness,readiness}` (`deploy/scripts/health-check-microservices.sh`). Secrets in `/etc/mini-and-more/prod.env` (chmod 600). Nginx config: `deploy/nginx/prod.minisnmore.com.locations.conf`.
-- Profile matrix: local dev = `dev`; UAT = gateway `prod,api-docs,uat`, others `prod,api-docs`; production = `prod` (+`consul` if using the config server).
-- CI: Jenkins jobs `BUILD_GATEWAY`, `BUILD_BACKEND`, `BUILD_STORE`, `BUILD_COMMERCE`, `BUILD_INTEGRATION` (defunct, see below), `DEPLOY_UAT`.
+**Production isolated stack** (live on minisnmore.com — Consul **off**, fixed HTTP URIs in `application-uat-isolated.yml`):
 
-### `integration/` is defunct
+```text
+Nginx (443)
+  → Gateway   127.0.0.1:9180  (profiles prod,uat-isolated)
+      → Store     127.0.0.1:9181
+      → Commerce  127.0.0.1:9182
+          → Catalog core 127.0.0.1:9184
+Frontend PM2 :3000 · Postgres :5432 · Redis :6379
+```
 
-Deleted from git in commit `3278ca7` ("Implement Ledgerly integration... Replace ZohoBooksIntegrationClient references with Ledgerly counterparts") — no `pom.xml`, no tracked source. Its former responsibility (Zoho/Ledgerly settings + webhooks) now lives entirely in `backend` (`LedgerlySetting`, `LedgerlyWebhookEvent`, `Ledgerly*` services). What remains on disk under `integration/` is stale build artifacts, not live code. **However**, `docs/PRODUCTION_READINESS.md` and several `deploy/scripts/*.sh` still iterate over `integration` as a fifth service to build/deploy/health-check — this should be cleaned up or the scripts will no-op/fail on that step.
+- Local dev infra: `docker compose -f docker/microservices.yml up -d` — Consul (dev mode), Postgres, Redis.
+- Production: `./mvnw -Pprod -DskipTests clean package` per module; **PM2** via `deploy/scripts/prod-microservices-isolated-pm2.sh`; health via `deploy/scripts/health-check-microservices.sh` (`GATEWAY_URL=http://127.0.0.1:9180`). Secrets: `/etc/mini-and-more/prod.env`. Nginx: `deploy/nginx/prod.minisnmore.com.isolated-9180.locations.conf`.
+- Ledgerly / Zoho / Razorpay / XpressBees webhooks on production gateway route straight to catalog core `:9184` where configured in `application-uat-isolated.yml`.
+
+The former **`integration/`** microservice was removed; Ledgerly and legacy Zoho webhook handlers live in **catalog core** only.
 
 ## Related docs
 

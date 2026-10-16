@@ -15,16 +15,13 @@ lerna-debug.log*
 # Self-referential deploy symlink
 current
 
-# Legacy import path; canonical sources live under src/lib (local symlink lib -> src/lib)
-/lib
-
 node_modules
 dist
 dist-ssr
 coverage
 .output
 .vinxi
-.tanstack/**
+.tanstack/
 .nitro
 *.local
 
@@ -84,3 +81,15 @@ artifacts/reports-site/
 *.njsproj
 *.sln
 *.sw?
+
+# Filesystem metadata and local scanner/tool downloads
+._*
+.scannerwork/
+.jenkins-tools/
+
+# Generated deployment binaries and runtime logs
+/deploy/*.jar
+/deploy/logs/
+
+# Immutable production release artifacts
+/deploy/releases/

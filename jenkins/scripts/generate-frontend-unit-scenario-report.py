@@ -112,7 +112,7 @@ def infer_priority(module: str, suite_file: str, test_title: str) -> str:
 def suite_context(suite_file: str) -> tuple[str, str, str, str]:
     """module label, display title, path/subtitle hint, id prefix."""
     path = suite_file.replace("\\", "/")
-    rel = path.removeprefix("src/")
+    rel = path.removeprefix("frontend/").removeprefix("src/")
     parts = rel.split("/")
     area = parts[0] if parts else "other"
     module = MODULE_LABELS.get(area, area.replace("-", " ").title())
@@ -129,18 +129,18 @@ def suite_context(suite_file: str) -> tuple[str, str, str, str]:
     if area == "components":
         comp = stem.split("/")[-1]
         title = comp.replace("-", " ")
-        return module, title, f"src/{rel}", "CMP"
+        return module, title, f"frontend/src/{rel}", "CMP"
 
     if area == "hooks":
         name = stem.split("/")[-1]
-        return module, name, f"src/{rel}", "HOK"
+        return module, name, f"frontend/src/{rel}", "HOK"
 
     if area == "store":
         name = stem.split("/")[-1]
-        return module, name, f"src/{rel}", "STR"
+        return module, name, f"frontend/src/{rel}", "STR"
 
     name = stem.split("/")[-1]
-    return module, name.replace("-", " "), f"src/{rel}", "LIB"
+    return module, name.replace("-", " "), f"frontend/src/{rel}", "LIB"
 
 
 def parse_junit(path: Path) -> list[dict]:
@@ -432,7 +432,7 @@ def copy_logo(out_dir: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default="coverage/frontend/junit.xml")
+    parser.add_argument("--input", default="frontend/coverage/junit.xml")
     parser.add_argument("--output-dir", default="artifacts/frontend-unit-scenarios")
     args = parser.parse_args()
 

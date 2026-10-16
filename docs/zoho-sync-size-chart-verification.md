@@ -20,7 +20,7 @@ Size charts are local product data. Sending or pulling charts through Zoho is **
 | Local chart validation | Frontend parsing, Excel import, save serialization, and backend product writes reject negative/non-finite measurements, boolean/object/array coercion, and duplicate size bands/measurement rows. Zero remains allowed for garment construction measurements; blanks/N/A are not zero. |
 | Local chart labels and units | Both sides of size filtering use the same month/dash/common-size normalization. Explicit centimetre/inch values are accepted; the fit parser converts inches to centimetres. |
 | Local chart display | The compact guide remains. An expandable table exposes every saved section and measurement in the product size guide and admin preview. |
-| Chart ownership | Regression tests verify that simple and variant pulls preserve their existing local chart JSON. The mirrored `lib/` and `src/lib/` chart implementations remain aligned. |
+| Chart ownership | Regression tests verify that simple and variant pulls preserve their existing local chart JSON. The mirrored `lib/` and `frontend/src/lib/` chart implementations remain aligned. |
 | Variant size/color conflicts | Pulling a different SKU/item ID into an occupied size/color combination now reports a conflict before changing the matrix. This covers appends, existing-variant size/color changes, inactive rows, and item-ID/SKU matches pointing to different local rows. Combination matching is case-insensitive with surrounding whitespace trimmed. Existing duplicate records are not automatically merged or deleted. |
 
 The API response checks follow the published [Zoho Books pagination contract](https://www.zoho.com/books/api/v3/pagination/) and [item response examples](https://www.zoho.com/books/api/v3/items/). Organization-specific live behaviour still needs UAT verification.
@@ -54,8 +54,8 @@ Mockito requires JVM attachment, so the sandbox-blocked backend run was repeated
 - Restarted `mini-prod-ms-catalog-core` (:9184) and `mini-prod-frontend` (:3000), retaining their existing PM2 configuration/environment.
 - Catalog readiness and liveness reported `UP`; the public catalog API and storefront returned HTTP 200 after restart.
 - Backend SHA-256: `e6676e2a855f6a4d916dee94b72dca429e3bb1adeffac000b4d2a4f772e8daef`.
-- Rollback artifacts: `deploy/backups/variant-conflict.0LWGUc/miniandmore-0.0.1-SNAPSHOT.jar` and `deploy/backups/variant-conflict.0LWGUc/dist-previous/` (also a separate `dist/` copy).
-- Restore those artifacts to the existing backend JAR and `dist/` paths, then restart the same two UAT PM2 services if rollback is required. Old frontend assets were also retained in the new release for already-open browser sessions.
+- Rollback artifacts: `deploy/backups/variant-conflict.0LWGUc/miniandmore-0.0.1-SNAPSHOT.jar` and `deploy/backups/variant-conflict.0LWGUc/dist-previous/` (also a separate `frontend/dist/` copy).
+- Restore those artifacts to the existing backend JAR and `frontend/dist/` paths, then restart the same two UAT PM2 services if rollback is required. Old frontend assets were also retained in the new release for already-open browser sessions.
 - Existing duplicated variants were left untouched. The new guard prevents further conflicting pulls; resolving already-created duplicates requires an explicit mapping/data-repair decision.
 
 ## Second review: what still needs controlled integration verification

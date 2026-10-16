@@ -537,8 +537,8 @@ Each workflow will be verified against the sequence diagram before release.
 | Order cancellation | `backend/.../InternalAccountOrderResource.java` |
 | Return APIs | `backend/.../InternalOrderReturnResource.java`, `InternalAdminOrderReturnResource.java` |
 | XpressBees client | `backend/.../client/XpressBeesClient.java` |
-| Admin returns UI | `src/routes/admin.returns.tsx` |
-| Customer order UI | `src/routes/account.orders.$orderNumber.tsx` |
+| Admin returns UI | `frontend/src/routes/admin.returns.tsx` |
+| Customer order UI | `frontend/src/routes/account.orders.$orderNumber.tsx` |
 | Status lifecycle doc | `docs/order-status-lifecycle.md` |
 | JSON contract | `docs/order-return-json-contract.md` |
 

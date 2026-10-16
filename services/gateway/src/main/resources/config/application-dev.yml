@@ -1,0 +1,209 @@
+# ===================================================================
+# Spring Boot configuration for the "dev" profile.
+#
+# This configuration overrides the application.yml file.
+#
+# More information on profiles: https://www.jhipster.tech/profiles/
+# More information on configuration properties: https://www.jhipster.tech/common-application-properties/
+# ===================================================================
+
+# ===================================================================
+# Standard Spring Boot properties.
+# Full reference is available at:
+# https://docs.spring.io/spring-boot/appendix/application-properties/index.html
+# ===================================================================
+
+logging:
+  level:
+    ROOT: DEBUG
+    tech.jhipster: DEBUG
+    org.hibernate.SQL: DEBUG
+    com.miniandmore.gateway: DEBUG
+
+management:
+  zipkin: # Use the "zipkin" Maven profile to have the Spring Cloud Zipkin dependencies
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
+  tracing:
+    sampling:
+      probability: 1.0 # report 100% of traces
+
+spring:
+  devtools:
+    restart:
+      enabled: true
+      additional-exclude: static/**
+    livereload:
+      enabled: false # we use Webpack dev server + BrowserSync for livereload
+  jackson:
+    serialization:
+      indent-output: true
+  cloud:
+    consul:
+      config:
+        fail-fast: false # if not in "prod" profile, do not force to use Spring Cloud Config
+        format: yaml
+        profile-separator: '-'
+      discovery:
+        prefer-ip-address: true
+        tags:
+          - profile=${spring.profiles.active}
+          - version='@project.version@'
+          - git-version=${git.commit.id.describe:}
+          - git-commit=${git.commit.id.abbrev:}
+          - git-branch=${git.branch:}
+      host: localhost
+      port: 8500
+    gateway:
+      server:
+        webflux:
+          # Dev: direct URIs (no Consul). Store :8081, commerce :8082; core catalog :8084 internal only.
+            routes:
+            - id: miniandmore-ledgerly-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/ledgerly/webhooks
+            - id: miniandmore-zoho-stock-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/zoho/stock-webhook,/api/v1/zoho/stock-webhook
+            - id: miniandmore-zoho-shipment-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/zoho/shipment-webhook,/api/v1/zoho/shipment-webhook
+            - id: miniandmore-zoho-item-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/zoho/item-webhook,/api/v1/zoho/item-webhook
+            - id: miniandmore-zoho-order-status-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/zoho/order-status-webhook,/api/v1/zoho/order-status-webhook
+            - id: miniandmore-zoho-invoice-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/zoho/invoice-webhook,/api/v1/zoho/invoice-webhook
+            - id: miniandmore-xpressbees-return-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/webhooks/xpressbees/returns,/api/v1/webhooks/xpressbees/returns
+            - id: miniandmore-xpressbees-shipment-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/webhooks/xpressbees/shipments,/api/v1/webhooks/xpressbees/shipments
+            - id: miniandmore-razorpay-webhooks
+              uri: http://127.0.0.1:8084
+              predicates:
+                - Path=/internal/v1/webhooks/razorpay,/api/v1/webhooks/razorpay
+            - id: miniandmore-ledgerly-api
+              uri: http://127.0.0.1:8081
+              predicates:
+                - Path=/api/v1/admin/ledgerly/**
+            - id: miniandmore-zoho-api
+              uri: http://127.0.0.1:8081
+              predicates:
+                - Path=/api/v1/admin/zoho/**,/api/v1/admin/zoho-settings
+              metadata:
+                response-timeout: 600000
+                connect-timeout: 5000
+            - id: miniandmore-commerce-api
+              uri: http://127.0.0.1:8082
+              predicates:
+                - Path=/api/v1/orders/**,/api/v1/account/**,/api/v1/payments,/api/v1/coupons/**,/api/v1/order-returns/**,/api/v1/admin/order-returns/**,/api/v1/admin/orders,/api/v1/admin/orders/**,/api/v1/admin/cancellation-requests,/api/v1/admin/cancellation-requests/**
+            - id: miniandmore-store-api
+              uri: http://127.0.0.1:8081
+              predicates:
+                - Path=/api/v1/**
+  liquibase:
+    # Remove 'faker' if you do not want the sample data to be loaded automatically
+    contexts: dev, faker
+    url: jdbc:postgresql://localhost:5433/gateway
+  mail:
+    host: localhost
+    port: 25
+  messages:
+    cache-duration: PT1S # 1 second, see the ISO 8601 standard
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5433/gateway
+  thymeleaf:
+    cache: false
+
+server:
+  port: 8080
+  # make sure requests the proxy uri instead of the server one
+  forward-headers-strategy: native
+
+# ===================================================================
+# JHipster specific properties
+#
+# Full reference is available at: https://www.jhipster.tech/common-application-properties/
+# ===================================================================
+
+jhipster:
+  # API rate limits are configured under application.rate-limiting in application.yml.
+  # CORS is only enabled by default with the "dev" profile
+  cors:
+    # Allow Ionic for JHipster by default (* no longer allowed in Spring Boot 2.4+)
+    allowed-origins: 'http://localhost:8100,https://localhost:8100,http://localhost:5173,http://127.0.0.1:5173'
+    # Enable CORS when running in GitHub Codespaces
+    allowed-origin-patterns: 'https://*.githubpreview.dev'
+    allowed-methods: '*'
+    allowed-headers: '*'
+    exposed-headers: 'Authorization,Link,X-Total-Count,X-${jhipster.clientApp.name}-alert,X-${jhipster.clientApp.name}-error,X-${jhipster.clientApp.name}-params'
+    allow-credentials: true
+    max-age: 1800
+  security:
+    authentication:
+      jwt:
+        # Token is valid 24 hours
+        token-validity-in-seconds: 86400
+        token-validity-in-seconds-for-remember-me: 2592000
+  mail: # specific JHipster mail property, for standard properties see MailProperties
+    base-url: http://127.0.0.1:8080
+  logging:
+    use-json-format: false # By default, logs are not in Json format
+    logstash: # Forward logs to logstash over a socket, used by LoggingConfiguration
+      enabled: false
+      host: localhost
+      port: 5000
+      ring-buffer-size: 512
+# ===================================================================
+# Application specific properties
+# Add your own application properties here, see the ApplicationProperties class
+# to have type-safe configuration, like in the JHipsterProperties above
+#
+# More documentation is available at:
+# https://www.jhipster.tech/common-application-properties/
+# ===================================================================
+
+application:
+  oauth2:
+    frontend-callback-url: ${FRONTEND_AUTH_CALLBACK_URL:http://localhost:5173/auth/callback}
+
+# Uncomment and set env vars to enable Google / Apple / Facebook login on the gateway:
+# spring:
+#   security:
+#     oauth2:
+#       client:
+#         provider:
+#           apple:
+#             authorization-uri: https://appleid.apple.com/auth/authorize
+#             token-uri: https://appleid.apple.com/auth/token
+#             jwk-set-uri: https://appleid.apple.com/auth/keys
+#             issuer-uri: https://appleid.apple.com
+#             user-name-attribute: sub
+#         registration:
+#           google:
+#             client-id: ${GOOGLE_CLIENT_ID:}
+#             client-secret: ${GOOGLE_CLIENT_SECRET:}
+#             scope: openid,profile,email
+#           apple:
+#             provider: apple
+#             client-id: ${APPLE_CLIENT_ID:}
+#             client-secret: ${APPLE_CLIENT_SECRET:}
+#             scope: openid,name,email
+#             client-authentication-method: client_secret_post
+#           facebook:
+#             client-id: ${FACEBOOK_CLIENT_ID:}
+#             client-secret: ${FACEBOOK_CLIENT_SECRET:}
+#             scope: email,public_profile

@@ -71,7 +71,7 @@ Then the support engineer:
 | Situation | Action |
 | --- | --- |
 | Process `errored` / OOM | `pm2` restart that name; if loop, check last deploy and disk |
-| Bad frontend build | Keep API up; restore previous `dist/` or `git checkout` last known `prod` SHA and `prod-frontend-pm2.sh` |
+| Bad frontend build | Keep API up; restore previous `frontend/dist/` or `git checkout` last known `prod` SHA and `prod-frontend-pm2.sh` |
 | Bad catalog JAR | Relink previous `backend/target/*.jar`, `prod-restart-isolated-catalog.sh`. Schema: only roll back DB if that JAR required a Liquibase changeset you applied — restore `pg_dump` to a **copy** first |
 | Bad env edit | Restore `prod.env` from vault, `prod-reload-env-and-restart.sh` |
 | Nginx mistake | `nginx -t` must pass; if live is broken, restore `mini-prod.conf` from git and `systemctl reload nginx` |

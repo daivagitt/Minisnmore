@@ -1,0 +1,78 @@
+# Isolated production microservices stack (store :9181, commerce :9182).
+# OAuth: non-empty defaults let the JVM start when prod.env has unused APPLE_CLIENT_ID=.
+# Real GOOGLE_* / FACEBOOK_* from /etc/mini-and-more/prod.env override these for social login.
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:prod-isolated-placeholder}
+            client-secret: ${GOOGLE_CLIENT_SECRET:prod-isolated-placeholder}
+          apple:
+            client-id: ${APPLE_CLIENT_ID:prod-isolated-placeholder}
+            client-secret: ${APPLE_CLIENT_SECRET:prod-isolated-placeholder}
+          facebook:
+            client-id: ${FACEBOOK_CLIENT_ID:prod-isolated-placeholder}
+            client-secret: ${FACEBOOK_CLIENT_SECRET:prod-isolated-placeholder}
+            scope: email,public_profile
+  cloud:
+    gateway:
+      server:
+        webflux:
+            routes:
+            - id: miniandmore-ledgerly-webhooks
+              uri: http://127.0.0.1:9184
+              predicates:
+                - Path=/internal/v1/ledgerly/webhooks
+            - id: miniandmore-zoho-stock-webhooks
+              uri: http://127.0.0.1:9184
+              predicates:
+                - Path=/internal/v1/zoho/stock-webhook,/api/v1/zoho/stock-webhook
+            - id: miniandmore-zoho-shipment-webhooks
+              uri: http://127.0.0.1:9184
+              predicates:
+                - Path=/internal/v1/zoho/shipment-webhook,/api/v1/zoho/shipment-webhook
+            - id: miniandmore-zoho-item-webhooks
+              uri: http://127.0.0.1:9184
+              predicates:
+                - Path=/internal/v1/zoho/item-webhook,/api/v1/zoho/item-webhook
+            - id: miniandmore-zoho-order-status-webhooks
+              uri: http://127.0.0.1:9184
+              predicates:
+                - Path=/internal/v1/zoho/order-status-webhook,/api/v1/zoho/order-status-webhook
+            - id: miniandmore-zoho-invoice-webhooks
+              uri: http://127.0.0.1:9184
+              predicates:
+                - Path=/internal/v1/zoho/invoice-webhook,/api/v1/zoho/invoice-webhook
+            - id: miniandmore-xpressbees-return-webhooks
+              uri: http://127.0.0.1:9184
+              predicates:
+                - Path=/internal/v1/webhooks/xpressbees/returns,/api/v1/webhooks/xpressbees/returns
+            - id: miniandmore-xpressbees-shipment-webhooks
+              uri: http://127.0.0.1:9184
+              predicates:
+                - Path=/internal/v1/webhooks/xpressbees/shipments,/api/v1/webhooks/xpressbees/shipments
+            - id: miniandmore-razorpay-webhooks
+              uri: http://127.0.0.1:9184
+              predicates:
+                - Path=/internal/v1/webhooks/razorpay,/api/v1/webhooks/razorpay
+            - id: miniandmore-ledgerly-api
+              uri: http://127.0.0.1:9181
+              predicates:
+                - Path=/api/v1/admin/ledgerly/**
+            - id: miniandmore-zoho-api
+              uri: http://127.0.0.1:9181
+              predicates:
+                - Path=/api/v1/admin/zoho/**,/api/v1/admin/zoho-settings
+              metadata:
+                response-timeout: 600000
+                connect-timeout: 5000
+            - id: miniandmore-commerce-api
+              uri: http://127.0.0.1:9182
+              predicates:
+                - Path=/api/v1/orders/**,/api/v1/account/**,/api/v1/payments,/api/v1/coupons/**,/api/v1/order-returns/**,/api/v1/admin/order-returns/**,/api/v1/admin/orders,/api/v1/admin/orders/**,/api/v1/admin/cancellation-requests,/api/v1/admin/cancellation-requests/**
+            - id: miniandmore-store-api
+              uri: http://127.0.0.1:9181
+              predicates:
+                - Path=/api/v1/**

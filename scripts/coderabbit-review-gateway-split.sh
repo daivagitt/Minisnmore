@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CodeRabbit review for gateway module in sub-chunks (150-file CLI limit).
-# Use when "gateway/" (230+ files) or gateway/src/main/java is too large.
+# Use when "gateway/" (230+ files) or services/gateway/src/main/java is too large.
 #
 # Usage:
 #   git add -A
@@ -60,20 +60,20 @@ run_chunk() {
 
 # Java: one package per chunk (largest is web @ ~20 files; whole tree was ~84).
 CHUNKS=(
-  "Gateway config Java|gateway/src/main/java/com/miniandmore/gateway/config"
-  "Gateway security|gateway/src/main/java/com/miniandmore/gateway/security"
-  "Gateway repository|gateway/src/main/java/com/miniandmore/gateway/repository"
-  "Gateway service|gateway/src/main/java/com/miniandmore/gateway/service"
-  "Gateway web|gateway/src/main/java/com/miniandmore/gateway/web"
-  "Gateway domain|gateway/src/main/java/com/miniandmore/gateway/domain"
-  "Gateway management|gateway/src/main/java/com/miniandmore/gateway/management"
-  "Gateway aop|gateway/src/main/java/com/miniandmore/gateway/aop"
-  "Gateway resources YAML|gateway/src/main/resources/config"
-  "Gateway resources templates|gateway/src/main/resources/templates"
-  "Gateway resources i18n|gateway/src/main/resources/i18n"
-  "Gateway resources|gateway/src/main/resources"
-  "Gateway test|gateway/src/test/java"
-  "Gateway docker|gateway/src/main/docker"
+  "Gateway config Java|services/gateway/src/main/java/com/miniandmore/gateway/config"
+  "Gateway security|services/gateway/src/main/java/com/miniandmore/gateway/security"
+  "Gateway repository|services/gateway/src/main/java/com/miniandmore/gateway/repository"
+  "Gateway service|services/gateway/src/main/java/com/miniandmore/gateway/service"
+  "Gateway web|services/gateway/src/main/java/com/miniandmore/gateway/web"
+  "Gateway domain|services/gateway/src/main/java/com/miniandmore/gateway/domain"
+  "Gateway management|services/gateway/src/main/java/com/miniandmore/gateway/management"
+  "Gateway aop|services/gateway/src/main/java/com/miniandmore/gateway/aop"
+  "Gateway resources YAML|services/gateway/src/main/resources/config"
+  "Gateway resources templates|services/gateway/src/main/resources/templates"
+  "Gateway resources i18n|services/gateway/src/main/resources/i18n"
+  "Gateway resources|services/gateway/src/main/resources"
+  "Gateway test|services/gateway/src/test/java"
+  "Gateway docker|services/gateway/src/main/docker"
 )
 
 FAILED=0

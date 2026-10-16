@@ -1,48 +1,33 @@
 #!/usr/bin/env bash
-# Storefront source of truth is src/ (TanStack/Vite build). This script prevents
-# regressions from editing or deploying stale root-level copies.
+# Validate source locations without modifying the checkout.
 set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$REPO_ROOT"
 
-link_if_missing() {
-  local name="$1"
-  local target="src/$1"
-  if [ ! -d "$target" ]; then
-    echo "ERROR: missing $target" >&2
+for path in routes components hooks lib data assets store test; do
+  if [ ! -d "frontend/src/$path" ]; then
+    echo "ERROR: missing canonical frontend directory frontend/src/$path" >&2
     exit 1
   fi
-  if [ -L "$name" ]; then
-    if [ "$(readlink "$name")" != "$target" ]; then
-      echo "ERROR: $name points to $(readlink "$name"), expected $target" >&2
-      exit 1
-    fi
-    return 0
+done
+for path in src/router.tsx src/styles.css package.json package-lock.json tsconfig.json vite.config.ts vitest.config.ts; do
+  if [ ! -f "frontend/$path" ]; then
+    echo "ERROR: missing frontend/$path" >&2
+    exit 1
   fi
-  if [ -d "$name" ]; then
-    if ! diff -qr "$name" "$target" >/dev/null; then
-      echo "ERROR: $name/ differs from $target/; refusing automatic source migration" >&2
-      exit 1
-    fi
-    local backup_dir="deploy/backups/frontend-source-$(date +%Y%m%d%H%M%S)"
-    mkdir -p "$backup_dir"
-    mv "$name" "$backup_dir/$name"
-    echo "Moved identical legacy $name/ mirror to $backup_dir/$name"
+done
+for path in backend services/gateway services/store services/commerce; do
+  if [ ! -f "$path/pom.xml" ]; then
+    echo "ERROR: missing Java module $path/pom.xml" >&2
+    exit 1
   fi
-  ln -s "$target" "$name"
-  echo "Linked $name -> $target"
-}
-
-link_if_missing routes
-link_if_missing components
-link_if_missing hooks
-
-# Never copy root -> src (that reverts fixes). Sync src -> root mirrors only.
-for dir in lib data; do
-  if [ -d "src/$dir" ] && [ -d "$dir" ] && [ ! -L "$dir" ]; then
-    rsync -a "src/$dir/" "$dir/"
+done
+for path in src public package.json package-lock.json vite.config.ts tsconfig.json gateway store commerce routes components hooks lib data assets test router.tsx routeTree.gen.ts styles.css; do
+  if [ -e "$path" ] || [ -L "$path" ]; then
+    echo "ERROR: obsolete root path $path; use frontend/, backend/, or services/" >&2
+    exit 1
   fi
 done
 
-echo "OK: frontend source is src/ (routes + components + hooks symlinked)"
+echo "OK: frontend/, backend/, and services/ contain the application sources"

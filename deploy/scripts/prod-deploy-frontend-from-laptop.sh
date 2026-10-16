@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build storefront on your Mac, rsync dist to UAT, restart PM2 (fast + reliable).
+# Build storefront locally, upload the complete frontend package and build, then restart PM2.
 #
 #   bash deploy/scripts/prod-deploy-frontend-from-laptop.sh
 #
@@ -25,7 +25,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo "=== Build locally (VITE_API_BASE_URL=https://minisnmore.com) ==="
-cd "$ROOT"
+cd "$ROOT/frontend"
 export VITE_API_BASE_URL="${VITE_API_BASE_URL:-https://minisnmore.com}"
 rm -rf dist
 npm run build
@@ -42,33 +42,35 @@ echo "OK  dist built (${BUILD_NUM} ${GIT_SHA})"
 
 echo "=== SSH (one password) ==="
 ssh -M -S "$SSH_SOCK" -o ControlPersist=30m -f -N "$REMOTE"
-ssh -S "$SSH_SOCK" "$REMOTE" "mkdir -p ${REMOTE_DIR}/dist ${REMOTE_DIR}/deploy/scripts"
+ssh -S "$SSH_SOCK" "$REMOTE" "mkdir -p ${REMOTE_DIR}/frontend/dist ${REMOTE_DIR}/deploy/scripts"
 
 echo "=== Upload dist/ (client + server for TanStack preview) ==="
 # Do not delete old hashed client assets during deploy. Browsers may still have
 # cached HTML/route chunks that reference the previous build's /assets files.
 rsync -az -e "ssh -S $SSH_SOCK" \
-  "$ROOT/dist/" "${REMOTE}:${REMOTE_DIR}/dist/"
+  "$ROOT/frontend/dist/" "${REMOTE}:${REMOTE_DIR}/frontend/dist/"
 
 rsync -az -e "ssh -S $SSH_SOCK" \
-  "$ROOT/package.json" "$ROOT/package-lock.json" \
-  "$REMOTE:${REMOTE_DIR}/"
+  --exclude node_modules --exclude dist --exclude coverage \
+  --exclude .tanstack --exclude .scannerwork --exclude '.env*' \
+  "$ROOT/frontend/" "$REMOTE:${REMOTE_DIR}/frontend/"
 
 rsync -az -e "ssh -S $SSH_SOCK" \
   "$ROOT/deploy/scripts/prod-frontend-pm2.sh" \
   "$REMOTE:${REMOTE_DIR}/deploy/scripts/"
 
-echo "=== Restart PM2 preview (no npm ci on VPS) ==="
+echo "=== Install locked preview dependencies and restart PM2 ==="
 ssh -S "$SSH_SOCK" "$REMOTE" "set -euo pipefail
   export PATH=\"/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:\$PATH\"
   export NVM_DIR=\"\${NVM_DIR:-\$HOME/.nvm}\"
   [ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\"
   REPO='${REMOTE_DIR}'
   cd \"\$REPO\"
-  if [ ! -f package.json ]; then
+  if [ ! -f frontend/package.json ]; then
     echo 'ERROR: missing package.json in '\$REPO >&2
     exit 1
   fi
+  npm --prefix frontend ci --no-audit --no-fund
   chmod +x deploy/scripts/prod-frontend-pm2.sh
   # Only free the port if listeners look like this frontend (PM2/npm preview), not unrelated services.
   if command -v fuser >/dev/null 2>&1; then
@@ -84,15 +86,15 @@ ssh -S "$SSH_SOCK" "$REMOTE" "set -euo pipefail
   fi
   sleep 1
   pm2 delete ${PM2_NAME} >/dev/null 2>&1 || true
-  pm2 start npm --name ${PM2_NAME} --cwd \"\$REPO\" --update-env -- run preview -- --host 127.0.0.1 --port ${FRONTEND_PORT} --strictPort
+  pm2 start npm --name ${PM2_NAME} --cwd \"\$REPO/frontend\" --update-env -- run preview -- --host 127.0.0.1 --port ${FRONTEND_PORT} --strictPort
   pm2 save
   sleep 3
   echo '--- PM2 cwd ---'
   pm2 describe ${PM2_NAME} 2>/dev/null | grep -E 'cwd|status|script' || pm2 list
   echo '--- Local verify ---'
-  head -1 \"\$REPO/dist/client/RELEASE.txt\" || true
+  head -1 \"\$REPO/frontend/dist/client/RELEASE.txt\" || true
   curl -fsS -m 10 http://127.0.0.1:${FRONTEND_PORT}/RELEASE.txt || echo 'WARN: :${FRONTEND_PORT} RELEASE.txt not reachable yet'
-  grep -rl WELCOME10 \"\$REPO/dist/client\" | head -2 || { echo 'ERROR: WELCOME10 missing on VPS dist' >&2; exit 1; }
+  grep -rl WELCOME10 \"\$REPO/frontend/dist/client\" | head -2 || { echo 'ERROR: WELCOME10 missing on VPS dist' >&2; exit 1; }
 "
 
 echo ""

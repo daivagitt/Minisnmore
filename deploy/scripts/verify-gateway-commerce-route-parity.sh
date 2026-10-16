@@ -13,7 +13,7 @@ import re
 import sys
 from pathlib import Path
 
-root = Path(__import__("os").environ["REPO_ROOT"]) / "gateway"
+root = Path(__import__("os").environ["REPO_ROOT"]) / "services" / "gateway"
 canon_file = root / "src/main/resources/config/application.yml"
 
 ROUTE_BLOCK = re.compile(

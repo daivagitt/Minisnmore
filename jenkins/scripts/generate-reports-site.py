@@ -192,49 +192,52 @@ SECTIONS: list[tuple[str, str, list[tuple[str, str, str]]]] = [
     ),
 ]
 
-EXTERNAL_SECTIONS: list[tuple[str, str, list[tuple[str, str, str]]]] = [
-    (
-        "Architecture",
-        "Live architecture documentation — https://architecturediagrams.aaushmon.com/",
-        [
-            (
-                "https://architecturediagrams.aaushmon.com/",
-                "https://architecturediagrams.aaushmon.com/",
-                "Architecture & Technical Documentation — system, frontend, backend, database, API, and CI/CD diagrams",
-            ),
-            (
-                "https://architecturediagrams.aaushmon.com/",
-                "Architecture documentation hub",
-                "Six interactive diagrams with step-by-step explanations and SVG/PNG downloads",
-            ),
-            (
-                "https://architecturediagrams.aaushmon.com/architecture/system-architecture",
-                "System architecture",
-                "Nginx, gateway, store/commerce proxies, catalog core, Postgres, Ledgerly, Razorpay",
-            ),
-            (
-                "https://architecturediagrams.aaushmon.com/architecture/frontend-architecture",
-                "Frontend architecture",
-                "Route groups, components, state management, and typed data layer",
-            ),
-            (
-                "https://architecturediagrams.aaushmon.com/architecture/backend-architecture",
-                "Backend architecture",
-                "Gateway, store, commerce, and catalog core service boundaries",
-            ),
-            (
-                "https://architecturediagrams.aaushmon.com/architecture/database-er-diagram",
-                "Database ER diagram",
-                "miniandmore and gateway Postgres schemas",
-            ),
-            (
-                "https://architecturediagrams.aaushmon.com/architecture/api-schema",
-                "API resource map",
-                "REST surface grouped by owning microservice",
-            ),
-        ],
-    ),
-]
+ARCHITECTURE_SECTION: tuple[str, str, list[tuple[str, str, str]]] = (
+    "Architecture",
+    "System, production topology, frontend, backend, database ER, API map, and CI/CD — Mermaid diagrams rendered in-browser.",
+    [
+        (
+            "./architecture/index.html",
+            "Architecture documentation hub",
+            "Seven interactive pages sourced from docs/ — production 9180–9184 layout included",
+        ),
+        (
+            "./architecture/viewer.html?doc=production-topology.md",
+            "Production topology",
+            "Live minisnmore.com — Nginx, PM2, webhooks, Postgres, Redis, R2, Ledgerly",
+        ),
+        (
+            "./architecture/viewer.html?doc=system-architecture.md",
+            "System architecture",
+            "Services, auth, data stores, dev vs production routing",
+        ),
+        (
+            "./architecture/viewer.html?doc=frontend-architecture.md",
+            "Frontend architecture",
+            "TanStack Start routes, components, React Query, lib/ clients",
+        ),
+        (
+            "./architecture/viewer.html?doc=backend-architecture.md",
+            "Backend architecture",
+            "Gateway, store, commerce, catalog core boundaries and schedulers",
+        ),
+        (
+            "./architecture/viewer.html?doc=database-er-diagram.md",
+            "Database ER diagram",
+            "miniandmore and gateway Postgres entities (Mermaid ER)",
+        ),
+        (
+            "./architecture/viewer.html?doc=api-schema.md",
+            "API resource map",
+            "REST paths grouped by owning microservice",
+        ),
+        (
+            "./architecture/viewer.html?doc=architecture-ci-cd.md",
+            "CI/CD and reports pipeline",
+            "Deploy flow and Jenkins reports bundle",
+        ),
+    ],
+)
 
 SONAR_PROJECTS: list[tuple[str, str, str]] = [
     ("frontend", "Frontend", "React storefront — Vitest coverage"),
@@ -319,6 +322,14 @@ def ensure_brand_assets(out_dir: Path) -> None:
         shutil.copy2(logo_src, out_dir / "daiva-logo.svg")
 
 
+def ensure_architecture(out_dir: Path) -> None:
+    script = Path(__file__).resolve().parent / "generate-architecture-report.py"
+    subprocess.run(
+        [sys.executable, str(script), "--output", str(out_dir / "architecture")],
+        check=False,
+    )
+
+
 def ensure_guidelines(out_dir: Path) -> None:
     src = Path(__file__).resolve().parents[2] / "artifacts" / "guidelines"
     if not any(src.rglob("*.md")):
@@ -383,14 +394,17 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     ensure_brand_assets(out_dir)
     ensure_wireframes(out_dir)
+    ensure_architecture(out_dir)
     ensure_guidelines(out_dir)
     write_sonar_hub(out_dir, args.sonar_url)
 
     parts: list[str] = []
     any_section = False
-    for title, blurb, links in EXTERNAL_SECTIONS:
+    arch_title, arch_blurb, arch_links = ARCHITECTURE_SECTION
+    arch_present = existing_links(arch_links, out_dir)
+    if arch_present:
         any_section = True
-        parts.append(section_html(title, blurb, links))
+    parts.append(section_html(arch_title, arch_blurb, arch_present))
     for title, blurb, links in SECTIONS:
         present = existing_links(links, out_dir)
         if present:
@@ -426,8 +440,8 @@ def main() -> None:
     toc_links = []
     if quick_access_html(out_dir):
         toc_links.append('<a href="#scenario-reports">Scenario reports</a>')
-    for title, _, links in EXTERNAL_SECTIONS:
-        toc_links.append(f'<a href="#{esc(section_id(title))}">{esc(title)}</a>')
+    if arch_present:
+        toc_links.append(f'<a href="#{esc(section_id(arch_title))}">{esc(arch_title)}</a>')
     for title, _, links in SECTIONS:
         if existing_links(links, out_dir):
             toc_links.append(f'<a href="#{esc(section_id(title))}">{esc(title)}</a>')

@@ -1031,7 +1031,50 @@ public class ZohoSyncService implements ZohoCreditNoteOrderSupport {
                     builder.failure(requestedGroupId, "Zoho item group contains a variant without a SKU");
                     continue;
                 }
-                upsertPulledProduct(variant, autoCreateCategory, builder, variantParents, null, true);
+                try {
+                    // Group summaries can omit stock and contain stale photos. Always read the
+                    // child detail, even when image sync is disabled, retaining group defaults.
+                    String itemId = StringUtils.trimToNull(stringValue(variant.get("item_id")));
+                    if (itemId == null) {
+                        builder.failure(sku, "Zoho item group variant has no item_id; stock and images could not be refreshed");
+                        continue;
+                    }
+                    Map<String, Object> summary = new LinkedHashMap<>(item);
+                    summary.put("item_id", itemId);
+                    List<String> imageFields = List.of(
+                        "documents", "image_document_id", "image_name", "image_type", "image_uri", "image_url", "item_image_url"
+                    );
+                    imageFields.forEach(summary::remove);
+                    Optional<Map<String, Object>> detail = fetchValidatedZohoItemDetail(summary, itemId, sku);
+                    if (detail.isEmpty()) {
+                        builder.failure(sku, "Zoho item detail not found; stock and images could not be refreshed");
+                        continue;
+                    }
+                    String detailGroupId = ZohoBooksItemAttributes.groupId(detail.orElseThrow());
+                    if (StringUtils.isNotBlank(detailGroupId) && !requestedGroupId.equals(detailGroupId)) {
+                        builder.failure(sku, "Zoho variant belongs to a different item group");
+                        continue;
+                    }
+                    variant = itemGroupVariant(group, detail.orElseThrow(), requestedGroupId);
+                    // Never inherit group/summary photos that the authoritative child omits.
+                    for (String field : imageFields) {
+                        if (!detail.orElseThrow().containsKey(field)) {
+                            variant.remove(field);
+                        }
+                    }
+                    upsertPulledProduct(variant, autoCreateCategory, builder, variantParents, null, true);
+                } catch (RestClientResponseException e) {
+                    builder.failure(sku, exceptionMessage(e));
+                    if (isOperationWideHttpFailure(e)) {
+                        break;
+                    }
+                } catch (ResourceAccessException e) {
+                    builder.failure(sku, "Zoho unreachable while reading item detail: " + exceptionMessage(e));
+                    break;
+                } catch (Exception e) {
+                    LOG.warn("Zoho item group pull failed for variant {}: {}", sku, exceptionMessage(e), e);
+                    builder.failure(sku, exceptionMessage(e));
+                }
             }
         } catch (RestClientResponseException e) {
             builder.failure(requestedGroupId, exceptionMessage(e));

@@ -21,21 +21,8 @@ gateway_verify_env
 
 export FRONTEND_AUTH_CALLBACK_URL="${FRONTEND_AUTH_CALLBACK_URL:-https://minisnmore.com/auth/callback}"
 
-if [ -z "${JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET:-}" ] && command -v pm2 >/dev/null 2>&1; then
-  JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET=$(
-    pm2 jlist 2>/dev/null | python3 -c "
-import json, sys
-for p in json.load(sys.stdin):
-    if p.get('name') == 'mini-uat':
-        print(p.get('pm2_env', {}).get('JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET', ''))
-        break
-" 2>/dev/null || true
-  )
-  export JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET
-fi
-
 if [ -z "${JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET:-}" ]; then
-  echo "ERROR: JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET not set (check prod.env or mini-uat PM2 env)." >&2
+  echo "ERROR: JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET not set in prod.env." >&2
   exit 1
 fi
 
@@ -60,29 +47,26 @@ export SPRING_LIQUIBASE_USERNAME="minisandmore_user"
 for _oauth_var in GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET APPLE_CLIENT_ID APPLE_CLIENT_SECRET FACEBOOK_CLIENT_ID FACEBOOK_CLIENT_SECRET; do
   if [ -z "${!_oauth_var:-}" ]; then
     echo "WARN: ${_oauth_var} is empty — OAuth for that provider will fail (set in /etc/mini-and-more/prod.env)." >&2
-    export "${_oauth_var}=uat-isolated-placeholder"
+    export "${_oauth_var}=prod-isolated-placeholder"
   fi
 done
-if [ "${FACEBOOK_CLIENT_ID:-}" = "uat-isolated-placeholder" ]; then
+if [ "${FACEBOOK_CLIENT_ID:-}" = "prod-isolated-placeholder" ]; then
   echo "WARN: Facebook login will return server_error until real FACEBOOK_CLIENT_ID/SECRET are in prod.env." >&2
 fi
 
-GATEWAY_JAR_SRC=$(ls -1 "${REPO_ROOT}"/gateway/target/gateway-*.jar 2>/dev/null | head -1 || true)
+GATEWAY_JAR_SRC=$(ls -1 "${REPO_ROOT}"/services/gateway/target/gateway-*.jar 2>/dev/null | head -1 || true)
 if [ -z "$GATEWAY_JAR_SRC" ] || [ ! -f "$GATEWAY_JAR_SRC" ]; then
   GATEWAY_JAR_SRC="${REPO_ROOT}/deploy/gateway-prod.jar"
-fi
-if [ ! -f "$GATEWAY_JAR_SRC" ]; then
-  GATEWAY_JAR_SRC="${REPO_ROOT}/deploy/gateway-uat.jar"
 fi
 if [ ! -f "$GATEWAY_JAR_SRC" ]; then
   echo "ERROR: gateway JAR not found (build gateway or copy to deploy/gateway-prod.jar)" >&2
   exit 1
 fi
 
-# PM2 must not use gateway/target/*.jar — Maven repackage can corrupt it mid-read.
+# PM2 must not use services/gateway/target/*.jar — Maven repackage can corrupt it mid-read.
 GATEWAY_JAR_PATH="${REPO_ROOT}/deploy/gateway-prod.jar"
 mkdir -p "${REPO_ROOT}/deploy"
-# gateway/target/*.jar is often a symlink to deploy/gateway-prod.jar — compare inodes, not path strings.
+# services/gateway/target/*.jar is often a symlink to deploy/gateway-prod.jar — compare inodes, not path strings.
 if [ ! "$GATEWAY_JAR_SRC" -ef "$GATEWAY_JAR_PATH" ]; then
   install -m 644 "$GATEWAY_JAR_SRC" "$GATEWAY_JAR_PATH"
 fi
@@ -91,9 +75,9 @@ if ! unzip -t -q "$GATEWAY_JAR_PATH"; then
   exit 1
 fi
 
-# spring-boot-properties-migrator (in current JARs) reads gateway/target/*.jar when cwd is gateway/.
-mkdir -p "${REPO_ROOT}/gateway/target"
-ln -sf "../../deploy/gateway-prod.jar" "${REPO_ROOT}/gateway/target/gateway-0.0.1-SNAPSHOT.jar"
+# spring-boot-properties-migrator (in current JARs) reads services/gateway/target/*.jar when cwd is gateway/.
+mkdir -p "${REPO_ROOT}/services/gateway/target"
+ln -sf "../../../deploy/gateway-prod.jar" "${REPO_ROOT}/services/gateway/target/gateway-0.0.1-SNAPSHOT.jar"
 
 STORE_PORT="${STORE_PORT:-9181}"
 COMMERCE_PORT="${COMMERCE_PORT:-9182}"
@@ -115,7 +99,6 @@ if [ -z "${SPRING_R2DBC_PASSWORD:-}" ]; then
 fi
 
 pm2 delete mini-prod-ms-gateway >/dev/null 2>&1 || true
-pm2 delete mini-uat-ms-gateway >/dev/null 2>&1 || true
 fuser -k "${GATEWAY_PORT}/tcp" >/dev/null 2>&1 || true
 unset SPRING_PROFILES_ACTIVE SPRING_PROFILES_INCLUDE
 
@@ -125,7 +108,7 @@ pm2 start java --name mini-prod-ms-gateway --cwd "${REPO_ROOT}" --update-env -- 
   -Dserver.port="${GATEWAY_PORT}" \
   -Djhipster.security.authentication.jwt.base64-secret="${JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET}" \
   -jar "$GATEWAY_JAR_PATH" \
-  --spring.profiles.active=prod,uat-isolated \
+  --spring.profiles.active=prod,prod-isolated \
   --springdoc.api-docs.enabled=false \
   --springdoc.swagger-ui.enabled=false \
   --spring.cloud.consul.enabled=false \

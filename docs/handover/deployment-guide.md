@@ -32,10 +32,10 @@ mini-prod-ms-catalog-core   :9184
 | Service | Typical JAR / output |
 | --- | --- |
 | Catalog | `backend/target/miniandmore-*.jar` |
-| Store | `store/target/miniandmore-store-*.jar` |
-| Commerce | `commerce/target/miniandmore-commerce-*.jar` |
-| Gateway | `gateway/target/gateway-*.jar` copied to `deploy/gateway-prod.jar` |
-| Frontend | `npm ci && npm run build` → `dist/` |
+| Store | `services/store/target/miniandmore-store-*.jar` |
+| Commerce | `services/commerce/target/miniandmore-commerce-*.jar` |
+| Gateway | `services/gateway/target/gateway-*.jar` copied to `deploy/gateway-prod.jar` |
+| Frontend | `npm --prefix frontend ci && npm --prefix frontend run build` → `frontend/dist/` |
 
 Java: `./mvnw -Pprod -DskipTests package` in each module. Runtime Liquibase is disabled; apply schema **before** swapping the catalog process:
 
@@ -56,7 +56,7 @@ Always wait for `/management/health/liveness` before moving on.
 | Commerce | `bash deploy/scripts/prod-restart-isolated-commerce.sh` |
 | Gateway | `bash deploy/scripts/prod-restart-isolated-gateway.sh` |
 | Frontend (rebuild) | `bash deploy/scripts/prod-frontend-pm2.sh` |
-| Frontend (`dist/` already built) | `bash deploy/scripts/prod-frontend-restart.sh` |
+| Frontend (`frontend/dist/` already built) | `bash deploy/scripts/prod-frontend-restart.sh` |
 | Reload env into running JVMs | `bash deploy/scripts/prod-reload-env-and-restart.sh` |
 
 Store has no dedicated helper in all cases; start it the same way as commerce (prod profile, `APPLICATION_CATALOG_BASE_URL=http://127.0.0.1:9184`, port `9181`) or use the isolated stack script.
@@ -64,6 +64,8 @@ Store has no dedicated helper in all cases; start it the same way as commerce (p
 Scripts delete **both** `mini-prod-ms-*` and legacy `mini-uat-ms-*` names so a bounce cannot leave two processes on the same port.
 
 ## Full isolated stack
+
+**Artifact prerequisite:** this helper requires an Integration JAR for `:9183`, even though the documented live stack does not run Integration and this checkout has no `integration/` source module. Use individual service helpers unless that artifact is available. See the [current script index](../../deploy/scripts/README.md).
 
 ```bash
 REPO_ROOT=/var/www/uat1/mini_ms_test bash deploy/scripts/prod-microservices-isolated-pm2.sh
@@ -91,7 +93,7 @@ Public API must keep proxying `/api/` to `127.0.0.1:9180` except invoice webhook
 
 ## Laptop → server (optional)
 
-`deploy/scripts/prod-deploy-frontend-from-laptop.sh` and `prod-deploy-gateway-from-laptop.sh` rsync build output then run the restart scripts on the VPS. Confirm `REMOTE_DIR=/var/www/uat1/mini_ms_test`.
+`deploy/scripts/prod-deploy-frontend-from-laptop.sh` builds the frontend locally, uploads `frontend/dist/`, and restarts it on the VPS. Confirm `REMOTE_DIR=/var/www/uat1/mini_ms_test`. The old gateway/all/unified laptop launchers were removed because they require the missing Integration source module. Build Java modules and use the individual server helpers above.
 
 ## After every deploy
 
@@ -100,4 +102,4 @@ Public API must keep proxying `/api/` to `127.0.0.1:9180` except invoice webhook
 3. `pm2 list` — all `mini-prod-*` **online**, no `errored`
 4. `pm2 save`
 
-If a health check fails, keep the prior JAR or `dist/` available and restore only the affected service. Re-run the same health checks before reopening the change window.
+If a health check fails, keep the prior JAR or `frontend/dist/` available and restore only the affected service. Re-run the same health checks before reopening the change window.

@@ -1,3 +1,5 @@
+> Historical deployment instructions: obsolete UAT, 808x, and Integration-dependent laptop launchers have been removed. Use the [current script index](../deploy/scripts/README.md) for supported commands.
+
 # Production readiness — microservices
 
 Checklist for running **gateway** + **catalog** at production quality.
@@ -7,11 +9,10 @@ Checklist for running **gateway** + **catalog** at production quality.
 | Component | Port | Exposure |
 |-----------|------|----------|
 | Nginx | 443 | Public |
-| Gateway | 8080 | `127.0.0.1` only |
-| Store | 8081 | `127.0.0.1` only |
-| Commerce | 8082 | `127.0.0.1` only |
-| Integration | 8083 | `127.0.0.1` only |
-| Catalog core | 8084 | `127.0.0.1` only |
+| Gateway (`services/gateway/`) | 9180 | `127.0.0.1` only |
+| Store (`services/store/`) | 9181 | `127.0.0.1` only |
+| Commerce (`services/commerce/`) | 9182 | `127.0.0.1` only |
+| Catalog core (`backend/`) | 9184 | `127.0.0.1` only |
 | Consul | 8500 | `127.0.0.1` only |
 | Postgres | 5432+ | `127.0.0.1` only |
 | Redis | 6379 | `127.0.0.1` only |
@@ -40,56 +41,65 @@ Checklist for running **gateway** + **catalog** at production quality.
 - [ ] Prometheus optional (`PROMETHEUS_ENABLED=true` on internal scrape)
 - [ ] Tracing sample rate 5–10% (`TRACING_SAMPLE_PROBABILITY`)
 
-## Deploy (replace monolith on :8081 / :8086)
+## Validate and build
+
+From the repository root:
 
 ```bash
-# 1. Build all five JARs (local or CI)
-for dir in gateway backend store commerce integration; do
-  (cd "$dir" && ./mvnw -Pprod -DskipTests clean package)
+npm --prefix frontend ci
+npm --prefix frontend run check
+bash scripts/verify-deployment-layout.sh
+for dir in backend services/gateway services/store services/commerce; do
+  (cd "$dir" && ./mvnw test)
 done
-
-# 2. On VPS — env + preflight
-sudo cp deploy/env/prod.env.example /etc/mini-and-more/prod.env
-sudo chmod 600 /etc/mini-and-more/prod.env
-# Fill secrets; reuse existing prod DB password and JWT secret from monolith.
-
-sudo cp deploy/nginx/prod.minisnmore.com.locations.conf /etc/nginx/snippets/minisnmore-prod-locations.conf
-sudo nginx -t && sudo systemctl reload nginx
-
-chmod +x deploy/scripts/preflight-prod-microservices.sh deploy/scripts/prod-microservices-pm2.sh
-REPO_ROOT=/var/www/blossom-blueprint-craft bash deploy/scripts/preflight-prod-microservices.sh
-
-# 3. Start stack (stops legacy mini-backend-prod and binds :8080–8084)
-ENV_FILE=/etc/mini-and-more/prod.env REPO_ROOT=/var/www/blossom-blueprint-craft \
-  bash deploy/scripts/prod-microservices-pm2.sh
+npm --prefix frontend run build
+(cd backend && ./mvnw -Pprod -DskipTests package)
+(cd services/gateway && ./mvnw -Pprod -DskipTests package)
+(cd services/store && ./mvnw -DskipTests package)
+(cd services/commerce && ./mvnw -DskipTests package)
 ```
 
-### Production frontend
+The lightweight store/commerce projects use runtime Spring profiles; they do not declare a Maven `prod` profile. The core and gateway retain their generated Maven profiles.
 
-Build and restart the storefront/admin UI from the production checkout:
+## Deployment
+
+Use the [current script index](../deploy/scripts/README.md). `REPO_ROOT` identifies the repository, while frontend PM2 uses `$REPO_ROOT/frontend` as its working directory.
+
+After staging validation, select the restart helper for the changed module:
 
 ```bash
-REPO_ROOT=/var/www/uat1/mini_ms_test \
-  bash deploy/scripts/prod-frontend-pm2.sh
+export REPO_ROOT=/path/to/release
+bash deploy/scripts/prod-restart-isolated-catalog.sh
+bash deploy/scripts/prod-restart-isolated-commerce.sh
+bash deploy/scripts/prod-restart-isolated-gateway.sh
+bash deploy/scripts/prod-frontend-pm2.sh
 ```
 
-The production frontend uses `https://minisnmore.com` by default and runs as
-`mini-prod-frontend` on localhost port `3000`. UAT frontend scripts retain
-their separate `minisnmore.com` defaults.
+The full four-service launcher is `prod-microservices-isolated-pm2.sh`. It reads JARs from `backend/target/` and `services/*/target/`, applies the catalog migrations listed in `catalog-isolated-migrations.list`, and starts catalog, store, commerce, and gateway. Integration logic runs inside core.
 
-**Port layout:** Nginx public → gateway **8080** only. Store **8081**, commerce **8082**, integration **8083**, catalog **8084** are localhost-only. Do not expose edge ports publicly.
+The production frontend listens on localhost `3000`; Nginx forwards API traffic to gateway `9180`. Store `9181`, commerce `9182`, and core `9184` remain internal. The isolated production Nginx snippet is `deploy/nginx/prod.minisnmore.com.isolated-9180.locations.conf`; static files are under `frontend/public/`. Validate the site's assembled configuration with `nginx -t` before reloading it.
 
-UAT1 (`/var/www/uat1/mini_and_more`): Jenkins `DEPLOY_UAT` rsyncs all JARs; on the VPS run `deploy/scripts/prod-microservices-pm2.sh` (see `deploy/env/prod.env.example`). Gateway profile `uat` uses localhost routes to edges.
+Deployment helpers load the existing `/etc/mini-and-more/prod.env`. Use separate configuration, databases, gateway credentials, payment test keys, and mail capture on a staging host. The historical `uat1` directory on this server is production, not an isolated test environment.
 
-## Profiles
+## Runtime profiles
 
-| Environment | Gateway | Catalog |
-|-------------|---------|---------|
-| Local dev | `dev` | `dev` |
-| UAT | `prod,api-docs,uat` | `prod,api-docs` (core); edges `prod` |
-| Production | `prod` (+ `consul` if using config server) | `prod` |
+| Component | Production profile |
+| --- | --- |
+| Gateway | `prod,prod-isolated,api-docs` |
+| Catalog core | `prod,api-docs` |
+| Store and commerce | `prod` |
 
-Do not use `dev` or `faker` Liquibase contexts in production.
+Do not enable `faker` or seed-data migrations against production databases.
+
+## Post-deployment checks
+
+```bash
+bash deploy/scripts/health-check-microservices.sh
+bash deploy/scripts/prod-verify-isolated-stack.sh
+bash scripts/verify-frontend-api-contract.sh
+```
+
+On staging, validate registration/login, catalog and product variants, cart and coupons, a payment in test mode, admin actions, return/refund workflows, and email delivery into a test mailbox. Record that evidence before production rollout.
 
 ## Frontend contract
 
@@ -102,4 +112,4 @@ After deploy, verify modules in order: [MODULES_TESTING.md](./MODULES_TESTING.md
 
 ## CI
 
-Jenkins: `BUILD_GATEWAY`, `BUILD_BACKEND`, `BUILD_STORE`, `BUILD_COMMERCE`, `BUILD_INTEGRATION`, `DEPLOY_UAT` — see root `Jenkinsfile` (UAT1 → `REMOTE_APP_DIR=/var/www/uat1/mini_ms_test`).
+Use `frontend/package-lock.json` with npm, and run `npm --prefix frontend run check` plus each module’s Maven test suite before packaging release artifacts. The report helpers under `jenkins/` read frontend output from `frontend/coverage/` and service output from `services/*/target/`.

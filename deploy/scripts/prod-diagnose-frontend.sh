@@ -16,10 +16,10 @@ ss -tlnp | grep ":${PORT} " || echo "nothing listening on :${PORT}"
 
 echo ""
 echo "=== dist in ${REPO} ==="
-if [ -f "${REPO}/dist/client/RELEASE.txt" ]; then
-  echo "RELEASE: $(cat "${REPO}/dist/client/RELEASE.txt" | tr '\n' ' ')"
-  grep -rl WELCOME10 "${REPO}/dist/client" 2>/dev/null | head -2 || echo "WELCOME10: MISSING in dist"
-  grep -rl 'Letters from us' "${REPO}/dist/client" 2>/dev/null | head -1 || echo "new footer: MISSING"
+if [ -f "${REPO}/frontend/dist/client/RELEASE.txt" ]; then
+  echo "RELEASE: $(cat "${REPO}/frontend/dist/client/RELEASE.txt" | tr '\n' ' ')"
+  grep -rl WELCOME10 "${REPO}/frontend/dist/client" 2>/dev/null | head -2 || echo "WELCOME10: MISSING in dist"
+  grep -rl 'Letters from us' "${REPO}/frontend/dist/client" 2>/dev/null | head -1 || echo "new footer: MISSING"
 else
   echo "NO dist/client/RELEASE.txt — frontend never built in ${REPO}"
 fi

@@ -37,13 +37,13 @@ BACKEND_SONAR_DIR="$ROOT/jenkins/sonar/backend-all"
 )
 
 echo "=== Sonar: frontend ==="
-if [ -f coverage/frontend/lcov.info ]; then
-  sonar-scanner \
+if [ -f frontend/coverage/lcov.info ]; then
+  (cd frontend && sonar-scanner \
     -Dsonar.host.url="$SONAR_HOST_URL" \
     -Dsonar.token="$SONAR_TOKEN" \
-    -Dproject.settings=sonar-project.properties
+    -Dproject.settings=sonar-project.properties)
 else
-  echo "WARNING: coverage/frontend/lcov.info missing — run Vitest coverage first" >&2
+  echo "WARNING: frontend/coverage/lcov.info missing — run Vitest coverage first" >&2
 fi
 
 OUT_DIR="${SONAR_SUMMARY_DIR:-artifacts/sonar-summary}"

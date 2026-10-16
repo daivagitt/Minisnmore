@@ -78,16 +78,16 @@ rm -rf "$PKG/backend/scenario-integration" "$PKG/backend/ledgerly-scenario-integ
 
 if [ "$RUN_UNIT_TESTS" = "true" ]; then
   echo "=== 2. Frontend unit tests (Vitest + coverage) ==="
-  run_step npm run test:coverage -- \
+  run_step npm --prefix frontend run test:coverage -- \
     --coverage.thresholds.lines=0 \
     --coverage.thresholds.statements=0 \
     --coverage.thresholds.branches=0 \
     --coverage.thresholds.functions=0 \
     --coverage.reportOnFailure=true \
-    --reporter=default --reporter=junit --outputFile.junit=coverage/frontend/junit.xml
+    --reporter=default --reporter=junit --outputFile.junit=coverage/junit.xml
 
   echo "=== 3. Backend unit tests (gateway, catalog, store, commerce) ==="
-  for mod in gateway backend store commerce; do
+  for mod in services/gateway backend services/store services/commerce; do
     echo "  module: $mod"
     run_step bash -c "cd '$REPO_ROOT/$mod' && ./mvnw -q test jacoco:report -DskipITs -Djacoco.haltOnFailure=false -Dmaven.test.failure.ignore=true"
   done
@@ -103,7 +103,7 @@ bash jenkins/scripts/package-test-reports.sh "$PKG" || true
 
 if [ "$RUN_JAVADOC" = "true" ]; then
   echo "=== 6. JavaDoc (all microservices) ==="
-  for mod_spec in gateway:gateway backend:catalog store:store commerce:commerce; do
+  for mod_spec in services/gateway:gateway backend:catalog services/store:store services/commerce:commerce; do
     IFS=: read -r mod_dir slug <<< "$mod_spec"
     if [ -d "$PKG/backend/javadoc/$slug/index.html" ]; then
       echo "  keeping existing $slug JavaDoc from current release"

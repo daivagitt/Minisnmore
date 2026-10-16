@@ -76,7 +76,7 @@ Admin upload / Zoho image sync
 
 ## 2. Gallery resolution (`galleryForSelectedColor`)
 
-**File:** `src/lib/product-gallery.ts` (mirrored at repo root `lib/product-gallery.ts` for Vitest paths).
+**File:** `frontend/src/lib/product-gallery.ts` (mirrored at repo root `lib/product-gallery.ts` for Vitest paths).
 
 **Entry point:**
 
@@ -115,7 +115,7 @@ Returns `{ image: heroUrl, gallery: remainingUrls[] }`. Hero is always first; `g
 
 ## 3. Image derivatives (`storefront-image`)
 
-**File:** `src/lib/storefront-image.ts`
+**File:** `frontend/src/lib/storefront-image.ts`
 
 R2/S3 stores three tiers for each catalog photo:
 
@@ -151,7 +151,7 @@ resetStorefrontImagePrefetch()  // test helper
 
 ## 4. LazyImage component
 
-**File:** `src/components/LazyImage.tsx`
+**File:** `frontend/src/components/LazyImage.tsx`
 
 Shared image primitive used across storefront (PDP, cards, cart, navbar, homepage). Wraps native `<img>` with loading policy and resilience.
 
@@ -193,7 +193,7 @@ On `error`, if `fallbackSrc` differs from `src`, swaps to fallback and clears `s
 
 ## 5. ProductGallery UI
 
-**File:** `src/components/ProductGallery.tsx`
+**File:** `frontend/src/components/ProductGallery.tsx`
 
 ### Layout
 
@@ -231,7 +231,7 @@ After hero natural dimensions are known:
 
 ## 6. Colour swatches & prefetch on intent
 
-**File:** `src/components/VariantPickers.tsx` — `VariantColorButtons`
+**File:** `frontend/src/components/VariantPickers.tsx` — `VariantColorButtons`
 
 | Feature | Implementation |
 |---------|----------------|
@@ -246,7 +246,7 @@ Swatch images render at 48–56px; requesting 240px thumbs is intentional (sharp
 
 ## 7. PDP route wiring
 
-**File:** `src/routes/product.$slug.tsx`
+**File:** `frontend/src/routes/product.$slug.tsx`
 
 ```ts
 const colorGallery = useMemo(
@@ -288,7 +288,7 @@ Colour/size state drives gallery recomputation; `useLayoutEffect` in `ProductGal
 | Client upload normalize | `product-image-normalize.ts` | Gallery export 1250px; swatch smaller |
 | Admin UI | `ColorImagesEditor.tsx` | Per-print lifestyle upload; `ADMIN_IMAGE_SPECS.productGallery` |
 
-**Admin image specs:** `src/lib/admin-image-specs.ts` — documents that swatch uploads are for the colour picker, not the main gallery.
+**Admin image specs:** `frontend/src/lib/admin-image-specs.ts` — documents that swatch uploads are for the colour picker, not the main gallery.
 
 ---
 
@@ -383,17 +383,17 @@ Not implemented; candidates if profiling shows need:
 
 | Topic | Path |
 |-------|------|
-| Gallery resolution | `src/lib/product-gallery.ts` |
-| Print / swatch helpers | `src/lib/product-colors.ts` |
-| Derivative URLs + prefetch | `src/lib/storefront-image.ts` |
-| Lazy load wrapper | `src/components/LazyImage.tsx` |
-| In-memory image cache | `src/lib/image-cache/` |
-| PDP gallery UI | `src/components/ProductGallery.tsx` |
-| Colour swatches | `src/components/VariantPickers.tsx` |
-| PDP page | `src/routes/product.$slug.tsx` |
-| Product card (listing) | `src/components/ProductCard.tsx` |
-| Client upload normalize | `src/lib/product-image-normalize.ts` |
-| Storefront product map | `src/lib/storefront.ts` |
+| Gallery resolution | `frontend/src/lib/product-gallery.ts` |
+| Print / swatch helpers | `frontend/src/lib/product-colors.ts` |
+| Derivative URLs + prefetch | `frontend/src/lib/storefront-image.ts` |
+| Lazy load wrapper | `frontend/src/components/LazyImage.tsx` |
+| In-memory image cache | `frontend/src/lib/image-cache/` |
+| PDP gallery UI | `frontend/src/components/ProductGallery.tsx` |
+| Colour swatches | `frontend/src/components/VariantPickers.tsx` |
+| PDP page | `frontend/src/routes/product.$slug.tsx` |
+| Product card (listing) | `frontend/src/components/ProductCard.tsx` |
+| Client upload normalize | `frontend/src/lib/product-image-normalize.ts` |
+| Storefront product map | `frontend/src/lib/storefront.ts` |
 | Per-print DB support | `backend/.../ProductColorImagesSupport.java` |
 | Derivative generation | `backend/.../ImagePreviewSupport.java` |
 | Zoho images | `backend/.../ZohoItemImageSync.java` |

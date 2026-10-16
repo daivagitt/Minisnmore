@@ -1,77 +1,112 @@
 # System Architecture
 
-Mini's n More runs as a **JHipster 9 / Spring Cloud microservice backend** behind a single React (TanStack Start) frontend. This document is the top-level map; see the companion docs for detail:
+Mini's n More is a **JHipster microservice backend** (gateway + store + commerce + catalog core) behind a single **TanStack Start** storefront and admin UI under `frontend/`.
 
-- [frontend-architecture.md](./frontend-architecture.md)
-- [backend-architecture.md](./backend-architecture.md)
-- [database-er-diagram.md](./database-er-diagram.md)
-- [api-schema.md](./api-schema.md)
+Companion docs: [frontend-architecture.md](./frontend-architecture.md), [backend-architecture.md](./backend-architecture.md), [database-er-diagram.md](./database-er-diagram.md), [api-schema.md](./api-schema.md), [production topology](./handover/architecture-diagram.md).
 
 ## Services
 
-| Service | Folder | Stack | Port (dev) | Role |
-|---|---|---|---|---|
-| **Frontend** | repo root (`src/`) | TanStack Start (React 19) + Vite | 5173 | Storefront + admin CMS UI |
-| **Gateway** | `gateway/` | Spring Boot 3.5 / JHipster 8.12, WebFlux | 8080 | JWT issuance, login/register/OAuth2, Spring Cloud Gateway routing, Consul |
-| **Catalog core (backend)** | `backend/` (`miniandmore`) | Spring Boot 4.0 / JHipster 9.0, MVC | 8084 | Domain DB, business logic, Ledgerly sync, `/internal/v1/**` only |
-| **Store** | `store/` (`miniandmore-store`) | Spring Boot 4.0 / JHipster 9.0, MVC | 8081 | Public storefront + admin CMS proxy → core |
-| **Commerce** | `commerce/` (`miniandmore-commerce`) | Spring Boot 4.0 / JHipster 9.0, MVC | 8082 | Orders/profile/coupons/returns proxy → core |
-| ~~Integration~~ | `integration/` | — | 8083 | **Defunct.** Deleted from git in commit `3278ca7`; its Zoho/Ledgerly responsibilities were absorbed into `backend`. Deploy scripts and `docs/PRODUCTION_READINESS.md` still reference it and need cleanup. |
+| Service | Folder | Dev port | Production port | Role |
+| --- | --- | --- | --- | --- |
+| **Frontend** | `frontend/` | 5173 (Vite) | 3000 (PM2 preview) | Storefront + admin CMS |
+| **Gateway** | `services/gateway/` | 8080 | **9180** | JWT, OAuth2, Spring Cloud Gateway |
+| **Store** | `services/store/` | 8081 | **9181** | Shop + admin CMS proxy → catalog core |
+| **Commerce** | `services/commerce/` | 8082 | **9182** | Orders, profile, coupons, returns → core |
+| **Catalog core** | `backend/` (`miniandmore`) | 8084 | **9184** | Domain DB, Ledgerly, Razorpay, R2, internal APIs |
 
-Both `store` and `commerce` are **thin proxies with no database of their own** — they exist purely as auth/routing boundaries in front of `backend`, which owns all persistence and business logic.
+`store` and `commerce` have **no database** — they validate JWT and forward to catalog core over a fixed `CATALOG_BASE_URL` (`RestClient`, not Feign).
 
-## Request flow
+## Request flow (logical)
 
-```text
-Browser
-  → Nginx (443, public)
-    → Gateway (:8080, Consul lb://)
-        ├── /api/authenticate, /api/register, /api/account/*, /oauth2/**   → handled on gateway itself
-        ├── /api/v1/orders/**, /account/profile, /coupons, /order-returns  → Commerce (:8082) → Backend (:8084)
-        └── /api/v1/** (shop, categories, CMS, admin, ledgerly)            → Store (:8081) → Backend (:8084)
+```mermaid
+flowchart TB
+  Browser["Browser"]
+  Nginx["Nginx :443"]
+  FE["Frontend SPA"]
+  GW["Gateway"]
+  ST["Store edge"]
+  CM["Commerce edge"]
+  CC["Catalog core backend/"]
+
+  Browser --> Nginx
+  Nginx -->|pages assets| FE
+  Nginx -->|/api oauth2| GW
+  GW -->|/api/v1 shop CMS admin| ST
+  GW -->|orders coupons returns payments| CM
+  ST -->|/internal/v1| CC
+  CM -->|/internal/v1| CC
 ```
 
-- Only the **gateway hop** is Consul service-discovery routed (`lb://miniandmore-store`, `lb://miniandmore-commerce`).
-- The **edge → core hop** (store/commerce → backend) is a fixed `CATALOG_BASE_URL` (default `http://127.0.0.1:8084`) via Spring's synchronous `RestClient` — not Feign, not Consul.
-- `backend` binds to `127.0.0.1` only in production; it is never reachable directly from the internet.
-- Every proxied request carries the same Bearer JWT end-to-end; the gateway's `JWTRelayGatewayFilterFactory` decodes and relays it, and each downstream service independently validates it as an OAuth2 resource server using the same shared HMAC secret (`JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET`).
-
-## Databases
-
-Two independent Postgres databases (see [database-er-diagram.md](./database-er-diagram.md) for full schema):
-
-| Database | Owned by | Contents |
-|---|---|---|
-| `gateway` (port 5433 dev) | gateway (R2DBC, reactive) | `jhi_user`, `jhi_authority`, `jhi_user_authority` — accounts and roles |
-| `miniandmore` (port 5432 dev) | backend (JPA/Hikari) | Product, Category, CustomerOrder, OrderItem, Coupon, OrderReturn, CustomerProfile, CMS content, Ledgerly settings |
-
-Cross-database references (e.g. `CustomerOrder.userLogin` → `jhi_user.login`) are **logical only** — plain string columns, no enforced FK, since the two databases are physically separate.
-
-Supporting infra: **Consul** (service discovery + config, port 8500), **Redis** (caching, port 6379), **S3/R2-compatible object storage** (product images/uploads).
-
-## External integrations
-
-- **Ledgerly** — accounting/inventory system. `backend` pushes products/orders and pulls inventory/tracking via scheduled jobs (`LedgerlySyncScheduler`, `LedgerlyInventoryPullScheduler`) and receives webhooks at `/internal/v1/ledgerly/webhooks`.
-- **Razorpay** — payment gateway, integrated directly in `backend` (`RazorpayRefundService`, order verification flow).
-- **Google OAuth2** — social login, terminates on the gateway.
-
-## Deployment topology (production/UAT)
+### Local development
 
 ```text
-Nginx (443, public)
-  → Gateway   127.0.0.1:8080
-      → Store     127.0.0.1:8081
-      → Commerce  127.0.0.1:8082
-          → Backend (catalog core) 127.0.0.1:8084
-Consul  127.0.0.1:8500
-Postgres (catalog) 127.0.0.1:5432
-Postgres (gateway)  127.0.0.1:5433
-Redis   127.0.0.1:6379
+Browser → Vite :5173 (proxies /api → Gateway :8080)
+  → Gateway (Consul lb://miniandmore-store | miniandmore-commerce)
+      → Store :8081 | Commerce :8082
+          → Catalog core :8084 (127.0.0.1)
 ```
 
-All Java services run under **PM2** (`deploy/scripts/prod-microservices-pm2.sh` / `prod-microservices-pm2.sh`), built via `./mvnw -Pprod -DskipTests clean package` per module and health-checked against `/management/health/{liveness,readiness}`. The frontend is built with Vite and served separately (see `prod-frontend-pm2.sh`). See `docs/PRODUCTION_READINESS.md` and `docs/LOCAL_DEV.md` for the full runbook (note: those docs still list the defunct `integration` service — treat that as stale).
+### Production (minisnmore.com)
 
-## Known architectural discrepancies (worth fixing)
+```text
+Browser → Nginx :443
+  → Frontend PM2 :3000 (HTML/JS)
+  → Gateway PM2 :9180 (profile prod,uat-isolated — Consul OFF)
+      → Store :9181 | Commerce :9182 (fixed HTTP, not lb://)
+          → Catalog core :9184 (loopback only)
+```
 
-- `integration/` is deleted from source control but still referenced by `docs/PRODUCTION_READINESS.md` and several `deploy/scripts/*.sh` (build/health-check loops iterate over it).
-- The Ledgerly webhook endpoint (`/internal/v1/ledgerly/webhooks`) is not proxied by any committed Nginx config or gateway route — only reachable if something outside the repo (e.g. a manual VPS Nginx block) forwards it.
+Some webhooks hit catalog core **directly** on `:9184` (e.g. invoice callback) or via gateway routes to `:9184`; see [handover/architecture-diagram.md](./handover/architecture-diagram.md).
+
+## Authentication
+
+- JWT is issued only on the **gateway** (`POST /api/authenticate`, register, OAuth2).
+- `JWTRelayGatewayFilterFactory` forwards the bearer token to store/commerce.
+- Every Java service validates the same HMAC secret: `JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET`.
+- Edge → core may also send `application.internal-api-key` (`INTERNAL_API_KEY`).
+
+## Databases and cache
+
+| Database | Typical dev | Production (this VPS) | Owner | Contents |
+| --- | --- | --- | --- | --- |
+| `miniandmore` | `:5432` | `:5432` | catalog core | Products, orders, CMS, Ledgerly settings |
+| `gateway` | `:5433` | often same host DB | gateway (R2DBC) | `jhi_user`, roles |
+
+Cross-DB `user_login` references are **logical strings**, not foreign keys.
+
+**Redis** (`127.0.0.1:6379`) — catalog cache. **Cloudflare R2** — product images (`application.storage.s3.*`).
+
+## External systems
+
+| System | Where integrated | Purpose |
+| --- | --- | --- |
+| **Ledgerly** | catalog core | Product/order sync, inventory pull, webhooks `/internal/v1/ledgerly/webhooks` |
+| **Razorpay** | catalog core | Payments and refunds |
+| **XpressBees** | catalog core | Shipment / return webhooks |
+| **Google / Apple / Facebook OAuth** | gateway | Social login |
+| **SMTP** | gateway / mail config | Transactional email |
+| **Zoho Books paths** | catalog core (legacy routes) | Legacy webhook URL compatibility; admin Zoho settings where still enabled |
+
+## Discovery and config
+
+| Environment | Consul | Gateway → edge routing |
+| --- | --- | --- |
+| Local dev | On (`:8500`) | `lb://miniandmore-store`, `lb://miniandmore-commerce` |
+| Production isolated stack | **Disabled** | Fixed `http://127.0.0.1:9181` / `9182` / `9184` in `application-uat-isolated.yml` |
+
+## Code layout
+
+| Path | Service |
+| --- | --- |
+| `frontend/src/` | React storefront + admin |
+| `services/gateway/` | Auth + routing |
+| `services/store/` | Store edge |
+| `services/commerce/` | Commerce edge |
+| `backend/` | Catalog core |
+| `deploy/` | Nginx, PM2, env examples, release scripts |
+
+## Operations pointers
+
+- Production ports and PM2 names: [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md), [deploy/scripts/README.md](../deploy/scripts/README.md).
+- Schema: Liquibase in `backend/`; production applies via `deploy/scripts/run-catalog-liquibase.sh` before catalog JAR restart when needed.
+- Reports site embeds these diagrams: run `python3 jenkins/scripts/generate-architecture-report.py` (wired from `generate-reports-site.py`).

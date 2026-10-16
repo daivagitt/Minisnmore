@@ -226,7 +226,7 @@ Broader than local Mini (which only handled item + `invoice.paid`).
 
 ## 9. Admin UI & APIs
 
-- **UI:** `/admin/integrations/ledgerly` (`src/routes/admin.integrations.ledgerly.tsx`)
+- **UI:** `/admin/integrations/ledgerly` (`frontend/src/routes/admin.integrations.ledgerly.tsx`)
 - **Not** `/admin/zoho` (no active route)
 - **API base:** `/api/v1/admin/ledgerly` (`LedgerlyAdminResource`)
 

@@ -90,12 +90,12 @@ Ledgerly sync (pull / push / webhook):
 | Excel → print names (image hash match) | `deploy/scripts/prod-sku-wise-print-import.py` → `build_print_name_map()` |
 | Excel → variants/stock | same script → `build_products()` |
 | Admin xlsx upload endpoint | `InternalAdminImportResource.java` → `/internal/v1/admin/import/sku-wise-print` |
-| Admin UI upload button | `src/routes/admin.products.tsx` |
+| Admin UI upload button | `frontend/src/routes/admin.products.tsx` |
 | Ledgerly pull merge | `LedgerlyProductMergeService.java` → `mergeLedgerlyItem()` |
 | Ledgerly push payload | `LedgerlyProductMergeService.java` → `buildPushPayload()` |
 | Per-print gallery import to R2 | `LedgerlyItemImageSync.java` (when `LEDGERLY_SYNC_PRODUCT_IMAGES=true`) |
 | Swatch restore from PRINT NAMES | `deploy/scripts/prod-restore-print-swatch-images.py` |
-| Storefront merge | `src/lib/product-colors.ts` → `mergeColorImagesIntoColors()` |
+| Storefront merge | `frontend/src/lib/product-colors.ts` → `mergeColorImagesIntoColors()` |
 
 ### Manual overrides (when image match fails)
 

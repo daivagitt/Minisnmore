@@ -19,11 +19,12 @@ flowchart LR
   CM["Commerce<br/>mini-prod-ms-commerce :9182"]
   CC["Catalog core<br/>mini-prod-ms-catalog-core :9184"]
   PG[("Postgres miniandmore :5432")]
+  Redis[("Redis :6379")]
   R2["Cloudflare R2"]
-  Zoho["Zoho Books"]
+  Ledgerly["Ledgerly ERP"]
   XB["XpressBees"]
   Rzp["Razorpay"]
-  Mail["SMTP Gmail or Zoho"]
+  Mail["SMTP"]
 
   Browser --> Nginx
   Nginx -->|HTML /assets| FE
@@ -31,12 +32,14 @@ flowchart LR
   Nginx -->|"invoice webhooks"| CC
   GW -->|shop CMS admin catalog| ST
   GW -->|orders coupons returns payments| CM
+  GW -->|webhooks razorpay xpressbees zoho ledgerly| CC
   ST -->|/internal/v1| CC
   CM -->|/internal/v1| CC
   CC --> PG
   GW --> PG
+  CC --> Redis
   CC --> R2
-  CC --> Zoho
+  CC --> Ledgerly
   CC --> XB
   CC --> Rzp
   GW --> Mail
@@ -46,7 +49,7 @@ flowchart LR
 
 | Process | PM2 name | Bind | Role |
 | --- | --- | --- | --- |
-| Storefront + admin UI | `mini-prod-frontend` | `127.0.0.1:3000` | Vite preview of `dist/` |
+| Storefront + admin UI | `mini-prod-frontend` | `127.0.0.1:3000` | Vite preview of `frontend/dist/` |
 | Gateway | `mini-prod-ms-gateway` | `127.0.0.1:9180` | JWT, OAuth, route `/api` |
 | Store | `mini-prod-ms-store` | `127.0.0.1:9181` | Catalog/CMS/admin proxy |
 | Commerce | `mini-prod-ms-commerce` | `127.0.0.1:9182` | Orders, coupons, returns, payments |
@@ -85,12 +88,12 @@ Consul is **disabled** on the isolated stack (`--spring.cloud.consul.enabled=fal
 
 | Folder | Service |
 | --- | --- |
-| `src/` | Storefront + admin (TanStack Start / React) |
-| `gateway/` | Auth + routing |
-| `store/` | Store edge |
-| `commerce/` | Commerce edge |
+| `frontend/src/` | Storefront + admin (TanStack Start / React) |
+| `services/gateway/` | Auth + routing |
+| `services/store/` | Store edge |
+| `services/commerce/` | Commerce edge |
 | `backend/` | Catalog core (`miniandmore`) |
 | `integration/` | Optional; not in the current PM2 list |
 | `deploy/` | Scripts, Nginx snippets, env example |
 
-Companion architecture write-ups: [`docs/system-architecture.md`](../system-architecture.md), [`docs/backend-architecture.md`](../backend-architecture.md), [`docs/frontend-architecture.md`](../frontend-architecture.md), [`docs/database-er-diagram.md`](../database-er-diagram.md). Those still mention 8080/Consul in places; **this handover diagram is what is actually live**.
+Companion write-ups (also rendered on the [Reports architecture hub](https://minisnmore.com/reports/architecture/)): [`docs/system-architecture.md`](../system-architecture.md), [`docs/backend-architecture.md`](../backend-architecture.md), [`docs/frontend-architecture.md`](../frontend-architecture.md), [`docs/database-er-diagram.md`](../database-er-diagram.md), [`docs/architecture-ci-cd.md`](../architecture-ci-cd.md).

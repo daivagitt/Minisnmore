@@ -85,7 +85,7 @@ The gateway module previously failed to compile from source due to missing `User
 Verify the build now compiles:
 
 ```bash
-cd gateway
+cd services/gateway
 ./mvnw -DskipTests compile
 ```
 
@@ -98,7 +98,7 @@ Also restored: `sonar-project.properties` (was missing, blocked the Maven proper
 Verify tests pass:
 
 ```bash
-cd store
+cd services/store
 ./mvnw test -Djacoco.skip=true
 ```
 
@@ -180,7 +180,7 @@ L-55  Webhook retry on transient failure
 | Item | Location |
 |------|----------|
 | UAT secrets | `/etc/mini-and-more/prod.env` |
-| Gateway UAT routes | `gateway/src/main/resources/config/application-uat-isolated.yml` |
+| Gateway UAT routes | `services/gateway/src/main/resources/config/application-uat-isolated.yml` |
 | Ledgerly properties binding | `backend/src/main/java/com/miniandmore/app/config/ApplicationProperties.java` |
 | Nginx UAT config | `/etc/nginx/sites-enabled/mini-frontend-uat` |
 | Test scenarios | `docs/ledgerly-integration-test-scenarios.md` |

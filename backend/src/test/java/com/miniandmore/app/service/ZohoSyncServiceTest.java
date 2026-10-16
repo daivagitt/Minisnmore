@@ -4366,6 +4366,9 @@ class ZohoSyncServiceTest {
         when(productRepository.findAll()).thenReturn(List.of(parent));
         when(variantSupport.isVariants(parent)).thenReturn(true);
         when(booksClient.getItemGroup(groupId)).thenReturn(group);
+        for (Map<String, Object> child : (List<Map<String, Object>>) group.get("items")) {
+            when(booksClient.getItem(child.get("item_id").toString())).thenReturn(Map.of("item", child));
+        }
         when(variantSupport.findProductContainingVariantZohoItemId(any(), any())).thenReturn(Optional.empty());
         when(variantSupport.findProductContainingVariantSku(any(), any())).thenReturn(Optional.empty());
         when(variantSupport.upsertPulledVariantFromZoho(eq(parent), eq("NEG-GROUP-S-OK"), any(), any(), any(), any(), eq(4), any(), eq(true)))
@@ -4443,8 +4446,9 @@ class ZohoSyncServiceTest {
         verify(zohoSettingRepository, never()).save(any());
     }
 
-    @Test
-    void pullProductGroup_mergesAllVariantsAndPropagatesParentCategory() {
+    @ParameterizedTest
+    @ValueSource(ints = { 0, 8 })
+    void pullProductGroup_mergesAllVariantsAndPropagatesParentCategory(int detailStock) {
         String groupId = "3624052000000394593";
         Product parent = new Product()
             .id(708L)
@@ -4465,7 +4469,7 @@ class ZohoSyncServiceTest {
             List.of(
                 Map.of(
                     "item_id", "zoho-jabla-s", "sku", "JABLA-S-AQUA", "attribute_option_name1", "S",
-                    "attribute_option_name2", "Aqua", "rate", 499, "stock_on_hand", 3
+                    "attribute_option_name2", "Aqua", "rate", 499
                 ),
                 Map.of(
                     "item_id", "zoho-jabla-m", "sku", "JABLA-M-AQUA", "attribute_option_name1", "M",
@@ -4477,6 +4481,8 @@ class ZohoSyncServiceTest {
         when(productRepository.findAll()).thenReturn(List.of(parent));
         when(variantSupport.isVariants(parent)).thenReturn(true);
         when(booksClient.getItemGroup(groupId)).thenReturn(group);
+        when(booksClient.getItem("zoho-jabla-s")).thenReturn(Map.of("item", Map.of("stock_on_hand", detailStock)));
+        when(booksClient.getItem("zoho-jabla-m")).thenReturn(Map.of("item", Map.of("stock_on_hand", detailStock)));
         when(variantSupport.findProductContainingVariantZohoItemId(any(), any())).thenReturn(Optional.empty());
         when(variantSupport.findProductContainingVariantSku(any(), any())).thenReturn(Optional.empty());
         when(variantSupport.upsertPulledVariantFromZoho(eq(parent), any(), any(), any(), any(), any(), any(), any(), eq(true)))
@@ -4489,12 +4495,177 @@ class ZohoSyncServiceTest {
         assertThat(result.get("success")).isEqualTo(2);
         assertThat(result.get("failed")).isEqualTo(0);
         verify(booksClient).getItemGroup(groupId);
+        verify(variantSupport).upsertPulledVariantFromZoho(eq(parent), eq("JABLA-S-AQUA"), any(), any(), any(), any(), eq(detailStock), eq("zoho-jabla-s"), eq(true));
+        verify(variantSupport).upsertPulledVariantFromZoho(eq(parent), eq("JABLA-M-AQUA"), any(), any(), any(), any(), eq(detailStock), eq("zoho-jabla-m"), eq(true));
         verify(productFieldMapper, times(2)).applyPulledItem(
             eq(parent),
             argThat(item -> "Jablas".equals(item.get("category_name")) && groupId.equals(item.get("group_id"))),
             anyBoolean()
         );
         verify(productRepository, times(2)).save(parent);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = { false, true })
+    void pullProductGroup_refreshesColorGalleriesFromChildDetails(boolean staleSummaryImage) {
+        variantSupport = StorePricingTestSupport.variantSupport(objectMapper);
+        itemImageSync = new ZohoItemImageSync(objectMapper, applicationProperties, booksClient, s3StorageService, variantSupport);
+        setUpZohoProperties();
+        applicationProperties.getZoho().setSyncProductImages(true);
+        ApplicationProperties.Storage storage = new ApplicationProperties.Storage();
+        storage.getS3().setMaxUploadBytes(8_192_000L);
+        when(applicationProperties.getStorage()).thenReturn(storage);
+        String groupId = "3624052000000394593";
+        Product parent = new Product().id(708L).sku("JABLA").name("Jabla").active(true)
+            .zohoItemId(groupId).itemStructure("VARIANTS")
+            .variantsJson("""
+                [
+                  {"sku":"JABLA-S-AQUA","size":"S","color":"Aqua","rate":499,"stock":3,"active":true,"zohoItemId":"aqua-item"},
+                  {"sku":"JABLA-S-BLUE","size":"S","color":"Blue","rate":499,"stock":3,"active":true,"zohoItemId":"blue-item"}
+                ]
+                """)
+            .imagesJson("[\"old-aqua.jpg\",\"old-blue.jpg\"]")
+            .colorImagesJson("{\"Aqua\":[\"old-aqua.jpg\"],\"Blue\":[\"old-blue.jpg\"]}");
+        Map<String, Object> aqua = new LinkedHashMap<>(Map.of(
+            "item_id", "aqua-item", "sku", "JABLA-S-AQUA", "attribute_option_name1", "S", "attribute_option_name2", "Aqua"
+        ));
+        if (staleSummaryImage) {
+            aqua.put("image_document_id", "old-doc");
+            aqua.put("documents", List.of(Map.of("document_id", "old-doc")));
+        }
+        when(productRepository.findAll()).thenReturn(List.of(parent));
+        Map<String, Object> blue = new LinkedHashMap<>(Map.of(
+            "item_id", "blue-item", "sku", "JABLA-S-BLUE", "attribute_option_name1", "S", "attribute_option_name2", "Blue"
+        ));
+        if (staleSummaryImage) {
+            blue.put("documents", List.of(Map.of("document_id", "old-doc")));
+        }
+        when(booksClient.getItemGroup(groupId)).thenReturn(Map.of(
+            "group_id", groupId, "group_name", "Jabla", "category_name", "Jablas",
+            "attribute_name1", "Size", "attribute_name2", "Color",
+            "documents", List.of(Map.of("document_id", "old-group-doc")),
+            "items", List.of(aqua, blue)
+        ));
+        when(booksClient.getItem("aqua-item")).thenReturn(Map.of("item", Map.of(
+            "item_id", "aqua-item", "sku", "JABLA-S-AQUA", "image_document_id", "aqua-front",
+            "documents", List.of(Map.of("document_id", "aqua-front"), Map.of("document_id", "aqua-back"))
+        )));
+        when(booksClient.getItem("blue-item")).thenReturn(Map.of("item", Map.of(
+            "item_id", "blue-item", "sku", "JABLA-S-BLUE", "image_document_id", "blue-front"
+        )));
+        for (String documentId : List.of("aqua-front", "aqua-back", "blue-front")) {
+            byte[] bytes = documentId.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            when(booksClient.downloadDocument(eq(documentId), any(Long.class)))
+                .thenReturn(Optional.of(new ZohoBooksClient.BinaryDownload(bytes, "image/png")));
+            when(s3StorageService.uploadObject(eq("products"), any(), eq(bytes), eq("image/png")))
+                .thenReturn("https://cdn.example.com/" + documentId + ".png");
+        }
+
+        Map<String, Object> result = service.pullProductGroup(groupId);
+
+        assertThat(result.get("success")).isEqualTo(2);
+        assertThat(result.get("failed")).isEqualTo(0);
+        assertThat(parent.getColorImagesJson()).contains("aqua-front.png", "aqua-back.png", "blue-front.png")
+            .doesNotContain("old-aqua.jpg", "old-blue.jpg");
+        assertThat(parent.getImagesJson()).contains("aqua-front.png", "aqua-back.png", "blue-front.png")
+            .doesNotContain("old-aqua.jpg", "old-blue.jpg");
+        verify(booksClient, never()).downloadDocument(eq("old-doc"), any(Long.class));
+        verify(booksClient, never()).downloadDocument(eq("old-group-doc"), any(Long.class));
+        verify(productFieldMapper, times(2)).applyPulledItem(eq(parent),
+            argThat(item -> "Jablas".equals(item.get("category_name")) && groupId.equals(item.get("group_id"))), anyBoolean());
+        verify(productRepository, times(2)).save(parent);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "missing", "wrong-item", "wrong-sku", "wrong-group" })
+    void pullProductGroup_rejectsMissingOrConflictingChildDetails(String failure) {
+        String groupId = "3624052000000394593";
+        when(booksClient.getItemGroup(groupId)).thenReturn(Map.of(
+            "group_id", groupId, "items", List.of(Map.of("item_id", "child", "sku", "JABLA-S-AQUA"))
+        ));
+        Map<String, Object> detail = new LinkedHashMap<>(Map.of("item_id", "child", "sku", "JABLA-S-AQUA"));
+        switch (failure) {
+            case "missing" -> detail.clear();
+            case "wrong-item" -> detail.put("item_id", "another-child");
+            case "wrong-sku" -> detail.put("sku", "ANOTHER-SKU");
+            case "wrong-group" -> detail.put("group_id", "another-group");
+            default -> throw new IllegalArgumentException(failure);
+        }
+        when(booksClient.getItem("child")).thenReturn(detail.isEmpty() ? Map.of() : Map.of("item", detail));
+
+        Map<String, Object> result = service.pullProductGroup(groupId);
+
+        assertThat(result.get("success")).isEqualTo(0);
+        assertThat(result.get("failed")).isEqualTo(1);
+        verify(productRepository, never()).save(any());
+        verify(itemImageSync, never()).importZohoVariantColorImage(any(), any(), any(), any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "not-found", "wrong-item", "wrong-sku" })
+    void pullProductGroup_continuesAfterChildDetailFailure(String failure) throws Exception {
+        variantSupport = StorePricingTestSupport.variantSupport(objectMapper);
+        setUpZohoProperties();
+        String groupId = "group-continuation";
+        Product parent = new Product().id(714L).sku("GROUP").name("Group").active(true)
+            .zohoItemId(groupId).itemStructure("VARIANTS")
+            .variantsJson("""
+                [
+                  {"sku":"BAD","size":"S","color":"Blue","rate":100,"stock":3,"active":true,"zohoItemId":"bad"},
+                  {"sku":"GOOD","size":"M","color":"Blue","rate":100,"stock":3,"active":true,"zohoItemId":"good"}
+                ]
+                """);
+        when(productRepository.findAll()).thenReturn(List.of(parent));
+        when(booksClient.getItemGroup(groupId)).thenReturn(Map.of(
+            "group_id", groupId, "attribute_name1", "Size", "attribute_name2", "Color",
+            "items", List.of(
+                Map.of("item_id", "bad", "sku", "BAD", "attribute_option_name1", "S", "attribute_option_name2", "Blue"),
+                Map.of("item_id", "good", "sku", "GOOD", "attribute_option_name1", "M", "attribute_option_name2", "Blue")
+            )
+        ));
+        if (failure.equals("not-found")) {
+            when(booksClient.getItem("bad")).thenThrow(new RestClientResponseException("Not found", 404, "Not Found", null, null, null));
+        } else {
+            when(booksClient.getItem("bad")).thenReturn(Map.of("item", Map.of(
+                "item_id", failure.equals("wrong-item") ? "another-item" : "bad",
+                "sku", failure.equals("wrong-sku") ? "OTHER" : "BAD"
+            )));
+        }
+        when(booksClient.getItem("good")).thenReturn(Map.of("item", Map.of("item_id", "good", "sku", "GOOD", "stock_on_hand", 0)));
+
+        Map<String, Object> result = service.pullProductGroup(groupId);
+
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(result.get("success")).isEqualTo(1);
+        assertThat(result.get("failures").toString()).contains("BAD");
+        verify(booksClient).getItem("good");
+        verify(productRepository, times(1)).save(parent);
+        var variants = objectMapper.readTree(parent.getVariantsJson());
+        assertThat(variants.get(0).get("stock").asInt()).isEqualTo(3);
+        assertThat(variants.get(1).get("stock").asInt()).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = { 0, 401, 403, 408, 429, 500, 503 })
+    void pullProductGroup_stopsOnOperationWideChildFailure(int status) {
+        when(booksClient.getItemGroup("group-stop")).thenReturn(Map.of(
+            "group_id", "group-stop", "items", List.of(
+                Map.of("item_id", "bad", "sku", "BAD"),
+                Map.of("item_id", "good", "sku", "GOOD")
+            )
+        ));
+        RuntimeException error = status == 0
+            ? new ResourceAccessException("Connection refused")
+            : new RestClientResponseException("Zoho unavailable", status, "Unavailable", null, null, null);
+        when(booksClient.getItem("bad")).thenThrow(error);
+
+        Map<String, Object> result = service.pullProductGroup("group-stop");
+
+        assertThat(result.get("failed")).isEqualTo(1);
+        assertThat(result.get("success")).isEqualTo(0);
+        assertThat(result.get("failures").toString()).contains("BAD");
+        verify(booksClient, never()).getItem("good");
+        verify(productRepository, never()).save(any());
     }
 
     @Test

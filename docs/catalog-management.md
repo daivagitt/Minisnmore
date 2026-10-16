@@ -17,9 +17,9 @@ Internal guide for **`mini_ms_test`** (Mini’s n More): where product data live
 
 | Service | Directory | Port (prod / UAT isolated) | Owns catalog DB? |
 |---------|-----------|----------------------------|------------------|
-| Gateway | `gateway/` | `8080` / `9180` | No |
-| Store (edge API) | `store/` | `8081` / `9181` | No |
-| Commerce | `commerce/` | `8082` / `9182` | No |
+| Gateway | `services/gateway/` | `8080` / `9180` | No |
+| Store (edge API) | `services/store/` | `8081` / `9181` | No |
+| Commerce | `services/commerce/` | `8082` / `9182` | No |
 | **Catalog core** | `backend/` | **`8084` / `9184`** | **Yes** |
 
 - DB: Postgres database **`miniandmore`** (Liquibase runs **only** on catalog core).
@@ -58,8 +58,8 @@ flowchart LR
 
 | Piece | Path |
 |-------|------|
-| Store catch-all | `store/.../StoreCatalogProxyResource.java` |
-| Path rewrite | `store/.../CatalogCoreClient.java` — `/api/v1/X` → `/internal/v1/X` |
+| Store catch-all | `services/store/.../StoreCatalogProxyResource.java` |
+| Path rewrite | `services/store/.../CatalogCoreClient.java` — `/api/v1/X` → `/internal/v1/X` |
 | Exception | `/api/v1/admin/ledgerly/**` stays `/api/v1/admin/ledgerly/**` on catalog (not rewritten to `/internal`) |
 
 ---
@@ -78,10 +78,10 @@ flowchart LR
 
 | Role | Path |
 |------|------|
-| Fetch / map | `src/lib/backend-data.ts`, `src/lib/storefront.ts` |
-| Hook | `src/hooks/useProducts.tsx` |
-| Shop / search | `src/routes/shop.tsx`, `src/lib/shop-filters.ts`, `src/lib/product-search.ts` |
-| Header search | `src/components/Navbar.tsx` |
+| Fetch / map | `frontend/src/lib/backend-data.ts`, `frontend/src/lib/storefront.ts` |
+| Hook | `frontend/src/hooks/useProducts.tsx` |
+| Shop / search | `frontend/src/routes/shop.tsx`, `frontend/src/lib/shop-filters.ts`, `frontend/src/lib/product-search.ts` |
+| Header search | `frontend/src/components/Navbar.tsx` |
 
 Today the storefront loads the **full active catalog** once, then filters/searches in the browser (category, age, fabric, free-text `?q=`).
 
@@ -93,9 +93,9 @@ Today the storefront loads the **full active catalog** once, then filters/search
 
 | Screen | Route | File |
 |--------|-------|------|
-| Products | `/admin/products` | `src/routes/admin.products.tsx` |
-| Categories | `/admin/categories` | `src/routes/admin.categories.tsx` |
-| Ledgerly | `/admin/integrations/ledgerly` | `src/routes/admin.integrations.ledgerly.tsx` |
+| Products | `/admin/products` | `frontend/src/routes/admin.products.tsx` |
+| Categories | `/admin/categories` | `frontend/src/routes/admin.categories.tsx` |
+| Ledgerly | `/admin/integrations/ledgerly` | `frontend/src/routes/admin.integrations.ledgerly.tsx` |
 
 ### APIs
 
@@ -130,7 +130,7 @@ Entity: `backend/.../domain/Product.java` → table `product`.
 
 **Category** (`category`): `slug`, `name`, `description`, `image_url`, `sort_order`, `active`, `ledgerly_category_id`.
 
-Frontend uses snake_case (`compare_at_price`, `item_structure`, `variants_json`, …) via `fromProductDto` / `toProductDto` in `src/lib/backend-data.ts`.
+Frontend uses snake_case (`compare_at_price`, `item_structure`, `variants_json`, …) via `fromProductDto` / `toProductDto` in `frontend/src/lib/backend-data.ts`.
 
 ### Pricing naming (admin UI)
 
@@ -149,8 +149,8 @@ See the full pricing / inventory / sync tables in [`catalog-and-ledgerly-alignme
 |-------|------|
 | Migration | `backend/.../liquibase/changelog/20260714150000_add_product_variants_and_order_item_variant_sku.xml` |
 | Backend logic | `backend/.../ProductVariantSupport.java` |
-| Admin matrix UI | `src/components/admin/VariantsMatrixEditor.tsx` |
-| Storefront parse | `src/lib/product-variants.ts` |
+| Admin matrix UI | `frontend/src/components/admin/VariantsMatrixEditor.tsx` |
+| Storefront parse | `frontend/src/lib/product-variants.ts` |
 
 - **`SIMPLE`**: one SKU / one price / one stock.
 - **`VARIANTS`**: `variants_json` is a size × color matrix, e.g.
@@ -172,7 +172,7 @@ See the full pricing / inventory / sync tables in [`catalog-and-ledgerly-alignme
 - Stored as **URLs** in `product.images_json` (not blobs in Postgres).
 - Admin uploads via `POST /api/v1/admin/uploads` (or presign) → **S3-compatible** storage (Cloudflare R2 in prod/UAT).
 - Config: `application.storage.s3.*` / env `S3_*` (or R2 equivalents).
-- FE helper: `uploadAdminImage("products", file)` in `src/lib/backend-data.ts`.
+- FE helper: `uploadAdminImage("products", file)` in `frontend/src/lib/backend-data.ts`.
 - More detail: [`docs/product-images-and-ledgerly-sync.md`](./product-images-and-ledgerly-sync.md).
 
 ---
@@ -226,10 +226,10 @@ Store and commerce do **not** run Liquibase against the catalog DB.
 | Product entity / DTO | `backend/.../domain/Product.java`, `.../dto/ProductDTO.java` |
 | Storefront internal API | `backend/.../InternalStorefrontResource.java` |
 | Admin internal API | `backend/.../InternalAdminStoreResource.java` |
-| Store proxy | `store/.../StoreCatalogProxyResource.java`, `CatalogCoreClient.java` |
-| Gateway routes | `gateway/src/main/resources/config/application.yml` |
-| FE data layer | `src/lib/backend-data.ts`, `src/lib/storefront.ts` |
-| Admin products | `src/routes/admin.products.tsx` |
+| Store proxy | `services/store/.../StoreCatalogProxyResource.java`, `CatalogCoreClient.java` |
+| Gateway routes | `services/gateway/src/main/resources/config/application.yml` |
+| FE data layer | `frontend/src/lib/backend-data.ts`, `frontend/src/lib/storefront.ts` |
+| Admin products | `frontend/src/routes/admin.products.tsx` |
 | Deploy / ports | `deploy/scripts/prod-microservices-isolated-pm2.sh`, `deploy/nginx/*` |
 
 ---

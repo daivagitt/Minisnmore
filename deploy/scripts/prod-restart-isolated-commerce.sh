@@ -19,9 +19,9 @@ fi
 
 export APPLICATION_CATALOG_BASE_URL="http://127.0.0.1:${CATALOG_PORT}"
 
-COMMERCE_JAR=$(ls -1 "${REPO_ROOT}"/commerce/target/miniandmore-commerce-*.jar 2>/dev/null | head -1)
+COMMERCE_JAR=$(ls -1 "${REPO_ROOT}"/services/commerce/target/miniandmore-commerce-*.jar 2>/dev/null | head -1)
 if [ -z "$COMMERCE_JAR" ]; then
-  echo "ERROR: commerce JAR missing under ${REPO_ROOT}/commerce/target" >&2
+  echo "ERROR: commerce JAR missing under ${REPO_ROOT}/services/commerce/target" >&2
   exit 1
 fi
 

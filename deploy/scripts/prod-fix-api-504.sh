@@ -17,9 +17,9 @@ if [ -f /etc/mini-and-more/prod.env ]; then
   set +a
 fi
 
-STORE_JAR=$(ls -1 "${REPO_ROOT}"/store/target/miniandmore-store-*.jar 2>/dev/null | head -1)
+STORE_JAR=$(ls -1 "${REPO_ROOT}"/services/store/target/miniandmore-store-*.jar 2>/dev/null | head -1)
 if [ -z "$STORE_JAR" ]; then
-  echo "ERROR: store JAR missing under ${REPO_ROOT}/store/target" >&2
+  echo "ERROR: store JAR missing under ${REPO_ROOT}/services/store/target" >&2
   exit 1
 fi
 

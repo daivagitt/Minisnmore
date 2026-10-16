@@ -11,7 +11,7 @@ cd backend && ./mvnw compile -DskipTests
 
 After any regen:
 
-1. **Delete** `src/main/java/com/minisandmore/` and `src/test/java/com/minisandmore/` if they reappear.
+1. **Delete** `frontend/src/main/java/com/minisandmore/` and `frontend/src/test/java/com/minisandmore/` if they reappear.
 2. **Delete** JHipster `/api/{entity}` controllers under `com.miniandmore.app.web.rest/` (keep only `v1/` and `errors/`).
 3. **Do not** re-enable `FeignConfiguration` — catalog uses JWT `userLogin`, not Feign to gateway.
 4. Keep `.yo-rc.json`: `"feignClient": false`, `"skipUserManagement": true`.

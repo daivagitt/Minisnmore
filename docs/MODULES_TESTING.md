@@ -1,26 +1,28 @@
+> Historical deployment instructions: obsolete UAT, 808x, and Integration-dependent laptop launchers have been removed. Use the [current script index](../deploy/scripts/README.md) for supported commands.
+
 # Module completion checklist (test in order)
 
 Production deploy and security: [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).
 
-All store modules are implemented on the **catalog** (`backend/`, `miniandmore`). Auth and OAuth are on the **gateway** (`gateway/`). Use this list to verify each area before full E2E.
+All store modules are implemented on the **catalog** (`backend/`, `miniandmore`). Auth and OAuth are on the **gateway** (`services/gateway/`). Use this list to verify each area before full E2E.
 
 **Prerequisites** — see [LOCAL_DEV.md](./LOCAL_DEV.md) for the full local stack.
 
-**No Docker?** Run **unit tests only** (no `*IT*` / Testcontainers): `bash scripts/test-local-no-docker.sh` (or `npm run test:no-docker`). Each module enforces **95% line coverage** (JaCoCo on Java services, Vitest on scoped frontend files). Integration tests (`mvn verify` Failsafe) are **not** run by default (`skipITs=true` in `backend` and `gateway`). Live module checks below still need Postgres + services.
+**No Docker?** Run **unit tests only** (no `*IT*` / Testcontainers): `bash scripts/test-local-no-docker.sh` (or `npm --prefix frontend run test:no-docker`). Each module enforces **95% line coverage** (JaCoCo on Java services, Vitest on scoped frontend files). Integration tests (`mvn verify` Failsafe) are **not** run by default (`skipITs=true` in `backend` and `gateway`). Live module checks below still need Postgres + services.
 
 | Module | Unit tests | Coverage gate |
 |--------|------------|-----------------|
-| Frontend | `npm run test:coverage` | Vitest 95% (see `vitest.config.ts` includes) |
-| Gateway | `cd gateway && ./mvnw test` | JaCoCo LINE ≥ 95% |
+| Frontend | `npm --prefix frontend run test:coverage` | Vitest 95% (see `vitest.config.ts` includes) |
+| Gateway | `cd services/gateway && ./mvnw test` | JaCoCo LINE ≥ 95% |
 | Catalog (`backend/`) | `cd backend && ./mvnw test` | JaCoCo LINE ≥ 95% |
-| Store | `cd store && ./mvnw test` | JaCoCo LINE ≥ 95% |
-| Commerce | `cd commerce && ./mvnw test` | JaCoCo LINE ≥ 95% |
+| Store | `cd services/store && ./mvnw test` | JaCoCo LINE ≥ 95% |
+| Commerce | `cd services/commerce && ./mvnw test` | JaCoCo LINE ≥ 95% |
 
 ```bash
 docker compose -f docker/microservices.yml up -d   # optional if you have native Postgres/Redis/Consul
 cd backend && ./mvnw -DskipTests
-cd gateway && ./mvnw -DskipTests
-npm run dev   # proxies to gateway :8080
+cd services/gateway && ./mvnw -DskipTests
+npm --prefix frontend run dev   # proxies to gateway :8080
 ```
 
 Obtain JWT: `POST http://localhost:8080/api/authenticate` with admin credentials.
@@ -45,7 +47,7 @@ Obtain JWT: `POST http://localhost:8080/api/authenticate` with admin credentials
 | 5 | Register / activate | `POST /api/register`, `GET /api/activate` | User DB on gateway |
 | 6 | Account | `GET/POST /api/account` | Profile, password |
 | 7 | Admin users | `/api/admin/users` | ADMIN role |
-| 8 | Social OAuth | `GET /oauth2/authorization/{google\|facebook\|apple}` | Enable YAML + env in `gateway/.../application-dev.yml` |
+| 8 | Social OAuth | `GET /oauth2/authorization/{google\|facebook\|apple}` | Enable YAML + env in `services/gateway/.../application-dev.yml` |
 
 ---
 

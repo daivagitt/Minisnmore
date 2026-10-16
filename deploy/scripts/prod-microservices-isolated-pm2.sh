@@ -3,9 +3,9 @@
 #
 # Database safety (production):
 #   - Catalog Liquibase migrations run once, before any service is stopped or a new JAR serves traffic.
-#   - Runtime Liquibase remains disabled on catalog, integration, and gateway.
+#   - Runtime Liquibase remains disabled on catalog and gateway.
 #   - Never uses the "faker" Liquibase context (no mock products/users/orders).
-#   - Catalog/integration connect read/write to existing miniandmore data only; uses the production catalog database.
+#   - Catalog connects read/write to existing miniandmore data only; uses the production catalog database.
 #
 # Usage (on production VPS after JARs are in REPO_ROOT):
 #   REPO_ROOT=/var/www/uat1/mini_ms_test bash deploy/scripts/prod-microservices-isolated-pm2.sh
@@ -17,11 +17,10 @@ REPO_ROOT="${REPO_ROOT:-/var/www/uat1/mini_ms_test}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib/gateway-env.sh
 source "${SCRIPT_DIR}/lib/gateway-env.sh"
-GATEWAY_JAR="${GATEWAY_JAR:-$REPO_ROOT/gateway/target/gateway-*.jar}"
+GATEWAY_JAR="${GATEWAY_JAR:-$REPO_ROOT/services/gateway/target/gateway-*.jar}"
 CATALOG_JAR="${CATALOG_JAR:-$REPO_ROOT/backend/target/miniandmore-*.jar}"
-STORE_JAR="${STORE_JAR:-$REPO_ROOT/store/target/miniandmore-store-*.jar}"
-COMMERCE_JAR="${COMMERCE_JAR:-$REPO_ROOT/commerce/target/miniandmore-commerce-*.jar}"
-INTEGRATION_JAR="${INTEGRATION_JAR:-$REPO_ROOT/integration/target/miniandmore-integration-*.jar}"
+STORE_JAR="${STORE_JAR:-$REPO_ROOT/services/store/target/miniandmore-store-*.jar}"
+COMMERCE_JAR="${COMMERCE_JAR:-$REPO_ROOT/services/commerce/target/miniandmore-commerce-*.jar}"
 
 GATEWAY_PORT="${GATEWAY_PORT:-9180}"
 STORE_PORT="${STORE_PORT:-9181}"
@@ -100,7 +99,7 @@ if [ -z "${SPRING_DATASOURCE_PASSWORD:-}" ]; then
   fi
 fi
 if [ -z "${SPRING_DATASOURCE_PASSWORD:-}" ]; then
-  echo "WARN: SPRING_DATASOURCE_PASSWORD not set; catalog/integration may fail to connect." >&2
+  echo "WARN: SPRING_DATASOURCE_PASSWORD not set; catalog may fail to connect." >&2
 fi
 if [ -n "${SPRING_DATASOURCE_PASSWORD:-}" ]; then
   export SPRING_R2DBC_PASSWORD="${SPRING_R2DBC_PASSWORD:-$SPRING_DATASOURCE_PASSWORD}"
@@ -163,10 +162,9 @@ verify_fat_jar "$GATEWAY_JAR_PATH" "gateway"
 CATALOG_JAR_PATH=$(resolve_jar "$CATALOG_JAR")
 STORE_JAR_PATH=$(resolve_jar "$STORE_JAR")
 COMMERCE_JAR_PATH=$(resolve_jar "$COMMERCE_JAR")
-INTEGRATION_JAR_PATH=$(resolve_jar "$INTEGRATION_JAR")
 
 missing=0
-for name in GATEWAY CATALOG STORE COMMERCE INTEGRATION; do
+for name in GATEWAY CATALOG STORE COMMERCE; do
   var="${name}_JAR_PATH"
   if [ -z "${!var}" ]; then
     echo "Missing JAR for ${name} (expected under ${REPO_ROOT})" >&2
@@ -183,7 +181,6 @@ echo "  gateway:     ${GATEWAY_JAR_PATH}" >&2
 echo "  catalog:     ${CATALOG_JAR_PATH}" >&2
 echo "  store:       ${STORE_JAR_PATH}" >&2
 echo "  commerce:    ${COMMERCE_JAR_PATH}" >&2
-echo "  integration: ${INTEGRATION_JAR_PATH}" >&2
 
 # Fail before stopping the healthy stack if the release schema cannot be applied.
 # Apply every changelog in catalog-isolated-migrations.list (not a single late file).
@@ -197,7 +194,6 @@ JAVA_OPTS_CATALOG="-Xms256m -Xmx512m -XX:+UseG1GC"
 JAVA_OPTS_GATEWAY="-Xms128m -Xmx384m -XX:+UseG1GC"
 JAVA_OPTS_STORE="-Xms128m -Xmx384m -XX:+UseG1GC"
 JAVA_OPTS_COMMERCE="-Xms128m -Xmx384m -XX:+UseG1GC"
-JAVA_OPTS_INTEGRATION="-Xms256m -Xmx512m -XX:+UseG1GC"
 
 # production VPS often needs 15–20+ min per JVM; 600s caused false "not ready" WARNs.
 BOOT_WAIT_SECS="${BOOT_WAIT_SECS:-1800}"
@@ -241,7 +237,7 @@ ZOHO_HTTPS_ARGS=(
 # Catalog core serves the public /api/v1 OpenAPI contract (springdoc + path remap).
 SPRING_ARGS_CATALOG=(--spring.profiles.active=prod,api-docs --server.port="${CATALOG_PORT}" "${CONSUL_OFF[@]}" "${LIQUIBASE_OFF[@]}")
 SPRING_ARGS_GATEWAY=(
-  --spring.profiles.active=prod,uat-isolated,api-docs
+  --spring.profiles.active=prod,prod-isolated,api-docs
   --server.port="${GATEWAY_PORT}"
   "${CONSUL_OFF[@]}"
   "${LIQUIBASE_OFF[@]}"
@@ -268,16 +264,15 @@ SPRING_ARGS_COMMERCE=(
   "${CONSUL_OFF[@]}"
   "${LIQUIBASE_OFF[@]}"
 )
-SPRING_ARGS_INTEGRATION=(--spring.profiles.active=prod --server.port="${INTEGRATION_PORT}" "${CONSUL_OFF[@]}" "${LIQUIBASE_OFF[@]}" "${ZOHO_HTTPS_ARGS[@]}")
 
 echo "Liquibase disabled on all isolated services (no mock/faker/seed data)." >&2
 
 # Only recycle isolated ports — never touch :8081 monolith.
-for port in "$GATEWAY_PORT" "$STORE_PORT" "$COMMERCE_PORT" "$INTEGRATION_PORT" "$CATALOG_PORT"; do
+for port in "$GATEWAY_PORT" "$STORE_PORT" "$COMMERCE_PORT" "$CATALOG_PORT"; do
   fuser -k "${port}/tcp" >/dev/null 2>&1 || true
 done
 
-for app in mini-prod-ms-gateway mini-prod-ms-catalog-core mini-prod-ms-store mini-prod-ms-commerce mini-prod-ms-integration; do
+for app in mini-prod-ms-gateway mini-prod-ms-catalog-core mini-prod-ms-store mini-prod-ms-commerce; do
   pm2_delete_ms "$app"
 done
 
@@ -293,21 +288,6 @@ pm2 start java --name mini-prod-ms-catalog-core --update-env -- \
   -jar "$CATALOG_JAR_PATH" \
   "${SPRING_ARGS_CATALOG[@]}"
 wait_for_port "$CATALOG_PORT" "catalog core" "mini-prod-ms-catalog-core" || true
-
-echo "Starting isolated integration (${INTEGRATION_PORT})..."
-pm2 start java --name mini-prod-ms-integration --update-env -- \
-  $JAVA_OPTS_INTEGRATION \
-  -Djava.security.egd=file:/dev/./urandom \
-  -Dserver.port="${INTEGRATION_PORT}" \
-  -Djhipster.security.authentication.jwt.base64-secret="${JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET}" \
-  -Dspring.security.oauth2.resourceserver.jwt.authorities-claim-name=auth \
-  -Dspring.security.oauth2.resourceserver.jwt.authority-prefix= \
-  -Dapplication.internal-api-key="${INTERNAL_API_KEY}" \
-  -jar "$INTEGRATION_JAR_PATH" \
-  --spring.security.oauth2.resourceserver.jwt.authorities-claim-name=auth \
-  --spring.security.oauth2.resourceserver.jwt.authority-prefix= \
-  "${SPRING_ARGS_INTEGRATION[@]}"
-wait_for_port "$INTEGRATION_PORT" "integration" "mini-prod-ms-integration" || true
 
 echo "Starting isolated commerce (${COMMERCE_PORT}) → catalog :${CATALOG_PORT}..."
 pm2 start java --name mini-prod-ms-commerce --update-env -- \
@@ -346,8 +326,8 @@ if ! unzip -t -q "$GATEWAY_JAR_RUN"; then
   echo "ERROR: gateway JAR failed integrity check: ${GATEWAY_JAR_RUN}" >&2
   exit 1
 fi
-mkdir -p "${REPO_ROOT}/gateway/target"
-ln -sf "../../deploy/gateway-prod.jar" "${REPO_ROOT}/gateway/target/gateway-0.0.1-SNAPSHOT.jar"
+mkdir -p "${REPO_ROOT}/services/gateway/target"
+ln -sf "../../../deploy/gateway-prod.jar" "${REPO_ROOT}/services/gateway/target/gateway-0.0.1-SNAPSHOT.jar"
 pm2 start java --name mini-prod-ms-gateway --cwd "${REPO_ROOT}" --update-env -- \
   $JAVA_OPTS_GATEWAY \
   -Djava.security.egd=file:/dev/./urandom \
@@ -360,10 +340,9 @@ wait_for_port "$GATEWAY_PORT" "gateway" "mini-prod-ms-gateway" || true
 pm2 save
 
 echo ""
-echo "Final boot wait (all 5 JVMs may need several minutes on a busy production VPS)..."
+echo "Final boot wait (all 4 JVMs may need several minutes on a busy production VPS)..."
 for _spec in \
   "${CATALOG_PORT}:catalog core:mini-prod-ms-catalog-core" \
-  "${INTEGRATION_PORT}:integration:mini-prod-ms-integration" \
   "${COMMERCE_PORT}:commerce:mini-prod-ms-commerce" \
   "${STORE_PORT}:store:mini-prod-ms-store" \
   "${GATEWAY_PORT}:gateway:mini-prod-ms-gateway"; do
@@ -377,7 +356,6 @@ if [ -x "$HEALTH_SCRIPT" ]; then
   GATEWAY_URL="http://127.0.0.1:${GATEWAY_PORT}" \
   STORE_URL="http://127.0.0.1:${STORE_PORT}" \
   COMMERCE_URL="http://127.0.0.1:${COMMERCE_PORT}" \
-  INTEGRATION_URL="http://127.0.0.1:${INTEGRATION_PORT}" \
   CATALOG_CORE_URL="http://127.0.0.1:${CATALOG_PORT}" \
     bash "$HEALTH_SCRIPT" || true
 fi
@@ -387,7 +365,6 @@ echo "Isolated microservices (monolith on :8081 untouched):"
 echo "  Gateway:     http://127.0.0.1:${GATEWAY_PORT}"
 echo "  Store:       http://127.0.0.1:${STORE_PORT}"
 echo "  Commerce:    http://127.0.0.1:${COMMERCE_PORT}"
-echo "  Integration: http://127.0.0.1:${INTEGRATION_PORT}"
 echo "  Catalog:     http://127.0.0.1:${CATALOG_PORT}"
 echo ""
 echo "From your laptop: ssh -L ${GATEWAY_PORT}:127.0.0.1:${GATEWAY_PORT} root@93.127.199.55"

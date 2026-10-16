@@ -20,14 +20,14 @@ Until Figma is attached, treat **production** [https://minisnmore.com](https://m
 
 | Experience | Primary files |
 | --- | --- |
-| Home | `src/routes/index.tsx` |
-| Shop listing | `src/routes/shop.tsx` |
-| Product detail | `src/routes/product.$slug.tsx` (and related `src/components/Product*.tsx`) |
-| Cart / checkout | `src/routes/checkout.tsx`, cart store under `src/store/` |
-| Account orders | `src/routes/account.orders.$orderNumber.tsx` |
-| Admin shell + nav | `src/routes/admin.tsx`, `src/lib/admin-nav.ts` |
-| Admin products | `src/routes/admin.products.tsx` |
-| Tokens / layout | Tailwind + `src/components/` glass / display fonts |
+| Home | `frontend/src/routes/index.tsx` |
+| Shop listing | `frontend/src/routes/shop.tsx` |
+| Product detail | `frontend/src/routes/product.$slug.tsx` (and related `frontend/src/components/Product*.tsx`) |
+| Cart / checkout | `frontend/src/routes/checkout.tsx`, cart store under `frontend/src/store/` |
+| Account orders | `frontend/src/routes/account.orders.$orderNumber.tsx` |
+| Admin shell + nav | `frontend/src/routes/admin.tsx`, `frontend/src/lib/admin-nav.ts` |
+| Admin products | `frontend/src/routes/admin.products.tsx` |
+| Tokens / layout | Tailwind + `frontend/src/components/` glass / display fonts |
 
 Assets (favicon, OG image, robots): `public/`. Nginx serves those files from disk, not via the SPA.
 

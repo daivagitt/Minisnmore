@@ -41,7 +41,7 @@ If a product has **no** images in Admin, the UI may fall back to a placeholder â
 
 **Code references:**
 
-- Storefront mapping: `src/lib/storefront.ts` (`mapProduct`)
+- Storefront mapping: `frontend/src/lib/storefront.ts` (`mapProduct`)
 - Product field: `backend/.../domain/Product.java` (`imagesJson` / `images_json`)
 - Admin upload: `/api/v1/admin/uploads` â†’ `InternalStorageUploadResource`
 

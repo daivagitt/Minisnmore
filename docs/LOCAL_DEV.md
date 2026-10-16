@@ -10,8 +10,8 @@ docker compose -f docker/microservices.yml up -d
 |---------|------|
 | Gateway | 8080 |
 | Catalog core (`backend/`) | 8084 (internal APIs only) |
-| Store (`store/`) | 8081 |
-| Commerce (`commerce/`) | 8082 |
+| Store (`services/store/`) | 8081 |
+| Commerce (`services/commerce/`) | 8082 |
 | Consul | 8500 |
 | Postgres (catalog) | 5432 |
 | Postgres (gateway) | 5433 |
@@ -29,7 +29,7 @@ bash scripts/dev-start-microservices.sh
 
 ```bash
 cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
-cd gateway && ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+cd services/gateway && ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
 Dev gateway routes `/api/v1/**` directly to `http://127.0.0.1:8081` (no Consul required for routing).
@@ -37,7 +37,7 @@ Dev gateway routes `/api/v1/**` directly to `http://127.0.0.1:8081` (no Consul r
 ## 3. Frontend
 
 ```bash
-npm run dev
+npm --prefix frontend run dev
 ```
 
 Vite proxies `/api`, `/oauth2`, `/login/oauth2` → **http://127.0.0.1:8080**.
@@ -79,10 +79,10 @@ bash scripts/test-local-no-docker.sh
 
 ```bash
 # Frontend — mocks API; no Java services
-npm run test
+npm --prefix frontend run test
 
 # Gateway + catalog — unit tests only (*IT* excluded by Surefire)
-cd gateway && ./mvnw test
+cd services/gateway && ./mvnw test
 cd ../backend && ./mvnw test
 ```
 
@@ -90,7 +90,7 @@ Compile only:
 
 ```bash
 cd backend && ./mvnw compile -DskipTests
-cd gateway && ./mvnw compile -DskipTests
+cd services/gateway && ./mvnw compile -DskipTests
 ```
 
 ### What still needs Docker or native installs

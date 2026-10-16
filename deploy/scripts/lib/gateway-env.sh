@@ -133,6 +133,25 @@ pm2_live_ms_name() {
   return 1
 }
 
+gateway_verify_rate_limit_redis() {
+  local _enabled
+  _enabled="$(printf '%s' "${GATEWAY_RATE_LIMIT_ENABLED:-true}" | tr '[:upper:]' '[:lower:]')"
+  case "$_enabled" in
+    false | 0 | no | off) return 0 ;;
+  esac
+  local _url="${GATEWAY_RATE_LIMIT_REDIS_URL:-redis://127.0.0.1:6379}"
+  if ! command -v redis-cli >/dev/null 2>&1; then
+    echo "WARN: redis-cli missing; cannot verify gateway rate-limit Redis at ${_url}" >&2
+    return 0
+  fi
+  if ! redis-cli -u "$_url" ping 2>/dev/null | grep -qF PONG; then
+    echo "ERROR: gateway rate limiting is enabled but Redis is unreachable at ${_url}." >&2
+    echo "Set GATEWAY_RATE_LIMIT_REDIS_URL (not JHIPSTER_CACHE_REDIS_SERVER) or GATEWAY_RATE_LIMIT_ENABLED=false." >&2
+    return 1
+  fi
+  return 0
+}
+
 gateway_verify_env() {
   local _bad
   _bad=$(compgen -e | grep -E '^SPRING_CLOUD_GATEWAY(_SERVER_WEBFLUX)?(_ROUTES|\.ROUTES)' || true)
@@ -147,7 +166,7 @@ gateway_verify_env() {
       return 1
     fi
   done
-  return 0
+  gateway_verify_rate_limit_redis
 }
 
 # UAT restart scripts still use the older function names.
