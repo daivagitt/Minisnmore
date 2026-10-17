@@ -29,6 +29,10 @@ if [ -z "${JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET:-}" ]; then
   echo "ERROR: JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET not set in prod.env" >&2
   exit 1
 fi
+if [ -z "${VAULT_MASTER_KEY:-}" ]; then
+  echo "ERROR: VAULT_MASTER_KEY must be set (Zoho secrets are encrypted at rest)" >&2
+  exit 1
+fi
 if [ -z "${INTERNAL_API_KEY:-}" ]; then
   export INTERNAL_API_KEY="uat-ms-isolated-internal-key"
 fi

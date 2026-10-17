@@ -33,4 +33,26 @@ class VaultCryptoTest {
         VaultCrypto.setEncryptionRequired(true);
         assertThatThrownBy(() -> VaultCrypto.encrypt("secret")).isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    void encryptWith_doesNotMutateProcessKey() {
+        byte[] other = new byte[32];
+        for (int i = 0; i < other.length; i++) {
+            other[i] = (byte) (100 + i);
+        }
+        String withOther = VaultCrypto.encryptWith(other, "scoped");
+        assertThat(withOther).startsWith(VaultCrypto.ENCRYPTED_PREFIX);
+        assertThat(VaultCrypto.decryptWith(other, withOther)).isEqualTo("scoped");
+        // Process key still decrypts values encrypted with the @BeforeEach key.
+        String withProcess = VaultCrypto.encrypt("still-process");
+        assertThat(VaultCrypto.decrypt(withProcess)).isEqualTo("still-process");
+        assertThatThrownBy(() -> VaultCrypto.decrypt(withOther)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void validateMasterKey_rejectsBadLength() {
+        assertThatThrownBy(() -> VaultCrypto.decodeMasterKey(Base64.getEncoder().encodeToString(new byte[16])))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("32 bytes");
+    }
 }

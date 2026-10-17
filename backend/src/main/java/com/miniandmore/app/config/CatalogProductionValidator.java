@@ -42,5 +42,14 @@ public class CatalogProductionValidator {
             throw new IllegalStateException("razorpay.key-id and razorpay.key-secret must be set in production");
         }
         VaultJdbcSecretsLoader.assertProductionReady(environment);
+        // Zoho OAuth columns are AES-GCM ciphertext in prod — refuse boot without a master key.
+        if (
+            StringUtils.isBlank(environment.getProperty("VAULT_MASTER_KEY")) &&
+            !com.miniandmore.shared.vault.VaultCrypto.isReady()
+        ) {
+            throw new IllegalStateException(
+                "VAULT_MASTER_KEY must be set in production (encrypted zoho_setting secrets require it)"
+            );
+        }
     }
 }

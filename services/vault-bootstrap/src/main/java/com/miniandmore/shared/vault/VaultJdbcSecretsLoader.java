@@ -124,14 +124,20 @@ public final class VaultJdbcSecretsLoader {
     }
 
     static JdbcBootstrap resolveJdbcBootstrap(Environment environment) {
-        String url = firstNonBlank(environment.getProperty("VAULT_JDBC_URL"), environment.getProperty("SPRING_DATASOURCE_URL"));
+        String url = firstNonBlank(
+            environment.getProperty("VAULT_JDBC_URL"),
+            environment.getProperty("SPRING_DATASOURCE_URL"),
+            environment.getProperty("spring.datasource.url")
+        );
         String username = firstNonBlank(
             environment.getProperty("VAULT_JDBC_USERNAME"),
-            environment.getProperty("SPRING_DATASOURCE_USERNAME")
+            environment.getProperty("SPRING_DATASOURCE_USERNAME"),
+            environment.getProperty("spring.datasource.username")
         );
         String password = firstNonBlank(
             environment.getProperty("VAULT_JDBC_PASSWORD"),
-            environment.getProperty("SPRING_DATASOURCE_PASSWORD")
+            environment.getProperty("SPRING_DATASOURCE_PASSWORD"),
+            environment.getProperty("spring.datasource.password")
         );
         if (StringUtils.isBlank(url) || StringUtils.isBlank(username)) {
             return null;

@@ -1,9 +1,7 @@
 package com.miniandmore.app.service;
 
 import com.miniandmore.app.domain.AppVaultSecret;
-import com.miniandmore.app.domain.ZohoSetting;
 import com.miniandmore.app.repository.AppVaultSecretRepository;
-import com.miniandmore.app.repository.ZohoSettingRepository;
 import com.miniandmore.app.security.vault.VaultKnownKeys;
 import com.miniandmore.shared.vault.VaultBootstrapDenylist;
 import com.miniandmore.shared.vault.VaultCrypto;
@@ -14,19 +12,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @Transactional
 public class VaultSecretService {
 
     private final AppVaultSecretRepository repository;
-    private final ZohoSettingRepository zohoSettingRepository;
+    private final JdbcTemplate jdbcTemplate;
 
-    public VaultSecretService(AppVaultSecretRepository repository, ZohoSettingRepository zohoSettingRepository) {
+    public VaultSecretService(AppVaultSecretRepository repository, JdbcTemplate jdbcTemplate) {
         this.repository = repository;
-        this.zohoSettingRepository = zohoSettingRepository;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Transactional(readOnly = true)
@@ -102,8 +103,10 @@ public class VaultSecretService {
     }
 
     /**
-     * Decrypt all vault + Zoho secrets with the current {@code VAULT_MASTER_KEY}, then re-encrypt with {@code newBase64MasterKey}.
-     * After this call, update {@code VAULT_MASTER_KEY} on every host and restart all services.
+     * Re-encrypt vault + Zoho secrets under a new master key without mutating process-wide crypto until
+     * the transaction commits. Zoho columns are rewritten via JDBC so Hibernate dirty-checking cannot
+     * skip the UPDATE.
+     * <p>After success, set {@code VAULT_MASTER_KEY} on every host to the new key and restart all services.
      */
     public Map<String, Object> rotateMasterKey(String newBase64MasterKey) {
         if (!VaultCrypto.isReady()) {
@@ -113,71 +116,81 @@ public class VaultSecretService {
             throw new IllegalArgumentException("newMasterKey is required");
         }
         String newKey = newBase64MasterKey.trim();
-        String currentKey = System.getenv("VAULT_MASTER_KEY");
-        if (StringUtils.isBlank(currentKey)) {
-            throw new IllegalStateException(
-                "Cannot rotate: current VAULT_MASTER_KEY is not available in the process environment"
-            );
+        final byte[] newRaw;
+        try {
+            newRaw = VaultCrypto.decodeMasterKey(newKey);
+            VaultCrypto.validateMasterKey(newRaw);
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("Invalid newMasterKey: " + e.getMessage(), e);
         }
 
-        // Decrypt everything with the CURRENT key before switching process-wide crypto state.
+        // Decrypt with the CURRENT process key (unchanged until afterCommit).
         Map<String, String> vaultPlaintext = new LinkedHashMap<>();
         for (AppVaultSecret row : repository.findAll()) {
             vaultPlaintext.put(row.getName(), VaultCrypto.decrypt(row.getCiphertext()));
         }
-        List<ZohoSetting> zohoPlaintext = new ArrayList<>();
-        for (ZohoSetting setting : zohoSettingRepository.findAll()) {
-            ZohoSetting copy = new ZohoSetting();
-            copy.setId(setting.getId());
-            copy.setClientSecret(setting.getClientSecret());
-            copy.setRefreshToken(setting.getRefreshToken());
-            zohoPlaintext.add(copy);
+        List<Map<String, Object>> zohoRows = jdbcTemplate.queryForList(
+            "SELECT id, client_secret, refresh_token FROM zoho_setting"
+        );
+
+        int vaultUpdated = 0;
+        Instant now = Instant.now();
+        for (Map.Entry<String, String> entry : vaultPlaintext.entrySet()) {
+            if (StringUtils.isBlank(entry.getValue())) {
+                continue;
+            }
+            AppVaultSecret row = repository.findById(entry.getKey()).orElseGet(AppVaultSecret::new);
+            row.setName(entry.getKey());
+            row.setCiphertext(VaultCrypto.encryptWith(newRaw, entry.getValue()));
+            row.setUpdatedAt(now);
+            row.setUpdatedBy("master-key-rotation");
+            repository.save(row);
+            vaultUpdated++;
         }
 
-        // Validate new key, then restore current key if validation fails.
-        try {
-            VaultCrypto.initFromBase64MasterKey(newKey);
-            String probe = VaultCrypto.encrypt("rotation-probe");
-            if (!VaultCrypto.isEncrypted(probe) || !"rotation-probe".equals(VaultCrypto.decrypt(probe))) {
-                throw new IllegalStateException("New master key failed encrypt/decrypt probe");
-            }
-        } catch (RuntimeException e) {
-            VaultCrypto.initFromBase64MasterKey(currentKey);
-            throw new IllegalArgumentException("Invalid newMasterKey: " + e.getMessage(), e);
-        }
-
-        // Rewrite ciphertext under the new key. On failure, restore crypto state so the JVM stays usable.
-        VaultCrypto.initFromBase64MasterKey(newKey);
-        try {
-            int vaultUpdated = 0;
-            for (Map.Entry<String, String> entry : vaultPlaintext.entrySet()) {
-                if (StringUtils.isBlank(entry.getValue())) {
-                    continue;
-                }
-                putSecret(entry.getKey(), entry.getValue(), "master-key-rotation");
-                vaultUpdated++;
-            }
-            int zohoUpdated = 0;
-            for (ZohoSetting plain : zohoPlaintext) {
-                ZohoSetting row = zohoSettingRepository.findById(plain.getId()).orElseThrow();
-                row.setClientSecret(plain.getClientSecret());
-                row.setRefreshToken(plain.getRefreshToken());
-                zohoSettingRepository.save(row);
-                zohoUpdated++;
-            }
-            return Map.of(
-                "ok",
-                true,
-                "vaultSecretsReencrypted",
-                vaultUpdated,
-                "zohoRowsReencrypted",
-                zohoUpdated,
-                "nextStep",
-                "Set VAULT_MASTER_KEY on all servers to the new key and restart gateway, store, commerce, and catalog"
+        int zohoUpdated = 0;
+        for (Map<String, Object> row : zohoRows) {
+            Long id = ((Number) row.get("id")).longValue();
+            String clientSecret = row.get("client_secret") != null ? row.get("client_secret").toString() : null;
+            String refreshToken = row.get("refresh_token") != null ? row.get("refresh_token").toString() : null;
+            String plainClient = VaultCrypto.decrypt(clientSecret);
+            String plainRefresh = VaultCrypto.decrypt(refreshToken);
+            String newClient = StringUtils.isBlank(plainClient) ? clientSecret : VaultCrypto.encryptWith(newRaw, plainClient);
+            String newRefresh = StringUtils.isBlank(plainRefresh)
+                ? refreshToken
+                : VaultCrypto.encryptWith(newRaw, plainRefresh);
+            jdbcTemplate.update(
+                "UPDATE zoho_setting SET client_secret = ?, refresh_token = ? WHERE id = ?",
+                newClient,
+                newRefresh,
+                id
             );
-        } catch (RuntimeException e) {
-            VaultCrypto.initFromBase64MasterKey(currentKey);
-            throw e;
+            zohoUpdated++;
         }
+
+        // Only switch process-wide crypto after a successful commit (rollback leaves old key intact).
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        VaultCrypto.initFromBase64MasterKey(newKey);
+                    }
+                }
+            );
+        } else {
+            VaultCrypto.initFromBase64MasterKey(newKey);
+        }
+
+        return Map.of(
+            "ok",
+            true,
+            "vaultSecretsReencrypted",
+            vaultUpdated,
+            "zohoRowsReencrypted",
+            zohoUpdated,
+            "nextStep",
+            "Set VAULT_MASTER_KEY on all servers to the new key and restart gateway, store, commerce, and catalog"
+        );
     }
 }

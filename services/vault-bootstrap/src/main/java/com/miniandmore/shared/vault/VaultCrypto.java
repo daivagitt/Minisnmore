@@ -30,11 +30,27 @@ public final class VaultCrypto {
             masterKey = null;
             return;
         }
+        masterKey = toSecretKey(decodeMasterKey(base64MasterKey));
+    }
+
+    /** Decode and validate a base64 AES-256 master key without mutating process state. */
+    public static byte[] decodeMasterKey(String base64MasterKey) {
+        if (StringUtils.isBlank(base64MasterKey)) {
+            throw new IllegalArgumentException("VAULT_MASTER_KEY must not be blank");
+        }
         byte[] raw = Base64.getDecoder().decode(base64MasterKey.trim());
         if (raw.length != 32) {
             throw new IllegalArgumentException("VAULT_MASTER_KEY must decode to 32 bytes (AES-256)");
         }
-        masterKey = new SecretKeySpec(raw, "AES");
+        return raw;
+    }
+
+    /** Encrypt/decrypt probe with {@code rawKey} without changing the process-wide master key. */
+    public static void validateMasterKey(byte[] rawKey) {
+        String probe = encryptWith(rawKey, "rotation-probe");
+        if (!isEncrypted(probe) || !"rotation-probe".equals(decryptWith(rawKey, probe))) {
+            throw new IllegalStateException("Master key failed encrypt/decrypt probe");
+        }
     }
 
     public static void setEncryptionRequired(boolean required) {
@@ -69,7 +85,31 @@ public final class VaultCrypto {
             }
             return plaintext;
         }
-        SecretKey key = requireKey();
+        return encryptWith(masterKey.getEncoded(), plaintext);
+    }
+
+    public static String decrypt(String stored) {
+        if (stored == null || stored.isEmpty()) {
+            return stored;
+        }
+        if (!isEncrypted(stored)) {
+            return stored;
+        }
+        return decryptWith(requireKey().getEncoded(), stored);
+    }
+
+    /** Encrypt using an explicit key; does not mutate process-wide {@link #masterKey}. */
+    public static String encryptWith(byte[] rawKey, String plaintext) {
+        if (plaintext == null) {
+            return null;
+        }
+        if (plaintext.isEmpty()) {
+            return plaintext;
+        }
+        if (isEncrypted(plaintext)) {
+            return plaintext;
+        }
+        SecretKey key = toSecretKey(rawKey);
         try {
             byte[] iv = new byte[GCM_IV_LENGTH];
             SECURE_RANDOM.nextBytes(iv);
@@ -85,14 +125,15 @@ public final class VaultCrypto {
         }
     }
 
-    public static String decrypt(String stored) {
+    /** Decrypt using an explicit key; does not mutate process-wide {@link #masterKey}. */
+    public static String decryptWith(byte[] rawKey, String stored) {
         if (stored == null || stored.isEmpty()) {
             return stored;
         }
         if (!isEncrypted(stored)) {
             return stored;
         }
-        SecretKey key = requireKey();
+        SecretKey key = toSecretKey(rawKey);
         try {
             byte[] packed = Base64.getDecoder().decode(stored.substring(ENCRYPTED_PREFIX.length()));
             if (packed.length <= GCM_IV_LENGTH) {
@@ -108,6 +149,13 @@ public final class VaultCrypto {
         } catch (GeneralSecurityException e) {
             throw new IllegalStateException("Vault decryption failed", e);
         }
+    }
+
+    private static SecretKey toSecretKey(byte[] rawKey) {
+        if (rawKey == null || rawKey.length != 32) {
+            throw new IllegalArgumentException("VAULT_MASTER_KEY must decode to 32 bytes (AES-256)");
+        }
+        return new SecretKeySpec(rawKey, "AES");
     }
 
     private static SecretKey requireKey() {

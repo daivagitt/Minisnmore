@@ -4,7 +4,6 @@ import com.miniandmore.shared.vault.VaultCrypto;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -22,12 +21,9 @@ public class ZohoPlaintextSecretMigrationRunner implements ApplicationRunner {
     private final JdbcTemplate jdbcTemplate;
     private final boolean migrateEnabled;
 
-    public ZohoPlaintextSecretMigrationRunner(
-        JdbcTemplate jdbcTemplate,
-        @Value("${application.vault.migrate-zoho-plaintext-secrets:false}") boolean migrateEnabled
-    ) {
+    public ZohoPlaintextSecretMigrationRunner(JdbcTemplate jdbcTemplate, ApplicationProperties applicationProperties) {
         this.jdbcTemplate = jdbcTemplate;
-        this.migrateEnabled = migrateEnabled;
+        this.migrateEnabled = applicationProperties.getVault().isMigrateZohoPlaintextSecrets();
     }
 
     @Override
@@ -71,7 +67,9 @@ public class ZohoPlaintextSecretMigrationRunner implements ApplicationRunner {
         if (updated > 0) {
             LOG.info("Encrypted plaintext Zoho credentials for {} row(s)", updated);
         } else {
-            LOG.info("Zoho plaintext migration: no plaintext rows to encrypt");
+            LOG.warn(
+                "VAULT_MIGRATE_ZOHO_PLAINTEXT is still true but no plaintext Zoho rows remain — set it to false in host env"
+            );
         }
     }
 

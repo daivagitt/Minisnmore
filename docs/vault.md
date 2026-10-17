@@ -156,16 +156,16 @@ Rotation re-encrypts all `app_vault_secret` rows and Zoho secret columns **in th
 ### Option A — Admin API (catalog running with current key)
 
 1. Generate new key: `NEW=$(openssl rand -base64 32)`
-2. Call (admin JWT, maintenance window):
+2. Call (**SUPER_ADMIN** JWT only, maintenance window):
 
    ```bash
    curl -fsS -X POST "$BASE_URL/api/v1/admin/vault/rotate-master-key" \
-     -H "Authorization: Bearer $ADMIN_JWT" \
+     -H "Authorization: Bearer $SUPER_ADMIN_JWT" \
      -H "Content-Type: application/json" \
      -d "{\"newMasterKey\":\"$NEW\"}"
    ```
 
-3. Update `/etc/mini-and-more/*.env` on **all** hosts: `VAULT_MASTER_KEY=$NEW`
+3. Update host env (`prod.env.enc` / `uat.env.enc`) on **all** hosts: `VAULT_MASTER_KEY=$NEW`
 4. Restart gateway, store, commerce, catalog.
 
 ### Option B — Export / import (if API unavailable)
@@ -185,17 +185,16 @@ See [`deploy/scripts/vault-rotate-master-key.sh`](../deploy/scripts/vault-rotate
 
 | Symptom | Likely cause |
 |---------|----------------|
-| Startup: `VAULT_MASTER_KEY is set but VAULT_JDBC_URL...` | Gateway/store/commerce missing catalog JDBC |
 | Startup: `has N row(s) but no secrets were loaded` | `VAULT_JDBC_*` points at wrong database |
 | Zoho OAuth fails after encrypting DB | Catalog started without `VAULT_MASTER_KEY` |
 | Secret change has no effect | Services not restarted after vault edit |
-| Prod validator: master key required | `app_vault_secret` has rows but env has no key |
+| Prod validator: master key required | `app_vault_secret` has rows, or Zoho ciphertext, but no key |
 
 ## Security notes
 
 - Vault admin APIs are as sensitive as root credentials; protect ADMIN accounts and use TLS.
 - OS env still overrides vault — intentional for break-glass.
-- `POST /import` and `rotate-master-key` are powerful; audit who has ADMIN.
+- `POST /import` requires ADMIN; `rotate-master-key` requires **SUPER_ADMIN** only.
 - Backups of Postgres now contain ciphertext; protect backups and master key separately.
 
 ## Related files

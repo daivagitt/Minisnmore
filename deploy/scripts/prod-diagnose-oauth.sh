@@ -36,10 +36,9 @@ echo "$fb" | grep -i '^HTTP\|^location:' | head -5
 
 echo ""
 echo "=== Facebook app secret (client_credentials — invalid secret = Meta misconfig) ==="
-SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 # shellcheck source=lib/encrypted-env.sh
 source "${SCRIPT_DIR}/lib/encrypted-env.sh"
-mini_load_host_env prod || true
+if mini_load_host_env prod; then
   if [ -n "${FACEBOOK_CLIENT_ID:-}" ] && [ -n "${FACEBOOK_CLIENT_SECRET:-}" ]; then
     fb_token=$(
       curl -sS -m 15 \
@@ -52,13 +51,13 @@ mini_load_host_env prod || true
       echo "FAIL Facebook rejected client credentials:" >&2
       echo "$fb_token" | head -c 300 >&2
       echo "" >&2
-      echo "      Fix FACEBOOK_CLIENT_SECRET in prod.env (Meta → Settings → Basic → App secret)" >&2
+      echo "      Fix FACEBOOK_CLIENT_SECRET in host env (Meta → Settings → Basic → App secret)" >&2
     fi
   else
-    echo "WARN: FACEBOOK_CLIENT_ID or FACEBOOK_CLIENT_SECRET empty in prod.env" >&2
+    echo "WARN: FACEBOOK_CLIENT_ID or FACEBOOK_CLIENT_SECRET empty in host env" >&2
   fi
 else
-  echo "WARN: /etc/mini-and-more/prod.env missing" >&2
+  echo "WARN: could not load host env (prod.env.enc / prod.env)" >&2
 fi
 
 echo ""
@@ -74,13 +73,14 @@ else
 fi
 
 echo ""
-echo "=== prod.env OAuth keys (set = present, not values) ==="
-if [ -f /etc/mini-and-more/prod.env ]; then
-  grep -E '^GOOGLE_CLIENT_ID=|^GOOGLE_CLIENT_SECRET=|^FACEBOOK_CLIENT_ID=|^FRONTEND_AUTH_CALLBACK_URL=' /etc/mini-and-more/prod.env \
-    | sed 's/=.*/=***set***/' || echo "WARN: OAuth vars missing in prod.env" >&2
-else
-  echo "WARN: /etc/mini-and-more/prod.env missing" >&2
-fi
+echo "=== Host env OAuth keys (set = present, not values) ==="
+for var in GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET FACEBOOK_CLIENT_ID FACEBOOK_CLIENT_SECRET FRONTEND_AUTH_CALLBACK_URL; do
+  if [ -n "${!var:-}" ]; then
+    echo "${var}=***set***"
+  else
+    echo "${var}=***missing***"
+  fi
+done
 
 echo ""
 echo "=== Local gateway health ==="

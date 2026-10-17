@@ -3,6 +3,7 @@ package com.miniandmore.app.web.rest.admin;
 import com.miniandmore.app.service.VaultSecretService;
 import java.util.List;
 import java.util.Map;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -47,6 +48,7 @@ public class VaultAdminResource {
     }
 
     @PostMapping("/rotate-master-key")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN')")
     public Map<String, Object> rotateMasterKey(@RequestBody Map<String, String> body) {
         String newKey = body != null ? body.get("newMasterKey") : null;
         return vaultSecretService.rotateMasterKey(newKey);

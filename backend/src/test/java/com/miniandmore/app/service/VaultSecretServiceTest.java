@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 import com.miniandmore.app.repository.AppVaultSecretRepository;
-import com.miniandmore.app.repository.ZohoSettingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 class VaultSecretServiceTest {
 
@@ -14,7 +14,7 @@ class VaultSecretServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new VaultSecretService(mock(AppVaultSecretRepository.class), mock(ZohoSettingRepository.class));
+        service = new VaultSecretService(mock(AppVaultSecretRepository.class), mock(JdbcTemplate.class));
     }
 
     @Test
