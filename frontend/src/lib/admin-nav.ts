@@ -30,6 +30,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { to: "/admin/cancellations", label: "Cancellations", keywords: "cancel request refund" },
   { to: "/admin/returns", label: "Returns & exchanges", keywords: "order returns exchange refund pickup" },
   { to: "/admin/zoho", label: "Zoho settings", keywords: "ledgerly erp integration" },
+  { to: "/admin/vault", label: "Env vault", keywords: "secrets credentials encryption environment keys" },
   { to: "/admin/customers", label: "Customers", keywords: "accounts registered buyers patrons shoppers users joined timeline week" },
   { to: "/admin/rbac", label: "RBAC", keywords: "staff invite roles access permissions hierarchy" },
 ];

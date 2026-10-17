@@ -1945,6 +1945,23 @@ export const getZohoSettings = async (): Promise<ZohoSettingsRow | null> => {
   };
 };
 
+export type VaultSecretRow = {
+  name: string;
+  hasValue: boolean;
+  updatedAt: string | null;
+};
+
+export const getVaultSecrets = async (): Promise<VaultSecretRow[]> => {
+  const rows = await api.get<VaultSecretRow[]>("/api/v1/admin/vault", { auth: true });
+  return rows ?? [];
+};
+
+export const saveVaultSecret = (name: string, value: string) =>
+  api.put<{ ok: boolean }>(`/api/v1/admin/vault/${encodeURIComponent(name)}`, { value }, { auth: true });
+
+export const deleteVaultSecret = (name: string) =>
+  api.delete<{ ok: boolean }>(`/api/v1/admin/vault/${encodeURIComponent(name)}`, { auth: true });
+
 export const saveZohoSettings = (
   row: ZohoSettingsRow,
   options?: { hasClientSecret?: boolean; requireRefreshToken?: boolean },
