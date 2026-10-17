@@ -120,7 +120,9 @@ echo "=== Zoho API via gateway (admin JWT) ==="
 if [ -z "$ADMIN_PASSWORD" ]; then
   echo "SKIP admin JWT checks (set PROD_ADMIN_PASSWORD)"
 else
-  if [ -f /etc/mini-and-more/prod.env ]; then set -a; . /etc/mini-and-more/prod.env; set +a; fi
+  # shellcheck source=lib/encrypted-env.sh
+  source "${SCRIPT_DIR}/lib/encrypted-env.sh"
+  mini_load_host_env prod || true
   TOKEN=$(curl -sS -m 15 -X POST "http://127.0.0.1:${GATEWAY_PORT}/api/authenticate" \
     -H "Content-Type: application/json" \
     -d "{\"username\":\"${ADMIN_EMAIL}\",\"password\":\"${ADMIN_PASSWORD}\"}" \

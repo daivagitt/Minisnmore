@@ -1,5 +1,6 @@
 package com.miniandmore.app.config;
 
+import com.miniandmore.shared.vault.VaultJdbcSecretsLoader;
 import java.util.Arrays;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.annotation.Configuration;
@@ -40,5 +41,6 @@ public class CatalogProductionValidator {
         if ("DEMO".equalsIgnoreCase(razorpayKeyId) || StringUtils.isBlank(razorpayKeySecret)) {
             throw new IllegalStateException("razorpay.key-id and razorpay.key-secret must be set in production");
         }
+        VaultJdbcSecretsLoader.assertProductionReady(environment);
     }
 }

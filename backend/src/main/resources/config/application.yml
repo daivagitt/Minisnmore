@@ -246,6 +246,8 @@ application:
       max-upload-bytes: ${S3_MAX_UPLOAD_BYTES:8192000}
       max-pdf-upload-bytes: ${S3_MAX_PDF_UPLOAD_BYTES:78643200}
   internal-api-key: ${INTERNAL_API_KEY:}
+  vault:
+    migrate-zoho-plaintext-secrets: ${VAULT_MIGRATE_ZOHO_PLAINTEXT:false}
   mail:
     config-change-to: ${ADMIN_CONFIG_CHANGE_EMAIL:info@stoltglobal.com,saikedar2003@gmail.com}
   zoho:

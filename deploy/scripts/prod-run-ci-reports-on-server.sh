@@ -12,6 +12,8 @@
 #   API_TEST_NO_MAIL=true|false (default true: skip every live call that can email via Care@minisnmore.com)
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$REPO_ROOT"
 
@@ -33,11 +35,12 @@ PKG="${PKG:-artifacts/reports-site}"
 REMOTE="${REMOTE_REPORTS_DIR:-/var/www/uat1/mini_reports}"
 RELEASE_ID="${RELEASE_ID:-$(date +%Y%m%d%H%M)-uat}"
 
-if [ -f /etc/mini-and-more/prod.env ]; then
-  set -a
-  # shellcheck source=/dev/null
-  . /etc/mini-and-more/prod.env
-  set +a
+# Prefer encrypted prod.env.enc
+# shellcheck source=lib/encrypted-env.sh
+source "${SCRIPT_DIR}/lib/encrypted-env.sh"
+if ! mini_load_host_env prod; then
+  echo "ERROR: could not load host env (prod.env.enc or prod.env)." >&2
+  exit 1
 fi
 
 if [ -f /etc/mini-and-more/sonar-ci.env ]; then

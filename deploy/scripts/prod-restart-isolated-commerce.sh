@@ -3,6 +3,8 @@
 # Run on VPS: REPO_ROOT=/var/www/uat1/mini_ms_test bash deploy/scripts/prod-restart-isolated-commerce.sh
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
 REPO_ROOT="${REPO_ROOT:-/var/www/uat1/mini_ms_test}"
@@ -10,11 +12,12 @@ COMMERCE_PORT="${COMMERCE_PORT:-9182}"
 CATALOG_PORT="${CATALOG_PORT:-9184}"
 GATEWAY_PORT="${GATEWAY_PORT:-9180}"
 
-if [ -f /etc/mini-and-more/prod.env ]; then
-  set -a
-  # shellcheck source=/dev/null
-  . /etc/mini-and-more/prod.env
-  set +a
+# Prefer encrypted prod.env.enc
+# shellcheck source=lib/encrypted-env.sh
+source "${SCRIPT_DIR}/lib/encrypted-env.sh"
+if ! mini_load_host_env prod; then
+  echo "ERROR: could not load host env (prod.env.enc or prod.env)." >&2
+  exit 1
 fi
 
 export APPLICATION_CATALOG_BASE_URL="http://127.0.0.1:${CATALOG_PORT}"

@@ -80,6 +80,11 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.miniandmore</groupId>
+            <artifactId>vault-bootstrap</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
+        <dependency>
             <groupId>tech.jhipster</groupId>
             <artifactId>jhipster-framework</artifactId>
             <version>${jhipster-framework.version}</version>

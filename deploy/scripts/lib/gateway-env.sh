@@ -1,8 +1,13 @@
 # shellcheck shell=bash
-# Shared gateway env for the production isolated stack. Source after /etc/mini-and-more/prod.env.
+# Shared gateway env for the production isolated stack.
+# Prefer: source this file, then load_mini_env (supports encrypted prod.env.enc).
 #
 # Partial SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES_N_* env vars override YAML route[0]
 # with uri=null and predicates=[] → gateway crash loop. Never set route URIs via env; use MINIANDMORE_*_URI.
+
+_GATEWAY_ENV_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=encrypted-env.sh
+source "${_GATEWAY_ENV_DIR}/encrypted-env.sh"
 
 gateway_sanitize_env() {
   local _var _removed=0
@@ -88,16 +93,37 @@ gateway_resolve_mail_provider() {
   esac
 }
 
+# Loads /etc/mini-and-more/prod.env.enc (preferred) or plaintext prod.env.
+# Override with PROD_ENV_WHICH=uat for UAT hosts.
 load_mini_env() {
-  local f="${PROD_ENV_FILE:-/etc/mini-and-more/prod.env}"
-  if [ ! -f "$f" ]; then
-    echo "ERROR: missing $f (copy from deploy/env/prod.env.example)." >&2
-    return 1
+  local which="${PROD_ENV_WHICH:-prod}"
+  if [ -n "${PROD_ENV_FILE:-}" ]; then
+    # Explicit path: if .enc, decrypt; else source plaintext
+    if [[ "$PROD_ENV_FILE" == *.enc ]]; then
+      local tmp
+      tmp="$(mktemp "${TMPDIR:-/tmp}/mini-env.XXXXXX")"
+      mini_env_openssl_decrypt_to "$PROD_ENV_FILE" "$tmp" || {
+        rm -f "$tmp"
+        return 1
+      }
+      set -a
+      # shellcheck source=/dev/null
+      . "$tmp"
+      set +a
+      shred -u "$tmp" 2>/dev/null || rm -f "$tmp"
+      return 0
+    fi
+    if [ ! -f "$PROD_ENV_FILE" ]; then
+      echo "ERROR: missing $PROD_ENV_FILE" >&2
+      return 1
+    fi
+    set -a
+    # shellcheck source=/dev/null
+    . "$PROD_ENV_FILE"
+    set +a
+    return 0
   fi
-  set -a
-  # shellcheck source=/dev/null
-  . "$f"
-  set +a
+  mini_load_host_env "$which"
 }
 
 legacy_pm2_ms_name() {

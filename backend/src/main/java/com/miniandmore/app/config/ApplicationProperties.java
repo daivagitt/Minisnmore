@@ -32,6 +32,8 @@ public class ApplicationProperties {
 
     private final Mail mail = new Mail();
 
+    private final Vault vault = new Vault();
+
     private String internalApiKey = "";
 
     // jhipster-needle-application-properties-property
@@ -72,6 +74,10 @@ public class ApplicationProperties {
         return mail;
     }
 
+    public Vault getVault() {
+        return vault;
+    }
+
     public String getInternalApiKey() {
         return internalApiKey;
     }
@@ -81,6 +87,20 @@ public class ApplicationProperties {
     }
 
     // jhipster-needle-application-properties-property-getter
+
+    public static class Vault {
+
+        /** One-shot encrypt of existing plaintext Zoho client_secret / refresh_token columns. */
+        private boolean migrateZohoPlaintextSecrets = false;
+
+        public boolean isMigrateZohoPlaintextSecrets() {
+            return migrateZohoPlaintextSecrets;
+        }
+
+        public void setMigrateZohoPlaintextSecrets(boolean migrateZohoPlaintextSecrets) {
+            this.migrateZohoPlaintextSecrets = migrateZohoPlaintextSecrets;
+        }
+    }
 
     public static class Mail {
 

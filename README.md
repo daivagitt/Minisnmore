@@ -9,11 +9,13 @@ services/
   gateway/            API gateway and authentication
   store/              Store API service
   commerce/           Commerce API service
+  vault-bootstrap/    Shared env vault loader (install before other Java modules)
 deploy/               Deployment scripts, Nginx configuration, environment examples, and API tooling
 docker/               Shared local development infrastructure
 jenkins/              CI, report generators, assets, and report templates
 scripts/              Repository checks and developer utilities
 docs/                 Architecture, runbooks, handover, design references, and historical material
+                      See [docs/vault.md](docs/vault.md) for env vault setup and key rotation.
 artifacts/            Generated CI reports and documentation
 ```
 
@@ -36,6 +38,7 @@ Or run the usual npm commands from `frontend/`. The `@/` alias resolves to `fron
 Each Java application owns its Maven wrapper, configuration, source, tests, and resources:
 
 ```bash
+(cd services/vault-bootstrap && ./mvnw install)
 (cd backend && ./mvnw test)
 (cd services/gateway && ./mvnw test)
 (cd services/store && ./mvnw test)

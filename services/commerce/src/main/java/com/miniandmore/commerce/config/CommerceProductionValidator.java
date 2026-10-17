@@ -1,5 +1,6 @@
 package com.miniandmore.commerce.config;
 
+import com.miniandmore.shared.vault.VaultJdbcSecretsLoader;
 import java.util.Arrays;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.StringUtils;
@@ -24,5 +25,6 @@ public class CommerceProductionValidator {
         if (StringUtils.hasText(jwtSecret) && SAMPLE_JWT_SECRET.equals(jwtSecret.trim())) {
             throw new IllegalStateException("JHipster sample JWT secret must not be used in production");
         }
+        VaultJdbcSecretsLoader.assertProductionReady(environment);
     }
 }

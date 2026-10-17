@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        20260606120000 was MARK_RAN on hybrid databases before user_login existed,
+        so order_return.user_id stayed NOT NULL. Catalog inserts only user_login,
+        and Postgres then rejects the row (23502), which the API reports as
+        "A required field was missing."
+    -->
+    <changeSet id="20261016180000-drop-order-return-user-id" author="miniandmore">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="order_return" columnName="user_id"/>
+        </preConditions>
+        <sql dbms="postgresql">
+            UPDATE order_return r
+            SET user_login = LOWER(u.login)
+            FROM jhi_user u
+            WHERE r.user_id = u.id
+              AND (r.user_login IS NULL OR BTRIM(r.user_login) = '');
+
+            ALTER TABLE order_return DROP CONSTRAINT IF EXISTS fk_order_return__user_id;
+            ALTER TABLE order_return DROP COLUMN user_id;
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

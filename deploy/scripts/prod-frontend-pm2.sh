@@ -5,6 +5,8 @@
 #   REPO_ROOT=/var/www/uat1/mini_ms_test bash deploy/scripts/prod-frontend-pm2.sh
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 if [ -s "$NVM_DIR/nvm.sh" ]; then
@@ -42,11 +44,12 @@ if [ "${SKIP_BUILD:-0}" = "1" ] && [ -d dist/client ] && [ -f dist/client/RELEAS
   exit 0
 fi
 
-if [ -f /etc/mini-and-more/prod.env ]; then
-  set -a
-  # shellcheck source=/dev/null
-  . /etc/mini-and-more/prod.env
-  set +a
+# Prefer encrypted prod.env.enc
+# shellcheck source=lib/encrypted-env.sh
+source "${SCRIPT_DIR}/lib/encrypted-env.sh"
+if ! mini_load_host_env prod; then
+  echo "ERROR: could not load host env (prod.env.enc or prod.env)." >&2
+  exit 1
 fi
 export VITE_API_BASE_URL="${VITE_API_BASE_URL:-https://minisnmore.com}"
 export VITE_SITE_ENV="${VITE_SITE_ENV:-production}"

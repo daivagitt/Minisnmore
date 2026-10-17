@@ -1,5 +1,6 @@
 package com.miniandmore.gateway.config;
 
+import com.miniandmore.shared.vault.VaultJdbcSecretsLoader;
 import java.util.Arrays;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.annotation.Configuration;
@@ -27,5 +28,6 @@ public class GatewayProductionValidator {
         if (applicationProperties.getRateLimiting().isEnabled() && applicationProperties.getRateLimiting().isFailOpen()) {
             throw new IllegalStateException("GATEWAY_RATE_LIMIT_FAIL_OPEN must not be enabled in production");
         }
+        VaultJdbcSecretsLoader.assertProductionReady(environment);
     }
 }

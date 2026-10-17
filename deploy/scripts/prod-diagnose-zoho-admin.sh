@@ -5,16 +5,19 @@
 #   bash deploy/scripts/prod-diagnose-zoho-admin.sh
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 GATEWAY_PORT="${GATEWAY_PORT:-9180}"
 INTEGRATION_PORT="${INTEGRATION_PORT:-9183}"
 ADMIN_EMAIL="${PROD_ADMIN_EMAIL:-admin@minisnmore.com}"
 ADMIN_PASSWORD="${PROD_ADMIN_PASSWORD:-}"
 
-if [ -f /etc/mini-and-more/prod.env ]; then
-  set -a
-  # shellcheck source=/dev/null
-  . /etc/mini-and-more/prod.env
-  set +a
+# Prefer encrypted prod.env.enc
+# shellcheck source=lib/encrypted-env.sh
+source "${SCRIPT_DIR}/lib/encrypted-env.sh"
+if ! mini_load_host_env prod; then
+  echo "ERROR: could not load host env (prod.env.enc or prod.env)." >&2
+  exit 1
 fi
 
 echo "=== PM2 integration ==="

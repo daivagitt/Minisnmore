@@ -88,7 +88,7 @@ spring:
             - id: miniandmore-zoho-api
               uri: http://127.0.0.1:8081
               predicates:
-                - Path=/api/v1/admin/zoho/**,/api/v1/admin/zoho-settings
+                - Path=/api/v1/admin/zoho/**,/api/v1/admin/zoho-settings,/api/v1/admin/vault/**
               metadata:
                 response-timeout: 600000
                 connect-timeout: 5000

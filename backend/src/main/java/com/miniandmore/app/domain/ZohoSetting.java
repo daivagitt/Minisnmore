@@ -1,5 +1,6 @@
 package com.miniandmore.app.domain;
 
+import com.miniandmore.app.security.vault.EncryptedStringAttributeConverter;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serial;
@@ -31,12 +32,14 @@ public class ZohoSetting implements Serializable {
     @Column(name = "client_id", length = 220)
     private String clientId;
 
-    @Size(max = 500)
-    @Column(name = "client_secret", length = 500)
+    @Size(max = 2000)
+    @Column(name = "client_secret", length = 2000)
+    @Convert(converter = EncryptedStringAttributeConverter.class)
     private String clientSecret;
 
-    @Size(max = 800)
-    @Column(name = "refresh_token", length = 800)
+    @Size(max = 2000)
+    @Column(name = "refresh_token", length = 2000)
+    @Convert(converter = EncryptedStringAttributeConverter.class)
     private String refreshToken;
 
     @Size(max = 40)

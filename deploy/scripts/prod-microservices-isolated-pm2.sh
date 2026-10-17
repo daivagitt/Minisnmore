@@ -28,11 +28,10 @@ COMMERCE_PORT="${COMMERCE_PORT:-9182}"
 INTEGRATION_PORT="${INTEGRATION_PORT:-9183}"
 CATALOG_PORT="${CATALOG_PORT:-9184}"
 
-if [ -f /etc/mini-and-more/prod.env ]; then
-  set -a
-  # shellcheck source=/dev/null
-  . /etc/mini-and-more/prod.env
-  set +a
+# Prefer encrypted /etc/mini-and-more/prod.env.enc (see deploy/scripts/env-file-encrypt.sh)
+if ! load_mini_env; then
+  echo "ERROR: could not load host env (prod.env.enc or prod.env)." >&2
+  exit 1
 fi
 
 gateway_sanitize_env

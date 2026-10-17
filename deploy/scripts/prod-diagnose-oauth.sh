@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # OAuth diagnostics for production (run on VPS as root).
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 HOST="${OAUTH_HOST:-https://minisnmore.com}"
 GATEWAY_PORT="${GATEWAY_PORT:-9180}"
@@ -35,11 +36,10 @@ echo "$fb" | grep -i '^HTTP\|^location:' | head -5
 
 echo ""
 echo "=== Facebook app secret (client_credentials — invalid secret = Meta misconfig) ==="
-if [ -f /etc/mini-and-more/prod.env ]; then
-  set -a
-  # shellcheck source=/dev/null
-  . /etc/mini-and-more/prod.env
-  set +a
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+# shellcheck source=lib/encrypted-env.sh
+source "${SCRIPT_DIR}/lib/encrypted-env.sh"
+mini_load_host_env prod || true
   if [ -n "${FACEBOOK_CLIENT_ID:-}" ] && [ -n "${FACEBOOK_CLIENT_SECRET:-}" ]; then
     fb_token=$(
       curl -sS -m 15 \

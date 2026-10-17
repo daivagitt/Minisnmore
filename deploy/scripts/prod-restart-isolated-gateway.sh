@@ -9,11 +9,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib/gateway-env.sh
 source "${SCRIPT_DIR}/lib/gateway-env.sh"
 
-if [ -f /etc/mini-and-more/prod.env ]; then
-  set -a
-  # shellcheck source=/dev/null
-  . /etc/mini-and-more/prod.env
-  set +a
+# Prefer encrypted /etc/mini-and-more/prod.env.enc (see deploy/scripts/env-file-encrypt.sh)
+if ! load_mini_env; then
+  echo "ERROR: could not load host env (prod.env.enc or prod.env)." >&2
+  exit 1
 fi
 
 gateway_sanitize_env
@@ -21,8 +20,13 @@ gateway_verify_env
 
 export FRONTEND_AUTH_CALLBACK_URL="${FRONTEND_AUTH_CALLBACK_URL:-https://minisnmore.com/auth/callback}"
 
-if [ -z "${JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET:-}" ]; then
-  echo "ERROR: JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET not set in prod.env." >&2
+GATEWAY_JWT_JAVA_ARGS=()
+if [ -n "${JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET:-}" ]; then
+  GATEWAY_JWT_JAVA_ARGS=(-Djhipster.security.authentication.jwt.base64-secret="${JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET}")
+elif [ -n "${VAULT_MASTER_KEY:-}" ] && [ -n "${VAULT_JDBC_URL:-}" ]; then
+  echo "INFO: JWT not in prod.env; gateway will load secrets from app_vault_secret via VAULT_MASTER_KEY." >&2
+else
+  echo "ERROR: Set JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET in prod.env, or VAULT_MASTER_KEY + VAULT_JDBC_URL for vault-backed JWT." >&2
   exit 1
 fi
 
@@ -106,7 +110,7 @@ pm2 start java --name mini-prod-ms-gateway --cwd "${REPO_ROOT}" --update-env -- 
   -Xms128m -Xmx384m -XX:+UseG1GC \
   -Djava.security.egd=file:/dev/./urandom \
   -Dserver.port="${GATEWAY_PORT}" \
-  -Djhipster.security.authentication.jwt.base64-secret="${JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET}" \
+  "${GATEWAY_JWT_JAVA_ARGS[@]}" \
   -jar "$GATEWAY_JAR_PATH" \
   --spring.profiles.active=prod,prod-isolated \
   --springdoc.api-docs.enabled=false \

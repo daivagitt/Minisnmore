@@ -20,6 +20,7 @@ public class CatalogCoreClient {
     private static final String LEDGERLY_ADMIN_PREFIX = "/api/v1/admin/ledgerly";
     private static final String ZOHO_ADMIN_PREFIX = "/api/v1/admin/zoho";
     private static final String ZOHO_SETTINGS_PREFIX = "/api/v1/admin/zoho-settings";
+    private static final String VAULT_ADMIN_PREFIX = "/api/v1/admin/vault";
 
     private final RestClient restClient;
     private final String catalogBaseUrl;
@@ -32,7 +33,7 @@ public class CatalogCoreClient {
     /**
      * Forward a generic servlet request to catalog core, translating the path:
      * - /api/v1/admin/ledgerly/** → /api/v1/admin/ledgerly/** (kept as-is; lives on catalog)
-     * - /api/v1/admin/zoho/** and /api/v1/admin/zoho-settings → kept as-is (catalog core)
+     * - /api/v1/admin/zoho/**, /api/v1/admin/zoho-settings, /api/v1/admin/vault/** → kept as-is (catalog core)
      * - /api/v1/** → /internal/v1/** (normal store-to-catalog internal path)
      */
     public ResponseEntity<byte[]> forward(HttpServletRequest request) throws IOException {
@@ -143,7 +144,8 @@ public class CatalogCoreClient {
             requestPath.startsWith(LEDGERLY_ADMIN_PREFIX) ||
             requestPath.startsWith(ZOHO_ADMIN_PREFIX) ||
             requestPath.equals(ZOHO_SETTINGS_PREFIX) ||
-            requestPath.startsWith(ZOHO_SETTINGS_PREFIX + "/")
+            requestPath.startsWith(ZOHO_SETTINGS_PREFIX + "/") ||
+            requestPath.startsWith(VAULT_ADMIN_PREFIX)
         ) {
             return requestPath;
         }
